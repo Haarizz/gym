@@ -71,7 +71,7 @@ public class PaymentVoucherService {
             int page, int limit) {
         Specification<PaymentVoucher> spec = buildSpec(search, status, supplierType, category, from, to);
 
-        String sortBy = SORTABLE_FIELDS.contains(sortField) ? sortField : "paymentDate";
+        String sortBy = sortField != null && SORTABLE_FIELDS.contains(sortField) ? sortField : "paymentDate";
         Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(direction, sortBy));
 
@@ -298,6 +298,71 @@ public class PaymentVoucherService {
 
         paymentVoucherRepository.save(pv);
         // No separate notification — callers already send their own
+    }
+
+    /**
+     * Records one payment made against a supplier bill from the Purchase screens as a
+     * Paid payment voucher (with its bill row), so every bill payment has a dated,
+     * numbered record and posts DR Accounts Payable / CR Cash-Bank — mirroring the
+     * CR Accounts Payable the bill posted when it was confirmed. The supplier statement
+     * of account reads these vouchers as its payment lines.
+     */
+    public PaymentVoucher recordSupplierBillPayment(com.company.project.entities.SupplierBill bill, BigDecimal amount,
+                                                    String paymentMethod, List<com.company.project.dto.PaymentSplitDTO> breakdown,
+                                                    String notes, LocalDate paymentDate, BigDecimal remainingAfter) {
+        assertPositiveAmount(amount);
+        PaymentVoucher pv = new PaymentVoucher();
+        pv.setVoucherNo(voucherNumberService.next("PV"));
+        pv.setSupplierName(bill.getSupplierName());
+        pv.setSupplierType("Supplier");
+        pv.setBillNo(bill.getBillNumber());
+        pv.setPaymentDate(paymentDate != null ? paymentDate : LocalDate.now());
+        pv.setAmount(amount);
+        pv.setPaymentMethod(voucherMethodLabel(paymentMethod));
+        pv.setPaymentBreakdown(breakdown);
+        pv.setDescription("Payment against purchase invoice " + bill.getBillNumber());
+        pv.setNotes(notes);
+        pv.setStatus("Paid");
+        PaymentVoucher saved = paymentVoucherRepository.save(pv);
+
+        PaymentVoucherBill row = new PaymentVoucherBill();
+        row.setPaymentVoucherId(saved.getId());
+        row.setBillNo(bill.getBillNumber());
+        row.setBillDate(bill.getBillDate());
+        row.setOriginalAmount(bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO);
+        row.setPaidAmount(amount);
+        row.setRemainingBalance(remainingAfter != null ? remainingAfter.max(BigDecimal.ZERO) : BigDecimal.ZERO);
+        row.setDueDate(bill.getDueDate());
+        row.setStatus(remainingAfter != null && remainingAfter.compareTo(new BigDecimal("0.01")) > 0 ? "Partial" : "Paid");
+        billRepository.save(row);
+
+        postToLedgerIfPaid(saved);
+        return saved;
+    }
+
+    /** Payment Voucher screens show "Cash" / "Card" / "Bank Transfer"; the Purchase screen sends snake_case codes. */
+    private static String voucherMethodLabel(String method) {
+        if (method == null || method.isBlank()) return "Cash";
+        return switch (method.trim().toLowerCase(Locale.ROOT)) {
+            case "cash" -> "Cash";
+            case "card", "credit_card", "debit_card" -> "Card";
+            case "bank_transfer", "online", "bank" -> "Bank Transfer";
+            case "cheque", "check" -> "Cheque";
+            case "mixed" -> "Mixed";
+            default -> method;
+        };
+    }
+
+    /** Paid supplier vouchers for a supplier (matched by name, as vouchers store it), oldest first. */
+    @Transactional(readOnly = true)
+    public List<PaymentVoucher> findPaidSupplierVouchers(String supplierName) {
+        if (supplierName == null || supplierName.isBlank()) return Collections.emptyList();
+        String key = supplierName.trim().toLowerCase(Locale.ROOT);
+        return paymentVoucherRepository.findAll().stream()
+                .filter(v -> v.getSupplierName() != null && v.getSupplierName().trim().toLowerCase(Locale.ROOT).equals(key))
+                .filter(v -> "Paid".equalsIgnoreCase(v.getStatus()))
+                .filter(v -> v.getSupplierType() == null || "Supplier".equalsIgnoreCase(v.getSupplierType()))
+                .collect(Collectors.toList());
     }
 
     private void applyRequest(PaymentVoucher pv, PaymentVoucherRequestDTO req) {

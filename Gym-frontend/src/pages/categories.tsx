@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { productsService, Product, ProductCategory } from "../utils/supabase/products-service";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
+import { BrandsTab } from "../components/catalog/BrandsTab";
+import { ModuleHeader } from "../components/purchase/purchaseUi";
+import styles from "../components/purchase/PurchaseInvoice.module.css";
+import { Award } from "lucide-react";
 
 // ── Icon catalogue ────────────────────────────────────────────────────────────
 
@@ -90,8 +95,8 @@ function typeBadge(type: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function Categories() {
-    const [categories, setCategories] = useState<ProductCategory[]>([]);
+function CategoriesTab({ createNonce }: { createNonce: number }) {
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [search, setSearch]         = useState("");
@@ -122,6 +127,7 @@ export function Categories() {
   }
 
   useEffect(() => { loadCategories(); }, []);
+  useEffect(() => { if (createNonce) openCreate(); }, [createNonce]);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -212,26 +218,7 @@ export function Categories() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Product Categories</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Organise products into categories for better inventory tracking and reporting.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9" onClick={loadCategories} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button size="sm" className="h-9" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> Add Category
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
 
       <style>{`
         @keyframes catFadeIn {
@@ -299,7 +286,7 @@ export function Categories() {
       <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-[3]">
+            <div className="relative" style={{ flex: "1 1 auto", minWidth: 0 }}>
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search categories by name..."
@@ -309,7 +296,7 @@ export function Categories() {
               />
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[120px] h-9 text-xs">
+              <SelectTrigger className="h-10" style={{ flex: "0 0 180px", width: 180 }}>
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
@@ -663,6 +650,34 @@ export function Categories() {
         </DialogContent>
       </Dialog>
 
+    </div>
+  );
+}
+
+// ── Page: Category / Brand ────────────────────────────────────────────────────
+
+export function Categories() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "brands" ? "brands" : "categories";
+  const [createCategory, setCreateCategory] = useState(0);
+  const [createBrand, setCreateBrand] = useState(0);
+  const setTab = (t: "categories" | "brands") => setParams(t === "brands" ? { tab: "brands" } : {}, { replace: true });
+
+  return (
+    <div className={styles.page}>
+      <ModuleHeader
+        title="Category / Brand"
+        icon={Tag}
+        subtitle="Organise products by category and brand for cleaner inventory, reporting and product forms"
+        actions={tab === "categories"
+          ? <Button size="sm" onClick={() => setCreateCategory(n => n + 1)}><Plus className="h-4 w-4" /> Add Category</Button>
+          : <Button size="sm" onClick={() => setCreateBrand(n => n + 1)}><Plus className="h-4 w-4" /> Add Brand</Button>}
+        tabs={[
+          { key: "categories", label: "Categories", icon: Tag, active: tab === "categories", onClick: () => setTab("categories") },
+          { key: "brands", label: "Brands", icon: Award, active: tab === "brands", onClick: () => setTab("brands") },
+        ]}
+      />
+      {tab === "categories" ? <CategoriesTab createNonce={createCategory} /> : <BrandsTab createNonce={createBrand} />}
     </div>
   );
 }

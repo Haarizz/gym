@@ -1,422 +1,434 @@
-﻿import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useCurrency, CurrencyGlyph } from '../utils/currency';
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Separator } from "../components/ui/separator";
-import { Progress } from "../components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
-import { accountHeadsService, AccountHead } from "../utils/supabase/account-heads-service";
-import { usePaymentManager } from "../payments/usePaymentManager";
-import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
-import { PAYMENT_TYPES } from "../payments/paymentModel";
-import { buildPaymentPayload } from "../payments/paymentPayload";
-import { toLegacyPayment } from "../payments/legacyPaymentBridge";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ShoppingBag,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Eye,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Package,
-  Truck,
-  FileText,
-  Receipt,
-  Mail,
-  Phone,
-  MapPin,
-  User,
-  Building,
-  DollarSign,
-  Hash,
-  X,
-  Save,
-  RefreshCw,
-  PrinterIcon,
-  Loader2,
-  TrendingUp,
-  ShoppingCart,
-  Users,
-  AlertTriangle,
-  Star,
-  Settings,
-  CreditCard,
-  Wallet,
-  BarChart3,
-  PieChart,
-  LineChart,
-  Zap,
-  Box,
+  AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle, CheckCircle2, Clock,
+  CreditCard, Download, Edit, Eye, FileText, Loader2, Plus, Printer, Receipt, Save, ScanBarcode, Search, ShoppingBag, Trash2,
+  TrendingUp, User, Users, Wallet, XCircle,
 } from 'lucide-react';
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { cn } from "../components/ui/utils";
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Button } from '../components/ui/button';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Input } from '../components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import {
-  LineChart as RechartsLineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import {
-  supplierBillService,
-  SupplierBill,
-  SupplierBillRequest,
-} from '../utils/supabase/supplier-bill-service';
-import { purchaseService, Supplier } from '../utils/supabase/purchase-service';
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import { CurrencyValue, useCurrency } from '../utils/currency';
+import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
+import { usePaymentManager } from '../payments/usePaymentManager';
+import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
+import { PAYMENT_TYPES } from '../payments/paymentModel';
+import { buildPaymentPayload } from '../payments/paymentPayload';
+import { toLegacyPayment } from '../payments/legacyPaymentBridge';
+import { supplierBillService, SupplierBill, SupplierBillRequest } from '../utils/supabase/supplier-bill-service';
+import { purchaseService, Supplier, PurchaseOrder } from '../utils/supabase/purchase-service';
 import { productsService, Product, Warehouse } from '../utils/supabase/products-service';
+import { PurchaseInvoicePreview } from '../components/purchase/PurchaseInvoicePreview';
+import { PurchaseInvoiceEditor, PurchaseInvoiceEditorHandle } from '../components/purchase/PurchaseInvoiceEditor';
+import styles from '../components/purchase/PurchaseInvoice.module.css';
+import { IconBtn, ModuleHeader, NativeSelect, StatCard, SupplierFormDialog, cx } from '../components/purchase/purchaseUi';
+import {
+  STATUS_FILTERS, DisplayStatus, balanceOf, billActions, displayDate, displayStatus, exportBillsCsv, paymentSummaryLabel,
+  fetchAllBills, fetchAllOrders, priorityMeta, statusMeta, todayIso,
+} from '../components/purchase/purchaseInvoiceUtils';
+import { buildBillDocument, printPurchaseDocument } from '../components/print-templates/purchasePrint';
+import type { BarcodePrintRequest } from './barcode-print';
 
-// â”€â”€ Default bill form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+const PAGE_SIZE = 20;
 
-type BillFormItem = {
-  productId?: number;
-  productName: string;
-  productSku: string;
-  unitOfMeasure: string;
-  quantity: number;
-  unitPrice: number;
-  discountPercent: number;
-  taxPercent: number;
-  notes: string;
-};
+type View = 'list' | 'preview' | 'editor';
+type SortKey = 'billNumber' | 'billDate' | 'supplierName' | 'totalAmount' | 'amountPaid' | 'balance';
+type Period = 'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_90' | 'THIS_YEAR';
 
-const defaultBillForm = () => ({
-  supplierId: 0,
-  purchaseNumber: '',
-  invoiceNumber: '',
-  referenceNumber: '',
-  billDate: format(new Date(), 'yyyy-MM-dd'),
-  dueDate: '',
-  priority: 'MEDIUM',
-  paymentStatus: 'UNPAID',
-  shippingCost: 0,
-  warehouseId: undefined as number | undefined,
-  notes: '',
-  receivedBy: '',
-  items: [] as BillFormItem[],
-});
+const PERIODS: { value: Period; label: string }[] = [
+  { value: 'ALL', label: 'All Time' },
+  { value: 'THIS_MONTH', label: 'This Month' },
+  { value: 'LAST_MONTH', label: 'Last Month' },
+  { value: 'LAST_90', label: 'Last 90 Days' },
+  { value: 'THIS_YEAR', label: 'This Year' },
+];
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-const CHART_COLORS = ['#2563eb', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
-
-const getStatusBadge = (status: string) => {
-  const cfg: Record<string, { label: string; className: string }> = {
-    DRAFT:     { label: 'Draft',     className: 'bg-gray-100 text-gray-800' },
-    CONFIRMED: { label: 'Confirmed', className: 'bg-blue-100 text-blue-800' },
-    CANCELLED: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
-  };
-  const c = cfg[status] ?? cfg.DRAFT;
-  return <Badge className={c.className}>{c.label}</Badge>;
-};
-
-const getPaymentBadge = (status: string) => {
-  const cfg: Record<string, { label: string; className: string }> = {
-    UNPAID:  { label: 'Unpaid',  className: 'bg-orange-100 text-orange-800' },
-    PARTIAL: { label: 'Partial', className: 'bg-yellow-100 text-yellow-800' },
-    PAID:    { label: 'Paid',    className: 'bg-green-100 text-green-800' },
-  };
-  const c = cfg[status] ?? cfg.UNPAID;
-  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
-};
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  const { currencyCode } = useCurrency();
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-card border rounded-lg p-3 shadow-lg">
-        <p className="font-medium">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {typeof entry.value === 'number'
-              ? `${currencyCode} ${entry.value.toLocaleString()}`
-              : entry.value}
-          </p>
-        ))}
-      </div>
-    );
+function periodRange(p: Period): [string, string] | null {
+  const now = new Date();
+  const iso = (d: Date) => format(d, 'yyyy-MM-dd');
+  switch (p) {
+    case 'THIS_MONTH': return [iso(new Date(now.getFullYear(), now.getMonth(), 1)), iso(now)];
+    case 'LAST_MONTH': return [iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), iso(new Date(now.getFullYear(), now.getMonth(), 0))];
+    case 'LAST_90': { const d = new Date(now); d.setDate(d.getDate() - 90); return [iso(d), iso(now)]; }
+    case 'THIS_YEAR': return [iso(new Date(now.getFullYear(), 0, 1)), iso(now)];
+    default: return null;
   }
-  return null;
-};
-
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+}
 
 export function Purchase() {
   const { currencyCode } = useCurrency();
-  // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [bills, setBills]             = useState<SupplierBill[]>([]);
-  const [suppliers, setSuppliers]     = useState<Supplier[]>([]);
-  const [warehouses, setWarehouses]   = useState<Warehouse[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
-  const [page, setPage]               = useState(1);
-  const [totalPages, setTotalPages]   = useState(1);
-  const [totalBills, setTotalBills]   = useState(0);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [prefillPoId, setPrefillPoId] = useState<number | undefined>();
 
-  // â”€â”€ Filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [searchTerm, setSearchTerm]         = useState('');
-  const [statusFilter, setStatusFilter]     = useState('');
-  // â”€â”€ Bill form / dialogs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [showBillForm, setShowBillForm]                 = useState(false);
-  const [editingBill, setEditingBill]                   = useState<SupplierBill | null>(null);
-  const [showBillDetail, setShowBillDetail]             = useState(false);
-  const [selectedBill, setSelectedBill]                 = useState<SupplierBill | null>(null);
-  const [showPaymentDialog, setShowPaymentDialog]       = useState(false);
-  const [payingBill, setPayingBill]                     = useState<SupplierBill | null>(null);
-  const payingBillBalance = payingBill ? Math.max(0, payingBill.totalAmount - payingBill.amountPaid) : 0;
-  const paymentManager = usePaymentManager({ invoiceTotal: payingBillBalance });
-  const [payNotes, setPayNotes]                         = useState('');
-  const [confirmingId, setConfirmingId]                 = useState<number | null>(null);
-  const [bankAccounts, setBankAccounts]                 = useState<AccountHead[]>([]);
-  useEffect(() => {
-    accountHeadsService.getBankAccounts()
-      .then(setBankAccounts)
-      .catch(err => console.error('Failed to load bank accounts:', err));
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const [bills, setBills] = useState<SupplierBill[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  const [view, setView] = useState<View>('list');
+  const [previewId, setPreviewId] = useState<number | null>(null);
+  const [editingBill, setEditingBill] = useState<SupplierBill | null>(null);
+  const [editorSession, setEditorSession] = useState(0);
+  const editorRef = useRef<PurchaseInvoiceEditorHandle>(null);
+
+  // ── List filters ──────────────────────────────────────────────────────────
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'ALL'>('ALL');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [period, setPeriod] = useState<Period>('ALL');
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'billDate', dir: 'desc' });
+  const [page, setPage] = useState(1);
+
+  // ── Dialog state ──────────────────────────────────────────────────────────
+  const [pendingConfirm, setPendingConfirm] = useState<{ req?: SupplierBillRequest; bill?: SupplierBill } | null>(null);
+  const [pendingCancel, setPendingCancel] = useState<SupplierBill | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<SupplierBill | null>(null);
+  const [payingBill, setPayingBill] = useState<SupplierBill | null>(null);
+  const payingBillBalance = payingBill ? balanceOf(payingBill) : 0;
+  // Paying less than the balance leaves the rest on credit (supplier outstanding).
+  const [payNowInput, setPayNowInput] = useState('');
+  const payNow = Math.min(payingBillBalance, Math.max(0, Math.round((Number(payNowInput) || 0) * 100) / 100));
+  const [payDate, setPayDate] = useState(todayIso());
+  const paymentManager = usePaymentManager({ invoiceTotal: payNow });
+  // A Credit line inside the allocation is money NOT paid now either — it stays on the
+  // bill (Accounts Payable) together with whatever wasn't entered as "Paying now".
+  const creditAllocated = paymentManager.totalByType(PAYMENT_TYPES.CREDIT);
+  const paidNow = Math.max(0, Math.round((payNow - creditAllocated) * 100) / 100);
+  const leftOnCredit = Math.max(0, Math.round((payingBillBalance - paidNow) * 100) / 100);
+  const [payNotes, setPayNotes] = useState('');
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [newSupplier, setNewSupplier] = useState<{ id: number; nonce: number } | null>(null);
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+  const loadBills = useCallback(async () => {
+    try {
+      setBills(await fetchAllBills());
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load purchase invoices');
+    }
   }, []);
 
-  // â”€â”€ Bill form data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [billForm, setBillForm] = useState(defaultBillForm);
-
-  // â”€â”€ Supplier form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [showSupplierForm, setShowSupplierForm]     = useState(false);
-  const [editingSupplier, setEditingSupplier]       = useState<Supplier | null>(null);
-  const [savingSupplier, setSavingSupplier]         = useState(false);
-  const [supplierForm, setSupplierForm] = useState<Partial<Supplier>>({
-    name: '', contactPerson: '', email: '', phone: '',
-    address: '', city: '', country: '', taxId: '',
-    paymentTerms: '', creditLimit: 0, isActive: true, notes: '',
-  });
-
-  // â”€â”€ Product search (for bill form line items) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [apiProducts, setApiProducts]       = useState<Product[]>([]);
-  const [productSearch, setProductSearch]   = useState('');
-  const [showProductSearch, setShowProductSearch] = useState(false);
-
-  // â”€â”€ Load data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [billsPage, suppliersData, productsData, warehousesData] = await Promise.all([
-        supplierBillService.getBills({
-          page,
-          size: 20,
-          status: statusFilter || undefined,
-          search: searchTerm || undefined,
-        }),
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [billsRes, suppliersRes, warehousesRes, productsRes, posRes, banksRes] = await Promise.allSettled([
+        fetchAllBills(),
         purchaseService.getAllSuppliers(),
-        productsService.getProducts({ size: 200 }),
         productsService.getActiveWarehouses(),
+        productsService.getProducts({ size: 500 }),
+        fetchAllOrders(),
+        accountHeadsService.getBankAccounts(),
       ]);
-      setBills(billsPage.bills);
-      setTotalPages(billsPage.pagination.totalPages);
-      setTotalBills(billsPage.pagination.total);
-      setSuppliers(suppliersData);
-      setApiProducts(productsData.products ?? []);
-      setWarehouses(warehousesData);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load data');
-    } finally {
+      if (billsRes.status === 'fulfilled') setBills(billsRes.value);
+      else toast.error(billsRes.reason?.message || 'Failed to load purchase invoices');
+      if (suppliersRes.status === 'fulfilled') setSuppliers(suppliersRes.value);
+      else toast.error('Failed to load suppliers');
+      if (warehousesRes.status === 'fulfilled') setWarehouses(warehousesRes.value);
+      if (productsRes.status === 'fulfilled') setProducts(productsRes.value.products ?? []);
+      if (posRes.status === 'fulfilled') setPurchaseOrders(posRes.value);
+      if (banksRes.status === 'fulfilled') setBankAccounts(banksRes.value);
       setLoading(false);
-    }
-  }, [page, statusFilter, searchTerm]);
+    })();
+  }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const refreshProducts = () =>
+    productsService.getProducts({ size: 500 }).then(r => setProducts(r.products ?? [])).catch(() => undefined);
 
-  // â”€â”€ Bill form helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const addItem = (preset?: Partial<BillFormItem>) => {
-    setBillForm(prev => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          productName: '',
-          productSku: '',
-          unitOfMeasure: 'pcs',
-          quantity: 1,
-          unitPrice: 0,
-          discountPercent: 0,
-          taxPercent: 0,
-          notes: '',
-          ...preset,
-        },
-      ],
-    }));
-  };
+  const warehouseName = useCallback(
+    (id?: number) => (id ? warehouses.find(w => w.id === id)?.name ?? `Warehouse #${id}` : '—'),
+    [warehouses],
+  );
 
-  const removeItem = (idx: number) => {
-    setBillForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
-  };
-
-  const updateItem = (idx: number, updates: Partial<BillFormItem>) => {
-    setBillForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => (i === idx ? { ...item, ...updates } : item)),
-    }));
-  };
-
-  // â”€â”€ Live totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const billTotals = useMemo(() => {
-    const subtotal = billForm.items.reduce((sum, item) => {
-      const lineBase = item.quantity * item.unitPrice;
-      const afterDiscount = lineBase * (1 - item.discountPercent / 100);
-      return sum + afterDiscount;
-    }, 0);
-
-    const discountAmount = billForm.items.reduce((sum, item) => {
-      const lineBase = item.quantity * item.unitPrice;
-      return sum + lineBase * (item.discountPercent / 100);
-    }, 0);
-
-    const taxAmount = billForm.items.reduce((sum, item) => {
-      const lineBase = item.quantity * item.unitPrice;
-      const afterDiscount = lineBase * (1 - item.discountPercent / 100);
-      return sum + afterDiscount * (item.taxPercent / 100);
-    }, 0);
-
-    const total = subtotal + taxAmount + (billForm.shippingCost || 0);
-    return { subtotal, discountAmount, taxAmount, total };
-  }, [billForm.items, billForm.shippingCost]);
-
-  // â”€â”€ Save bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleSaveBill = async () => {
-    if (!billForm.supplierId) {
-      toast.error('Please select a supplier');
+  // Deep links from Purchase Orders: ?bill=<id> opens that invoice, ?fromPo=<id> starts a new invoice against the PO.
+  useEffect(() => {
+    if (loading) return;
+    const billId = Number(searchParams.get('bill'));
+    if (billId) {
+      const b = bills.find(x => x.id === billId);
+      if (b) openPreview(b); else toast.error('That purchase invoice could not be found');
+      setSearchParams({}, { replace: true });
       return;
     }
-    if (!billForm.warehouseId) {
-      toast.error('Please select a warehouse');
-      return;
-    }
-    if (billForm.items.length === 0) {
-      toast.error('Please add at least one line item');
-      return;
-    }
-    if (billForm.items.some(i => !i.productName.trim())) {
-      toast.error('All items must have a product name');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const req: SupplierBillRequest = {
-        supplierId: billForm.supplierId,
-        invoiceNumber: billForm.invoiceNumber || undefined,
-        billDate: billForm.billDate,
-        dueDate: billForm.dueDate || undefined,
-        priority: billForm.priority,
-        shippingCost: billForm.shippingCost,
-        warehouseId: billForm.warehouseId,
-        notes: billForm.notes || undefined,
-        receivedBy: billForm.receivedBy || undefined,
-        items: billForm.items.map(i => ({
-          productId: i.productId,
-          productName: i.productName,
-          productSku: i.productSku || undefined,
-          unitOfMeasure: i.unitOfMeasure || undefined,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          discountPercent: i.discountPercent,
-          taxPercent: i.taxPercent,
-          notes: i.notes || undefined,
-        })),
-      };
-
-      if (editingBill) {
-        await supplierBillService.updateBill(editingBill.id, req);
-        toast.success('Bill updated successfully');
-      } else {
-        await supplierBillService.createBill(req);
-        toast.success('Bill created successfully');
-      }
-      setShowBillForm(false);
+    const po = Number(searchParams.get('fromPo'));
+    if (!po) return;
+    const existing = bills.find(b => b.purchaseOrderId === po && b.status !== 'CANCELLED');
+    if (existing) {
+      toast.info(`This purchase order is already billed on ${existing.billNumber}`);
+      openPreview(existing);
+    } else {
       setEditingBill(null);
-      setBillForm(defaultBillForm());
-      await loadData();
+      setPrefillPoId(po);
+      setEditorSession(n => n + 1);
+      setView('editor');
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Filtering / sorting / paging ──────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const range = periodRange(period);
+    const rows = bills.filter(b => {
+      if (statusFilter !== 'ALL' && displayStatus(b) !== statusFilter) return false;
+      if (supplierFilter && String(b.supplierId) !== supplierFilter) return false;
+      if (range && (b.billDate < range[0] || b.billDate > range[1])) return false;
+      if (!q) return true;
+      return [b.billNumber, b.supplierName, b.invoiceNumber, b.receivedBy, ...b.items.map(i => i.productName)]
+        .some(v => (v ?? '').toLowerCase().includes(q));
+    });
+    const val = (b: SupplierBill): string | number =>
+      sort.key === 'balance' ? balanceOf(b) : (b[sort.key] as string | number) ?? '';
+    rows.sort((a, b) => {
+      const x = val(a), y = val(b);
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+      return (sort.dir === 'asc' ? c : -c) || b.id - a.id;
+    });
+    return rows;
+  }, [bills, search, statusFilter, supplierFilter, period, sort]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter, supplierFilter, period]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const toggleSort = (key: SortKey) =>
+    setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'supplierName' || key === 'billNumber' ? 'asc' : 'desc' }));
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  const kpi = useMemo(() => {
+    const monthStart = format(new Date(), 'yyyy-MM-01');
+    const today = todayIso();
+    const confirmed = bills.filter(b => b.status === 'CONFIRMED');
+    const month = confirmed.filter(b => b.billDate >= monthStart && b.billDate <= today);
+    const overdue = confirmed.filter(b => displayStatus(b) === 'OVERDUE');
+    return {
+      monthSpend: month.reduce((s, b) => s + b.totalAmount, 0),
+      monthCount: month.length,
+      outstanding: confirmed.reduce((s, b) => s + balanceOf(b), 0),
+      outstandingCount: confirmed.filter(b => balanceOf(b) > 0).length,
+      overdueAmount: overdue.reduce((s, b) => s + balanceOf(b), 0),
+      overdueCount: overdue.length,
+      drafts: bills.filter(b => b.status === 'DRAFT').length,
+    };
+  }, [bills]);
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
+  const leaveEditorOk = () =>
+    view !== 'editor' || !editorRef.current?.isDirty() || window.confirm('Discard your unsaved changes to this invoice?');
+
+  const goList = () => { if (leaveEditorOk()) setView('list'); };
+  const openPreview = (b: SupplierBill) => { setPreviewId(b.id); setView('preview'); };
+  const openNew = () => {
+    if (!leaveEditorOk()) return;
+    setEditingBill(null);
+    setPrefillPoId(undefined);
+    setEditorSession(n => n + 1);
+    setView('editor');
+  };
+  const openEdit = (b: SupplierBill) => {
+    setEditingBill(b);
+    setEditorSession(n => n + 1);
+    setView('editor');
+  };
+
+  const supplierOf = (b: SupplierBill) => suppliers.find(s => s.id === b.supplierId);
+  // One label per unit received, opened in Sales & Purchases › Barcode Print.
+  const handlePrintBarcodes = (b: SupplierBill) => {
+    const request: BarcodePrintRequest = { billId: b.id };
+    navigate('/barcode-print', { state: { barcodePrint: request } });
+  };
+  const handlePrint = (b: SupplierBill) => {
+    const extras = {
+      warehouse: b.warehouseId ? warehouseName(b.warehouseId) : undefined,
+      poNumber: b.purchaseOrderId ? purchaseOrders.find(p => p.id === b.purchaseOrderId)?.poNumber : undefined,
+    };
+    printPurchaseDocument({
+      docType: 'purchase-invoice',
+      branchId: b.branchId,
+      fallbackCurrency: currencyCode,
+      build: (company, currency) => buildBillDocument(b, supplierOf(b), company, currency, extras, products),
+      onError: msg => toast.error(msg),
+    });
+  };
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
+  // A PO-linked invoice never adds stock itself — receiving on the PO does, so the same goods
+  // can't be counted twice. If the PO still has unreceived quantity when its invoice is
+  // confirmed, receive it now into the invoice's warehouse; already-received units are untouched.
+  const receivePendingForPO = async (poId: number, warehouseId?: number): Promise<number> => {
+    const po = await purchaseService.getOrderById(poId);
+    const items = po.items
+      .map(i => ({ purchaseOrderItemId: i.id, quantityReceived: Math.max(0, (i.quantityOrdered || 0) - (i.quantityReceived || 0)), warehouseId: warehouseId ?? 0 }))
+      .filter(i => i.quantityReceived > 0);
+    if (items.length === 0) return 0;
+    if (!warehouseId) throw new Error('Select the warehouse receiving the goods before confirming');
+    const updated = await purchaseService.receiveItems(poId, items);
+    setPurchaseOrders(prev => prev.map(o => (o.id === updated.id ? updated : o)));
+    return items.reduce((s, i) => s + i.quantityReceived, 0);
+  };
+
+  const confirmedMessage = (billNumber: string, poLinked: boolean, received: number) =>
+    !poLinked
+      ? `${billNumber} confirmed — stock received & payable posted`
+      : received > 0
+        ? `${billNumber} confirmed — ${received} pending unit${received === 1 ? '' : 's'} received from the PO & payable posted`
+        : `${billNumber} confirmed — payable posted (PO goods were already received)`;
+
+  const persist = async (req: SupplierBillRequest, confirm: boolean): Promise<SupplierBill | null> => {
+    setSaving(true);
+    let saved: SupplierBill | null = null;
+    try {
+      saved = editingBill
+        ? await supplierBillService.updateBill(editingBill.id, req)
+        : await supplierBillService.createBill(req);
+      if (confirm) {
+        const received = req.purchaseOrderId ? await receivePendingForPO(req.purchaseOrderId, req.warehouseId) : 0;
+        saved = await supplierBillService.confirmBill(saved.id);
+        toast.success(confirmedMessage(saved.billNumber, !!req.purchaseOrderId, received));
+      } else {
+        toast.success(`${saved.billNumber} saved as draft`);
+      }
+      await loadBills();
+      if (confirm) refreshProducts();
+      setPreviewId(saved.id);
+      setView('preview');
+      return confirm ? saved : null;
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save bill');
+      toast.error(err.message || 'Failed to save purchase invoice');
+      if (saved) {
+        // Saved as draft but confirm failed — keep editing that draft so a retry doesn't create a duplicate.
+        setEditingBill(saved);
+        await loadBills();
+      }
+      return null;
     } finally {
       setSaving(false);
     }
   };
 
-  // â”€â”€ Confirm bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleConfirm = async (bill: SupplierBill) => {
-    setConfirmingId(bill.id);
+  const onEditorSave = (req: SupplierBillRequest, confirm: boolean) => {
+    if (confirm) setPendingConfirm({ req });
+    else persist(req, false);
+  };
+
+  const confirmExisting = async (b: SupplierBill): Promise<SupplierBill | null> => {
+    setBusyId(b.id);
     try {
-      await supplierBillService.confirmBill(bill.id);
-      toast.success('Bill confirmed â€” stock updated');
-      await loadData();
+      const received = b.purchaseOrderId ? await receivePendingForPO(b.purchaseOrderId, b.warehouseId) : 0;
+      const res = await supplierBillService.confirmBill(b.id);
+      toast.success(confirmedMessage(res.billNumber, !!b.purchaseOrderId, received));
+      await loadBills();
+      refreshProducts();
+      return res;
     } catch (err: any) {
-      toast.error(err.message || 'Failed to confirm bill');
+      toast.error(err.message || 'Failed to confirm invoice');
+      return null;
     } finally {
-      setConfirmingId(null);
+      setBusyId(null);
     }
   };
 
-  // â”€â”€ Cancel bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleCancelBill = async (bill: SupplierBill) => {
+  // payNow = false → the whole invoice stays on credit (supplier outstanding) until paid.
+  const runPendingConfirm = async (payNow: boolean) => {
+    const p = pendingConfirm;
+    setPendingConfirm(null);
+    if (!p) return;
+    const confirmed = p.req ? await persist(p.req, true) : p.bill ? await confirmExisting(p.bill) : null;
+    if (payNow && confirmed && balanceOf(confirmed) > 0) openPayment(confirmed);
+  };
+
+  const cancelBill = async (b: SupplierBill) => {
+    setBusyId(b.id);
     try {
-      await supplierBillService.cancelBill(bill.id);
-      toast.success('Bill cancelled');
-      await loadData();
+      await supplierBillService.cancelBill(b.id);
+      toast.success(`${b.billNumber} cancelled`);
+      await loadBills();
+      if (b.status === 'CONFIRMED') refreshProducts();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to cancel bill');
+      toast.error(err.message || 'Failed to cancel invoice');
+    } finally {
+      setBusyId(null);
     }
   };
 
-  // â”€â”€ Delete bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleDelete = async (bill: SupplierBill) => {
+  const deleteBill = async (b: SupplierBill) => {
+    setBusyId(b.id);
     try {
-      await supplierBillService.deleteBill(bill.id);
-      toast.success('Bill deleted');
-      await loadData();
+      await supplierBillService.deleteBill(b.id);
+      toast.success(`${b.billNumber} deleted`);
+      await loadBills();
+      if (previewId === b.id) { setPreviewId(null); setView('list'); }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete bill');
+      toast.error(err.message || 'Failed to delete invoice');
+    } finally {
+      setBusyId(null);
     }
   };
 
-  // â”€â”€ Record payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const openPayment = (b: SupplierBill) => {
+    paymentManager.clearLines();
+    setPayNotes('');
+    setPayNowInput(balanceOf(b).toFixed(2));
+    setPayDate(todayIso());
+    setPayingBill(b);
+  };
+
   const handleRecordPayment = async () => {
     if (!payingBill) return;
+    if (payNow <= 0) {
+      toast.error('Enter the amount you are paying now — or close this and leave the invoice on credit');
+      return;
+    }
     if (!paymentManager.settleable) {
-      toast.error('Allocate the full payment amount before continuing');
+      toast.error('Allocate the amount being paid now across the payment methods');
+      return;
+    }
+    if (payDate > todayIso()) {
+      toast.error('Payment date cannot be in the future');
+      return;
+    }
+    if (paidNow <= 0) {
+      // Everything allocated to Credit — nothing changes hands, the bill simply stays payable.
+      toast.success(`${payingBill.billNumber} kept on credit`);
+      setPayingBill(null);
+      paymentManager.clearLines();
+      setPayNotes('');
       return;
     }
     setSaving(true);
     try {
-      const payload = buildPaymentPayload(paymentManager.paymentLines, payingBillBalance);
-      const legacy = toLegacyPayment(paymentManager.paymentLines);
-      const amount = payload.paidAmount;
+      const payload = buildPaymentPayload(paymentManager.paymentLines, payNow);
+      // Credit lines are excluded from what's posted as paid (payload.paidAmount already
+      // nets them out); the legacy bridge would otherwise book a Credit leg as CASH.
+      const legacy = toLegacyPayment(paymentManager.paymentLines.filter(l => l.paymentType !== PAYMENT_TYPES.CREDIT));
       const paymentMethod = legacy.paymentMethod === 'CASH' ? 'cash'
         : legacy.paymentMethod === 'CARD' ? 'credit_card'
         : legacy.paymentMethod === 'ONLINE' ? 'bank_transfer'
         : 'Mixed';
-      const paymentBreakdown = legacy.paymentBreakdown;
-      await supplierBillService.recordPayment(payingBill.id, amount, paymentMethod, payNotes || undefined, paymentBreakdown);
-      toast.success('Payment recorded successfully');
-      setShowPaymentDialog(false);
+      await supplierBillService.recordPayment(payingBill.id, payload.paidAmount, paymentMethod, payNotes || undefined, legacy.paymentBreakdown, payDate);
+      toast.success(leftOnCredit > 0
+        ? `Paid ${paidNow.toFixed(2)} on ${payingBill.billNumber} — ${leftOnCredit.toFixed(2)} left on credit`
+        : `${payingBill.billNumber} paid in full`);
       setPayingBill(null);
       paymentManager.clearLines();
       setPayNotes('');
-      await loadData();
+      await loadBills();
     } catch (err: any) {
       toast.error(err.message || 'Failed to record payment');
     } finally {
@@ -424,1620 +436,416 @@ export function Purchase() {
     }
   };
 
-  // â”€â”€ Open edit bill dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const openEditBill = (bill: SupplierBill) => {
-    setEditingBill(bill);
-    setBillForm({
-      supplierId: bill.supplierId,
-      invoiceNumber: bill.invoiceNumber ?? '',
-      billDate: bill.billDate,
-      dueDate: bill.dueDate ?? '',
-      shippingCost: bill.shippingCost,
-      warehouseId: bill.warehouseId,
-      notes: bill.notes ?? '',
-      receivedBy: bill.receivedBy ?? '',
-      items: bill.items.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        productSku: item.productSku ?? '',
-        unitOfMeasure: item.unitOfMeasure ?? '',
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discountPercent: item.discountPercent,
-        taxPercent: item.taxPercent,
-        notes: item.notes ?? '',
-      })),
-    });
-    setShowBillForm(true);
+  // ── Suppliers (quick add from the editor; full management lives in the Suppliers module) ──
+  const openCreateSupplier = () => setShowSupplierForm(true);
+
+  const onSupplierSaved = async (created: Supplier) => {
+    setSuppliers(await purchaseService.getAllSuppliers().catch(() => suppliers));
+    if (view === 'editor' && created?.id) setNewSupplier({ id: created.id, nonce: Date.now() });
   };
 
-  // â”€â”€ Print bill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const printBill = (bill: SupplierBill) => {
-    const supplier = suppliers.find(s => s.id === bill.supplierId);
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
-      <html><head><title>Bill ${bill.billNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 24px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f5f5f5; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 24px; }
-        .totals { text-align: right; margin-top: 16px; }
-      </style></head><body>
-      <div class="header">
-        <div><h2>Supplier Bill</h2><p>${bill.billNumber}</p></div>
-        <div><p>Date: ${bill.billDate}</p>${bill.dueDate ? `<p>Due: ${bill.dueDate}</p>` : ''}</div>
-      </div>
-      <p><strong>Supplier:</strong> ${bill.supplierName}</p>
-      ${bill.invoiceNumber ? `<p><strong>Invoice #:</strong> ${bill.invoiceNumber}</p>` : ''}
-      <table>
-        <thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Tax%</th><th>Total</th></tr></thead>
-        <tbody>
-          ${bill.items.map(i => `<tr>
-            <td>${i.productName}</td>
-            <td>${i.productSku ?? ''}</td>
-            <td>${i.quantity} ${i.unitOfMeasure ?? ''}</td>
-            <td>${currencyCode} ${i.unitPrice.toFixed(2)}</td>
-            <td>${i.discountPercent}%</td>
-            <td>${i.taxPercent}%</td>
-            <td>${currencyCode} ${i.totalAmount.toFixed(2)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      <div class="totals">
-        <p>Subtotal: ${currencyCode} ${bill.subtotal.toFixed(2)}</p>
-        ${bill.discountAmount > 0 ? `<p>Discount: -${currencyCode} ${bill.discountAmount.toFixed(2)}</p>` : ''}
-        <p>Tax: ${currencyCode} ${bill.taxAmount.toFixed(2)}</p>
-        <p>Shipping: ${currencyCode} ${bill.shippingCost.toFixed(2)}</p>
-        <hr/>
-        <p><strong>Total: ${currencyCode} ${bill.totalAmount.toFixed(2)}</strong></p>
-      </div>
-      </body></html>
-    `);
-    win.document.close();
-    win.print();
-  };
+  // ── Render ────────────────────────────────────────────────────────────────
+  const editorReadOnly = !!editingBill && editingBill.status !== 'DRAFT';
+  const SortIcon = ({ k }: { k: SortKey }) => (sort.key === k ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null);
 
-  // â”€â”€ Supplier management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const openCreateSupplier = () => {
-    setEditingSupplier(null);
-    setSupplierForm({
-      name: '', contactPerson: '', email: '', phone: '',
-      address: '', city: '', country: '', taxId: '',
-      paymentTerms: '', creditLimit: 0, isActive: true, notes: '',
-    });
-    setShowSupplierForm(true);
-  };
-
-  const openEditSupplier = (s: Supplier) => {
-    setEditingSupplier(s);
-    setSupplierForm({ ...s });
-    setShowSupplierForm(true);
-  };
-
-  const handleSaveSupplier = async () => {
-    if (!supplierForm.name?.trim()) {
-      toast.error('Supplier name is required');
-      return;
-    }
-    setSavingSupplier(true);
-    try {
-      if (editingSupplier) {
-        await purchaseService.updateSupplier(editingSupplier.id, supplierForm);
-        toast.success('Supplier updated');
-      } else {
-        await purchaseService.createSupplier(supplierForm);
-        toast.success('Supplier created');
-      }
-      setShowSupplierForm(false);
-      setEditingSupplier(null);
-      const updated = await purchaseService.getAllSuppliers();
-      setSuppliers(updated);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save supplier');
-    } finally {
-      setSavingSupplier(false);
-    }
-  };
-
-  const handleDeleteSupplier = async (s: Supplier) => {
-    try {
-      await purchaseService.deleteSupplier(s.id);
-      toast.success('Supplier deleted');
-      const updated = await purchaseService.getAllSuppliers();
-      setSuppliers(updated);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete supplier');
-    }
-  };
-
-  // â”€â”€ Summary cards computed from live bills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const summary = useMemo(() => {
-    const totalAmount = bills.reduce((s, b) => s + b.totalAmount, 0);
-    const unpaidAmount = bills
-      .filter(b => b.paymentStatus !== 'PAID')
-      .reduce((s, b) => s + (b.totalAmount - b.amountPaid), 0);
-    const paidAmount = bills.reduce((s, b) => s + b.amountPaid, 0);
-    return { totalAmount, unpaidAmount, paidAmount };
-  }, [bills]);
-
-  // â”€â”€ Supplier distribution chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const supplierChartData = useMemo(() => {
-    const map: Record<string, number> = {};
-    bills.forEach(b => {
-      map[b.supplierName] = (map[b.supplierName] ?? 0) + b.totalAmount;
-    });
-    return Object.entries(map)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 6)
-      .map(([name, value], i) => ({ name, value, color: CHART_COLORS[i] }));
-  }, [bills]);
-
-  // â”€â”€ Payment status chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const paymentChartData = useMemo(() => {
-    const unpaid  = bills.filter(b => b.paymentStatus === 'UNPAID').length;
-    const partial = bills.filter(b => b.paymentStatus === 'PARTIAL').length;
-    const paid    = bills.filter(b => b.paymentStatus === 'PAID').length;
-    return [
-      { name: 'Unpaid',  value: unpaid,  color: '#f97316' },
-      { name: 'Partial', value: partial, color: '#eab308' },
-      { name: 'Paid',    value: paid,    color: '#22c55e' },
-    ].filter(d => d.value > 0);
-  }, [bills]);
-
-  // â”€â”€ Status filter bar chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const statusChartData = useMemo(() => {
-    const draft     = bills.filter(b => b.status === 'DRAFT').length;
-    const confirmed = bills.filter(b => b.status === 'CONFIRMED').length;
-    const cancelled = bills.filter(b => b.status === 'CANCELLED').length;
-    return [
-      { name: 'Draft',     count: draft },
-      { name: 'Confirmed', count: confirmed },
-      { name: 'Cancelled', count: cancelled },
-    ];
-  }, [bills]);
-
-  // â”€â”€ Extra computed stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const extraStats = useMemo(() => {
-    const now = new Date();
-    const monthlyBills = bills.filter(b => {
-      if (!b.billDate) return false;
-      const d = new Date(b.billDate);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    });
-    const monthlySpend = monthlyBills.reduce((s, b) => s + b.totalAmount, 0);
-    const inventoryAdded = bills
-      .filter(b => b.status === 'CONFIRMED')
-      .reduce((s, b) => s + b.items.reduce((si, i) => si + (i.quantity || 0), 0), 0);
-    const supplierTotals: Record<string, number> = {};
-    bills.forEach(b => { supplierTotals[b.supplierName] = (supplierTotals[b.supplierName] ?? 0) + b.totalAmount; });
-    const topEntry = Object.entries(supplierTotals).sort(([, a], [, b]) => b - a)[0];
-    const urgentCount = bills.filter(b => b.priority === 'HIGH' || b.priority === 'URGENT').length;
-    const pendingApprovals = bills.filter(b => b.status === 'DRAFT').length;
-    return { monthlySpend, inventoryAdded, topSupplier: topEntry?.[0] ?? 'â€”', topAmount: topEntry?.[1] ?? 0, urgentCount, pendingApprovals };
-  }, [bills]);
-
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-
-  const filteredBills = useMemo(() => bills.filter(b => {
-    if (supplierFilter && String(b.supplierId) !== supplierFilter) return false;
-    if (priorityFilter && b.priority !== priorityFilter) return false;
-    return true;
-  }), [bills, supplierFilter, priorityFilter]);
-
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
-    <div className="p-6 space-y-6">
-
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Purchase Management</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track and manage all purchases including supplier transactions and inventory acquisitions
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Bulk Upload
-          </Button>
-          <Button variant="outline" size="sm">
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Button size="sm" onClick={() => {
-            setEditingBill(null);
-            setBillForm(defaultBillForm());
-            setShowBillForm(true);
-          }}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Purchase
-          </Button>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes purchaseFadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .purchase-panel {
-          animation: purchaseFadeIn 0.22s ease-out;
-        }
-      `}</style>
-      {/* Stats row — 6 cards */}
-      <div className="purchase-panel grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Total Purchases</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <FileText className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{totalBills}</div>
-            <p className="text-xs text-muted-foreground mt-1">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Pending Approvals</CardTitle>
-            <div className="bg-orange-50 p-2 rounded-lg">
-              <Clock className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-700">{extraStats.pendingApprovals}</div>
-            <p className="text-xs text-muted-foreground mt-1">Need approval</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Monthly Spend</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-green-700">
-              <CurrencyGlyph /> {extraStats.monthlySpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Inventory Added</CardTitle>
-            <div className="bg-purple-50 p-2 rounded-lg">
-              <Package className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-700">{extraStats.inventoryAdded}</div>
-            <p className="text-xs text-muted-foreground mt-1">Items received</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Top Supplier</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm font-bold text-blue-700 truncate">{extraStats.topSupplier}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              <CurrencyGlyph /> {extraStats.topAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Urgent Purchases</CardTitle>
-            <div className="bg-red-50 p-2 rounded-lg">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">{extraStats.urgentCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">High priority</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main content + sidebar */}
-      <div className="flex gap-6">
-
-        {/* â”€â”€ Main content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <div className="flex-1 min-w-0 space-y-6">
-
-          {/* Filter bar */}
-          <Card className="purchase-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="flex-1 min-w-[200px] relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by purchase number, supplier, or invoice..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-11 h-10"
-                  />
-                </div>
-                <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[130px] h-9">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="DRAFT">Pending Approval</SelectItem>
-                    <SelectItem value="CONFIRMED">Received</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={supplierFilter || 'all'} onValueChange={v => setSupplierFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[140px] h-9">
-                    <SelectValue placeholder="All Suppliers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Suppliers</SelectItem>
-                    {suppliers.map(s => (
-                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={priorityFilter || 'all'} onValueChange={v => setPriorityFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[120px] h-9">
-                    <SelectValue placeholder="All Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priority</SelectItem>
-                    <SelectItem value="LOW">Low</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="URGENT">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="ghost" size="sm" className="h-9">
-                  <Search className="mr-2 h-4 w-4" />
-                  Advanced
+    <div className={styles.page}>
+      <ModuleHeader
+        title="Purchase Invoices"
+        icon={ShoppingBag}
+        subtitle="Supplier bills for stock and services you buy — receive stock, track payables and pay suppliers"
+        meta={view === 'editor' ? (
+          <>
+            {editingBill
+              ? <span className={cx(styles.pill, statusMeta(displayStatus(editingBill)).cls)}>{statusMeta(displayStatus(editingBill)).label}</span>
+              : <span className={cx(styles.pill, styles.pillGray)}>Draft (new)</span>}
+            <span>Bill No: <strong>{editingBill?.billNumber ?? '—'}</strong></span>
+          </>
+        ) : undefined}
+        actions={
+          <>
+            {view !== 'list' && (
+              <Button variant="outline" size="sm" onClick={goList}><ArrowLeft className="h-4 w-4" /> Back</Button>
+            )}
+            {view === 'editor' && !editorReadOnly && (
+              <>
+                <Button variant="outline" size="sm" disabled={saving} onClick={() => editorRef.current?.save(false)}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Draft
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Purchase list table */}
-          <Card className="purchase-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Purchase List</CardTitle>
-                  <CardDescription>{filteredBills.length} of {totalBills} purchases</CardDescription>
-                </div>
-                <Button variant="ghost" size="sm">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Columns
+                <Button size="sm" disabled={saving} onClick={() => editorRef.current?.save(true)}>
+                  <CheckCircle2 className="h-4 w-4" /> Confirm
                 </Button>
+              </>
+            )}
+            {view === 'editor' && (
+              <Button variant="outline" size="sm" onClick={() => editorRef.current?.print()}><Printer className="h-4 w-4" /> Print</Button>
+            )}
+            {view === 'list' && (
+              <>
+                <Button variant="outline" size="sm" disabled={filtered.length === 0}
+                  onClick={() => exportBillsCsv(filtered, currencyCode, warehouseName)}>
+                  <Download className="h-4 w-4" /> Export
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/suppliers')}><Users className="h-4 w-4" /> Suppliers</Button>
+              </>
+            )}
+            {view !== 'editor' && (
+              <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> New Purchase Invoice</Button>
+            )}
+          </>
+        }
+        tabs={[
+          { key: 'list', label: 'Invoice List', icon: FileText, active: view !== 'editor', onClick: goList },
+          { key: 'editor', label: 'Invoice Editor', icon: ShoppingBag, active: view === 'editor', onClick: () => { if (view !== 'editor') openNew(); } },
+        ]}
+      />
+
+      {/* ── LIST ── */}
+      {view === 'list' && (
+        <div className={styles.fadeIn} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className={styles.kpiGrid}>
+            <StatCard title="This Month Spend" icon={TrendingUp} tone="green" loading={loading}
+              value={<CurrencyValue amount={kpi.monthSpend} options={fmt2} />} sub={`${kpi.monthCount} confirmed invoice${kpi.monthCount === 1 ? '' : 's'}`} />
+            <StatCard title="Outstanding Payable" icon={CreditCard} tone="red" loading={loading}
+              value={<CurrencyValue amount={kpi.outstanding} options={fmt2} />} sub={`${kpi.outstandingCount} unpaid invoice${kpi.outstandingCount === 1 ? '' : 's'}`} />
+            <StatCard title="Overdue" icon={AlertTriangle} tone="orange" loading={loading}
+              value={<CurrencyValue amount={kpi.overdueAmount} options={fmt2} />} sub={`${kpi.overdueCount} past due date`} />
+            <StatCard title="Drafts to Confirm" icon={Clock} tone="blue" loading={loading}
+              value={kpi.drafts} sub="Not yet posted to stock" />
+          </div>
+
+          <div className={cx(styles.panel, styles.panelPad)}>
+            <div className={styles.toolbar}>
+              <h3 className={styles.panelTitle}>
+                All Purchase Invoices <span className={cx(styles.muted, styles.tiny)} style={{ fontWeight: 500 }}>({filtered.length})</span>
+              </h3>
+              <div className={styles.filters}>
+                <div className={styles.searchBox}>
+                  <Search size={14} />
+                  <input className={styles.searchInput} placeholder="Search bill no, supplier, item…" value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <NativeSelect value={period} onChange={v => setPeriod(v as Period)} options={PERIODS} label="Period" />
+                <NativeSelect value={statusFilter} onChange={v => setStatusFilter(v as DisplayStatus | 'ALL')} options={STATUS_FILTERS} label="Status" />
+                <NativeSelect value={supplierFilter} onChange={setSupplierFilter} label="Supplier"
+                  options={[{ value: '', label: 'All Suppliers' }, ...suppliers.map(s => ({ value: String(s.id), label: s.name }))]} />
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : filteredBills.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
-                  <p className="font-medium">No purchases found</p>
-                  <p className="text-sm mb-4">Create your first purchase to get started</p>
-                  <Button onClick={() => { setEditingBill(null); setBillForm({ ...defaultBillForm(), warehouseId: warehouses[0]?.id }); setShowBillForm(true); }}>
-                    <Plus className="mr-2 h-4 w-4" /> New Purchase
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50/50">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-10 pl-4">
-                          <input type="checkbox" className="rounded" />
-                        </TableHead>
-                        <TableHead>Purchase #</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead>Total Amount</TableHead>
-                        <TableHead className="text-right pr-4">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredBills.map(bill => {
-                        const supplier = suppliers.find(s => s.id === bill.supplierId);
-                        const dateObj = bill.billDate ? new Date(bill.billDate) : null;
-                        const dateStr = dateObj ? format(dateObj, 'MMM dd, yyyy') : 'â€”';
-                        const dayStr  = dateObj ? format(dateObj, 'EEE') : '';
-                        return (
-                          <TableRow key={bill.id} className="hover:bg-slate-50/50 transition-colors">
-                            <TableCell className="pl-4">
-                              <input type="checkbox" className="rounded" />
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-sm">{bill.billNumber}</p>
-                                {bill.createdBy && (
-                                  <p className="text-xs text-muted-foreground">by {bill.createdBy}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-sm">{bill.supplierName}</p>
-                                {supplier?.contactPerson && (
-                                  <p className="text-xs text-muted-foreground">{supplier.contactPerson}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="text-sm">{dateStr}</p>
-                                <p className="text-xs text-muted-foreground">{dayStr}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {bill.status === 'DRAFT' && (
-                                <Badge className="text-xs bg-orange-100 text-orange-800 hover:bg-orange-100">Pending Approval</Badge>
-                              )}
-                              {bill.status === 'CONFIRMED' && (
-                                <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Received</Badge>
-                              )}
-                              {bill.status === 'CANCELLED' && (
-                                <Badge className="text-xs bg-red-100 text-red-800 hover:bg-red-100">Cancelled</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {bill.priority === 'LOW' && <Badge className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-100">Low</Badge>}
-                              {bill.priority === 'MEDIUM' && <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">Medium</Badge>}
-                              {bill.priority === 'HIGH' && <Badge className="text-xs bg-orange-100 text-orange-700 hover:bg-orange-100">High</Badge>}
-                              {bill.priority === 'URGENT' && <Badge className="text-xs bg-red-100 text-red-700 hover:bg-red-100">Urgent</Badge>}
-                              {!bill.priority && <Badge className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100">Medium</Badge>}
-                            </TableCell>
-                            <TableCell>
-                              {bill.paymentStatus === 'PAID' && <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>}
-                              {bill.paymentStatus === 'PARTIAL' && <Badge className="text-xs bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Partial</Badge>}
-                              {bill.paymentStatus === 'UNPAID' && <Badge className="text-xs bg-gray-100 text-gray-700 hover:bg-gray-100">Pending</Badge>}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-sm"><CurrencyGlyph /> {bill.totalAmount.toFixed(2)}</p>
-                                <p className="text-xs text-muted-foreground">{bill.items.length} item{bill.items.length !== 1 ? 's' : ''}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right pr-4">
-                              <div className="flex items-center justify-end gap-1">
-                              {/* View */}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                title="View details"
-                                onClick={() => { setSelectedBill(bill); setShowBillDetail(true); }}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+            </div>
 
-                              {/* Edit (DRAFT only) */}
-                              {bill.status === 'DRAFT' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Edit bill"
-                                  onClick={() => openEditBill(bill)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.center} style={{ width: 56 }}>S.No.</th>
+                    <th className={styles.sortable} onClick={() => toggleSort('billNumber')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Bill No <SortIcon k="billNumber" /></span></th>
+                    <th className={styles.sortable} onClick={() => toggleSort('billDate')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Date <SortIcon k="billDate" /></span></th>
+                    <th className={styles.sortable} onClick={() => toggleSort('supplierName')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Supplier <SortIcon k="supplierName" /></span></th>
+                    <th>Source</th>
+                    <th>Warehouse</th>
+                    <th>Priority</th>
+                    <th className={cx(styles.sortable, styles.right)} onClick={() => toggleSort('totalAmount')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Net Amount <SortIcon k="totalAmount" /></span></th>
+                    <th className={cx(styles.sortable, styles.right)} onClick={() => toggleSort('amountPaid')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Paid <SortIcon k="amountPaid" /></span></th>
+                    <th className={styles.sortable} onClick={() => toggleSort('balance')}><span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>Balance / Status <SortIcon k="balance" /></span></th>
+                    <th className={styles.right}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && bills.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={`sk${i}`}>{Array.from({ length: 11 }).map((__, j) => <td key={j}><div className={styles.skeleton} style={{ width: j === 3 ? 120 : 60 }} /></td>)}</tr>
+                  ))}
+                  {pageRows.map((b, idx) => {
+                    const st = statusMeta(displayStatus(b));
+                    const pr = priorityMeta(b.priority);
+                    const a = billActions(b);
+                    const po = b.purchaseOrderId ? purchaseOrders.find(p => p.id === b.purchaseOrderId) : undefined;
+                    const busy = busyId === b.id;
+                    return (
+                      <tr key={b.id} className={cx(styles.row, b.id === previewId && styles.rowSelected)} onClick={() => openPreview(b)}>
+                        <td className={cx(styles.center, styles.muted, styles.mono)}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{b.billNumber}</div>
+                          {b.invoiceNumber && <div className={cx(styles.tiny, styles.muted)}>Supp. inv: {b.invoiceNumber}</div>}
+                        </td>
+                        <td>
+                          <div>{displayDate(b.billDate)}</div>
+                          {b.dueDate && <div className={cx(styles.tiny, displayStatus(b) === 'OVERDUE' ? styles.danger : styles.muted)}>Due {displayDate(b.dueDate)}</div>}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 500 }}>{b.supplierName}</div>
+                          {supplierOf(b)?.contactPerson && <div className={cx(styles.tiny, styles.muted)}>{supplierOf(b)!.contactPerson}</div>}
+                        </td>
+                        <td>
+                          <span className={cx(styles.pill, po || b.purchaseOrderId ? styles.pillPurple : styles.pillPrimary)}>
+                            {po ? `PO ${po.poNumber}` : b.purchaseOrderId ? 'Purchase Order' : 'Direct'}
+                          </span>
+                        </td>
+                        <td className={styles.muted}>{warehouseName(b.warehouseId)}</td>
+                        <td><span className={cx(styles.pill, pr.cls)}>{pr.label}</span></td>
+                        <td className={cx(styles.right, styles.num)} style={{ fontWeight: 600 }}>
+                          <CurrencyValue amount={b.totalAmount} options={fmt2} />
+                          <div className={cx(styles.tiny, styles.muted)} style={{ fontWeight: 400 }}>{b.items.length} item{b.items.length === 1 ? '' : 's'}</div>
+                        </td>
+                        <td className={cx(styles.right, styles.num, styles.success)}>
+                          <CurrencyValue amount={b.amountPaid} options={fmt2} />
+                          {b.amountPaid > 0 && <div className={cx(styles.tiny, styles.muted)}>{paymentSummaryLabel(b)}</div>}
+                        </td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            {b.status === 'CONFIRMED' && balanceOf(b) > 0 && (
+                              <CurrencyValue amount={balanceOf(b)} options={fmt2} className={cx(styles.danger, styles.num)} />
+                            )}
+                            <span className={cx(styles.pill, st.cls)}>{st.label}</span>
+                          </span>
+                        </td>
+                        <td>
+                          <div className={styles.rowActions} onClick={e => e.stopPropagation()}>
+                            <IconBtn title="View" onClick={() => openPreview(b)}><Eye size={15} /></IconBtn>
+                            {a.edit && <IconBtn title="Edit" onClick={() => openEdit(b)}><Edit size={15} /></IconBtn>}
+                            {a.confirm && <IconBtn title="Confirm" tone={styles.iconBtnPrimary} disabled={busy} onClick={() => setPendingConfirm({ bill: b })}>
+                              {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                            </IconBtn>}
+                            {a.recordPayment && <IconBtn title="Record payment" tone={styles.iconBtnGreen} onClick={() => openPayment(b)}><Wallet size={15} /></IconBtn>}
+                            <IconBtn title="Print" onClick={() => handlePrint(b)}><Printer size={15} /></IconBtn>
+                            {b.items.some(i => i.productId != null) && (
+                              <IconBtn title="Print barcode labels" onClick={() => handlePrintBarcodes(b)}><ScanBarcode size={15} /></IconBtn>
+                            )}
+                            {a.cancel && <IconBtn title="Cancel" tone={styles.iconBtnAmber} disabled={busy} onClick={() => setPendingCancel(b)}><XCircle size={15} /></IconBtn>}
+                            {a.delete && <IconBtn title="Delete" tone={styles.iconBtnRed} disabled={busy} onClick={() => setPendingDelete(b)}><Trash2 size={15} /></IconBtn>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!loading && filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={11} className={styles.emptyCell}>
+                        <Receipt size={32} style={{ margin: '0 auto 8px', opacity: 0.35 }} />
+                        <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>
+                          {bills.length === 0 ? 'No purchase invoices yet' : 'No invoices match these filters'}
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          {bills.length === 0 ? 'Record your first supplier bill to start tracking stock and payables.' : 'Try clearing the search or changing the filters.'}
+                        </div>
+                        {bills.length === 0 && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> New Purchase Invoice</Button>}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-                              {/* Confirm (DRAFT only) */}
-                              {bill.status === 'DRAFT' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Confirm bill"
-                                  disabled={confirmingId === bill.id}
-                                  onClick={() => handleConfirm(bill)}
-                                  className="text-blue-600 hover:text-blue-700"
-                                >
-                                  {confirmingId === bill.id
-                                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                                    : <CheckCircle className="h-4 w-4" />
-                                  }
-                                </Button>
-                              )}
+            {/* Mobile cards */}
+            <div className={styles.mobileList}>
+              {pageRows.map(b => {
+                const st = statusMeta(displayStatus(b));
+                return (
+                  <button key={b.id} type="button" className={styles.mobileCard} onClick={() => openPreview(b)}>
+                    <div className={styles.cardLine}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{b.billNumber}</span>
+                      <span className={cx(styles.pill, st.cls)}>{st.label}</span>
+                    </div>
+                    <div className={cx(styles.tiny, styles.muted)} style={{ margin: '2px 0 8px' }}>{displayDate(b.billDate)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, marginBottom: 10 }}><User size={12} /> {b.supplierName}</div>
+                    <div className={styles.cardLine} style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                      <span><span className={styles.eyebrow} style={{ display: 'block' }}>Net</span><CurrencyValue amount={b.totalAmount} options={fmt2} className="font-bold" /></span>
+                      <span style={{ textAlign: 'right' }}><span className={styles.eyebrow} style={{ display: 'block' }}>Balance</span><CurrencyValue amount={balanceOf(b)} options={fmt2} className={cx('font-bold', styles.danger)} /></span>
+                    </div>
+                  </button>
+                );
+              })}
+              {!loading && filtered.length === 0 && <div className={styles.empty}>No invoices found.</div>}
+            </div>
 
-                              {/* Record Payment (CONFIRMED + not fully paid) */}
-                              {bill.status === 'CONFIRMED' && bill.paymentStatus !== 'PAID' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Record payment"
-                                  className="text-green-600 hover:text-green-700"
-                                  onClick={() => {
-                                    setPayingBill(bill);
-                                    setShowPaymentDialog(true);
-                                  }}
-                                >
-                                  <Wallet className="h-4 w-4" />
-                                </Button>
-                              )}
-
-                              {/* Cancel (DRAFT or CONFIRMED) */}
-                              {(bill.status === 'DRAFT' || bill.status === 'CONFIRMED') && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      title="Cancel bill"
-                                      className="text-orange-600 hover:text-orange-700"
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Cancel Bill</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to cancel bill {bill.billNumber}? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Keep Bill</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleCancelBill(bill)}>
-                                        Cancel Bill
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
-
-                              {/* Delete (DRAFT only) */}
-                              {bill.status === 'DRAFT' && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      title="Delete bill"
-                                      className="text-red-600 hover:text-red-700"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Bill</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Permanently delete bill {bill.billNumber}? This cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Keep</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        className="bg-red-600 hover:bg-red-700"
-                                        onClick={() => handleDelete(bill)}
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
-
-                              {/* Print */}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                title="Print bill"
-                                onClick={() => printBill(bill)}
-                              >
-                                <PrinterIcon className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 p-4">
+            {filtered.length > 0 && (
+              <div className={styles.pager}>
+                <span>
+                  Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} invoices
+                </span>
+                <div className={styles.pagerBtns}>
                   <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-                  <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+                  <span>Page {page} of {totalPages}</span>
                   <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>{/* end main content */}
-
-        {/* â”€â”€ Right Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <div className="w-72 shrink-0 space-y-6">
-
-          {/* Quick Actions */}
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Zap className="h-4 w-4 text-yellow-500" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 p-4 pt-0">
-              <Button
-                className="w-full justify-start bg-emerald-600 hover:bg-emerald-700 text-white"
-                size="sm"
-                onClick={() => { setEditingBill(null); setBillForm({ ...defaultBillForm(), warehouseId: warehouses[0]?.id }); setShowBillForm(true); }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                New Purchase
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Bulk Upload
-              </Button>
-              <Button variant="ghost" size="sm" className="w-full justify-start">
-                <Receipt className="mr-2 h-4 w-4" />
-                Scan Receipt
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start"
-                onClick={openCreateSupplier}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Add Supplier
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Inventory Snapshot */}
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Package className="h-4 w-4 text-blue-500" />
-                Inventory Snapshot
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-3">
-              {apiProducts.slice(0, 6).map(p => (
-                <div key={p.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.categoryName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{p.totalStock} {p.defaultUnit ?? 'pcs'}</p>
-                    {p.stockStatus === 'LOW_STOCK' && (
-                      <p className="text-xs text-orange-600">Low Stock</p>
-                    )}
-                    {p.stockStatus === 'OUT_OF_STOCK' && (
-                      <p className="text-xs text-red-600">Out of Stock</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {apiProducts.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No products loaded</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Suppliers quick list */}
-          <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-500" />
-                  Suppliers ({suppliers.length})
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={openCreateSupplier}>
-                  <Plus className="h-3 w-3 mr-1" />Add
-                </Button>
               </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2">
-              {suppliers.slice(0, 5).map(s => (
-                <div key={s.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{s.name}</p>
-                    {s.contactPerson && <p className="text-xs text-muted-foreground">{s.contactPerson}</p>}
-                  </div>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => openEditSupplier(s)}>
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {suppliers.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No suppliers yet</p>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>{/* end sidebar */}
-
-      </div>{/* end two-column layout */}
-
-      {/* â”€â”€ Create / Edit Bill Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <Dialog open={showBillForm} onOpenChange={open => {
-        setShowBillForm(open);
-        if (!open) { setEditingBill(null); setBillForm(defaultBillForm()); setProductSearch(''); setShowProductSearch(false); }
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingBill ? 'Edit Purchase' : 'Create New Purchase'}</DialogTitle>
-            <DialogDescription>
-              Create a new purchase record with supplier and product information
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-
-            {/* Row 1: Purchase Number + Purchase Date */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Purchase Number</Label>
-                <Input
-                  placeholder="Auto-generated if empty"
-                  value={billForm.purchaseNumber}
-                  onChange={e => setBillForm(prev => ({ ...prev, purchaseNumber: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Purchase Date</Label>
-                <Input
-                  type="date"
-                  value={billForm.billDate}
-                  onChange={e => setBillForm(prev => ({ ...prev, billDate: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Row 2: Priority + Payment Status */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Priority</Label>
-                <Select
-                  value={billForm.priority}
-                  onValueChange={v => setBillForm(prev => ({ ...prev, priority: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LOW">Low</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="URGENT">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Payment Status</Label>
-                <Select
-                  value={billForm.paymentStatus}
-                  onValueChange={v => setBillForm(prev => ({ ...prev, paymentStatus: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UNPAID">Pending</SelectItem>
-                    <SelectItem value="PARTIAL">Partial</SelectItem>
-                    <SelectItem value="PAID">Paid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Supplier */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Supplier *</Label>
-              <Select
-                value={billForm.supplierId ? String(billForm.supplierId) : ''}
-                onValueChange={v => setBillForm(prev => ({ ...prev, supplierId: Number(v) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select supplier..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Warehouse */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Warehouse *</Label>
-              <Select
-                value={billForm.warehouseId ? String(billForm.warehouseId) : ''}
-                onValueChange={v => setBillForm(prev => ({ ...prev, warehouseId: Number(v) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select warehouse..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map(w => (
-                    <SelectItem key={w.id} value={String(w.id)}>
-                      {w.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Stock from confirmed items in this bill will be added to the selected warehouse.
-              </p>
-            </div>
-
-            {/* Purchase Items */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs text-muted-foreground font-semibold">Purchase Items</Label>
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-8 text-xs"
-                  onClick={() => { setShowProductSearch(true); setProductSearch(''); }}
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add Product
-                </Button>
-              </div>
-
-              {/* Product search dropdown */}
-              {showProductSearch && (
-                <div className="relative mb-3">
-                  <div className="border rounded-lg shadow-lg bg-background z-50">
-                    <div className="p-2 border-b">
-                      <div className="relative">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          autoFocus
-                          placeholder="Search products..."
-                          value={productSearch}
-                          onChange={e => setProductSearch(e.target.value)}
-                          className="pl-8 h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="max-h-52 overflow-y-auto">
-                      {(() => {
-                        const filtered = apiProducts.filter(p =>
-                          p.isActive && (
-                            !productSearch ||
-                            p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-                            p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-                            (p.categoryName ?? '').toLowerCase().includes(productSearch.toLowerCase())
-                          )
-                        );
-                        if (filtered.length === 0) {
-                          return (
-                            <div className="py-6 text-center text-sm text-muted-foreground">
-                              No products found
-                            </div>
-                          );
-                        }
-                        return filtered.map(p => (
-                          <button
-                            key={p.id}
-                            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted text-left transition-colors"
-                            onClick={() => {
-                              addItem({
-                                productId: p.id,
-                                productName: p.name,
-                                productSku: p.sku ?? '',
-                                unitOfMeasure: p.defaultUnit ?? 'pcs',
-                                unitPrice: p.costPrice ?? 0,
-                                taxPercent: p.taxRate ?? 0,
-                                quantity: 1,
-                              });
-                              setShowProductSearch(false);
-                              setProductSearch('');
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium text-sm">{p.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {p.sku} â€¢ {p.categoryName}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 ml-3 shrink-0">
-                              <span className="text-sm font-semibold"><CurrencyGlyph /> {(p.costPrice ?? 0).toFixed(0)}</span>
-                              {p.stockStatus === 'OUT_OF_STOCK' && (
-                                <Badge className="text-[10px] px-1 py-0 bg-red-100 text-red-700">Out of Stock</Badge>
-                              )}
-                              {p.stockStatus === 'LOW_STOCK' && (
-                                <Badge className="text-[10px] px-1 py-0 bg-yellow-100 text-yellow-700">Low Stock</Badge>
-                              )}
-                              {p.stockStatus === 'ACTIVE' && (
-                                <Badge className="text-[10px] px-1 py-0 bg-green-100 text-green-700">Stock: {p.totalStock}</Badge>
-                              )}
-                            </div>
-                          </button>
-                        ));
-                      })()}
-                    </div>
-                    <div className="p-2 border-t">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="w-full text-xs"
-                        onClick={() => {
-                          addItem();
-                          setShowProductSearch(false);
-                          setProductSearch('');
-                        }}
-                      >
-                        + Add custom item manually
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Line items list */}
-              {billForm.items.length === 0 && !showProductSearch ? (
-                <div
-                  className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setShowProductSearch(true)}
-                >
-                  <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">Click "Add Product" to add items</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {billForm.items.map((item, idx) => (
-                    <div key={idx} className="border rounded-lg p-3 bg-muted/30">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex-1">
-                          <Input
-                            placeholder="Product name *"
-                            value={item.productName}
-                            onChange={e => updateItem(idx, { productName: e.target.value })}
-                            className="font-medium text-sm h-8"
-                          />
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
-                          onClick={() => removeItem(idx)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">SKU</Label>
-                          <Input
-                            placeholder="SKU"
-                            value={item.productSku}
-                            onChange={e => updateItem(idx, { productSku: e.target.value })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Unit</Label>
-                          <Input
-                            placeholder="pcs, kg..."
-                            value={item.unitOfMeasure}
-                            onChange={e => updateItem(idx, { unitOfMeasure: e.target.value })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Qty *</Label>
-                          <Input
-                            type="number"
-                            min="0.01"
-                            step="any"
-                            value={item.quantity}
-                            onChange={e => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Unit Price ({currencyCode}) *</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.unitPrice}
-                            onChange={e => updateItem(idx, { unitPrice: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Discount %</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={item.discountPercent}
-                            onChange={e => updateItem(idx, { discountPercent: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Tax %</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={item.taxPercent}
-                            onChange={e => updateItem(idx, { taxPercent: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2 text-right text-xs font-semibold text-primary">
-                        Line Total: <CurrencyGlyph /> {(
-                          item.quantity * item.unitPrice
-                          * (1 - item.discountPercent / 100)
-                          * (1 + item.taxPercent / 100)
-                        ).toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Invoice Number + Reference Number */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Invoice Number</Label>
-                <Input
-                  placeholder="Invoice number from supplier"
-                  value={billForm.invoiceNumber}
-                  onChange={e => setBillForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Reference Number</Label>
-                <Input
-                  placeholder="Internal reference number"
-                  value={billForm.referenceNumber}
-                  onChange={e => setBillForm(prev => ({ ...prev, referenceNumber: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label className="text-xs text-muted-foreground">Notes</Label>
-              <Textarea
-                placeholder="Additional notes or comments..."
-                rows={2}
-                value={billForm.notes}
-                onChange={e => setBillForm(prev => ({ ...prev, notes: e.target.value }))}
-              />
-            </div>
-
-            {/* Totals summary */}
-            {billForm.items.length > 0 && (
-              <Card className="bg-muted/30">
-                <CardContent className="p-3">
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span><CurrencyGlyph /> {billTotals.subtotal.toFixed(2)}</span>
-                    </div>
-                    {billTotals.discountAmount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Discount</span>
-                        <span>-<CurrencyGlyph /> {billTotals.discountAmount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {billTotals.taxAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax</span>
-                        <span><CurrencyGlyph /> {billTotals.taxAmount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <Separator />
-                    <div className="flex justify-between font-semibold">
-                      <span>Total</span>
-                      <span className="text-primary"><CurrencyGlyph /> {billTotals.total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             )}
-
-            {/* Form actions */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <Button
-                variant="ghost"
-                onClick={() => { setShowBillForm(false); setEditingBill(null); setBillForm(defaultBillForm()); }}
-              >
-                Cancel
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleSaveBill}
-                  disabled={saving}
-                >
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save as Draft
-                </Button>
-                <Button onClick={handleSaveBill} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                  {editingBill ? 'Update Purchase' : 'Create Purchase'}
-                </Button>
-              </div>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* â”€â”€ Bill Detail Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <Dialog open={showBillDetail} onOpenChange={setShowBillDetail}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          {selectedBill && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <Receipt className="h-5 w-5" />
-                  {selectedBill.billNumber}
-                  {getStatusBadge(selectedBill.status)}
-                  {getPaymentBadge(selectedBill.paymentStatus)}
-                </DialogTitle>
-                <DialogDescription>Supplier bill details and line items</DialogDescription>
-              </DialogHeader>
+      {/* ── PREVIEW ── */}
+      {view === 'preview' && (
+        <PurchaseInvoicePreview
+          bills={filtered}
+          loading={loading}
+          selectedId={previewId}
+          onSelect={b => setPreviewId(b.id)}
+          searchTerm={search}
+          onSearchChange={setSearch}
+          suppliers={suppliers}
+          purchaseOrders={purchaseOrders}
+          products={products}
+          warehouseName={warehouseName}
+          busyId={busyId}
+          onBack={goList}
+          onEdit={openEdit}
+          onConfirm={b => setPendingConfirm({ bill: b })}
+          onRecordPayment={openPayment}
+          onCancel={setPendingCancel}
+          onDelete={setPendingDelete}
+          onPrint={handlePrint}
+          onPrintBarcodes={handlePrintBarcodes}
+        />
+      )}
 
-              <div className="space-y-5">
-                {/* Info cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Supplier Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Supplier: </span>
-                        <span className="font-medium">{selectedBill.supplierName}</span>
-                      </div>
-                      {selectedBill.invoiceNumber && (
-                        <div>
-                          <span className="text-muted-foreground">Invoice #: </span>
-                          <span className="font-medium">{selectedBill.invoiceNumber}</span>
-                        </div>
-                      )}
-                      {selectedBill.receivedBy && (
-                        <div>
-                          <span className="text-muted-foreground">Received by: </span>
-                          <span className="font-medium">{selectedBill.receivedBy}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+      {/* ── EDITOR ── */}
+      {view === 'editor' && (
+        <PurchaseInvoiceEditor
+          key={`${editorSession}-${editingBill?.id ?? 'new'}`}
+          ref={editorRef}
+          bill={editingBill}
+          allBills={bills}
+          suppliers={suppliers}
+          warehouses={warehouses}
+          products={products}
+          purchaseOrders={purchaseOrders}
+          saving={saving}
+          selectSupplier={newSupplier}
+          initialPurchaseOrderId={editingBill ? undefined : prefillPoId}
+          onSave={onEditorSave}
+          onPrint={handlePrint}
+          onAddSupplier={openCreateSupplier}
+          onRecordPayment={openPayment}
+          onRefreshProducts={refreshProducts}
+        />
+      )}
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Bill Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Bill Date: </span>
-                        <span className="font-medium">{selectedBill.billDate}</span>
-                      </div>
-                      {selectedBill.dueDate && (
-                        <div>
-                          <span className="text-muted-foreground">Due Date: </span>
-                          <span className="font-medium">{selectedBill.dueDate}</span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground">Created: </span>
-                        <span className="font-medium">{selectedBill.createdAt}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Amount Paid: </span>
-                        <span className="font-medium text-green-600"><CurrencyGlyph /> {selectedBill.amountPaid.toFixed(2)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+      {/* ── Confirm (post) ── */}
+      <AlertDialog open={!!pendingConfirm} onOpenChange={o => { if (!o) setPendingConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm purchase invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingConfirm?.bill ? `${pendingConfirm.bill.billNumber} will be locked. ` : 'The invoice will be saved and locked. '}
+              {(pendingConfirm?.req?.purchaseOrderId ?? pendingConfirm?.bill?.purchaseOrderId)
+                ? `It is linked to a purchase order: any quantity not yet received on that PO is received into ${warehouseName(pendingConfirm?.req?.warehouseId ?? pendingConfirm?.bill?.warehouseId)} now, and the supplier payable is posted. Goods already received on the PO are not added again.`
+                : `Stock for its catalog items will be added to ${warehouseName(pendingConfirm?.req?.warehouseId ?? pendingConfirm?.bill?.warehouseId)} and the supplier payable is posted.`}
+              {' '}Confirmed invoices can’t be edited — only cancelled.
+              <br /><br />
+              <strong>Confirm on Credit</strong> leaves the full amount as supplier outstanding to pay later;{' '}
+              <strong>Confirm &amp; Pay Now</strong> opens the payment window straight after (full or part payment).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not yet</AlertDialogCancel>
+            <AlertDialogAction className="bg-secondary text-secondary-foreground" onClick={() => runPendingConfirm(false)}>Confirm on Credit</AlertDialogAction>
+            <AlertDialogAction onClick={() => runPendingConfirm(true)}>Confirm &amp; Pay Now</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-                {/* Line items table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Line Items ({selectedBill.items.length})</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Qty</TableHead>
-                          <TableHead>Unit Price</TableHead>
-                          <TableHead>Disc%</TableHead>
-                          <TableHead>Tax%</TableHead>
-                          <TableHead>Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedBill.items.map(item => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <p className="font-medium">{item.productName}</p>
-                              {item.notes && <p className="text-xs text-muted-foreground italic">{item.notes}</p>}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{item.productSku ?? 'â€”'}</TableCell>
-                            <TableCell>{item.quantity} {item.unitOfMeasure ?? ''}</TableCell>
-                            <TableCell><CurrencyGlyph /> {item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell>{item.discountPercent}%</TableCell>
-                            <TableCell>{item.taxPercent}%</TableCell>
-                            <TableCell className="font-medium"><CurrencyGlyph /> {item.totalAmount.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+      {/* ── Cancel ── */}
+      <AlertDialog open={!!pendingCancel} onOpenChange={o => { if (!o) setPendingCancel(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel {pendingCancel?.billNumber}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingCancel?.status === 'CONFIRMED' && !pendingCancel.purchaseOrderId
+                ? 'Stock that this invoice added will be reversed. '
+                : ''}
+              This can’t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Invoice</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { const b = pendingCancel; setPendingCancel(null); if (b) cancelBill(b); }}>Cancel Invoice</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-                {/* Financial summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Financial Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-1 text-sm max-w-xs ml-auto">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span><CurrencyGlyph /> {selectedBill.subtotal.toFixed(2)}</span>
-                      </div>
-                      {selectedBill.discountAmount > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Discount</span>
-                          <span>-<CurrencyGlyph /> {selectedBill.discountAmount.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax</span>
-                        <span><CurrencyGlyph /> {selectedBill.taxAmount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Shipping</span>
-                        <span><CurrencyGlyph /> {selectedBill.shippingCost.toFixed(2)}</span>
-                      </div>
-                      <Separator />
-                      <div className="flex justify-between font-semibold">
-                        <span>Total</span>
-                        <span><CurrencyGlyph /> {selectedBill.totalAmount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-green-600">
-                        <span>Paid</span>
-                        <span><CurrencyGlyph /> {selectedBill.amountPaid.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-orange-600">
-                        <span>Balance Due</span>
-                        <span><CurrencyGlyph /> {(selectedBill.totalAmount - selectedBill.amountPaid).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+      {/* ── Delete ── */}
+      <AlertDialog open={!!pendingDelete} onOpenChange={o => { if (!o) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete draft {pendingDelete?.billNumber}?</AlertDialogTitle>
+            <AlertDialogDescription>The draft and its lines will be permanently removed.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600" onClick={() => { const b = pendingDelete; setPendingDelete(null); if (b) deleteBill(b); }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-                {selectedBill.notes && (
-                  <Card>
-                    <CardHeader><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground text-sm">{selectedBill.notes}</p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Dialog actions */}
-                <div className="flex justify-between">
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => printBill(selectedBill)}>
-                      <PrinterIcon className="mr-2 h-4 w-4" />
-                      Print
-                    </Button>
-                  </div>
-                  <div className="flex gap-2">
-                    {selectedBill.status === 'DRAFT' && (
-                      <>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setShowBillDetail(false);
-                            openEditBill(selectedBill);
-                          }}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          disabled={confirmingId === selectedBill.id}
-                          onClick={() => handleConfirm(selectedBill)}
-                        >
-                          {confirmingId === selectedBill.id
-                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            : <CheckCircle className="mr-2 h-4 w-4" />
-                          }
-                          Confirm Bill
-                        </Button>
-                      </>
-                    )}
-                    {selectedBill.status === 'CONFIRMED' && selectedBill.paymentStatus !== 'PAID' && (
-                      <Button
-                        onClick={() => {
-                          setPayingBill(selectedBill);
-                          setShowBillDetail(false);
-                          setShowPaymentDialog(true);
-                        }}
-                      >
-                        <Wallet className="mr-2 h-4 w-4" />
-                        Record Payment
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* â”€â”€ Record Payment Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <Dialog open={showPaymentDialog} onOpenChange={open => {
-        setShowPaymentDialog(open);
+      {/* ── Record payment ── */}
+      <Dialog open={!!payingBill} onOpenChange={open => {
         if (!open) { setPayingBill(null); paymentManager.clearLines(); setPayNotes(''); }
       }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Record Payment
-            </DialogTitle>
-            <DialogDescription>
-              {payingBill && `Bill ${payingBill.billNumber} â€” Balance: ${currencyCode} ${payingBillBalance.toFixed(2)}`}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <PaymentAllocationPanel
-              manager={paymentManager}
-              invoiceTotal={payingBillBalance}
-              bankAccounts={bankAccounts}
-              offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE]}
-            />
-
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                placeholder="Payment reference or notes..."
-                rows={2}
-                value={payNotes}
-                onChange={e => setPayNotes(e.target.value)}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleRecordPayment} disabled={saving || !paymentManager.settleable}>
-                {saving
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <CreditCard className="mr-2 h-4 w-4" />
-                }
-                Record Payment
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* â”€â”€ Supplier Form Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <Dialog open={showSupplierForm} onOpenChange={open => {
-        setShowSupplierForm(open);
-        if (!open) setEditingSupplier(null);
-      }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingSupplier ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
-            <DialogDescription>
-              {editingSupplier ? 'Update supplier information' : 'Create a new supplier record'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Name *</Label>
-                <Input
-                  placeholder="Company name"
-                  value={supplierForm.name ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Contact Person</Label>
-                <Input
-                  placeholder="Contact name"
-                  value={supplierForm.contactPerson ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, contactPerson: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  placeholder="email@company.com"
-                  value={supplierForm.email ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, email: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Phone</Label>
-                <Input
-                  placeholder="+971-4-xxx-xxxx"
-                  value={supplierForm.phone ?? ''}
-                  onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setSupplierForm(p => ({ ...p, phone: v })); }}
-                />
-              </div>
-              <div>
-                <Label>City</Label>
-                <Input
-                  placeholder="City"
-                  value={supplierForm.city ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, city: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Country</Label>
-                <Input
-                  placeholder="Country"
-                  value={supplierForm.country ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, country: e.target.value }))}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Address</Label>
-                <Input
-                  placeholder="Street address"
-                  value={supplierForm.address ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, address: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Tax ID / TRN</Label>
-                <Input
-                  placeholder="Tax ID"
-                  value={supplierForm.taxId ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, taxId: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Payment Terms</Label>
-                <Select
-                  value={supplierForm.paymentTerms ?? ''}
-                  onValueChange={v => setSupplierForm(p => ({ ...p, paymentTerms: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="IMMEDIATE">Immediate</SelectItem>
-                    <SelectItem value="NET 7">NET 7</SelectItem>
-                    <SelectItem value="NET 15">NET 15</SelectItem>
-                    <SelectItem value="NET 30">NET 30</SelectItem>
-                    <SelectItem value="NET 60">NET 60</SelectItem>
-                    <SelectItem value="NET 90">NET 90</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Credit Limit ({currencyCode})</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={supplierForm.creditLimit ?? 0}
-                  onChange={e => setSupplierForm(p => ({ ...p, creditLimit: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div>
-                <Label>Rating (0â€“5)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={supplierForm.rating ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, rating: parseFloat(e.target.value) || undefined }))}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Notes</Label>
-                <Textarea
-                  placeholder="Notes about this supplier..."
-                  rows={2}
-                  value={supplierForm.notes ?? ''}
-                  onChange={e => setSupplierForm(p => ({ ...p, notes: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowSupplierForm(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveSupplier} disabled={savingSupplier}>
-                {savingSupplier
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <Save className="mr-2 h-4 w-4" />
-                }
-                {editingSupplier ? 'Update Supplier' : 'Create Supplier'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mobile FAB */}
-      <div className="fixed bottom-6 right-6 md:hidden">
-        <Button
-          size="lg"
-          className="rounded-full shadow-lg"
-          onClick={() => {
-            setEditingBill(null);
-            setBillForm(defaultBillForm());
-            setShowBillForm(true);
+        {/* Header / scrolling body / pinned footer: the allocation panel grows with every
+            payment line, and an uncapped centered dialog then overflows the screen on both
+            ends (title and Record button unreachable). Height is capped to the real
+            viewport — body is at zoom 0.9, hence the /0.9 (same as the sidebar's fix). */}
+        <DialogContent
+          style={{
+            display: 'flex', flexDirection: 'column', gap: 0, padding: 0, overflow: 'hidden',
+            width: '100%', maxWidth: 'min(28rem, calc(100% - 2rem))',
+            maxHeight: 'calc(100dvh / 0.9 - 2rem)',
           }}
         >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+          <DialogHeader style={{ flexShrink: 0, padding: '20px 48px 12px 20px', textAlign: 'left' }}>
+            <DialogTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Record Payment</DialogTitle>
+            <DialogDescription>
+              {payingBill && <>{payingBill.billNumber} · {payingBill.supplierName} — balance <CurrencyValue amount={payingBillBalance} options={fmt2} /></>}
+            </DialogDescription>
+          </DialogHeader>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '4px 20px 16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              <div>
+                <Label htmlFor="pay-now">Paying now</Label>
+                <Input id="pay-now" type="number" min={0} max={payingBillBalance} step="0.01" value={payNowInput}
+                  onChange={e => { setPayNowInput(e.target.value); paymentManager.clearLines(); }} />
+              </div>
+              <div>
+                <Label htmlFor="pay-date">Payment date</Label>
+                <Input id="pay-date" type="date" max={todayIso()} value={payDate} onChange={e => setPayDate(e.target.value)} />
+              </div>
+            </div>
+            <div className={cx(styles.notice, leftOnCredit > 0 ? styles.noticeWarn : styles.noticeInfo)} style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <span>Balance due <strong><CurrencyValue amount={payingBillBalance} options={fmt2} /></strong></span>
+              <span>{leftOnCredit > 0
+                ? <>Left on credit <strong><CurrencyValue amount={leftOnCredit} options={fmt2} /></strong> (supplier outstanding)</>
+                : <>Settles the invoice in full</>}</span>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setPayNowInput(payingBillBalance.toFixed(2)); paymentManager.clearLines(); }}>Full</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setPayNowInput((Math.round(payingBillBalance * 50) / 100).toFixed(2)); paymentManager.clearLines(); }}>Half</Button>
+              </span>
+            </div>
+            <PaymentAllocationPanel
+              manager={paymentManager}
+              invoiceTotal={payNow}
+              bankAccounts={bankAccounts}
+              offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT]}
+              creditParty={payingBill ? {
+                code: String(payingBill.supplierId),
+                name: payingBill.supplierName,
+                roleLabel: 'Supplier',
+                accountLabel: 'Accounts Payable',
+              } : undefined}
+            />
+            <div>
+              <Label>Notes</Label>
+              <Textarea placeholder="Payment reference or notes..." rows={2} value={payNotes} onChange={e => setPayNotes(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, padding: '12px 20px 16px', borderTop: '1px solid var(--border)' }}>
+            <Button variant="outline" onClick={() => setPayingBill(null)}>{leftOnCredit >= payingBillBalance ? 'Keep on Credit' : 'Cancel'}</Button>
+            <Button onClick={handleRecordPayment} disabled={saving || payNow <= 0 || !paymentManager.settleable}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+              {leftOnCredit > 0 ? 'Record Part Payment' : 'Record Payment'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <SupplierFormDialog open={showSupplierForm} supplier={null} onOpenChange={setShowSupplierForm} onSaved={onSupplierSaved} />
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

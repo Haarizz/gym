@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
+import { overlaySize } from '../ui/overlay-root';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '../ui/command';
 import { Input } from '../ui/input';
 import { geocodingApi, LocationSuggestion } from '../../utils/supabase/gym-service';
@@ -75,7 +76,8 @@ export function LocationPicker({ id, value, onChange, placeholder }: LocationPic
         </div>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0 w-[--radix-popover-trigger-width]"
+        className="p-0"
+        style={{ width: overlaySize("--radix-popover-trigger-width") }}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command shouldFilter={false}>

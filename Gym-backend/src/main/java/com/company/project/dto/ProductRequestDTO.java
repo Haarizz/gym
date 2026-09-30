@@ -22,6 +22,8 @@ public class ProductRequestDTO {
     private BigDecimal costPrice;
     private BigDecimal taxRate;
     private String supplier;
+    // Only honoured when Products › Settings › Auto-generate SKU is off.
+    private String sku;
 
     // Initial stock allocation
     private Integer openingStock;
@@ -84,6 +86,9 @@ public class ProductRequestDTO {
 
     public String getSupplier() { return supplier; }
     public void setSupplier(String supplier) { this.supplier = supplier; }
+
+    public String getSku() { return sku; }
+    public void setSku(String sku) { this.sku = sku; }
 
     public Integer getOpeningStock() { return openingStock; }
     public void setOpeningStock(Integer openingStock) { this.openingStock = openingStock; }

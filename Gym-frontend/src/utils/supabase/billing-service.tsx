@@ -27,7 +27,9 @@ export interface MemberDue {
   days_overdue: number;
   last_payment: string | null;
   status: 'Overdue' | 'Due Soon' | 'Pending';
-  due_type?: 'Membership Due' | 'Renewal Due';
+  due_type?: 'Membership Due' | 'Renewal Due' | 'Sales Invoice';
+  /** Set on 'Sales Invoice' rows (unpaid balance of a member's confirmed Sales Invoice) — built client-side. */
+  sales_invoice?: import('./sales-invoice-service').SalesInvoice;
 }
 
 export interface PaymentSplitLeg {

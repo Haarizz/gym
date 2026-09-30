@@ -8,7 +8,7 @@ import type { PaymentManager } from "./usePaymentManager";
 import { CashModal, CashDraft } from "./modals/CashModal";
 import { CardModal, CardDraft } from "./modals/CardModal";
 import { OnlineModal, OnlineDraft } from "./modals/OnlineModal";
-import { CreditModal, CreditDraft, CreditCustomer } from "./modals/CreditModal";
+import { CreditModal, CreditDraft, CreditCustomer, CreditParty } from "./modals/CreditModal";
 import { resolveConfirm } from "./resolveConfirm";
 
 type Draft = CashDraft | CardDraft | OnlineDraft | CreditDraft;
@@ -37,12 +37,13 @@ function isTypingTarget(el: EventTarget | null): boolean {
 interface PaymentEntryRowProps {
   line: PaymentLine;
   error?: string;
+  creditLabel: string;
   onEdit: (line: PaymentLine) => void;
   onRemove: (id: string) => void;
 }
 
 const PaymentEntryRow = React.memo(
-  function PaymentEntryRow({ line, error, onEdit, onRemove }: PaymentEntryRowProps) {
+  function PaymentEntryRow({ line, error, creditLabel, onEdit, onRemove }: PaymentEntryRowProps) {
     const tile = METHOD_TILES.find((t) => t.type === line.paymentType)!;
     const detailParts = [line.paymentType === PAYMENT_TYPES.CARD ? line.paymentSubtype : null, line.customerName, line.reference ? `Ref ${line.reference}` : null].filter(
       Boolean
@@ -91,7 +92,7 @@ const PaymentEntryRow = React.memo(
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 13.5 }}>
-            {line.paymentType === PAYMENT_TYPES.CREDIT ? "Transferred to Accounts Receivable" : lineLabel(line)}
+            {line.paymentType === PAYMENT_TYPES.CREDIT ? creditLabel : lineLabel(line)}
           </div>
           {detailParts.length > 0 && (
             <div style={{ fontSize: 12, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -135,7 +136,7 @@ const PaymentEntryRow = React.memo(
       </div>
     );
   },
-  (prev, next) => prev.line === next.line && prev.error === next.error && prev.onEdit === next.onEdit && prev.onRemove === next.onRemove
+  (prev, next) => prev.line === next.line && prev.error === next.error && prev.creditLabel === next.creditLabel && prev.onEdit === next.onEdit && prev.onRemove === next.onRemove
 );
 
 export interface PaymentAllocationPanelProps {
@@ -146,6 +147,8 @@ export interface PaymentAllocationPanelProps {
   customers?: CreditCustomer[];
   onSearchCustomers?: (query: string) => void;
   offeredTypes?: PaymentType[];
+  /** Fixed owner of any Credit line (e.g. the bill's supplier) — see CreditParty. */
+  creditParty?: CreditParty;
 }
 
 export function PaymentAllocationPanel({
@@ -156,7 +159,9 @@ export function PaymentAllocationPanel({
   customers = [],
   onSearchCustomers,
   offeredTypes = [PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT],
+  creditParty,
 }: PaymentAllocationPanelProps) {
+  const creditLabel = creditParty ? `Left on credit (${creditParty.accountLabel})` : "Transferred to Accounts Receivable";
   const [openModal, setOpenModal] = useState<PaymentType | null>(null);
   const [editingLine, setEditingLine] = useState<PaymentLine | null>(null);
 
@@ -384,7 +389,7 @@ export function PaymentAllocationPanel({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {paymentLines.map((line) => (
-              <PaymentEntryRow key={line.id} line={line} error={errors[line.id]} onEdit={openEditModal} onRemove={removeLine} />
+              <PaymentEntryRow key={line.id} line={line} error={errors[line.id]} creditLabel={creditLabel} onEdit={openEditModal} onRemove={removeLine} />
             ))}
           </div>
         )}
@@ -432,6 +437,7 @@ export function PaymentAllocationPanel({
           customers={customers}
           onSearchCustomers={onSearchCustomers}
           offeredTypes={offeredTypes}
+          fixedParty={creditParty}
         />
       )}
     </div>

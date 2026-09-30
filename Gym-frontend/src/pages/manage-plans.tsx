@@ -45,6 +45,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.png';
 import { toast } from "sonner";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 export function ManagePlans() {
   const { activeBranchId } = useBranch();
@@ -56,6 +57,7 @@ export function ManagePlans() {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [viewingPlan, setViewingPlan] = useState<Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  useGlobalSearchPrefill(setSearchTerm);
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");

@@ -83,6 +83,18 @@ public class SupplierBillController {
     }
 
     /**
+     * GET /api/supplier-bills/statement?supplierId=&from=yyyy-MM-dd&to=yyyy-MM-dd
+     * Supplier statement of account (invoices as credits, payments as debits, running balance).
+     */
+    @GetMapping("/statement")
+    public ResponseEntity<java.util.Map<String, Object>> getStatement(
+            @RequestParam Long supplierId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return ResponseEntity.ok(supplierBillService.getStatement(supplierId, from, to));
+    }
+
+    /**
      * POST /api/supplier-bills/{id}/record-payment
      */
     @PostMapping("/{id}/record-payment")

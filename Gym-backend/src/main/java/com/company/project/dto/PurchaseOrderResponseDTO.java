@@ -33,6 +33,8 @@ public class PurchaseOrderResponseDTO {
     private String notes;
     private String createdBy;
     private String approvedBy;
+    // Prints use this branch's company details (name, address, TRN, logo) in the header.
+    private Long branchId;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -62,6 +64,7 @@ public class PurchaseOrderResponseDTO {
         dto.setNotes(po.getNotes());
         dto.setCreatedBy(po.getCreatedBy());
         dto.setApprovedBy(po.getApprovedBy());
+        dto.setBranchId(po.getBranchId());
         dto.setCreatedAt(po.getCreatedAt());
         dto.setUpdatedAt(po.getUpdatedAt());
         dto.setItems(items.stream().map(PurchaseOrderItemDTO::fromEntity).collect(Collectors.toList()));
@@ -126,6 +129,9 @@ public class PurchaseOrderResponseDTO {
 
     public String getApprovedBy() { return approvedBy; }
     public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
