@@ -5,12 +5,14 @@ import com.company.project.entities.DeferredRevenueSchedule;
 import com.company.project.entities.JournalVoucher;
 import com.company.project.entities.JournalVoucherLine;
 import com.company.project.entities.Receipt;
+import com.company.project.entities.SalesInvoice;
 import com.company.project.entities.SupplierBill;
 import com.company.project.entities.TaxCode;
 import com.company.project.repositories.AccountHeadRepository;
 import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.JournalVoucherRepository;
 import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.SalesInvoiceRepository;
 import com.company.project.repositories.SupplierBillRepository;
 import com.company.project.repositories.TaxCodeRepository;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,7 @@ public class FinancialReportService {
     private final ReceiptRepository             receiptRepository;
     private final SupplierBillRepository        supplierBillRepository;
     private final TaxCodeRepository             taxCodeRepository;
+    private final SalesInvoiceRepository        salesInvoiceRepository;
 
     public FinancialReportService(AccountHeadRepository accountHeadRepository,
                                    JournalVoucherRepository journalVoucherRepository,
@@ -54,7 +57,8 @@ public class FinancialReportService {
                                    DeferredRevenueScheduleService deferredRevenueScheduleService,
                                    ReceiptRepository receiptRepository,
                                    SupplierBillRepository supplierBillRepository,
-                                   TaxCodeRepository taxCodeRepository) {
+                                   TaxCodeRepository taxCodeRepository,
+                                   SalesInvoiceRepository salesInvoiceRepository) {
         this.accountHeadRepository        = accountHeadRepository;
         this.journalVoucherRepository     = journalVoucherRepository;
         this.journalVoucherLineRepository = journalVoucherLineRepository;
@@ -62,6 +66,7 @@ public class FinancialReportService {
         this.receiptRepository            = receiptRepository;
         this.supplierBillRepository       = supplierBillRepository;
         this.taxCodeRepository            = taxCodeRepository;
+        this.salesInvoiceRepository       = salesInvoiceRepository;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -608,6 +613,27 @@ public class FinancialReportService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("member_name", r.getMemberName());
             row.put("receipt_no", r.getReceiptNo());
+            row.put("due_date", dueDate);
+            row.put("outstanding", outstanding);
+            row.put("days_overdue", Math.max(daysOverdue, 0));
+            row.put("bucket", AGING_BUCKET_LABELS[bucket]);
+            rows.add(row);
+        }
+
+        // Confirmed Sales Invoices sold on account (members) with a balance still due.
+        for (SalesInvoice inv : salesInvoiceRepository.findAll()) {
+            if (!"CONFIRMED".equals(inv.getStatus())) continue;
+            BigDecimal outstanding = safe(inv.getTotalAmount()).subtract(safe(inv.getAmountPaid()));
+            if (outstanding.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            LocalDate dueDate = inv.getDueDate() != null ? inv.getDueDate() : inv.getInvoiceDate();
+            int daysOverdue = dueDate != null ? (int) ChronoUnit.DAYS.between(dueDate, asOf) : 0;
+            int bucket = agingBucketIndex(daysOverdue);
+            bucketTotals[bucket] = bucketTotals[bucket].add(outstanding);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("member_name", inv.getCustomerName());
+            row.put("receipt_no", inv.getInvoiceNumber());
             row.put("due_date", dueDate);
             row.put("outstanding", outstanding);
             row.put("days_overdue", Math.max(daysOverdue, 0));

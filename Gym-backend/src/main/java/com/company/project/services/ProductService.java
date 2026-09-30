@@ -45,6 +45,7 @@ public class ProductService {
     private final WarehouseRepository warehouseRepository;
     private final ProductUnitRepository unitRepository;
     private final BranchService branchService;
+    private final ProductSettingsService productSettingsService;
 
     public ProductService(ProductRepository productRepository,
                           ProductCategoryRepository categoryRepository,
@@ -52,7 +53,8 @@ public class ProductService {
                           StockAdjustmentRepository adjustmentRepository,
                           WarehouseRepository warehouseRepository,
                           ProductUnitRepository unitRepository,
-                          BranchService branchService) {
+                          BranchService branchService,
+                          ProductSettingsService productSettingsService) {
         this.productRepository  = productRepository;
         this.categoryRepository = categoryRepository;
         this.stockRepository    = stockRepository;
@@ -60,6 +62,7 @@ public class ProductService {
         this.warehouseRepository  = warehouseRepository;
         this.unitRepository       = unitRepository;
         this.branchService        = branchService;
+        this.productSettingsService = productSettingsService;
     }
 
     // ── Create ──────────────────────────────────────────────────────────────
@@ -69,12 +72,15 @@ public class ProductService {
         Long branchId = branchService.resolveBranchForCreate(null);
         product.setBranchId(branchId);
         
+        boolean autoSku = productSettingsService.isEnabled(ProductSettingsService.AUTO_GENERATE_SKU);
+        String manualSku = autoSku ? null : requireManualSku(req.getSku(), null);
+
         mapRequestToProduct(req, product);
         product = productRepository.save(product);
 
-        // Auto-generate SKU based on category type
-        String sku = generateSku(product.getId(), product.getCategoryId());
-        product.setSku(sku);
+        // Auto-generate SKU based on category type, unless the gym enters its own
+        // (Products › Settings › Auto-generate SKU off).
+        product.setSku(autoSku ? generateSku(product.getId(), product.getCategoryId()) : manualSku);
         product = productRepository.save(product);
 
         // Persist product units
@@ -145,10 +151,19 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
         mapRequestToProduct(req, product);
 
-        // If category changed, regenerate SKU
-        if (req.getCategoryId() != null && !req.getCategoryId().equals(product.getCategoryId())) {
-            product.setCategoryId(req.getCategoryId());
-            product.setSku(generateSku(product.getId(), req.getCategoryId()));
+        if (productSettingsService.isEnabled(ProductSettingsService.AUTO_GENERATE_SKU)) {
+            // If category changed, regenerate SKU
+            if (req.getCategoryId() != null && !req.getCategoryId().equals(product.getCategoryId())) {
+                product.setCategoryId(req.getCategoryId());
+                product.setSku(generateSku(product.getId(), req.getCategoryId()));
+            }
+        } else {
+            // Manual SKUs are the gym's own codes — never rewrite them on a category
+            // change; only replace one when a different code is actually submitted.
+            if (req.getCategoryId() != null) product.setCategoryId(req.getCategoryId());
+            if (req.getSku() != null && !req.getSku().isBlank() && !req.getSku().trim().equals(product.getSku())) {
+                product.setSku(requireManualSku(req.getSku(), product.getId()));
+            }
         }
 
         product = productRepository.save(product);
@@ -168,7 +183,59 @@ public class ProductService {
             }
         }
 
+        updateInventorySettings(id, req);
+
         return buildResponseDTO(product);
+    }
+
+    /**
+     * Edit-mode counterpart of createProduct's opening-stock entry: the Inventory tab
+     * sends openingStock/reorderLevel/warehouseId on every save, but update used to
+     * drop them, so edits there silently did nothing. Reorder level is a plain setting.
+     * Opening stock is history — stock has usually moved since (purchases, sales) — so
+     * a change is applied as a correction: current stock shifts by the same difference
+     * (floored at 0, like a SUBTRACT adjustment) and is audited like any adjustment.
+     */
+    private void updateInventorySettings(Long productId, ProductRequestDTO req) {
+        if (req.getWarehouseId() == null) return;
+        ProductStock stock = stockRepository.findByProductIdAndWarehouseId(productId, req.getWarehouseId())
+                .orElseGet(() -> {
+                    ProductStock s = new ProductStock();
+                    s.setProductId(productId);
+                    s.setWarehouseId(req.getWarehouseId());
+                    s.setCurrentStock(0);
+                    s.setOpeningStock(0);
+                    s.setReorderLevel(0);
+                    return s;
+                });
+
+        if (req.getReorderLevel() != null) {
+            stock.setReorderLevel(Math.max(0, req.getReorderLevel()));
+        }
+
+        if (req.getOpeningStock() != null) {
+            int oldOpening = stock.getOpeningStock() != null ? stock.getOpeningStock() : 0;
+            int newOpening = Math.max(0, req.getOpeningStock());
+            int delta = newOpening - oldOpening;
+            if (delta != 0) {
+                int previousStock = stock.getCurrentStock() != null ? stock.getCurrentStock() : 0;
+                int newStock = Math.max(0, previousStock + delta);
+                stock.setOpeningStock(newOpening);
+                stock.setCurrentStock(newStock);
+
+                StockAdjustment adjustment = new StockAdjustment();
+                adjustment.setProductId(productId);
+                adjustment.setWarehouseId(req.getWarehouseId());
+                adjustment.setAdjustmentType(delta > 0 ? "ADD" : "SUBTRACT");
+                adjustment.setQuantity(Math.abs(delta));
+                adjustment.setPreviousStock(previousStock);
+                adjustment.setNewStock(newStock);
+                adjustment.setReason("Opening stock corrected from " + oldOpening + " to " + newOpening);
+                adjustmentRepository.save(adjustment);
+            }
+        }
+
+        stockRepository.save(stock);
     }
 
     // ── Delete ──────────────────────────────────────────────────────────────
@@ -352,6 +419,23 @@ public class ProductService {
         if (req.getCostPrice() != null) product.setCostPrice(req.getCostPrice());
         if (req.getTaxRate() != null) product.setTaxRate(req.getTaxRate());
         if (req.getSupplier() != null) product.setSupplier(req.getSupplier());
+    }
+
+    /** Validates a user-entered SKU: required, trimmed, and unique across products. */
+    private String requireManualSku(String sku, Long currentProductId) {
+        if (sku == null || sku.isBlank()) {
+            throw new IllegalArgumentException("SKU is required when auto-generate SKU is turned off");
+        }
+        String trimmed = sku.trim();
+        if (trimmed.length() > 64) {
+            throw new IllegalArgumentException("SKU must be 64 characters or fewer");
+        }
+        productRepository.findBySku(trimmed)
+                .filter(existing -> !existing.getId().equals(currentProductId))
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("SKU \"" + trimmed + "\" is already used by " + existing.getName());
+                });
+        return trimmed;
     }
 
     private String generateSku(Long productId, Long categoryId) {

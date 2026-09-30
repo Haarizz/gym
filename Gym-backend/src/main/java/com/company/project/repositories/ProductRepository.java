@@ -16,4 +16,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     boolean existsBySku(String sku);
 
     List<Product> findByCategoryId(Long categoryId);
+
+    List<Product> findByBrandIgnoreCase(String brand);
+
+    // [lower(brand), count] pairs — product counts per brand name in one query.
+    @org.springframework.data.jpa.repository.Query(
+        "select lower(p.brand), count(p) from Product p where p.brand is not null and p.brand <> '' group by lower(p.brand)")
+    List<Object[]> countProductsByBrand();
 }

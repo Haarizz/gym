@@ -46,6 +46,40 @@ import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
+import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
+import type { SalesInvoice } from '../utils/supabase/sales-invoice-service';
+import { balanceOf as invoiceBalance, fetchAllInvoices } from '../components/sales-invoice/salesInvoiceUtils';
+import { SalesInvoiceSettleDialog, type SettleRequest } from '../components/sales-invoice/SalesInvoiceSettleDialog';
+
+/**
+ * A member's confirmed Sales Invoice with money still owed, shaped as a Member Due row
+ * (due type "Sales Invoice"). Collected through the sales invoice payment window, not a
+ * membership receipt, so the invoice and its receivable stay in step.
+ */
+function salesInvoiceDue(inv: SalesInvoice): MemberDue {
+  const today = new Date(new Date().toDateString());
+  const dueDate = inv.dueDate || inv.invoiceDate;
+  const due = new Date(`${dueDate}T00:00:00`);
+  const daysOverdue = Math.max(0, Math.floor((today.getTime() - due.getTime()) / 86_400_000));
+  const daysLeft = Math.floor((due.getTime() - today.getTime()) / 86_400_000);
+  const paidDates = (inv.paymentBreakdown ?? []).map((p: any) => p.payment_date ?? p.paymentDate).filter(Boolean).sort();
+  return {
+    id: inv.memberId ?? 0,
+    member_id: String(inv.memberId ?? ''),
+    member_name: inv.customerName,
+    member_email: inv.customerEmail ?? '',
+    member_phone: inv.customerPhone ?? '',
+    membership: inv.invoiceNumber,
+    amount: invoiceBalance(inv),
+    due_date: dueDate,
+    days_overdue: daysOverdue,
+    last_payment: paidDates.length ? paidDates[paidDates.length - 1] : null,
+    status: daysOverdue > 0 ? 'Overdue' : daysLeft <= 7 ? 'Due Soon' : 'Pending',
+    due_type: 'Sales Invoice',
+    sales_invoice: inv,
+  };
+}
 
 interface BillingProps {
   onNavigate?: (section: string) => void;
@@ -56,6 +90,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const { currencyCode } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
+  useGlobalSearchPrefill(setSearchTerm);
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedTransactionType, setSelectedTransactionType] = useState("all-transactions");
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
@@ -103,15 +138,32 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       .finally(() => setLoadingStats(false));
   };
 
+  // Sales invoice payments collected from the Member Due tab.
+  const [settleRequest, setSettleRequest] = useState<SettleRequest | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
+
   const loadDues = () => {
     setLoadingDues(true);
-    billingService.getMemberDues()
-      .then(setMemberDues)
+    Promise.all([
+      billingService.getMemberDues(),
+      // Unpaid member Sales Invoices appear here too; a failure there must not hide membership dues.
+      fetchAllInvoices('CONFIRMED').catch(() => [] as SalesInvoice[]),
+    ])
+      .then(([dues, invoices]) => {
+        const invoiceDues = invoices
+          .filter(i => i.status === 'CONFIRMED' && i.customerType === 'MEMBER' && invoiceBalance(i) > 0)
+          .map(salesInvoiceDue);
+        setMemberDues([...dues, ...invoiceDues]);
+      })
       .catch(console.error)
       .finally(() => setLoadingDues(false));
   };
 
-  useEffect(() => { loadStats(); loadDues(); }, []);
+  useEffect(() => {
+    loadStats();
+    loadDues();
+    accountHeadsService.getBankAccounts().then(setBankAccounts).catch(() => undefined);
+  }, []);
 
   // ── Member SOA: debounced member search ─────────────────────────────────
   useEffect(() => {
@@ -217,6 +269,10 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   };
 
   const handleCollectPayment = (due: MemberDue) => {
+    if (due.sales_invoice) {
+      setSettleRequest({ inv: due.sales_invoice, mode: 'payment' });
+      return;
+    }
     // Navigate to create-receipt with member pre-selected via location state
     navigate('/create-receipt', {
       state: { preSelectMemberId: due.id, preSelectMemberName: due.member_name }
@@ -618,7 +674,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Member Due Payments</CardTitle>
-                  <CardDescription>Track overdue and upcoming membership payments</CardDescription>
+                  <CardDescription>Track overdue and upcoming membership payments and unpaid sales invoices</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => { loadDues(); loadStats(); }}>
@@ -669,7 +725,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   </TableHeader>
                   <TableBody>
                     {filteredDues.map((due) => (
-                      <TableRow key={due.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableRow key={due.sales_invoice ? `si-${due.sales_invoice.id}` : due.id} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <Avatar className="h-8 w-8">
@@ -683,15 +739,28 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{due.membership ?? '-'}</TableCell>
+                        <TableCell>
+                          {due.sales_invoice ? (
+                            <button
+                              type="button"
+                              className="text-primary hover:underline font-medium"
+                              title="Open this sales invoice"
+                              onClick={() => navigate(`/sales-invoice?invoice=${due.sales_invoice!.id}`)}
+                            >
+                              {due.sales_invoice.invoiceNumber}
+                            </button>
+                          ) : (due.membership ?? '-')}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={due.due_type === 'Extra Freeze Days'
-                              ? 'border-sky-300 text-sky-700 bg-sky-50'
-                              : due.due_type === 'Renewal Due'
-                                ? 'border-blue-300 text-blue-700 bg-blue-50'
-                                : 'border-amber-300 text-amber-700 bg-amber-50'}
+                            className={due.due_type === 'Sales Invoice'
+                              ? 'border-purple-300 text-purple-700 bg-purple-50'
+                              : due.due_type === 'Extra Freeze Days'
+                                ? 'border-sky-300 text-sky-700 bg-sky-50'
+                                : due.due_type === 'Renewal Due'
+                                  ? 'border-blue-300 text-blue-700 bg-blue-50'
+                                  : 'border-amber-300 text-amber-700 bg-amber-50'}
                           >
                             {due.due_type ?? 'Membership Due'}
                           </Badge>
@@ -736,13 +805,13 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             <Button
                               variant="outline" size="sm"
                               className="h-8 w-8 p-0 border-primary/20 hover:bg-green-50"
-                              title="Collect Payment"
+                              title={due.sales_invoice ? 'Receive payment on this sales invoice' : 'Collect Payment'}
                               onClick={() => handleCollectPayment(due)}
                             >
                               <CreditCard className="h-4 w-4 text-green-600" />
                             </Button>
-                            {/* Freeze (overdue only) */}
-                            {due.status === "Overdue" && (
+                            {/* Freeze (overdue membership dues only) */}
+                            {due.status === "Overdue" && !due.sales_invoice && (
                               <Button
                                 variant="outline" size="sm"
                                 className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50"
@@ -822,15 +891,15 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 <Button
                   variant="outline"
                   className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                  disabled={memberDues.filter(m => m.status === 'Overdue').length === 0}
+                  disabled={memberDues.filter(m => m.status === 'Overdue' && !m.sales_invoice).length === 0}
                   onClick={() => {
-                    toast.info(`${memberDues.filter(m => m.status === 'Overdue').length} overdue account(s) would be frozen`, {
+                    toast.info(`${memberDues.filter(m => m.status === 'Overdue' && !m.sales_invoice).length} overdue account(s) would be frozen`, {
                       description: 'Use individual freeze buttons to freeze specific accounts'
                     });
                   }}
                 >
                   <Snowflake className="mr-2 h-4 w-4" />
-                  Freeze Overdue Accounts ({memberDues.filter(m => m.status === 'Overdue').length})
+                  Freeze Overdue Accounts ({memberDues.filter(m => m.status === 'Overdue' && !m.sales_invoice).length})
                 </Button>
               </CardContent>
             </Card>
@@ -1007,7 +1076,12 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                                 <div className="text-xs text-muted-foreground font-normal">Inv: {line.invoice_no}</div>
                               )}
                             </TableCell>
-                            <TableCell><Badge variant="outline" className="text-xs">{line.type}</Badge></TableCell>
+                            <TableCell>
+                              <Badge variant="outline"
+                                className={`text-xs ${line.type.startsWith('Sales') ? 'border-purple-300 text-purple-700 bg-purple-50' : ''}`}>
+                                {line.type}
+                              </Badge>
+                            </TableCell>
                             <TableCell>
                               <div>{line.description}</div>
                               {line.minor_charges && line.minor_charges.length > 0 && (
@@ -1413,6 +1487,14 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Receive payment on a member's Sales Invoice (Member Due › Sales Invoice rows) */}
+      <SalesInvoiceSettleDialog
+        request={settleRequest}
+        bankAccounts={bankAccounts}
+        onClose={() => setSettleRequest(null)}
+        onDone={() => { setSettleRequest(null); loadDues(); }}
+      />
     </div>
   );
 }

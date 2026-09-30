@@ -41,6 +41,10 @@ public class PaymentSplitDTO {
     private String onlinePaymentType;   // Google Pay / PhonePe / Paytm / ... / Other
     private String providerName;        // only when onlinePaymentType == "Other"
 
+    // When this leg was paid (ISO "YYYY-MM-DD") — set on supplier-bill payment legs,
+    // since one bill can collect several payments on different dates.
+    private String paymentDate;
+
     public PaymentSplitDTO() {}
 
     public PaymentSplitDTO(String method, BigDecimal amount, String reference) {
@@ -48,6 +52,9 @@ public class PaymentSplitDTO {
         this.amount = amount;
         this.reference = reference;
     }
+
+    public String getPaymentDate() { return paymentDate; }
+    public void setPaymentDate(String paymentDate) { this.paymentDate = paymentDate; }
 
     public String getMethod() { return method; }
     public void setMethod(String method) { this.method = method; }

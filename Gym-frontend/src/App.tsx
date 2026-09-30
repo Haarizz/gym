@@ -7,6 +7,7 @@ import React, {
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import { NotificationBell } from "./components/shared/NotificationBell";
+import { GlobalSearch, type GlobalSearchPage } from "./components/global-search/GlobalSearch";
 import { authService, User } from "./utils/supabase/auth-service";
 import { useBranch } from "./utils/branch-context";
 import {
@@ -73,6 +74,10 @@ import { MemberConnectAnalytics } from "./pages/member-connect-analytics";
 import { MemberConnectReports } from "./pages/member-connect-reports";
 import { PurchaseOrder } from "./pages/purchase-order";
 import { Purchase } from "./pages/purchase";
+import { SalesInvoicePage } from "./pages/sales-invoice";
+import { BarcodePrint } from "./pages/barcode-print";
+import { Suppliers } from "./pages/suppliers";
+import { Warehouses } from "./pages/warehouses";
 import { PaymentVoucher } from "./pages/payment-voucher";
 import { BankReconciliation } from "./pages/bank-reconciliation";
 import { Expenses } from "./pages/expenses";
@@ -153,6 +158,7 @@ import {
   Tag,
   ClipboardList,
   ShoppingBag,
+  ScanBarcode,
   ArrowLeftRight,
   ChefHat,
   Calculator,
@@ -184,7 +190,8 @@ import {
   Search,
   Box,
   Info,
-  ClipboardCheck
+  ClipboardCheck,
+  Warehouse,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -362,6 +369,22 @@ const menuItems = [
         permission: "POINT_OF_SALE_VIEW",
       },
       {
+        title: "Sales Invoice",
+        icon: FileText,
+        id: "sales-invoice",
+        path: "/sales-invoice",
+        // Back-office counterpart of the POS (direct sales to members / walk-ins). No dedicated
+        // permission yet — a new key wouldn't reach existing gyms' roles — so it follows POS.
+        permission: "POINT_OF_SALE_VIEW",
+      },
+      {
+        title: "Category / Brand",
+        icon: Tag,
+        id: "category",
+        path: "/category",
+        permission: "CATEGORY_VIEW",
+      },
+      {
         title: "Products",
         icon: Package,
         id: "products",
@@ -369,11 +392,20 @@ const menuItems = [
         permission: "PRODUCTS_VIEW",
       },
       {
-        title: "Category",
-        icon: Tag,
-        id: "category",
-        path: "/category",
-        permission: "CATEGORY_VIEW",
+        title: "Warehouses",
+        icon: Warehouse,
+        id: "warehouses",
+        path: "/warehouses",
+        // Warehouses used to live under Products › Settings, so they keep the Products permission.
+        permission: "PRODUCTS_VIEW",
+      },
+      {
+        title: "Suppliers",
+        icon: Building2,
+        id: "suppliers",
+        path: "/suppliers",
+        // No dedicated permission exists yet; anyone who can raise purchase orders manages suppliers.
+        permission: "PURCHASE_ORDER_VIEW",
       },
       {
         title: "Purchase Order",
@@ -388,6 +420,14 @@ const menuItems = [
         id: "purchase",
         path: "/purchase",
         permission: "PURCHASE_VIEW",
+      },
+      {
+        title: "Barcode Print",
+        icon: ScanBarcode,
+        id: "barcode-print",
+        path: "/barcode-print",
+        // Prints product labels, so it follows the Products permission.
+        permission: "PRODUCTS_VIEW",
       },
       {
         title: "Wastage / Returns",
@@ -763,7 +803,7 @@ export default function App() {
   const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
 
   // Global state for branches
-  const { activeBranchId, accessibleBranches, setActiveBranch, isAllBranches, refreshBranches } = useBranch();
+  const { activeBranchId, activeBranchName, accessibleBranches, setActiveBranch, isAllBranches, refreshBranches } = useBranch();
 
   const [expandedItems, setExpandedItems] = useState<string[]>(
     [],
@@ -793,6 +833,22 @@ export default function App() {
     ),
     [permissions, isGymbiosAdmin],
   );
+  const globalSearchPages = useMemo<GlobalSearchPage[]>(() => {
+    const seen = new Set<string>();
+    const flat: GlobalSearchPage[] = [];
+    const add = (item: any) => {
+      if (item.path && !seen.has(item.path)) {
+        seen.add(item.path);
+        flat.push({ title: item.title, path: item.path, icon: item.icon });
+      }
+    };
+    visibleMenuItems.forEach((item: any) => {
+      add(item);
+      (item.subItems ?? []).forEach(add);
+    });
+    return flat;
+  }, [visibleMenuItems]);
+  const isMemberRole = roles.some(r => r.toLowerCase().replace("role_", "") === "member");
 
   // Blocks direct URL navigation to a gated page too — sidebar hiding alone
   // doesn't stop typing e.g. /payroll-employees straight into the address bar.
@@ -937,10 +993,14 @@ export default function App() {
       // Auto-expand Sales & Purchases for its sub-items
       const salesPurchasesSubItems = [
         "point-of-sale",
-        "products",
+        "sales-invoice",
         "category",
+        "products",
+        "warehouses",
+        "suppliers",
         "purchase-order",
         "purchase",
+        "barcode-print",
         "wastage-returns",
         "production-recipe",
         "sales-reports",
@@ -1082,11 +1142,15 @@ export default function App() {
       
       <Route path="/sales-purchases" element={<SalesPurchases />} />
       <Route path="/point-of-sale" element={<PointOfSale />} />
+      <Route path="/sales-invoice" element={<SalesInvoicePage />} />
       <Route path="/products" element={<Products onNavigate={handleNavClick} />} />
       <Route path="/add-product" element={<AddProduct onNavigate={handleNavClick} />} />
       <Route path="/category" element={<Categories />} />
       <Route path="/purchase-order" element={<PurchaseOrder />} />
       <Route path="/purchase" element={<Purchase />} />
+      <Route path="/barcode-print" element={<BarcodePrint />} />
+      <Route path="/suppliers" element={<Suppliers />} />
+      <Route path="/warehouses" element={<Warehouses />} />
       <Route path="/wastage-returns" element={<WastageReturns />} />
       <Route path="/production-recipe" element={<ProductionRecipe />} />
       <Route path="/sales-reports" element={<SalesReports />} />
@@ -1460,6 +1524,9 @@ export default function App() {
           </div>
         </main>
       </div>
+      {!isGymbiosAdmin && !isMemberRole && (
+        <GlobalSearch pages={globalSearchPages} branchId={activeBranchId} branchName={activeBranchName} />
+      )}
       <Toaster />
     </SidebarProvider>
   );

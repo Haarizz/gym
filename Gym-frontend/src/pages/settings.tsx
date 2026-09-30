@@ -4,7 +4,7 @@ import { invalidateCompanyDetailsCache } from "../utils/company-details";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned } from "lucide-react";
+import { Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned, Stamp } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
 import { toast } from "sonner";
@@ -42,8 +42,11 @@ export function AppSettings() {
     email: "",
     phone: "",
     logoPreview: "",
+    stampPreview: "",
     trn: ""
   });
+  // Id of the saved company_stamp row, so removing the stamp can delete it (settings can't hold blank values).
+  const [stampSettingId, setStampSettingId] = useState<number | null>(null);
   const [isCompanyLoading, setIsCompanyLoading] = useState(true);
   const [isCompanySaving, setIsCompanySaving] = useState(false);
 
@@ -57,17 +60,21 @@ export function AppSettings() {
           email: "",
           phone: "",
           logoPreview: "",
+          stampPreview: "",
           trn: ""
         };
+        let stampId: number | null = null;
         settings.forEach(s => {
           if (s.settingKey === "company_name") details.name = s.settingValue;
           if (s.settingKey === "company_address") details.address = s.settingValue;
           if (s.settingKey === "company_email") details.email = s.settingValue;
           if (s.settingKey === "company_phone") details.phone = s.settingValue;
           if (s.settingKey === "company_logo") details.logoPreview = s.settingValue;
+          if (s.settingKey === "company_stamp") { details.stampPreview = s.settingValue; stampId = s.id; }
           if (s.settingKey === "company_trn") details.trn = s.settingValue;
         });
         setCompanyDetails(details);
+        setStampSettingId(stampId);
       } catch (err) {
         console.error("Failed to load company details", err);
       } finally {
@@ -109,6 +116,19 @@ export function AppSettings() {
     reader.readAsDataURL(file);
   };
 
+  const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Company stamp must be less than 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => handleCompanyChange("stampPreview", event.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveCompany = async () => {
     setIsCompanySaving(true);
     try {
@@ -118,6 +138,7 @@ export function AppSettings() {
         { key: "company_email", val: companyDetails.email },
         { key: "company_phone", val: companyDetails.phone },
         { key: "company_logo", val: companyDetails.logoPreview },
+        { key: "company_stamp", val: companyDetails.stampPreview },
         { key: "company_trn", val: companyDetails.trn },
       ].filter(k => k.val.trim() !== "");
 
@@ -129,6 +150,11 @@ export function AppSettings() {
           description: `Company ${k.key.split('_')[1]}`
         })
       ));
+      // A removed stamp can't be saved as blank — delete its row instead.
+      if (!companyDetails.stampPreview && stampSettingId != null) {
+        await financialSettingsService.deleteSetting(stampSettingId);
+        setStampSettingId(null);
+      }
 
       invalidateCompanyDetailsCache();
       setIsCompanyDirty(false);
@@ -313,6 +339,47 @@ export function AppSettings() {
                     title={companyDetails.logoPreview ? "Change Logo" : "Upload Logo"}
                   />
                 </div>
+
+                <Label className="flex items-center gap-2 pt-2">
+                  <Stamp className="h-4 w-4 text-gray-500" />
+                  Company Stamp
+                </Label>
+                <div className="border-2 border-dashed rounded-xl p-4 w-full md:w-48 flex flex-col items-center justify-center text-center gap-3 bg-gray-50/50 relative overflow-hidden transition-colors hover:bg-gray-50 h-48">
+                  {companyDetails.stampPreview ? (
+                    <>
+                      <img src={companyDetails.stampPreview} alt="Company Stamp" className="max-h-full max-w-full object-contain" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Label htmlFor="stampUpload" className="cursor-pointer text-white text-sm font-medium hover:underline">Change Stamp</Label>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-8 w-8 text-gray-400" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-gray-700">Upload Stamp</p>
+                        <p className="text-xs text-gray-500">PNG with transparent background, max 2MB</p>
+                      </div>
+                    </>
+                  )}
+                  <input
+                    id="stampUpload"
+                    type="file"
+                    accept="image/*"
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    onChange={handleStampUpload}
+                    title={companyDetails.stampPreview ? "Change Stamp" : "Upload Stamp"}
+                  />
+                </div>
+                {companyDetails.stampPreview && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-red-600 hover:underline"
+                    onClick={() => handleCompanyChange("stampPreview", "")}
+                  >
+                    Remove stamp
+                  </button>
+                )}
+                <p className="text-xs text-gray-500 md:w-48">Printed on purchase orders and invoices for this branch.</p>
               </div>
             </div>
 

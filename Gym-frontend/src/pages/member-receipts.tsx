@@ -47,6 +47,7 @@ import { Separator } from "../components/ui/separator";
 import { toast } from "sonner";
 import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
 import { downloadReceiptInvoice } from "../utils/receipt-invoice";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
@@ -60,6 +61,7 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
   const { currencyCode } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
+  useGlobalSearchPrefill(setSearchTerm);
   const [selectedTransactionType, setSelectedTransactionType] = useState("all-transactions");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [receipts, setReceipts] = useState<Receipt[]>([]);

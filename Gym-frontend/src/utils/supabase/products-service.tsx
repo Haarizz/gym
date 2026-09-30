@@ -12,6 +12,16 @@ export interface Warehouse {
   isActive: boolean;
 }
 
+export interface ProductBrand {
+  id: number;
+  name: string;
+  description?: string;
+  website?: string;
+  color: string;
+  isActive: boolean;
+  productCount: number;
+}
+
 export interface ProductCategory {
   id: number;
   name: string;
@@ -92,6 +102,39 @@ export interface ProductRequest {
   openingStock: number;
   reorderLevel: number;
   warehouseId: number;
+  /** Only used when Products › Settings › Auto-generate SKU is off. */
+  sku?: string;
+  units?: {
+    unit?: string;
+    conversionFactor?: number;
+    costPrice?: number;
+    sellingPrice?: number;
+    barcode?: string;
+  }[];
+}
+
+/** Products › Settings tab — values are strings, as stored server-side. */
+export interface ProductSettings {
+  autoGenerateSku: string;             // "true" | "false"
+  lowStockAlerts: string;              // "true" | "false"
+  autoDeductRecipeIngredients: string; // "true" | "false"
+  defaultTaxRate: string;              // "5" | "0" | "exempt"
+}
+
+export const DEFAULT_PRODUCT_SETTINGS: ProductSettings = {
+  autoGenerateSku: 'true',
+  lowStockAlerts: 'true',
+  autoDeductRecipeIngredients: 'true',
+  defaultTaxRate: '5',
+};
+
+/** The backend's structured error body carries a readable `message` (e.g. duplicate SKU). */
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body?.message) return body.message;
+  } catch { /* non-JSON body */ }
+  return `${fallback}: ${res.status}`;
 }
 
 export interface ProductStats {
@@ -197,6 +240,18 @@ function mapProduct(r: any): Product {
     stockByWarehouse: stocks,
     createdAt: r.created_at ?? r.createdAt ?? '',
     updatedAt: r.updated_at ?? r.updatedAt ?? '',
+    units: (r.units ?? []).map(mapProductUnit),
+  };
+}
+
+function mapProductUnit(u: any): ProductUnit {
+  return {
+    id: u.id,
+    unit: u.unit ?? undefined,
+    conversionFactor: u.conversion_factor ?? u.conversionFactor ?? undefined,
+    costPrice: u.cost_price != null || u.costPrice != null ? Number(u.cost_price ?? u.costPrice) : undefined,
+    sellingPrice: u.selling_price != null || u.sellingPrice != null ? Number(u.selling_price ?? u.sellingPrice) : undefined,
+    barcode: u.barcode ?? undefined,
   };
 }
 
@@ -234,6 +289,16 @@ function toRequestBody(data: ProductRequest): Record<string, any> {
     opening_stock: data.openingStock,
     reorder_level: data.reorderLevel,
     warehouse_id: data.warehouseId,
+    sku: data.sku,
+    // The backend's update replaces a product's units with exactly this list —
+    // leaving it out (as before) wiped every unit on each edit.
+    units: data.units?.map(u => ({
+      unit: u.unit,
+      conversion_factor: u.conversionFactor,
+      cost_price: u.costPrice,
+      selling_price: u.sellingPrice,
+      barcode: u.barcode,
+    })),
   };
 }
 
@@ -251,6 +316,28 @@ function toWarehouseBody(data: Partial<Warehouse>): Record<string, any> {
     name: data.name,
     type: data.type,
     location: data.location,
+    is_active: data.isActive,
+  };
+}
+
+function mapBrand(r: any): ProductBrand {
+  return {
+    id: r.id,
+    name: r.name ?? '',
+    description: r.description ?? undefined,
+    website: r.website ?? undefined,
+    color: r.color ?? 'bg-blue-500',
+    isActive: r.is_active ?? r.isActive ?? true,
+    productCount: r.product_count ?? r.productCount ?? 0,
+  };
+}
+
+function toBrandBody(data: Partial<ProductBrand>): Record<string, any> {
+  return {
+    name: data.name,
+    description: data.description ?? '',
+    website: data.website ?? '',
+    color: data.color,
     is_active: data.isActive,
   };
 }
@@ -343,6 +430,40 @@ class ProductsService {
     if (!res.ok) throw new Error(`Failed to delete category: ${res.status}`);
   }
 
+  // ── Brands ──────────────────────────────────────────────────────────────────
+
+  async getBrands(): Promise<ProductBrand[]> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-brands`);
+    if (!res.ok) throw new Error(`Failed to fetch brands: ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapBrand) : [];
+  }
+
+  async createBrand(data: Partial<ProductBrand>): Promise<ProductBrand> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-brands`, {
+      method: 'POST',
+      body: JSON.stringify(toBrandBody(data)),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to create brand'));
+    return mapBrand(await res.json());
+  }
+
+  async updateBrand(id: number, data: Partial<ProductBrand>): Promise<ProductBrand> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-brands/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(toBrandBody(data)),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to update brand'));
+    return mapBrand(await res.json());
+  }
+
+  async deleteBrand(id: number): Promise<void> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/product-brands/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to delete brand'));
+  }
+
   // ── Products ────────────────────────────────────────────────────────────────
 
   async getProducts(filters?: {
@@ -386,7 +507,7 @@ class ProductsService {
       method: 'POST',
       body: JSON.stringify(toRequestBody(data)),
     });
-    if (!res.ok) throw new Error(`Failed to create product: ${res.status}`);
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to create product'));
     return mapProduct(await res.json());
   }
 
@@ -395,7 +516,7 @@ class ProductsService {
       method: 'PUT',
       body: JSON.stringify(toRequestBody(data)),
     });
-    if (!res.ok) throw new Error(`Failed to update product: ${res.status}`);
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to update product'));
     return mapProduct(await res.json());
   }
 
@@ -427,6 +548,21 @@ class ProductsService {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/stats`);
     if (!res.ok) throw new Error(`Failed to fetch product stats: ${res.status}`);
     return mapStats(await res.json());
+  }
+
+  async getSettings(): Promise<ProductSettings> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/settings`);
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to load product settings'));
+    return { ...DEFAULT_PRODUCT_SETTINGS, ...(await res.json()) };
+  }
+
+  async updateSettings(settings: Partial<ProductSettings>): Promise<ProductSettings> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/products/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res, 'Failed to save product settings'));
+    return { ...DEFAULT_PRODUCT_SETTINGS, ...(await res.json()) };
   }
 
   async getLowStockProducts(): Promise<Product[]> {

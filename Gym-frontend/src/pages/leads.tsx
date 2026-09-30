@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { leadService, type LeadResponse } from '../utils/supabase/lead-service';
 import { staffService } from '../utils/supabase/staff-service';
+import { LeadFormsManager } from '../components/shared/lead-forms-manager';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../utils/currency';
 import { Button } from "../components/ui/button";
@@ -180,6 +181,7 @@ export function Leads() {
   const [newStatus, setNewStatus] = useState('new');
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkAssignStaff, setBulkAssignStaff] = useState('');
+  const [showLeadForms, setShowLeadForms] = useState(false);
   const navigate = useNavigate();
 
   const loadLeads = useCallback(async () => {
@@ -491,6 +493,10 @@ export function Leads() {
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button variant="outline" onClick={() => setShowLeadForms(true)}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Lead Forms
           </Button>
           <Button onClick={() => setShowAddLead(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1630,6 +1636,12 @@ export function Leads() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LeadFormsManager
+        open={showLeadForms}
+        onOpenChange={open => { setShowLeadForms(open); if (!open) loadLeads(); }}
+        staffMembers={staffMembers}
+      />
     </div>
   );
 }

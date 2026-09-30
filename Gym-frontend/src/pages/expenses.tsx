@@ -47,6 +47,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
+import { overlaySize } from "../components/ui/overlay-root";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import {
   Plus,
@@ -76,6 +77,7 @@ import { expensesService, type Expense, type ExpenseCreateRequest, type ExpenseS
 import { exportAsCsv } from "../utils/export-utils";
 import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { ledgersService, type CostCenter } from "../utils/supabase/ledgers-service";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 // Category color mapping
 const categoryColors: Record<string, string> = {
@@ -119,6 +121,7 @@ export function Expenses() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  useGlobalSearchPrefill(setSearchTerm);
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -371,7 +374,7 @@ export function Expenses() {
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent style={{ width: 'var(--radix-popover-trigger-width)' }} className="p-0" align="start">
+          <PopoverContent style={{ width: overlaySize("--radix-popover-trigger-width") }} className="p-0" align="start">
             <Command>
               <CommandInput 
                 placeholder="Search vendor..." 

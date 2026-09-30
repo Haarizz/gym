@@ -82,7 +82,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
-import { productsService, Warehouse as WarehouseType, ProductCategory } from "../utils/supabase/products-service";
+import { productsService, Warehouse as WarehouseType, ProductCategory, ProductSettings, DEFAULT_PRODUCT_SETTINGS } from "../utils/supabase/products-service";
+import { purchaseService, Supplier as SupplierRecord } from "../utils/supabase/purchase-service";
+import { SearchableSelect } from "../components/shared/SearchableSelect";
+import { SupplierFormDialog } from "../components/purchase/purchaseUi";
 import QRCode from "react-qr-code";
 import JsBarcode from "jsbarcode";
 
@@ -187,6 +190,16 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [openingStock, setOpeningStock] = useState("");
   const [reorderLevel, setReorderLevel] = useState("");
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+  // Edit mode: the product's saved per-warehouse stock rows, so switching warehouse
+  // shows (and saves against) THAT warehouse's opening stock / reorder level.
+  const [savedStockRows, setSavedStockRows] = useState<{ warehouseId: number; openingStock?: number; reorderLevel?: number }[]>([]);
+  const handleWarehouseChange = (value: string) => {
+    setSelectedWarehouseId(value);
+    if (!isEditMode) return;
+    const row = savedStockRows.find(r => String(r.warehouseId) === value);
+    setOpeningStock(String(row?.openingStock || 0));
+    setReorderLevel(String(row?.reorderLevel || 0));
+  };
   const [supplier, setSupplier] = useState("");
 
   // Collapsible states
@@ -207,9 +220,70 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     return url.startsWith("/") ? `${resolvedBase}${url}` : `${resolvedBase}/${url}`;
   }, []);
 
-  const brands = [
-    "Optimum Nutrition", "BSN", "MuscleTech", "Dymatize", "Gold Standard", "MyProtein", "House Brand"
-  ];
+  // Brands come from Category / Brand › Brands. Keep the product's current brand
+  // in the list even if it's inactive or was typed before brands were managed.
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  // Products › Settings: SKU mode and the default tax rate for new products.
+  const [productSettings, setProductSettings] = useState<ProductSettings>(DEFAULT_PRODUCT_SETTINGS);
+  const autoSku = productSettings.autoGenerateSku === 'true';
+  const defaultTaxRate = productSettings.defaultTaxRate === '5' ? '5' : '0'; // "exempt" carries no tax
+  useEffect(() => {
+    productsService.getSettings()
+      .then(settings => {
+        setProductSettings(settings);
+        if (!isEditMode) setTaxRate(settings.defaultTaxRate === '5' ? '5' : '0');
+      })
+      .catch(() => { /* keep defaults — the backend applies its own on save */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    productsService.getBrands()
+      .then(list => setBrandOptions(list.filter(b => b.isActive).map(b => b.name)))
+      .catch(() => setBrandOptions([]));
+  }, []);
+  const brands = useMemo(
+    () => (selectedBrand && !brandOptions.some(b => b.toLowerCase() === selectedBrand.toLowerCase()) ? [selectedBrand, ...brandOptions] : brandOptions),
+    [brandOptions, selectedBrand],
+  );
+
+  // Suppliers (Sales & Purchases › Suppliers). Products store the supplier by name.
+  const [supplierList, setSupplierList] = useState<SupplierRecord[]>([]);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [supplierDraftName, setSupplierDraftName] = useState("");
+  useEffect(() => {
+    purchaseService.getAllSuppliers().then(setSupplierList).catch(() => setSupplierList([]));
+  }, []);
+
+  // Quick-add for category / brand straight from their dropdowns.
+  const [quickAdd, setQuickAdd] = useState<{ kind: "category" | "brand"; name: string; categoryType: string } | null>(null);
+  const [quickAddSaving, setQuickAddSaving] = useState(false);
+
+  const saveQuickAdd = async () => {
+    if (!quickAdd) return;
+    const name = quickAdd.name.trim();
+    if (!name) { toast.error(`${quickAdd.kind === "category" ? "Category" : "Brand"} name is required`); return; }
+    setQuickAddSaving(true);
+    try {
+      if (quickAdd.kind === "category") {
+        if (categories.some(c => c.name.trim().toLowerCase() === name.toLowerCase())) { toast.error("A category with this name already exists"); return; }
+        const created = await productsService.createCategory({ name, categoryType: quickAdd.categoryType, color: "bg-blue-500", iconName: "Package" });
+        setCategories(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        setSelectedCategory(String(created.id));
+        toast.success(`Category "${created.name}" added`);
+      } else {
+        const created = await productsService.createBrand({ name, color: "bg-blue-500", isActive: true });
+        setBrandOptions(prev => [...prev, created.name].sort((a, b) => a.localeCompare(b)));
+        setSelectedBrand(created.name);
+        toast.success(`Brand "${created.name}" added`);
+      }
+      setQuickAdd(null);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save");
+    } finally {
+      setQuickAddSaving(false);
+    }
+  };
 
   const barcodeTemplates = [
     "Code 128", "Code 39", "EAN-13", "UPC-A", "QR Code"
@@ -276,6 +350,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         setSupplier(product.supplier || "");
 
         // Inventory
+        setSavedStockRows(product.stockByWarehouse ?? []);
         const firstStock = product.stockByWarehouse?.[0];
         if (firstStock) {
           setOpeningStock(String(firstStock.openingStock || 0));
@@ -659,7 +734,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     setGeneratedBarcode("");
     setDefaultPrice("");
     setCostPrice("");
-    setTaxRate("0");
+    setTaxRate(defaultTaxRate);
     setProductUnits([]);
     setIsManufactured(false);
     setRecipeIngredients([]);
@@ -691,6 +766,12 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
     if (!selectedCategory) {
       toast.error("Category is required");
+      setActiveTab("basic-info");
+      return;
+    }
+
+    if (!autoSku && !sku.trim()) {
+      toast.error("SKU is required — auto-generate SKU is turned off in Products › Settings");
       setActiveTab("basic-info");
       return;
     }
@@ -731,6 +812,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         openingStock: openingStock ? parseInt(openingStock, 10) : 0,
         reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : 0,
         warehouseId: parseInt(selectedWarehouseId, 10),
+        sku: autoSku ? undefined : sku.trim(),
         units: productUnits.map(u => ({
           unit: u.unit || undefined,
           conversionFactor: u.conversionFactor || 1,
@@ -755,7 +837,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
       }
     } catch (error) {
       console.error('Save product error:', error);
-      toast.error(isEditMode ? 'Failed to update product' : 'Failed to save product');
+      toast.error((error as Error)?.message || (isEditMode ? 'Failed to update product' : 'Failed to save product'));
     } finally {
       setIsSubmitting(false);
     }
@@ -887,57 +969,76 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU / Product Code</Label>
+                    <Label htmlFor="sku">SKU / Product Code{autoSku ? '' : ' *'}</Label>
                     <Input
                       id="sku"
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
-                      placeholder="Enter SKU or product code"
+                      readOnly={autoSku}
+                      placeholder={autoSku ? "Generated automatically on save" : "Enter a unique SKU or product code"}
                       className="input-focus"
                     />
+                    {autoSku && (
+                      <p className="text-xs text-muted-foreground">Auto-generated from the category. Turn this off in Products › Settings to enter your own.</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="category">Category *</Label>
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingMeta ? "Loading categories..." : "Select category"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      id="category"
+                      value={selectedCategory}
+                      onChange={setSelectedCategory}
+                      loading={isLoadingMeta}
+                      options={categories.map(c => ({
+                        value: String(c.id),
+                        label: c.name,
+                        hint: c.categoryType ? c.categoryType.toLowerCase().replace(/_/g, " ") : undefined,
+                      }))}
+                      placeholder="Select category"
+                      searchPlaceholder="Search categories..."
+                      emptyText="No category found."
+                      addLabel="Add category"
+                      onAdd={typed => setQuickAdd({ kind: "category", name: typed, categoryType: "SUPPLEMENTS" })}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="brand">Brand</Label>
-                    <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select brand" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>
-                            {brand}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      id="brand"
+                      value={selectedBrand}
+                      onChange={setSelectedBrand}
+                      options={brands.map(b => ({ value: b, label: b }))}
+                      placeholder="Select brand"
+                      searchPlaceholder="Search brands..."
+                      emptyText="No brand found."
+                      addLabel="Add brand"
+                      onAdd={typed => setQuickAdd({ kind: "brand", name: typed, categoryType: "" })}
+                      clearable
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="supplier">Supplier</Label>
-                  <Input
+                  <SearchableSelect
                     id="supplier"
                     value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    placeholder="Enter supplier name"
-                    className="input-focus"
+                    onChange={setSupplier}
+                    options={[
+                      ...(supplier && !supplierList.some(s => s.name.toLowerCase() === supplier.toLowerCase())
+                        ? [{ value: supplier, label: supplier }] : []),
+                      ...supplierList
+                        .filter(s => s.isActive !== false || s.name === supplier)
+                        .map(s => ({ value: s.name, label: s.name, hint: s.contactPerson || s.city || undefined })),
+                    ]}
+                    placeholder="Select supplier"
+                    searchPlaceholder="Search suppliers..."
+                    emptyText="No supplier found."
+                    addLabel="Add supplier"
+                    onAdd={typed => { setSupplierDraftName(typed); setShowSupplierForm(true); }}
+                    clearable
                   />
                 </div>
 
@@ -1805,7 +1906,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
                   <div className="space-y-2">
                     <Label htmlFor="warehouse">Warehouse / Location *</Label>
-                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                    <Select value={selectedWarehouseId} onValueChange={handleWarehouseChange}>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingMeta ? "Loading warehouses..." : "Select warehouse"} />
                       </SelectTrigger>
@@ -1826,8 +1927,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                     <div>
                       <h4 className="font-medium text-blue-900">Inventory Management</h4>
                       <p className="text-sm text-blue-700 mt-1">
-                        Opening stock will be automatically added to the selected warehouse.
-                        Reorder level helps trigger low stock alerts when inventory falls below this threshold.
+                        {isEditMode
+                          ? 'Changing opening stock corrects the current stock in the selected warehouse by the same difference (recorded as a stock adjustment).'
+                          : 'Opening stock will be automatically added to the selected warehouse.'}
+                        {' '}Reorder level marks the product as Low Stock when stock falls to or below this number.
                       </p>
                     </div>
                   </div>
@@ -1867,6 +1970,66 @@ export function AddProduct({ onNavigate }: AddProductProps) {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Quick add: category / brand */}
+      <Dialog open={!!quickAdd} onOpenChange={o => { if (!o) setQuickAdd(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{quickAdd?.kind === "category" ? "Add Category" : "Add Brand"}</DialogTitle>
+            <DialogDescription>
+              {quickAdd?.kind === "category"
+                ? "Creates the category and selects it for this product. Colours and icons can be set later in Category / Brand."
+                : "Creates the brand and selects it for this product. More details can be added later in Category / Brand › Brands."}
+            </DialogDescription>
+          </DialogHeader>
+          {quickAdd && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="quick-add-name">Name *</Label>
+                <Input
+                  id="quick-add-name"
+                  autoFocus
+                  value={quickAdd.name}
+                  placeholder={quickAdd.kind === "category" ? "e.g. Supplements" : "e.g. Optimum Nutrition"}
+                  onChange={e => setQuickAdd(q => (q ? { ...q, name: e.target.value } : q))}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveQuickAdd(); } }}
+                />
+              </div>
+              {quickAdd.kind === "category" && (
+                <div className="space-y-2">
+                  <Label>Category Type</Label>
+                  <Select value={quickAdd.categoryType} onValueChange={v => setQuickAdd(q => (q ? { ...q, categoryType: v } : q))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["SUPPLEMENTS", "EQUIPMENT", "MERCHANDISE", "CAFE", "APPAREL", "ACCESSORIES", "OTHER"].map(t => (
+                        <SelectItem key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setQuickAdd(null)} disabled={quickAddSaving}>Cancel</Button>
+                <Button onClick={saveQuickAdd} disabled={quickAddSaving}>
+                  {quickAddSaving ? "Saving..." : quickAdd.kind === "category" ? "Add Category" : "Add Brand"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick add: supplier (full supplier form) */}
+      <SupplierFormDialog
+        open={showSupplierForm}
+        supplier={null}
+        initialName={supplierDraftName}
+        onOpenChange={setShowSupplierForm}
+        onSaved={saved => {
+          setSupplierList(prev => [...prev.filter(s => s.id !== saved.id), saved].sort((a, b) => a.name.localeCompare(b.name)));
+          setSupplier(saved.name);
+        }}
+      />
     </div>
   );
 }

@@ -1,0 +1,1154 @@
+/* Barcode Print (Sales & Purchases) — BillBull's Barcode Print & Design in
+   GymBios module style. Page chrome, panels, pills and tables come from
+   purchase/PurchaseInvoice.module.css and the designer shell from
+   print-templates/PrintTemplates.module.css; this file only holds what those
+   don't: the print workspace, queue rows, label stages and template cards.
+   index.css is a frozen Tailwind snapshot, so layout lives here as real CSS. */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 20px;
+  align-items: start;
+}
+
+.mainCol,
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.rail {
+  position: sticky;
+  top: 150px;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panelSub {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Add products ─────────────────────────────────────────────────── */
+
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+
+.searchWrap > svg {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 44px;
+  padding: 0 88px 0 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.searchInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent);
+}
+
+.searchHint {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--popover, var(--card));
+  border: 1px solid var(--pi-edge);
+  border-radius: 10px;
+  box-shadow: var(--pi-shadow-lg);
+}
+
+.suggestItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 14px;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestItem:hover:not(:disabled),
+.suggestActive {
+  background: color-mix(in oklab, var(--primary) 9%, var(--card));
+}
+
+.suggestItem:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.suggestEmpty {
+  padding: 18px 14px;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.itemText {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemSub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.code {
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ── Print queue ──────────────────────────────────────────────────── */
+
+.queueTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+
+.queueTable th {
+  height: 42px;
+  padding: 0 12px;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+  color: var(--foreground);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.queueTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 35%, transparent);
+  vertical-align: middle;
+}
+
+.queueTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.queueTable tbody tr {
+  transition: background-color 0.12s;
+}
+
+.queueTable tbody tr:hover {
+  background: color-mix(in oklab, var(--primary) 4%, var(--card));
+}
+
+.queueActive,
+.queueTable tbody tr.queueActive:hover {
+  background: color-mix(in oklab, var(--primary) 8%, var(--card));
+}
+
+.codeSelect {
+  width: 100%;
+  max-width: 250px;
+  height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.codeSelect:focus {
+  border-color: var(--primary);
+}
+
+.selectWrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 250px;
+}
+
+.selectWrap > svg {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.stepper button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.stepper button:hover:not(:disabled) {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.stepper button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepper input {
+  width: 48px;
+  height: 100%;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.stepper input::-webkit-outer-spin-button,
+.stepper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.queueEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+.queueEmpty strong {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.queueEmptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--primary) 10%, var(--card));
+  color: var(--primary);
+}
+
+.queueFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px -20px -20px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--pi-edge);
+  color: var(--muted-foreground);
+}
+
+.queueFoot strong {
+  color: var(--foreground);
+}
+
+/* ── Rail: template picker, preview, print ────────────────────────── */
+
+.railPanel {
+  background: var(--card);
+  border: 1px solid var(--pi-edge);
+  border-radius: 12px;
+  box-shadow: var(--pi-shadow);
+}
+
+.railHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--pi-edge);
+}
+
+.railBody {
+  padding: 14px 18px 18px;
+}
+
+.templateSelect {
+  width: 100%;
+  height: 40px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.templateSelect:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 18%, transparent);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.fact {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.fact span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.fact b {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A checkered-free, softly shaded stage the white label sits on. */
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 210px;
+  padding: 22px 16px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 1px, transparent 0) 0 0 / 14px 14px,
+    color-mix(in oklab, var(--muted-foreground) 9%, var(--background));
+  overflow: hidden;
+}
+
+.stageLabel {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.14);
+  border-radius: 2px;
+}
+
+.stageCaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.warn svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.printRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.printRow:last-of-type {
+  border-bottom: 0;
+}
+
+.printRow small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.numInput {
+  width: 72px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-background, var(--card));
+  color: var(--foreground);
+  font-size: 14px;
+  text-align: center;
+  outline: none;
+}
+
+.numInput:focus {
+  border-color: var(--primary);
+}
+
+.printBtn {
+  width: 100%;
+  margin-top: 14px;
+}
+
+/* ── Template cards ───────────────────────────────────────────────── */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.tCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--pi-edge);
+  border-radius: 12px;
+  box-shadow: var(--pi-shadow-sm);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.tCard:hover {
+  box-shadow: var(--pi-shadow-lg);
+}
+
+.tCardSelected {
+  border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 14%, transparent), var(--pi-shadow);
+}
+
+.tPreview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--muted-foreground) 20%, transparent) 1px, transparent 0) 0 0 / 12px 12px,
+    color-mix(in oklab, var(--muted-foreground) 8%, var(--background));
+}
+
+.tBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.tName {
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tDesc {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tActions > :first-child {
+  flex: 1;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionTitle h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sectionTitle p {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--primary) 10%, var(--card));
+  color: var(--primary);
+}
+
+.emptySaved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border: 1px dashed color-mix(in oklab, var(--primary) 30%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--primary) 4%, var(--card));
+}
+
+.emptySaved strong {
+  display: block;
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.emptySaved p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+}
+
+/* ── Designer extras ──────────────────────────────────────────────── */
+
+.segmented {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.segmented button {
+  height: 30px;
+  white-space: nowrap;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.segmentedOn,
+.segmented button.segmentedOn {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.preset {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--pi-edge, var(--border));
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.preset:hover {
+  background: var(--muted);
+}
+
+.presetOn,
+.presetOn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.dimPair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+}
+
+.range {
+  width: 150px;
+  accent-color: var(--primary);
+}
+
+.canvasStage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 0 8px;
+}
+
+.dimWrap {
+  position: relative;
+  padding: 26px 0 0 34px;
+}
+
+.dimTop,
+.dimSide {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dimTop {
+  top: 0;
+  left: 34px;
+  right: 0;
+  height: 18px;
+  border-bottom: 1px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+}
+
+.dimSide {
+  top: 26px;
+  bottom: 0;
+  left: 0;
+  width: 26px;
+  border-right: 1px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.bigLabel {
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.08), 0 16px 40px rgb(0 0 0 / 0.16);
+  border-radius: 2px;
+}
+
+.pageMapCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  box-shadow: var(--pi-shadow-sm, 0 1px 3px rgb(0 0 0 / 0.1));
+}
+
+.pageMapTitle {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.pageMap {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.14);
+}
+
+.pageMapCell {
+  position: absolute;
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--primary) 18%, #fff);
+  border: 1px solid color-mix(in oklab, var(--primary) 45%, #fff);
+}
+
+/* Dimension lines get end ticks, like a drawing. */
+.dimTop::before,
+.dimTop::after,
+.dimSide::before,
+.dimSide::after {
+  content: '';
+  position: absolute;
+  background: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+}
+
+.dimTop::before,
+.dimTop::after {
+  bottom: -5px;
+  width: 1px;
+  height: 9px;
+}
+
+.dimTop::before { left: 0; }
+.dimTop::after { right: 0; }
+
+.dimSide::before,
+.dimSide::after {
+  right: -5px;
+  width: 9px;
+  height: 1px;
+}
+
+.dimSide::before { top: 0; }
+.dimSide::after { bottom: 0; }
+
+/* ── Template designer ─────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field > span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.field i {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+
+.sizeCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.sizeCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.sizeCard:hover {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+
+.sizeCard b {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sizeCard small {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.sizeCardOn,
+.sizeCardOn:hover {
+  border-color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 8%, var(--card));
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.sizeShape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 4px;
+}
+
+.sizeShape span {
+  border: 1.5px solid color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  border-radius: 2px;
+  background: #fff;
+}
+
+.sizeCardOn .sizeShape span {
+  border-color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 15%, #fff);
+}
+
+.customSize {
+  margin-top: 10px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  background: var(--muted);
+}
+
+.customSizeTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.customBadge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.whRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dimPrefix {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.swapBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.swapBtn:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.swapBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button.zoomFit {
+  width: auto;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+button.zoomFit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.previewWith {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.previewWith .segmented {
+  border-radius: 999px;
+}
+
+.previewWith .segmented button {
+  height: 26px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.setupCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  box-shadow: var(--pi-shadow-sm, 0 1px 3px rgb(0 0 0 / 0.1));
+}
+
+.setupCard .pageMapTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.setupCard ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setupCard li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.setupCard li b {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Load from purchase dialog ────────────────────────────────────── */
+
+.billList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
+}
+
+.billCard {
+  border: 1px solid var(--pi-edge, var(--border));
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  overflow: hidden;
+}
+
+.billHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.billItems {
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 45%, var(--card));
+}
+
+.billItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 70px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.billItem:last-child {
+  border-bottom: 0;
+}
+
+.dialogFilters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 1280px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dialogFilters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .billItem {
+    grid-template-columns: minmax(0, 1fr) 70px;
+  }
+
+  .billItem > :nth-child(2) {
+    display: none;
+  }
+}

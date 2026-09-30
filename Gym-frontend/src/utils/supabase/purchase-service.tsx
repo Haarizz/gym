@@ -57,8 +57,10 @@ export interface PurchaseOrder {
   notes?: string;
   createdBy?: string;
   approvedBy?: string;
+  branchId?: number;
   items: PurchaseOrderItem[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface POItemRequest {
@@ -158,8 +160,10 @@ function mapPO(r: any): PurchaseOrder {
     notes: r.notes,
     createdBy: r.created_by ?? r.createdBy,
     approvedBy: r.approved_by ?? r.approvedBy,
+    branchId: r.branch_id ?? r.branchId ?? undefined,
     items,
     createdAt: r.created_at ?? r.createdAt ?? '',
+    updatedAt: r.updated_at ?? r.updatedAt,
   };
 }
 

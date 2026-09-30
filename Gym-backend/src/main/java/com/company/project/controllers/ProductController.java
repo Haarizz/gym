@@ -6,20 +6,45 @@ import com.company.project.dto.ProductStatsDTO;
 import com.company.project.dto.ProductsPageResponseDTO;
 import com.company.project.dto.StockAdjustmentRequestDTO;
 import com.company.project.services.ProductService;
+import com.company.project.services.ProductSettingsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductSettingsService productSettingsService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, ProductSettingsService productSettingsService) {
         this.productService = productService;
+        this.productSettingsService = productSettingsService;
+    }
+
+    /**
+     * GET /api/products/settings — Products › Settings tab (also read by the Add
+     * Product form for the SKU mode and default tax rate).
+     */
+    @GetMapping("/settings")
+    public ResponseEntity<Map<String, String>> getSettings() {
+        return ResponseEntity.ok(productSettingsService.getSettings());
+    }
+
+    /**
+     * PUT /api/products/settings — partial update, e.g. {"lowStockAlerts": "false"}.
+     * /api/products/** is otherwise open to any authenticated user, so changing
+     * gym-wide behaviour is gated on the products edit permission.
+     */
+    @PutMapping("/settings")
+    @PreAuthorize("hasAuthority('PRODUCTS_EDIT')")
+    public ResponseEntity<Map<String, String>> updateSettings(@RequestBody Map<String, String> settings) {
+        return ResponseEntity.ok(productSettingsService.updateSettings(settings));
     }
 
     /**

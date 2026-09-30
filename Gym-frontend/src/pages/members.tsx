@@ -1403,18 +1403,32 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               new Date(getMembershipEndDate(member)).toLocaleDateString('en-GB') : '—'}
                           </TableCell>
                           <TableCell>
-                            {isBilledToGuardian(member) ? (
-                              <span className="text-xs text-slate-500 italic">
-                                Billed to: {(member as any).family_head_name || member.family_head_id || 'guardian'}
-                              </span>
-                            ) : (
-                              <span
-                                className={`font-medium ${amountDue > 0 ? 'text-red-600' : 'text-emerald-600'
-                                  }`}
-                              >
-                                {amountDue > 0 ? `${currencyCode} ${amountDue.toFixed(2)}` : `${currencyCode} 0.00`}
-                              </span>
-                            )}
+                            {(() => {
+                              // Membership due (billing) + unpaid Sales Invoices (products sold on account).
+                              const salesDue = Number((member as any).sales_invoice_due) || 0;
+                              const guardian = isBilledToGuardian(member);
+                              const total = (guardian ? 0 : amountDue) + salesDue;
+                              return (
+                                <div>
+                                  {guardian && (
+                                    <span className="text-xs text-slate-500 italic" style={{ display: 'block' }}>
+                                      Billed to: {(member as any).family_head_name || member.family_head_id || 'guardian'}
+                                    </span>
+                                  )}
+                                  {(!guardian || salesDue > 0) && (
+                                    <span className={`font-medium ${total > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                      {`${currencyCode} ${total.toFixed(2)}`}
+                                    </span>
+                                  )}
+                                  {salesDue > 0 && (
+                                    <span className="text-xs text-muted-foreground" style={{ display: 'block' }}
+                                      title="Unpaid balance on sales invoices — collect it from Sales & Purchases › Sales Invoice">
+                                      {!guardian && amountDue > 0 && <>Membership {amountDue.toFixed(2)} · </>}Sales invoices {salesDue.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             {paymentDueDate ? paymentDueDate : '—'}

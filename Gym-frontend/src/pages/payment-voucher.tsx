@@ -12,6 +12,7 @@ import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { overlaySize } from "../components/ui/overlay-root";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
@@ -54,6 +55,7 @@ import { accountHeadsService, AccountHead } from "../utils/supabase/account-head
 import { usePaymentManager } from "../payments/usePaymentManager";
 import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
 import { PAYMENT_TYPES } from "../payments/paymentModel";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 interface PaymentVoucher {
   id: string;
@@ -215,6 +217,7 @@ export function PaymentVoucher() {
   // Filters & sorting state
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  useGlobalSearchPrefill(setSearchQuery);
   const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("all");
@@ -674,7 +677,7 @@ export function PaymentVoucher() {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent style={{ width: 'var(--radix-popover-trigger-width)' }} className="p-0" align="start">
+            <PopoverContent style={{ width: overlaySize("--radix-popover-trigger-width") }} className="p-0" align="start">
               <Command>
                 <CommandInput 
                   placeholder="Search supplier..." 

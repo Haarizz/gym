@@ -1,12 +1,14 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 
+@Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "suppliers")
-public class Supplier extends BaseEntity {
+public class Supplier extends BaseEntity implements BranchAware {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -96,4 +98,10 @@ public class Supplier extends BaseEntity {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 }

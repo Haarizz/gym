@@ -53,6 +53,8 @@ public class MemberResponseDTO {
     private String regDocNumber;
     private String regDocDate;
     private java.math.BigDecimal outstandingBalance;
+    /** Unpaid balance on confirmed Sales Invoices (products sold on account) — separate from outstandingBalance. */
+    private java.math.BigDecimal salesInvoiceDue = java.math.BigDecimal.ZERO;
     private String lastPaymentDate;
     private String nextPaymentDate;
     private String paymentMethodUsed;
@@ -187,6 +189,8 @@ public class MemberResponseDTO {
     public String getRegDocNumber() { return regDocNumber; }
     public String getRegDocDate() { return regDocDate; }
     public java.math.BigDecimal getOutstandingBalance() { return outstandingBalance; }
+    public java.math.BigDecimal getSalesInvoiceDue() { return salesInvoiceDue; }
+    public void setSalesInvoiceDue(java.math.BigDecimal salesInvoiceDue) { this.salesInvoiceDue = salesInvoiceDue; }
     public String getLastPaymentDate() { return lastPaymentDate; }
     public String getNextPaymentDate() { return nextPaymentDate; }
     public String getPaymentMethodUsed() { return paymentMethodUsed; }

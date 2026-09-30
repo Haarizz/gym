@@ -87,6 +87,13 @@ public class SecurityConfig {
                 // authenticated() catch-all below.
                 .requestMatchers(HttpMethod.POST, "/api/platform-leads").permitAll()
 
+                // A gym's own public lead forms (/f/{formKey}, linked from its social-media
+                // ads). The unguessable form key is what scopes these to one tenant + branch
+                // (PublicLeadFormController); submit is rate-limited and honeypot-checked.
+                // Managing forms stays under /api/lead-forms (authenticated, LEADS_*).
+                .requestMatchers(HttpMethod.GET, "/api/public/lead-forms/*").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/lead-forms/*/submit").permitAll()
+
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on
                 // any of these operational routes, so it is deliberately absent from all of
@@ -124,6 +131,7 @@ public class SecurityConfig {
                     "/api/products/**",
                     "/api/warehouses/**",
                     "/api/product-categories/**",
+                    "/api/product-brands/**",
                     "/api/plans/**",
                     "/api/promotions/**",
                     "/api/leads/**",
@@ -134,6 +142,7 @@ public class SecurityConfig {
                     "/api/suppliers/**",
                     "/api/purchase-orders/**",
                     "/api/supplier-bills/**",
+                    "/api/sales-invoices/**",
                     "/api/wastage-returns/**",
                     "/api/recipes/**",
                     "/api/production-orders/**",

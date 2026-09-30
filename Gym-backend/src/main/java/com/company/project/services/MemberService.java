@@ -77,6 +77,7 @@ public class MemberService {
     private final UserDirectoryRepository userDirectoryRepository;
     private final RewardRedemptionService rewardRedemptionService;
     private final DiscountCodeService discountCodeService;
+    private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -96,7 +97,8 @@ public class MemberService {
                          UserBranchRepository userBranchRepository,
                          UserDirectoryRepository userDirectoryRepository,
                          @Lazy RewardRedemptionService rewardRedemptionService,
-                         @Lazy DiscountCodeService discountCodeService) {
+                         @Lazy DiscountCodeService discountCodeService,
+                         com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -113,6 +115,7 @@ public class MemberService {
         this.userDirectoryRepository   = userDirectoryRepository;
         this.rewardRedemptionService   = rewardRedemptionService;
         this.discountCodeService       = discountCodeService;
+        this.salesInvoiceRepository    = salesInvoiceRepository;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -130,6 +133,7 @@ public class MemberService {
                 .collect(Collectors.toList());
 
         resolveFamilyHeadNames(dtos);
+        applySalesInvoiceDue(dtos);
 
         PaginationDTO pagination = new PaginationDTO(
                 page, limit,
@@ -138,6 +142,21 @@ public class MemberService {
         );
 
         return new MembersPageResponseDTO(dtos, pagination);
+    }
+
+    /** Fills each member's unpaid Sales Invoice balance (products sold on account) in one query. */
+    private void applySalesInvoiceDue(List<MemberResponseDTO> dtos) {
+        // MemberResponseDTO.id is the DB id as a String.
+        List<Long> ids = dtos.stream().map(MemberResponseDTO::getId)
+                .filter(id -> id != null && id.matches("\\d+")).map(Long::valueOf).collect(Collectors.toList());
+        if (ids.isEmpty()) return;
+        java.util.Map<String, BigDecimal> due = new java.util.HashMap<>();
+        for (Object[] row : salesInvoiceRepository.sumDueByMember(ids)) {
+            due.put(String.valueOf(((Number) row[0]).longValue()), (BigDecimal) row[1]);
+        }
+        for (MemberResponseDTO dto : dtos) {
+            dto.setSalesInvoiceDue(due.getOrDefault(dto.getId(), BigDecimal.ZERO));
+        }
     }
 
     /**
@@ -303,6 +322,7 @@ public class MemberService {
             memberRepository.findByMemberId(member.getFamilyHeadId())
                     .ifPresent(head -> dto.setFamilyHeadName(head.getName()));
         }
+        applySalesInvoiceDue(List.of(dto));
         return dto;
     }
 

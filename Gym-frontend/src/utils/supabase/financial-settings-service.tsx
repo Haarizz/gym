@@ -35,11 +35,18 @@ function mapSetting(r: any): FinancialSetting {
 }
 
 class FinancialSettingsService {
-  async getSettings(category?: string): Promise<FinancialSetting[]> {
+  /**
+   * `branchId` reads a branch-scoped category (COMPANY, APP_PREFERENCES) for that
+   * branch instead of the active one — e.g. printing another branch's document.
+   */
+  async getSettings(category?: string, branchId?: number | null): Promise<FinancialSetting[]> {
     const query = category ? `?category=${encodeURIComponent(category)}` : "";
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/financial-settings${query}`,
-      { method: "GET" }
+      {
+        method: "GET",
+        ...(branchId != null ? { headers: { "X-Active-Branch-Id": String(branchId) } } : {}),
+      }
     );
     if (!res.ok) throw new Error("Failed to fetch financial settings");
     const data = await res.json();
