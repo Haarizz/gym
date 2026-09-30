@@ -144,6 +144,17 @@ public class PrimaryDataSourceConfig {
                 .ignoreMigrationPatterns("*:missing")
                 .load();
         if (flywayEnabled) {
+            // Same as TenantMigrationRunner: repair() first realigns the recorded checksum of
+            // a migration that was edited after it ran (e.g. V51/V53/V57/V58 gaining IF NOT
+            // EXISTS guards so gyms whose tables Hibernate created can migrate past them) —
+            // without it migrate() refuses to start on the checksum mismatch. repair() never
+            // executes migration SQL; it's a no-op when nothing has drifted. Skipped when the
+            // history has renumbered-file rows (see FlywayHistoryInspector.repairIfSafe).
+            try {
+                com.company.project.controlplane.migration.FlywayHistoryInspector.repairIfSafe(flyway, primaryDataSource);
+            } catch (java.io.IOException | java.sql.SQLException e) {
+                throw new IllegalStateException("Could not inspect Flyway history before migrating", e);
+            }
             flyway.migrate();
         }
         return flyway;

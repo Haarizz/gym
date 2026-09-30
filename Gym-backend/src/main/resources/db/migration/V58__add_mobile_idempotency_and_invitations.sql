@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS mobile_family_invitations (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
-CREATE INDEX idx_family_invitations_token ON mobile_family_invitations(token_hash);
-CREATE INDEX idx_family_invitations_recipient ON mobile_family_invitations(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_family_invitations_token ON mobile_family_invitations(token_hash);
+CREATE INDEX IF NOT EXISTS idx_family_invitations_recipient ON mobile_family_invitations(recipient_email);
 
 -- 3. Pre-flight check for duplicates before adding unique index
 -- This block will fail the migration if duplicates exist, acting as an audit mechanism
@@ -46,4 +46,4 @@ BEGIN
 END $$;
 
 -- 4. Apply the strict UNIQUE constraint
-CREATE UNIQUE INDEX idx_members_global_user_id_unique ON members(global_user_id) WHERE global_user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_members_global_user_id_unique ON members(global_user_id) WHERE global_user_id IS NOT NULL;

@@ -4,7 +4,7 @@
 -- (created_by/updated_by were a known gap the hard way in V36 — included here
 -- up front instead).
 
-CREATE TABLE branch_images (
+CREATE TABLE IF NOT EXISTS branch_images (
     id BIGSERIAL PRIMARY KEY,
     branch_id BIGINT NOT NULL,
     image_url TEXT NOT NULL,
@@ -16,9 +16,9 @@ CREATE TABLE branch_images (
     updated_by VARCHAR(255)
 );
 
-CREATE INDEX idx_branch_images_branch_id ON branch_images(branch_id);
+CREATE INDEX IF NOT EXISTS idx_branch_images_branch_id ON branch_images(branch_id);
 
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
     id BIGSERIAL PRIMARY KEY,
     branch_id BIGINT NOT NULL,
     member_id BIGINT NOT NULL,
@@ -32,4 +32,4 @@ CREATE TABLE reviews (
     UNIQUE (branch_id, member_id)
 );
 
-CREATE INDEX idx_reviews_branch_id ON reviews(branch_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_branch_id ON reviews(branch_id);
