@@ -1,4 +1,4 @@
-CREATE TABLE mobile_pending_registrations (
+CREATE TABLE IF NOT EXISTS mobile_pending_registrations (
     id                      BIGSERIAL PRIMARY KEY,
     registration_token_hash VARCHAR(64) NOT NULL,
     email_normalized        VARCHAR(255) NOT NULL,
@@ -27,6 +27,6 @@ CREATE TABLE mobile_pending_registrations (
 -- one per normalized username, regardless of status. "Re-registration" and
 -- "reclaim" are implemented as updates/deletes against the existing row rather
 -- than a second insert — see MobilePendingRegistrationService.
-CREATE UNIQUE INDEX idx_mobile_pending_registrations_email ON mobile_pending_registrations (email_normalized);
-CREATE UNIQUE INDEX idx_mobile_pending_registrations_username ON mobile_pending_registrations (username_normalized);
-CREATE UNIQUE INDEX idx_mobile_pending_registrations_token_hash ON mobile_pending_registrations (registration_token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_pending_registrations_email ON mobile_pending_registrations (email_normalized);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_pending_registrations_username ON mobile_pending_registrations (username_normalized);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mobile_pending_registrations_token_hash ON mobile_pending_registrations (registration_token_hash);

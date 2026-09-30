@@ -44,6 +44,23 @@ public final class FlywayHistoryInspector {
     public record HistoryRow(int installedRank, String version, String description, String type,
                              String script, Integer checksum, boolean success) {}
 
+    /**
+     * Runs flyway.repair() — realigning checksums of migration files edited after they ran
+     * (e.g. gaining an IF NOT EXISTS guard) — but only when no history row was run from a
+     * since-renumbered file, where repair() would instead relabel that row as a migration
+     * that never ran. In that case it does nothing, so migrate() fails loudly exactly as
+     * before and TenantFlywayHistoryRepairRunner remains the fix. Never executes SQL.
+     *
+     * @return true if repair() ran
+     */
+    public static boolean repairIfSafe(org.flywaydb.core.Flyway flyway, DataSource ds) throws IOException, SQLException {
+        if (hasHistoryTable(ds) && !findRenumberedRows(readHistory(ds), loadLocalMigrations()).isEmpty()) {
+            return false;
+        }
+        flyway.repair();
+        return true;
+    }
+
     /** db/migration/V*.sql by version, with Flyway-compatible descriptions and checksums. */
     public static Map<MigrationVersion, LocalMigration> loadLocalMigrations() throws IOException {
         Map<MigrationVersion, LocalMigration> result = new TreeMap<>();
