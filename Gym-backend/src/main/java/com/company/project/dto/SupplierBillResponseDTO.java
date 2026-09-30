@@ -36,6 +36,8 @@ public class SupplierBillResponseDTO {
     private String taxCode;
     private String paymentMethod;
     private List<PaymentSplitDTO> paymentBreakdown;
+    // Prints use this branch's company details (name, address, TRN, logo) in the header.
+    private Long branchId;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -69,6 +71,7 @@ public class SupplierBillResponseDTO {
         dto.setTaxCode(bill.getTaxCode());
         dto.setPaymentMethod(bill.getPaymentMethod());
         dto.setPaymentBreakdown(bill.getPaymentBreakdown());
+        dto.setBranchId(bill.getBranchId());
         dto.setCreatedAt(bill.getCreatedAt());
         dto.setUpdatedAt(bill.getUpdatedAt());
         dto.setItems(items.stream().map(SupplierBillItemDTO::fromEntity).collect(Collectors.toList()));
@@ -145,6 +148,9 @@ public class SupplierBillResponseDTO {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public Long getBranchId() { return branchId; }
+    public void setBranchId(Long branchId) { this.branchId = branchId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

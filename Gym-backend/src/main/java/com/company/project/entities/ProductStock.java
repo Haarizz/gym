@@ -5,6 +5,7 @@ import org.hibernate.annotations.Filter;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(ProductStockAlertListener.class)
 @Table(name = "product_stocks",
         uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "warehouse_id"}))
 public class ProductStock extends BaseEntity implements BranchAware {
@@ -28,6 +29,11 @@ public class ProductStock extends BaseEntity implements BranchAware {
     @Column(name = "reorder_level")
     private Integer reorderLevel = 0;
 
+    // Stock status when this row was loaded — lets ProductStockAlertListener tell a
+    // real "fell to low/out of stock" change from an unrelated update.
+    @Transient
+    private String statusAtLoad;
+
     public ProductStock() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -40,6 +46,9 @@ public class ProductStock extends BaseEntity implements BranchAware {
 
     public Long getWarehouseId() { return warehouseId; }
     public void setWarehouseId(Long warehouseId) { this.warehouseId = warehouseId; }
+
+    public String getStatusAtLoad() { return statusAtLoad; }
+    public void setStatusAtLoad(String statusAtLoad) { this.statusAtLoad = statusAtLoad; }
 
     public Integer getCurrentStock() { return currentStock; }
     public void setCurrentStock(Integer currentStock) { this.currentStock = currentStock; }

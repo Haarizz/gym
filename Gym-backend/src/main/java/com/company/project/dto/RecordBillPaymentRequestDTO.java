@@ -11,8 +11,14 @@ public class RecordBillPaymentRequestDTO {
     // Method-specific detail (card type, cheque number, bank account, online
     // payment type, ...) for the payment method above.
     private List<PaymentSplitDTO> paymentBreakdown;
+    // Date the supplier was paid (defaults to today). Drives the payment voucher,
+    // its journal entry and the supplier statement of account.
+    private java.time.LocalDate paymentDate;
 
     public RecordBillPaymentRequestDTO() {}
+
+    public java.time.LocalDate getPaymentDate() { return paymentDate; }
+    public void setPaymentDate(java.time.LocalDate paymentDate) { this.paymentDate = paymentDate; }
 
     // ── Getters & Setters ──────────────────────────────────────────────────
 

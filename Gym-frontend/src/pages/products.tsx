@@ -48,11 +48,14 @@ import {
   FaTags,
 } from "react-icons/fa6";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Eye } from "lucide-react";
+import { ProductDetailsDialog } from "../components/products/ProductDetailsDialog";
 import { toast } from "sonner";
-import { productsService, Product, ProductCategory, ProductStats, Warehouse } from "../utils/supabase/products-service";
+import { productsService, Product, ProductCategory, ProductStats, Warehouse, ProductSettings, DEFAULT_PRODUCT_SETTINGS } from "../utils/supabase/products-service";
 import { useNavigate } from "react-router-dom";
-import { Warehouse as WarehouseIcon, MapPin, Globe, Building2 } from "lucide-react";
+import { Warehouse as WarehouseIcon } from "lucide-react";
+import type { BarcodePrintRequest } from "./barcode-print";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 interface CategoryDisplay {
   id: number;
@@ -107,29 +110,43 @@ export function Products({ onNavigate }: ProductsProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("inventory");
   const [searchQuery, setSearchQuery] = useState("");
+  useGlobalSearchPrefill(setSearchQuery);
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+
+  // Products › Settings tab — persisted server-side (GET/PUT /api/products/settings).
+  const [productSettings, setProductSettings] = useState<ProductSettings>(DEFAULT_PRODUCT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [savingSetting, setSavingSetting] = useState<keyof ProductSettings | null>(null);
+
+  useEffect(() => {
+    productsService.getSettings()
+      .then(setProductSettings)
+      .catch(() => toast.error("Couldn't load product settings"))
+      .finally(() => setSettingsLoaded(true));
+  }, []);
+
+  const updateProductSetting = async (key: keyof ProductSettings, value: string, label: string) => {
+    const previous = productSettings;
+    setProductSettings({ ...previous, [key]: value });
+    setSavingSetting(key);
+    try {
+      setProductSettings(await productsService.updateSettings({ [key]: value }));
+      toast.success(`${label} saved`);
+    } catch (err: any) {
+      setProductSettings(previous);
+      toast.error(err?.message || `Couldn't save ${label.toLowerCase()}`);
+    } finally {
+      setSavingSetting(null);
+    }
+  };
   const [products, setProducts] = useState<Product[]>([]);
+  // Product whose details box is open (clicking a row).
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<CategoryDisplay[]>([]);
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showStockDialog, setShowStockDialog] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [stockAdjustment, setStockAdjustment] = useState({
-    type: 'ADD' as 'ADD' | 'SUBTRACT',
-    quantity: 0,
-    reason: '',
-  });
-  const [isAdjusting, setIsAdjusting] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
-  const [selectedStockWarehouseId, setSelectedStockWarehouseId] = useState<number | null>(null);
-  // Warehouse management state
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [warehousesLoading, setWarehousesLoading] = useState(false);
-  const [showWarehouseDialog, setShowWarehouseDialog] = useState(false);
-  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
-  const [warehouseForm, setWarehouseForm] = useState({ name: '', type: 'BRANCH', location: '', isActive: true });
-  const [isSavingWarehouse, setIsSavingWarehouse] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
 
@@ -188,11 +205,12 @@ export function Products({ onNavigate }: ProductsProps) {
     const status = product.isActive ? product.stockStatus : 'INACTIVE';
     switch (status) {
       case 'ACTIVE':
-        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Active</Badge>;
+      case 'IN_STOCK':
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">In Stock</Badge>;
       case 'INACTIVE':
         return <Badge variant="secondary">Inactive</Badge>;
       case 'OUT_OF_STOCK':
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Out of Stock</Badge>;
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Insufficient</Badge>;
       case 'LOW_STOCK':
         return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Low Stock</Badge>;
       default:
@@ -201,8 +219,8 @@ export function Products({ onNavigate }: ProductsProps) {
   };
 
   const getStockStatus = (product: Product) => {
-    if (product.totalStock === 0) {
-      return <div className="flex items-center gap-1 text-red-600"><AlertTriangle className="h-4 w-4" /> Out of Stock</div>;
+    if (product.totalStock <= 0) {
+      return <div className="flex items-center gap-1 text-red-600"><AlertTriangle className="h-4 w-4" /> Insufficient</div>;
     } else if (product.stockStatus === 'LOW_STOCK') {
       return <div className="flex items-center gap-1 text-yellow-600"><AlertTriangle className="h-4 w-4" /> Low Stock</div>;
     } else {
@@ -226,100 +244,10 @@ export function Products({ onNavigate }: ProductsProps) {
     }
   };
 
-  const loadWarehouses = useCallback(async () => {
-    setWarehousesLoading(true);
-    try {
-      const data = await productsService.getAllWarehouses();
-      setWarehouses(data);
-    } catch {
-      toast.error('Failed to load warehouses');
-    } finally {
-      setWarehousesLoading(false);
-    }
-  }, []);
-
-  const openWarehouseDialog = (warehouse?: Warehouse) => {
-    if (warehouse) {
-      setEditingWarehouse(warehouse);
-      setWarehouseForm({ name: warehouse.name, type: warehouse.type, location: warehouse.location ?? '', isActive: warehouse.isActive });
-    } else {
-      setEditingWarehouse(null);
-      setWarehouseForm({ name: '', type: 'BRANCH', location: '', isActive: true });
-    }
-    setShowWarehouseDialog(true);
-  };
-
-  const saveWarehouse = async () => {
-    if (!warehouseForm.name.trim()) { toast.error('Warehouse name is required'); return; }
-    setIsSavingWarehouse(true);
-    try {
-      if (editingWarehouse) {
-        await productsService.updateWarehouse(editingWarehouse.id, warehouseForm);
-        toast.success('Warehouse updated successfully');
-      } else {
-        await productsService.createWarehouse(warehouseForm);
-        toast.success('Warehouse created successfully');
-      }
-      setShowWarehouseDialog(false);
-      loadWarehouses();
-    } catch {
-      toast.error('Failed to save warehouse');
-    } finally {
-      setIsSavingWarehouse(false);
-    }
-  };
-
-  const deleteWarehouse = async (warehouse: Warehouse) => {
-    if (!window.confirm(`Delete warehouse "${warehouse.name}"? Products in this warehouse will lose their stock allocation.`)) return;
-    try {
-      await productsService.deleteWarehouse(warehouse.id);
-      toast.success('Warehouse deleted');
-      loadWarehouses();
-    } catch {
-      toast.error('Failed to delete warehouse');
-    }
-  };
-
-  const handleStockAdjustment = (product: Product) => {
-    setSelectedProduct(product);
-    const firstWarehouseId = product.stockByWarehouse?.[0]?.warehouseId ?? null;
-    setSelectedStockWarehouseId(firstWarehouseId);
-    setStockAdjustment({ type: 'ADD', quantity: 0, reason: '' });
-    setShowStockDialog(true);
-  };
-
-  const processStockAdjustment = async () => {
-    if (!selectedProduct) return;
-    if (!stockAdjustment.quantity || stockAdjustment.quantity <= 0 || isNaN(stockAdjustment.quantity)) {
-      toast.error("Please enter a valid quantity");
-      return;
-    }
-
-    setIsAdjusting(true);
-    try {
-      const warehouseId = selectedStockWarehouseId ?? selectedProduct.stockByWarehouse?.[0]?.warehouseId ?? 1;
-      await productsService.adjustStock(selectedProduct.id, {
-        warehouseId,
-        adjustmentType: stockAdjustment.type,
-        quantity: Math.floor(stockAdjustment.quantity),
-        reason: stockAdjustment.reason || undefined,
-      });
-
-      toast.success(`Stock ${stockAdjustment.type === 'ADD' ? 'added' : 'removed'} successfully`);
-      setShowStockDialog(false);
-      setSelectedProduct(null);
-      setStockAdjustment({ type: 'ADD', quantity: 0, reason: '' });
-
-      // Reload products
-      const categoryId = selectedCategoryId !== 'all' ? Number(selectedCategoryId) : undefined;
-      const status = selectedStatus !== 'all' ? selectedStatus : undefined;
-      loadData({ search: searchQuery || undefined, categoryId, status });
-    } catch (error) {
-      console.error('Stock adjustment failed:', error);
-      toast.error('Failed to adjust stock. Please try again.');
-    } finally {
-      setIsAdjusting(false);
-    }
+  // Labels are designed and printed in Sales & Purchases › Barcode Print.
+  const openBarcodePrint = (productIds: number[]) => {
+    const request: BarcodePrintRequest = { productIds };
+    navigate('/barcode-print', { state: { barcodePrint: request } });
   };
 
   const handlePrintBarcode = (product: Product) => {
@@ -327,23 +255,7 @@ export function Products({ onNavigate }: ProductsProps) {
       toast.error("No barcode available for this product");
       return;
     }
-    const barcodeValue = product.barcode || product.sku;
-    const printWindow = window.open('', '_blank', 'width=400,height=300');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head><title>Barcode - ${product.name}</title></head>
-          <body style="text-align:center;font-family:monospace;padding:20px;">
-            <h3>${product.name}</h3>
-            <p style="font-size:24px;letter-spacing:4px;border:1px solid #000;padding:10px;display:inline-block;">${barcodeValue}</p>
-            <p>SKU: ${product.sku}</p>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-    }
+    openBarcodePrint([product.id]);
   };
 
   const handleDuplicate = async (product: Product) => {
@@ -389,29 +301,9 @@ export function Products({ onNavigate }: ProductsProps) {
   };
 
   const handlePrintAllBarcodes = () => {
-    if (products.length === 0) { toast.error('No products to print'); return; }
-    const productsWithBarcode = products.filter(p => p.barcode || p.sku);
-    if (productsWithBarcode.length === 0) { toast.error('No barcodes found'); return; }
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) { toast.error('Popup blocked — please allow popups'); return; }
-    const items = productsWithBarcode.map(p => `
-      <div style="display:inline-block;border:1px solid #ddd;border-radius:6px;padding:12px;margin:6px;text-align:center;width:160px;vertical-align:top;">
-        <div style="font-size:11px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
-        <div style="font-family:monospace;font-size:15px;letter-spacing:2px;border:1px solid #333;padding:6px;background:#f9f9f9;border-radius:3px;">${p.barcode || p.sku}</div>
-        <div style="font-size:10px;color:#666;margin-top:4px;">SKU: ${p.sku}</div>
-        <div style="font-size:10px;color:#444;font-weight:500;">${currencyCode} ${p.sellingPrice.toFixed(2)}</div>
-      </div>`).join('');
-    printWindow.document.write(`<html><head><title>Barcode List — GymBios</title>
-      <style>@media print { body { margin: 10px; } button { display: none; } }</style>
-      </head><body>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:2px solid #333;padding-bottom:10px;">
-        <h2 style="margin:0;font-family:sans-serif;">Product Barcode List</h2>
-        <span style="font-size:12px;color:#666;">Generated: ${new Date().toLocaleString()} | ${productsWithBarcode.length} products</span>
-      </div>
-      <div>${items}</div>
-      <script>window.onload=()=>window.print();<\/script>
-      </body></html>`);
-    printWindow.document.close();
+    const printable = products.filter(p => p.barcode || p.sku);
+    if (printable.length === 0) { toast.error('No products with a barcode or SKU to print'); return; }
+    openBarcodePrint(printable.map(p => p.id));
   };
 
   const handleDelete = async (product: Product) => {
@@ -582,7 +474,7 @@ export function Products({ onNavigate }: ProductsProps) {
       `}</style>
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'settings') loadWarehouses(); }} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="w-full flex">
           <TabsTrigger value="inventory" className="flex-1">Inventory</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">Analytics</TabsTrigger>
@@ -673,7 +565,7 @@ export function Products({ onNavigate }: ProductsProps) {
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="ACTIVE">Active</SelectItem>
                     <SelectItem value="INACTIVE">Inactive</SelectItem>
-                    <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+                    <SelectItem value="OUT_OF_STOCK">Insufficient</SelectItem>
                     <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
                   </SelectContent>
                 </Select>
@@ -725,7 +617,14 @@ export function Products({ onNavigate }: ProductsProps) {
                     </TableHeader>
                     <TableBody>
                       {products.map((product) => (
-                        <TableRow key={product.id} className="hover:bg-slate-50/50 transition-colors">
+                        <TableRow
+                          key={product.id}
+                          className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                          tabIndex={0}
+                          aria-label={`View details of ${product.name}`}
+                          onClick={() => setViewingProduct(product)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) setViewingProduct(product); }}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -771,7 +670,8 @@ export function Products({ onNavigate }: ProductsProps) {
                             )}
                           </TableCell>
                           <TableCell><CurrencyGlyph /> {product.inventoryValue.toLocaleString()}</TableCell>
-                          <TableCell>
+                          {/* The actions menu must not also open the details box. */}
+                          <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm">
@@ -780,13 +680,13 @@ export function Products({ onNavigate }: ProductsProps) {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => setViewingProduct(product)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEditProduct(product)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Product
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleStockAdjustment(product)}>
-                                  <RefreshCw className="h-4 w-4 mr-2" />
-                                  Adjust Stock
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handlePrintBarcode(product)}>
                                   <QrCode className="h-4 w-4 mr-2" />
@@ -813,6 +713,12 @@ export function Products({ onNavigate }: ProductsProps) {
                   </Table>
                 </ScrollArea>
               )}
+              <ProductDetailsDialog
+                product={viewingProduct}
+                onClose={() => setViewingProduct(null)}
+                onEdit={(p) => { setViewingProduct(null); handleEditProduct(p); }}
+                onPrintBarcode={handlePrintBarcode}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -877,9 +783,9 @@ export function Products({ onNavigate }: ProductsProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleStockAdjustment(product)}
+                            onClick={() => navigate('/purchase-order')}
                           >
-                            Add Stock
+                            Order Stock
                           </Button>
                         </div>
                       </div>
@@ -938,7 +844,7 @@ export function Products({ onNavigate }: ProductsProps) {
                   <QrCode className="h-5 w-5" />
                   Barcode List
                 </CardTitle>
-                <CardDescription>Print barcodes for all products</CardDescription>
+                <CardDescription>Design and print labels for every product in this list</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button variant="outline" className="w-full border-0" onClick={handlePrintAllBarcodes}>
@@ -951,101 +857,14 @@ export function Products({ onNavigate }: ProductsProps) {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6">
-          {/* Warehouse Management */}
+          {/* Warehouses moved to their own module (Sales & Purchases › Warehouses) */}
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <WarehouseIcon className="h-5 w-5" />
-                    Warehouse Management
-                  </CardTitle>
-                  <CardDescription>Add and manage storage locations for your inventory</CardDescription>
-                </div>
-                <Button onClick={() => openWarehouseDialog()} className="bg-primary hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Warehouse
-                </Button>
+            <CardContent className="flex items-center justify-between gap-4 p-6">
+              <div>
+                <CardTitle className="flex items-center gap-2"><WarehouseIcon className="h-5 w-5" /> Warehouses</CardTitle>
+                <CardDescription className="mt-1">Storage locations are now managed in Sales &amp; Purchases › Warehouses.</CardDescription>
               </div>
-            </CardHeader>
-            <CardContent>
-              {warehousesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-5 w-5 animate-spin text-primary mr-2" />
-                  <span className="text-muted-foreground">Loading warehouses...</span>
-                </div>
-              ) : warehouses.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <WarehouseIcon className="h-10 w-10 text-gray-300 mb-3" />
-                  <p className="text-muted-foreground mb-3">No warehouses found</p>
-                  <Button variant="outline" onClick={() => openWarehouseDialog()}>
-                    <Plus className="h-4 w-4 mr-2" /> Create First Warehouse
-                  </Button>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Warehouse Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {warehouses.map((wh) => (
-                      <TableRow key={wh.id} className="hover:bg-slate-50/50 transition-colors">
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {wh.type === 'ONLINE' ? (
-                              <Globe className="h-4 w-4 text-blue-500" />
-                            ) : wh.type === 'MAIN_WAREHOUSE' ? (
-                              <Building2 className="h-4 w-4 text-primary" />
-                            ) : (
-                              <WarehouseIcon className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className="font-medium">{wh.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {wh.type === 'MAIN_WAREHOUSE' ? 'Main Warehouse'
-                              : wh.type === 'BRANCH' ? 'Branch'
-                              : 'Online'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {wh.location ? (
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              {wh.location}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {wh.isActive
-                            ? <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Active</Badge>
-                            : <Badge variant="secondary">Inactive</Badge>
-                          }
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => openWarehouseDialog(wh)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => deleteWarehouse(wh)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <Button variant="outline" onClick={() => navigate('/warehouses')}>Open Warehouses</Button>
             </CardContent>
           </Card>
 
@@ -1060,29 +879,50 @@ export function Products({ onNavigate }: ProductsProps) {
                 <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Auto-generate SKU</Label>
-                    <p className="text-sm text-muted-foreground">Automatically generate SKU codes for new products</p>
+                    <p className="text-sm text-muted-foreground">
+                      {productSettings.autoGenerateSku === 'true'
+                        ? 'SKU codes are generated from the category (e.g. SUP-0001)'
+                        : "You enter each product's SKU yourself — it must be unique"}
+                    </p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={productSettings.autoGenerateSku === 'true'}
+                    disabled={!settingsLoaded || savingSetting === 'autoGenerateSku'}
+                    onCheckedChange={v => updateProductSetting('autoGenerateSku', String(v), 'Auto-generate SKU')}
+                  />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Low stock alerts</Label>
-                    <p className="text-sm text-muted-foreground">Send notifications when products reach low stock threshold</p>
+                    <p className="text-sm text-muted-foreground">Notify admins and managers when a product falls to its reorder level or runs out</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={productSettings.lowStockAlerts === 'true'}
+                    disabled={!settingsLoaded || savingSetting === 'lowStockAlerts'}
+                    onCheckedChange={v => updateProductSetting('lowStockAlerts', String(v), 'Low stock alerts')}
+                  />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                   <div>
                     <Label>Auto-deduct recipe ingredients</Label>
-                    <p className="text-sm text-muted-foreground">Automatically reduce ingredient stock when recipes are used</p>
+                    <p className="text-sm text-muted-foreground">Reduce ingredient stock automatically when a production order is completed</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={productSettings.autoDeductRecipeIngredients === 'true'}
+                    disabled={!settingsLoaded || savingSetting === 'autoDeductRecipeIngredients'}
+                    onCheckedChange={v => updateProductSetting('autoDeductRecipeIngredients', String(v), 'Auto-deduct recipe ingredients')}
+                  />
                 </div>
               </div>
               <Separator />
               <div className="space-y-2 rounded-lg border border-primary/10 bg-slate-50/40 p-3">
                 <Label>Default Tax Rate</Label>
-                <Select defaultValue="5">
+                <p className="text-sm text-muted-foreground">Pre-filled on new products — each product can still set its own rate</p>
+                <Select
+                  value={productSettings.defaultTaxRate}
+                  disabled={!settingsLoaded || savingSetting === 'defaultTaxRate'}
+                  onValueChange={v => updateProductSetting('defaultTaxRate', v, 'Default tax rate')}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1098,174 +938,6 @@ export function Products({ onNavigate }: ProductsProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Warehouse Create/Edit Dialog */}
-      <Dialog open={showWarehouseDialog} onOpenChange={setShowWarehouseDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingWarehouse ? 'Edit Warehouse' : 'Add New Warehouse'}</DialogTitle>
-            <DialogDescription>
-              {editingWarehouse ? 'Update warehouse details' : 'Create a new storage location for your inventory'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Warehouse Name *</Label>
-              <Input
-                placeholder="e.g. Main Warehouse, Downtown Store"
-                value={warehouseForm.name}
-                onChange={(e) => setWarehouseForm((p) => ({ ...p, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={warehouseForm.type} onValueChange={(v) => setWarehouseForm((p) => ({ ...p, type: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MAIN_WAREHOUSE">Main Warehouse</SelectItem>
-                  <SelectItem value="BRANCH">Branch / Store</SelectItem>
-                  <SelectItem value="ONLINE">Online Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Location / Address</Label>
-              <Input
-                placeholder="e.g. Dubai Marina, JBR Walk"
-                value={warehouseForm.location}
-                onChange={(e) => setWarehouseForm((p) => ({ ...p, location: e.target.value }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Active</Label>
-                <p className="text-sm text-muted-foreground">Inactive warehouses won't appear in product forms</p>
-              </div>
-              <Switch
-                checked={warehouseForm.isActive}
-                onCheckedChange={(v) => setWarehouseForm((p) => ({ ...p, isActive: v }))}
-              />
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setShowWarehouseDialog(false)} disabled={isSavingWarehouse}>
-                Cancel
-              </Button>
-              <Button onClick={saveWarehouse} disabled={isSavingWarehouse}>
-                {isSavingWarehouse ? (
-                  <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
-                ) : editingWarehouse ? 'Update Warehouse' : 'Create Warehouse'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Stock Adjustment Dialog */}
-      <Dialog open={showStockDialog} onOpenChange={setShowStockDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust Stock - {selectedProduct?.name}</DialogTitle>
-            <DialogDescription>
-              Update inventory levels for this product
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Warehouse</Label>
-              <Select
-                value={selectedStockWarehouseId ? String(selectedStockWarehouseId) : ''}
-                onValueChange={(v) => setSelectedStockWarehouseId(Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select warehouse" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedProduct?.stockByWarehouse?.map((s) => (
-                    <SelectItem key={s.warehouseId} value={String(s.warehouseId)}>
-                      {s.warehouseName} — Current: {s.currentStock} {selectedProduct.defaultUnit || 'units'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Current Stock (Total)</Label>
-                <div className="text-2xl font-bold">
-                  {selectedProduct?.totalStock ?? 0} {selectedProduct?.defaultUnit || 'units'}
-                </div>
-              </div>
-              <div>
-                <Label>Selected Warehouse Stock</Label>
-                <div className="text-2xl font-bold text-primary">
-                  {selectedProduct?.stockByWarehouse?.find(s => s.warehouseId === selectedStockWarehouseId)?.currentStock ?? 0}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Adjustment Type</Label>
-              <Select
-                value={stockAdjustment.type}
-                onValueChange={(value: 'ADD' | 'SUBTRACT') =>
-                  setStockAdjustment((prev) => ({ ...prev, type: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADD">Add Stock</SelectItem>
-                  <SelectItem value="SUBTRACT">Remove Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Quantity</Label>
-              <Input
-                type="number"
-                placeholder="Enter quantity"
-                value={stockAdjustment.quantity === 0 ? '' : stockAdjustment.quantity.toString()}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const numValue = value === '' ? 0 : parseInt(value, 10);
-                  setStockAdjustment((prev) => ({
-                    ...prev,
-                    quantity: isNaN(numValue) ? 0 : numValue,
-                  }));
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Reason (Optional)</Label>
-              <Textarea
-                placeholder="Enter reason for stock adjustment"
-                value={stockAdjustment.reason}
-                onChange={(e) => setStockAdjustment((prev) => ({ ...prev, reason: e.target.value }))}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowStockDialog(false)} disabled={isAdjusting}>
-                Cancel
-              </Button>
-              <Button onClick={processStockAdjustment} disabled={isAdjusting}>
-                {isAdjusting ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Stock'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -75,6 +75,7 @@ import {
 } from 'lucide-react';
 import { PermissionGate, hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
+import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 
 interface StaffsTrainersProps {
@@ -368,6 +369,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('all-staff');
   const [searchQuery, setSearchQuery] = useState('');
+  useGlobalSearchPrefill(setSearchQuery);
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');

@@ -561,6 +561,10 @@ public class TenantProvisioningService {
      * V53__create_branch_images_and_reviews.sql have the exact same unconditional-
      * CREATE-TABLE-with-a-matching-@Entity shape and would fail the same way the
      * moment a tenant's first provisioning run reached V53, just not yet reported.
+     * UserIdentityProvider/MobilePendingSocialRegistration vs.
+     * V57__add_social_login_tables.sql then did exactly that in production
+     * (2026-09-29: every gym created after the V57 release stuck as "Main Gym" /
+     * owner "Not issued").
      * Rather than keep discovering and patching these one migration at a time,
      * this drops every table known to collide this way in one place — the fix for
      * the NEXT such entity/migration pair is adding one line here, not waiting for
@@ -580,6 +584,8 @@ public class TenantProvisioningService {
             stmt.execute("DROP TABLE IF EXISTS mobile_pending_registrations");     // V51
             stmt.execute("DROP TABLE IF EXISTS branch_images");                    // V53
             stmt.execute("DROP TABLE IF EXISTS reviews");                         // V53
+            stmt.execute("DROP TABLE IF EXISTS user_identity_providers");          // V57
+            stmt.execute("DROP TABLE IF EXISTS mobile_pending_social_registrations"); // V57
         }
     }
 

@@ -48,6 +48,7 @@ public class SupplierBillService {
     private final WarehouseRepository warehouseRepository;
 
     private final FinancialEventService financialEventService;
+    private final PaymentVoucherService paymentVoucherService;
 
     public SupplierBillService(SupplierBillRepository supplierBillRepository,
                                SupplierBillItemRepository supplierBillItemRepository,
@@ -55,7 +56,8 @@ public class SupplierBillService {
                                ProductStockRepository productStockRepository,
                                ProductRepository productRepository,
                                WarehouseRepository warehouseRepository,
-                               FinancialEventService financialEventService) {
+                               FinancialEventService financialEventService,
+                               PaymentVoucherService paymentVoucherService) {
         this.supplierBillRepository     = supplierBillRepository;
         this.supplierBillItemRepository = supplierBillItemRepository;
         this.supplierRepository         = supplierRepository;
@@ -63,6 +65,7 @@ public class SupplierBillService {
         this.productRepository          = productRepository;
         this.warehouseRepository        = warehouseRepository;
         this.financialEventService      = financialEventService;
+        this.paymentVoucherService      = paymentVoucherService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -218,6 +221,11 @@ public class SupplierBillService {
         if ("CANCELLED".equals(bill.getStatus())) {
             throw new BusinessRuleViolationException("Bill is already cancelled.");
         }
+        // Money already paid against it would be stranded (voucher + ledger stay posted).
+        if (bill.getAmountPaid() != null && bill.getAmountPaid().compareTo(BigDecimal.ZERO) > 0) {
+            throw new BusinessRuleViolationException("Bill " + bill.getBillNumber() + " has payments recorded ("
+                    + bill.getAmountPaid() + ") and can't be cancelled. Settle it with a debit note instead.");
+        }
 
         // If CONFIRMED, reverse stock (only if not linked to a PO)
         if ("CONFIRMED".equals(bill.getStatus()) && bill.getPurchaseOrderId() == null) {
@@ -244,6 +252,20 @@ public class SupplierBillService {
         return SupplierBillResponseDTO.fromEntity(bill, items);
     }
 
+    /** Field-by-field copy, so stamping a date never mutates the request's legs (also passed to the voucher). */
+    private static com.company.project.dto.PaymentSplitDTO copyLeg(com.company.project.dto.PaymentSplitDTO leg) {
+        com.company.project.dto.PaymentSplitDTO c = new com.company.project.dto.PaymentSplitDTO(leg.getMethod(), leg.getAmount(), leg.getReference());
+        c.setCardType(leg.getCardType());
+        c.setChequeNumber(leg.getChequeNumber());
+        c.setChequeDate(leg.getChequeDate());
+        c.setBankName(leg.getBankName());
+        c.setBankAccountCode(leg.getBankAccountCode());
+        c.setBankAccountName(leg.getBankAccountName());
+        c.setOnlinePaymentType(leg.getOnlinePaymentType());
+        c.setProviderName(leg.getProviderName());
+        return c;
+    }
+
     public SupplierBillResponseDTO recordPayment(Long id, RecordBillPaymentRequestDTO req) {
         SupplierBill bill = supplierBillRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Supplier bill not found with id: " + id));
@@ -252,23 +274,155 @@ public class SupplierBillService {
             throw new BusinessRuleViolationException("Payments can only be recorded on CONFIRMED bills. Current status: " + bill.getStatus());
         }
 
-        BigDecimal currentPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
-        BigDecimal newAmountPaid = currentPaid.add(req.getAmount() != null ? req.getAmount() : BigDecimal.ZERO);
-        bill.setAmountPaid(newAmountPaid);
-        if (req.getPaymentMethod() != null) bill.setPaymentMethod(req.getPaymentMethod());
-        if (req.getPaymentBreakdown() != null) bill.setPaymentBreakdown(req.getPaymentBreakdown());
-
+        BigDecimal amount = req.getAmount() != null ? req.getAmount().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleViolationException("Payment amount must be greater than 0.");
+        }
         BigDecimal total = bill.getTotalAmount() != null ? bill.getTotalAmount() : BigDecimal.ZERO;
-        if (newAmountPaid.compareTo(total) >= 0) {
-            bill.setPaymentStatus("PAID");
-        } else {
-            bill.setPaymentStatus("PARTIAL");
+        BigDecimal currentPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal balance = total.subtract(currentPaid);
+        if (amount.subtract(balance).compareTo(new BigDecimal("0.01")) > 0) {
+            throw new BusinessRuleViolationException("Payment of " + amount + " is more than the balance due (" + balance.max(BigDecimal.ZERO) + ").");
         }
 
+        BigDecimal newAmountPaid = currentPaid.add(amount);
+        bill.setAmountPaid(newAmountPaid);
+        if (req.getPaymentMethod() != null) {
+            // More than one payment with different methods reads as "Mixed" on the bill.
+            String prev = bill.getPaymentMethod();
+            bill.setPaymentMethod(currentPaid.compareTo(BigDecimal.ZERO) > 0 && prev != null && !prev.equalsIgnoreCase(req.getPaymentMethod())
+                    ? "Mixed" : req.getPaymentMethod());
+        }
+        // Keep every payment's legs on the bill (append, don't overwrite earlier payments),
+        // each stamped with its payment date for the invoice's Payments tab. A single-method
+        // payment arrives without a breakdown — record it as one leg too, otherwise it would
+        // be missing from the list as soon as any later payment adds legs.
+        String paidOn = (req.getPaymentDate() != null ? req.getPaymentDate() : java.time.LocalDate.now()).toString();
+        List<com.company.project.dto.PaymentSplitDTO> newLegs = new ArrayList<>();
+        if (req.getPaymentBreakdown() != null && !req.getPaymentBreakdown().isEmpty()) {
+            for (com.company.project.dto.PaymentSplitDTO leg : req.getPaymentBreakdown()) {
+                com.company.project.dto.PaymentSplitDTO copy = copyLeg(leg);
+                copy.setPaymentDate(paidOn);
+                newLegs.add(copy);
+            }
+        } else {
+            com.company.project.dto.PaymentSplitDTO single = new com.company.project.dto.PaymentSplitDTO(
+                    req.getPaymentMethod() != null ? req.getPaymentMethod() : "Cash", amount, null);
+            single.setPaymentDate(paidOn);
+            newLegs.add(single);
+        }
+        List<com.company.project.dto.PaymentSplitDTO> legs = new ArrayList<>();
+        if (bill.getPaymentBreakdown() != null) legs.addAll(bill.getPaymentBreakdown());
+        legs.addAll(newLegs);
+        bill.setPaymentBreakdown(legs);
+        bill.setPaymentStatus(newAmountPaid.compareTo(total) >= 0 ? "PAID" : "PARTIAL");
         bill = supplierBillRepository.save(bill);
+
+        // Dated payment voucher → DR Accounts Payable / CR Cash-Bank, and the supplier SOA's payment line.
+        paymentVoucherService.recordSupplierBillPayment(bill, amount, req.getPaymentMethod(), req.getPaymentBreakdown(),
+                req.getNotes(), req.getPaymentDate(), total.subtract(newAmountPaid));
+
         List<SupplierBillItem> items = supplierBillItemRepository.findByBillId(bill.getId());
         return SupplierBillResponseDTO.fromEntity(bill, items);
     }
+
+    // ── Supplier statement of account ───────────────────────────────────────
+
+    /**
+     * Supplier SOA for a period: confirmed invoices are credits (we owe more), payments
+     * are debits (we owe less). Payments come from Paid supplier payment vouchers; any
+     * amount recorded on a bill before vouchers were created for bill payments (so with
+     * no voucher behind it) is shown as one "payment on invoice" line so the balance
+     * still matches the bills. Positive balance = payable to the supplier.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getStatement(Long supplierId, java.time.LocalDate from, java.time.LocalDate to) {
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new EntityNotFoundException("Supplier not found with id: " + supplierId));
+        java.time.LocalDate start = from != null ? from : java.time.LocalDate.of(1970, 1, 1);
+        java.time.LocalDate end = to != null ? to : java.time.LocalDate.now();
+
+        List<SupplierBill> bills = supplierBillRepository.findAll().stream()
+                .filter(b -> supplierId.equals(b.getSupplierId()) && "CONFIRMED".equals(b.getStatus()))
+                .collect(Collectors.toList());
+        java.util.Set<String> billNumbers = bills.stream().map(SupplierBill::getBillNumber).collect(Collectors.toSet());
+        List<com.company.project.entities.PaymentVoucher> vouchers = paymentVoucherService.findPaidSupplierVouchers(supplier.getName());
+
+        List<java.util.Map<String, Object>> all = new ArrayList<>();
+        for (SupplierBill b : bills) {
+            java.time.LocalDate d = b.getBillDate() != null ? b.getBillDate() : b.getCreatedAt().toLocalDate();
+            all.add(entry(d, 0, "INVOICE", b.getBillNumber(),
+                    "Purchase invoice" + (b.getPurchaseOrderId() != null ? " (against PO)" : ""),
+                    b.getInvoiceNumber(), BigDecimal.ZERO, nz(b.getTotalAmount())));
+
+            BigDecimal vouchered = vouchers.stream()
+                    .filter(v -> b.getBillNumber().equals(v.getBillNo()))
+                    .map(v -> nz(v.getAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal legacy = nz(b.getAmountPaid()).subtract(vouchered);
+            if (legacy.compareTo(new BigDecimal("0.01")) >= 0) {
+                java.time.LocalDate pd = b.getUpdatedAt() != null ? b.getUpdatedAt().toLocalDate() : d;
+                all.add(entry(pd, 1, "PAYMENT", b.getBillNumber(), "Payment recorded on invoice",
+                        b.getPaymentMethod(), legacy, BigDecimal.ZERO));
+            }
+        }
+        for (com.company.project.entities.PaymentVoucher v : vouchers) {
+            java.time.LocalDate d = v.getPaymentDate() != null ? v.getPaymentDate() : java.time.LocalDate.now();
+            boolean linked = v.getBillNo() != null && billNumbers.contains(v.getBillNo());
+            all.add(entry(d, 1, "PAYMENT", v.getVoucherNo(),
+                    linked ? "Payment against " + v.getBillNo() : (v.getDescription() != null ? v.getDescription() : "Payment on account"),
+                    v.getPaymentMethod(), nz(v.getAmount()), BigDecimal.ZERO));
+        }
+        all.sort(java.util.Comparator
+                .comparing((java.util.Map<String, Object> e) -> (java.time.LocalDate) e.get("transaction_date"))
+                .thenComparing(e -> (Integer) e.get("_order"))
+                .thenComparing(e -> String.valueOf(e.get("document_no"))));
+
+        BigDecimal opening = BigDecimal.ZERO, totalDebit = BigDecimal.ZERO, totalCredit = BigDecimal.ZERO;
+        List<java.util.Map<String, Object>> entries = new ArrayList<>();
+        for (java.util.Map<String, Object> e : all) {
+            java.time.LocalDate d = (java.time.LocalDate) e.get("transaction_date");
+            BigDecimal debit = (BigDecimal) e.get("debit"), credit = (BigDecimal) e.get("credit");
+            if (d.isBefore(start)) { opening = opening.add(credit).subtract(debit); continue; }
+            if (d.isAfter(end)) continue;
+            totalDebit = totalDebit.add(debit);
+            totalCredit = totalCredit.add(credit);
+            entries.add(e);
+        }
+        BigDecimal running = opening;
+        for (java.util.Map<String, Object> e : entries) {
+            running = running.add((BigDecimal) e.get("credit")).subtract((BigDecimal) e.get("debit"));
+            e.put("running_balance", running);
+            e.remove("_order");
+        }
+
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("supplier_id", supplier.getId());
+        out.put("supplier_name", supplier.getName());
+        out.put("from", start);
+        out.put("to", end);
+        out.put("opening_balance", opening);
+        out.put("total_debit", totalDebit);
+        out.put("total_credit", totalCredit);
+        out.put("closing_balance", running);
+        out.put("entries", entries);
+        return out;
+    }
+
+    private static java.util.Map<String, Object> entry(java.time.LocalDate date, int order, String type, String documentNo,
+                                                      String description, String reference, BigDecimal debit, BigDecimal credit) {
+        java.util.Map<String, Object> e = new java.util.LinkedHashMap<>();
+        e.put("transaction_date", date);
+        e.put("_order", order);
+        e.put("type", type);
+        e.put("document_no", documentNo);
+        e.put("description", description);
+        e.put("reference", reference);
+        e.put("debit", debit);
+        e.put("credit", credit);
+        return e;
+    }
+
+    private static BigDecimal nz(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }
 
     public void deleteBill(Long id) {
         SupplierBill bill = supplierBillRepository.findById(id)

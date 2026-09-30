@@ -47,13 +47,81 @@ public class ReceiptService {
                           FinancialEventService financialEventService,
                           @Lazy ReceiptVoucherService receiptVoucherService,
                           VoucherNumberService voucherNumberService,
-                          StaffRepository staffRepository) {
+                          StaffRepository staffRepository,
+                          com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository,
+                          com.company.project.repositories.SalesInvoiceItemRepository salesInvoiceItemRepository) {
         this.receiptRepository     = receiptRepository;
         this.memberRepository      = memberRepository;
         this.financialEventService = financialEventService;
         this.receiptVoucherService = receiptVoucherService;
         this.voucherNumberService  = voucherNumberService;
         this.staffRepository      = staffRepository;
+        this.salesInvoiceRepository     = salesInvoiceRepository;
+        this.salesInvoiceItemRepository = salesInvoiceItemRepository;
+    }
+
+    private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
+    private final com.company.project.repositories.SalesInvoiceItemRepository salesInvoiceItemRepository;
+
+    /**
+     * Member SOA rows for the member's confirmed Sales Invoices (products sold to them):
+     * one "Sales Invoice" debit per invoice, then one "Sales Payment" credit per payment
+     * leg, dated the day it was received. Credit left on account simply stays in the balance.
+     */
+    private List<com.company.project.dto.StatementLineDTO> salesInvoiceRows(Long memberDbId, DateTimeFormatter dateFmt) {
+        List<com.company.project.dto.StatementLineDTO> rows = new ArrayList<>();
+        for (com.company.project.entities.SalesInvoice inv :
+                salesInvoiceRepository.findByMemberIdAndStatusOrderByInvoiceDateAscIdAsc(memberDbId, "CONFIRMED")) {
+            String invDate = inv.getInvoiceDate() != null ? inv.getInvoiceDate().format(dateFmt)
+                    : inv.getCreatedAt() != null ? inv.getCreatedAt().format(dateFmt) : null;
+            String items = salesInvoiceItemRepository.findByInvoiceIdOrderByIdAsc(inv.getId()).stream()
+                    .map(i -> i.getProductName() + " × " + i.getQuantity())
+                    .collect(Collectors.joining(", "));
+
+            com.company.project.dto.StatementLineDTO invRow = new com.company.project.dto.StatementLineDTO();
+            invRow.setId(inv.getId());
+            invRow.setDate(invDate);
+            invRow.setReceiptNo(inv.getInvoiceNumber());
+            invRow.setInvoiceNo(inv.getInvoiceNumber());
+            invRow.setType("Sales Invoice");
+            invRow.setDescription(items.isEmpty() ? "Products sold" : items);
+            invRow.setDebit(inv.getTotalAmount() != null ? inv.getTotalAmount() : BigDecimal.ZERO);
+            invRow.setCredit(BigDecimal.ZERO);
+            invRow.setStatus(inv.getPaymentStatus());
+            rows.add(invRow);
+
+            BigDecimal paid = inv.getAmountPaid() != null ? inv.getAmountPaid() : BigDecimal.ZERO;
+            BigDecimal legsTotal = BigDecimal.ZERO;
+            if (inv.getPaymentBreakdown() != null) {
+                for (com.company.project.dto.PaymentSplitDTO leg : inv.getPaymentBreakdown()) {
+                    BigDecimal amount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
+                    if (amount.signum() <= 0) continue;
+                    legsTotal = legsTotal.add(amount);
+                    rows.add(salesPaymentRow(inv, leg.getPaymentDate() != null ? leg.getPaymentDate() : invDate, leg.getMethod(), amount));
+                }
+            }
+            // Anything recorded as paid but not itemised in legs still counts, as one row.
+            BigDecimal rest = paid.subtract(legsTotal);
+            if (rest.compareTo(new BigDecimal("0.005")) > 0) {
+                rows.add(salesPaymentRow(inv, invDate, inv.getPaymentMethod(), rest));
+            }
+        }
+        return rows;
+    }
+
+    private static com.company.project.dto.StatementLineDTO salesPaymentRow(
+            com.company.project.entities.SalesInvoice inv, String date, String method, BigDecimal amount) {
+        com.company.project.dto.StatementLineDTO row = new com.company.project.dto.StatementLineDTO();
+        row.setId(inv.getId());
+        row.setDate(date);
+        row.setReceiptNo(inv.getInvoiceNumber());
+        row.setType("Sales Payment");
+        row.setDescription("Payment on sales invoice" + (method != null ? " (" + method + ")" : ""));
+        row.setDebit(BigDecimal.ZERO);
+        row.setCredit(amount);
+        row.setPaymentMethod(method);
+        row.setStatus(inv.getPaymentStatus());
+        return row;
     }
 
     /**
@@ -164,7 +232,12 @@ public class ReceiptService {
         dto.setIsMinor(Boolean.TRUE.equals(member.getIsMinor()));
         dto.setBilledToHead(member.isEffectivelyBilledToHead());
 
-        if (member.isEffectivelyBilledToHead()) {
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        // Products sold to this member on Sales Invoices are always their own, even when
+        // their membership fees are billed to a family head.
+        List<com.company.project.dto.StatementLineDTO> salesRows = salesInvoiceRows(memberDbId, dateFmt);
+
+        if (member.isEffectivelyBilledToHead() && salesRows.isEmpty()) {
             String headName = null;
             if (member.getFamilyHeadId() != null) {
                 headName = memberRepository.findByMemberId(member.getFamilyHeadId())
@@ -179,14 +252,21 @@ public class ReceiptService {
             return dto;
         }
 
-        List<Receipt> receipts = receiptRepository.findByMemberDbIdOrderByTransactionDateAsc(memberDbId);
-        // Fallback: handles stale/null member_db_id on older receipts, same as getPendingBillsForMember.
-        if (receipts.isEmpty()) {
-            receipts = receiptRepository.findByMemberNameOrderByTransactionDateAsc(member.getName());
-            selfHealMemberDbId(receipts, memberDbId);
+        List<Receipt> receipts;
+        if (member.isEffectivelyBilledToHead()) {
+            // Membership fees live on the head's statement; only the sales rows belong here.
+            String headName = member.getFamilyHeadId() == null ? null
+                    : memberRepository.findByMemberId(member.getFamilyHeadId()).map(Member::getName).orElse(null);
+            dto.setFamilyHeadName(headName);
+            receipts = new ArrayList<>();
+        } else {
+            receipts = receiptRepository.findByMemberDbIdOrderByTransactionDateAsc(memberDbId);
+            // Fallback: handles stale/null member_db_id on older receipts, same as getPendingBillsForMember.
+            if (receipts.isEmpty()) {
+                receipts = receiptRepository.findByMemberNameOrderByTransactionDateAsc(member.getName());
+                selfHealMemberDbId(receipts, memberDbId);
+            }
         }
-
-        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
         // Bills (New/Renewal/Add-on/Daily Entry) create debt; "Payment" receipts are
         // settlement vouchers created by settlePayment(). Each bill's paidAmount is
@@ -286,6 +366,8 @@ public class ReceiptService {
                 }
             }
         }
+
+        allRows.addAll(salesRows);
 
         // Stable sort by date — ties (a bill's Invoice + initial-Payment row share the
         // bill's own date) keep insertion order, so Invoice always precedes its Payment.

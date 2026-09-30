@@ -167,10 +167,26 @@ public class ReceiptVoucherService {
         return toResponseDTO(saved);
     }
 
+    /** Source category of vouchers created by Sales Invoice payments (SalesInvoiceService). */
+    public static final String SALES_INVOICE_CATEGORY = "Sales Invoice";
+
+    /**
+     * A Sales Invoice payment's voucher is only the receipt document: the invoice owns
+     * the amount paid and its own journal entry (DR Cash/Bank · CR Receivable). Editing
+     * or deleting the voucher here would leave the invoice and the ledger out of step.
+     */
+    private void assertNotSalesInvoicePayment(ReceiptVoucher rv) {
+        if (SALES_INVOICE_CATEGORY.equalsIgnoreCase(rv.getSourceCategory())) {
+            throw new BusinessRuleViolationException("Receipt " + rv.getVoucherNo() + " is a payment on sales invoice "
+                    + rv.getReference() + " and can't be changed here. Manage it from Sales & Purchases › Sales Invoice.");
+        }
+    }
+
     public ReceiptVoucherResponseDTO updateReceiptVoucher(Long id, ReceiptVoucherRequestDTO req) {
         assertPositiveAmount(req.getAmount());
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+        assertNotSalesInvoicePayment(rv);
 
         // Once a voucher is posted to the General Ledger (either auto-created from a
         // real payment event, or a manual voucher that has since been marked
@@ -207,6 +223,7 @@ public class ReceiptVoucherService {
     public ReceiptVoucherResponseDTO updateStatus(Long id, String status) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+        assertNotSalesInvoicePayment(rv);
         rv.setStatus(status);
         ReceiptVoucher saved = receiptVoucherRepository.save(rv);
         postToLedgerIfNeeded(saved);
@@ -226,6 +243,7 @@ public class ReceiptVoucherService {
     public void deleteReceiptVoucher(Long id) {
         ReceiptVoucher rv = receiptVoucherRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
+        assertNotSalesInvoicePayment(rv);
 
         journalEntrySourceRepository
                 .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", id)
@@ -242,7 +260,7 @@ public class ReceiptVoucherService {
      * Add-ons, POS, etc.) to automatically post a ReceiptVoucher into the
      * General Ledger / Financials module.  NOT exposed as an HTTP endpoint.
      */
-    public void createVoucherFromModule(
+    public ReceiptVoucher createVoucherFromModule(
             String source,
             String sourceCategory,
             String memberName,
@@ -253,7 +271,7 @@ public class ReceiptVoucherService {
             String transactionId,
             String notes,
             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown) {
-        createVoucherFromModule(source, sourceCategory, memberName, memberId, amount,
+        return createVoucherFromModule(source, sourceCategory, memberName, memberId, amount,
                 paymentMode, reference, transactionId, notes, paymentBreakdown, null);
     }
 
@@ -267,7 +285,7 @@ public class ReceiptVoucherService {
      * unresolvable id just leaves the branch blank as before, it never fails
      * the voucher creation.
      */
-    public void createVoucherFromModule(
+    public ReceiptVoucher createVoucherFromModule(
             String source,
             String sourceCategory,
             String memberName,
@@ -279,12 +297,34 @@ public class ReceiptVoucherService {
             String notes,
             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
             Long branchId) {
+        return createVoucherFromModule(source, sourceCategory, memberName, memberId, amount,
+                paymentMode, reference, transactionId, notes, paymentBreakdown, branchId, null);
+    }
 
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+    /**
+     * Same as above, dated `date` (the day the money was actually received, e.g. a
+     * back-dated sales invoice payment) instead of today. Returns the saved voucher,
+     * or null when amount is not positive (nothing is created).
+     */
+    public ReceiptVoucher createVoucherFromModule(
+            String source,
+            String sourceCategory,
+            String memberName,
+            Long memberId,
+            BigDecimal amount,
+            String paymentMode,
+            String reference,
+            String transactionId,
+            String notes,
+            List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+            Long branchId,
+            LocalDate date) {
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return null;
 
         ReceiptVoucher rv = new ReceiptVoucher();
         rv.setVoucherNo(voucherNumberService.next("RV"));
-        rv.setDate(LocalDate.now());
+        rv.setDate(date != null ? date : LocalDate.now());
         rv.setSource(source);
         rv.setSourceCategory(sourceCategory);
         rv.setMemberName(memberName);
@@ -312,6 +352,7 @@ public class ReceiptVoucherService {
                 saved.getId(), "/receipt-voucher",
                 "RECEIPT_MODULE_" + saved.getId()
         );
+        return saved;
     }
 
     private void applyRequest(ReceiptVoucher rv, ReceiptVoucherRequestDTO req) {

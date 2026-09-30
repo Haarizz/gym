@@ -38,6 +38,8 @@ export interface Member {
   freeze_end_date?: string;
   freeze_reason?: string;
   outstanding_balance?: number;
+  /** Unpaid balance on confirmed Sales Invoices (products sold on account) — separate from outstanding_balance. */
+  sales_invoice_due?: number;
   last_payment_date?: string;
   next_payment_date?: string;
   payment_method?: string;

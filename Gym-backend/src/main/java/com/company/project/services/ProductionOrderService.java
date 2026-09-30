@@ -41,17 +41,20 @@ public class ProductionOrderService {
     private final RecipeIngredientRepository recipeIngredientRepository;
     private final ProductStockRepository productStockRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ProductSettingsService productSettingsService;
 
     public ProductionOrderService(ProductionOrderRepository productionOrderRepository,
                                   RecipeRepository recipeRepository,
                                   RecipeIngredientRepository recipeIngredientRepository,
                                   ProductStockRepository productStockRepository,
-                                  WarehouseRepository warehouseRepository) {
+                                  WarehouseRepository warehouseRepository,
+                                  ProductSettingsService productSettingsService) {
         this.productionOrderRepository = productionOrderRepository;
         this.recipeRepository = recipeRepository;
         this.recipeIngredientRepository = recipeIngredientRepository;
         this.productStockRepository = productStockRepository;
         this.warehouseRepository = warehouseRepository;
+        this.productSettingsService = productSettingsService;
     }
 
     // ── Write ────────────────────────────────────────────────────────────────
@@ -126,8 +129,11 @@ public class ProductionOrderService {
         List<RecipeIngredient> ingredients = recipeIngredientRepository.findByRecipeId(order.getRecipeId());
         BigDecimal scaleFactor = computeScaleFactorFromOrder(order);
 
-        // Deduct stock for each scaled ingredient
-        for (RecipeIngredient ing : ingredients) {
+        // Deduct stock for each scaled ingredient — unless the gym turned off
+        // Products › Settings › Auto-deduct recipe ingredients (it then records
+        // ingredient consumption itself, e.g. via stock adjustments / wastage).
+        boolean autoDeduct = productSettingsService.isEnabled(ProductSettingsService.AUTO_DEDUCT_RECIPE_INGREDIENTS);
+        for (RecipeIngredient ing : autoDeduct ? ingredients : List.<RecipeIngredient>of()) {
             if (ing.getProductId() != null) {
                 BigDecimal scaledQty = (ing.getQuantity() != null ? ing.getQuantity() : BigDecimal.ZERO)
                         .multiply(scaleFactor)

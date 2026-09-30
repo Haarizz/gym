@@ -24,6 +24,7 @@ export interface SupplierBill {
   billNumber: string;
   supplierId: number;
   supplierName: string;
+  purchaseOrderId?: number;
   invoiceNumber?: string;
   billDate: string;       // LocalDate → "YYYY-MM-DD"
   dueDate?: string;
@@ -39,9 +40,11 @@ export interface SupplierBill {
   priority: string;
   notes?: string;
   receivedBy?: string;
+  taxCode?: string;
   createdBy?: string;
   paymentMethod?: string;
   paymentBreakdown?: Record<string, any>[];
+  branchId?: number;
   createdAt: string;
   updatedAt?: string;
   items: SupplierBillItem[];
@@ -61,6 +64,7 @@ export interface SupplierBillItemRequest {
 
 export interface SupplierBillRequest {
   supplierId: number;
+  purchaseOrderId?: number;
   invoiceNumber?: string;
   billDate: string;
   dueDate?: string;
@@ -69,6 +73,7 @@ export interface SupplierBillRequest {
   warehouseId?: number;
   notes?: string;
   receivedBy?: string;
+  taxCode?: string;
   items: SupplierBillItemRequest[];
 }
 
@@ -102,6 +107,7 @@ function mapBill(r: any): SupplierBill {
     billNumber: r.bill_number ?? r.billNumber ?? '',
     supplierId: r.supplier_id ?? r.supplierId ?? 0,
     supplierName: r.supplier_name ?? r.supplierName ?? '',
+    purchaseOrderId: r.purchase_order_id ?? r.purchaseOrderId,
     invoiceNumber: r.invoice_number ?? r.invoiceNumber,
     billDate: r.bill_date ?? r.billDate ?? '',
     dueDate: r.due_date ?? r.dueDate,
@@ -117,9 +123,11 @@ function mapBill(r: any): SupplierBill {
     priority: r.priority ?? 'MEDIUM',
     notes: r.notes,
     receivedBy: r.received_by ?? r.receivedBy,
+    taxCode: r.tax_code ?? r.taxCode,
     createdBy: r.created_by ?? r.createdBy,
     paymentMethod: r.payment_method ?? r.paymentMethod,
     paymentBreakdown: r.payment_breakdown ?? r.paymentBreakdown,
+    branchId: r.branch_id ?? r.branchId ?? undefined,
     createdAt: r.created_at ?? r.createdAt ?? '',
     updatedAt: r.updated_at ?? r.updatedAt,
     items: (r.items ?? []).map(mapBillItem),
@@ -145,6 +153,7 @@ function toBillItemBody(item: SupplierBillItemRequest): Record<string, any> {
 function toBillBody(req: SupplierBillRequest): Record<string, any> {
   return {
     supplier_id: req.supplierId,
+    purchase_order_id: req.purchaseOrderId,
     invoice_number: req.invoiceNumber,
     bill_date: req.billDate,
     due_date: req.dueDate,
@@ -153,6 +162,7 @@ function toBillBody(req: SupplierBillRequest): Record<string, any> {
     warehouse_id: req.warehouseId,
     notes: req.notes,
     received_by: req.receivedBy,
+    tax_code: req.taxCode,
     items: req.items.map(toBillItemBody),
   };
 }
@@ -255,13 +265,14 @@ class SupplierBillService {
     amount: number,
     paymentMethod: string,
     notes?: string,
-    paymentBreakdown?: Record<string, any>[]
+    paymentBreakdown?: Record<string, any>[],
+    paymentDate?: string
   ): Promise<SupplierBill> {
     const res = await authService.makeAuthenticatedRequest(
       `${BASE_URL}/supplier-bills/${id}/record-payment`,
       {
         method: 'POST',
-        body: JSON.stringify({ amount, payment_method: paymentMethod, notes, payment_breakdown: paymentBreakdown }),
+        body: JSON.stringify({ amount, payment_method: paymentMethod, notes, payment_breakdown: paymentBreakdown, payment_date: paymentDate }),
       }
     );
     if (!res.ok) {
@@ -270,6 +281,63 @@ class SupplierBillService {
     }
     return mapBill(await res.json());
   }
+
+  /** Supplier statement of account for a period (invoices = credit, payments = debit). */
+  async getStatement(supplierId: number, from?: string, to?: string): Promise<SupplierStatement> {
+    const params = new URLSearchParams({ supplierId: String(supplierId) });
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/supplier-bills/statement?${params.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any).message || `Failed to load statement: ${res.status}`);
+    }
+    const r = await res.json();
+    const n = (v: any) => Number(v ?? 0);
+    return {
+      supplierId: r.supplier_id ?? r.supplierId,
+      supplierName: r.supplier_name ?? r.supplierName ?? '',
+      from: r.from,
+      to: r.to,
+      openingBalance: n(r.opening_balance ?? r.openingBalance),
+      totalDebit: n(r.total_debit ?? r.totalDebit),
+      totalCredit: n(r.total_credit ?? r.totalCredit),
+      closingBalance: n(r.closing_balance ?? r.closingBalance),
+      entries: (r.entries ?? []).map((e: any) => ({
+        date: e.transaction_date ?? e.transactionDate,
+        type: e.type,
+        documentNo: e.document_no ?? e.documentNo ?? '',
+        description: e.description ?? '',
+        reference: e.reference ?? '',
+        debit: n(e.debit),
+        credit: n(e.credit),
+        runningBalance: n(e.running_balance ?? e.runningBalance),
+      })),
+    };
+  }
+}
+
+export interface SupplierStatementEntry {
+  date: string;
+  type: 'INVOICE' | 'PAYMENT' | string;
+  documentNo: string;
+  description: string;
+  reference: string;
+  debit: number;          // payments (reduce what we owe)
+  credit: number;         // invoices (increase what we owe)
+  runningBalance: number; // positive = payable to supplier
+}
+
+export interface SupplierStatement {
+  supplierId: number;
+  supplierName: string;
+  from: string;
+  to: string;
+  openingBalance: number;
+  totalDebit: number;
+  totalCredit: number;
+  closingBalance: number;
+  entries: SupplierStatementEntry[];
 }
 
 export const supplierBillService = new SupplierBillService();

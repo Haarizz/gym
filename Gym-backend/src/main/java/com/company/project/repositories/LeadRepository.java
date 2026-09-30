@@ -14,4 +14,15 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
 
     @org.springframework.data.jpa.repository.Query("SELECT l.status, COUNT(l) FROM Lead l GROUP BY l.status")
     java.util.List<Object[]> countLeadsByStatus();
+
+    // Duplicate check for public lead forms: compares the last 10 digits so
+    // "+91 98765-43210" and "9876543210" match. Native (for regexp_replace), so the
+    // Hibernate branchFilter does NOT apply — branch_id is filtered explicitly.
+    @org.springframework.data.jpa.repository.Query(value =
+            "SELECT * FROM leads WHERE branch_id = :branchId AND phone IS NOT NULL " +
+            "AND right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = :phoneDigits " +
+            "ORDER BY created_at DESC LIMIT 1", nativeQuery = true)
+    Optional<Lead> findLatestByBranchAndPhoneDigits(
+            @org.springframework.data.repository.query.Param("branchId") Long branchId,
+            @org.springframework.data.repository.query.Param("phoneDigits") String phoneDigits);
 }

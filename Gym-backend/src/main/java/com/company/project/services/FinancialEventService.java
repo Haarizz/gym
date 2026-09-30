@@ -420,6 +420,95 @@ public class FinancialEventService {
     }
 
     /**
+     * SALES — back-office Sales Invoice confirmed (sold on account; payments settle it later).
+     * DR  Accounts Receivable          (totalAmount)
+     * CR  Sales Revenue                (totalAmount − tax: goods, delivery charge, round-off)
+     * CR  Tax / GST Payable            (taxAmount)   — only if tax > 0
+     * DR  COGS / CR Inventory Asset    (totalCogs)   — only if goods left stock
+     */
+    public void onSalesInvoiceConfirmed(SalesInvoice invoice) {
+        if (alreadyJournaled("SalesInvoice", invoice.getId())) return;
+
+        BigDecimal total   = safe(invoice.getTotalAmount());
+        BigDecimal tax     = safe(invoice.getTaxAmount());
+        BigDecimal revenue = total.subtract(tax);
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for SalesInvoice id={}: total {} is not positive", invoice.getId(), total);
+            return;
+        }
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_RECEIVABLE, "Accounts Receivable", total,
+                "Invoice " + invoice.getInvoiceNumber() + " — " + invoice.getCustomerName()));
+        lines.add(cr(ACC_SALES_REVENUE, "Sales Revenue", revenue, "Sales revenue — " + invoice.getInvoiceNumber()));
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "VAT collected — " + invoice.getInvoiceNumber()));
+        }
+        BigDecimal cogs = Boolean.TRUE.equals(invoice.getStockDeducted()) ? safe(invoice.getTotalCogs()) : BigDecimal.ZERO;
+        if (cogs.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_PURCHASE_COGS, "Cost of Goods Sold", cogs, "COGS — " + invoice.getInvoiceNumber()));
+            lines.add(cr(ACC_INVENTORY_ASSET, "Inventory Asset", cogs, "Inventory reduction — " + invoice.getInvoiceNumber()));
+        }
+
+        LocalDate date = invoice.getInvoiceDate() != null ? invoice.getInvoiceDate() : LocalDate.now();
+        JournalVoucher jv = createAndPost(
+                "Sales Invoice: " + invoice.getInvoiceNumber() + " — " + invoice.getCustomerName(), date, lines, "SALES");
+        registerSource("SalesInvoice", invoice.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SALES — confirmed Sales Invoice cancelled (only possible while nothing is paid on it):
+     * the exact reverse of onSalesInvoiceConfirmed. No-op when the invoice was never journaled.
+     */
+    public void onSalesInvoiceCancelled(SalesInvoice invoice) {
+        if (!alreadyJournaled("SalesInvoice", invoice.getId())) return;
+        if (alreadyJournaled("SalesInvoiceCancel", invoice.getId())) return;
+
+        BigDecimal total   = safe(invoice.getTotalAmount());
+        BigDecimal tax     = safe(invoice.getTaxAmount());
+        BigDecimal revenue = total.subtract(tax);
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_SALES_REVENUE, "Sales Revenue", revenue, "Cancelled — revenue reversal"));
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Cancelled — VAT reversal"));
+        }
+        lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", total, "Invoice " + invoice.getInvoiceNumber() + " cancelled"));
+        BigDecimal cogs = Boolean.TRUE.equals(invoice.getStockDeducted()) ? safe(invoice.getTotalCogs()) : BigDecimal.ZERO;
+        if (cogs.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_INVENTORY_ASSET, "Inventory Asset", cogs, "Cancelled — inventory restoration"));
+            lines.add(cr(ACC_PURCHASE_COGS, "Cost of Goods Sold", cogs, "Cancelled — COGS reversal"));
+        }
+
+        JournalVoucher jv = createAndPost(
+                "Sales Invoice Cancelled: " + invoice.getInvoiceNumber(), LocalDate.now(), lines, "SALES");
+        registerSource("SalesInvoiceCancel", invoice.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SALES — payment received against a Sales Invoice. Keyed on the receipt voucher
+     * the payment created, since one invoice can take several payments.
+     * DR  Cash / Bank                  (amount — one line per leg for a Mixed payment)
+     * CR  Accounts Receivable          (amount)
+     */
+    public void onSalesInvoicePaymentReceived(SalesInvoice invoice, ReceiptVoucher voucher, BigDecimal amount,
+                                              String paymentMethod, List<PaymentSplitDTO> breakdown, LocalDate date) {
+        if (voucher == null || alreadyJournaled("SalesInvoicePayment", voucher.getId())) return;
+        BigDecimal paid = safe(amount);
+        if (paid.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(
+                paymentMethod, breakdown, paid, true, "Payment on " + invoice.getInvoiceNumber()));
+        lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", paid,
+                "Invoice " + invoice.getInvoiceNumber() + " — " + voucher.getVoucherNo()));
+
+        JournalVoucher jv = createAndPost(
+                "Sales Invoice Payment: " + invoice.getInvoiceNumber() + " — " + invoice.getCustomerName(),
+                date != null ? date : LocalDate.now(), lines, "SALES");
+        registerSource("SalesInvoicePayment", voucher.getId(), "SALES", jv.getId());
+    }
+
+    /**
      * SERVICE — Member add-on purchased (Training, Nutrition, Spa, Classes, ...).
      * DR  Cash/Bank                    (amount)
      * CR  Service / Add-on Revenue     (amount, net of VAT)

@@ -12,6 +12,16 @@ export interface CreditCustomer {
   name: string;
 }
 
+/**
+ * The party the credit belongs to when the screen already knows it — e.g. the
+ * supplier on a purchase bill. Skips the customer search, and `accountLabel`
+ * says where the balance stays (Accounts Payable for a supplier).
+ */
+export interface CreditParty extends CreditCustomer {
+  roleLabel: string;
+  accountLabel: string;
+}
+
 export interface CreditDraft {
   paymentType: typeof PAYMENT_TYPES.CREDIT;
   amount: number;
@@ -31,6 +41,7 @@ export interface CreditModalProps {
   customers: CreditCustomer[];
   onSearchCustomers?: (query: string) => void;
   offeredTypes: PaymentType[];
+  fixedParty?: CreditParty;
 }
 
 export function CreditModal({
@@ -42,12 +53,13 @@ export function CreditModal({
   customers,
   onSearchCustomers,
   offeredTypes,
+  fixedParty,
 }: CreditModalProps) {
   const [amount, setAmount] = useState(() => String(editingLine?.amount ?? target));
   const [receivedNow, setReceivedNow] = useState("0");
   const [customerQuery, setCustomerQuery] = useState(editingLine?.customerName ?? "");
   const [selectedCustomer, setSelectedCustomer] = useState<CreditCustomer | null>(
-    editingLine ? { code: editingLine.customerCode ?? "", name: editingLine.customerName ?? "" } : null
+    fixedParty ?? (editingLine ? { code: editingLine.customerCode ?? "", name: editingLine.customerName ?? "" } : null)
   );
 
   const numericAmount = toAmount(amount);
@@ -95,6 +107,15 @@ export function CreditModal({
       confirmDisabled={!valid}
       error={exceedsTarget ? `Credit cannot exceed the remaining ${target.toFixed(2)}.` : null}
       fields={
+        fixedParty ? (
+          <div style={{ fontSize: 13.5, borderRadius: 10, border: "1px solid #ddd6fe", padding: 14, backgroundColor: "#f5f3ff" }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>{fixedParty.roleLabel}</div>
+            <div style={{ fontWeight: 600, color: "#4c1d95", marginTop: 2 }}>{fixedParty.name}</div>
+            <p style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
+              This amount is not paid now — it stays in {fixedParty.accountLabel} as {fixedParty.roleLabel.toLowerCase()} outstanding.
+            </p>
+          </div>
+        ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
             <Label style={{ fontSize: 12 }}>Customer</Label>
@@ -182,6 +203,7 @@ export function CreditModal({
             </div>
           )}
         </div>
+        )
       }
     />
   );

@@ -10,6 +10,8 @@ export interface CompanyDetails {
   email: string;
   phone: string;
   logo: string; // data URL, or "" if none uploaded
+  /** Company stamp image (data URL, or "") printed on purchase documents. */
+  stamp: string;
   /** UAE FTA Tax Registration Number — required on any document titled "Tax Invoice". */
   trn: string;
 }
@@ -20,21 +22,36 @@ const DEFAULT_COMPANY: CompanyDetails = {
   email: "",
   phone: "",
   logo: "",
+  stamp: "",
   trn: "",
 };
 
-let cached: CompanyDetails | null = null;
-let inflight: Promise<CompanyDetails> | null = null;
-
-// Company details rarely change and are needed on every receipt print, so
-// fetch once and reuse across the session; settings.tsx calls
+// Company details are branch-scoped (each branch saves its own on the Settings
+// page), so the cache is keyed by branch. They rarely change and are needed on
+// every print, so each branch is fetched once per session; settings.tsx calls
 // invalidateCompanyDetailsCache() after a successful save.
-export async function getCompanyDetails(): Promise<CompanyDetails> {
-  if (cached) return cached;
-  if (inflight) return inflight;
+const cached = new Map<string, CompanyDetails>();
+const inflight = new Map<string, Promise<CompanyDetails>>();
 
-  inflight = financialSettingsService
-    .getSettings("COMPANY")
+function activeBranchKey(): string {
+  const id = sessionStorage.getItem("activeBranchId");
+  return id && id !== "null" && id !== "undefined" ? id : "default";
+}
+
+/**
+ * Company details for `branchId` — the branch a document was raised in — or,
+ * when omitted, for the active branch. A document always prints its own
+ * branch's header, whichever branch the user happens to be viewing.
+ */
+export async function getCompanyDetails(branchId?: number | null): Promise<CompanyDetails> {
+  const key = branchId != null ? String(branchId) : activeBranchKey();
+  const hit = cached.get(key);
+  if (hit) return hit;
+  const pending = inflight.get(key);
+  if (pending) return pending;
+
+  const request = financialSettingsService
+    .getSettings("COMPANY", branchId)
     .then(settings => {
       const details = { ...DEFAULT_COMPANY };
       settings.forEach(s => {
@@ -44,24 +61,27 @@ export async function getCompanyDetails(): Promise<CompanyDetails> {
         if (s.settingKey === "company_email") details.email = s.settingValue;
         if (s.settingKey === "company_phone") details.phone = s.settingValue;
         if (s.settingKey === "company_logo") details.logo = s.settingValue;
+        if (s.settingKey === "company_stamp") details.stamp = s.settingValue;
         if (s.settingKey === "company_trn") details.trn = s.settingValue;
       });
-      cached = details;
+      cached.set(key, details);
       return details;
     })
     .catch(err => {
+      // e.g. no access to that branch — its header can't be read, so fall back.
       console.error("Failed to load company details, using defaults", err);
-      return DEFAULT_COMPANY;
+      return branchId != null ? getCompanyDetails() : DEFAULT_COMPANY;
     })
     .finally(() => {
-      inflight = null;
+      inflight.delete(key);
     });
 
-  return inflight;
+  inflight.set(key, request);
+  return request;
 }
 
 export function invalidateCompanyDetailsCache() {
-  cached = null;
+  cached.clear();
 }
 
 function escapeHtml(value: string): string {
@@ -77,7 +97,7 @@ function escapeHtml(value: string): string {
 // data-URI round-trip needed) — safe to drop straight into a print HTML
 // string since it's built with the same `qr.js` encoder react-qr-code uses
 // internally, just without the React tree that component requires.
-function buildQrCodeSvg(value: string): string {
+export function buildQrCodeSvg(value: string): string {
   const qr = new QRCodeGenerator(-1, ErrorCorrectLevel.M);
   qr.addData(value);
   qr.make();
