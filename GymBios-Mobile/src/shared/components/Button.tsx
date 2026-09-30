@@ -13,8 +13,8 @@ import { Radius, Spacing } from '@/core/theme';
 import { Typography } from './Typography';
 
 export interface ButtonProps extends Omit<PressableProps, 'style'> {
-  label?: string;
-  title?: string;
+  label?: React.ReactNode;
+  title?: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
   size?: 'md' | 'lg';
   loading?: boolean;

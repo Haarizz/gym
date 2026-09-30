@@ -8,6 +8,8 @@ declare module 'axios' {
 
 export interface ApiErrorBody {
   message?: string;
+  // Some endpoints (e.g. mobile referrals) report their reason as { error: "..." }.
+  error?: string;
   code?: string;
   errors?: Record<string, string[]>;
 }

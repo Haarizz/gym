@@ -19,7 +19,8 @@ export interface EarningsBreakdownItem {
 
 export interface CommissionStructureItem {
   label: string;
-  amount: string;
+  /** Null when the backend value has no number in it. */
+  amount: number | null;
 }
 
 export interface RecentEarningTransaction {
@@ -32,10 +33,10 @@ export interface RecentEarningTransaction {
 }
 
 export interface TaxInformation {
-  ytdEarnings: string;
-  tdsDeducted: string;
-  baseSalaryPaid: string;
-  totalCommission: string;
+  ytdEarnings: number;
+  tdsDeducted: number;
+  baseSalaryPaid: number;
+  totalCommission: number;
   conversions: number;
 }
 

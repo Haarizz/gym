@@ -32,7 +32,7 @@ export function CommunityLeaderboard({ entries }: CommunityLeaderboardProps) {
 
         return (
           <View
-            key={entry.userId}
+            key={entry.userId != null ? `u${entry.userId}` : `m${entry.memberId}`}
             style={[styles.row, { backgroundColor: theme.backgroundElement }]}
           >
             {/* Rank */}

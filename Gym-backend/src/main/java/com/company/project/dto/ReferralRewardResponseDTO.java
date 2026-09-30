@@ -42,6 +42,9 @@ public class ReferralRewardResponseDTO {
     private String remarks;
     // Coupon code, populated only for COUPON-type rewards that already have one generated.
     private String couponCode;
+    private String rewardUnit;
+    private String consumedContext;
+    private Long consumedRefId;
 
     public static ReferralRewardResponseDTO fromEntity(ReferralReward r) {
         ReferralRewardResponseDTO dto = new ReferralRewardResponseDTO();
@@ -67,6 +70,9 @@ public class ReferralRewardResponseDTO {
         dto.claimedDate = r.getClaimedDate();
         dto.redeemedDate = r.getRedeemedDate();
         dto.remarks = r.getRemarks();
+        dto.rewardUnit = r.getRewardUnit();
+        dto.consumedContext = r.getConsumedContext();
+        dto.consumedRefId = r.getConsumedRefId();
         return dto;
     }
 
@@ -138,4 +144,13 @@ public class ReferralRewardResponseDTO {
 
     public String getCouponCode() { return couponCode; }
     public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
+
+    public String getRewardUnit() { return rewardUnit; }
+    public void setRewardUnit(String rewardUnit) { this.rewardUnit = rewardUnit; }
+
+    public String getConsumedContext() { return consumedContext; }
+    public void setConsumedContext(String consumedContext) { this.consumedContext = consumedContext; }
+
+    public Long getConsumedRefId() { return consumedRefId; }
+    public void setConsumedRefId(Long consumedRefId) { this.consumedRefId = consumedRefId; }
 }

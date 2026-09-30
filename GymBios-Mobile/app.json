@@ -47,6 +47,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -65,7 +66,8 @@
         }
       ],
       "@react-native-google-signin/google-signin",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true,

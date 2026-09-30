@@ -68,4 +68,11 @@ public class MobilePurchaseRequestDTO {
 
     public List<com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO> getConnectedMembers() { return connectedMembers; }
     public void setConnectedMembers(List<com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO> connectedMembers) { this.connectedMembers = connectedMembers; }
+
+    // A shareable COUPON reward code; the server takes its discount off the plan price.
+    @JsonProperty("couponCode")
+    private String couponCode;
+
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
 }

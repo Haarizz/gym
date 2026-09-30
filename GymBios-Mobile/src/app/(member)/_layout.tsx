@@ -5,10 +5,12 @@ import {
 } from '@/domains/auth/presentation/navigation/RoleTabsLayout';
 
 import { BranchProvider } from '@/shared/providers/BranchProvider';
+import { MemberPushNotifications } from '@/domains/notifications';
 
 export default function MemberLayout() {
   return (
     <BranchProvider>
+      <MemberPushNotifications />
       <RoleTabsLayout
         title={MEMBER_HEADER.title}
         subtitle={MEMBER_HEADER.subtitle}

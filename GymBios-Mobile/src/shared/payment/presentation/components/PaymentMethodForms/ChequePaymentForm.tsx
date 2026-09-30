@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
@@ -14,7 +15,6 @@ interface ChequePaymentFormProps {
   bankName: string;
   chequeDate?: Date | null;
   paymentDueDate?: Date | null;
-  currency?: string;
   errors?: Record<string, string>;
   onPaidAmountChange: (val: string) => void;
   onChequeNumberChange: (val: string) => void;
@@ -30,7 +30,6 @@ export function ChequePaymentForm({
   bankName,
   chequeDate,
   paymentDueDate,
-  currency = '₹',
   errors,
   onPaidAmountChange,
   onChequeNumberChange,
@@ -80,7 +79,7 @@ export function ChequePaymentForm({
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={`Amount (${currency}) *`}
+            label={<>Amount (<CurrencyGlyph />) *</>}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -124,7 +123,7 @@ export function ChequePaymentForm({
             Final Amount:
           </Typography>
           <Typography variant="bodySmallBold">
-            {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -132,7 +131,7 @@ export function ChequePaymentForm({
             Paid Amount:
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            {currency} {(numPaid || 0).toFixed(2)}
+            <CurrencyValue amount={(numPaid || 0)} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -143,7 +142,7 @@ export function ChequePaymentForm({
             variant="bodySmallBold"
             style={{ color: remaining > 0 ? theme.error : '#10B981' }}
           >
-            {currency} {remaining.toFixed(2)}
+            <CurrencyValue amount={remaining} decimals={2} />
           </Typography>
         </View>
       </View>

@@ -4,10 +4,12 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public class MembershipChangePreviewResponseDTO {
+    private BigDecimal rewardDiscountAmount;
     private MobileMembershipPlanDTO selectedPlan;
     private String operation; // RENEWAL, UPGRADE, DOWNGRADE
     private BigDecimal regularAmount;
     private BigDecimal discountAmount;
+    private String offerLabel; // the plan offer behind discountAmount, when it has one
     private BigDecimal finalAmount;
     private List<String> features;
 
@@ -28,4 +30,10 @@ public class MembershipChangePreviewResponseDTO {
 
     public List<String> getFeatures() { return features; }
     public void setFeatures(List<String> features) { this.features = features; }
+
+    public BigDecimal getRewardDiscountAmount() { return rewardDiscountAmount; }
+    public void setRewardDiscountAmount(BigDecimal rewardDiscountAmount) { this.rewardDiscountAmount = rewardDiscountAmount; }
+
+    public String getOfferLabel() { return offerLabel; }
+    public void setOfferLabel(String offerLabel) { this.offerLabel = offerLabel; }
 }

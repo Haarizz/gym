@@ -6,6 +6,7 @@ import * as Sharing from 'expo-sharing';
 
 import { AppBottomSheet } from '../AppBottomSheet';
 import { Loader } from '../Loader';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing } from '@/core/theme';
 import { buildReceiptInvoiceHtml } from '../../utils/buildReceiptInvoiceHtml';
 import { useMemberReceipt } from '@/domains/memberPortal/membership/hooks/useMemberReceipt';
@@ -48,14 +49,6 @@ export function ReceiptBottomSheet({
       console.error('Download failed:', error);
       Alert.alert('Error', 'Failed to generate receipt PDF.');
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount);
   };
 
   const formatDate = (dateStr?: string) => {
@@ -127,7 +120,7 @@ export function ReceiptBottomSheet({
               <Text style={styles.rowValue}>{receipt.paymentMethod || '-'}</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Plan / Service</Text>
+              <Text style={styles.rowLabel}>Subscription / Service</Text>
               <Text style={styles.rowValue}>{receipt.planName || '-'}</Text>
             </View>
             {receipt.validFrom && receipt.validTill && (
@@ -149,12 +142,12 @@ export function ReceiptBottomSheet({
             <View style={styles.totalsContainer}>
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total Amount</Text>
-                <Text style={styles.totalValue}>{formatCurrency(receipt.amount)}</Text>
+                <CurrencyValue style={styles.totalValue} amount={receipt.amount} decimals={2} />
               </View>
               <View style={styles.totalRow}>
                 <Text style={[styles.totalLabel, { color: '#16a34a' }]}>Amount Paid</Text>
                 <Text style={[styles.totalValue, { color: '#16a34a' }]}>
-                  {formatCurrency(receipt.paidAmount)}
+                  <CurrencyValue amount={receipt.paidAmount} decimals={2} />
                 </Text>
               </View>
               <View style={[styles.totalRow, { marginTop: Spacing.two }]}>
@@ -165,7 +158,7 @@ export function ReceiptBottomSheet({
                     { color: receipt.dueAmount > 0 ? BrandColors.danger : '#16a34a' },
                   ]}
                 >
-                  {formatCurrency(receipt.dueAmount)}
+                  <CurrencyValue amount={receipt.dueAmount} decimals={2} />
                 </Text>
               </View>
             </View>

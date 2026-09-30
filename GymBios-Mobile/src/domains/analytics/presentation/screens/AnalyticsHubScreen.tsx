@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -17,7 +18,7 @@ type AnalyticsModule = {
 const analyticsModules: AnalyticsModule[] = [
   { id: 'community', title: 'Community', icon: 'users', route: '/(admin)/analytics/community', description: 'Social feed & challenges' },
   { id: 'member-connect', title: 'Member Connect', icon: 'message-square', route: '/(admin)/analytics/member-connect', description: 'Engagement metrics' },
-  { id: 'membership', title: 'Membership', icon: 'credit-card', route: '/(admin)/analytics/membership', description: 'Plans & subscriptions' },
+  { id: 'membership', title: 'Membership', icon: 'credit-card', route: '/(admin)/analytics/membership', description: 'Subscriptions' },
   { id: 'attendance', title: 'Attendance', icon: 'calendar', route: '/(admin)/analytics/attendance', description: 'Check-ins & trends' },
   { id: 'facilities', title: 'Facilities', icon: 'map-pin', route: '/(admin)/analytics/facilities', description: 'Usage & bookings' },
   { id: 'sales-purchases', title: 'Sales & Purchases', icon: 'shopping-cart', route: '/(admin)/analytics/sales-purchases', description: 'POS & revenue' },
@@ -48,7 +49,7 @@ export function AnalyticsHubScreen() {
               >
                 <View style={styles.listItemContent}>
                   <View style={styles.iconContainer}>
-                    <Feather name={item.icon} size={20} color={BrandColors.teal} />
+                    <FeatherIcon name={item.icon} size={20} color={BrandColors.teal} />
                   </View>
                   <View style={styles.textContainer}>
                     <Text style={styles.itemTitle}>{item.title}</Text>

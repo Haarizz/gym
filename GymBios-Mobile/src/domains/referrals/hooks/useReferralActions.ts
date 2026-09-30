@@ -62,7 +62,7 @@ export function useMarkReferralSuccessful() {
       queryClient.invalidateQueries({ queryKey: referralKeys.lists() });
       queryClient.invalidateQueries({ queryKey: referralKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: referralKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: rewardKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: rewardKeys.all });
     },
   });
 }
@@ -102,7 +102,7 @@ export function useRedeemReferralReward() {
       queryClient.invalidateQueries({ queryKey: referralKeys.lists() });
       queryClient.invalidateQueries({ queryKey: referralKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: referralKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: rewardKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: rewardKeys.all });
     },
   });
 }
@@ -121,7 +121,7 @@ export function useFixReferralRewards() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: referralKeys.lists() });
       queryClient.invalidateQueries({ queryKey: referralKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: rewardKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: rewardKeys.all });
     },
   });
 }

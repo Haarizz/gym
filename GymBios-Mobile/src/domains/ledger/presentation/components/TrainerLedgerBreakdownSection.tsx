@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TrainerEarningsBreakdownItem, TrainerEarningsSummary } from '../../domain/TrainerLedgerData';
 
@@ -23,7 +24,7 @@ export function TrainerLedgerBreakdownSection({
               <View style={styles.itemHeader}>
                 <Text style={styles.itemCategory}>{item.category}</Text>
                 <Text style={styles.itemAmount}>
-                  ₹{(item.amount / 1000).toFixed(1)}K
+                  <CurrencyValue amount={item.amount} compact />
                 </Text>
               </View>
               <View style={styles.barTrack}>
@@ -54,13 +55,13 @@ export function TrainerLedgerBreakdownSection({
           <View style={styles.comparisonRow}>
             <Text style={styles.comparisonLabel}>This Month</Text>
             <Text style={styles.comparisonValue}>
-              ₹{(summary.thisMonth / 1000).toFixed(0)}K
+              <CurrencyValue amount={summary.thisMonth} compact />
             </Text>
           </View>
           <View style={styles.comparisonRow}>
             <Text style={styles.comparisonLabel}>Last Month</Text>
             <Text style={styles.comparisonValue}>
-              ₹{(summary.lastMonth / 1000).toFixed(0)}K
+              <CurrencyValue amount={summary.lastMonth} compact />
             </Text>
           </View>
           <View style={[styles.comparisonRow, styles.growthRow]}>

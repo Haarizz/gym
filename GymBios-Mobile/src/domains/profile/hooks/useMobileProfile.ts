@@ -5,6 +5,7 @@ import { Session } from '../../auth/domain/entities/Session';
 import { User } from '../../auth/domain/entities/User';
 import { useAuthStore } from '../../auth/store/authStore';
 import { authRepository } from '../../auth';
+import { profileKeys } from './profileKeys';
 
 export function useMobileProfile() {
   const queryClient = useQueryClient();
@@ -28,6 +29,8 @@ export function useMobileProfile() {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['mobileProfile'] });
+      // MyProfileScreen's contact details come from profileKeys.current().
+      queryClient.invalidateQueries({ queryKey: profileKeys.current() });
       // Update session to reflect profileCompleted = true
       if (session) {
         const updatedSession = Session.create({

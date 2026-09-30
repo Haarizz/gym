@@ -86,6 +86,8 @@ export interface MinorCharge {
 export interface Receipt {
   id: string;
   receiptNo?: string;
+  /** Only set when this receipt is itself a bill — a settlement/"Payment" receipt has none. */
+  invoiceNo?: string;
   transactionDate?: string;
   memberDbId?: string;
   memberId?: string;
@@ -93,7 +95,8 @@ export interface Receipt {
   memberPhone?: string;
   transactionType?: TransactionType;
   amount?: number;
-  paymentMethod?: PaymentMethod;
+  /** A known PaymentMethod, or the raw backend value when it isn't one of them. */
+  paymentMethod?: PaymentMethod | string;
   paymentBreakdown?: PaymentSplit[];
   status?: ReceiptStatus;
   planName?: string;
@@ -111,6 +114,8 @@ export interface Receipt {
   totalPaidToDate?: number;
   balanceAfter?: number;
   linkedBillId?: string;
+  /** PENDING until reception approves a mobile Cash/Credit/Mixed purchase; APPROVED / REJECTED after. */
+  approvalStatus?: string;
   createdAt?: string;
   updatedAt?: string;
 }

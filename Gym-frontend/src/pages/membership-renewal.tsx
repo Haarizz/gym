@@ -55,6 +55,7 @@ import {
   Flame
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -94,6 +95,8 @@ interface RawMember {
 interface RawPlan {
   id: number; name: string; type?: string; planType?: string;
   price?: number; discount?: number; description?: string;
+  effective_price?: number; effectivePrice?: number;
+  offer_label?: string | null; offerLabel?: string | null;
   duration_type?: string; durationType?: string;
   duration_value?: string; durationValue?: string;
 }
@@ -142,8 +145,9 @@ const buildMembershipData = (raw: RawMember) => {
 const buildRenewalPlans = (raw: RawPlan[], currentPlanName: string) => {
   return raw.map((p, idx) => {
     const price = Number(p.price ?? 0);
-    const discount = Number(p.discount ?? 0);
-    const finalPrice = price - discount;
+    // The plan's running offer, priced by the server (effectivePrice == price when none).
+    const finalPrice = Number(p.effective_price ?? p.effectivePrice ?? price);
+    const discount = Math.max(0, price - finalPrice);
     const newExpiry = new Date();
     newExpiry.setMonth(newExpiry.getMonth() + 1);
     const type = p.name === currentPlanName ? "Recommended" : idx === 0 ? "Recommended" : "Upgrade";
@@ -254,6 +258,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const [rewardSel, setRewardSel] = useState<RewardDiscountSelection>(null);
 
   const loadData = useCallback(async () => {
     const token = sessionStorage.getItem("token");
@@ -340,8 +345,14 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
 
   const handleRenewClick = (plan: any) => {
     setSelectedPlan(plan);
+    setRewardSel(null);
     setShowRenewalSheet(true);
   };
+
+  // Reward Pass / coupon discount on top of the plan's own discount — the backend
+  // recomputes and spends it; this is only for display.
+  const rewardOff = selectedPlan ? selectionDiscount(rewardSel, Number(selectedPlan.finalPrice) || 0) : 0;
+  const totalPayable = selectedPlan ? Math.max(0, (Number(selectedPlan.finalPrice) || 0) - rewardOff) : 0;
 
   const handleConfirmRenewal = async () => {
     if (!memberId || !selectedPlan) return;
@@ -349,13 +360,17 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
       const token = sessionStorage.getItem("token") ?? "";
       const newEnd = new Date();
       newEnd.setMonth(newEnd.getMonth() + 1);
+      // snake_case: the backend's global Jackson naming is SNAKE_CASE, so camelCase keys
+      // here were silently ignored (the renewal never picked up the plan or fee).
       const body = {
-        planName: selectedPlan.name,
-        membershipEndDate: newEnd.toISOString(),
-        membershipFee: selectedPlan.finalPrice,
-        paymentStatus: "pending",
-        membershipType: membershipData?.currentPlan.type ?? "Individual",
-        membershipStatus: "active",
+        plan_name: selectedPlan.name,
+        membership_end_date: newEnd.toISOString(),
+        // Fee before any Reward Pass / coupon — the backend takes that discount off.
+        membership_fee: selectedPlan.finalPrice,
+        payment_status: "pending",
+        membership_type: membershipData?.currentPlan.type ?? "Individual",
+        membership_status: "active",
+        ...selectionRequestFields(rewardSel),
       };
       const res = await fetch(`${API_BASE}/members/${memberId}/renew`, {
         method: "POST",
@@ -1078,6 +1093,16 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                 </Card>
               )}
 
+              {/* Reward Pass / Coupon */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2"><Gift className="h-5 w-5" /> Rewards</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RewardDiscountPicker memberId={memberId} value={rewardSel} onChange={setRewardSel} />
+                </CardContent>
+              </Card>
+
               {/* Renewal Details */}
               <Card>
                 <CardHeader>
@@ -1122,10 +1147,16 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
                       <span>- <CurrencyGlyph /> {selectedPlan.discount}</span>
                     </div>
                   )}
+                  {rewardOff > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>{rewardSel?.kind === 'pass' ? 'Reward Pass' : 'Coupon'}</span>
+                      <span>- <CurrencyGlyph /> {rewardOff.toFixed(2)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Payable</span>
-                    <span className="text-[#327F74]"><CurrencyGlyph /> {selectedPlan.finalPrice}</span>
+                    <span className="text-[#327F74]"><CurrencyGlyph /> {totalPayable.toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>

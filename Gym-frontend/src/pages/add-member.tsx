@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { plansService, Plan as MembershipPlanData } from '../utils/supabase/plans-service';
+import { plansService, Plan as MembershipPlanData, planHasOffer, planOfferPrice } from '../utils/supabase/plans-service';
 import { membersService } from '../utils/supabase/members-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { staffService, Staff } from '../utils/supabase/staff-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
+import { discountCodeService } from '../utils/supabase/reward-service';
 import { referralService, ReferralResponse } from '../utils/supabase/referral-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { useBranch } from '../utils/branch-context';
@@ -142,6 +143,9 @@ const calculateAge = (dob: string): number | null => {
   return age;
 };
 
+// Synthetic discount-list id prefix for a referral coupon applied via the promo code field.
+const COUPON_DISCOUNT_PREFIX = 'coupon:';
+
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
@@ -275,15 +279,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     ));
   };
 
-  // Auto-fills a family member's fee when they select a plan (discount-adjusted,
+  // Auto-fills a family member's fee when they select a plan (offer-adjusted,
   // mirroring getMembershipDetails() for the primary member).
   const getPlanPriceById = (planId: string) => {
     const plan = apiPlans.find(p => p.id.toString() === planId);
     if (!plan) return 0;
-    const discounted = plan.discount && Number(plan.discount) > 0
-      ? Number(plan.price) * (1 - Number(plan.discount) / 100)
-      : Number(plan.price);
-    return Math.round(discounted * 100) / 100;
+    return planOfferPrice(plan);
   };
 
   // The selected primary-member plan, and whether it's a Family/Couple plan
@@ -1069,12 +1070,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       };
     }
 
-    const originalPrice = plan.discount && plan.discount > 0
-      ? Number(plan.price)
-      : null;
-    const discountedPrice = plan.discount && plan.discount > 0
-      ? Number(plan.price) * (1 - Number(plan.discount) / 100)
-      : Number(plan.price);
+    // The plan's running offer (priced by the server) is what every member pays.
+    const originalPrice = planHasOffer(plan) ? Number(plan.price) : null;
+    const discountedPrice = planOfferPrice(plan);
     const savings = originalPrice ? originalPrice - discountedPrice : null;
     return {
       name: plan.name,
@@ -1147,6 +1145,36 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     setDiscountAmount(Math.min(calculatedDiscount, basePrice));
   };
 
+  // A referral coupon typed into the promo field. It's tracked as a synthetic discount
+  // entry "coupon:<CODE>" so every existing "pick another discount" path clears it too;
+  // on submit the code goes out as coupon_code and the backend spends it.
+  const applyCouponDiscount = (code: string, discountType: 'percentage' | 'fixed', discountValue: number) => {
+    const id = `${COUPON_DISCOUNT_PREFIX}${code}`;
+    setDiscountList(prev => prev.some(d => d.id === id) ? prev : [...prev, {
+      id,
+      apiId: undefined,
+      name: `Referral coupon ${code}`,
+      type: 'coupon',
+      discountType,
+      discountValue,
+      status: 'active',
+      code,
+      usageCount: 0,
+      usageLimit: 1,
+    }]);
+    setSelectedDiscount(id);
+    setAppliedPromotionId(null);
+    setPromoCodeApplied(true);
+    setReferralCodeApplied(false);
+    setReferralCodeInput('');
+    setAppliedReferralId(null);
+
+    const basePrice = getMembershipDetails().price;
+    const calculated = discountType === 'percentage' ? (basePrice * discountValue) / 100 : discountValue;
+    setDiscountAmount(Math.min(calculated, basePrice));
+    toast.success(`Coupon "${code}" applied! ${discountType === 'percentage' ? `${discountValue}% Off` : `${currencyCode} ${discountValue} Off`}`);
+  };
+
   // Handle promo code apply
   const handleApplyPromoCode = async () => {
     if (!promoCodeInput.trim()) {
@@ -1155,6 +1183,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     }
     setIsValidatingPromoCode(true);
     try {
+      // The code may be a promotion or a shareable referral coupon.
+      const resolved = await discountCodeService.validate(promoCodeInput.trim());
+      if (resolved.source === 'COUPON') {
+        applyCouponDiscount(resolved.code, resolved.discountType, resolved.discountValue);
+        return;
+      }
       const promo = await promotionsService.validateCode(promoCodeInput.trim());
       // Check if this promotion is already in the dropdown list
       let matchingDiscount = discountList.find(d => d.apiId === promo.id);
@@ -1389,6 +1423,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       payment_breakdown: paymentBreakdownForPayload,
       processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       discount_applied: discountAmount || 0,
+      // A referral coupon: the backend checks discount_applied against it and spends it.
+      coupon_code: selectedDiscount.startsWith(COUPON_DISCOUNT_PREFIX) && discountAmount > 0
+        ? selectedDiscount.slice(COUPON_DISCOUNT_PREFIX.length) : undefined,
       reg_doc_number: formData.regDocNumber,
       reg_doc_date: toIso(formData.regDocDate),
       address: formData.address,
@@ -2295,12 +2332,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getFilteredMembershipPlans().map((plan) => {
                 const isSelected = formData.membershipPlan === plan.id.toString();
-                const discountedPrice = plan.discount && Number(plan.discount) > 0
-                  ? Number(plan.price) * (1 - Number(plan.discount) / 100)
-                  : Number(plan.price);
-                const originalPrice = plan.discount && Number(plan.discount) > 0
-                  ? Number(plan.price)
-                  : null;
+                const discountedPrice = planOfferPrice(plan);
+                const originalPrice = planHasOffer(plan) ? Number(plan.price) : null;
                 return (
                   <div
                     key={plan.id}
@@ -2329,8 +2362,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           {originalPrice && (
                             <div className="text-sm text-gray-500 line-through"><CurrencyGlyph /> {originalPrice}</div>
                           )}
-                          {plan.discount && Number(plan.discount) > 0 && (
-                            <div className="text-xs text-green-600 font-semibold">{plan.discount}% OFF</div>
+                          {planHasOffer(plan) && (
+                            <div className="text-xs text-green-600 font-semibold">{plan.offerLabel || 'Offer'}</div>
                           )}
                         </div>
                       </div>

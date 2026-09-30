@@ -7,12 +7,12 @@ export interface ReportMetricProps {
   /** Descriptive label shown above the value (e.g. "Total Revenue"). */
   label: string;
 
-  /** Formatted value string (e.g. "₹4.2L", "$1,024", "98%"). */
-  value: string;
+  /** Formatted value — a string ("98%") or an inline node such as <CurrencyValue compact />. */
+  value: React.ReactNode;
 
   /**
    * Optional trend / change text displayed below the value
-   * (e.g. "+8%", "-2 members", "−₹300").
+   * (e.g. "+8%", "-2 members").
    */
   change?: string;
 

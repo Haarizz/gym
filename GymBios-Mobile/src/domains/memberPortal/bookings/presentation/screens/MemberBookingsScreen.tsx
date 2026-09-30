@@ -154,10 +154,10 @@ export function MemberBookingsScreen() {
         style={({ pressed }) => [styles.bookButton, pressed && styles.bookButtonPressed]}
         onPress={() => setIsBookModalVisible(true)}
         accessibilityRole="button"
-        accessibilityLabel="Book a New Class"
+        accessibilityLabel="Book a Session"
       >
         <Feather name="plus" size={20} color="#FFFFFF" />
-        <Text style={styles.bookButtonText}>Book a New Class</Text>
+        <Text style={styles.bookButtonText}>Book a Session</Text>
       </Pressable>
 
       {/* Upcoming Bookings Section */}

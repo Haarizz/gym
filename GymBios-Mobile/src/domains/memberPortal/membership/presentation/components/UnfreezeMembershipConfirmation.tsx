@@ -21,7 +21,7 @@ export function UnfreezeMembershipConfirmation({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Unfreeze Membership</Text>
+              <Text style={styles.title}>Unfreeze Subscription</Text>
             </View>
             <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton} disabled={isLoading}>
               <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -32,7 +32,7 @@ export function UnfreezeMembershipConfirmation({
             <View style={styles.infoBox}>
               <Feather name="info" size={24} color={BrandColors.teal} />
               <Text style={styles.infoText}>
-                Your membership is currently frozen. By unfreezing, your membership will become active immediately, and your expiry date will be extended by the number of days your account was frozen.
+                Your subscription is currently frozen. By unfreezing, your subscription will become active immediately, and your expiry date will be extended by the number of days your account was frozen.
               </Text>
             </View>
           </View>

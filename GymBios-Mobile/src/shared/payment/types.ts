@@ -77,7 +77,6 @@ export interface PaymentBottomSheetProps {
   amount: number;
   title: string;
   subtitle?: string;
-  currency?: string;
   allowDiscount?: boolean;
   initialDiscount?: { type: DiscountType; value: number };
   isProcessing?: boolean;

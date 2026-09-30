@@ -16,6 +16,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countBySessionIdAndStatusNot(Long sessionId, String status);
     boolean existsBySessionId(Long sessionId);
     long deleteBySessionId(Long sessionId);
+    // Bookings on a session that were paid with a Reward Pass (to give passes back before deleting).
+    List<Booking> findBySessionIdAndRewardIdIsNotNull(Long sessionId);
 
     // (className, bookedCount) for group classes (PT excluded) in the period
     @Query("SELECT s.name, COUNT(b) FROM Booking b JOIN b.session s " +

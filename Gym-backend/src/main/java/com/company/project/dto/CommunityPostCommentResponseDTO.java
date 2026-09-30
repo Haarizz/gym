@@ -12,6 +12,8 @@ public class CommunityPostCommentResponseDTO {
     private Long postId;
     private String content;
     private Long authorUserId;
+    private Long authorMemberId;
+    private boolean ownedByMe;
     private String authorUsername;
     private List<String> authorRoles;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -30,6 +32,12 @@ public class CommunityPostCommentResponseDTO {
 
     public Long getAuthorUserId() { return authorUserId; }
     public void setAuthorUserId(Long authorUserId) { this.authorUserId = authorUserId; }
+
+    public Long getAuthorMemberId() { return authorMemberId; }
+    public void setAuthorMemberId(Long authorMemberId) { this.authorMemberId = authorMemberId; }
+
+    public boolean isOwnedByMe() { return ownedByMe; }
+    public void setOwnedByMe(boolean ownedByMe) { this.ownedByMe = ownedByMe; }
 
     public String getAuthorUsername() { return authorUsername; }
     public void setAuthorUsername(String authorUsername) { this.authorUsername = authorUsername; }

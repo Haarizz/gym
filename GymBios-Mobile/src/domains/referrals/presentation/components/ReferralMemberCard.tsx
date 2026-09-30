@@ -4,7 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Avatar } from '@/shared/components/Avatar';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -36,7 +36,6 @@ export function ReferralMemberCard({
   onCopyLink,
   onGenerateQr,
 }: ReferralMemberCardProps) {
-  const { currencyCode } = useCurrency();
 
   const getTierStyle = (tier: string) => {
     switch (tier) {
@@ -156,7 +155,7 @@ export function ReferralMemberCard({
             Total Earned
           </Typography>
           <Typography variant="subtitle" style={{ color: '#7e22ce', fontWeight: '700', fontSize: 13 }}>
-            <CurrencyGlyph code={currencyCode} /> {member.totalRewardsEarned.toLocaleString()}
+            <CurrencyValue amount={member.totalRewardsEarned} />
           </Typography>
         </View>
 
@@ -165,7 +164,7 @@ export function ReferralMemberCard({
             Balance
           </Typography>
           <Typography variant="subtitle" style={{ color: '#1d4ed8', fontWeight: '700', fontSize: 13 }}>
-            <CurrencyGlyph code={currencyCode} /> {member.rewardBalance.toLocaleString()}
+            <CurrencyValue amount={member.rewardBalance} />
           </Typography>
         </View>
       </View>

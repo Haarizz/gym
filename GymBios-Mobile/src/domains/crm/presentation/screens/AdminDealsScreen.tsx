@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 
+import { CurrencyValue, formatCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { ScreenLayout } from '@/shared/layouts';
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -114,9 +115,10 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
             ) : (
               <View style={styles.dealsList}>
                 {activeDeals.map((deal) => {
+                  // Plain text for the share message; the card itself shows the currency glyph.
                   const discountText = deal.discountType === 'percentage'
                     ? `${deal.discountValue}% OFF`
-                    : `₹${deal.discountValue} OFF`;
+                    : `${formatCurrency(deal.discountValue)} OFF`;
                   const status = getEffectiveStatus(deal, today);
                   const statusColor = STATUS_COLORS[status] ?? STATUS_COLORS.draft;
                   const usageCount = deal.usageCount || 0;
@@ -131,7 +133,11 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                         <View style={styles.dealHeaderInfo}>
                           <Text style={styles.dealTitle}>{deal.name}</Text>
                           <View style={styles.discountBadge}>
-                            <Text style={styles.discountText}>{discountText}</Text>
+                            <Text style={styles.discountText}>
+                              {deal.discountType === 'percentage'
+                                ? discountText
+                                : <CurrencyValue amount={deal.discountValue} suffix=" OFF" />}
+                            </Text>
                           </View>
                         </View>
                         <View
@@ -243,7 +249,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                         <View style={styles.referralMetricBox}>
                           <Text style={styles.referralMetricLabel}>Reward</Text>
                           <Text style={[styles.referralMetricValue, { color: '#16a34a' }]}>
-                            ₹{referral.rewardAmount}
+                            <CurrencyValue amount={referral.rewardAmount} />
                           </Text>
                         </View>
                       ) : null}

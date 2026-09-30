@@ -5,6 +5,7 @@ import com.company.project.entities.Member;
 import com.company.project.entities.ReferralReward;
 import com.company.project.entities.RewardAuditLog;
 import com.company.project.entities.WalletTransaction;
+import com.company.project.enums.PassContext;
 import com.company.project.enums.RedemptionAction;
 import com.company.project.enums.RewardAuditAction;
 import com.company.project.enums.RewardStatus;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -127,11 +130,17 @@ public class RewardRedemptionService {
                 notifyRedeemed(reward);
                 return reward;
             }
-            case MEMBERSHIP_DISCOUNT, FREE_PT, FREE_CLASS, GIFT, LOYALTY_POINTS -> {
-                // Discount is applied directly on the receipt by the caller before this
-                // is invoked; PT/Class credit and gift collection are staff-confirmed
-                // actions; loyalty points are marked used once applied — none of these
-                // need a further integration step beyond the status transition itself.
+            case MEMBERSHIP_DISCOUNT, FREE_PT, FREE_CLASS -> {
+                // Reward Passes are only spent by picking them at renewal/booking
+                // (consumePass) — redeeming one here would mark it used without it
+                // ever having been applied to anything.
+                throw new BusinessRuleViolationException(
+                        "This reward is a Reward Pass — apply it while renewing a membership or booking a session");
+            }
+            case GIFT, LOYALTY_POINTS -> {
+                // Gift collection is a staff-confirmed action; loyalty points are marked
+                // used once applied — neither needs an integration step beyond the
+                // status transition itself.
             }
         }
 
@@ -265,6 +274,116 @@ public class RewardRedemptionService {
 
         reward.setRemarks("Membership extended by " + days + " day(s): "
                 + base.toLocalDate() + " -> " + newExpiry.toLocalDate());
+    }
+
+    // ── Reward Passes (MEMBERSHIP_DISCOUNT / FREE_PT / FREE_CLASS) ─────────────
+
+    /**
+     * Spends a member's Reward Pass on a renewal (MEMBERSHIP) or a booking (PT/CLASS).
+     * Runs inside the caller's transaction, so a failed renewal/booking rolls the pass
+     * back to its previous status. refId is the member id (MEMBERSHIP) or booking id.
+     */
+    public ReferralReward consumePass(Long rewardId, String memberId, PassContext context, Long refId) {
+        ReferralReward reward = rewardRepository.findByIdForUpdate(rewardId)
+                .orElseThrow(() -> new EntityNotFoundException("Reward not found: " + rewardId));
+        requireSpendable(reward, memberId, context);
+
+        reward.setStatus(RewardStatus.REDEEMED);
+        reward.setRedeemedDate(LocalDateTime.now());
+        reward.setConsumedContext(context == PassContext.MEMBERSHIP ? "MEMBERSHIP" : "BOOKING");
+        reward.setConsumedRefId(refId);
+        ReferralReward saved = rewardRepository.save(reward);
+        audit(saved, RewardAuditAction.REDEEMED, context == PassContext.MEMBERSHIP
+                ? "Reward Pass applied to membership renewal"
+                : "Reward Pass used on booking #" + refId);
+        notifyRedeemed(saved);
+        return saved;
+    }
+
+    /** Gives a booking's Reward Pass back when that booking is cancelled or deleted. */
+    public void restorePass(Long rewardId) {
+        rewardRepository.findByIdForUpdate(rewardId).ifPresent(reward -> {
+            if (reward.getStatus() != RewardStatus.REDEEMED || !"BOOKING".equals(reward.getConsumedContext())) {
+                return;
+            }
+            boolean expired = reward.getExpiryDate() != null && reward.getExpiryDate().isBefore(LocalDate.now());
+            reward.setStatus(expired ? RewardStatus.EXPIRED : RewardStatus.AVAILABLE);
+            reward.setRedeemedDate(null);
+            reward.setConsumedContext(null);
+            reward.setConsumedRefId(null);
+            rewardRepository.save(reward);
+            audit(reward, expired ? RewardAuditAction.EXPIRED : RewardAuditAction.RESTORED,
+                    expired ? "Booking cancelled — pass had already expired, not restored"
+                            : "Booking cancelled — Reward Pass restored");
+        });
+    }
+
+    /** Checks a pass could be spent and returns its discount on `gross`, without spending it (price previews). */
+    @Transactional(readOnly = true)
+    public BigDecimal previewPassDiscount(Long rewardId, String memberId, PassContext context, BigDecimal gross) {
+        ReferralReward reward = findOrThrow(rewardId);
+        requireSpendable(reward, memberId, context);
+        return discountFor(reward.getRewardUnit(), reward.getRewardValue(), gross);
+    }
+
+    /** Checks a coupon code is usable and returns its discount on `gross`, without spending it. */
+    @Transactional(readOnly = true)
+    public BigDecimal previewCouponDiscount(String code, BigDecimal gross) {
+        Coupon coupon = couponService.validate(code.trim().toUpperCase());
+        return discountFor(coupon.getDiscountUnit(), coupon.getDiscountValue(), gross);
+    }
+
+    /** The discount a MEMBERSHIP_DISCOUNT pass gives on a fee of `gross` (never more than gross). */
+    public BigDecimal passDiscount(Long rewardId, BigDecimal gross) {
+        ReferralReward reward = findOrThrow(rewardId);
+        return discountFor(reward.getRewardUnit(), reward.getRewardValue(), gross);
+    }
+
+    /** PERCENT → gross × value / 100; anything else is a flat amount. Capped at gross, never negative. */
+    public static BigDecimal discountFor(String unit, BigDecimal value, BigDecimal gross) {
+        BigDecimal base = gross != null ? gross.max(BigDecimal.ZERO) : BigDecimal.ZERO;
+        if (value == null || value.signum() <= 0) return BigDecimal.ZERO;
+        BigDecimal discount = "PERCENT".equalsIgnoreCase(unit)
+                ? base.multiply(value).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                : value;
+        return discount.min(base).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void requireSpendable(ReferralReward reward, String memberId, PassContext context) {
+        if (memberId == null || !memberId.equals(reward.getMemberId())) {
+            throw new BusinessRuleViolationException("This Reward Pass belongs to a different member");
+        }
+        if (!context.accepts(reward.getRewardType())) {
+            throw new BusinessRuleViolationException("This Reward Pass can't be used for " + context.name().toLowerCase());
+        }
+        if (reward.getStatus() != RewardStatus.AVAILABLE && reward.getStatus() != RewardStatus.CLAIMED) {
+            throw new BusinessRuleViolationException("Reward Pass is " + reward.getStatus().name().toLowerCase());
+        }
+        if (reward.getExpiryDate() != null && reward.getExpiryDate().isBefore(LocalDate.now())) {
+            throw new BusinessRuleViolationException("Reward Pass has expired");
+        }
+    }
+
+    // ── Shareable coupons ─────────────────────────────────────────────────────
+
+    /**
+     * Uses a COUPON reward's code at checkout. The code is shareable, so usedByMemberDbId
+     * can be anyone (not necessarily the reward's owner). Returns the discount on `gross`.
+     */
+    public BigDecimal redeemCouponAtCheckout(String code, BigDecimal gross, Long usedByMemberDbId, String usedByName) {
+        Coupon coupon = couponService.validate(code.trim().toUpperCase());
+        BigDecimal discount = discountFor(coupon.getDiscountUnit(), coupon.getDiscountValue(), gross);
+        couponService.consume(coupon.getCode()); // also flips the owning reward to REDEEMED once exhausted
+
+        rewardRepository.findById(coupon.getRewardId()).ifPresent(reward -> {
+            reward.setConsumedContext("COUPON");
+            reward.setConsumedRefId(usedByMemberDbId);
+            rewardRepository.save(reward);
+            audit(reward, RewardAuditAction.REDEEMED, "Coupon " + coupon.getCode() + " used at checkout by "
+                    + (usedByName != null ? usedByName : "member #" + usedByMemberDbId)
+                    + " — discount " + discount);
+        });
+        return discount;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

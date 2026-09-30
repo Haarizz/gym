@@ -5,9 +5,8 @@ import { useTheme } from '@/core/hooks';
 import { FormSection } from '@/shared/components/FormSection';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
-import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
+import { PLAN_TYPES, type PlanWizardData } from '../../hooks/useMembershipPlanWizard';
 
-const PLAN_TYPES = ['INDIVIDUAL', 'FAMILY'];
 const MEMBERSHIP_TYPES = ['Standard', 'Premium', 'VIP', 'Student', 'Corporate'];
 const STATUSES = ['ACTIVE', 'INACTIVE', 'DRAFT'];
 
@@ -63,7 +62,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
     <View style={styles.container}>
       <FormSection title="Basic Information">
         <Input
-          label="Plan Name *"
+          label="Subscription Name *"
           value={values.name}
           onChangeText={(v) => onChange('name', v)}
           placeholder="e.g. Monthly Premium"
@@ -73,7 +72,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
           label="Description"
           value={values.description}
           onChangeText={(v) => onChange('description', v)}
-          placeholder="Describe this plan"
+          placeholder="Describe this subscription"
           multiline
           numberOfLines={3}
           style={styles.multiline}

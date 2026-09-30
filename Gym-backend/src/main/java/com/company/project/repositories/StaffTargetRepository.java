@@ -2,6 +2,9 @@ package com.company.project.repositories;
 
 import com.company.project.entities.StaffTarget;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import java.util.List;
 
@@ -17,4 +20,8 @@ public interface StaffTargetRepository extends JpaRepository<StaffTarget, Long>,
     List<StaffTarget> findByStaff_Id(Long staffId);
     List<StaffTarget> findByStaff_IdAndScope(Long staffId, String scope);
     List<StaffTarget> findByScopeAndYearAndMonthAndStaffIsNull(String scope, Integer year, Integer month);
+
+    @Modifying
+    @Query("DELETE FROM StaffTarget t WHERE t.staff.id = :staffId")
+    void deleteByStaffId(@Param("staffId") Long staffId);
 }

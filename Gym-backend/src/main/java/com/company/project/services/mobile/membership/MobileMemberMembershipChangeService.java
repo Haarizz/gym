@@ -4,12 +4,15 @@ import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.dto.mobile.membership.*;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.enums.PassContext;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.MemberService;
+import com.company.project.services.MembershipFreezeService;
+import com.company.project.services.RewardRedemptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +21,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import com.company.project.services.PlanOfferPricing;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -30,14 +35,20 @@ public class MobileMemberMembershipChangeService {
     private final MemberRepository memberRepository;
     private final MembershipPlanRepository membershipPlanRepository;
     private final MemberService memberService;
+    private final RewardRedemptionService rewardRedemptionService;
+    private final MembershipFreezeService freezeService;
 
     public MobileMemberMembershipChangeService(
             MemberRepository memberRepository,
             MembershipPlanRepository membershipPlanRepository,
-            MemberService memberService) {
+            MemberService memberService,
+            RewardRedemptionService rewardRedemptionService,
+            MembershipFreezeService freezeService) {
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.memberService = memberService;
+        this.rewardRedemptionService = rewardRedemptionService;
+        this.freezeService = freezeService;
     }
 
     private Member getAuthenticatedMember(UserDetailsImpl principal) {
@@ -59,8 +70,11 @@ public class MobileMemberMembershipChangeService {
         dto.setId(plan.getId());
         dto.setName(plan.getName());
         dto.setPrice(plan.getPrice());
-        dto.setDiscount(plan.getDiscount() != null ? plan.getDiscount() : BigDecimal.ZERO);
+        dto.setDiscount(PlanOfferPricing.discount(plan));
+        dto.setEffectivePrice(PlanOfferPricing.effectivePrice(plan));
+        dto.setOfferLabel(PlanOfferPricing.isActive(plan, LocalDate.now()) ? plan.getOfferLabel() : null);
         dto.setDuration(plan.getDuration());
+        dto.setPlanType(plan.getPlanType());
 
         List<String> features = new ArrayList<>();
         if (plan.getDescription() != null && !plan.getDescription().trim().isEmpty()) {
@@ -115,6 +129,7 @@ public class MobileMemberMembershipChangeService {
         if (!"Active".equalsIgnoreCase(plan.getStatus())) {
             throw new BusinessRuleViolationException("Selected plan is not available");
         }
+        rejectFamilyPlan(member, plan);
 
         MobileMembershipPlanDTO planDTO = toMobileDTO(plan);
         MembershipChangePreviewResponseDTO response = new MembershipChangePreviewResponseDTO();
@@ -142,12 +157,19 @@ public class MobileMemberMembershipChangeService {
         response.setOperation(operation);
 
         BigDecimal regularAmount = newPrice;
-        BigDecimal discountAmount = plan.getDiscount() != null ? plan.getDiscount() : BigDecimal.ZERO;
-        BigDecimal finalAmount = regularAmount.subtract(discountAmount).max(BigDecimal.ZERO);
+        // The plan's running offer, if any; everyone gets it without a code.
+        BigDecimal discountAmount = PlanOfferPricing.discount(plan);
+        BigDecimal finalAmount = PlanOfferPricing.effectivePrice(plan);
+
+        // A picked Reward Pass / coupon comes off the plan's offer price —
+        // previewed only here; changePlan() spends it.
+        BigDecimal rewardDiscount = previewRewardDiscount(member, request.getRewardPassId(), request.getCouponCode(), finalAmount);
 
         response.setRegularAmount(regularAmount);
         response.setDiscountAmount(discountAmount);
-        response.setFinalAmount(finalAmount);
+        response.setOfferLabel(discountAmount.signum() > 0 ? plan.getOfferLabel() : null);
+        response.setRewardDiscountAmount(rewardDiscount);
+        response.setFinalAmount(finalAmount.subtract(rewardDiscount));
 
         return response;
     }
@@ -161,10 +183,9 @@ public class MobileMemberMembershipChangeService {
         if (!"Active".equalsIgnoreCase(plan.getStatus())) {
             throw new BusinessRuleViolationException("Selected plan is not available");
         }
+        rejectFamilyPlan(member, plan);
 
-        BigDecimal regularAmount = plan.getPrice() != null ? plan.getPrice() : BigDecimal.ZERO;
-        BigDecimal discountAmount = plan.getDiscount() != null ? plan.getDiscount() : BigDecimal.ZERO;
-        BigDecimal finalAmount = regularAmount.subtract(discountAmount).max(BigDecimal.ZERO);
+        BigDecimal finalAmount = PlanOfferPricing.effectivePrice(plan);
 
         RenewalRequestDTO renewalRequest = new RenewalRequestDTO();
         renewalRequest.setPlanName(plan.getName());
@@ -172,7 +193,40 @@ public class MobileMemberMembershipChangeService {
         renewalRequest.setAmountReceived(finalAmount);
         renewalRequest.setPaymentMethod(request.getPaymentMethodUsed());
         renewalRequest.setPaymentBreakdown(request.getPaymentBreakdown());
-        
-        memberService.renewMember(member.getId(), renewalRequest);
+        // renewMember treats membershipFee as the pre-reward fee, takes the pass/coupon
+        // discount off it and caps amountReceived at the net fee.
+        renewalRequest.setRewardPassId(request.getRewardPassId());
+        renewalRequest.setCouponCode(request.getCouponCode());
+
+        freezeService.renewEndingFreeze(member.getId(), renewalRequest);
+    }
+
+    /**
+     * Switching onto a Family/Couple plan also registers the family members, so it
+     * goes through /api/mobile/family/convert — renewing into one here would leave
+     * a family plan with nobody on it. Renewing the Family/Couple plan they're
+     * already on is still a plain renewal.
+     */
+    private void rejectFamilyPlan(Member member, MembershipPlan plan) {
+        boolean familyPlan = "Family".equalsIgnoreCase(plan.getPlanType())
+                || "Couple".equalsIgnoreCase(plan.getPlanType());
+        if (familyPlan && !plan.getName().equals(member.getMembershipPlan())) {
+            throw new BusinessRuleViolationException("Switching to a " + plan.getPlanType()
+                    + " plan needs your family members — use the family membership screen.");
+        }
+    }
+
+    private BigDecimal previewRewardDiscount(Member member, Long rewardPassId, String couponCode, BigDecimal gross) {
+        boolean hasCoupon = couponCode != null && !couponCode.isBlank();
+        if (rewardPassId != null && hasCoupon) {
+            throw new BusinessRuleViolationException("Apply either a Reward Pass or a coupon code, not both");
+        }
+        if (rewardPassId != null) {
+            return rewardRedemptionService.previewPassDiscount(rewardPassId, member.getMemberId(), PassContext.MEMBERSHIP, gross);
+        }
+        if (hasCoupon) {
+            return rewardRedemptionService.previewCouponDiscount(couponCode, gross);
+        }
+        return BigDecimal.ZERO;
     }
 }

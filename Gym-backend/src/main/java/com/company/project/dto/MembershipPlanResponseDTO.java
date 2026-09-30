@@ -1,10 +1,12 @@
 package com.company.project.dto;
 
 import com.company.project.entities.MembershipPlan;
+import com.company.project.services.PlanOfferPricing;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -25,6 +27,18 @@ public class MembershipPlanResponseDTO {
     private String duration;
     private BigDecimal price;
     private BigDecimal discount;
+
+    // Offer as configured, plus what it's worth today (computed server-side so every
+    // client shows the price the member is actually charged).
+    private String offerType;
+    private BigDecimal offerValue;
+    private String offerLabel;
+    private String offerStartDate;
+    private String offerEndDate;
+    private boolean offerActive;
+    private BigDecimal offerDiscountAmount;
+    private BigDecimal effectivePrice;
+
     private String status;
     private String description;
     private Integer maxSessions;
@@ -77,6 +91,15 @@ public class MembershipPlanResponseDTO {
         dto.duration            = p.getDuration();
         dto.price               = p.getPrice();
         dto.discount            = p.getDiscount() != null ? p.getDiscount() : BigDecimal.ZERO;
+        LocalDate today = LocalDate.now();
+        dto.offerType           = p.getOfferType();
+        dto.offerValue          = p.getOfferValue();
+        dto.offerLabel          = p.getOfferLabel();
+        dto.offerStartDate      = p.getOfferStartDate() != null ? p.getOfferStartDate().toString() : null;
+        dto.offerEndDate        = p.getOfferEndDate() != null ? p.getOfferEndDate().toString() : null;
+        dto.offerActive         = PlanOfferPricing.isActive(p, today);
+        dto.offerDiscountAmount = PlanOfferPricing.discount(p, today);
+        dto.effectivePrice      = PlanOfferPricing.effectivePrice(p, today);
         dto.status              = p.getStatus();
         dto.description         = p.getDescription();
         dto.maxSessions         = p.getMaxSessions();
@@ -119,6 +142,14 @@ public class MembershipPlanResponseDTO {
     public String getDuration() { return duration; }
     public BigDecimal getPrice() { return price; }
     public BigDecimal getDiscount() { return discount; }
+    public String getOfferType() { return offerType; }
+    public BigDecimal getOfferValue() { return offerValue; }
+    public String getOfferLabel() { return offerLabel; }
+    public String getOfferStartDate() { return offerStartDate; }
+    public String getOfferEndDate() { return offerEndDate; }
+    public boolean isOfferActive() { return offerActive; }
+    public BigDecimal getOfferDiscountAmount() { return offerDiscountAmount; }
+    public BigDecimal getEffectivePrice() { return effectivePrice; }
     public String getStatus() { return status; }
     public String getDescription() { return description; }
     public Integer getMaxSessions() { return maxSessions; }

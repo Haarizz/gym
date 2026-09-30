@@ -4,6 +4,14 @@ import type { ReactNode } from 'react';
 
 export type DatePickerMode = 'date' | 'month-year' | 'year';
 
+/**
+ * Which panel the picker opens on when no value is selected yet.
+ * - 'calendar' → day grid (default)
+ * - 'year'     → year wheel (newest first), then month, then day.
+ *                Suited to far-past dates such as date of birth.
+ */
+export type DatePickerInitialView = 'calendar' | 'year';
+
 export interface DatePickerProps {
   /**
    * Optional field label.
@@ -41,6 +49,11 @@ export interface DatePickerProps {
   mode?: DatePickerMode;
 
   /**
+   * Panel to open on when no value is selected. Defaults to 'calendar'.
+   */
+  initialView?: DatePickerInitialView;
+
+  /**
    * Marks the field as required.
    */
   required?: boolean;
@@ -74,6 +87,7 @@ export interface DatePickerModalProps {
   value: Date | null;
 
   mode: DatePickerMode;
+  initialView?: DatePickerInitialView;
 
   minimumDate?: Date;
   maximumDate?: Date;
@@ -100,6 +114,8 @@ export interface YearSelectorProps {
   selectedYear: number;
   minimumYear?: number;
   maximumYear?: number;
+  /** List newest year first. */
+  descending?: boolean;
 
   onSelectYear: (year: number) => void;
 }

@@ -7,7 +7,12 @@ import { useRouter } from 'expo-router';
 import { Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components';
 
-export function CommunityHeader() {
+interface CommunityHeaderProps {
+  unreadCount: number;
+  onNotificationsPress: () => void;
+}
+
+export function CommunityHeader({ unreadCount, onNotificationsPress }: CommunityHeaderProps) {
   const { headerColors, primaryColor } = useCommunityTheme();
   const router = useRouter();
 
@@ -40,9 +45,16 @@ export function CommunityHeader() {
           </Typography>
         </View>
 
-        <TouchableOpacity style={styles.iconBtn}>
+        <TouchableOpacity
+          onPress={onNotificationsPress}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={
+            unreadCount > 0 ? `Community notifications, ${unreadCount} unread` : 'Community notifications'
+          }
+        >
           <Feather name="bell" size={20} color="#fff" />
-          <View style={[styles.bellDot, { borderColor: primaryColor }]} />
+          {unreadCount > 0 && <View style={[styles.bellDot, { borderColor: primaryColor }]} />}
         </TouchableOpacity>
       </View>
     </LinearGradient>

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TrainerEarningsSummary } from '../../domain/TrainerLedgerData';
 
@@ -20,12 +21,12 @@ export function TrainerLedgerSummaryCard({ summary }: TrainerLedgerSummaryCardPr
       <View style={styles.gridRow}>
         <View style={styles.gridCol}>
           <Text style={styles.label}>This Month</Text>
-          <Text style={styles.largeValue}>₹{(summary.thisMonth / 1000).toFixed(0)}K</Text>
+          <Text style={styles.largeValue}><CurrencyValue amount={summary.thisMonth} compact /></Text>
         </View>
 
         <View style={styles.gridCol}>
           <Text style={styles.label}>Last Month</Text>
-          <Text style={styles.mediumValue}>₹{(summary.lastMonth / 1000).toFixed(0)}K</Text>
+          <Text style={styles.mediumValue}><CurrencyValue amount={summary.lastMonth} compact /></Text>
         </View>
       </View>
 
@@ -35,14 +36,14 @@ export function TrainerLedgerSummaryCard({ summary }: TrainerLedgerSummaryCardPr
         <View style={styles.gridCol}>
           <Text style={styles.label}>Paid</Text>
           <Text style={[styles.smallValue, styles.paidValue]}>
-            ₹{(summary.paid / 1000).toFixed(0)}K
+            <CurrencyValue amount={summary.paid} compact />
           </Text>
         </View>
 
         <View style={styles.gridCol}>
           <Text style={styles.label}>Pending</Text>
           <Text style={[styles.smallValue, styles.pendingValue]}>
-            ₹{(summary.pending / 1000).toFixed(0)}K
+            <CurrencyValue amount={summary.pending} compact />
           </Text>
         </View>
       </View>

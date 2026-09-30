@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { CommissionStructureItem, EarningsBreakdownItem } from '../../domain/StaffLedgerData';
 
@@ -22,7 +23,7 @@ export function StaffLedgerBreakdownSection({
             <View key={idx} style={styles.breakdownItem}>
               <View style={styles.itemHeader}>
                 <Text style={styles.itemCategory}>{item.category}</Text>
-                <Text style={styles.itemAmount}>₹{item.amount.toLocaleString()}</Text>
+                <Text style={styles.itemAmount}><CurrencyValue amount={item.amount} /></Text>
               </View>
               <View style={styles.barTrack}>
                 <View
@@ -49,7 +50,7 @@ export function StaffLedgerBreakdownSection({
           {commissionStructure.map((item, idx) => (
             <View key={idx} style={styles.commissionRow}>
               <Text style={styles.commissionLabel}>{item.label}</Text>
-              <Text style={styles.commissionAmount}>{item.amount}</Text>
+              <Text style={styles.commissionAmount}>{item.amount != null ? <CurrencyValue amount={item.amount} /> : '—'}</Text>
             </View>
           ))}
         </View>

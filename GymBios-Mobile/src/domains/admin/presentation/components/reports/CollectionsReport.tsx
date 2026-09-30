@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { Spacing } from '@/core/theme';
 import {
   ReportSection,
@@ -17,13 +18,13 @@ import {
 const summary = [
   {
     label: 'Collected',
-    value: '₹2.18L',
+    value: <CurrencyValue amount={218000} compact />,
     change: '+12%',
     changeType: 'positive',
   },
   {
     label: 'Outstanding',
-    value: '₹34,500',
+    value: <CurrencyValue amount={34500} />,
     change: '-5%',
     changeType: 'negative',
   },
@@ -33,19 +34,19 @@ const branches = [
   {
     title: 'Downtown',
     subtitle: '145 Transactions',
-    value: '₹1.20L',
+    value: <CurrencyValue amount={120000} compact />,
     trend: '+15%',
   },
   {
     title: 'Uptown',
     subtitle: '98 Transactions',
-    value: '₹85K',
+    value: <CurrencyValue amount={85000} compact />,
     trend: '+8%',
   },
   {
     title: 'Central',
     subtitle: '67 Transactions',
-    value: '₹55K',
+    value: <CurrencyValue amount={55000} compact />,
     trend: '+12%',
   },
 ];
@@ -54,32 +55,32 @@ const payments = [
   {
     title: 'Premium Membership',
     subtitle: 'UPI • Today',
-    value: '₹1,499',
+    value: <CurrencyValue amount={1499} />,
   },
   {
     title: 'Annual Membership',
     subtitle: 'Card • Yesterday',
-    value: '₹9,999',
+    value: <CurrencyValue amount={9999} />,
   },
   {
     title: 'Monthly Basic',
     subtitle: 'Cash • Jul 27',
-    value: '₹699',
+    value: <CurrencyValue amount={699} />,
   },
 ];
 
 const channels = [
   {
     title: 'UPI',
-    value: '₹1.12L',
+    value: <CurrencyValue amount={112000} compact />,
   },
   {
     title: 'Cash',
-    value: '₹54,200',
+    value: <CurrencyValue amount={54200} />,
   },
   {
     title: 'Card',
-    value: '₹51,600',
+    value: <CurrencyValue amount={51600} />,
   },
 ];
 

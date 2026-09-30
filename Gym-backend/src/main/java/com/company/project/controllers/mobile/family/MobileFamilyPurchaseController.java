@@ -4,7 +4,10 @@ import com.company.project.controlplane.entities.GlobalBranchDiscovery;
 import com.company.project.controlplane.repositories.GlobalBranchDiscoveryRepository;
 import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.mobile.family.MobileFamilyQuoteRequestDTO;
+import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.entities.UserProfile;
 import com.company.project.security.BranchContextHolder;
 import com.company.project.security.TenantContextHolder;
@@ -43,19 +46,22 @@ public class MobileFamilyPurchaseController {
     private final GlobalUserService globalUserService;
     private final GlobalBranchDiscoveryRepository globalDiscoveryRepository;
     private final EntityManagerFactory entityManagerFactory;
+    private final MemberRepository memberRepository;
 
     public MobileFamilyPurchaseController(MobileFamilyPurchaseService purchaseService,
                                           MobileFamilyPricingService pricingService,
                                           MobileFamilyInvitationService invitationService,
                                           GlobalUserService globalUserService,
                                           GlobalBranchDiscoveryRepository globalDiscoveryRepository,
-                                          EntityManagerFactory entityManagerFactory) {
+                                          EntityManagerFactory entityManagerFactory,
+                                          MemberRepository memberRepository) {
         this.purchaseService = purchaseService;
         this.pricingService = pricingService;
         this.invitationService = invitationService;
         this.globalUserService = globalUserService;
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.entityManagerFactory = entityManagerFactory;
+        this.memberRepository = memberRepository;
     }
 
     @PostMapping("/quote/{tenantSlug}/{branchId}")
@@ -124,5 +130,34 @@ public class MobileFamilyPurchaseController {
             BranchContextHolder.clear();
             TenantContextHolder.clear();
         }
+    }
+
+    /**
+     * An existing member of the X-Tenant-ID gym switching onto a Family/Couple plan.
+     * Unlike purchase/quote this path is tenant-routed and membership-checked by
+     * TenantContextFilter, since the caller must already belong to this gym.
+     */
+    @PostMapping("/convert")
+    public ResponseEntity<String> convertToFamilyPlan(
+            @RequestHeader("Idempotency-Key") UUID idempotencyKey,
+            @RequestHeader("Payload-Fingerprint") String fingerprint,
+            @RequestBody @Valid MobilePurchaseRequestDTO request,
+            @AuthenticationPrincipal UserDetailsImpl user) {
+        Member member = (user.isGlobal()
+                ? memberRepository.findByGlobalUserId(user.getId())
+                : memberRepository.findByUserId(user.getId()))
+                .orElseThrow(() -> new EntityNotFoundException("No member profile linked to this user account"));
+        String tenantSlug = TenantContextHolder.getCurrentTenant();
+        String gymName = member.getBranchId() == null ? null
+                : globalDiscoveryRepository.findByTenantSlugAndBranchId(tenantSlug, member.getBranchId())
+                        .map(GlobalBranchDiscovery::getGymName).orElse(null);
+
+        MobileFamilyPurchaseService.PurchaseOutcome outcome = purchaseService.convert(
+                idempotencyKey, fingerprint, request, member.getId(), tenantSlug, gymName);
+        for (MobileFamilyPurchaseService.InvitationEmail email : outcome.emails()) {
+            invitationService.sendInvitationEmail(email.email(), email.name(), email.inviterName(),
+                    gymName, email.planName());
+        }
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(outcome.responseJson());
     }
 }

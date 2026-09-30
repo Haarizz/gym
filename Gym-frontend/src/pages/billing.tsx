@@ -246,9 +246,9 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const handleExportOverdueReport = () => {
     const overdue = memberDues.filter(m => m.status === 'Overdue');
     if (overdue.length === 0) { toast.info('No overdue members to export'); return; }
-    const header = 'Member Name,Member ID,Email,Phone,Membership,Due Type,Amount Due,Due Date,Days Overdue,Last Payment\n';
+    const header = 'Member Name,Member ID,Email,Phone,Membership,Due Type,Amount Due,Extra Freeze Days Amount,Due Date,Days Overdue,Last Payment\n';
     const rows = overdue.map(m =>
-      `"${m.member_name}","${m.member_id}","${m.member_email}","${m.member_phone}","${m.membership ?? ''}","${m.due_type ?? 'Membership Due'}","${m.amount ?? 0}","${m.due_date ?? ''}","${m.days_overdue}","${m.last_payment ?? ''}"`
+      `"${m.member_name}","${m.member_id}","${m.member_email}","${m.member_phone}","${m.membership ?? ''}","${m.due_type ?? 'Membership Due'}","${m.amount ?? 0}","${m.freeze_charge_amount ?? 0}","${m.due_date ?? ''}","${m.days_overdue}","${m.last_payment ?? ''}"`
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -687,15 +687,23 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={due.due_type === 'Membership Due'
-                              ? 'border-amber-300 text-amber-700 bg-amber-50'
-                              : 'border-blue-300 text-blue-700 bg-blue-50'}
+                            className={due.due_type === 'Extra Freeze Days'
+                              ? 'border-sky-300 text-sky-700 bg-sky-50'
+                              : due.due_type === 'Renewal Due'
+                                ? 'border-blue-300 text-blue-700 bg-blue-50'
+                                : 'border-amber-300 text-amber-700 bg-amber-50'}
                           >
                             {due.due_type ?? 'Membership Due'}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium text-red-600">
-                          <CurrencyGlyph /> {due.amount != null ? Number(due.amount).toLocaleString() : '-'}
+                          <div><CurrencyGlyph /> {due.amount != null ? Number(due.amount).toLocaleString() : '-'}</div>
+                          {/* Part of a larger balance is for extra freeze days — itemize it */}
+                          {Number(due.freeze_charge_amount ?? 0) > 0 && due.due_type !== 'Extra Freeze Days' && (
+                            <div className="text-xs font-normal text-sky-700">
+                              incl. <CurrencyGlyph /> {Number(due.freeze_charge_amount).toLocaleString()} extra freeze days
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className={due.status === "Overdue" ? "text-red-600 font-medium" : ""}>

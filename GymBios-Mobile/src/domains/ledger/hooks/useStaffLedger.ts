@@ -20,9 +20,9 @@ const DEFAULT_STAFF_LEDGER: StaffLedgerData = {
     { category: 'Bonuses', amount: 1500, percentage: 6.25 },
   ],
   commissionStructure: [
-    { label: 'Membership Sale', amount: '₹1,500' },
-    { label: 'PT Package Sale', amount: '₹1,000' },
-    { label: 'Add-on Sale', amount: '₹500' },
+    { label: 'Membership Sale', amount: 1500 },
+    { label: 'PT Package Sale', amount: 1000 },
+    { label: 'Add-on Sale', amount: 500 },
   ],
   recentEarnings: [
     {
@@ -59,10 +59,10 @@ const DEFAULT_STAFF_LEDGER: StaffLedgerData = {
     },
   ],
   taxInfo: {
-    ytdEarnings: '₹2,68,000',
-    tdsDeducted: '₹8,040',
-    baseSalaryPaid: '₹2,00,000',
-    totalCommission: '₹68,000',
+    ytdEarnings: 268000,
+    tdsDeducted: 8040,
+    baseSalaryPaid: 200000,
+    totalCommission: 68000,
     conversions: 42,
   },
   taxDocuments: [

@@ -1,75 +1,135 @@
 import React, { useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
+import { CurrencyValue } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
-import { useRewardStats } from '@/domains/rewards';
+import {
+  useRewardStats,
+  useRewards,
+  useRewardAction,
+  REWARD_PASS_TYPES,
+  type ReferralReward,
+  type RewardAction,
+  type RewardStatus,
+  type RewardType,
+} from '@/domains/rewards';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
+type StatusFilter = 'all' | 'PENDING' | 'AVAILABLE' | 'REDEEMED';
+
+const FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'ALL' },
+  { key: 'PENDING', label: 'PENDING' },
+  { key: 'AVAILABLE', label: 'AVAILABLE' },
+  { key: 'REDEEMED', label: 'REDEEMED' },
+];
+
+const REWARD_TYPE_LABELS: Record<RewardType, string> = {
+  WALLET_CREDIT: 'Wallet Credit',
+  MEMBERSHIP_EXTENSION: 'Membership Extension',
+  MEMBERSHIP_DISCOUNT: 'Membership Discount',
+  FREE_PT: 'Free PT',
+  FREE_CLASS: 'Free Class',
+  COUPON: 'Coupon',
+  LOYALTY_POINTS: 'Loyalty Points',
+  GIFT: 'Gift',
+  CASH: 'Cash',
+};
+
+const STATUS_COLORS: Record<RewardStatus, { bg: string; fg: string }> = {
+  PENDING: { bg: '#fef9c3', fg: '#a16207' },
+  AVAILABLE: { bg: '#dbeafe', fg: '#1d4ed8' },
+  CLAIMED: { bg: '#f3e8ff', fg: '#7e22ce' },
+  REDEEMED: { bg: '#dcfce7', fg: '#15803d' },
+  EXPIRED: { bg: '#e5e7eb', fg: '#374151' },
+  CANCELLED: { bg: '#fee2e2', fg: '#b91c1c' },
+};
+
+const ACTION_COPY: Record<RewardAction, { title: string; confirm: string; done: string }> = {
+  approve: { title: 'Approve reward?', confirm: 'Approve', done: 'approved' },
+  reject: { title: 'Reject reward?', confirm: 'Reject', done: 'rejected' },
+  redeem: { title: 'Mark reward as redeemed?', confirm: 'Mark Redeemed', done: 'marked as redeemed' },
+};
+
+// Mirrors the web Reward Queue's action rules.
+function canApproveOrReject(reward: ReferralReward) {
+  return reward.status === 'PENDING';
+}
+
+function canRedeem(reward: ReferralReward) {
+  // Reward Passes are only spent at renewal/booking — redeeming here would burn them unused.
+  return (reward.status === 'AVAILABLE' || reward.status === 'CLAIMED')
+    && !REWARD_PASS_TYPES.includes(reward.rewardType);
+}
+
+function RewardValue({
+  reward,
+}: {
+  reward: ReferralReward;
+}) {
+  const value = reward.rewardValue;
+  if (value === undefined || value === null) {
+    return <Typography variant="bodySmall" style={{ fontWeight: '700' }}>—</Typography>;
+  }
+  if (reward.rewardType === 'WALLET_CREDIT' || reward.rewardType === 'CASH'
+    || (reward.rewardType === 'MEMBERSHIP_DISCOUNT' && reward.rewardUnit === 'AMOUNT')) {
+    return (
+      <Typography variant="bodySmall" style={{ fontWeight: '700', color: BrandColors.teal }}>
+        <CurrencyValue amount={Number(value)} />
+      </Typography>
+    );
+  }
+  let text = String(value);
+  if (reward.rewardType === 'MEMBERSHIP_EXTENSION') text = `${value} Day${value === 1 ? '' : 's'}`;
+  else if (reward.rewardUnit === 'PERCENT') text = `${value}%`;
+  else if (reward.rewardType === 'LOYALTY_POINTS') text = `${value} pts`;
+  return <Typography variant="bodySmall" style={{ fontWeight: '700' }}>{text}</Typography>;
+}
+
 export function RewardQueueScreen() {
   const router = useRouter();
-  const { currencyCode } = useCurrency();
-  const { data: stats, isLoading: isStatsLoading, refetch } = useRewardStats();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [pendingAction, setPendingAction] = useState<{ reward: ReferralReward; action: RewardAction } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'redeemed'>('all');
+
+  const { data: stats, isLoading: isStatsLoading, refetch: refetchStats } = useRewardStats();
+  const {
+    data: rewardPage,
+    isLoading: isRewardsLoading,
+    error: rewardsError,
+    refetch: refetchRewards,
+  } = useRewards({ size: 50, status: statusFilter === 'all' ? undefined : statusFilter });
+  const rewardAction = useRewardAction();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetchStats(), refetchRewards()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetchStats, refetchRewards]);
 
-  const totalGenerated = stats?.totalGenerated ?? 12;
-  const pendingApproval = stats?.pendingApproval ?? 3;
-  const redeemedCount = stats?.redeemed ?? 7;
-  const expiredCount = stats?.expired ?? 2;
+  const statValue = (value?: number) => (isStatsLoading ? '-' : value ?? 0);
 
-  const mockQueueItems = [
-    {
-      id: 1,
-      code: 'REW-9901',
-      memberId: 'MEM-101',
-      memberName: 'Sarah Connor',
-      type: 'Wallet Credit',
-      value: 50,
-      status: 'PENDING',
-      date: '2026-08-10',
-    },
-    {
-      id: 2,
-      code: 'REW-9902',
-      memberId: 'MEM-104',
-      memberName: 'John Matrix',
-      type: 'Membership Extension',
-      value: 7,
-      isDays: true,
-      status: 'PENDING',
-      date: '2026-08-11',
-    },
-    {
-      id: 3,
-      code: 'REW-9903',
-      memberId: 'MEM-108',
-      memberName: 'Alex Murphy',
-      type: 'Free PT',
-      value: 1,
-      status: 'REDEEMED',
-      date: '2026-08-08',
-    },
-  ];
+  const rewards = rewardPage?.rewards ?? [];
+  const hiddenCount = (rewardPage?.totalItems ?? 0) - rewards.length;
 
-  const filteredItems = mockQueueItems.filter((item) => {
-    if (statusFilter === 'all') return true;
-    return item.status.toLowerCase() === statusFilter;
-  });
-
-  const handleAction = (code: string, action: string) => {
-    toast.info(`Reward ${code} ${action.toLowerCase()} successfully.`);
+  const handleConfirmAction = () => {
+    if (!pendingAction) return;
+    const { reward, action } = pendingAction;
+    rewardAction.mutate(
+      { id: reward.id, action },
+      {
+        onSuccess: () => {
+          toast.success(`Reward ${reward.rewardCode} ${ACTION_COPY[action].done}.`);
+          setPendingAction(null);
+        },
+        onError: () => setPendingAction(null),
+      },
+    );
   };
 
   return (
@@ -100,7 +160,7 @@ export function RewardQueueScreen() {
                 Total Generated
               </Typography>
               <Typography variant="subtitle" style={{ color: '#1d4ed8', fontSize: 18, fontWeight: '700' }}>
-                {totalGenerated}
+                {statValue(stats?.totalGenerated)}
               </Typography>
             </View>
 
@@ -109,7 +169,7 @@ export function RewardQueueScreen() {
                 Pending
               </Typography>
               <Typography variant="subtitle" style={{ color: '#a16207', fontSize: 18, fontWeight: '700' }}>
-                {pendingApproval}
+                {statValue(stats?.pendingApproval)}
               </Typography>
             </View>
 
@@ -118,7 +178,7 @@ export function RewardQueueScreen() {
                 Redeemed
               </Typography>
               <Typography variant="subtitle" style={{ color: '#15803d', fontSize: 18, fontWeight: '700' }}>
-                {redeemedCount}
+                {statValue(stats?.redeemed)}
               </Typography>
             </View>
 
@@ -127,24 +187,24 @@ export function RewardQueueScreen() {
                 Expired
               </Typography>
               <Typography variant="subtitle" style={{ color: '#b91c1c', fontSize: 18, fontWeight: '700' }}>
-                {expiredCount}
+                {statValue(stats?.expired)}
               </Typography>
             </View>
           </View>
 
           {/* Filter Tabs */}
           <View style={styles.filterRow}>
-            {(['all', 'pending', 'redeemed'] as const).map((st) => (
+            {FILTERS.map(({ key, label }) => (
               <Pressable
-                key={st}
-                style={[styles.filterTab, statusFilter === st && styles.filterTabActive]}
-                onPress={() => setStatusFilter(st)}
+                key={key}
+                style={[styles.filterTab, statusFilter === key && styles.filterTabActive]}
+                onPress={() => setStatusFilter(key)}
               >
                 <Typography
                   variant="caption"
-                  style={[styles.filterTabText, statusFilter === st && styles.filterTabTextActive]}
+                  style={[styles.filterTabText, statusFilter === key && styles.filterTabTextActive]}
                 >
-                  {st.toUpperCase()}
+                  {label}
                 </Typography>
               </Pressable>
             ))}
@@ -155,75 +215,105 @@ export function RewardQueueScreen() {
             Queue Items
           </Typography>
 
-          {filteredItems.map((item) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <View>
-                  <Typography variant="subtitle" style={styles.codeText}>
-                    {item.code}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {item.memberName} ({item.memberId})
-                  </Typography>
-                </View>
+          {isRewardsLoading ? (
+            <ActivityIndicator size="small" color={BrandColors.teal} style={styles.stateBlock} />
+          ) : rewardsError ? (
+            <Typography variant="bodySmall" style={[styles.stateBlock, { color: '#dc2626' }]}>
+              Failed to load rewards. Pull down to retry.
+            </Typography>
+          ) : rewards.length === 0 ? (
+            <Typography variant="bodySmall" color="textSecondary" style={styles.stateBlock}>
+              {statusFilter === 'all' ? 'No rewards generated yet.' : 'No rewards match this filter.'}
+            </Typography>
+          ) : (
+            rewards.map((item) => {
+              const statusColor = STATUS_COLORS[item.status] ?? STATUS_COLORS.EXPIRED;
+              const showApproveReject = canApproveOrReject(item);
+              const showRedeem = canRedeem(item);
 
-                <View
-                  style={[
-                    styles.statusBadge,
-                    item.status === 'PENDING'
-                      ? { backgroundColor: '#fef9c3' }
-                      : { backgroundColor: '#dcfce7' },
-                  ]}
-                >
-                  <Typography
-                    variant="caption"
-                    style={[
-                      styles.statusBadgeText,
-                      item.status === 'PENDING' ? { color: '#a16207' } : { color: '#15803d' },
-                    ]}
-                  >
-                    {item.status}
-                  </Typography>
-                </View>
-              </View>
+              return (
+                <View key={item.id} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <View style={styles.itemHeaderInfo}>
+                      <Typography variant="subtitle" style={styles.codeText}>
+                        {item.rewardCode}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {item.memberId}
+                        {item.memberType ? ` · ${item.memberType === 'REFERRER' ? 'Referrer' : 'Referee'}` : ''}
+                      </Typography>
+                    </View>
 
-              <View style={styles.itemBody}>
-                <Typography variant="bodySmall">
-                  Type: <Typography variant="bodySmall" style={{ fontWeight: '600' }}>{item.type}</Typography>
-                </Typography>
-                <Typography variant="bodySmall">
-                  Value:{' '}
-                  {item.isDays ? (
-                    <Typography variant="bodySmall" style={{ fontWeight: '700' }}>
-                      {item.value} Days
+                    <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+                      <Typography variant="caption" style={[styles.statusBadgeText, { color: statusColor.fg }]}>
+                        {item.status}
+                      </Typography>
+                    </View>
+                  </View>
+
+                  <View style={styles.itemBody}>
+                    <Typography variant="bodySmall">
+                      Type:{' '}
+                      <Typography variant="bodySmall" style={{ fontWeight: '600' }}>
+                        {REWARD_TYPE_LABELS[item.rewardType] ?? item.rewardType}
+                      </Typography>
                     </Typography>
-                  ) : (
-                    <Typography variant="bodySmall" style={{ fontWeight: '700', color: BrandColors.teal }}>
-                      <CurrencyGlyph code={currencyCode} /> {item.value}
+                    <Typography variant="bodySmall">
+                      Value: <RewardValue reward={item} />
                     </Typography>
-                  )}
-                </Typography>
-              </View>
+                  </View>
 
-              {item.status === 'PENDING' ? (
-                <View style={styles.actionRow}>
-                  <Button
-                    title="Approve"
-                    onPress={() => handleAction(item.code, 'Approve')}
-                    style={[styles.btn, { backgroundColor: '#16a34a' }]}
-                  />
-                  <Button
-                    title="Reject"
-                    variant="outline"
-                    onPress={() => handleAction(item.code, 'Reject')}
-                    style={[styles.btn, { borderColor: '#dc2626' }]}
-                  />
+                  {showApproveReject ? (
+                    <View style={styles.actionRow}>
+                      <Button
+                        title="Approve"
+                        onPress={() => setPendingAction({ reward: item, action: 'approve' })}
+                        style={[styles.btn, { backgroundColor: '#16a34a' }]}
+                      />
+                      <Button
+                        title="Reject"
+                        variant="outline"
+                        onPress={() => setPendingAction({ reward: item, action: 'reject' })}
+                        style={[styles.btn, { borderColor: '#dc2626' }]}
+                      />
+                    </View>
+                  ) : showRedeem ? (
+                    <View style={styles.actionRow}>
+                      <Button
+                        title="Mark Redeemed"
+                        onPress={() => setPendingAction({ reward: item, action: 'redeem' })}
+                        style={styles.btn}
+                      />
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
-          ))}
+              );
+            })
+          )}
+
+          {hiddenCount > 0 ? (
+            <Typography variant="caption" color="textSecondary" style={styles.stateBlock}>
+              Showing the latest {rewards.length} of {rewardPage?.totalItems} rewards.
+            </Typography>
+          ) : null}
         </View>
       </ScrollView>
+
+      <ConfirmationModal
+        visible={!!pendingAction}
+        title={pendingAction ? ACTION_COPY[pendingAction.action].title : ''}
+        message={
+          pendingAction
+            ? `${pendingAction.reward.rewardCode} · ${pendingAction.reward.memberId}`
+            : ''
+        }
+        confirmText={pendingAction ? ACTION_COPY[pendingAction.action].confirm : 'Confirm'}
+        variant={pendingAction?.action === 'reject' ? 'danger' : 'primary'}
+        icon={pendingAction?.action === 'reject' ? 'x-circle' : 'check-circle'}
+        loading={rewardAction.isPending}
+        onConfirm={handleConfirmAction}
+        onClose={() => setPendingAction(null)}
+      />
     </View>
   );
 }
@@ -304,6 +394,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.two,
   },
+  itemHeaderInfo: {
+    flex: 1,
+    marginRight: Spacing.two,
+  },
   codeText: {
     fontSize: 14,
     fontWeight: '700',
@@ -334,5 +428,9 @@ const styles = StyleSheet.create({
   },
   btn: {
     flex: 1,
+  },
+  stateBlock: {
+    marginVertical: Spacing.three,
+    textAlign: 'center',
   },
 });

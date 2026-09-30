@@ -20,7 +20,9 @@ interface MemberDraftModalProps {
     price: number;
     duration: string;
     benefits: string[];
-    discount?: number;
+    /** What the member pays — the offer price when the plan has one running. */
+    effectivePrice?: number;
+    offerLabel?: string | null;
   } | null;
   onSubmitDraft: (draftData: any) => void;
 }
@@ -90,7 +92,7 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
       ...formData,
       planId: selectedPlan.id,
       planName: selectedPlan.name,
-      planPrice: selectedPlan.price,
+      planPrice: selectedPlan.effectivePrice ?? selectedPlan.price,
       planDuration: selectedPlan.duration,
       status: 'pending_approval',
       requestedDate: new Date().toISOString(),
@@ -142,16 +144,16 @@ export function MemberDraftModal({ open, onOpenChange, selectedPlan, onSubmitDra
                 <div>
                   <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
                     {selectedPlan.name}
-                    {selectedPlan.discount && selectedPlan.discount > 0 ? (
+                    {selectedPlan.effectivePrice != null && selectedPlan.effectivePrice < selectedPlan.price ? (
                       <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-                        {selectedPlan.discount}% OFF
+                        {selectedPlan.offerLabel || 'Offer'}
                       </Badge>
                     ) : null}
                   </h3>
                   <p className="text-sm opacity-90">{selectedPlan.duration}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold"><CurrencyGlyph /> {selectedPlan.price}</div>
+                  <div className="text-2xl font-bold"><CurrencyGlyph /> {selectedPlan.effectivePrice ?? selectedPlan.price}</div>
                   <p className="text-xs opacity-90">Total Amount</p>
                 </div>
               </div>

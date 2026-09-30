@@ -1,5 +1,7 @@
 import { StyleSheet, View, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { UserTransaction } from '../../domain';
@@ -38,7 +40,7 @@ export function TransactionCard({ transaction, onPress, divider = true }: Transa
   return (
     <Wrapper onPress={onPress} style={[styles.row, divider && styles.divider]}>
       <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-        <Feather name={iconName} size={18} color={iconColor} />
+        <FeatherIcon name={iconName} size={18} color={iconColor} />
       </View>
 
       <View style={styles.details}>
@@ -60,7 +62,7 @@ export function TransactionCard({ transaction, onPress, divider = true }: Transa
             variant="subtitle"
             style={[styles.amount, { color: isPurchase ? '#dc2626' : '#16a34a' }]}
           >
-            {isPurchase ? '-' : '+'}${transaction.amount.toLocaleString()}
+            {isPurchase ? '-' : '+'}<CurrencyValue amount={transaction.amount} />
           </Typography>
         ) : (
           <Typography variant="caption" color="textSecondary">

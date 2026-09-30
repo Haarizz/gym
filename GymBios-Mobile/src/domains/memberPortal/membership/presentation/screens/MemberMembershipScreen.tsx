@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassBlob, GlassSurface } from '@/shared/components';
@@ -24,19 +25,29 @@ import { useMemberAddOns } from '../../hooks/useMemberAddOns';
 import { useFreezeMembership } from '../../hooks/useFreezeMembership';
 import { useUnfreezeMembership } from '../../hooks/useUnfreezeMembership';
 import { UnfreezeMembershipConfirmation } from '../components/UnfreezeMembershipConfirmation';
+import {
+  OutstandingBalanceCard,
+  hasOutstandingBalance,
+  membershipPaymentPath,
+  useOutstandingBalance,
+} from '@/domains/membershipPayment';
 type MembershipTabType = 'benefits' | 'payments' | 'addons';
 
 export function MemberMembershipScreen() {
+  const router = useRouter();
   const { data: memberState, isLoading: isMembershipLoading, isError: isMembershipError, refetch: refetchMembership, isRefetching: isMembershipRefetching } = useMemberMembership();
   
   const [addonsPage, setAddonsPage] = useState(1);
   const { data: addonsData, isLoading: isAddonsLoading, isError: isAddonsError, refetch: refetchAddons, isRefetching: isAddonsRefetching } = useMemberAddOns({ page: addonsPage, limit: 5 });
+  const { data: outstanding, refetch: refetchOutstanding, isRefetching: isOutstandingRefetching } = useOutstandingBalance();
   
   const [activeTab, setActiveTab] = useState<MembershipTabType>('benefits');
   const [isFreezeModalOpen, setIsFreezeModalOpen] = useState(false);
+  const [freezeSheetKey, setFreezeSheetKey] = useState(0);
   const [isUnfreezeModalOpen, setIsUnfreezeModalOpen] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
 
+  const freezeInfo = memberState?.freeze;
   const freezeMutation = useFreezeMembership();
   const unfreezeMutation = useUnfreezeMembership();
 
@@ -49,6 +60,17 @@ export function MemberMembershipScreen() {
         },
       }
     );
+  };
+
+  const openFreeze = () => {
+    if (!freezeInfo?.available) {
+      toast.info(freezeInfo?.unavailable_message || 'Your subscription does not allow freezing.', {
+        title: 'Freeze Unavailable',
+      });
+      return;
+    }
+    setFreezeSheetKey((k) => k + 1);
+    setIsFreezeModalOpen(true);
   };
 
   const handleUnfreezeConfirm = () => {
@@ -66,6 +88,7 @@ export function MemberMembershipScreen() {
   const onRefresh = () => {
     refetchMembership();
     refetchAddons();
+    refetchOutstanding();
   };
 
   const membership: MembershipDetails | null = useMemo(() => {
@@ -80,7 +103,8 @@ export function MemberMembershipScreen() {
       daysRemaining: ms?.remaining_days || 0,
       totalDays: ms?.total_days || 0,
       autoRenew: ms?.auto_renew || false,
-      price: ms?.plan ? `₹${ms.plan.price} / ${ms.plan.duration}` : 'N/A',
+      price: ms?.plan ? ms.plan.price : null,
+      pricePeriod: ms?.plan?.duration,
       benefits: benefits ? benefits.map(b => b.name) : [],
       freezeAvailable: freeze?.available || false,
       freezeDaysAllowed: freeze?.allowed_days || 0,
@@ -91,7 +115,7 @@ export function MemberMembershipScreen() {
 
   const isLoading = isMembershipLoading;
   const isError = isMembershipError;
-  const isRefetching = isMembershipRefetching || isAddonsRefetching;
+  const isRefetching = isMembershipRefetching || isAddonsRefetching || isOutstandingRefetching;
 
   if (isLoading) {
     return (
@@ -112,7 +136,7 @@ export function MemberMembershipScreen() {
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
         >
           <Feather name="alert-triangle" size={48} color={BrandColors.trainerAmber} />
-          <Text style={styles.errorText}>Failed to load membership data.</Text>
+          <Text style={styles.errorText}>Failed to load subscription data.</Text>
           <Pressable style={styles.retryButton} onPress={onRefresh}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </Pressable>
@@ -142,6 +166,14 @@ export function MemberMembershipScreen() {
       {/* Membership Card */}
       <MembershipStatusCard membership={membership} />
 
+      {/* Outstanding balance — shown only while the backend reports money owed */}
+      {hasOutstandingBalance(outstanding) && outstanding.membershipId !== null && (
+        <OutstandingBalanceCard
+          balance={outstanding}
+          onPay={() => router.push(membershipPaymentPath(outstanding.membershipId as number))}
+        />
+      )}
+
       {membership.status !== 'No Active Plan' && (
         <>
           {/* Quick Action Buttons */}
@@ -150,7 +182,7 @@ export function MemberMembershipScreen() {
               style={({ pressed }) => [styles.actionButtonGold, pressed && styles.pressed]}
           onPress={() => setIsRenewModalOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Renew Membership"
+          accessibilityLabel="Renew Subscription"
         >
           <Feather name="refresh-cw" size={20} color={BrandColors.memberGold} />
           <Text style={styles.actionButtonGoldText}>Renew Now</Text>
@@ -161,17 +193,21 @@ export function MemberMembershipScreen() {
             style={({ pressed }) => [styles.actionButtonAmber, pressed && styles.pressed]}
             onPress={() => setIsUnfreezeModalOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="Unfreeze Membership"
+            accessibilityLabel="Unfreeze Subscription"
           >
             <Feather name="play-circle" size={20} color={BrandColors.trainerAmber} />
             <Text style={styles.actionButtonAmberText}>Unfreeze</Text>
           </Pressable>
         ) : (
           <Pressable
-            style={({ pressed }) => [styles.actionButtonAmber, pressed && styles.pressed]}
-            onPress={() => setIsFreezeModalOpen(true)}
+            style={({ pressed }) => [
+              styles.actionButtonAmber,
+              !membership.freezeAvailable && styles.actionButtonUnavailable,
+              pressed && styles.pressed,
+            ]}
+            onPress={openFreeze}
             accessibilityRole="button"
-            accessibilityLabel="Freeze Membership"
+            accessibilityLabel="Freeze Subscription"
           >
             <Feather name="pause-circle" size={20} color={BrandColors.trainerAmber} />
             <Text style={styles.actionButtonAmberText}>Freeze</Text>
@@ -220,7 +256,7 @@ export function MemberMembershipScreen() {
         <MembershipBenefitsTab
           membership={membership}
           onClaimOffer={() => setIsRenewModalOpen(true)}
-          onOpenFreeze={() => setIsFreezeModalOpen(true)}
+          onOpenFreeze={openFreeze}
         />
       )}
 
@@ -239,13 +275,16 @@ export function MemberMembershipScreen() {
       )}
 
       {/* Modals */}
-      <FreezeMembershipModal
-        visible={isFreezeModalOpen}
-        daysAvailable={membership.freezeDaysAllowed}
-        isLoading={freezeMutation.isPending}
-        onClose={() => setIsFreezeModalOpen(false)}
-        onConfirm={handleFreezeConfirm}
-      />
+      {freezeInfo && (
+        <FreezeMembershipModal
+          key={freezeSheetKey}
+          visible={isFreezeModalOpen}
+          freeze={freezeInfo}
+          isLoading={freezeMutation.isPending}
+          onClose={() => setIsFreezeModalOpen(false)}
+          onConfirm={handleFreezeConfirm}
+        />
+      )}
 
       <UnfreezeMembershipConfirmation
         visible={isUnfreezeModalOpen}
@@ -340,6 +379,9 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  actionButtonUnavailable: {
+    opacity: 0.5,
   },
   actionButtonAmberText: {
     fontSize: 15,

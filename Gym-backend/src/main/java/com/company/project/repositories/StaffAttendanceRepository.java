@@ -2,6 +2,7 @@ package com.company.project.repositories;
 
 import com.company.project.entities.StaffAttendance;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,10 @@ import java.util.Optional;
 
 @Repository
 public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance, Long> {
+
+    @Modifying
+    @Query("DELETE FROM StaffAttendance sa WHERE sa.staff.id = :staffId")
+    void deleteByStaffId(@Param("staffId") Long staffId);
 
     // Active (working) session for a staff member
     Optional<StaffAttendance> findByStaff_IdAndStatus(Long staffId, String status);

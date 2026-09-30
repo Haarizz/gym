@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
@@ -11,7 +12,6 @@ interface CashPaymentFormProps {
   finalAmount: number;
   paidAmount: string;
   paymentDueDate?: Date | null;
-  currency?: string;
   errors?: Record<string, string>;
   onPaidAmountChange: (value: string) => void;
   onDueDateChange: (date: Date | null) => void;
@@ -21,7 +21,6 @@ export function CashPaymentForm({
   finalAmount,
   paidAmount,
   paymentDueDate,
-  currency = '₹',
   errors,
   onPaidAmountChange,
   onDueDateChange,
@@ -49,7 +48,7 @@ export function CashPaymentForm({
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={`Paid Amount (${currency}) *`}
+            label={<>Paid Amount (<CurrencyGlyph />) *</>}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -60,7 +59,7 @@ export function CashPaymentForm({
 
         <View style={styles.flex1}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Pay Back Amount ({currency})
+            Pay Back Amount (<CurrencyGlyph />)
           </Typography>
           <View
             style={[
@@ -72,7 +71,7 @@ export function CashPaymentForm({
             ]}
           >
             <Typography variant="bodySmallBold" style={{ color: '#047857' }}>
-              {currency} {payBack.toFixed(2)}
+              <CurrencyValue amount={payBack} decimals={2} />
             </Typography>
           </View>
           <Typography
@@ -109,7 +108,7 @@ export function CashPaymentForm({
             Final Amount:
           </Typography>
           <Typography variant="bodySmallBold">
-            {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -117,7 +116,7 @@ export function CashPaymentForm({
             Paid Amount:
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            {currency} {(numPaid || 0).toFixed(2)}
+            <CurrencyValue amount={(numPaid || 0)} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -128,7 +127,7 @@ export function CashPaymentForm({
             variant="bodySmallBold"
             style={{ color: remaining > 0 ? theme.error : '#10B981' }}
           >
-            {currency} {remaining > 0 ? remaining.toFixed(2) : payBack.toFixed(2)}
+            <CurrencyValue amount={remaining > 0 ? remaining : payBack} decimals={2} />
           </Typography>
         </View>
 
@@ -138,7 +137,7 @@ export function CashPaymentForm({
               <Typography variant="caption" style={{ fontWeight: '700', color: '#047857' }}>
                 Cash Return Required:{' '}
               </Typography>
-              Return {currency} {payBack.toFixed(2)} to customer
+              Return <CurrencyValue amount={payBack} decimals={2} /> to customer
             </Typography>
           </View>
         ) : remaining > 0 ? (
@@ -147,7 +146,7 @@ export function CashPaymentForm({
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
                 Partial Payment:{' '}
               </Typography>
-              {currency} {remaining.toFixed(2)} will be added to outstanding balance.
+              <CurrencyValue amount={remaining} decimals={2} /> will be added to outstanding balance.
             </Typography>
           </View>
         ) : null}

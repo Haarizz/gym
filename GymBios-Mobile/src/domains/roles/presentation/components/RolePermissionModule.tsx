@@ -4,7 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { Typography } from '@/shared/components/Typography';
 import { Spacing, Radius, BrandColors } from '@/core/theme';
-import { PERMISSION_ACTIONS } from '../constants/modules';
+import { PERMISSION_ACTIONS, moduleLabel } from '../constants/modules';
 
 interface RolePermissionModuleProps {
   moduleName: string;
@@ -40,7 +40,7 @@ export function RolePermissionModule({
         activeOpacity={0.7}
       >
         <Typography variant="body" style={styles.moduleName}>
-          {moduleName}
+          {moduleLabel(moduleName)}
         </Typography>
         
         <View style={[styles.badge, hasSelection && styles.badgeActive]}>

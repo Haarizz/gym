@@ -14,7 +14,6 @@ interface StaffCardProps {
   staff: Staff;
   /** Undefined while the performance snapshot is still loading. */
   performance?: StaffPerformance;
-  currencyCode: string;
   onPress?: (staff: Staff) => void;
   onMessage?: (staff: Staff) => void;
 }
@@ -30,7 +29,6 @@ const STATUS_STYLES: Record<StaffPerformanceStatus | 'INACTIVE', { label: string
 export const StaffCard = memo(function StaffCard({
   staff,
   performance,
-  currencyCode,
   onPress,
   onMessage,
 }: StaffCardProps) {
@@ -49,9 +47,9 @@ export const StaffCard = memo(function StaffCard({
 
   const target = performance?.revenueTarget || staff.monthlyTarget;
   const achievedText = performance
-    ? formatCompactCurrency(performance.revenueAchieved, currencyCode)
+    ? formatCompactCurrency(performance.revenueAchieved)
     : '—';
-  const targetText = target > 0 ? formatCompactCurrency(target, currencyCode) : 'No target';
+  const targetText = target > 0 ? formatCompactCurrency(target) : 'No target';
 
   return (
     <Pressable onPress={() => onPress?.(staff)}>

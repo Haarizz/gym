@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
@@ -10,14 +11,12 @@ interface PaymentSummaryCardProps {
   title: string;
   subtitle?: string;
   amount: number;
-  currency?: string;
 }
 
 export function PaymentSummaryCard({
   title,
   subtitle,
   amount,
-  currency = '₹',
 }: PaymentSummaryCardProps) {
   const theme = useTheme();
 
@@ -67,7 +66,7 @@ export function PaymentSummaryCard({
             variant="subtitle"
             style={[styles.amountText, { color: theme.primary }]}
           >
-            {currency} {amount.toFixed(2)}
+            <CurrencyValue amount={amount} decimals={2} />
           </Typography>
         </View>
       </View>

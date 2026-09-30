@@ -24,13 +24,13 @@ export interface RecentConversionItem {
   id?: string | number;
   name: string;
   plan: string;
-  amount: string;
+  amount: number;
 }
 
 export interface StaffMonthSummary {
   targetAchievement: number;
   totalConversions: number;
-  revenueGenerated: string;
+  revenueGenerated: number;
   conversionRate: number;
 }
 

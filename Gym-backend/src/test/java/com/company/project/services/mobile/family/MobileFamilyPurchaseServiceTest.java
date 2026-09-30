@@ -3,6 +3,7 @@ package com.company.project.services.mobile.family;
 import com.company.project.dto.FamilyMemberDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
+import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO;
 import com.company.project.entities.Member;
@@ -13,6 +14,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.services.MemberService;
+import com.company.project.services.MembershipFreezeService;
 import com.company.project.services.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +44,7 @@ class MobileFamilyPurchaseServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private MembershipPlanRepository planRepository;
     @Mock private NotificationService notificationService;
+    @Mock private MembershipFreezeService freezeService;
 
     private MobileFamilyPurchaseService purchaseService;
 
@@ -55,7 +59,7 @@ class MobileFamilyPurchaseServiceTest {
     void setUp() {
         MobileFamilyPricingService pricing = new MobileFamilyPricingService(planRepository, memberService);
         purchaseService = new MobileFamilyPurchaseService(idempotencyService, pricing, invitationService,
-                memberService, memberRepository, notificationService, new ObjectMapper());
+                memberService, memberRepository, notificationService, freezeService, new ObjectMapper());
 
         lease = new MobileIdempotencyRecord();
         lease.setIdempotencyKey(key);
@@ -191,5 +195,124 @@ class MobileFamilyPurchaseServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> purchase(request("2000", connected("Jane", "JOHN@example.com", false))));
+    }
+
+    private Member existingMember() {
+        Member m = new Member();
+        m.setId(42L);
+        m.setMemberId("MBR-42");
+        m.setName("John Doe");
+        m.setEmail("john@example.com");
+        return m;
+    }
+
+    @Test
+    @DisplayName("Convert, individual billing: head renewal covers own fee + minor, adult priced on their own receipt")
+    void convertIndividualBilling() {
+        when(idempotencyService.acquireOrRenewLease(key, "fp")).thenReturn(lease);
+        when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
+        Member head = existingMember();
+        when(memberRepository.findById(42L)).thenReturn(Optional.of(head));
+        Member spouse = new Member();
+        spouse.setMemberId("MBR-43");
+        spouse.setName("Jane");
+        spouse.setEmail("jane@example.com");
+        when(memberRepository.findByFamilyHeadId("MBR-42")).thenReturn(List.of(spouse));
+
+        String response = purchaseService.convert(key, "fp", request("2300",
+                connected("Jane", "jane@example.com", false),
+                connected("Kid", null, true)), 42L, "acme", "Acme Gym").responseJson();
+
+        ArgumentCaptor<RenewalRequestDTO> renewal = ArgumentCaptor.forClass(RenewalRequestDTO.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<FamilyMemberDTO>> members = ArgumentCaptor.forClass(List.class);
+        InOrder order = inOrder(freezeService, memberService);
+        order.verify(freezeService).endFreezeForRenewal(42L);
+        order.verify(memberService).convertToFamilyHead(eq(42L), eq(plan), renewal.capture(), members.capture());
+        RenewalRequestDTO r = renewal.getValue();
+        assertEquals(bd("1000"), r.getMembershipFee());
+        assertEquals(bd("300"), r.getBilledToHeadFeeTotal());
+        // head's 1000 + the child's 300 are funded before the spouse's own receipt
+        assertEquals(0, bd("1300").compareTo(r.getAmountReceived()));
+        assertEquals(1, r.getMinorCharges().size());
+        assertTrue(r.getMinorCharges().get(0).getPaid());
+
+        FamilyMemberDTO spouseDto = members.getValue().get(0);
+        assertEquals(bd("1000"), spouseDto.getMembershipFee());
+        assertEquals("paid", spouseDto.getPaymentStatus());
+
+        verify(memberService, never()).createMember(any());
+        verify(invitationService).createInvitation(eq(head), eq(spouse), eq("acme"), eq("Acme Gym"), eq("Family Gold"));
+        verify(idempotencyService).completeRequest(eq(key), eq(lease.getLeaseId()), eq(response));
+        assertTrue(response.contains("\"approvalPending\":false"));
+    }
+
+    @Test
+    @DisplayName("Convert, family_head billing: one invoice on the head, every member itemized on it")
+    void convertFamilyHeadBilling() {
+        plan.setFamilyBillingMode("family_head");
+        when(memberService.memberPriceForIndex(eq(plan), anyInt())).thenReturn(bd("300"));
+        when(idempotencyService.acquireOrRenewLease(key, "fp")).thenReturn(lease);
+        when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
+        when(memberRepository.findById(42L)).thenReturn(Optional.of(existingMember()));
+
+        purchaseService.convert(key, "fp", request("600", connected("Jane", null, false)), 42L, "acme", null);
+
+        ArgumentCaptor<RenewalRequestDTO> renewal = ArgumentCaptor.forClass(RenewalRequestDTO.class);
+        verify(memberService).convertToFamilyHead(eq(42L), eq(plan), renewal.capture(), anyList());
+        RenewalRequestDTO r = renewal.getValue();
+        assertEquals(bd("600"), r.getMembershipFee());
+        assertEquals(0, r.getBilledToHeadFeeTotal().signum());
+        assertEquals(bd("300"), r.getMinorCharges().get(0).getAmount());
+        assertTrue(r.getMinorCharges().get(0).getPaid());
+    }
+
+    @Test
+    @DisplayName("Convert: a family member can't reuse the head's own email")
+    void convertRejectsHeadEmail() {
+        when(idempotencyService.acquireOrRenewLease(key, "fp")).thenReturn(lease);
+        when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
+        when(memberRepository.findById(42L)).thenReturn(Optional.of(existingMember()));
+
+        assertThrows(IllegalArgumentException.class, () -> purchaseService.convert(key, "fp",
+                request("2000", connected("Jane", "John@Example.com", false)), 42L, "acme", null));
+        verify(idempotencyService).failRequest(key, lease.getLeaseId());
+        verify(memberService, never()).convertToFamilyHead(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Quote checks the plan's member caps before any price is shown")
+    void quoteEnforcesFamilyCaps() {
+        MobileFamilyPricingService pricing = new MobileFamilyPricingService(planRepository, memberService);
+        doThrow(new IllegalArgumentException("This family plan allows a maximum of 2 adult member(s)."))
+                .when(memberService).enforceFamilyMemberCaps(plan, 3, 1);
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> pricing.quote(plan, List.of(false, false, true), null));
+        assertTrue(e.getMessage().contains("2 adult"));
+    }
+
+    @Test
+    @DisplayName("Couple quote: exactly one adult partner")
+    void coupleQuoteRules() {
+        MobileFamilyPricingService pricing = new MobileFamilyPricingService(planRepository, memberService);
+        plan.setPlanType("Couple");
+
+        assertThrows(IllegalArgumentException.class, () -> pricing.quote(plan, List.of(false, false), null));
+        assertThrows(IllegalArgumentException.class, () -> pricing.quote(plan, List.of(true), null));
+        assertEquals(bd("2000"), pricing.quote(plan, List.of(false), null).getTotal());
+    }
+
+    @Test
+    @DisplayName("family_head billing without price-per-member: the plan price is the whole family's invoice")
+    void familyHeadFlatPrice() {
+        MobileFamilyPricingService pricing = new MobileFamilyPricingService(planRepository, memberService);
+        plan.setFamilyBillingMode("family_head");
+        plan.setPricePerMember(null);
+
+        // 1000 plan + a sister: one invoice of 1000, not 2000 as under individual billing
+        assertEquals(bd("1000"), pricing.quote(plan, List.of(false), null).getTotal());
+        plan.setFamilyBillingMode("individual");
+        assertEquals(bd("2000"), pricing.quote(plan, List.of(false), null).getTotal());
     }
 }

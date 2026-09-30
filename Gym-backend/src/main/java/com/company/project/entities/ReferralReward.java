@@ -92,6 +92,18 @@ public class ReferralReward extends BaseEntity {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    // PERCENT / AMOUNT — how rewardValue is read for MEMBERSHIP_DISCOUNT and COUPON rewards.
+    @Column(name = "reward_unit", length = 20)
+    private String rewardUnit;
+
+    // Where a Reward Pass / coupon was spent: MEMBERSHIP, BOOKING or COUPON.
+    @Column(name = "consumed_context", length = 30)
+    private String consumedContext;
+
+    // Member id (MEMBERSHIP/COUPON) or booking id (BOOKING) the reward was spent on.
+    @Column(name = "consumed_ref_id")
+    private Long consumedRefId;
+
     public ReferralReward() {}
 
     public Long getId() { return id; }
@@ -159,4 +171,13 @@ public class ReferralReward extends BaseEntity {
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+
+    public String getRewardUnit() { return rewardUnit; }
+    public void setRewardUnit(String rewardUnit) { this.rewardUnit = rewardUnit; }
+
+    public String getConsumedContext() { return consumedContext; }
+    public void setConsumedContext(String consumedContext) { this.consumedContext = consumedContext; }
+
+    public Long getConsumedRefId() { return consumedRefId; }
+    public void setConsumedRefId(Long consumedRefId) { this.consumedRefId = consumedRefId; }
 }

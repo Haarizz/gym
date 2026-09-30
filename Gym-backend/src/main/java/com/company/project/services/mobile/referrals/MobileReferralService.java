@@ -1,10 +1,12 @@
 package com.company.project.services.mobile.referrals;
 
 import com.company.project.dto.MyReferralClaimDTO;
+import com.company.project.entities.Member;
 import com.company.project.entities.MobileReferralAttribution;
 import com.company.project.entities.MobileReferralProfile;
 import com.company.project.entities.MobileReferralStatus;
 import com.company.project.entities.UserProfile;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.mobile.referrals.MobileReferralAttributionRepository;
 import com.company.project.repositories.mobile.referrals.MobileReferralProfileRepository;
 import com.company.project.config.TenantDataSourceRegistry;
@@ -13,6 +15,7 @@ import com.company.project.controlplane.repositories.TenantRepository;
 import com.company.project.security.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import com.company.project.services.GlobalUserService;
@@ -24,6 +27,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,6 +42,12 @@ public class MobileReferralService {
     private final TenantRepository tenantRepository;
     private final GlobalUserService globalUserService;
     private final MobileReferralResolutionService resolutionService;
+    private final MemberRepository memberRepository;
+
+    // With routing on, each gym has its own database and a request with no tenant means
+    // "not in any gym"; with routing off everything lives in one database.
+    @Value("${tenant.routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
 
     private static final String ALPHANUMERIC = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static final int CODE_LENGTH = 8;
@@ -48,13 +58,42 @@ public class MobileReferralService {
                                  TenantDataSourceRegistry tenantDataSourceRegistry,
                                  TenantRepository tenantRepository,
                                  GlobalUserService globalUserService,
-                                 MobileReferralResolutionService resolutionService) {
+                                 MobileReferralResolutionService resolutionService,
+                                 MemberRepository memberRepository) {
         this.profileRepository = profileRepository;
         this.attributionRepository = attributionRepository;
         this.tenantDataSourceRegistry = tenantDataSourceRegistry;
         this.tenantRepository = tenantRepository;
         this.globalUserService = globalUserService;
         this.resolutionService = resolutionService;
+        this.memberRepository = memberRepository;
+    }
+
+    /** Why a user can't have a referral code, as returned to the app. */
+    public enum CodeBlocker { NO_GYM, MEMBERSHIP_INACTIVE }
+
+    /**
+     * Referral codes only exist for active members, inside their gym's database — the
+     * only place claimCode() looks codes up. A code created with no gym selected used to
+     * land in the main database, where no claim could ever find it (400 "Invalid referral
+     * code"). Returns null when the user may have a code.
+     */
+    public CodeBlocker referralCodeBlocker(Long userId, boolean globalUser) {
+        if (tenantRoutingEnabled && TenantContextHolder.getCurrentTenant() == null) {
+            return CodeBlocker.NO_GYM;
+        }
+        Member member = globalUser
+                ? resolutionService.findMemberByGlobalUserId(userId)
+                : memberRepository.findByUserId(userId).orElse(null);
+        return blockerFor(member, LocalDateTime.now());
+    }
+
+    /** Same "not active" rule as the reward engine (expired status), plus a lapsed expiry date. */
+    static CodeBlocker blockerFor(Member member, LocalDateTime now) {
+        if (member == null) return CodeBlocker.NO_GYM;
+        boolean expired = "expired".equalsIgnoreCase(member.getMembershipStatus())
+                || (member.getExpiryDate() != null && member.getExpiryDate().isBefore(now));
+        return expired ? CodeBlocker.MEMBERSHIP_INACTIVE : null;
     }
 
     @Transactional

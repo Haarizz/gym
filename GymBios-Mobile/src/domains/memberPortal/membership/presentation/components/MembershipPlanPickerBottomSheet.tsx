@@ -57,7 +57,7 @@ export function MembershipPlanPickerBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Select Membership Plan"
+      title="Select Subscription"
       onClose={onClose}
     >
       <View style={styles.container}>
@@ -65,7 +65,7 @@ export function MembershipPlanPickerBottomSheet({
           <Feather name="search" size={20} color={BrandColors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search plans..."
+            placeholder="Search subscriptions..."
             placeholderTextColor={BrandColors.textSecondary}
             value={searchText}
             onChangeText={setSearchText}
@@ -87,7 +87,7 @@ export function MembershipPlanPickerBottomSheet({
           </View>
         ) : plans.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No plans found.</Text>
+            <Text style={styles.emptyText}>No subscriptions found.</Text>
           </View>
         ) : (
           <View style={styles.listContainer}>
@@ -95,7 +95,8 @@ export function MembershipPlanPickerBottomSheet({
               <MembershipPlanCard
                 key={plan.id}
                 name={plan.name}
-                price={plan.price}
+                price={plan.effectivePrice}
+                regularPrice={plan.price}
                 duration={plan.duration}
                 isCurrent={plan.name === currentPlanName}
                 isSelected={plan.id === selectedPlanId}

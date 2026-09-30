@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Avatar } from '@/shared/components/Avatar';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { Typography } from '@/shared/components/Typography';
@@ -12,6 +14,13 @@ import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayou
 import { useStaff } from '../hooks/useStaff';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+
+// Same values the web admin's "Change status" dialog writes.
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active', icon: 'check-circle', color: BrandColors.teal },
+  { value: 'inactive', label: 'Inactive', icon: 'user-x', color: BrandColors.danger },
+  { value: 'on_leave', label: 'On Leave', icon: 'clock', color: BrandColors.trainerAmber },
+] as const;
 
 interface StaffDetailScreenProps {
   staffId: string;
@@ -28,7 +37,8 @@ export function StaffDetailScreen({
 }: StaffDetailScreenProps) {
   const theme = useTheme();
   const router = useRouter();
-  const { selectedStaff, loadStaff, deleteStaff, submitting } = useStaff();
+  const { selectedStaff, loadStaff, deleteStaff, updateStaffStatus, submitting } = useStaff();
+  const [statusSheetVisible, setStatusSheetVisible] = useState(false);
 
   useEffect(() => {
     loadStaff(staffId);
@@ -57,6 +67,27 @@ export function StaffDetailScreen({
       ],
     );
   }, [staffId, deleteStaff, onDeleted]);
+
+  const handleChangeStatus = useCallback(
+    async (status: string) => {
+      setStatusSheetVisible(false);
+      if (selectedStaff?.status?.toLowerCase() === status) return;
+      try {
+        await updateStaffStatus(staffId, status);
+        toast.success('Staff status updated.');
+        onUpdated();
+      } catch {
+        toast.error('Failed to update staff status.', { title: 'Error' });
+      }
+    },
+    [selectedStaff?.status, staffId, updateStaffStatus, onUpdated],
+  );
+
+  const handleSetTarget = useCallback(() => {
+    toast.info('Setting targets from the app is coming in an upcoming update.', {
+      title: 'Coming soon',
+    });
+  }, []);
 
   const handleEdit = useCallback(() => {
     router.push(`/(admin)/staff/edit/${staffId}` as any);
@@ -120,19 +151,19 @@ export function StaffDetailScreen({
               <Feather name="edit" size={15} color={theme.text} />
               <Typography variant="caption">Edit details</Typography>
             </Pressable>
-            <Pressable style={styles.actionButton}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => setStatusSheetVisible(true)}
+              disabled={submitting}
+            >
               <Feather name="sliders" size={15} color={theme.text} />
               <Typography variant="caption">Change status</Typography>
             </Pressable>
-            <Pressable style={styles.actionButton}>
+            <Pressable style={styles.actionButton} onPress={handleSetTarget}>
               <Feather name="target" size={15} color={theme.text} />
               <Typography variant="caption">Set target</Typography>
             </Pressable>
-            <Pressable style={styles.actionButton}>
-              <Feather name="calendar" size={15} color={theme.text} />
-              <Typography variant="caption">View schedule</Typography>
-            </Pressable>
-            <Pressable style={styles.actionButton} onPress={handleDelete}>
+            <Pressable style={styles.actionButton} onPress={handleDelete} disabled={submitting}>
               <Feather name="trash-2" size={15} color={BrandColors.danger} />
               <Typography variant="caption" style={{ color: BrandColors.danger }}>Delete</Typography>
             </Pressable>
@@ -212,15 +243,42 @@ export function StaffDetailScreen({
             </View>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
               <Typography variant="caption" color="textSecondary">Revenue generated</Typography>
-              <Typography variant="subtitle">$0</Typography>
+              <Typography variant="subtitle"><CurrencyValue amount={0} /></Typography>
             </View>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
               <Typography variant="caption" color="textSecondary">Commission earned</Typography>
-              <Typography variant="subtitle">$0</Typography>
+              <Typography variant="subtitle"><CurrencyValue amount={0} /></Typography>
             </View>
           </View>
         </View>
       </ScrollView>
+
+      <AppBottomSheet
+        visible={statusSheetVisible}
+        title="Change status"
+        subtitle={selectedStaff.name}
+        onClose={() => setStatusSheetVisible(false)}
+      >
+        {STATUS_OPTIONS.map((option) => {
+          const isCurrent = selectedStaff.status?.toLowerCase() === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              style={[
+                styles.statusOption,
+                { borderColor: isCurrent ? option.color : theme.border },
+              ]}
+              onPress={() => handleChangeStatus(option.value)}
+            >
+              <Feather name={option.icon} size={18} color={option.color} />
+              <Typography variant="body" style={styles.statusOptionLabel}>
+                {option.label}
+              </Typography>
+              {isCurrent && <Feather name="check" size={18} color={option.color} />}
+            </Pressable>
+          );
+        })}
+      </AppBottomSheet>
     </ScreenLayout>
   );
 }
@@ -268,6 +326,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     gap: 6,
+  },
+  statusOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.two,
+  },
+  statusOptionLabel: {
+    flex: 1,
   },
   cardTitle: {
     marginBottom: Spacing.md,

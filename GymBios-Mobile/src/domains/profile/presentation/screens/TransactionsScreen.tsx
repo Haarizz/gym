@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, Colors } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
@@ -42,7 +43,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
           {!!summary?.totalEarnings && (
             <GlassSurface radius={Radius.lg} style={styles.summaryTile}>
               <Typography variant="subtitle" style={[styles.summaryValue, { color: '#16a34a' }]}>
-                ${summary.totalEarnings.toLocaleString()}
+                <CurrencyValue amount={summary.totalEarnings} />
               </Typography>
               <Typography variant="caption" color="textSecondary">
                 Total Earnings

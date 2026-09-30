@@ -19,7 +19,7 @@ export interface MonthlyTrendItem {
 export interface LeaderboardItem {
   name: string;
   conversions: number;
-  revenue: string;
+  revenue: number;
   rank: number;
   isCurrentUser?: boolean;
 }

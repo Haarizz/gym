@@ -30,6 +30,6 @@ export async function claimPendingFamilyInvitations(
     toast.success(`${r.inviterName ?? 'A family member'} added you to their ${r.planName ?? 'family'} membership at ${gym}.`);
   }
   for (const r of results.filter((x) => x.status === 'SKIPPED_EXISTING_MEMBERSHIP')) {
-    toast.info(`You already have a membership at ${r.gymName ?? 'this gym'}, so it stays active instead of the family plan.`);
+    toast.info(`You already have a membership at ${r.gymName ?? 'this gym'}, so it stays active instead of the family subscription.`);
   }
 }

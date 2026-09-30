@@ -13,6 +13,7 @@ import {
   useRetryReferralClaim,
   useMyReferralRewards,
 } from '../hooks/useMemberReferrals';
+import { REWARD_PASS_TYPES, type MyReferralReward } from '../../domain/types';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
@@ -46,6 +47,16 @@ const REWARD_TYPE_LABEL: Record<string, string> = {
   CASH: 'Cash',
 };
 
+const isOpenReward = (r: MyReferralReward) => r.status === 'AVAILABLE' || r.status === 'CLAIMED';
+
+function rewardValueLabel(r: MyReferralReward): string {
+  if (r.rewardType === 'FREE_PT' || r.rewardType === 'FREE_CLASS') return 'One free session';
+  if (r.rewardValue == null) return r.rewardName;
+  if (r.rewardUnit === 'PERCENT') return `${r.rewardValue}% off`;
+  if (r.rewardType === 'MEMBERSHIP_EXTENSION') return `${r.rewardValue} days`;
+  return `${r.rewardValue}${r.currency ? ' ' + r.currency : ''}`;
+}
+
 export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
   const router = useRouter();
   const { data: profile, isLoading: isLoadingProfile } = useReferralProfile();
@@ -59,7 +70,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
     setRetryError(null);
     retryClaim(undefined, {
       onError: (err: any) => {
-        setRetryError(err?.response?.data?.error || 'Retry failed. Please try again later.');
+        setRetryError(err?.body?.error || err?.body?.message || 'Retry failed. Please try again later.');
       },
     });
   };
@@ -135,6 +146,14 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
             <Typography variant="subtitle" style={styles.cardTitle}>
               Your Referral Link
             </Typography>
+            {profile && profile.eligible === false ? (
+              // No code until the user is an active member of a gym — a code made outside
+              // a gym could never be claimed.
+              <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
+                {profile.message ?? 'Join a gym to get your referral code.'}
+              </Typography>
+            ) : (
+            <>
             <Pressable
               style={styles.codeChip}
               onPress={handleCopy}
@@ -163,6 +182,8 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                 </Typography>
               </Pressable>
             </View>
+            </>
+            )}
           </GlassSurface>
 
           {/* Referral Code You Used */}
@@ -246,14 +267,32 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                   value={
                     <View>
                       <Typography variant="body" style={styles.rowValue}>
-                        {reward.rewardValue != null
-                          ? `${reward.rewardValue}${reward.currency ? ' ' + reward.currency : ''}`
-                          : reward.rewardName}
+                        {rewardValueLabel(reward)}
                       </Typography>
                       {reward.generatedDate && (
                         <Typography variant="caption" color="textSecondary">
                           {new Date(reward.generatedDate).toLocaleDateString()}
                         </Typography>
+                      )}
+                      {isOpenReward(reward) && REWARD_PASS_TYPES.includes(reward.rewardType) && (
+                        <Typography variant="caption" color="textSecondary">
+                          {reward.rewardType === 'MEMBERSHIP_DISCOUNT'
+                            ? 'Reward Pass — pick it when renewing'
+                            : 'Reward Pass — pick it when booking a class'}
+                        </Typography>
+                      )}
+                      {isOpenReward(reward) && reward.rewardType === 'COUPON' && reward.couponCode && (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(reward.couponCode!);
+                            toast.success(`Coupon ${reward.couponCode} copied — share it with a friend.`);
+                          }}
+                        >
+                          <Typography variant="caption" style={styles.couponCode}>
+                            {reward.couponCode} · tap to copy
+                          </Typography>
+                        </Pressable>
                       )}
                     </View>
                   }
@@ -396,6 +435,11 @@ const styles = StyleSheet.create({
   emptyText: {
     color: 'rgba(30,42,58,0.45)',
     fontStyle: 'italic',
+  },
+  couponCode: {
+    color: BrandColors.teal,
+    fontWeight: '700',
+    marginTop: 2,
   },
   rowValue: {
     fontWeight: '700',

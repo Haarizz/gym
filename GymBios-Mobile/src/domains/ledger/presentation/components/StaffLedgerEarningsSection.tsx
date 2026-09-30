@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { RecentEarningTransaction } from '../../domain/StaffLedgerData';
 
@@ -64,7 +65,7 @@ export function StaffLedgerEarningsSection({
 
                 <View style={styles.itemBottomRow}>
                   <Text style={styles.dateText}>{formatDate(item.date)}</Text>
-                  <Text style={styles.amountText}>₹{item.amount.toLocaleString()}</Text>
+                  <Text style={styles.amountText}><CurrencyValue amount={item.amount} /></Text>
                 </View>
               </View>
             );

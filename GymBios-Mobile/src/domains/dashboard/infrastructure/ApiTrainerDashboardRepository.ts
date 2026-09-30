@@ -47,7 +47,7 @@ export class ApiTrainerDashboardRepository {
         sessionsScheduled: data.todays_stats?.sessions_scheduled || 0,
         sessionsCompleted: data.todays_stats?.sessions_completed || 0,
         activeMembers: data.todays_stats?.active_members || 0,
-        todayEarnings: `₹${(data.todays_stats?.today_earnings || 0).toLocaleString('en-IN')}`,
+        todayEarnings: data.todays_stats?.today_earnings || 0,
         monthlyTargetPercentage: data.todays_stats?.monthly_target_percentage || 0,
       },
       todaySessions: (data.today_sessions || []).map((session) => {

@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationKeys } from './notificationKeys';
 import { notificationService } from './useUnreadNotificationCount';
 
-export function useNotificationMutations() {
+/** @param module when set, "mark all read" only affects notifications in that module. */
+export function useNotificationMutations(module?: string) {
   const queryClient = useQueryClient();
 
   const markReadMutation = useMutation({
@@ -13,7 +14,7 @@ export function useNotificationMutations() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: () => notificationService.markAllRead(),
+    mutationFn: () => notificationService.markAllRead(module),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },

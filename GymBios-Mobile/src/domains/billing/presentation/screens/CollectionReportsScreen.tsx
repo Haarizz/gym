@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -7,8 +7,11 @@ import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
+import { BillingService } from '../../application/BillingService';
+import { ApiBillingRepository } from '../../infrastructure/ApiBillingRepository';
 import { useBillingStats } from '../../hooks/useBills';
 import { BillingSkeleton, ErrorState, MoneyText } from '../components';
+import { exportCollectionCsv } from '../utils/exportCollectionReport';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -18,6 +21,11 @@ interface CollectionReportsScreenProps {
 
 type ReportPeriod = 'Daily' | 'Monthly' | 'Custom';
 
+// Same receipt window the web Billing page exports (receiptsService.getReceipts(..., { limit: 50 })).
+const EXPORT_RECEIPT_LIMIT = 50;
+
+const billingService = new BillingService(new ApiBillingRepository());
+
 /**
  * Dedicated Collection Reports Screen.
  * Analytics summary, breakdown charts/bars, period selectors, and export capabilities.
@@ -26,17 +34,26 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
   const [period, setPeriod] = useState<ReportPeriod>('Monthly');
   const { stats, loading, error, refresh } = useBillingStats();
 
-  const handleExportCSV = useCallback(() => {
-    toast.info(`Exported ${period} Collection Report to CSV.`, {
-      title: 'Export CSV'
-    });
-  }, [period]);
+  const [exporting, setExporting] = useState(false);
 
-  const handleExportPDF = useCallback(() => {
-    toast.info(`Exported ${period} Collection Report to PDF.`, {
-      title: 'Export PDF'
-    });
-  }, [period]);
+  const handleExportCSV = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const { receipts } = await billingService.getMemberReceipts({ limit: EXPORT_RECEIPT_LIMIT });
+      if (receipts.length === 0) {
+        toast.info('No receipts to export', { title: 'Export CSV' });
+        return;
+      }
+      const filename = await exportCollectionCsv(receipts);
+      toast.success(`Exported ${receipts.length} receipt(s) to ${filename}`, { title: 'Export CSV' });
+    } catch (e) {
+      console.error('Collection report export failed:', e);
+      toast.error('Failed to export collection report.', { title: 'Export CSV' });
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting]);
 
   const monthlyCollection = stats?.monthlyCollection ?? 0;
   const collectionRate = stats?.collectionRate ?? 0;
@@ -191,17 +208,18 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
           </Typography>
 
           <View style={styles.exportButtonsRow}>
-            <Pressable onPress={handleExportCSV} style={styles.exportBtn} accessibilityRole="button">
-              <Feather name="file-text" size={16} color={BrandColors.teal} />
+            <Pressable
+              onPress={handleExportCSV}
+              disabled={exporting}
+              style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: exporting, busy: exporting }}
+            >
+              {exporting
+                ? <ActivityIndicator size="small" color={BrandColors.teal} />
+                : <Feather name="file-text" size={16} color={BrandColors.teal} />}
               <Typography variant="caption" style={styles.exportBtnText}>
                 Export CSV
-              </Typography>
-            </Pressable>
-
-            <Pressable onPress={handleExportPDF} style={styles.exportBtn} accessibilityRole="button">
-              <Feather name="download" size={16} color={BrandColors.teal} />
-              <Typography variant="caption" style={styles.exportBtnText}>
-                Export PDF
               </Typography>
             </Pressable>
           </View>
@@ -344,6 +362,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BrandColors.teal,
     backgroundColor: BrandColors.screenBackgroundAlt,
+  },
+  exportBtnDisabled: {
+    opacity: 0.6,
   },
   exportBtnText: {
     color: BrandColors.teal,

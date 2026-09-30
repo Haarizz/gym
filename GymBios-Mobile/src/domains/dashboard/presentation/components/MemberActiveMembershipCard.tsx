@@ -36,8 +36,8 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
       <View style={[styles.card, styles.inactiveCard]}>
         <View style={styles.topRow}>
           <View style={styles.infoLeft}>
-            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Membership Status</Text>
-            <Text style={[styles.membershipType, styles.inactiveTextDark]}>No Active Membership</Text>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Subscription Status</Text>
+            <Text style={[styles.membershipType, styles.inactiveTextDark]}>No Active Subscription</Text>
             <View style={styles.locationRow}>
               <Feather name="info" size={12} color="#6B7280" />
               <Text style={[styles.gymName, styles.inactiveTextLight]}>Action Required</Text>
@@ -47,7 +47,7 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
         <View style={[styles.divider, styles.inactiveDivider]} />
         <View style={styles.bottomRow}>
           <Text style={styles.inactivePrompt}>
-            Please join a gym and select a membership plan to unlock all features.
+            Please join a gym and select a subscription to unlock all features.
           </Text>
         </View>
       </View>
@@ -70,7 +70,7 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
       <View style={styles.topRow}>
         <View style={styles.infoLeft}>
-          <Text style={styles.badgeLabel}>{isFrozen ? 'Frozen Membership' : 'Active Membership'}</Text>
+          <Text style={styles.badgeLabel}>{isFrozen ? 'Frozen Subscription' : 'Active Subscription'}</Text>
           <Text style={styles.membershipType}>{memberInfo.membershipType}</Text>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={12} color="rgba(74,50,0,0.75)" />

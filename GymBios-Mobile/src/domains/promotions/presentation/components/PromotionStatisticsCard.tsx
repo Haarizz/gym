@@ -1,12 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface PromotionStatisticsCardProps {
   title: string;
-  value: string | number;
+  value: React.ReactNode;
   iconName: React.ComponentProps<typeof Feather>['name'];
   iconColor?: string;
   iconBgColor?: string;
@@ -30,7 +31,7 @@ export function PromotionStatisticsCard({
           {title}
         </Text>
         <View style={[styles.iconBox, { backgroundColor: iconBgColor }]}>
-          <Feather name={iconName} size={18} color={iconColor} />
+          <FeatherIcon name={iconName} size={18} color={iconColor} />
         </View>
       </View>
 

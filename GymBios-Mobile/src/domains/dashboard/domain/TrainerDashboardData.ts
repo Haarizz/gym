@@ -8,7 +8,7 @@ export interface TrainerTodayStats {
   sessionsScheduled: number;
   sessionsCompleted: number;
   activeMembers: number;
-  todayEarnings: string;
+  todayEarnings: number;
   monthlyTargetPercentage: number;
 }
 

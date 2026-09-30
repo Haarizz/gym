@@ -9,8 +9,10 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { MembershipPlanCard } from './MembershipPlanCard';
 import { useMemberMembership } from '../../hooks/useMemberMembership';
@@ -18,6 +20,11 @@ import { useMembershipPlanChangePreview } from '../../hooks/useMembershipPlanCha
 import { useChangeMembershipPlan } from '../../hooks/useChangeMembershipPlan';
 import { PaymentBottomSheet, type PaymentResult } from '@/shared/payment';
 import { MembershipPlanPickerBottomSheet } from './MembershipPlanPickerBottomSheet';
+import { RewardPassPicker, type RewardSelection } from '@/domains/member-referrals/presentation/components/RewardPassPicker';
+import { discountCodeApi } from '@/domains/member-referrals/infrastructure/discountCodeApi';
+import { useAuthStore } from '@/domains/auth/store/authStore';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
+import type { MobileMembershipPlan } from '../../domain/models';
 
 interface RenewMembershipModalProps {
   visible: boolean;
@@ -30,6 +37,9 @@ export function RenewMembershipModal({
   onClose,
   onSuccess,
 }: RenewMembershipModalProps) {
+  const router = useRouter();
+  const activeTenant = useAuthStore((state) => state.activeTenant);
+  const { selectedBranchId } = useBranchContext();
   const { data: memberState, isLoading: isMemberLoading } = useMemberMembership();
   
   const currentPlan = memberState?.membership?.plan;
@@ -38,6 +48,10 @@ export function RenewMembershipModal({
   const [selectedPlanId, setSelectedPlanId] = useState<number | undefined>();
   const [showPayment, setShowPayment] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [rewardSel, setRewardSel] = useState<RewardSelection>(null);
+  const rewardFields = rewardSel?.kind === 'pass'
+    ? { rewardPassId: rewardSel.pass.id }
+    : rewardSel?.kind === 'coupon' ? { couponCode: rewardSel.coupon.code } : undefined;
 
   useEffect(() => {
     if (visible && currentPlanId && !selectedPlanId) {
@@ -45,7 +59,13 @@ export function RenewMembershipModal({
     }
   }, [visible, currentPlanId, selectedPlanId]);
 
-  const { data: preview, isFetching: isPreviewLoading } = useMembershipPlanChangePreview(selectedPlanId);
+  // The server prices the pass/coupon in the preview, so the total shown is what gets charged.
+  const { data: preview, isFetching: isPreviewLoading, error: previewError } =
+    useMembershipPlanChangePreview(selectedPlanId, rewardFields);
+
+  // A pass/coupon the server rejects (e.g. it just expired) — shown inline; paying is
+  // blocked until the member deselects it.
+  const rewardError = rewardSel && previewError ? previewError.message || 'This reward can no longer be used.' : null;
   const changePlanMutation = useChangeMembershipPlan();
 
   const handlePaymentComplete = async (result: PaymentResult) => {
@@ -56,12 +76,13 @@ export function RenewMembershipModal({
         planId: selectedPlanId,
         paymentMethodUsed: result.paymentMethodUsed,
         paymentBreakdown: result.paymentBreakdown,
+        ...rewardFields,
       });
 
       setShowPayment(false);
       Alert.alert(
         'Success! 🎉',
-        'Your membership plan has been updated successfully.',
+        'Your subscription has been updated successfully.',
         [
           {
             text: 'Awesome!',
@@ -73,21 +94,15 @@ export function RenewMembershipModal({
         ]
       );
     } catch (error) {
-      toast.error('Failed to update membership plan. Please try again.');
+      toast.error('Failed to update subscription. Please try again.');
     }
   };
 
   const getCtaLabel = () => {
-    if (!preview) return 'Select Plan';
+    if (!preview) return 'Select Subscription';
     if (isPreviewLoading) return 'Calculating...';
-    const amount = preview.finalAmount.toLocaleString();
-    
-    switch (preview.operation) {
-      case 'RENEWAL': return `Pay ₹${amount} & Renew`;
-      case 'UPGRADE': return `Pay ₹${amount} & Upgrade`;
-      case 'DOWNGRADE': return `Pay ₹${amount} & Continue`;
-      default: return `Pay ₹${amount} & Continue`;
-    }
+    const action = preview.operation === 'RENEWAL' ? 'Renew' : preview.operation === 'UPGRADE' ? 'Upgrade' : 'Continue';
+    return <>Pay <CurrencyValue amount={preview.finalAmount} /> & {action}</>;
   };
 
   const isReady = !isMemberLoading && !!preview && !!currentPlan;
@@ -95,7 +110,34 @@ export function RenewMembershipModal({
   // Handle modal close
   const handleClose = () => {
     setSelectedPlanId(undefined); // Clear transient state
+    setRewardSel(null);
     onClose();
+  };
+
+  // Switching onto a Family/Couple plan means adding the family members too, so it
+  // goes through the family screen; renewing the family plan you're already on
+  // stays a plain renewal here.
+  const handleSelectPlan = (plan: MobileMembershipPlan) => {
+    const type = plan.planType?.toLowerCase();
+    if ((type === 'family' || type === 'couple') && plan.id !== currentPlanId) {
+      if (!activeTenant || typeof selectedBranchId !== 'number') {
+        toast.error('Could not open the family subscription — please try again.');
+        return;
+      }
+      setShowPicker(false);
+      handleClose();
+      router.push({
+        pathname: '/(member)/family/purchase' as any,
+        params: {
+          tenantSlug: activeTenant,
+          branchId: String(selectedBranchId),
+          planId: String(plan.id),
+          mode: 'change',
+        },
+      });
+      return;
+    }
+    setSelectedPlanId(plan.id);
   };
 
   return (
@@ -105,8 +147,8 @@ export function RenewMembershipModal({
           <View style={styles.sheet}>
             <View style={styles.header}>
               <View>
-                <Text style={styles.title}>Membership Plan</Text>
-                <Text style={styles.subtitle}>Select a plan to continue</Text>
+                <Text style={styles.title}>Subscription</Text>
+                <Text style={styles.subtitle}>Select a subscription to continue</Text>
               </View>
               <Pressable hitSlop={12} onPress={handleClose} style={styles.closeButton}>
                 <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -120,7 +162,7 @@ export function RenewMembershipModal({
             ) : (
               <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
                 
-                <Text style={styles.sectionTitle}>Current Plan</Text>
+                <Text style={styles.sectionTitle}>Current Subscription</Text>
                 <View style={styles.plansContainer}>
                   <MembershipPlanCard
                     name={currentPlan.name}
@@ -133,9 +175,9 @@ export function RenewMembershipModal({
                 </View>
 
                 <View style={styles.changePlanHeader}>
-                  <Text style={styles.sectionTitle}>Change Plan</Text>
+                  <Text style={styles.sectionTitle}>Change Subscription</Text>
                   <Pressable onPress={() => setShowPicker(true)}>
-                    <Text style={styles.changePlanLink}>Choose another plan ›</Text>
+                    <Text style={styles.changePlanLink}>Choose another subscription ›</Text>
                   </Pressable>
                 </View>
                 
@@ -144,7 +186,8 @@ export function RenewMembershipModal({
                     <View pointerEvents="none">
                       <MembershipPlanCard
                         name={preview.selectedPlan.name}
-                        price={preview.selectedPlan.price}
+                        price={preview.selectedPlan.effectivePrice}
+                        regularPrice={preview.selectedPlan.price}
                         duration={preview.selectedPlan.duration}
                         isCurrent={preview.selectedPlan.id === currentPlanId}
                         isSelected={true}
@@ -173,7 +216,7 @@ export function RenewMembershipModal({
                     {/* Features Section */}
                     {preview.features && preview.features.length > 0 && (
                       <View style={styles.offerCard}>
-                        <Text style={styles.offerTitle}>Plan Features</Text>
+                        <Text style={styles.offerTitle}>Subscription Features</Text>
                         <View style={styles.perksList}>
                           {preview.features.map((feature, index) => (
                             <View key={index} style={styles.perkRow}>
@@ -185,22 +228,38 @@ export function RenewMembershipModal({
                       </View>
                     )}
 
+                    <RewardPassPicker
+                      passContext="MEMBERSHIP"
+                      value={rewardSel}
+                      onChange={setRewardSel}
+                      validateCode={discountCodeApi.validate}
+                    />
+                    {rewardError && <Text style={styles.rewardError}>{rewardError}</Text>}
+
                     {/* Price Breakdown */}
                     <View style={styles.priceCard}>
                       <View style={styles.priceRow}>
                         <Text style={styles.priceLabel}>Regular Price</Text>
-                        <Text style={styles.originalPriceText}>₹{preview.regularAmount.toLocaleString()}</Text>
+                        <Text style={styles.originalPriceText}><CurrencyValue amount={preview.regularAmount} /></Text>
                       </View>
                       {preview.discountAmount > 0 && (
                         <View style={styles.priceRow}>
-                          <Text style={styles.priceLabel}>Discount Applied</Text>
-                          <Text style={styles.discountText}>-₹{preview.discountAmount.toLocaleString()}</Text>
+                          <Text style={styles.priceLabel}>{preview.offerLabel || 'Offer'}</Text>
+                          <Text style={styles.discountText}>-<CurrencyValue amount={preview.discountAmount} /></Text>
+                        </View>
+                      )}
+                      {preview.rewardDiscountAmount > 0 && (
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceLabel}>
+                            {rewardSel?.kind === 'coupon' ? 'Coupon' : 'Reward Pass'}
+                          </Text>
+                          <Text style={styles.discountText}>-<CurrencyValue amount={preview.rewardDiscountAmount} /></Text>
                         </View>
                       )}
                       <View style={styles.divider} />
                       <View style={styles.priceRow}>
                         <Text style={styles.totalLabel}>Total Payable</Text>
-                        <Text style={styles.totalValue}>₹{preview.finalAmount.toLocaleString()}</Text>
+                        <Text style={styles.totalValue}><CurrencyValue amount={preview.finalAmount} /></Text>
                       </View>
                     </View>
                   </>
@@ -210,9 +269,9 @@ export function RenewMembershipModal({
 
             <View style={styles.footer}>
               <Pressable
-                style={[styles.renewButton, (!isReady || isPreviewLoading) && styles.renewButtonDisabled]}
+                style={[styles.renewButton, (!isReady || isPreviewLoading || !!rewardError) && styles.renewButtonDisabled]}
                 onPress={() => setShowPayment(true)}
-                disabled={!isReady || isPreviewLoading}
+                disabled={!isReady || isPreviewLoading || !!rewardError}
               >
                 <Text style={styles.renewButtonText}>
                   {getCtaLabel()}
@@ -229,7 +288,7 @@ export function RenewMembershipModal({
         currentPlanName={currentPlan?.name}
         selectedPlanId={selectedPlanId}
         onClose={() => setShowPicker(false)}
-        onSelectPlan={(plan) => setSelectedPlanId(plan.id)}
+        onSelectPlan={handleSelectPlan}
       />
 
       {/* Payment Sheet */}
@@ -411,6 +470,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.four,
     borderRadius: Radius.md,
     alignItems: 'center',
+  },
+  rewardError: {
+    fontSize: 12,
+    color: '#DC2626',
+    marginTop: -Spacing.two,
+    marginBottom: Spacing.four,
   },
   renewButtonDisabled: {
     opacity: 0.6,

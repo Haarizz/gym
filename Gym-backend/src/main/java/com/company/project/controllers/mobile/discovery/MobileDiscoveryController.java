@@ -59,6 +59,7 @@ public class MobileDiscoveryController {
     private final EntityManagerFactory entityManagerFactory;
     private final NotificationService notificationService;
     private final MobileReferralResolutionService mobileReferralResolutionService;
+    private final com.company.project.services.DiscountCodeService discountCodeService;
 
     // Payment methods that require reception/admin approval before the member gets
     // app access — cash and credit need physical/manual verification that the money
@@ -83,7 +84,8 @@ public class MobileDiscoveryController {
             com.company.project.services.GlobalUserService globalUserService,
             EntityManagerFactory entityManagerFactory,
             NotificationService notificationService,
-            MobileReferralResolutionService mobileReferralResolutionService) {
+            MobileReferralResolutionService mobileReferralResolutionService,
+            com.company.project.services.DiscountCodeService discountCodeService) {
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
         this.branchImageRepository = branchImageRepository;
@@ -97,6 +99,7 @@ public class MobileDiscoveryController {
         this.entityManagerFactory = entityManagerFactory;
         this.notificationService = notificationService;
         this.mobileReferralResolutionService = mobileReferralResolutionService;
+        this.discountCodeService = discountCodeService;
     }
 
     @GetMapping
@@ -111,13 +114,28 @@ public class MobileDiscoveryController {
                     dto.setAddress(c.getAddress());
                     dto.setLat(c.getLat());
                     dto.setLng(c.getLng());
-                    
+
+                    // Each center lives in a different tenant DB. Under OSIV the request's
+                    // EntityManager holds the first tenant connection it opens (and its
+                    // first-level cache — branch ids collide across tenants), so every
+                    // later center would silently be read from the first gym's DB. Give
+                    // each tenant its own EntityManager instead.
+                    EntityManagerHolder requestEmHolder = TransactionSynchronizationManager.hasResource(entityManagerFactory)
+                            ? (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory)
+                            : null;
                     try {
                         TenantContextHolder.setCurrentTenant(c.getTenantSlug());
                         BranchContextHolder.setActiveBranchId(c.getBranchId());
+                        TransactionSynchronizationManager.bindResource(entityManagerFactory,
+                                new EntityManagerHolder(entityManagerFactory.createEntityManager()));
 
+                        // Same source of truth as getCenterDetails — the tenant's Branch row
+                        // (edited in Branch Settings), with the discovery copy as fallback.
                         Branch branch = branchRepository.findById(c.getBranchId()).orElse(null);
                         if (branch != null) {
+                            if (branch.getAddress() != null && !branch.getAddress().isBlank()) dto.setAddress(branch.getAddress());
+                            if (branch.getLat() != null) dto.setLat(branch.getLat());
+                            if (branch.getLng() != null) dto.setLng(branch.getLng());
                             dto.setCenterType(branch.getCenterType());
                             dto.setAccessType(branch.getAccessType());
                             if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
@@ -128,8 +146,11 @@ public class MobileDiscoveryController {
                             }
                         }
 
-                        branchImageRepository.findByBranchIdAndIsCoverTrue(c.getBranchId()).stream()
-                                .findFirst()
+                        // Same cover rule as getCenterDetails: the flagged cover, else the first gallery image.
+                        List<com.company.project.entities.BranchImage> images =
+                                branchImageRepository.findByBranchIdOrderBySortOrderAsc(c.getBranchId());
+                        images.stream().filter(com.company.project.entities.BranchImage::isCover).findFirst()
+                                .or(() -> images.stream().findFirst())
                                 .ifPresent(cover -> dto.setCoverImageUrl(cover.getImageUrl()));
 
                         long reviewCount = reviewRepository.countByBranchId(c.getBranchId());
@@ -138,13 +159,20 @@ public class MobileDiscoveryController {
 
                         List<MembershipPlanResponseDTO> plans = planService.getPlans("Active");
                         BigDecimal minPrice = plans.stream()
-                            .map(MembershipPlanResponseDTO::getPrice)
+                            .map(MembershipPlanResponseDTO::getEffectivePrice)
                             .min(BigDecimal::compareTo)
                             .orElse(null);
                         dto.setStartingPrice(minPrice);
                     } catch (Exception e) {
                          // ignore
                     } finally {
+                        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
+                            EntityManagerHolder tenantEmHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
+                            EntityManagerFactoryUtils.closeEntityManager(tenantEmHolder.getEntityManager());
+                        }
+                        if (requestEmHolder != null) {
+                            TransactionSynchronizationManager.bindResource(entityManagerFactory, requestEmHolder);
+                        }
                         BranchContextHolder.clear();
                         TenantContextHolder.clear();
                     }
@@ -224,6 +252,26 @@ public class MobileDiscoveryController {
             dto.setTrainers(staffService.getStaff(null, null, null, "Active", null, 1, 100).getItems());
 
             return ResponseEntity.ok(dto);
+        } finally {
+            BranchContextHolder.clear();
+            TenantContextHolder.clear();
+        }
+    }
+
+    /**
+     * GET .../{tenantSlug}/{branchId}/discount-codes/validate?code=&amount= — promo or coupon
+     * code, checked in the gym's tenant; with amount, also returns the discount it gives on it.
+     */
+    @GetMapping("/{tenantSlug}/{branchId}/discount-codes/validate")
+    public ResponseEntity<com.company.project.dto.DiscountCodeDTO> validateDiscountCode(
+            @PathVariable String tenantSlug,
+            @PathVariable Long branchId,
+            @RequestParam String code,
+            @RequestParam(required = false) BigDecimal amount) {
+        try {
+            TenantContextHolder.setCurrentTenant(tenantSlug);
+            BranchContextHolder.setActiveBranchId(branchId);
+            return ResponseEntity.ok(discountCodeService.resolve(code, amount));
         } finally {
             BranchContextHolder.clear();
             TenantContextHolder.clear();
@@ -328,11 +376,24 @@ public class MobileDiscoveryController {
             // Fee paid so far, derived the same way ReceiptService does elsewhere
             // (invoice total − outstanding) — membershipFee/outstandingBalance are
             // what actually drives paidAmount on the created receipt.
+            // The plan's running offer applies to everyone (effectivePrice); a promotion or
+            // shareable coupon code then comes off that, and createMember() re-checks the
+            // code's discount and spends it.
+            BigDecimal offerPrice = plan.getEffectivePrice() != null ? plan.getEffectivePrice() : BigDecimal.ZERO;
+            memberRequest.setMembershipFee(offerPrice);
+            BigDecimal couponDiscount = BigDecimal.ZERO;
+            if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+                BigDecimal gross = offerPrice;
+                couponDiscount = discountCodeService.previewDiscount(request.getCouponCode(), gross);
+                memberRequest.setCouponCode(request.getCouponCode().trim());
+                memberRequest.setDiscountApplied(couponDiscount);
+                memberRequest.setMembershipFee(gross.subtract(couponDiscount));
+            }
             if (request.getPaidAmount() != null) {
-                BigDecimal planPrice = plan.getPrice() != null ? plan.getPrice() : BigDecimal.ZERO;
+                BigDecimal planPrice = offerPrice.subtract(couponDiscount);
                 memberRequest.setMembershipFee(planPrice);
                 BigDecimal outstanding = request.getOutstandingBalance() != null
-                        ? request.getOutstandingBalance()
+                        ? request.getOutstandingBalance().min(planPrice)
                         : planPrice.subtract(request.getPaidAmount()).max(BigDecimal.ZERO);
                 memberRequest.setOutstandingBalance(outstanding);
                 memberRequest.setPaymentStatus(outstanding.compareTo(BigDecimal.ZERO) <= 0 ? "paid"

@@ -28,6 +28,7 @@ import {
   ReferralReward,
   RewardType,
   Wallet,
+  REWARD_PASS_TYPES,
 } from "../utils/supabase/reward-service";
 
 // ── Local member shape (mirrors member-addons.tsx's picker) ─────────────────
@@ -246,6 +247,9 @@ export function MyRewards() {
     if (reward.rewardType === "LOYALTY_POINTS") {
       return <span>{reward.rewardValue ?? 0} pts</span>;
     }
+    if (reward.rewardUnit === "PERCENT" && reward.rewardValue != null) {
+      return <span className="font-semibold">{reward.rewardValue}% off</span>;
+    }
     if (reward.rewardType === "COUPON") {
       return (
         <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
@@ -301,6 +305,17 @@ export function MyRewards() {
     }
     if (reward.status === "CANCELLED") {
       return <span className="text-xs text-muted-foreground font-medium">Cancelled</span>;
+    }
+
+    // Reward Passes are spent by picking them at renewal/booking, not from here.
+    if (REWARD_PASS_TYPES.includes(reward.rewardType)) {
+      return (
+        <span className="text-xs text-muted-foreground font-medium">
+          {reward.rewardType === "MEMBERSHIP_DISCOUNT"
+            ? "Reward Pass — pick it when renewing"
+            : "Reward Pass — pick it when booking a PT or class"}
+        </span>
+      );
     }
 
     switch (reward.redemptionAction) {

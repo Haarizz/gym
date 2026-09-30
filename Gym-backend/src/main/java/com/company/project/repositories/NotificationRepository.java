@@ -67,7 +67,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         @Param("branchId") Long branchId
     );
 
-    /** Mark all unread as read for the given user + roles. */
+    /** Mark all unread as read for the given user + roles, optionally only within one module (null = all). */
     @Modifying
     @Query("""
         UPDATE Notification n SET n.isRead = true
@@ -75,6 +75,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
           AND n.isDeleted = false
           AND n.isRead = false
           AND (:branchId IS NULL OR n.branchId IS NULL OR n.branchId = :branchId)
+          AND (:module IS NULL OR n.module = :module)
           AND (
                n.targetUserId = :uid
             OR (n.targetRole IN :roles AND n.targetUserId IS NULL)
@@ -84,7 +85,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         @Param("cid") Long companyId,
         @Param("uid") Long userId,
         @Param("roles") List<String> roles,
-        @Param("branchId") Long branchId
+        @Param("branchId") Long branchId,
+        @Param("module") String module
     );
 
     /** Idempotency: find existing notification by company + eventKey. */

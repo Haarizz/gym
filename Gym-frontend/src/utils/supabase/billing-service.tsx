@@ -27,7 +27,9 @@ export interface MemberDue {
   days_overdue: number;
   last_payment: string | null;
   status: 'Overdue' | 'Due Soon' | 'Pending';
-  due_type?: 'Membership Due' | 'Renewal Due';
+  due_type?: 'Membership Due' | 'Renewal Due' | 'Extra Freeze Days';
+  // Part of `amount` owed for extra freeze days (days frozen beyond the plan's free allowance)
+  freeze_charge_amount?: number | null;
 }
 
 export interface PaymentSplitLeg {

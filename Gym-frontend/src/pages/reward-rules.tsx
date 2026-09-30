@@ -65,6 +65,9 @@ const REDEMPTION_ACTION_LABELS: Record<RedemptionAction, string> = {
   REQUEST_CASH: 'Request Cash Payout',
 };
 
+// Reward types whose value can be a percentage or a fixed amount (rule.unit "%" vs empty).
+const HAS_UNIT_CHOICE: RewardType[] = ['MEMBERSHIP_DISCOUNT', 'COUPON'];
+
 // Sensible default redemption action suggestion when a reward type is chosen.
 const DEFAULT_REDEMPTION_ACTION: Record<RewardType, RedemptionAction> = {
   WALLET_CREDIT: 'AUTO_WALLET',
@@ -102,7 +105,7 @@ function formatTarget(rule: RewardRule): string {
 
 function formatRewardValue(rule: RewardRule): string {
   if (rule.value == null) return '—';
-  const suffix = rule.unit || rule.currency || '';
+  const suffix = (rule.unit && rule.unit !== 'AMOUNT' ? rule.unit : '') || rule.currency || '';
   return suffix ? `${rule.value} ${suffix}` : String(rule.value);
 }
 
@@ -191,7 +194,7 @@ function ruleToForm(rule: RewardRule): RuleFormState {
     eligibility: rule.eligibility ?? 'referrer',
     rewardType: rule.rewardType ?? 'WALLET_CREDIT',
     value: rule.value != null ? String(rule.value) : '',
-    unit: rule.unit ?? '',
+    unit: rule.unit && rule.unit.toLowerCase().startsWith('percent') ? '%' : (rule.unit ?? ''),
     currency: rule.currency ?? '',
     redemptionAction: rule.redemptionAction ?? 'AUTO_WALLET',
     conditionTrigger: rule.conditionTrigger ?? 'payment',
@@ -298,8 +301,14 @@ export function RewardRules({ autoOpenSignal }: { autoOpenSignal?: number } = {}
       name: ruleForm.name.trim(),
       eligibility: ruleForm.eligibility,
       rewardType: ruleForm.rewardType,
-      value: ruleForm.value !== '' ? Number(ruleForm.value) : undefined,
-      unit: ruleForm.unit || undefined,
+      // A Free PT / Class pass is always exactly one session.
+      value: ruleForm.rewardType === 'FREE_PT' ? 1
+        : ruleForm.value !== '' ? Number(ruleForm.value) : undefined,
+      unit: ruleForm.rewardType === 'FREE_PT' ? 'session'
+        : ruleForm.rewardType === 'MEMBERSHIP_EXTENSION' ? 'days'
+        // Explicit AMOUNT (not undefined) — the backend keeps the old unit when it's omitted.
+        : HAS_UNIT_CHOICE.includes(ruleForm.rewardType) ? (ruleForm.unit === '%' ? '%' : 'AMOUNT')
+        : ruleForm.unit || undefined,
       currency: ruleForm.currency || undefined,
       redemptionAction: ruleForm.redemptionAction,
       conditionTrigger: ruleForm.conditionTrigger || undefined,
@@ -662,16 +671,39 @@ export function RewardRules({ autoOpenSignal }: { autoOpenSignal?: number } = {}
               </Select>
             </div>
 
-            <div>
-              <Label>Reward Value</Label>
-              <Input
-                className="mt-1"
-                type="number"
-                placeholder="e.g., 25 AED / 10%"
-                value={ruleForm.value}
-                onChange={(e) => setRuleForm((p) => ({ ...p, value: e.target.value }))}
-              />
-            </div>
+            {ruleForm.rewardType === 'FREE_PT' ? (
+              <p className="text-sm text-muted-foreground">
+                Gives the member a Reward Pass for one free PT or class session, picked when booking.
+              </p>
+            ) : (
+              <div className={HAS_UNIT_CHOICE.includes(ruleForm.rewardType) ? 'grid grid-cols-2 gap-4' : undefined}>
+                <div>
+                  <Label>{ruleForm.rewardType === 'MEMBERSHIP_EXTENSION' ? 'Extension (days)' : 'Reward Value'}</Label>
+                  <Input
+                    className="mt-1"
+                    type="number"
+                    placeholder={ruleForm.rewardType === 'MEMBERSHIP_EXTENSION' ? 'e.g., 30' : 'e.g., 25 / 10'}
+                    value={ruleForm.value}
+                    onChange={(e) => setRuleForm((p) => ({ ...p, value: e.target.value }))}
+                  />
+                </div>
+                {HAS_UNIT_CHOICE.includes(ruleForm.rewardType) && (
+                  <div>
+                    <Label>Unit</Label>
+                    <Select
+                      value={ruleForm.unit === '%' ? 'percent' : 'amount'}
+                      onValueChange={(v) => setRuleForm((p) => ({ ...p, unit: v === 'percent' ? '%' : '' }))}
+                    >
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percent">% off</SelectItem>
+                        <SelectItem value="amount">Fixed amount off</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <Label>Eligibility</Label>

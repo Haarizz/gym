@@ -1,12 +1,16 @@
 package com.company.project.services.mobile.membership;
 
 import com.company.project.dto.mobile.membership.MobileMemberMembershipResponseDTO;
+import com.company.project.entities.Currency;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.MembershipFreezeService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,12 +26,28 @@ public class MobileMemberMembershipService {
 
     private final MemberRepository memberRepository;
     private final MembershipPlanRepository membershipPlanRepository;
+    private final MembershipFreezeService freezeService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public MobileMemberMembershipService(
             MemberRepository memberRepository,
-            MembershipPlanRepository membershipPlanRepository) {
+            MembershipPlanRepository membershipPlanRepository,
+            MembershipFreezeService freezeService) {
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
+        this.freezeService = freezeService;
+    }
+
+    private String baseCurrencySymbol() {
+        return entityManager.createQuery(
+                        "SELECT c FROM Currency c WHERE c.baseCurrency = true AND c.active = true", Currency.class)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .map(Currency::getSymbol)
+                .orElse(null);
     }
 
     private java.util.Optional<Member> getAuthenticatedMember(UserDetailsImpl principal) {
@@ -146,14 +166,24 @@ public class MobileMemberMembershipService {
 
         // 3. Freeze Information
         MobileMemberMembershipResponseDTO.FreezeInfo freezeInfo = new MobileMemberMembershipResponseDTO.FreezeInfo();
-        if (plan != null && plan.getMaxFreezeDays() != null && plan.getMaxFreezeDays() > 0) {
-            freezeInfo.setAvailable(true);
-            freezeInfo.setAllowedDays(plan.getMaxFreezeDays());
-        } else {
-            freezeInfo.setAvailable(false);
-            freezeInfo.setAllowedDays(0);
+        MembershipFreezeService.FreezeAllowance allowance = freezeService.getAllowance(member, plan);
+        freezeInfo.setAvailable(allowance.canFreeze());
+        freezeInfo.setAllowedDays(allowance.remainingDays());
+        freezeInfo.setMaxDays(allowance.maxDays());
+        freezeInfo.setUsedDays(allowance.usedDays());
+        freezeInfo.setMaxOccurrences(allowance.maxOccurrences());
+        freezeInfo.setUsedOccurrences(allowance.usedOccurrences());
+        freezeInfo.setRemainingOccurrences(allowance.remainingOccurrences());
+        freezeInfo.setFreeDaysRemaining(allowance.freeDaysRemaining());
+        freezeInfo.setChargePerExtraDay(allowance.chargePerExtraDay());
+        freezeInfo.setAutoUnfreeze(allowance.autoUnfreeze());
+        freezeInfo.setCurrencySymbol(baseCurrencySymbol());
+        if (!allowance.canFreeze()) {
+            freezeInfo.setUnavailableReason(allowance.unavailableReason().name());
+            freezeInfo.setUnavailableMessage(
+                    MembershipFreezeService.unavailableMessage(allowance.unavailableReason(), allowance));
         }
-        
+
         boolean isFrozen = "frozen".equalsIgnoreCase(member.getMembershipStatus());
         freezeInfo.setIsFrozen(isFrozen);
         if (isFrozen) {

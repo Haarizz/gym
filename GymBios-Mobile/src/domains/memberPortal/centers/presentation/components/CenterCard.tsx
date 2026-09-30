@@ -1,6 +1,8 @@
 import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterSummary } from '@/domains/discovery';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
@@ -105,9 +107,9 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
               <Text style={styles.startingFromLabel}>Starting from</Text>
               <View style={styles.priceRow}>
                 {center.startingPrice != null ? (
-                  <Text style={styles.startingPrice}>₹{center.startingPrice.toLocaleString()}</Text>
+                  <Text style={styles.startingPrice}><CurrencyValue amount={center.startingPrice} /></Text>
                 ) : (
-                  <Text style={styles.startingPrice}>View Plans</Text>
+                  <Text style={styles.startingPrice}>View Subscriptions</Text>
                 )}
                 {center.startingPrice != null && <Text style={styles.perMonthText}> /month</Text>}
               </View>
@@ -115,12 +117,13 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
 
             {center.acceptedPaymentMethods?.length > 0 && (
               <View style={styles.paymentIconsRow}>
-                {center.acceptedPaymentMethods.slice(0, 2).map((method) => {
+                {/* BNPL gets its own chip below — keep it out of the icon chips so it can't
+                    take a slot from Cash/Card or render twice. */}
+                {center.acceptedPaymentMethods.filter((m) => m !== 'BNPL' && PAYMENT_ICON[m]).slice(0, 2).map((method) => {
                   const iconName = PAYMENT_ICON[method];
-                  if (!iconName) return null;
                   return (
                     <View key={method} style={styles.paymentIconChip}>
-                      <Feather name={iconName} size={12} color={BrandColors.textSecondary} />
+                      <FeatherIcon name={iconName} size={12} color={BrandColors.textSecondary} />
                       <Text style={styles.paymentIconText}>{method}</Text>
                     </View>
                   );
@@ -148,7 +151,7 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
               style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
               onPress={() => onBuyMembership(center)}
               accessibilityRole="button"
-              accessibilityLabel={`Buy membership at ${center.centerName}`}
+              accessibilityLabel={`Subscribe at ${center.centerName}`}
             >
               <LinearGradient
                 colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -156,7 +159,7 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
                 end={{ x: 1, y: 0 }}
                 style={styles.buyButton}
               >
-                <Text style={styles.buyButtonText}>Buy Membership</Text>
+                <Text style={styles.buyButtonText}>Subscribe</Text>
               </LinearGradient>
             </Pressable>
           </View>

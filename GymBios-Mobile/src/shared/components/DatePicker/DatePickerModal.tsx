@@ -32,6 +32,7 @@ type Panel = 'calendar' | 'month' | 'year';
 export function DatePickerModal({
   visible,
   value,
+  initialView = 'calendar',
   minimumDate,
   maximumDate,
   onClose,
@@ -63,26 +64,38 @@ export function DatePickerModal({
   }, [visible, translateY]);
 
   // ─── Internal state ────────────────────────────────────────────────────────
+  /**
+   * Where to open when there's no value: today, clamped into the allowed
+   * range so the first view never consists solely of disabled dates.
+   */
+  const getInitialDate = useCallback(() => {
+    if (value) return value;
+    const today = new Date();
+    if (maximumDate && today > maximumDate) return maximumDate;
+    if (minimumDate && today < minimumDate) return minimumDate;
+    return today;
+  }, [value, minimumDate, maximumDate]);
+
   /** The month currently being displayed in the calendar header. */
-  const [displayMonth, setDisplayMonth] = useState<Date>(
-    () => value ?? new Date(),
-  );
+  const [displayMonth, setDisplayMonth] = useState<Date>(getInitialDate);
 
   /** Temporary selection held until the user presses "Done". */
   const [tempDate, setTempDate] = useState<Date | null>(value ?? null);
 
+  /** Year-first flow (year → month → day) only applies when starting fresh. */
+  const yearFirst = initialView === 'year' && !value;
+
   /** Which panel is currently active. */
-  const [panel, setPanel] = useState<Panel>('calendar');
+  const [panel, setPanel] = useState<Panel>(yearFirst ? 'year' : 'calendar');
 
   // Re-sync internal state whenever the modal re-opens.
   useEffect(() => {
     if (visible) {
-      const initial = value ?? new Date();
-      setDisplayMonth(initial);
+      setDisplayMonth(getInitialDate());
       setTempDate(value ?? null);
-      setPanel('calendar');
+      setPanel(yearFirst ? 'year' : 'calendar');
     }
-  }, [visible, value]);
+  }, [visible, value, getInitialDate, yearFirst]);
 
   // ─── Derived values ────────────────────────────────────────────────────────
   const headerLabel = useMemo(
@@ -136,8 +149,9 @@ export function DatePickerModal({
       updated.setFullYear(year);
       return updated;
     });
-    setPanel('calendar');
-  }, []);
+    // In the year-first flow, pick the month next before showing days.
+    setPanel(yearFirst ? 'month' : 'calendar');
+  }, [yearFirst]);
 
   const handleToggleMonthPanel = useCallback(() => {
     setPanel((p) => (p === 'month' ? 'calendar' : 'month'));
@@ -270,6 +284,7 @@ export function DatePickerModal({
                   selectedYear={displayMonth.getFullYear()}
                   minimumYear={minimumDate?.getFullYear()}
                   maximumYear={maximumDate?.getFullYear()}
+                  descending={initialView === 'year'}
                   onSelectYear={handleSelectYear}
                 />
               )}

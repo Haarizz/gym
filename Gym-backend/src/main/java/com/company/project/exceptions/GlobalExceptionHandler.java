@@ -54,9 +54,9 @@ public class GlobalExceptionHandler {
         return build(ex.getStatus(), ex.getCode(), ex.getMessage());
     }
 
-    @ExceptionHandler(CommunityGlobalPrincipalNotSupportedException.class)
-    public ResponseEntity<Map<String, Object>> handleCommunityGlobalPrincipal(CommunityGlobalPrincipalNotSupportedException ex) {
-        return build(HttpStatus.FORBIDDEN, "COMMUNITY_GLOBAL_PRINCIPAL_NOT_SUPPORTED", ex.getMessage());
+    @ExceptionHandler(CommunityMembershipRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleCommunityMembershipRequired(CommunityMembershipRequiredException ex) {
+        return build(HttpStatus.FORBIDDEN, "COMMUNITY_MEMBERSHIP_REQUIRED", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

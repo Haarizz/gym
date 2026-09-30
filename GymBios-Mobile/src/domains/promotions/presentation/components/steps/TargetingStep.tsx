@@ -1,178 +1,56 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { Input } from '@/shared/components/Input';
-import type { PromotionFormData } from '../../hooks/usePromotionWizard';
+import { Dropdown } from '@/shared/components/Dropdown';
+import { CheckboxGroup, stepStyles, type Option, type StepProps } from './formControls';
 
-interface StepProps {
-  values: PromotionFormData;
-  onChange: (field: keyof PromotionFormData, value: any) => void;
-}
-
-const AUDIENCE_OPTIONS = [
+const AUDIENCE_OPTIONS: Option[] = [
   { label: 'All Members', value: 'all' },
   { label: 'New Members', value: 'new-members' },
-  { label: 'VIP / Premium', value: 'vip' },
-  { label: 'Inactive / At-Risk', value: 'inactive' },
+  { label: 'Existing Members', value: 'existing-members' },
+  { label: 'VIP Members', value: 'vip' },
+  { label: 'Specific Members', value: 'specific' },
 ];
 
-const CHANNEL_OPTIONS = [
-  { label: 'In-App', value: 'app' },
+const CHANNEL_OPTIONS: Option[] = [
+  { label: 'Website', value: 'website' },
+  { label: 'Mobile App', value: 'app' },
   { label: 'Email', value: 'email' },
   { label: 'SMS', value: 'sms' },
-  { label: 'Push Notification', value: 'push' },
+  { label: 'In-Person', value: 'in-person' },
+];
+
+const PLAN_OPTIONS: Option[] = [
+  { label: 'Standard Monthly', value: 'Standard Monthly' },
+  { label: 'Standard Annual', value: 'Standard Annual' },
+  { label: 'Premium Monthly', value: 'Premium Monthly' },
+  { label: 'Premium Annual', value: 'Premium Annual' },
 ];
 
 export function TargetingStep({ values, onChange }: StepProps) {
-  const toggleChannel = (channelValue: string) => {
-    const current = values.channels || [];
-    const next = current.includes(channelValue)
-      ? current.filter((c: string) => c !== channelValue)
-      : [...current, channelValue];
-    onChange('channels', next);
-  };
-
   return (
-    <View style={styles.container}>
-      <View style={styles.fieldGroup}>
-        <Text style={styles.fieldLabel}>Target Audience</Text>
-        <View style={styles.chipRow}>
-          {AUDIENCE_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.value}
-              style={[
-                styles.chip,
-                values.targetAudience === opt.value && styles.activeChip,
-              ]}
-              onPress={() => onChange('targetAudience', opt.value)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  values.targetAudience === opt.value && styles.activeChipText,
-                ]}
-              >
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.fieldLabel}>Distribution Channels</Text>
-        <View style={styles.chipRow}>
-          {CHANNEL_OPTIONS.map((opt) => {
-            const isSelected = (values.channels || []).includes(opt.value);
-            return (
-              <Pressable
-                key={opt.value}
-                style={[
-                  styles.chip,
-                  isSelected && styles.activeChip,
-                ]}
-                onPress={() => toggleChannel(opt.value)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    isSelected && styles.activeChipText,
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <Input
-        label="Applicable Plans (Comma separated)"
-        placeholder="e.g. Monthly VIP, Annual Basic"
-        value={(values.applicablePlans || []).join(', ')}
-        onChangeText={(val) =>
-          onChange(
-            'applicablePlans',
-            val
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
+    <View style={stepStyles.container}>
+      <Dropdown
+        label="Target Audience"
+        placeholder="Select target audience"
+        options={AUDIENCE_OPTIONS}
+        value={values.targetAudience}
+        onChange={(val) => onChange('targetAudience', val)}
       />
 
-      <Input
-        label="Applicable Services (Comma separated)"
-        placeholder="e.g. Personal Training, Spa"
-        value={(values.applicableServices || []).join(', ')}
-        onChangeText={(val) =>
-          onChange(
-            'applicableServices',
-            val
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
+      <CheckboxGroup
+        label="Distribution Channels"
+        options={CHANNEL_OPTIONS}
+        selected={values.channels}
+        onChange={(next) => onChange('channels', next)}
       />
 
-      <Input
-        label="Tags (Comma separated)"
-        placeholder="e.g. summer, discount, hot"
-        value={(values.tags || []).join(', ')}
-        onChangeText={(val) =>
-          onChange(
-            'tags',
-            val
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
+      <CheckboxGroup
+        label="Applicable Subscriptions"
+        options={PLAN_OPTIONS}
+        selected={values.applicablePlans}
+        onChange={(next) => onChange('applicablePlans', next)}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.four,
-  },
-  fieldGroup: {
-    gap: Spacing.one,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: BrandColors.textPrimary,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Radius.full,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  activeChip: {
-    backgroundColor: BrandColors.teal,
-    borderColor: BrandColors.teal,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  activeChipText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-});

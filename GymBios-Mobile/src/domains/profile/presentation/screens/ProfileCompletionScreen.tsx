@@ -32,6 +32,7 @@ import {
 } from '../components/ProfileCompletion/schemas';
 import { useAuthStore } from '@/domains/auth/store/authStore';
 import { uploadPhoto } from '@/shared/utils/uploadPhoto';
+import { getMaxBirthDate, getMinBirthDate } from '../../domain/dateOfBirthRules';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -264,7 +265,11 @@ export function ProfileCompletionScreen() {
       Alert.alert('Please wait', 'Your photo is still uploading.');
       return;
     }
-    updateProfile(data, {
+    updateProfile({
+      ...data,
+      // Backend rejects an empty string as an invalid date; omit when not provided.
+      dateOfBirth: data.dateOfBirth || undefined,
+    }, {
       // No manual navigation here — AuthBootstrap's useEffect reactively
       // detects session.profileCompleted = true and navigates to /(member).
       // Manually calling router.replace here caused a black-screen race condition.
@@ -435,7 +440,7 @@ export function ProfileCompletionScreen() {
                 name="phone"
                 render={({ field: { onChange, value } }) => (
                   <Input
-                    label="Phone *"
+                    label="Phone number *"
                     placeholder="+91 XXXXX XXXXX"
                     value={value}
                     onChangeText={onChange}
@@ -449,7 +454,7 @@ export function ProfileCompletionScreen() {
               {/* Date of Birth — uses DatePicker → formats to YYYY-MM-DD */}
               <View style={styles.field}>
                 <DatePicker
-                  label="Date of birth *"
+                  label="Date of birth (optional)"
                   placeholder="Select date"
                   value={dateValue}
                   onChange={(date: Date | null) => {
@@ -460,7 +465,9 @@ export function ProfileCompletionScreen() {
                       shouldValidate: true,
                     });
                   }}
-                  maximumDate={new Date()}
+                  initialView="year"
+                  minimumDate={getMinBirthDate()}
+                  maximumDate={getMaxBirthDate()}
                   error={errors.dateOfBirth?.message}
                 />
               </View>
@@ -488,8 +495,8 @@ export function ProfileCompletionScreen() {
                   render={({ field: { onChange, value } }) => (
                     <View style={{ flex: 1 }}>
                       <Dropdown
-                        label="Nationality"
-                        placeholder="Select country"
+                        label="Nationality (optional)"
+                        placeholder="Select nationality"
                         value={value}
                         options={NATIONALITY_OPTIONS}
                         onChange={onChange}
@@ -505,7 +512,7 @@ export function ProfileCompletionScreen() {
                 name="address"
                 render={({ field: { onChange, value } }) => (
                   <AddressAutocomplete
-                    label="Address"
+                    label="Address (optional)"
                     value={value || ''}
                     onChange={onChange}
                     error={errors.address?.message}

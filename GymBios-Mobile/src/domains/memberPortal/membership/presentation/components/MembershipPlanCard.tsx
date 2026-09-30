@@ -1,10 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
 
 interface MembershipPlanCardProps {
   name: string;
+  /** What the member pays (the offer price when the plan has one running). */
   price: number;
+  /** Regular price, shown struck through when it differs from `price`. */
+  regularPrice?: number;
   duration: string;
   isCurrent: boolean;
   isSelected: boolean;
@@ -14,6 +18,7 @@ interface MembershipPlanCardProps {
 export function MembershipPlanCard({
   name,
   price,
+  regularPrice,
   duration,
   isCurrent,
   isSelected,
@@ -39,9 +44,16 @@ export function MembershipPlanCard({
         {duration}
       </Text>
       <View style={styles.footer}>
-        <Text style={[styles.price, isSelected && styles.priceSelected]}>
-          ₹{price.toLocaleString()}
-        </Text>
+        <View>
+          <Text style={[styles.price, isSelected && styles.priceSelected]}>
+            <CurrencyValue amount={price} />
+          </Text>
+          {regularPrice != null && regularPrice > price && (
+            <Text style={styles.regularPrice}>
+              <CurrencyValue amount={regularPrice} />
+            </Text>
+          )}
+        </View>
         <View style={[styles.radio, isSelected && styles.radioSelected]}>
           {isSelected && <View style={styles.radioInner} />}
         </View>
@@ -106,6 +118,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: BrandColors.textPrimary,
+  },
+  regularPrice: {
+    fontSize: 12,
+    color: BrandColors.textSecondary,
+    textDecorationLine: 'line-through',
   },
   priceSelected: {
     color: BrandColors.memberGold,

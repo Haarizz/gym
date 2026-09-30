@@ -14,6 +14,7 @@ import type {
   UpdateSettingsDto,
 } from '../../application/dto/ProfileDtos';
 import { ProfileApi, type ApiAuthMeResponse } from '../api/ProfileApi';
+import type { ProfileApiModel } from '../api/ProfileApiModels';
 import { useAuthStore } from '@/domains/auth/store';
 import { secureStorage } from '@/core/platform/storage';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
@@ -57,11 +58,13 @@ export class ApiProfileRepository implements ProfileRepository {
       }
     }
 
-    // 3. Real photo, from the backend — falls back to the last-known local
-    // cache only if the profile fetch fails (e.g. offline).
+    // 3. Backend profile is the source of truth for photo and contact details
+    // (phone/address saved during profile completion, account email). Falls
+    // back to the local cache only if the fetch fails (e.g. offline).
     let photoUrl: string | undefined;
+    let remoteProfile: ProfileApiModel | null = null;
     try {
-      const remoteProfile = await this.api.getMobileProfile();
+      remoteProfile = await this.api.getMobileProfile();
       photoUrl = resolveImageUrl(remoteProfile.photoUrl) ?? undefined;
     } catch {
       const localPhoto = await secureStorage.getItem(`${PHOTO_STORAGE_PREFIX}${userId}`);
@@ -69,9 +72,9 @@ export class ApiProfileRepository implements ProfileRepository {
     }
 
     const name = localProfile.name || primaryName;
-    const email = localProfile.email || currentUser?.email || `${username}@gymbios.local`;
-    const phone = localProfile.phone || '';
-    const address = localProfile.address || '';
+    const email = remoteProfile?.email || localProfile.email || currentUser?.email || `${username}@gymbios.local`;
+    const phone = remoteProfile?.phone || localProfile.phone || '';
+    const address = remoteProfile?.address || localProfile.address || '';
     const roleDisplay = primaryRole.toUpperCase();
 
     return {

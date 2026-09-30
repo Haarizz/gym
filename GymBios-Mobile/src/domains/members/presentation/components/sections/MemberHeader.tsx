@@ -44,7 +44,7 @@ export function MemberHeader({ member }: MemberHeaderProps) {
 
       <View style={styles.summaryRow}>
         <View style={[styles.summaryBox, { backgroundColor: theme.backgroundElement }]}>
-          <Typography variant="caption" color="textSecondary">Plan</Typography>
+          <Typography variant="caption" color="textSecondary">Subscription</Typography>
           <Typography variant="bodySmallBold" numberOfLines={1}>
             {member.membershipType}
           </Typography>

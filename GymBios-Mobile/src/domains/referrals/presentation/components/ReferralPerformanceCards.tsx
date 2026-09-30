@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 
 interface MonthlyPerformanceData {
   thisMonthCount: number;
@@ -18,7 +18,6 @@ interface ReferralPerformanceCardsProps {
 }
 
 export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps) {
-  const { currencyCode } = useCurrency();
   const {
     thisMonthCount,
     monthGrowthPct,
@@ -59,7 +58,7 @@ export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps
             Rewards Paid
           </Typography>
           <Typography variant="subtitle" style={{ color: '#7e22ce', fontSize: 18, fontWeight: '700' }}>
-            <CurrencyGlyph code={currencyCode} /> {rewardsPaid.toLocaleString()}
+            <CurrencyValue amount={rewardsPaid} />
           </Typography>
           <Typography variant="caption" style={{ color: '#6b21a8', fontSize: 10 }}>
             {redeemedCount} redeemed
@@ -73,7 +72,7 @@ export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps
             Avg. Value
           </Typography>
           <Typography variant="subtitle" style={{ color: '#15803d', fontSize: 18, fontWeight: '700' }}>
-            <CurrencyGlyph code={currencyCode} /> {avgValue.toLocaleString()}
+            <CurrencyValue amount={avgValue} />
           </Typography>
           <Typography variant="caption" style={{ color: '#166534', fontSize: 10 }}>
             per successful referral

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -49,7 +50,7 @@ export function PaymentMethodCard({
             },
           ]}
         >
-          <Feather
+          <FeatherIcon
             name={option.iconName as any}
             size={18}
             color={isSelected ? theme.primaryText : option.badgeColor}

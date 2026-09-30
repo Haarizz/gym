@@ -22,7 +22,7 @@ export default function EditMembershipPlanRoute() {
     return (
       <View style={styles.center}>
         <Typography variant="body" color="textSecondary">
-          Invalid plan ID.
+          Invalid subscription ID.
         </Typography>
       </View>
     );

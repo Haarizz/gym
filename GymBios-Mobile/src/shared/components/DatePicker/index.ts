@@ -15,6 +15,7 @@ export type {
   MonthSelectorProps,
   YearSelectorProps,
   DatePickerMode,
+  DatePickerInitialView,
 } from './types';
 
 // ── Utilities ────────────────────────────────────────────────────────────────

@@ -9,8 +9,7 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors, Glass } from '@/core/theme';
-import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
+import { BrandColors, Glass, heroTint } from '@/core/theme';
 import { AppBottomSheet, GlassSurface, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import {
@@ -26,7 +25,7 @@ import {
   MODULE_ROUTES,
 } from './layoutRoutes';
 import { TabIcon } from './tabConfigs';
-import { RoleTabBarStyles, renderTabBarBackground, renderTabBarIcon } from './RoleTabBar';
+import { RoleTabBarStyles, TAB_BAR_HEIGHT, renderTabBarBackground, renderTabBarIcon } from './RoleTabBar';
 
 export type { TabIcon };
 export * from './layoutRoutes';
@@ -89,6 +88,7 @@ export function RoleTabsLayout({
   const greeting = getGreeting();
 
   const isAdmin = roleGroup === '(admin)';
+  const tabBarBottom = (insets.bottom > 0 ? insets.bottom : 24) + 6;
 
   return (
     <SafeAreaView
@@ -170,7 +170,7 @@ export function RoleTabsLayout({
             tabBarStyle: [
               RoleTabBarStyles.tabBar,
               {
-                bottom: (insets.bottom > 0 ? insets.bottom : 24) + 6,
+                bottom: tabBarBottom,
               },
               (isFullScreen || isCommunityScreen) && {
                 display: 'none',
@@ -208,17 +208,20 @@ export function RoleTabsLayout({
           <Pressable
             style={({ pressed }) => [
               styles.modulesFabContainer,
-              { bottom: MODULES_FAB_BOTTOM_PADDING + insets.bottom },
+              { bottom: tabBarBottom + MODULES_FAB_OFFSET },
               pressed && styles.modulesFabPressed,
             ]}
             onPress={() => setIsModulesOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="Open Modules"
           >
-            <View style={styles.modulesFab}>
-              <Feather name="grid" size={24} color="#FFF" />
-            </View>
-            <Text style={styles.modulesFabLabel}>Modules</Text>
+            <GlassSurface
+              tint={[heroTint(BrandColors.teal, 0.92), heroTint(BrandColors.tealDark, 0.78)]}
+              radius={MODULES_FAB_SIZE / 2}
+              style={styles.modulesFab}
+            >
+              <Feather name="grid" size={22} color="#FFF" />
+            </GlassSurface>
           </Pressable>
         )}
 
@@ -271,11 +274,15 @@ export function RoleTabsLayout({
   );
 }
 
-// Normal design spacing below the tab bar's icon/label content and below
-// the modules FAB — the actual system nav/gesture clearance is added on top
-// of these at runtime via insets.bottom, not baked into the constant.
+// Normal design spacing below the tab bar's icon/label content — the actual
+// system nav/gesture clearance is added on top at runtime via insets.bottom.
 const TAB_BAR_BOTTOM_PADDING = 12;
-const MODULES_FAB_BOTTOM_PADDING = 18;
+
+// The modules FAB is anchored to the tab bar: centred on it, then lifted so
+// it floats slightly proud of the pill's top edge.
+const MODULES_FAB_SIZE = 56;
+const MODULES_FAB_LIFT = 14;
+const MODULES_FAB_OFFSET = TAB_BAR_HEIGHT / 2 - MODULES_FAB_SIZE / 2 + MODULES_FAB_LIFT;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -380,28 +387,19 @@ const styles = StyleSheet.create({
   },
 
   modulesFab: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: BrandColors.teal,
+    width: MODULES_FAB_SIZE,
+    height: MODULES_FAB_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: BrandColors.surface,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Glass.border,
+    shadowColor: BrandColors.teal,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-  },
-
-  modulesFabLabel: {
-    marginTop: 4,
-    fontSize: 11,
-    fontWeight: '600',
-    color: BrandColors.textSecondary,
+    elevation: 10,
   },
 });

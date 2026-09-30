@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CurrencyValue } from '@/core/providers';
 import { View, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator, Text } from 'react-native';
 import { Stack } from 'expo-router';
 import { useAdminAnalytics } from '../../hooks/useAdminAnalytics';
@@ -68,7 +69,7 @@ export function AdminAnalyticsScreen() {
         />
         <MetricCard
           title="Avg Revenue"
-          value={`₹${(analytics.overview.averageRevenuePerMember / 1000).toFixed(1)}K`}
+          value={<CurrencyValue amount={analytics.overview.averageRevenuePerMember} compact />}
           subtitle="per member"
           icon="dollar-sign"
           iconColor="#9333ea"

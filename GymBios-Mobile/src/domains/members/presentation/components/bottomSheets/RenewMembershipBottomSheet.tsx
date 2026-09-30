@@ -69,7 +69,7 @@ export function RenewMembershipBottomSheet({
     >
       <View style={styles.container}>
         <Input
-          label="Plan ID"
+          label="Subscription ID"
           value={planId}
           onChangeText={setPlanId}
           placeholder="e.g. 1"

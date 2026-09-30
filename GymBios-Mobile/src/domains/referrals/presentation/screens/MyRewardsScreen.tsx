@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useMembers } from '@/domains/members';
 import { useRedeemReferralReward } from '../../hooks/useReferralActions';
@@ -15,7 +15,6 @@ import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function MyRewardsScreen() {
   const router = useRouter();
-  const { currencyCode } = useCurrency();
   const { members, loading: isMembersLoading } = useMembers();
   const redeemMutation = useRedeemReferralReward();
 
@@ -165,7 +164,7 @@ export function MyRewardsScreen() {
                   </View>
                 </View>
                 <Typography variant="title" style={styles.walletBalance}>
-                  <CurrencyGlyph code={currencyCode} /> 150.00
+                  <CurrencyValue amount={150.00} decimals={2} />
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
                   Available referral credits for {selectedMember.name}
@@ -188,7 +187,7 @@ export function MyRewardsScreen() {
                     </Typography>
                   </View>
                   <Typography variant="subtitle" style={styles.rewardAmount}>
-                    <CurrencyGlyph code={currencyCode} /> 50.00
+                    <CurrencyValue amount={50.00} decimals={2} />
                   </Typography>
                 </View>
                 <View style={styles.rewardActionRow}>

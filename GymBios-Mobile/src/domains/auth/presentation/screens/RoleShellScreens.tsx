@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Button, PlaceholderPanel, StatCard, Typography } from '@/shared/components';
 import { ScreenLayout } from '@/shared/layouts';
@@ -49,7 +50,7 @@ export function createAdminDashboardScreen(useRestoreSession: ReturnType<typeof 
         description="KPI overview, collections, and operational alerts will appear here."
         useRestoreSession={useRestoreSession}>
         <View style={styles.statsRow}>
-          <StatCard label="Collections" value="₹2.4L" iconName="dollar-sign" color="#22c55e" />
+          <StatCard label="Collections" value={<CurrencyValue amount={240000} compact />} iconName="dollar-sign" color="#22c55e" />
           <StatCard label="Members" value="1,245" iconName="users" color={BrandColors.teal} />
         </View>
       </RoleShellScreen>

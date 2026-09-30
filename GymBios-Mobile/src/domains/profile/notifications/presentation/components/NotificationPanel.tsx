@@ -22,9 +22,17 @@ import { NotificationFooter } from './NotificationFooter';
 interface NotificationPanelProps {
   visible: boolean;
   onClose: () => void;
+  /** Scope the panel (list, unread count, mark-all-read) to one backend notification module. */
+  module?: string;
+  title?: string;
+  /**
+   * Replaces the default "navigate to actionUrl" behaviour on tap. The item is
+   * still marked read first; the caller decides whether to close the panel.
+   */
+  onItemPress?: (item: NotificationItem) => void;
 }
 
-export function NotificationPanel({ visible, onClose }: NotificationPanelProps) {
+export function NotificationPanel({ visible, onClose, module, title, onItemPress }: NotificationPanelProps) {
   const router = useRouter();
   const screenWidth = Dimensions.get('window').width;
   const panelWidth = Math.min(screenWidth * 0.9, 420);
@@ -44,10 +52,10 @@ export function NotificationPanel({ visible, onClose }: NotificationPanelProps) 
     hasNextPage,
     fetchNextPage,
     refetch,
-  } = useNotifications();
+  } = useNotifications(module);
 
-  const { count: unreadCount, refetch: refetchUnreadCount } = useUnreadNotificationCount();
-  const { markRead, markAllRead, isMarkingAllRead } = useNotificationMutations();
+  const { count: unreadCount, refetch: refetchUnreadCount } = useUnreadNotificationCount(module);
+  const { markRead, markAllRead, isMarkingAllRead } = useNotificationMutations(module);
 
   useEffect(() => {
     if (visible) {
@@ -95,6 +103,11 @@ export function NotificationPanel({ visible, onClose }: NotificationPanelProps) 
   const handleItemPress = async (item: NotificationItem) => {
     if (!item.isRead) {
       await markRead(item.id);
+    }
+
+    if (onItemPress) {
+      onItemPress(item);
+      return;
     }
 
     if (item.actionUrl) {
@@ -149,6 +162,7 @@ export function NotificationPanel({ visible, onClose }: NotificationPanelProps) 
           <SafeAreaView edges={['top']} style={styles.safeAreaContainer}>
             {/* 1. Fixed Header */}
             <NotificationHeader
+              title={title}
               unreadCount={unreadCount}
               isRefreshing={isFetching && !isFetchingNextPage}
               onClose={onClose}

@@ -5,7 +5,6 @@ import { FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/core/hooks';
-import { useCurrency } from '@/core/providers/CurrencyProvider';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 import { EmptyState } from '@/shared/components/EmptyState';
@@ -36,7 +35,6 @@ export function AdminStaffScreen({
 }: AdminStaffScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { currencyCode } = useCurrency();
   const { staff, loading, refresh, page, totalPages, setPage } = useStaff();
   const { data: summary, refetch: refetchSummary } = useStaffSummary();
   const staffIds = useMemo(() => staff.map((s) => s.id), [staff]);
@@ -92,12 +90,11 @@ export function AdminStaffScreen({
       <StaffCard
         staff={item}
         performance={performanceById.get(item.id)}
-        currencyCode={currencyCode}
         onPress={onNavigateToDetail}
         onMessage={handleMessage}
       />
     ),
-    [performanceById, currencyCode, onNavigateToDetail, handleMessage],
+    [performanceById, onNavigateToDetail, handleMessage],
   );
 
   // Must be an element, not a component: a component whose identity changes on

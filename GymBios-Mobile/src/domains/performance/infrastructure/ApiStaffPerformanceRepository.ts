@@ -55,19 +55,6 @@ interface RawPerformanceResponse {
   };
 }
 
-function formatRevenue(amount: number): string {
-  if (!amount || amount <= 0) return '₹0';
-  if (amount >= 100000) {
-    const lakhs = amount / 100000;
-    return lakhs % 1 === 0 ? `₹${lakhs}L` : `₹${lakhs.toFixed(1)}L`;
-  }
-  if (amount >= 1000) {
-    const k = amount / 1000;
-    return k % 1 === 0 ? `₹${k}K` : `₹${k.toFixed(0)}K`;
-  }
-  return `₹${amount}`;
-}
-
 export class ApiStaffPerformanceRepository {
   /**
    * GET /api/mobile/staff/performance
@@ -108,7 +95,7 @@ export class ApiStaffPerformanceRepository {
         ? raw.leaderboard.map((l) => ({
             name: l.staff_name || 'Staff',
             conversions: l.conversion_count ?? 0,
-            revenue: formatRevenue(l.revenue),
+            revenue: l.revenue ?? 0,
             rank: l.rank,
             isCurrentUser: Boolean(l.current_user),
           }))

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import { useCurrency } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 
 interface AddOnPerformanceData {
   name: string;
@@ -13,7 +13,6 @@ interface AddOnPerformanceCardProps {
 }
 
 export function AddOnPerformanceCard({ data }: AddOnPerformanceCardProps) {
-  const { formatCurrency } = useCurrency();
   const items = data ?? [];
 
   return (
@@ -27,7 +26,7 @@ export function AddOnPerformanceCard({ data }: AddOnPerformanceCardProps) {
       {items.map((item, index) => (
         <View key={`${item.name}-${index}`} style={[styles.row, index < items.length - 1 && styles.borderBottom]}>
           <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.revenue}>{formatCurrency(item.revenue ?? 0, { maximumFractionDigits: 0 })}</Text>
+          <Text style={styles.revenue}><CurrencyValue amount={item.revenue ?? 0} options={{ maximumFractionDigits: 0 }} /></Text>
         </View>
       ))}
     </View>

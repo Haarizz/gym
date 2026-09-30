@@ -9,14 +9,19 @@ export interface PlanWizardData {
   name: string;
   description: string;
   type: string;        // membership type
-  planType: string;    // Individual | Family
+  planType: string;    // Individual | Couple | Family | Corporate | Walk-In (same values as the web app)
   status: string;
 
   // Step 2: Duration & Pricing
   durationType: string;
   durationValue: string;
   price: string;
-  discount: string;
+  discount: string; // legacy, passed through untouched
+  offerType: 'none' | 'percentage' | 'fixed';
+  offerValue: string;
+  offerLabel: string;
+  offerStartDate: string; // yyyy-MM-dd or ''
+  offerEndDate: string;   // yyyy-MM-dd or ''
 
   // Step 3: Sessions & Capacity
   maxSessions: string;
@@ -26,8 +31,8 @@ export interface PlanWizardData {
   attendanceValue: string;
   attendancePeriod: string;
 
-  // Step 4: Family Options (only when planType === 'FAMILY')
-  familyBillingMode: string;
+  // Step 4: Family Options (Family and Couple plans only)
+  familyBillingMode: string; // 'individual' | 'family_head' — the values the backend bills by
   pricePerMember: string;
   maxFamilyMembers: string;
   maxAdultMembers: string;
@@ -55,13 +60,18 @@ export const DEFAULT_PLAN_DATA: PlanWizardData = {
   name: '',
   description: '',
   type: '',
-  planType: 'INDIVIDUAL',
+  planType: 'Individual',
   status: 'ACTIVE',
 
   durationType: '',
   durationValue: '',
   price: '',
   discount: '0',
+  offerType: 'none',
+  offerValue: '',
+  offerLabel: '',
+  offerStartDate: '',
+  offerEndDate: '',
 
   maxSessions: '',
   membershipCapacity: '',
@@ -70,14 +80,15 @@ export const DEFAULT_PLAN_DATA: PlanWizardData = {
   attendanceValue: '',
   attendancePeriod: '',
 
-  familyBillingMode: '',
+  // Same defaults as the web app's plan form.
+  familyBillingMode: 'individual',
   pricePerMember: '',
   maxFamilyMembers: '',
   maxAdultMembers: '',
   maxChildMembers: '',
   allowAdditionalMembers: false,
   additionalMemberPrice: '',
-  autoCalculateTotal: false,
+  autoCalculateTotal: true,
 
   maxFreezeDays: '',
   maxFreezeOccurrences: '',
@@ -92,32 +103,49 @@ export const DEFAULT_PLAN_DATA: PlanWizardData = {
   selectedCampaigns: [],
 };
 
+export const PLAN_TYPES = ['Individual', 'Couple', 'Family', 'Corporate', 'Walk-In'];
+
+/** Plans saved by older app builds used 'FAMILY' / 'INDIVIDUAL'; the web app uses 'Family'. */
+function normalizePlanType(planType?: string): string {
+  return PLAN_TYPES.find((t) => t.toLowerCase() === planType?.toLowerCase()) ?? planType ?? 'Individual';
+}
+
+export function isFamilyPlanType(planType: string): boolean {
+  return planType === 'Family' || planType === 'Couple';
+}
+
 export function mapPlanToWizardData(plan?: MembershipPlan): PlanWizardData {
   if (!plan) return DEFAULT_PLAN_DATA;
   return {
     name: plan.name,
     description: plan.description,
     type: plan.type,
-    planType: plan.planType,
+    planType: normalizePlanType(plan.planType),
     status: plan.status,
     durationType: plan.durationType,
     durationValue: plan.durationValue,
     price: String(plan.price),
-    discount: String(plan.discount),
+    discount: String(plan.discount ?? 0),
+    offerType: plan.offerType ?? 'none',
+    offerValue: plan.offerValue != null ? String(plan.offerValue) : '',
+    offerLabel: plan.offerLabel ?? '',
+    offerStartDate: plan.offerStartDate ?? '',
+    offerEndDate: plan.offerEndDate ?? '',
     maxSessions: plan.maxSessions !== undefined ? String(plan.maxSessions) : '',
     membershipCapacity: plan.membershipCapacity ?? '',
     maxCapacity: plan.maxCapacity !== undefined ? String(plan.maxCapacity) : '',
     attendanceLimit: plan.attendanceLimit ?? '',
     attendanceValue: plan.attendanceValue !== undefined ? String(plan.attendanceValue) : '',
     attendancePeriod: plan.attendancePeriod ?? '',
-    familyBillingMode: plan.familyBillingMode ?? '',
+    // Anything but 'family_head' (incl. older app builds' 'Per Family' etc.) is billed individually.
+    familyBillingMode: plan.familyBillingMode === 'family_head' ? 'family_head' : 'individual',
     pricePerMember: plan.pricePerMember !== undefined ? String(plan.pricePerMember) : '',
     maxFamilyMembers: plan.maxFamilyMembers !== undefined ? String(plan.maxFamilyMembers) : '',
     maxAdultMembers: plan.maxAdultMembers !== undefined ? String(plan.maxAdultMembers) : '',
     maxChildMembers: plan.maxChildMembers !== undefined ? String(plan.maxChildMembers) : '',
     allowAdditionalMembers: plan.allowAdditionalMembers ?? false,
     additionalMemberPrice: plan.additionalMemberPrice !== undefined ? String(plan.additionalMemberPrice) : '',
-    autoCalculateTotal: plan.autoCalculateTotal ?? false,
+    autoCalculateTotal: plan.autoCalculateTotal ?? true,
     maxFreezeDays: plan.maxFreezeDays !== undefined ? String(plan.maxFreezeDays) : '',
     maxFreezeOccurrences: plan.maxFreezeOccurrences !== undefined ? String(plan.maxFreezeOccurrences) : '',
     chargePerExtraDay: plan.chargePerExtraDay !== undefined ? String(plan.chargePerExtraDay) : '',
@@ -132,6 +160,9 @@ export function mapPlanToWizardData(plan?: MembershipPlan): PlanWizardData {
 }
 
 function buildRequest(data: PlanWizardData): MembershipPlanRequest {
+  const isFamily = isFamilyPlanType(data.planType);
+  // Member caps / additional members only apply to Family — a Couple is always two.
+  const isFamilyOnly = data.planType === 'Family';
   return {
     name: data.name,
     type: data.type,
@@ -140,6 +171,15 @@ function buildRequest(data: PlanWizardData): MembershipPlanRequest {
     durationValue: data.durationValue,
     price: Number(data.price) || 0,
     discount: Number(data.discount) || 0,
+    ...(data.offerType === 'none'
+      ? { offerType: '' as const }
+      : {
+          offerType: data.offerType,
+          offerValue: Number(data.offerValue) || 0,
+          offerLabel: data.offerLabel.trim(),
+          offerStartDate: data.offerStartDate,
+          offerEndDate: data.offerEndDate,
+        }),
     status: data.status,
     description: data.description,
     maxSessions: data.maxSessions ? Number(data.maxSessions) : undefined,
@@ -148,14 +188,14 @@ function buildRequest(data: PlanWizardData): MembershipPlanRequest {
     attendanceLimit: data.attendanceLimit || undefined,
     attendanceValue: data.attendanceValue ? Number(data.attendanceValue) : undefined,
     attendancePeriod: data.attendancePeriod || undefined,
-    familyBillingMode: data.planType === 'FAMILY' ? data.familyBillingMode || undefined : undefined,
-    pricePerMember: data.planType === 'FAMILY' && data.pricePerMember ? Number(data.pricePerMember) : undefined,
-    maxFamilyMembers: data.planType === 'FAMILY' && data.maxFamilyMembers ? Number(data.maxFamilyMembers) : undefined,
-    maxAdultMembers: data.planType === 'FAMILY' && data.maxAdultMembers ? Number(data.maxAdultMembers) : undefined,
-    maxChildMembers: data.planType === 'FAMILY' && data.maxChildMembers ? Number(data.maxChildMembers) : undefined,
-    allowAdditionalMembers: data.planType === 'FAMILY' ? data.allowAdditionalMembers : undefined,
-    additionalMemberPrice: data.planType === 'FAMILY' && data.additionalMemberPrice ? Number(data.additionalMemberPrice) : undefined,
-    autoCalculateTotal: data.planType === 'FAMILY' ? data.autoCalculateTotal : undefined,
+    familyBillingMode: isFamily ? data.familyBillingMode || 'individual' : undefined,
+    pricePerMember: isFamily && data.pricePerMember ? Number(data.pricePerMember) : undefined,
+    maxFamilyMembers: isFamilyOnly && data.maxFamilyMembers ? Number(data.maxFamilyMembers) : undefined,
+    maxAdultMembers: isFamilyOnly && data.maxAdultMembers ? Number(data.maxAdultMembers) : undefined,
+    maxChildMembers: isFamilyOnly && data.maxChildMembers ? Number(data.maxChildMembers) : undefined,
+    allowAdditionalMembers: isFamilyOnly ? data.allowAdditionalMembers : undefined,
+    additionalMemberPrice: isFamilyOnly && data.additionalMemberPrice ? Number(data.additionalMemberPrice) : undefined,
+    autoCalculateTotal: isFamily ? data.autoCalculateTotal : undefined,
     maxFreezeDays: data.maxFreezeDays ? Number(data.maxFreezeDays) : undefined,
     maxFreezeOccurrences: data.maxFreezeOccurrences ? Number(data.maxFreezeOccurrences) : undefined,
     chargePerExtraDay: data.chargePerExtraDay ? Number(data.chargePerExtraDay) : undefined,
@@ -169,6 +209,18 @@ function buildRequest(data: PlanWizardData): MembershipPlanRequest {
   };
 }
 
+/** Why the offer can't be saved as entered, or null when it's fine (or there is none). */
+export function offerError(d: PlanWizardData): string | null {
+  if (d.offerType === 'none') return null;
+  const value = Number(d.offerValue);
+  if (!d.offerValue.trim() || !(value > 0)) return 'Enter an offer value greater than 0';
+  if (d.offerType === 'percentage' && value > 100) return "A percentage offer can't be more than 100%";
+  if (d.offerStartDate && d.offerEndDate && d.offerEndDate < d.offerStartDate) {
+    return "The end date can't be before the start date";
+  }
+  return null;
+}
+
 interface StepDef {
   id: string;
   title: string;
@@ -176,7 +228,7 @@ interface StepDef {
 }
 
 function buildSteps(planType: string): StepDef[] {
-  const isFamily = planType === 'FAMILY';
+  const isFamily = isFamilyPlanType(planType);
 
   const base: StepDef[] = [
     {
@@ -187,7 +239,7 @@ function buildSteps(planType: string): StepDef[] {
     {
       id: 'duration',
       title: 'Pricing',
-      validate: (d) => d.durationType.trim().length > 0 && d.price.trim().length > 0,
+      validate: (d) => d.durationType.trim().length > 0 && d.price.trim().length > 0 && !offerError(d),
     },
     {
       id: 'sessions',

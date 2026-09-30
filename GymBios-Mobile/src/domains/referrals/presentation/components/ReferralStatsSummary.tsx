@@ -1,16 +1,15 @@
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 import { useReferralStats } from '../../hooks/useReferrals';
 import { useRewardStats } from '@/domains/rewards';
 
 export function ReferralStatsSummary() {
   const { data: stats, isLoading: isStatsLoading } = useReferralStats();
   const { data: rewardStats, isLoading: isRewardsLoading } = useRewardStats();
-  const { currencyCode } = useCurrency();
 
   if (isStatsLoading || isRewardsLoading) {
     return (
@@ -90,13 +89,13 @@ export function ReferralStatsSummary() {
               {kpi.label}
             </Typography>
             <View style={[styles.iconBox, { backgroundColor: kpi.iconBg }]}>
-              <Feather name={kpi.icon} size={14} color={kpi.iconColor} />
+              <FeatherIcon name={kpi.icon} size={14} color={kpi.iconColor} />
             </View>
           </View>
           <View style={styles.valueRow}>
             {kpi.isCurrency ? (
               <Typography variant="subtitle" style={[styles.valueText, { color: kpi.iconColor }]}>
-                <CurrencyGlyph code={currencyCode} /> {kpi.value.toLocaleString()}
+                <CurrencyValue amount={kpi.value} />
               </Typography>
             ) : (
               <Typography variant="subtitle" style={[styles.valueText, { color: kpi.iconColor }]}>

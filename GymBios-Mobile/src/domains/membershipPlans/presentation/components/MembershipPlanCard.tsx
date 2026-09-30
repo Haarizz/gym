@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Card } from '@/shared/components/Card';
 import { Typography } from '@/shared/components/Typography';
@@ -25,10 +26,8 @@ export function MembershipPlanCard({
 }: MembershipPlanCardProps) {
   const theme = useTheme();
   const isFamily = plan.planType?.toUpperCase() === 'FAMILY';
-  const discountedPrice =
-    plan.discount > 0
-      ? plan.price - (plan.price * plan.discount) / 100
-      : plan.price;
+  // The plan's running offer, priced by the server.
+  const hasOffer = plan.offerActive && plan.offerDiscountAmount > 0;
 
   return (
     <Pressable onPress={() => onPress?.(plan)} style={styles.pressable}>
@@ -91,15 +90,11 @@ export function MembershipPlanCard({
           <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
             <Typography variant="caption" color="textSecondary">Price</Typography>
             <Typography variant="bodySmallBold">
-              {plan.discount > 0 ? (
-                `$${discountedPrice.toFixed(0)}`
-              ) : (
-                `$${plan.price.toLocaleString()}`
-              )}
+              <CurrencyValue amount={hasOffer ? plan.effectivePrice : plan.price} />
             </Typography>
-            {plan.discount > 0 && (
+            {hasOffer && (
               <Typography variant="caption" style={styles.originalPrice}>
-                ${plan.price}
+                <CurrencyValue amount={plan.price} />
               </Typography>
             )}
           </View>

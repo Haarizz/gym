@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { Divider } from '@/shared/components/Surface';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
 
 import { useReceipt } from '../../hooks/useBills';
@@ -20,6 +21,7 @@ import {
   PaymentSummaryCard,
   ReceiptActionBar,
 } from '../components';
+import { downloadReceiptPdf, emailReceiptPdf, printReceipt, smsReceiptPdf } from '../utils/receiptInvoice';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -41,7 +43,7 @@ function formatDate(dateStr?: string) {
   }
 }
 
-function InfoRow({ label, value }: { label: string; value?: string }) {
+function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
     <View style={styles.infoRow}>
       <Typography variant="caption" color="textSecondary" style={styles.infoLabel}>
@@ -65,34 +67,83 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
  *  - Outstanding balance
  *  - Minor charges (if present)
  *  - Payment breakdown
- *  - Sticky action bar (Download, Share, Email)
- *  - Share Bottom Sheet (Email, SMS, WhatsApp, Print)
+ *  - Sticky action bar (Download, Share) — both produce the same tax-invoice
+ *    PDF the web app prints (see utils/receiptInvoice.ts)
+ *  - Share Bottom Sheet (Email, SMS, Print)
  */
+
+type ShareChannel = 'Email' | 'SMS' | 'Print';
+
+const SHARE_CHANNELS: {
+  name: ShareChannel;
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+  bg: string;
+  detail: string;
+}[] = ([
+  { name: 'Email', icon: 'mail', color: '#0284c7', bg: '#e0f2fe', detail: 'Email the receipt PDF' },
+  { name: 'SMS', icon: 'message-square', color: '#16a34a', bg: '#dcfce7', detail: 'Text the receipt PDF to the member' },
+  { name: 'Print', icon: 'printer', color: '#4b5563', bg: '#f3f4f6', detail: 'Print tax invoice receipt' },
+] as const).filter(
+  // A browser can't produce the PDF file or attach it to an email/SMS, so the
+  // web build only offers Print (the same print window the web app opens).
+  (channel) => Platform.OS !== 'web' || channel.name === 'Print',
+);
+
+// Lets the sheet's slide-out animation finish before the OS share/print UI is
+// presented — iOS refuses to present a new view controller over a dismissing modal.
+const SHEET_DISMISS_DELAY_MS = 350;
 export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreenProps) {
   const { receipt, loading, error, refresh } = useReceipt(receiptId);
+  const { currencyCode } = useCurrency();
+  const [busyAction, setBusyAction] = useState<'download' | 'share' | null>(null);
   const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const tabBarInset = useTabBarBottomInset();
 
-  const handleDownload = useCallback(() => {
-    toast.info(
-      `Receipt ${receipt?.receiptNo ?? `#${receiptId}`} has been saved to your downloads.`,
-      {
-        title: 'Download Receipt'
+  const handleDownload = useCallback(async () => {
+    if (!receipt || busyAction) return;
+    setBusyAction('download');
+    try {
+      const result = await downloadReceiptPdf(receipt, currencyCode);
+      if (result.status === 'saved') {
+        toast.success(`${result.filename} saved to ${result.folder}.`, { title: 'Receipt Downloaded' });
       }
-    );
-  }, [receipt?.receiptNo, receiptId]);
+    } catch (err) {
+      console.error('Receipt download failed', err);
+      toast.error('Could not generate the receipt PDF. Please try again.', { title: 'Download Failed' });
+    } finally {
+      setBusyAction(null);
+    }
+  }, [receipt, busyAction, currencyCode]);
 
   const handleOpenShare = useCallback(() => {
     setShareSheetVisible(true);
   }, []);
 
-  const handleShareChannel = useCallback((channel: string) => {
+  // Every channel sends the real PDF: Email opens the mail composer and SMS the
+  // messaging app (addressed to the member) with it attached; Print opens the
+  // system print dialog.
+  const handleShareChannel = useCallback((channel: ShareChannel) => {
+    if (!receipt || busyAction) return;
     setShareSheetVisible(false);
-    setTimeout(() => {
-      toast.info(
-        `Receipt ${receipt?.receiptNo ?? `#${receiptId}`} sent via ${channel} to ${receipt?.memberName ?? 'Member'}.`
-      );
-    }, 200);
-  }, [receipt?.receiptNo, receipt?.memberName, receiptId]);
+    setBusyAction('share');
+    setTimeout(async () => {
+      try {
+        if (channel === 'Email') {
+          await emailReceiptPdf(receipt, currencyCode);
+        } else if (channel === 'SMS') {
+          await smsReceiptPdf(receipt, currencyCode);
+        } else {
+          await printReceipt(receipt, currencyCode);
+        }
+      } catch (err) {
+        console.error(`Receipt ${channel} failed`, err);
+        toast.error('Could not share the receipt PDF. Please try again.', { title: 'Share Failed' });
+      } finally {
+        setBusyAction(null);
+      }
+    }, SHEET_DISMISS_DELAY_MS);
+  }, [receipt, busyAction, currencyCode]);
 
   if (loading && !receipt) {
     return (
@@ -126,37 +177,6 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
     label: `${split.method}${split.reference ? ` (${split.reference})` : ''}`,
     amount: split.amount,
   }));
-
-  const shareChannels = [
-    {
-      name: 'Email',
-      icon: 'mail' as const,
-      color: '#0284c7',
-      bg: '#e0f2fe',
-      detail: receipt?.memberId ? `Send to member email` : 'Email PDF',
-    },
-    {
-      name: 'SMS',
-      icon: 'message-square' as const,
-      color: '#16a34a',
-      bg: '#dcfce7',
-      detail: receipt?.memberPhone ?? 'Send SMS link',
-    },
-    {
-      name: 'WhatsApp',
-      icon: 'phone' as const,
-      color: '#15803d',
-      bg: '#dcfce7',
-      detail: receipt?.memberPhone ?? 'Share via WhatsApp',
-    },
-    {
-      name: 'Print',
-      icon: 'printer' as const,
-      color: '#4b5563',
-      bg: '#f3f4f6',
-      detail: 'Print tax invoice receipt',
-    },
-  ];
 
   return (
     <ScreenLayout>
@@ -206,7 +226,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
             <Divider />
             <InfoRow label="Transaction Type" value={receipt?.transactionType} />
             <Divider />
-            <InfoRow label="Plan" value={receipt?.planName} />
+            <InfoRow label="Subscription" value={receipt?.planName} />
             <Divider />
             <InfoRow label="Processed By" value={receipt?.processedBy} />
             {receipt?.remarks && (
@@ -236,9 +256,9 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
           <View style={styles.infoCard}>
             <InfoRow label="Payment Method" value={receipt?.paymentMethod} />
             <Divider />
-            <InfoRow label="Paid Amount" value={receipt?.paidAmount !== undefined ? `₹${receipt.paidAmount.toLocaleString('en-IN')}` : undefined} />
+            <InfoRow label="Paid Amount" value={receipt?.paidAmount !== undefined ? <CurrencyValue amount={receipt.paidAmount} /> : undefined} />
             <Divider />
-            <InfoRow label="Due Amount" value={receipt?.dueAmount !== undefined ? `₹${receipt.dueAmount.toLocaleString('en-IN')}` : undefined} />
+            <InfoRow label="Due Amount" value={receipt?.dueAmount !== undefined ? <CurrencyValue amount={receipt.dueAmount} /> : undefined} />
             {receipt?.bankAccountName && (
               <>
                 <Divider />
@@ -316,11 +336,11 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
       </ScrollView>
 
       {/* Sticky action bar */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { paddingBottom: tabBarInset + Spacing.two }]}>
         <ReceiptActionBar
-          onDownload={handleDownload}
-          onShare={handleOpenShare}
-          onEmail={() => handleShareChannel('Email')}
+          onDownload={receipt ? handleDownload : undefined}
+          onShare={receipt ? handleOpenShare : undefined}
+          busyAction={busyAction}
         />
       </View>
 
@@ -340,12 +360,12 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
                 Share Receipt
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Choose a communication channel to send {receipt?.receiptNo ?? `Receipt #${receiptId}`}
+                Choose how to send {receipt?.receiptNo ?? `Receipt #${receiptId}`}
               </Typography>
             </View>
 
             <View style={styles.channelList}>
-              {shareChannels.map((item) => (
+              {SHARE_CHANNELS.map((item) => (
                 <Pressable
                   key={item.name}
                   style={({ pressed }) => [styles.channelItem, pressed && styles.pressed]}
@@ -384,7 +404,7 @@ const styles = StyleSheet.create({
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,
-    paddingBottom: 100, // clear of sticky action bar
+    paddingBottom: Spacing.four, // action bar sits below the ScrollView, not over it
   },
   heroCard: {
     backgroundColor: '#ffffff',
@@ -450,7 +470,6 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
     paddingTop: Spacing.two,
     backgroundColor: 'transparent',
   },

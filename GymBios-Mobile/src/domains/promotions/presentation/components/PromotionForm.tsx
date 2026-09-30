@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -11,11 +11,10 @@ import {
 } from '@/shared/components/Wizard';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
 import { usePromotionWizard } from '../hooks/usePromotionWizard';
-import { CoreInfoStep } from './steps/CoreInfoStep';
-import { ScheduleStep } from './steps/ScheduleStep';
+import { BasicInfoStep } from './steps/BasicInfoStep';
 import { DiscountStep } from './steps/DiscountStep';
 import { TargetingStep } from './steps/TargetingStep';
-import { PolicyStep } from './steps/PolicyStep';
+import { SettingsStep } from './steps/SettingsStep';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -54,6 +53,8 @@ export function PromotionForm({
     next,
     previous,
     submit,
+    saveDraft,
+    canSaveDraft,
   } = usePromotionWizard({
     mode,
     initialData,
@@ -68,16 +69,14 @@ export function PromotionForm({
     const stepId = steps[step - 1]?.id;
 
     switch (stepId) {
-      case 'core':
-        return <CoreInfoStep values={data} onChange={updateField} />;
-      case 'schedule':
-        return <ScheduleStep values={data} onChange={updateField} />;
+      case 'basic':
+        return <BasicInfoStep values={data} onChange={updateField} />;
       case 'discount':
         return <DiscountStep values={data} onChange={updateField} />;
       case 'targeting':
         return <TargetingStep values={data} onChange={updateField} />;
-      case 'policy':
-        return <PolicyStep values={data} onChange={updateField} />;
+      case 'settings':
+        return <SettingsStep values={data} onChange={updateField} />;
       default:
         return null;
     }
@@ -108,12 +107,30 @@ export function PromotionForm({
       >
         {/* Header */}
         <View style={styles.wizardHeader}>
-          <Typography variant="subtitle" style={styles.headerTitle}>
-            {mode === 'create' ? 'New Promotion' : 'Edit Promotion'}
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            {currentStepTitle}
-          </Typography>
+          <View style={styles.headerText}>
+            <Typography variant="subtitle" style={styles.headerTitle}>
+              {mode === 'create' ? 'Create New Promotion' : 'Edit Promotion'}
+            </Typography>
+            <Typography variant="caption" color="textSecondary">
+              {currentStepTitle}
+            </Typography>
+          </View>
+          {/* Same as the web dialog's "Save as Draft" — available from any step. */}
+          <Pressable
+            onPress={saveDraft}
+            disabled={!canSaveDraft || loading}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.draftButton,
+              (!canSaveDraft || loading) && styles.draftButtonDisabled,
+              pressed && styles.draftButtonPressed,
+            ]}
+          >
+            <Typography variant="bodySmallBold" style={styles.draftButtonText}>
+              Save as Draft
+            </Typography>
+          </Pressable>
         </View>
 
         {/* Progress */}
@@ -211,9 +228,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   wizardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.two,
+  },
+  headerText: {
+    flex: 1,
+  },
+  draftButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: BrandColors.white,
+  },
+  draftButtonDisabled: {
+    opacity: 0.5,
+  },
+  draftButtonPressed: {
+    opacity: 0.7,
+  },
+  draftButtonText: {
+    color: BrandColors.teal,
   },
   headerTitle: {
     fontSize: 20,

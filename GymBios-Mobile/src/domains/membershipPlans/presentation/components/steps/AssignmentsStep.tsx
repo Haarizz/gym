@@ -43,8 +43,8 @@ export function AssignmentsStep({ values }: AssignmentsStepProps) {
     <View style={styles.container}>
       <FormSection title="Assignments">
         <Typography variant="caption" color="textSecondary" style={styles.note}>
-          Assign trainers, streams, facilities, promotions, and campaigns to this plan.
-          These can also be configured after creating the plan.
+          Assign trainers, streams, facilities, promotions, and campaigns to this subscription.
+          These can also be configured after creating the subscription.
         </Typography>
 
         <InfoRow label="Assignable Trainers" count={values.assignableTrainers.length} />

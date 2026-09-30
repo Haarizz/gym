@@ -70,4 +70,16 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
 
     @Query("SELECT COALESCE(SUM(r.paidAmount), 0) FROM Receipt r WHERE r.planName LIKE %:category% AND r.transactionDate >= :start AND r.transactionDate < :end")
     BigDecimal sumPaidInPeriodByCategory(@Param("category") String category, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // When the member's current plan period began: their latest purchase or renewal bill.
+    // Renewals extend expiry without moving membershipStartDate, so that can't be used.
+    @Query("SELECT MAX(r.transactionDate) FROM Receipt r WHERE r.memberDbId = :memberDbId AND r.transactionType IN ('New', 'Renewal')")
+    LocalDateTime findLatestPlanPurchaseDate(@Param("memberDbId") Long memberDbId);
+
+    // Unpaid part of each member's open bills of one type, e.g. "Freeze Charge" —
+    // rows are [memberDbId, outstanding amount].
+    @Query("SELECT r.memberDbId, COALESCE(SUM(r.amount - COALESCE(r.totalPaidToDate, r.paidAmount, 0)), 0) FROM Receipt r " +
+           "WHERE r.transactionType = :transactionType AND r.status IN ('Pending', 'Overdue', 'Partial') AND r.memberDbId IS NOT NULL " +
+           "GROUP BY r.memberDbId")
+    List<Object[]> sumOpenAmountByMemberForType(@Param("transactionType") String transactionType);
 }

@@ -6,20 +6,22 @@ import type {
 
 export class NotificationApi {
   /**
-   * GET /api/notifications?page=0&size=20
+   * GET /api/notifications?page=0&size=20[&module=...]
    */
-  async getNotifications(page = 0, size = 20): Promise<NotificationPage> {
+  async getNotifications(page = 0, size = 20, module?: string): Promise<NotificationPage> {
     const response = await apiClient.get<NotificationPage>('/notifications', {
-      params: { page, size },
+      params: { page, size, module },
     });
     return response.data;
   }
 
   /**
-   * GET /api/notifications/unread-count
+   * GET /api/notifications/unread-count[?module=...]
    */
-  async getUnreadCount(): Promise<UnreadCountResponse> {
-    const response = await apiClient.get<UnreadCountResponse>('/notifications/unread-count');
+  async getUnreadCount(module?: string): Promise<UnreadCountResponse> {
+    const response = await apiClient.get<UnreadCountResponse>('/notifications/unread-count', {
+      params: { module },
+    });
     return response.data;
   }
 
@@ -31,10 +33,10 @@ export class NotificationApi {
   }
 
   /**
-   * PUT /api/notifications/read-all
+   * PUT /api/notifications/read-all[?module=...]
    */
-  async markAllRead(): Promise<void> {
-    await apiClient.put('/notifications/read-all');
+  async markAllRead(module?: string): Promise<void> {
+    await apiClient.put('/notifications/read-all', undefined, { params: { module } });
   }
 
   /**

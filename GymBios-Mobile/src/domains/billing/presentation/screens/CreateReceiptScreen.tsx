@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Modal, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 
+import { CurrencyValue, formatCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
@@ -144,7 +146,7 @@ export function CreateReceiptScreen({
         setPaymentSheetVisible(false);
         Alert.alert(
           'Receipt Generated!',
-          `Payment of ₹${totalSelectedAmount.toLocaleString('en-IN')} collected for ${selectedMember.name}. Receipt ${newReceipt?.receiptNo ?? ''} issued.`,
+          `Payment of ${formatCurrency(totalSelectedAmount)} collected for ${selectedMember.name}. Receipt ${newReceipt?.receiptNo ?? ''} issued.`,
           [
             {
               text: 'View Receipt',
@@ -371,7 +373,7 @@ export function CreateReceiptScreen({
                         </View>
 
                         <Typography variant="caption" color="textSecondary">
-                          Type: {bill.transactionType} · Due: ₹{bill.dueAmount.toLocaleString('en-IN')}
+                          Type: {bill.transactionType} · Due: <CurrencyValue amount={bill.dueAmount} />
                         </Typography>
                       </View>
 
@@ -442,7 +444,7 @@ export function CreateReceiptScreen({
                     style={[styles.methodChip, isSelected && styles.methodChipActive]}
                     onPress={() => setSelectedPaymentMethod(pm.method)}
                   >
-                    <Feather
+                    <FeatherIcon
                       name={pm.icon}
                       size={14}
                       color={isSelected ? BrandColors.teal : BrandColors.textSecondary}

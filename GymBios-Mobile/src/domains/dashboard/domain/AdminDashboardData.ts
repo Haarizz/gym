@@ -10,10 +10,15 @@ export type AdminReportType =
   | 'retention-rate'
   | null;
 
+import type { ReactNode } from 'react';
+
 export interface AdminKpiItem {
   id: string;
   label: string;
-  value: string;
+  /** Display value — a node so money can render the currency glyph. */
+  value: ReactNode;
+  /** Plain-text value for accessibility labels. */
+  valueText: string;
   change: string;
   trend: 'up' | 'down';
   icon: string;
@@ -23,7 +28,7 @@ export interface AdminKpiItem {
 
 export interface AdminPaymentMixItem {
   mode: string;
-  amount: string;
+  amount: ReactNode;
   percentage: number;
   color: string;
 }

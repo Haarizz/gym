@@ -6,6 +6,7 @@ import com.company.project.entities.Member;
 import com.company.project.entities.MobileReferralAttribution;
 import com.company.project.entities.MobileReferralProfile;
 import com.company.project.entities.MobileReferralStatus;
+import com.company.project.enums.PassContext;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
 import com.company.project.services.mobile.referrals.MobileReferralService;
@@ -38,11 +39,28 @@ public class MobileReferralController {
         this.entityManagerFactory = entityManagerFactory;
     }
 
+    /**
+     * The user's referral code for the gym in context. Only active members get one —
+     * otherwise eligible=false with a reason (NO_GYM / MEMBERSHIP_INACTIVE) and no code,
+     * as a 200 so the app shows a message rather than an error.
+     */
     @GetMapping("/me")
     public ResponseEntity<?> getMyProfile() {
-        Long userId = getCurrentUserId();
-        MobileReferralProfile profile = referralService.getOrCreateProfile(userId);
+        UserDetailsImpl principal = getCurrentPrincipal();
+        MobileReferralService.CodeBlocker blocker =
+                referralService.referralCodeBlocker(principal.getId(), principal.isGlobal());
+        if (blocker != null) {
+            return ResponseEntity.ok(Map.of(
+                    "eligible", false,
+                    "reason", blocker.name(),
+                    "message", blocker == MobileReferralService.CodeBlocker.NO_GYM
+                            ? "Join a gym to get your referral code."
+                            : "Renew your membership to share your referral code."
+            ));
+        }
+        MobileReferralProfile profile = referralService.getOrCreateProfile(principal.getId());
         return ResponseEntity.ok(Map.of(
+                "eligible", true,
                 "referralCode", profile.getReferralCode(),
                 "url", "https://gymbios.app/ref/" + profile.getReferralCode()
         ));
@@ -103,6 +121,17 @@ public class MobileReferralController {
         return ResponseEntity.ok(rewardService.getByMember(member.getMemberId()));
     }
 
+    /** GET /api/mobile/referrals/my-passes?context=MEMBERSHIP|PT|CLASS — the current user's spendable Reward Passes. */
+    @GetMapping("/my-passes")
+    public ResponseEntity<List<ReferralRewardResponseDTO>> getMyPasses(@RequestParam PassContext context) {
+        Long userId = getCurrentUserId();
+        Member member = resolutionService.findMemberByGlobalUserId(userId);
+        if (member == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(rewardService.getApplicablePasses(member.getMemberId(), context));
+    }
+
     /** GET /api/mobile/referrals/my-claim — the code the current user claimed as a referee, if any. */
     @GetMapping("/my-claim")
     public ResponseEntity<MyReferralClaimDTO> getMyClaim() {
@@ -127,9 +156,13 @@ public class MobileReferralController {
     }
 
     private Long getCurrentUserId() {
+        return getCurrentPrincipal().getId();
+    }
+
+    private UserDetailsImpl getCurrentPrincipal() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl) {
-            return ((UserDetailsImpl) auth.getPrincipal()).getId();
+            return (UserDetailsImpl) auth.getPrincipal();
         }
         throw new RuntimeException("Unauthorized");
     }

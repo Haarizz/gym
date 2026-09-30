@@ -20,13 +20,14 @@ function isToday(dateString: string): boolean {
   );
 }
 
-export function useNotifications() {
+/** @param module optional backend notification module to scope the list to (e.g. community activity). */
+export function useNotifications(module?: string) {
   const [filter, setFilter] = useState<NotificationFilter>('ALL');
 
   const query = useInfiniteQuery({
-    queryKey: notificationKeys.lists(),
+    queryKey: notificationKeys.list(module),
     queryFn: ({ pageParam = 0 }) =>
-      notificationService.getNotifications(pageParam as number, 20),
+      notificationService.getNotifications(pageParam as number, 20, module),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
       if (lastPage.last || lastPage.empty) {

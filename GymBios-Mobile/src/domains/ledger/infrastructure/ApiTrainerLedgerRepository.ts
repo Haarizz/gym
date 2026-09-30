@@ -1,4 +1,5 @@
 import { apiClient } from '@/core/network/apiClient';
+import { parseAmount } from '@/core/providers/currencyDefinitions';
 import type { TrainerLedgerData } from '../domain/TrainerLedgerData';
 
 export const trainerLedgerRepository = {
@@ -35,9 +36,10 @@ export const trainerLedgerRepository = {
         status: item.status,
       })),
       taxInfo: {
-        ytdEarnings: taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? '',
+        // The backend pre-formats these with a hardcoded "₹"; keep only the number.
+        ytdEarnings: parseAmount(taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings),
         totalSessions: taxInfoRaw.totalSessions ?? taxInfoRaw.total_sessions ?? 0,
-        avgPerSession: taxInfoRaw.avgPerSession ?? taxInfoRaw.avg_per_session ?? '',
+        avgPerSession: parseAmount(taxInfoRaw.avgPerSession ?? taxInfoRaw.avg_per_session),
         activeClients: taxInfoRaw.activeClients ?? taxInfoRaw.active_clients ?? 0,
       },
       taxDocuments: (raw.taxDocuments || raw.tax_documents || []).map((item: any) => ({

@@ -30,6 +30,10 @@ export class StaffService {
     return this.repository.updateStaff(id, request);
   }
 
+  updateStaffStatus(id: string, status: string): Promise<Staff> {
+    return this.repository.updateStaffStatus(id, status);
+  }
+
   deleteStaff(id: string): Promise<void> {
     return this.repository.deleteStaff(id);
   }

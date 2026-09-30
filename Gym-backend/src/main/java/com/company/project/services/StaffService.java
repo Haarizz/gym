@@ -11,7 +11,11 @@ import com.company.project.entities.StaffScheduleSlot;
 import com.company.project.entities.User;
 import com.company.project.entities.UserRole;
 import com.company.project.repositories.RoleRepository;
+import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.repositories.StaffRepository;
+import com.company.project.repositories.StaffTargetRepository;
+import com.company.project.repositories.TrainingSessionRepository;
+import com.company.project.repositories.TrainingStreamRepository;
 import com.company.project.repositories.UserRepository;
 import com.company.project.repositories.UserRoleRepository;
 import com.company.project.controlplane.entities.UserDirectoryEntry;
@@ -45,6 +49,10 @@ public class StaffService {
     private final com.company.project.repositories.StaffBranchRepository staffBranchRepository;
     private final BranchService branchService;
     private final UserDirectoryRepository userDirectoryRepository;
+    private final StaffAttendanceRepository staffAttendanceRepository;
+    private final StaffTargetRepository staffTargetRepository;
+    private final TrainingSessionRepository trainingSessionRepository;
+    private final TrainingStreamRepository trainingStreamRepository;
 
     public StaffService(StaffRepository staffRepository,
                         UserRepository userRepository,
@@ -53,7 +61,11 @@ public class StaffService {
                         PasswordEncoder passwordEncoder,
                         com.company.project.repositories.StaffBranchRepository staffBranchRepository,
                         BranchService branchService,
-                        UserDirectoryRepository userDirectoryRepository) {
+                        UserDirectoryRepository userDirectoryRepository,
+                        StaffAttendanceRepository staffAttendanceRepository,
+                        StaffTargetRepository staffTargetRepository,
+                        TrainingSessionRepository trainingSessionRepository,
+                        TrainingStreamRepository trainingStreamRepository) {
         this.staffRepository       = staffRepository;
         this.userRepository        = userRepository;
         this.roleRepository        = roleRepository;
@@ -62,6 +74,10 @@ public class StaffService {
         this.staffBranchRepository = staffBranchRepository;
         this.branchService         = branchService;
         this.userDirectoryRepository = userDirectoryRepository;
+        this.staffAttendanceRepository = staffAttendanceRepository;
+        this.staffTargetRepository = staffTargetRepository;
+        this.trainingSessionRepository = trainingSessionRepository;
+        this.trainingStreamRepository = trainingStreamRepository;
     }
 
     @Transactional(readOnly = true)
@@ -341,8 +357,27 @@ public class StaffService {
     }
 
     public void deleteStaff(Long id) {
-        if (!staffRepository.existsById(id)) throw new RuntimeException("Staff not found: " + id);
-        staffRepository.deleteById(id);
+        Staff staff = staffRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Staff not found: " + id));
+
+        // These rows hold FKs to staff.id, so Postgres rejects the delete while they exist.
+        // Attendance/targets belong to the staff member and go with them; classes and streams
+        // outlive their trainer, so just unassign them.
+        staffAttendanceRepository.deleteByStaffId(id);
+        staffTargetRepository.deleteByStaffId(id);
+        trainingSessionRepository.clearTrainer(id);
+        trainingStreamRepository.clearInstructor(id);
+        staffBranchRepository.deleteByStaffId(id);
+
+        // Revoke the linked app login rather than deleting the user, which other records may reference.
+        if (staff.getUserId() != null) {
+            userRepository.findById(staff.getUserId()).ifPresent(user -> {
+                user.setEnabled(false);
+                userRepository.save(user);
+            });
+        }
+
+        staffRepository.delete(staff);
     }
 
     private void applyRequest(StaffRequestDTO req, Staff staff) {

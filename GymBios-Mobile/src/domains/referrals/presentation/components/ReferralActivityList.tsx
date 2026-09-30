@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 import { ReferralStatusBadge } from './ReferralStatusBadge';
 import type { Referral } from '../../domain/Referral';
 
@@ -24,7 +24,6 @@ export function ReferralActivityList({
   onMarkSuccessful,
   maxItems,
 }: ReferralActivityListProps) {
-  const { currencyCode } = useCurrency();
   const list = maxItems ? referrals.slice(0, maxItems) : referrals;
 
   if (list.length === 0) {
@@ -64,7 +63,7 @@ export function ReferralActivityList({
               <View style={styles.statusCol}>
                 <ReferralStatusBadge status={item.status} />
                 <Typography variant="subtitle" style={styles.rewardText}>
-                  <CurrencyGlyph code={currencyCode} /> {rewardVal.toLocaleString()}
+                  <CurrencyValue amount={rewardVal} />
                 </Typography>
               </View>
             </View>

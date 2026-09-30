@@ -15,6 +15,7 @@ import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Typography } from '@/shared/components/Typography';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { PaymentBottomSheet } from '@/shared/payment/presentation/bottomSheets/PaymentBottomSheet';
 import type { PaymentResult } from '@/shared/payment/types';
@@ -63,12 +64,17 @@ const toIsoDate = (d: Date) =>
  * app's add-member form does. Pricing comes from the backend quote, never a local
  * estimate. Each member with an email is invited to the app after purchase and
  * gets the membership as soon as they log in with that email.
+ *
+ * mode=change: an existing member of this gym switching onto the plan (from
+ * Membership → Renew / Change plan) — they become the family head instead of
+ * joining as a new member.
  */
 export function FamilyPurchaseScreen() {
   const router = useRouter();
-  const { tenantSlug = '', branchId: branchIdParam, planId } =
-    useLocalSearchParams<{ tenantSlug: string; branchId: string; planId: string }>();
+  const { tenantSlug = '', branchId: branchIdParam, planId, mode } =
+    useLocalSearchParams<{ tenantSlug: string; branchId: string; planId: string; mode?: string }>();
   const branchId = Number(branchIdParam) || 0;
+  const isPlanChange = mode === 'change';
 
   const { data: details, isLoading: isDetailsLoading } = useCenterDetails(tenantSlug, branchId);
   const { data: plans, isLoading: isPlansLoading } = useCenterPlans(tenantSlug, branchId);
@@ -107,16 +113,18 @@ export function FamilyPurchaseScreen() {
   // Like the web form: under individual billing an adult may pick their own
   // (non-family) plan; under family_head billing everyone is on the one invoice.
   const allowsOwnPlan = selectedPlan?.familyBillingMode !== 'family_head';
+  // Dropdown labels are plain strings, so these use the text form (e.g. "AED 500").
+  const { formatCurrency } = useCurrency();
   const ownPlanOptions = useMemo(() => {
     const individualPlans = (plans ?? []).filter((p) => {
       const type = p.planType?.toLowerCase();
       return p.id !== selectedPlan?.id && type !== 'family' && type !== 'couple';
     });
     return [
-      { label: 'Same as your plan', value: '' },
-      ...individualPlans.map((p) => ({ label: `${p.name} · ₹${p.price}`, value: String(p.id) })),
+      { label: 'Same as your subscription', value: '' },
+      ...individualPlans.map((p) => ({ label: `${p.name} · ${formatCurrency(p.effectivePrice ?? p.price)}`, value: String(p.id) })),
     ];
-  }, [plans, selectedPlan]);
+  }, [plans, selectedPlan, formatCurrency]);
 
   const minorFlags = useMemo(() => watchMembers.map((m) => !isCouple && !!m.isMinor), [watchMembers, isCouple]);
   const memberPlanIds = useMemo(
@@ -129,6 +137,14 @@ export function FamilyPurchaseScreen() {
   const adultCount = minorFlags.filter((m) => !m).length;
   const childCount = minorFlags.length - adultCount;
   const canAddMember = limits.total == null || watchMembers.length < limits.total;
+  const limitLines = useMemo(() => {
+    if (isCouple) return ['You + your partner'];
+    const lines: string[] = [];
+    if (limits.total != null) lines.push(`You + up to ${limits.total} ${limits.total === 1 ? 'person' : 'people'}`);
+    if (limits.adults != null) lines.push(`Up to ${limits.adults} other adult${limits.adults === 1 ? '' : 's'} besides you`);
+    if (limits.children != null) lines.push(`Up to ${limits.children} child${limits.children === 1 ? '' : 'ren'}`);
+    return lines;
+  }, [limits, isCouple]);
 
   const { data: quote, isFetching: isQuoteFetching, error: quoteError } =
     useFamilyQuote(tenantSlug, branchId, selectedPlan?.id, minorFlags, memberPlanIds);
@@ -139,16 +155,20 @@ export function FamilyPurchaseScreen() {
       return;
     }
     if (limits.adults != null && adultCount > limits.adults) {
-      toast.error(`This plan allows ${limits.adults} other adult${limits.adults === 1 ? '' : 's'} besides you.`);
+      toast.error(`This subscription allows ${limits.adults} other adult${limits.adults === 1 ? '' : 's'} besides you.`);
       return;
     }
     if (limits.children != null && childCount > limits.children) {
-      toast.error(`This plan allows up to ${limits.children} child member${limits.children === 1 ? '' : 's'}.`);
+      toast.error(`This subscription allows up to ${limits.children} child member${limits.children === 1 ? '' : 's'}.`);
       return;
     }
     const emails = data.members.map((m) => m.email?.trim().toLowerCase()).filter(Boolean);
     if (new Set(emails).size !== emails.length) {
       toast.error('Each family member needs a different email.');
+      return;
+    }
+    if (quoteError) {
+      toast.error(quoteError.message);
       return;
     }
     if (!quote) {
@@ -184,23 +204,25 @@ export function FamilyPurchaseScreen() {
     };
 
     purchaseMutation.mutate(
-      { idempotencyKey, tenantSlug, branchId, request },
+      { idempotencyKey, tenantSlug, branchId, request, isPlanChange },
       {
         onSuccess: (result) => {
           setIsPaymentVisible(false);
           useAuthStore.getState().setActiveTenant(tenantSlug);
 
           toast.success(
-            result.approvalPending
-              ? `${selectedPlan.name} booked — the gym will confirm your payment before it's activated.`
-              : `You've purchased the ${selectedPlan.name} plan!`,
+            isPlanChange
+              ? `You've switched to the ${selectedPlan.name} subscription!`
+              : result.approvalPending
+                ? `${selectedPlan.name} booked — the gym will confirm your payment before it's activated.`
+                : `You've purchased the ${selectedPlan.name} subscription!`,
           );
           if (result.invitedEmails.length > 0) {
             toast.info(
               `Invitation sent to ${result.invitedEmails.join(', ')}. They get access by logging in to the app with that email.`,
             );
           }
-          router.replace('/(member)');
+          router.replace(isPlanChange ? '/(member)/membership' : '/(member)');
         },
         // The API client already shows the server's error message; the sheet stays
         // open so a retry reuses this attempt's idempotency key.
@@ -226,7 +248,7 @@ export function FamilyPurchaseScreen() {
         </View>
       ) : !selectedPlan ? (
         <View style={styles.center}>
-          <Typography variant="body" color="error">Plan not found.</Typography>
+          <Typography variant="body" color="error">Subscription not found.</Typography>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -237,14 +259,22 @@ export function FamilyPurchaseScreen() {
                 {selectedPlan.description}
               </Typography>
             )}
-            {limits.total != null && (
-              <View style={styles.planMetaRow}>
+            {limitLines.map((line) => (
+              <View key={line} style={styles.planMetaRow}>
                 <Feather name="users" size={16} color={BrandColors.teal} />
-                <Typography variant="bodySmall" color="textSecondary">
-                  You + up to {limits.total} {limits.total === 1 ? 'person' : 'people'}
-                </Typography>
+                <Typography variant="bodySmall" color="textSecondary">{line}</Typography>
               </View>
-            )}
+            ))}
+            <View style={styles.planMetaRow}>
+              <Feather name="file-text" size={16} color={BrandColors.teal} />
+              <Typography variant="bodySmall" color="textSecondary">
+                {selectedPlan.familyBillingMode === 'family_head'
+                  ? 'Everyone is billed together on one invoice to you'
+                  : isCouple
+                    ? 'Your partner gets their own membership, billed separately'
+                    : 'Adults get their own membership; children are billed to you'}
+              </Typography>
+            </View>
           </View>
 
           <View style={styles.sectionHeader}>
@@ -323,11 +353,11 @@ export function FamilyPurchaseScreen() {
                     name={`members.${index}.membershipPlanId`}
                     render={({ field: { onChange, value } }) => (
                       <Dropdown
-                        label="Membership plan (optional)"
+                        label="Subscription (optional)"
                         options={ownPlanOptions}
                         value={value}
                         onChange={onChange}
-                        placeholder="Same as your plan"
+                        placeholder="Same as your subscription"
                       />
                     )}
                   />
@@ -381,8 +411,9 @@ export function FamilyPurchaseScreen() {
                 {fee != null && (
                   <Typography variant="bodySmall" color="textSecondary" style={styles.memberFee}>
                     {isMinor
-                      ? `Added to your invoice: ₹${fee}`
-                      : `Their own membership (${quote?.memberPlanNames[index] ?? selectedPlan.name}): ₹${fee}`}
+                      ? 'Added to your invoice: '
+                      : `Their own membership (${quote?.memberPlanNames[index] ?? selectedPlan.name}): `}
+                    <CurrencyValue amount={fee} />
                   </Typography>
                 )}
               </View>
@@ -410,7 +441,9 @@ export function FamilyPurchaseScreen() {
             </View>
             {quoteError ? (
               <Typography variant="bodySmall" color="error" style={styles.totalRow}>
-                {`Couldn't load the price: ${quoteError.message}`}
+                {(quoteError as any).status >= 400 && (quoteError as any).status < 500
+                  ? quoteError.message
+                  : `Couldn't load the price: ${quoteError.message}`}
               </Typography>
             ) : quote ? (
               <>
@@ -418,11 +451,11 @@ export function FamilyPurchaseScreen() {
                   <>
                     <View style={styles.totalRow}>
                       <Typography variant="body" color="textSecondary">Your membership</Typography>
-                      <Typography variant="body">₹{quote.headFee}</Typography>
+                      <Typography variant="body"><CurrencyValue amount={quote.headFee} /></Typography>
                     </View>
                     <View style={styles.totalRow}>
                       <Typography variant="body" color="textSecondary">Family members ({watchMembers.length})</Typography>
-                      <Typography variant="body">₹{quote.membersTotal}</Typography>
+                      <Typography variant="body"><CurrencyValue amount={quote.membersTotal} /></Typography>
                     </View>
                   </>
                 ) : (
@@ -430,12 +463,12 @@ export function FamilyPurchaseScreen() {
                     <Typography variant="body" color="textSecondary">
                       Family invoice ({watchMembers.length + 1} members)
                     </Typography>
-                    <Typography variant="body">₹{quote.total}</Typography>
+                    <Typography variant="body"><CurrencyValue amount={quote.total} /></Typography>
                   </View>
                 )}
                 <View style={[styles.totalRow, styles.totalRowBold]}>
                   <Typography variant="title">Total</Typography>
-                  <Typography variant="title" color="primary">₹{quote.total}</Typography>
+                  <Typography variant="title" color="primary"><CurrencyValue amount={quote.total} /></Typography>
                 </View>
               </>
             ) : null}
@@ -444,7 +477,7 @@ export function FamilyPurchaseScreen() {
           <Button
             title="Review & Pay"
             onPress={handleSubmit(handleReviewAndPay)}
-            disabled={!quote || isQuoteFetching || watchMembers.length === 0}
+            disabled={!quote || !!quoteError || isQuoteFetching || watchMembers.length === 0}
             style={styles.submitBtn}
           />
         </ScrollView>
@@ -456,7 +489,6 @@ export function FamilyPurchaseScreen() {
           amount={quote.total}
           title={`Subscribe to ${selectedPlan.name}`}
           subtitle={details.centerName}
-          currency="₹"
           allowDiscount={false}
           onClose={() => setIsPaymentVisible(false)}
           isProcessing={purchaseMutation.isPending}

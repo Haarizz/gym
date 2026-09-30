@@ -2,6 +2,7 @@ package com.company.project.repositories;
 
 import com.company.project.entities.TrainingSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,6 +11,10 @@ import java.util.Collection;
 import java.util.List;
 
 public interface TrainingSessionRepository extends JpaRepository<TrainingSession, Long> {
+    @Modifying
+    @Query("UPDATE TrainingSession s SET s.trainer = null WHERE s.trainer.id = :staffId")
+    void clearTrainer(@Param("staffId") Long staffId);
+
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
     long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
 

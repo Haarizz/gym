@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyGlyph } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
@@ -197,7 +198,7 @@ export function PaymentSettlementScreen({
                   {/* Amount input */}
                   <View style={styles.amountInput}>
                     <Typography variant="caption" color="textSecondary" style={styles.currencySymbol}>
-                      ₹
+                      <CurrencyGlyph />
                     </Typography>
                     <TextInput
                       style={styles.textInput}

@@ -14,7 +14,12 @@ export interface CommunityPost {
   commentCount: number;
   likedByMe: boolean;
   image: CommunityPostImage | null;
-  authorUserId: number;
+  /** Set for staff / gym-issued logins; null when a GymBios app member authored it. */
+  authorUserId: number | null;
+  /** Set when a GymBios app member authored it; null otherwise. */
+  authorMemberId: number | null;
+  /** Server-computed: user and member IDs are separate spaces, so never compare IDs client-side. */
+  ownedByMe: boolean;
   authorUsername: string;
   authorRoles: string[];
   createdAt: string;
@@ -25,7 +30,9 @@ export interface CommunityComment {
   id: number;
   postId: number;
   content: string;
-  authorUserId: number;
+  authorUserId: number | null;
+  authorMemberId: number | null;
+  ownedByMe: boolean;
   authorUsername: string;
   authorRoles: string[];
   createdAt: string;
@@ -59,7 +66,8 @@ export interface TrendingTopic {
 }
 
 export interface LeaderboardEntry {
-  userId: number;
+  userId: number | null;
+  memberId: number | null;
   username: string;
   totalPosts: number;
   totalLikes: number;
@@ -77,6 +85,8 @@ export interface PaginationInfo {
 export interface CommunityPostsPageResponse {
   posts: CommunityPost[];
   pagination: PaginationInfo;
+  /** False for app accounts without a (payment-approved) membership in this gym: read-only. */
+  canPost: boolean;
 }
 
 export interface CreateCommunityPostRequest {
@@ -97,3 +107,9 @@ export interface ToggleCommunityLikeResponse {
   liked: boolean;
   likeCount: number;
 }
+
+/**
+ * Backend notification module for likes/comments on the current user's posts
+ * (CommunityService.NOTIFICATION_MODULE). referenceId on these is the post id.
+ */
+export const COMMUNITY_NOTIFICATION_MODULE = 'COMMUNITY_ACTIVITY';

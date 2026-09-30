@@ -6,6 +6,7 @@ public class CommunityPostsPageResponseDTO {
 
     private List<CommunityPostResponseDTO> posts;
     private PaginationDTO pagination;
+    private boolean canPost;
 
     public CommunityPostsPageResponseDTO() {}
 
@@ -19,5 +20,8 @@ public class CommunityPostsPageResponseDTO {
 
     public PaginationDTO getPagination() { return pagination; }
     public void setPagination(PaginationDTO pagination) { this.pagination = pagination; }
+
+    public boolean isCanPost() { return canPost; }
+    public void setCanPost(boolean canPost) { this.canPost = canPost; }
 }
 

@@ -136,7 +136,14 @@ public class TenantContextFilter extends OncePerRequestFilter {
                         }
                     }
 
-                    if (tenantSlug != null && !tenantSlug.isBlank() && !STRICTLY_GLOBAL_PATH.matches(request)) {
+                    // /api/mobile/profile/ is global only for global (member) accounts. Staff/admin
+                    // ids are tenant users.id, so their profile must resolve in the tenant DB —
+                    // otherwise the lazy profile insert hits the default DB and fails
+                    // user_profiles_user_id_fkey.
+                    boolean strictlyGlobal = STRICTLY_GLOBAL_PATH.matches(request)
+                            && (userDetails.isGlobal() || !STRICTLY_GLOBAL_PROFILE_PATH.matches(request));
+
+                    if (tenantSlug != null && !tenantSlug.isBlank() && !strictlyGlobal) {
                         TenantContextHolder.setCurrentTenant(tenantSlug);
                         
                         // Validate multi-tenant authorization for global users on protected member paths

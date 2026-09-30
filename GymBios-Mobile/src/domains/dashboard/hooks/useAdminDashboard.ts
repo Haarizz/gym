@@ -12,7 +12,7 @@ import type {
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { adminDashboardRepository } from '../infrastructure/ApiAdminDashboardRepository';
 import type { AdminDashboardKpiApi, AdminDashboardResponseApi } from '../infrastructure/AdminDashboardApiModels';
-import { formatChange, formatCompactCurrency, formatKpiValue } from '../utils/adminDashboardFormat';
+import { formatChange, formatCompactCurrency, formatKpiValue, formatKpiValueText } from '../utils/adminDashboardFormat';
 
 // Purely structural placeholder for the brief window before the first real
 // response arrives (or after a failed request) — every value is a genuine
@@ -61,13 +61,14 @@ export const adminDashboardKeys = {
   all: ['dashboard', 'admin'] as const,
 };
 
-function mapKpi(kpi: AdminDashboardKpiApi, currency: string): AdminKpiItem {
+function mapKpi(kpi: AdminDashboardKpiApi): AdminKpiItem {
   const style = KPI_STYLE[kpi.id] ?? { icon: 'bar-chart-2', color: '#64748B' };
   const { text, trend } = formatChange(kpi.change_percent);
   return {
     id: kpi.id,
     label: kpi.label,
-    value: kpi.available ? formatKpiValue(kpi.unit, kpi.value, currency) : 'N/A',
+    value: kpi.available ? formatKpiValue(kpi.unit, kpi.value) : 'N/A',
+    valueText: kpi.available ? formatKpiValueText(kpi.unit, kpi.value) : 'N/A',
     change: kpi.available ? text : '—',
     trend,
     icon: style.icon,
@@ -79,7 +80,7 @@ function mapKpi(kpi: AdminDashboardKpiApi, currency: string): AdminKpiItem {
 function mapPaymentMix(api: AdminDashboardResponseApi): AdminPaymentMixItem[] {
   return api.payment_mix.map((pm) => ({
     mode: pm.mode,
-    amount: formatCompactCurrency(pm.amount, api.currency),
+    amount: formatCompactCurrency(pm.amount),
     percentage: pm.percentage,
     color: PAYMENT_MODE_COLORS[pm.mode] ?? FALLBACK_PAYMENT_COLOR,
   }));
@@ -110,7 +111,7 @@ function mapDashboard(api: AdminDashboardResponseApi): AdminDashboardData {
   return {
     branch: api.branch.all_branches ? 'All Branches' : api.branch.branch_name,
     dateText: formatDateText(api.from, api.to),
-    kpis: api.kpis.map((k) => mapKpi(k, api.currency)),
+    kpis: api.kpis.map(mapKpi),
     paymentMix: mapPaymentMix(api),
     alerts: mapAlerts(api),
     highlights: mapHighlights(api),

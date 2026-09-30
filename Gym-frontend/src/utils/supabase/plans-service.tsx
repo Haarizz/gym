@@ -11,8 +11,20 @@ export interface Plan {
   durationType: string;
   durationValue: string;
   duration: string;
+  /** Regular price. */
   price: number;
+  /** Legacy percent field — no longer used for pricing; see the offer fields. */
   discount: number;
+  // Offer: a manual discount every member gets, optionally between two dates.
+  offerType: 'percentage' | 'fixed' | null;
+  offerValue: number | null;
+  offerLabel: string | null;
+  offerStartDate: string | null; // yyyy-MM-dd
+  offerEndDate: string | null;   // yyyy-MM-dd
+  /** Server-computed for today: whether the offer is running, what it takes off, what members pay. */
+  offerActive: boolean;
+  offerDiscountAmount: number;
+  effectivePrice: number;
   status: string;
   description: string;
   maxSessions: number | null;
@@ -44,6 +56,16 @@ export interface Plan {
   updatedAt: string | null;
 }
 
+/** The plan has an offer running today (server-computed). */
+export function planHasOffer(plan: Pick<Plan, 'offerActive' | 'offerDiscountAmount'>): boolean {
+  return !!plan.offerActive && Number(plan.offerDiscountAmount) > 0;
+}
+
+/** What a member pays for the plan today, before any code — the offer price when one is running. */
+export function planOfferPrice(plan: Pick<Plan, 'price' | 'effectivePrice' | 'offerActive' | 'offerDiscountAmount'>): number {
+  return planHasOffer(plan) ? Number(plan.effectivePrice) : Number(plan.price) || 0;
+}
+
 export interface PlanFormData {
   name: string;
   type: string;
@@ -52,6 +74,12 @@ export interface PlanFormData {
   durationValue: string;
   price: number | string;
   discount: number | string;
+  /** '' removes the offer; omit to leave it unchanged. */
+  offerType?: 'percentage' | 'fixed' | '';
+  offerValue?: number | null;
+  offerLabel?: string | null;
+  offerStartDate?: string | null;
+  offerEndDate?: string | null;
   status: string;
   description: string;
   maxSessions: number | string | null;

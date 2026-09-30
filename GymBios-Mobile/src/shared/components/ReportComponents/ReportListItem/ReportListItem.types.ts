@@ -10,8 +10,8 @@ export interface ReportListItemProps {
   /** Optional secondary detail line shown below the title. */
   subtitle?: string;
 
-  /** Optional trailing value shown on the right (e.g. "₹1,499", "Active"). */
-  value?: string;
+  /** Optional trailing value shown on the right (e.g. "Active", or a <CurrencyValue />). */
+  value?: React.ReactNode;
 
   /** When true the bottom divider is hidden. Useful for the last item in a list. */
   hideDivider?: boolean;

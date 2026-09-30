@@ -31,7 +31,7 @@ export function MemberOfferBanner() {
         <Text style={styles.title}>Special Offer! 🎉</Text>
       </View>
       <Text style={styles.description}>
-        Renew your membership now and get 15% off + 1 month free PT sessions.
+        Renew your subscription now and get 15% off + 1 month free PT sessions.
       </Text>
       <Pressable
         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}

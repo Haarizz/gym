@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
+import { CurrencyValue, formatAmount } from '@/core/providers';
 import Svg, { Path, Line, Circle, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { fullMonth, niceStep, shortMonth } from './chartUtils';
@@ -23,20 +24,6 @@ const TOOLTIP_WIDTH = 124;
 const GRID_COLOR = '#e5e7eb';
 const AXIS_COLOR = '#9ca3af';
 
-function trimNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
-}
-
-function formatCompactRupees(value: number) {
-  if (value >= 1e7) return `₹${trimNumber(value / 1e7)}Cr`;
-  if (value >= 1e5) return `₹${trimNumber(value / 1e5)}L`;
-  if (value >= 1e3) return `₹${trimNumber(value / 1e3)}K`;
-  return `₹${Math.round(value)}`;
-}
-
-function formatFullRupees(value: number) {
-  return `₹${Math.round(value).toLocaleString('en-IN')}`;
-}
 
 // Monotone cubic interpolation (Fritsch–Carlson): smooth like a bezier but never overshoots the data
 function monotonePath(points: { x: number; y: number }[]) {
@@ -94,7 +81,8 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
     const step = maxRevenue > 0 ? niceStep(maxRevenue / TICK_COUNT) : 250;
     const ticks = Array.from({ length: TICK_COUNT + 1 }, (_, i) => i * step);
     const yMax = ticks[ticks.length - 1];
-    const tickLabels = ticks.map(formatCompactRupees);
+    // SVG text can't draw the Dirham glyph font, so axis ticks are bare compact numbers.
+    const tickLabels = ticks.map((t) => formatAmount(t, { compact: true }));
 
     // Size the left gutter to the widest Y label so it never collides with the plot
     const longestLabel = Math.max(...tickLabels.map(label => label.length));
@@ -255,7 +243,7 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
         {activePoint && activeDatum && (
           <View pointerEvents="none" style={[styles.tooltip, { left: tooltipLeft, top: tooltipTop }]}>
             <Text style={styles.tooltipLabel}>{fullMonth(activeDatum.month)}</Text>
-            <Text style={styles.tooltipValue}>Revenue: {formatFullRupees(activeDatum.revenue)}</Text>
+            <Text style={styles.tooltipValue}>Revenue: <CurrencyValue amount={Math.round(activeDatum.revenue)} /></Text>
           </View>
         )}
       </View>

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.Period;
 import java.time.format.DateTimeParseException;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +38,11 @@ import com.company.project.security.UserDetailsImpl;
 @Service
 @Transactional
 public class MobileProfileService {
+
+    // Allowed member age range for date of birth. Keep in sync with
+    // GymBios-Mobile/src/domains/profile/domain/dateOfBirthRules.ts.
+    private static final int MIN_AGE_YEARS = 10;
+    private static final int MAX_AGE_YEARS = 100;
 
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
@@ -76,7 +82,7 @@ public class MobileProfileService {
                     newProfile.setFullName("Member"); // Add a default since fullName is non-null
                     return userProfileRepository.save(newProfile);
                 });
-        return MobileProfileDTO.fromEntity(profile);
+        return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
     }
 
     public MobileProfileDTO updateProfile(Long userId, MobileProfileDTO request) {
@@ -91,12 +97,17 @@ public class MobileProfileService {
         if (request.getFullName() != null) profile.setFullName(request.getFullName());
         if (request.getPhone() != null) profile.setPhone(request.getPhone());
         
-        if (request.getDateOfBirth() != null) {
+        if (request.getDateOfBirth() != null && request.getDateOfBirth().isBlank()) {
+            profile.setDateOfBirth(null);
+        } else if (request.getDateOfBirth() != null) {
+            LocalDate dateOfBirth;
             try {
-                profile.setDateOfBirth(LocalDate.parse(request.getDateOfBirth()));
+                dateOfBirth = LocalDate.parse(request.getDateOfBirth());
             } catch (DateTimeParseException e) {
                 throw new IllegalArgumentException("Invalid date format. Use YYYY-MM-DD");
             }
+            validateAge(dateOfBirth);
+            profile.setDateOfBirth(dateOfBirth);
         }
         
         if (request.getGender() != null) profile.setGender(request.getGender());
@@ -106,10 +117,30 @@ public class MobileProfileService {
         if (request.getEmergencyPhone() != null) profile.setEmergencyPhone(request.getEmergencyPhone());
         if (request.getBloodType() != null) profile.setBloodType(request.getBloodType());
         if (request.getMedicalConditions() != null) profile.setMedicalConditions(request.getMedicalConditions());
+        if (request.getAllergies() != null) profile.setAllergies(request.getAllergies());
+        if (request.getCurrentMedications() != null) profile.setCurrentMedications(request.getCurrentMedications());
+        if (request.getChronicIllnesses() != null) profile.setChronicIllnesses(request.getChronicIllnesses());
+        if (request.getHeight() != null) profile.setHeight(request.getHeight());
+        if (request.getWeight() != null) profile.setWeight(request.getWeight());
         if (request.getPhotoUrl() != null) profile.setPhotoUrl(request.getPhotoUrl());
 
         profile = userProfileRepository.save(profile);
-        return MobileProfileDTO.fromEntity(profile);
+        return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
+    }
+
+    private void validateAge(LocalDate dateOfBirth) {
+        int age = Period.between(dateOfBirth, LocalDate.now()).getYears();
+        if (dateOfBirth.isAfter(LocalDate.now()) || age < MIN_AGE_YEARS) {
+            throw new IllegalArgumentException("Member must be at least " + MIN_AGE_YEARS + " years old");
+        }
+        if (age > MAX_AGE_YEARS) {
+            throw new IllegalArgumentException("Age cannot be more than " + MAX_AGE_YEARS + " years");
+        }
+    }
+
+    private MobileProfileDTO withAccountEmail(MobileProfileDTO dto, Long userId) {
+        userRepository.findById(userId).ifPresent(user -> dto.setEmail(user.getEmail()));
+        return dto;
     }
 
     public MobileProfileTransactionsDTO getTransactions(UserDetailsImpl principal) {

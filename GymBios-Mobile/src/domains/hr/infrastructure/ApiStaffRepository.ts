@@ -159,6 +159,14 @@ export class ApiStaffRepository implements StaffRepository {
     return this.toDomain(response.data);
   }
 
+  async updateStaffStatus(id: string, status: string): Promise<Staff> {
+    // Status-only body: the backend applies only non-null fields, whereas the full
+    // payload from toStaffRequest would replace certifications and schedule.
+    const response = await apiClient.put<StaffResponse>(`/staff/${id}`, { status });
+
+    return this.toDomain(response.data);
+  }
+
   async deleteStaff(id: string): Promise<void> {
     await apiClient.delete(`/staff/${id}`);
   }

@@ -18,7 +18,7 @@ import type { ReportListItemProps } from './ReportListItem.types';
  * <ReportListItem
  *   title="Premium Membership"
  *   subtitle="Today"
- *   value="₹1,499"
+ *   value={<CurrencyValue amount={1499} />}
  * />
  * ```
  */

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { ApiPromotionRepository } from '../infrastructure/ApiPromotionRepository';
 import { PromotionService } from '../application/PromotionService';
 import { promotionKeys } from './promotionKeys';
@@ -13,15 +14,17 @@ const repository = new ApiPromotionRepository();
 const promotionService = new PromotionService(repository);
 
 export function usePromotions(statusFilter?: string) {
+  const { selectedBranchId } = useBranchContext();
   return useQuery<PromotionCampaignResponse[], Error>({
-    queryKey: promotionKeys.list(statusFilter),
+    queryKey: [...promotionKeys.list(statusFilter), selectedBranchId],
     queryFn: () => promotionService.getPromotions(statusFilter),
   });
 }
 
 export function usePromotion(id: number, enabled = true) {
+  const { selectedBranchId } = useBranchContext();
   return useQuery<PromotionCampaignResponse, Error>({
-    queryKey: promotionKeys.detail(id),
+    queryKey: [...promotionKeys.detail(id), selectedBranchId],
     queryFn: () => promotionService.getPromotionById(id),
     enabled: enabled && id > 0,
   });
@@ -133,15 +136,17 @@ export function useRedeemPromotion() {
 }
 
 export function usePromotionImpact() {
+  const { selectedBranchId } = useBranchContext();
   return useQuery<PromotionImpact, Error>({
-    queryKey: promotionKeys.impact(),
+    queryKey: [...promotionKeys.impact(), selectedBranchId],
     queryFn: () => promotionService.getMonthlyImpact(),
   });
 }
 
 export function useEligibilityMembers() {
+  const { selectedBranchId } = useBranchContext();
   return useQuery({
-    queryKey: promotionKeys.eligibilityMembers(),
+    queryKey: [...promotionKeys.eligibilityMembers(), selectedBranchId],
     queryFn: () => promotionService.getEligibilityMembers(),
   });
 }

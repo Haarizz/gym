@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TrainerRecentTransaction } from '../../domain/TrainerLedgerData';
 
@@ -66,7 +67,7 @@ export function TrainerLedgerTransactionsSection({
 
                 <View style={styles.itemBottomRow}>
                   <Text style={styles.dateText}>{formatDate(transaction.date)}</Text>
-                  <Text style={styles.amountText}>₹{transaction.amount.toLocaleString()}</Text>
+                  <Text style={styles.amountText}><CurrencyValue amount={transaction.amount} /></Text>
                 </View>
               </View>
             );

@@ -53,7 +53,8 @@ export function MembershipStep({ data, updateField }: MembershipStepProps) {
           error={error}
           onChange={(planId, plan) => {
             updateField('membershipPlanId', planId);
-            updateField('membershipFee', String(plan.price));
+            // The plan's running offer (if any) applies to staff-added members too.
+            updateField('membershipFee', String(plan.effectivePrice ?? plan.price));
             updateField('monthlyFee', String(plan.price));
             const startDate =
               data.startDate ?? data.joinDate ?? new Date();

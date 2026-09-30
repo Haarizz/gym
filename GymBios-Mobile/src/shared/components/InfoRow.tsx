@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from './Typography';
 
@@ -12,7 +13,7 @@ export interface InfoRowProps {
   iconColor?: string;
   iconBackground?: string;
   label: string;
-  /** Plain value renders through the label/value text style; pass a node for custom content (e.g. a progress bar). */
+  /** Plain value (or a <CurrencyValue>) renders through the label/value text style; pass a node for custom content (e.g. a progress bar). */
   value?: ReactNode;
   /** Shown, muted and italic, when value is empty. */
   emptyText?: string;
@@ -21,6 +22,8 @@ export interface InfoRowProps {
   /** Trailing content, e.g. an amount, a chevron, or a Switch. */
   right?: ReactNode;
   onPress?: () => void;
+  /** Max lines for a plain value; 0 shows the full text. */
+  valueLines?: number;
 }
 
 export function InfoRow({
@@ -33,9 +36,11 @@ export function InfoRow({
   divider = true,
   right,
   onPress,
+  valueLines = 2,
 }: InfoRowProps) {
   const Wrapper = onPress ? Pressable : View;
-  const isPlainValue = typeof value === 'string' || typeof value === 'number';
+  const isPlainValue =
+    typeof value === 'string' || typeof value === 'number' || (isValidElement(value) && value.type === CurrencyValue);
   const isEmpty = value === undefined || value === null || value === '';
 
   return (
@@ -52,7 +57,7 @@ export function InfoRow({
         {isPlainValue || isEmpty ? (
           <Typography
             variant="body"
-            numberOfLines={2}
+            numberOfLines={valueLines}
             style={[styles.value, isEmpty && styles.emptyValue]}
           >
             {isEmpty ? emptyText : value}

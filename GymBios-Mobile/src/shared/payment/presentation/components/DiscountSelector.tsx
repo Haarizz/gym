@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
@@ -11,7 +12,6 @@ import type { DiscountType } from '@/shared/payment/types';
 interface DiscountSelectorProps {
   discountType: DiscountType;
   discountValue: number;
-  currency?: string;
   onChange: (type: DiscountType, value: number) => void;
 }
 
@@ -24,7 +24,6 @@ const DISCOUNT_TYPE_OPTIONS = [
 export function DiscountSelector({
   discountType,
   discountValue,
-  currency = '₹',
   onChange,
 }: DiscountSelectorProps) {
   const theme = useTheme();
@@ -62,7 +61,7 @@ export function DiscountSelector({
               label={
                 discountType === 'percentage'
                   ? 'Discount (%)'
-                  : `Amount (${currency})`
+                  : <>Amount (<CurrencyGlyph />)</>
               }
               value={discountValue > 0 ? String(discountValue) : ''}
               onChangeText={(txt) => {

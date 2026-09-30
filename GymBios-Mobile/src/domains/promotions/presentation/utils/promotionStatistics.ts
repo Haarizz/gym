@@ -1,3 +1,4 @@
+import { formatCurrency } from '@/core/providers/currencyDefinitions';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
 
 export interface PromotionStatisticsData {
@@ -78,12 +79,13 @@ export function formatDiscountDisplay(
   discountType?: string | null,
   discountValue?: number | null,
 ): string {
+  // Plain text (share messages); cards render fixed discounts with <CurrencyValue> instead.
   const val = discountValue ?? 0;
   if (discountType === 'percentage') {
     return `${val}% OFF`;
   }
   if (discountType === 'fixed') {
-    return `$${val} OFF`;
+    return `${formatCurrency(val)} OFF`;
   }
   return val > 0 ? `${val} OFF` : 'SPECIAL OFFER';
 }

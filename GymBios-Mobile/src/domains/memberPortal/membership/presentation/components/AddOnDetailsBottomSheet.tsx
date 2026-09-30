@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing, TypographyScale } from '@/core/theme';
 import { AppBottomSheet, Button } from '@/shared/components';
 import type { AddOn } from '../../domain/models';
@@ -31,10 +32,7 @@ export function AddOnDetailsBottomSheet({
       <View style={styles.container}>
         <View style={styles.headerSection}>
           <Text style={styles.title}>{addOn.name}</Text>
-          <Text style={styles.price}>
-            {addOn.currency === 'INR' ? '₹' : addOn.currency}
-            {addOn.price} / {addOn.pricingUnit}
-          </Text>
+          <CurrencyValue style={styles.price} amount={addOn.price} suffix={` / ${addOn.pricingUnit}`} />
         </View>
 
         {!!addOn.description && (

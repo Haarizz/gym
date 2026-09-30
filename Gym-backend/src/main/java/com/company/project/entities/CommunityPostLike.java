@@ -5,7 +5,10 @@ import jakarta.persistence.*;
 @Entity
 @Table(
         name = "community_post_likes",
-        uniqueConstraints = @UniqueConstraint(name = "uq_community_post_like", columnNames = {"post_id", "user_id"})
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_community_post_like", columnNames = {"post_id", "user_id"}),
+                @UniqueConstraint(name = "uq_community_post_member_like", columnNames = {"post_id", "member_id"})
+        }
 )
 public class CommunityPostLike extends BaseEntity {
 
@@ -17,15 +20,25 @@ public class CommunityPostLike extends BaseEntity {
     @JoinColumn(name = "post_id", nullable = false)
     private CommunityPost post;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    // Exactly one of user / member is set — see CommunityPost.authorMember.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id")
+    private Member member;
 
     public CommunityPostLike() {}
 
     public CommunityPostLike(CommunityPost post, User user) {
         this.post = post;
         this.user = user;
+    }
+
+    public CommunityPostLike(CommunityPost post, Member member) {
+        this.post = post;
+        this.member = member;
     }
 
     public Long getId() { return id; }
@@ -36,5 +49,8 @@ public class CommunityPostLike extends BaseEntity {
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+
+    public Member getMember() { return member; }
+    public void setMember(Member member) { this.member = member; }
 }
 

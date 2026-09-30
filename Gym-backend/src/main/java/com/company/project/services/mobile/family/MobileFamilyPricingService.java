@@ -4,6 +4,7 @@ import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.services.MemberService;
+import com.company.project.services.PlanOfferPricing;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -106,7 +107,10 @@ public class MobileFamilyPricingService {
      * nobody has a plan of their own — same as the web form.
      */
     public Quote quote(MembershipPlan plan, List<Boolean> isMinorFlags, List<Long> memberPlanIds) {
-        BigDecimal planPrice = plan.getPrice() != null ? plan.getPrice() : BigDecimal.ZERO;
+        checkFamilySize(plan, isMinorFlags);
+        // The plan's running offer (if any) applies wherever its own price is charged;
+        // price-per-member / minor fees are separate prices and aren't discounted.
+        BigDecimal planPrice = PlanOfferPricing.effectivePrice(plan);
         boolean familyHeadBilling = "family_head".equalsIgnoreCase(plan.getFamilyBillingMode());
         List<BigDecimal> memberFees = new ArrayList<>();
         List<String> memberPlanNames = new ArrayList<>();
@@ -139,7 +143,7 @@ public class MobileFamilyPricingService {
                 Long ownPlanId = memberPlanIds != null && i < memberPlanIds.size() ? memberPlanIds.get(i) : null;
                 if (ownPlanId != null && !ownPlanId.equals(plan.getId())) {
                     MembershipPlan ownPlan = resolveMemberPlan(ownPlanId);
-                    fee = ownPlan.getPrice() != null ? ownPlan.getPrice() : BigDecimal.ZERO;
+                    fee = PlanOfferPricing.effectivePrice(ownPlan);
                     memberPlanNames.set(i, ownPlan.getName());
                 } else {
                     fee = planPrice;
@@ -149,6 +153,25 @@ public class MobileFamilyPricingService {
             total = total.add(fee);
         }
         return new Quote(plan, false, planPrice, memberFees, memberPlanNames, total);
+    }
+
+    /**
+     * The plan's member limits, checked on every quote so the app shows them while
+     * the family is being filled in — createMember/convertToFamilyHead enforce the
+     * same rules again, but only after the payment step.
+     */
+    private void checkFamilySize(MembershipPlan plan, List<Boolean> isMinorFlags) {
+        long children = isMinorFlags.stream().filter(Boolean.TRUE::equals).count();
+        if ("Couple".equalsIgnoreCase(plan.getPlanType())) {
+            if (isMinorFlags.size() > 1) {
+                throw new IllegalArgumentException("Couple membership allows only one connected member.");
+            }
+            if (children > 0) {
+                throw new IllegalArgumentException("Couple membership only supports an adult connected member.");
+            }
+            return;
+        }
+        memberService.enforceFamilyMemberCaps(plan, 1 + isMinorFlags.size() - children, children);
     }
 
     /**

@@ -6,6 +6,8 @@ import com.company.project.dto.BookingStatusUpdateDTO;
 import com.company.project.entities.Booking;
 import com.company.project.entities.Member;
 import com.company.project.entities.TrainingSession;
+import com.company.project.enums.PassContext;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.TrainingSessionRepository;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,17 +31,20 @@ public class BookingService {
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
     private final QrCodeService qrCodeService;
+    private final RewardRedemptionService rewardRedemptionService;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
                           MemberRepository memberRepository,
                           NotificationService notificationService,
-                          QrCodeService qrCodeService) {
+                          QrCodeService qrCodeService,
+                          RewardRedemptionService rewardRedemptionService) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
         this.qrCodeService = qrCodeService;
+        this.rewardRedemptionService = rewardRedemptionService;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -127,6 +133,18 @@ public class BookingService {
             }
         }
 
+        // A Free PT / Class Reward Pass must fit this booking before anything is saved.
+        PassContext passContext = null;
+        if (request.getRewardPassId() != null) {
+            if (member == null) {
+                throw new BusinessRuleViolationException("Reward Passes can only be used for member bookings");
+            }
+            passContext = PassContext.forSessionType(session.getType());
+            if (passContext == null) {
+                throw new BusinessRuleViolationException("Reward Passes can only be used for PT or class sessions");
+            }
+        }
+
         Booking booking = new Booking();
         booking.setSession(session);
         booking.setMember(member);
@@ -140,6 +158,14 @@ public class BookingService {
 
         // Save first to obtain the booking ID, then generate the HMAC-signed QR
         bookingRepository.save(booking);
+
+        if (passContext != null) {
+            // Spent in this same transaction — if anything below fails, the pass is untouched.
+            rewardRedemptionService.consumePass(request.getRewardPassId(), member.getMemberId(), passContext, booking.getId());
+            booking.setRewardId(request.getRewardPassId());
+            booking.setPrice(BigDecimal.ZERO);
+            booking.setPaymentStatus("paid");
+        }
         booking.setQrCode(qrCodeService.generateBookingQr(booking.getId()));
         bookingRepository.save(booking);
 
@@ -184,6 +210,9 @@ public class BookingService {
         if (request.getPaymentStatus() != null) {
             booking.setPaymentStatus(request.getPaymentStatus());
         }
+        if ("cancelled".equalsIgnoreCase(request.getStatus())) {
+            releaseRewardPass(booking);
+        }
         bookingRepository.save(booking);
 
         if ("cancelled".equalsIgnoreCase(request.getStatus())) {
@@ -221,12 +250,21 @@ public class BookingService {
 
     @Transactional
     public void deleteBooking(Long id) {
+        bookingRepository.findById(id).ifPresent(this::releaseRewardPass);
         bookingRepository.deleteById(id);
+    }
+
+    /** Gives back the Reward Pass a booking was paid with (cancel/delete), at most once. */
+    public void releaseRewardPass(Booking booking) {
+        if (booking.getRewardId() == null) return;
+        rewardRedemptionService.restorePass(booking.getRewardId());
+        booking.setRewardId(null);
     }
 
     private BookingResponseDTO toResponse(Booking booking) {
         BookingResponseDTO dto = new BookingResponseDTO();
         dto.setId(String.valueOf(booking.getId()));
+        dto.setRewardId(booking.getRewardId());
         dto.setSessionId(booking.getSession() == null ? null : String.valueOf(booking.getSession().getId()));
         dto.setSessionName(booking.getSession() == null ? null : booking.getSession().getName());
         dto.setTrainerName(booking.getSession() != null && booking.getSession().getTrainer() != null

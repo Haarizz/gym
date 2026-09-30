@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { MonthlyPerformanceDTO } from '../../domain/TrainerPerformanceData';
 
@@ -24,7 +25,7 @@ export function TrainerTargetProgressCard({ monthlyPerformance }: TrainerTargetP
         <View style={styles.targetHeader}>
           <Text style={styles.targetLabel}>Revenue Target</Text>
           <Text style={styles.targetValues}>
-            ₹{(revenue.achieved / 1000).toFixed(0)}K / ₹{(revenue.target / 1000).toFixed(0)}K
+            <CurrencyValue amount={revenue.achieved} compact /> / <CurrencyValue amount={revenue.target} compact />
           </Text>
         </View>
         <View style={styles.progressBarTrack}>

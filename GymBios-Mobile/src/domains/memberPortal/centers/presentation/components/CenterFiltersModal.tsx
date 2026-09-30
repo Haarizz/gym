@@ -8,7 +8,9 @@ import {
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export interface CenterFilters {
@@ -36,10 +38,10 @@ interface CenterFiltersModalProps {
 }
 
 const CATEGORIES = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
-const PRICE_RANGES: { value: CenterFilters['priceRange']; label: string }[] = [
-  { value: 'under2k', label: 'Under ₹2,000' },
-  { value: '2k-5k', label: '₹2,000–₹5,000' },
-  { value: 'above5k', label: 'Above ₹5,000' },
+const PRICE_RANGES: { value: CenterFilters['priceRange']; label: React.ReactNode }[] = [
+  { value: 'under2k', label: <>Under <CurrencyValue amount={2000} /></> },
+  { value: '2k-5k', label: <><CurrencyValue amount={2000} />–<CurrencyValue amount={5000} /></> },
+  { value: 'above5k', label: <>Above <CurrencyValue amount={5000} /></> },
 ];
 const ACCESS_TYPES = ['Mixed', 'Ladies Only', 'Men Only'];
 const PAYMENT_MODES = [
@@ -158,7 +160,7 @@ export function CenterFiltersModal({
                     style={[styles.chip, styles.chipWithIcon, isSelected && styles.chipSelected]}
                     onPress={() => toggle('paymentMode', value)}
                   >
-                    <Feather name={icon} size={13} color={isSelected ? BrandColors.teal : BrandColors.textSecondary} />
+                    <FeatherIcon name={icon} size={13} color={isSelected ? BrandColors.teal : BrandColors.textSecondary} />
                     <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{label}</Text>
                   </Pressable>
                 );

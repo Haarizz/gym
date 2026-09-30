@@ -63,6 +63,7 @@ export function useStaff(initialFilters?: StaffFilters) {
 
   const createStaffMutation = useCreateStaff();
   const updateStaffMutation = useUpdateStaff();
+  const updateStaffStatusMutation = useUpdateStaffStatus();
   const deleteStaffMutation = useDeleteStaff();
 
   const createStaff = useCallback(
@@ -79,6 +80,15 @@ export function useStaff(initialFilters?: StaffFilters) {
       return updated;
     },
     [updateStaffMutation],
+  );
+
+  const updateStaffStatus = useCallback(
+    async (id: string, status: string) => {
+      const updated = await updateStaffStatusMutation.mutateAsync({ id, status });
+      setSelectedStaff((prev) => (prev?.id === id ? updated : prev));
+      return updated;
+    },
+    [updateStaffStatusMutation],
   );
 
   const deleteStaff = useCallback(
@@ -100,6 +110,7 @@ export function useStaff(initialFilters?: StaffFilters) {
     submitting:
       createStaffMutation.isPending ||
       updateStaffMutation.isPending ||
+      updateStaffStatusMutation.isPending ||
       deleteStaffMutation.isPending,
     error,
 
@@ -107,6 +118,7 @@ export function useStaff(initialFilters?: StaffFilters) {
     loadStaff,
     createStaff,
     updateStaff,
+    updateStaffStatus,
     deleteStaff,
   };
 }
@@ -135,6 +147,20 @@ export function useUpdateStaff() {
       id: string;
       request: UpdateStaffRequest;
     }) => staffService.updateStaff(id, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all });
+      queryClient.invalidateQueries({ queryKey: staffKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useUpdateStaffStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      staffService.updateStaffStatus(id, status),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: staffKeys.all });
       queryClient.invalidateQueries({ queryKey: staffKeys.detail(variables.id) });

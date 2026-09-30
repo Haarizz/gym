@@ -29,8 +29,8 @@ export function MembershipPlanList({
   onDuplicate,
   onDelete,
   ListHeaderComponent,
-  emptyTitle = 'No Plans Found',
-  emptyDescription = 'Create your first membership plan to get started.',
+  emptyTitle = 'No Subscriptions Found',
+  emptyDescription = 'Create your first subscription to get started.',
 }: MembershipPlanListProps) {
   const renderItem = useCallback(
     ({ item }: { item: MembershipPlan }) => (

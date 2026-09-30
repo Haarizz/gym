@@ -42,7 +42,9 @@ export const ClaimReferralScreen = () => {
         }, 1500);
       },
       onError: (err: any) => {
-        setMessage({ text: err?.response?.data?.error || 'Failed to claim referral', type: 'error' });
+        // apiClient rejects with ApiError (body = the parsed response), not an axios error —
+        // the claim endpoint reports its reason as { error: "..." }.
+        setMessage({ text: err?.body?.error || err?.body?.message || 'Failed to claim referral', type: 'error' });
       }
     });
   };

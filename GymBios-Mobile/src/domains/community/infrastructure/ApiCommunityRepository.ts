@@ -44,7 +44,8 @@ export class ApiCommunityRepository implements CommunityRepository {
       '/community/stats/leaderboard',
     );
     return response.data.map(l => ({
-      userId: l.user_id,
+      userId: l.user_id ?? null,
+      memberId: l.member_id ?? null,
       username: l.username,
       totalPosts: l.total_posts,
       totalLikes: l.total_likes,
@@ -81,7 +82,8 @@ export class ApiCommunityRepository implements CommunityRepository {
         limit: response.data.pagination.limit,
         totalElements: response.data.pagination.total,
         totalPages: response.data.pagination.total_pages,
-      }
+      },
+      canPost: response.data.can_post === true,
     };
   }
 
@@ -119,7 +121,9 @@ export class ApiCommunityRepository implements CommunityRepository {
         cropPosition: data.image.crop_position,
         cropZoom: data.image.crop_zoom,
       } : null,
-      authorUserId: data.author_user_id,
+      authorUserId: data.author_user_id ?? null,
+      authorMemberId: data.author_member_id ?? null,
+      ownedByMe: data.owned_by_me === true,
       authorUsername: data.author_username,
       authorRoles: data.author_roles,
       createdAt: data.created_at,
@@ -168,7 +172,9 @@ export class ApiCommunityRepository implements CommunityRepository {
       id: data.id,
       postId: data.post_id,
       content: data.content,
-      authorUserId: data.author_user_id,
+      authorUserId: data.author_user_id ?? null,
+      authorMemberId: data.author_member_id ?? null,
+      ownedByMe: data.owned_by_me === true,
       authorUsername: data.author_username,
       authorRoles: data.author_roles,
       createdAt: data.created_at,

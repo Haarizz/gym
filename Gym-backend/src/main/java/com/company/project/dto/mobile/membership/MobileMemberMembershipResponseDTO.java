@@ -249,6 +249,52 @@ public class MobileMemberMembershipResponseDTO {
             this.endDate = endDate;
         }
 
+        // Plan freeze policy and what's left of it in the current plan period.
+        // allowedDays above is the days still available (remainingDays).
+        private Integer maxDays;
+        private Integer usedDays;
+        private Integer maxOccurrences;       // null = no limit
+        private Integer usedOccurrences;
+        private Integer remainingOccurrences; // null = no limit
+        private Integer freeDaysRemaining;
+        private BigDecimal chargePerExtraDay;
+        private String currencySymbol;
+        private Boolean autoUnfreeze;
+        private String unavailableReason;     // PLAN_DOES_NOT_ALLOW | NO_DAYS_LEFT | NO_FREEZES_LEFT
+        private String unavailableMessage;
+
+        public Integer getMaxDays() { return maxDays; }
+        public void setMaxDays(Integer maxDays) { this.maxDays = maxDays; }
+
+        public Integer getUsedDays() { return usedDays; }
+        public void setUsedDays(Integer usedDays) { this.usedDays = usedDays; }
+
+        public Integer getMaxOccurrences() { return maxOccurrences; }
+        public void setMaxOccurrences(Integer maxOccurrences) { this.maxOccurrences = maxOccurrences; }
+
+        public Integer getUsedOccurrences() { return usedOccurrences; }
+        public void setUsedOccurrences(Integer usedOccurrences) { this.usedOccurrences = usedOccurrences; }
+
+        public Integer getRemainingOccurrences() { return remainingOccurrences; }
+        public void setRemainingOccurrences(Integer remainingOccurrences) { this.remainingOccurrences = remainingOccurrences; }
+
+        public Integer getFreeDaysRemaining() { return freeDaysRemaining; }
+        public void setFreeDaysRemaining(Integer freeDaysRemaining) { this.freeDaysRemaining = freeDaysRemaining; }
+
+        public BigDecimal getChargePerExtraDay() { return chargePerExtraDay; }
+        public void setChargePerExtraDay(BigDecimal chargePerExtraDay) { this.chargePerExtraDay = chargePerExtraDay; }
+
+        public String getCurrencySymbol() { return currencySymbol; }
+        public void setCurrencySymbol(String currencySymbol) { this.currencySymbol = currencySymbol; }
+
+        public Boolean getAutoUnfreeze() { return autoUnfreeze; }
+        public void setAutoUnfreeze(Boolean autoUnfreeze) { this.autoUnfreeze = autoUnfreeze; }
+
+        public String getUnavailableReason() { return unavailableReason; }
+        public void setUnavailableReason(String unavailableReason) { this.unavailableReason = unavailableReason; }
+
+        public String getUnavailableMessage() { return unavailableMessage; }
+        public void setUnavailableMessage(String unavailableMessage) { this.unavailableMessage = unavailableMessage; }
     }
 
     public static class RenewalOfferInfo {

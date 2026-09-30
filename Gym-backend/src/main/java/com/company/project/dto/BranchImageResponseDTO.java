@@ -1,5 +1,7 @@
 package com.company.project.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class BranchImageResponseDTO {
     private Long id;
     private String imageUrl;
@@ -14,6 +16,9 @@ public class BranchImageResponseDTO {
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
+    // Without this, Jackson derives the name "cover" from the isCover() getter,
+    // but the web client reads is_cover — every cover then showed up as a gallery image.
+    @JsonProperty("is_cover")
     public boolean isCover() { return isCover; }
     public void setCover(boolean cover) { isCover = cover; }
 

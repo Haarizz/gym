@@ -12,5 +12,6 @@ public enum RewardAuditAction {
     WALLET_CREDITED,
     MEMBERSHIP_EXTENDED,
     COUPON_GENERATED,
-    CASH_PAID
+    CASH_PAID,
+    RESTORED        // a booking-spent Reward Pass given back after the booking was cancelled
 }

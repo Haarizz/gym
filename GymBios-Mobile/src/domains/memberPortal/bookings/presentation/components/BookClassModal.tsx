@@ -12,6 +12,9 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Colors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { useAvailableClasses, useCreateMemberBooking } from '../../hooks/useMemberBookings';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal/ConfirmationModal';
+import { RewardPassPicker, type RewardSelection } from '@/domains/member-referrals/presentation/components/RewardPassPicker';
+import type { PassContext } from '@/domains/member-referrals/domain/types';
+import type { SessionType } from '../../domain/MemberBookingData';
 
 interface BookClassModalProps {
   visible: boolean;
@@ -31,10 +34,26 @@ function formatTime(timeStr: string) {
   }
 }
 
+const SESSION_TYPE_LABELS: Record<SessionType, string> = {
+  class: 'Group Class',
+  pt: 'Personal Training',
+  facility: 'Facility',
+};
+
+// Mirrors the backend's PassContext.forSessionType — facility sessions take no Reward Pass.
+function passContextFor(type: SessionType | undefined): PassContext | null {
+  if (type === 'pt') return 'PT';
+  if (type === 'class') return 'CLASS';
+  return null;
+}
+
 export function BookClassModal({ visible, onClose }: BookClassModalProps) {
   const [selectedDayOffset, setSelectedDayOffset] = useState(0);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [selectedType, setSelectedType] = useState<SessionType | undefined>(undefined);
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+  // A Free PT / Class Reward Pass to pay for the booking (PT and group class sessions only).
+  const [rewardSel, setRewardSel] = useState<RewardSelection>(null);
 
   const dates = useMemo(() => [0, 1, 2, 3, 4].map((offset) => {
     const d = new Date();
@@ -52,6 +71,8 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
   const { data: availableClasses, isLoading, isError } = useAvailableClasses(selectedDate.isoString);
   const { mutate: createBooking, isPending: isCreating } = useCreateMemberBooking();
 
+  const selectedPassContext = passContextFor(selectedType);
+
   const handleConfirm = () => {
     if (!selectedClassId) return;
     setIsConfirmVisible(true);
@@ -60,11 +81,16 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
   const handleFinalConfirm = () => {
     if (!selectedClassId) return;
     createBooking(
-      { classId: selectedClassId },
+      {
+        classId: selectedClassId,
+        rewardPassId: selectedPassContext && rewardSel?.kind === 'pass' ? rewardSel.pass.id : undefined,
+      },
       {
         onSuccess: () => {
           setIsConfirmVisible(false);
           setSelectedClassId(null);
+          setSelectedType(undefined);
+          setRewardSel(null);
           onClose();
         },
         onError: () => {
@@ -80,7 +106,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Book a Class</Text>
+              <Text style={styles.title}>Book a Session</Text>
               <Text style={styles.subtitle}>Select your preferred session and time</Text>
             </View>
             <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton}>
@@ -108,7 +134,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
             </ScrollView>
 
             {/* Class Selector */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Available Classes</Text>
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Available Sessions</Text>
             <View style={styles.classList}>
               {isLoading && (
                 <View style={styles.centerContainer}>
@@ -117,12 +143,12 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
               )}
               {isError && (
                 <View style={styles.centerContainer}>
-                  <Text style={styles.errorText}>Unable to load classes</Text>
+                  <Text style={styles.errorText}>Unable to load sessions</Text>
                 </View>
               )}
               {!isLoading && !isError && (!availableClasses || availableClasses.length === 0) && (
                 <View style={styles.centerContainer}>
-                  <Text style={styles.emptyText}>No classes available</Text>
+                  <Text style={styles.emptyText}>No sessions available</Text>
                 </View>
               )}
               {!isLoading && !isError && availableClasses?.map((cls) => {
@@ -135,6 +161,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                 const memberBookingState = classData.member_booking_state ?? cls.memberBookingState;
                 const availableSpots = classData.available_spots ?? cls.availableSpots;
                 const startTime = classData.start_time ?? cls.startTime;
+                const type: SessionType | undefined = classData.type ?? cls.type;
 
                 const isSelected = selectedClassId === classId;
                 const isBooked = !!memberBookingState;
@@ -150,15 +177,25 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                       isDisabled && !isSelected && styles.classCardDisabled
                     ]}
                     onPress={() => {
-                      if (!isDisabled) setSelectedClassId(classId);
+                      if (isDisabled) return;
+                      if (passContextFor(type) !== selectedPassContext) setRewardSel(null);
+                      setSelectedClassId(classId);
+                      setSelectedType(type);
                     }}
                   >
                     <View style={styles.classInfo}>
+                      {type && SESSION_TYPE_LABELS[type] && (
+                        <Text style={styles.typeBadge}>{SESSION_TYPE_LABELS[type]}</Text>
+                      )}
                       <Text style={[styles.className, isSelected && styles.classNameSelected]}>
                         {className}
                       </Text>
                       <Text style={styles.classDetails}>
-                        with {trainerName || 'Instructor'} • {durationMinutes} min
+                        {trainerName
+                          ? `with ${trainerName} • ${durationMinutes} min`
+                          : type === 'facility'
+                            ? `${durationMinutes} min`
+                            : `with Instructor • ${durationMinutes} min`}
                       </Text>
                       <View style={styles.locationTag}>
                         <Feather name="map-pin" size={11} color={BrandColors.textSecondary} />
@@ -169,7 +206,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                          <Text style={styles.statusTextBooked}>Already Booked</Text>
                       )}
                       {isFull && !isBooked && (
-                         <Text style={styles.statusTextFull}>Class Full</Text>
+                         <Text style={styles.statusTextFull}>Fully Booked</Text>
                       )}
                     </View>
                     <View style={styles.timeTag}>
@@ -179,6 +216,9 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                 );
               })}
             </View>
+            {selectedClassId != null && selectedPassContext && (
+              <RewardPassPicker passContext={selectedPassContext} value={rewardSel} onChange={setRewardSel} />
+            )}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -202,7 +242,9 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
       <ConfirmationModal
         visible={isConfirmVisible}
         title="Confirm Booking"
-        message="Are you sure you want to book this session?"
+        message={rewardSel?.kind === 'pass'
+          ? 'Book this session using your Reward Pass? It will be free.'
+          : 'Are you sure you want to book this session?'}
         confirmText="Confirm"
         cancelText="Cancel"
         variant="primary"
@@ -321,6 +363,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: BrandColors.textPrimary,
+  },
+  typeBadge: {
+    alignSelf: 'flex-start',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: BrandColors.teal,
+    marginBottom: 2,
   },
   classNameSelected: {
     color: BrandColors.memberGold,

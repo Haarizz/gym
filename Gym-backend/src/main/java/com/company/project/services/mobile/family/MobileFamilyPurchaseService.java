@@ -3,7 +3,9 @@ package com.company.project.services.mobile.family;
 import com.company.project.dto.FamilyMemberDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
+import com.company.project.dto.MinorChargeDTO;
 import com.company.project.dto.PaymentSplitDTO;
+import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.mobile.family.MobileFamilyConnectedMemberDTO;
 import com.company.project.entities.Member;
@@ -13,6 +15,7 @@ import com.company.project.entities.UserProfile;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.services.MemberService;
+import com.company.project.services.MembershipFreezeService;
 import com.company.project.services.NotificationService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +54,7 @@ public class MobileFamilyPurchaseService {
     private final MemberService memberService;
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
+    private final MembershipFreezeService freezeService;
     private final ObjectMapper objectMapper;
 
     public MobileFamilyPurchaseService(MobileIdempotencyService idempotencyService,
@@ -59,6 +63,7 @@ public class MobileFamilyPurchaseService {
                                        MemberService memberService,
                                        MemberRepository memberRepository,
                                        NotificationService notificationService,
+                                       MembershipFreezeService freezeService,
                                        ObjectMapper objectMapper) {
         this.idempotencyService = idempotencyService;
         this.pricingService = pricingService;
@@ -66,6 +71,7 @@ public class MobileFamilyPurchaseService {
         this.memberService = memberService;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
+        this.freezeService = freezeService;
         this.objectMapper = objectMapper;
     }
 
@@ -112,50 +118,16 @@ public class MobileFamilyPurchaseService {
         }
         validateConnectedEmails(connected, buyerEmail);
 
-        List<Boolean> minorFlags = connected.stream().map(c -> Boolean.TRUE.equals(c.getIsMinor())).toList();
-        List<Long> memberPlanIds = connected.stream().map(MobileFamilyConnectedMemberDTO::getMembershipPlanId).toList();
-        MobileFamilyPricingService.Quote quote = pricingService.quote(plan, minorFlags, memberPlanIds);
-
         String paymentMethodUsed = request.getPaymentMethodUsed();
         boolean requiresApproval = paymentMethodUsed != null
                 && APPROVAL_REQUIRED_METHODS.contains(paymentMethodUsed.trim().toLowerCase());
-        List<PaymentSplitDTO> paidLegs = pricingService.paidLegs(request.getPaymentBreakdown(), paymentMethodUsed,
-                request.getPaidAmount(), quote.getTotal());
-
-        // Receipts are funded in order: head's own invoice, then (individual billing)
-        // minors folded onto it, then each adult's own receipt.
-        List<Integer> minorIdx = new ArrayList<>();
-        List<Integer> adultIdx = new ArrayList<>();
-        for (int i = 0; i < connected.size(); i++) {
-            (minorFlags.get(i) ? minorIdx : adultIdx).add(i);
-        }
-        List<BigDecimal> bucketFees = new ArrayList<>();
-        bucketFees.add(quote.getHeadFee());
-        if (!quote.isFamilyHeadBilling()) {
-            minorIdx.forEach(i -> bucketFees.add(quote.getMemberFees().get(i)));
-            adultIdx.forEach(i -> bucketFees.add(quote.getMemberFees().get(i)));
-        }
-        List<List<PaymentSplitDTO>> allocation = pricingService.allocate(paidLegs, bucketFees);
+        FamilyBill bill = billFamily(request, plan, connected);
+        MobileFamilyPricingService.Quote quote = bill.quote();
 
         MemberRequestDTO head = buildHeadRequest(request, profile, callerEmail, plan, quote.getHeadFee(),
-                allocation.get(0), requiresApproval);
-
-        FamilyMemberDTO[] familyMembers = new FamilyMemberDTO[connected.size()];
-        for (int i = 0; i < connected.size(); i++) {
-            familyMembers[i] = baseFamilyMember(connected.get(i));
-        }
-        if (!quote.isFamilyHeadBilling()) {
-            int bucket = 1;
-            for (int i : minorIdx) {
-                applyMinorPayment(familyMembers[i], quote.getMemberFees().get(i), allocation.get(bucket++), paymentMethodUsed);
-            }
-            for (int i : adultIdx) {
-                applyAdultPayment(familyMembers[i], quote.getMemberPlanNames().get(i), quote.getMemberFees().get(i),
-                        allocation.get(bucket++), paymentMethodUsed);
-            }
-        }
+                bill.headLegs(), requiresApproval);
         head.setIsFamilyHead(true);
-        head.setFamilyMembers(List.of(familyMembers));
+        head.setFamilyMembers(bill.familyMembers());
 
         MemberResponseDTO created = memberService.createMember(head);
         Long headDbId = Long.valueOf(created.getId());
@@ -174,10 +146,136 @@ public class MobileFamilyPurchaseService {
             );
         }
 
-        Member headEntity = memberRepository.findById(headDbId).orElseThrow();
+        return inviteAndRespond(memberRepository.findById(headDbId).orElseThrow(), plan, bill,
+                tenantSlug, gymName, requiresApproval);
+    }
+
+    /**
+     * An existing member here switching onto a Family/Couple plan: they become the
+     * family head (MemberService.convertToFamilyHead) and their family members are
+     * created and invited exactly as on a new purchase, priced by the same quote.
+     * No reception-approval gate — same as any other mobile plan change.
+     */
+    @Transactional
+    public PurchaseOutcome convert(UUID idempotencyKey, String payloadFingerprint, MobilePurchaseRequestDTO request,
+                                   Long headDbId, String tenantSlug, String gymName) {
+        MobileIdempotencyRecord lease = idempotencyService.acquireOrRenewLease(idempotencyKey, payloadFingerprint);
+        if ("COMPLETED".equals(lease.getStatus())) {
+            return new PurchaseOutcome(lease.getResponsePayload(), List.of());
+        }
+
+        try {
+            PurchaseOutcome outcome = doConvert(request, headDbId, tenantSlug, gymName);
+            memberRepository.flush();
+            idempotencyService.completeRequest(idempotencyKey, lease.getLeaseId(), outcome.responseJson());
+            return outcome;
+        } catch (RuntimeException e) {
+            idempotencyService.failRequest(idempotencyKey, lease.getLeaseId());
+            throw e;
+        }
+    }
+
+    private PurchaseOutcome doConvert(MobilePurchaseRequestDTO request, Long headDbId, String tenantSlug, String gymName) {
+        MembershipPlan plan = pricingService.resolveFamilyPlan(request.getPlanId());
+        List<MobileFamilyConnectedMemberDTO> connected = request.getConnectedMembers();
+        if (connected == null || connected.isEmpty()) {
+            throw new IllegalArgumentException("Add at least one family member.");
+        }
+        Member head = memberRepository.findById(headDbId).orElseThrow();
+        validateConnectedEmails(connected, MobileFamilyInvitationService.normalizeEmail(head.getEmail()));
+
+        FamilyBill bill = billFamily(request, plan, connected);
+        MobileFamilyPricingService.Quote quote = bill.quote();
+
+        // The head's renewal receipt covers their own fee plus everyone billed to
+        // them, itemized — the same invoice createMember builds for a new family.
+        List<PaymentSplitDTO> headLegs = new ArrayList<>(bill.headLegs());
+        BigDecimal billedToHeadFees = BigDecimal.ZERO;
+        List<MinorChargeDTO> charges = new ArrayList<>();
+        boolean familyPaidInFull = MobileFamilyPricingService.sum(bill.paidLegs()).compareTo(quote.getTotal()) >= 0;
+        for (int i = 0; i < connected.size(); i++) {
+            FamilyMemberDTO fm = bill.familyMembers().get(i);
+            BigDecimal fee = quote.getMemberFees().get(i);
+            if (quote.isFamilyHeadBilling()) {
+                fm.setMinorFee(fee); // their informational share of the head's invoice
+                charges.add(new MinorChargeDTO(null, null, fm.getName(), fee, familyPaidInFull));
+            } else if (Boolean.TRUE.equals(fm.getIsMinor())) {
+                BigDecimal paid = fm.getMinorPaidAmount() != null ? fm.getMinorPaidAmount() : BigDecimal.ZERO;
+                if (fm.getMinorPaymentBreakdown() != null) headLegs.addAll(fm.getMinorPaymentBreakdown());
+                billedToHeadFees = billedToHeadFees.add(fee);
+                charges.add(new MinorChargeDTO(null, null, fm.getName(), fee,
+                        fee.signum() > 0 && paid.compareTo(fee) >= 0));
+            }
+        }
+
+        RenewalRequestDTO renewal = new RenewalRequestDTO();
+        renewal.setMembershipFee(quote.getHeadFee());
+        renewal.setBilledToHeadFeeTotal(billedToHeadFees);
+        renewal.setMinorCharges(charges);
+        renewal.setAmountReceived(MobileFamilyPricingService.sum(headLegs));
+        renewal.setPaymentMethod(request.getPaymentMethodUsed());
+        renewal.setPaymentBreakdown(headLegs.isEmpty() ? null : headLegs);
+        renewal.setBankAccountCode(request.getBankAccountCode());
+        renewal.setBankAccountName(request.getBankAccountName());
+        // Unfreeze first: the family members copy the head's status, and a plan
+        // just paid for shouldn't start out frozen.
+        freezeService.endFreezeForRenewal(headDbId);
+        memberService.convertToFamilyHead(headDbId, plan, renewal, bill.familyMembers());
+
+        return inviteAndRespond(head, plan, bill, tenantSlug, gymName, false);
+    }
+
+    /** What a family costs and how the payment is split across its receipts. */
+    private record FamilyBill(MobileFamilyPricingService.Quote quote, List<PaymentSplitDTO> paidLegs,
+                              List<PaymentSplitDTO> headLegs, List<FamilyMemberDTO> familyMembers) {}
+
+    private FamilyBill billFamily(MobilePurchaseRequestDTO request, MembershipPlan plan,
+                                  List<MobileFamilyConnectedMemberDTO> connected) {
+        List<Boolean> minorFlags = connected.stream().map(c -> Boolean.TRUE.equals(c.getIsMinor())).toList();
+        List<Long> memberPlanIds = connected.stream().map(MobileFamilyConnectedMemberDTO::getMembershipPlanId).toList();
+        MobileFamilyPricingService.Quote quote = pricingService.quote(plan, minorFlags, memberPlanIds);
+
+        String paymentMethodUsed = request.getPaymentMethodUsed();
+        List<PaymentSplitDTO> paidLegs = pricingService.paidLegs(request.getPaymentBreakdown(), paymentMethodUsed,
+                request.getPaidAmount(), quote.getTotal());
+
+        // Receipts are funded in order: head's own invoice, then (individual billing)
+        // minors folded onto it, then each adult's own receipt.
+        List<Integer> minorIdx = new ArrayList<>();
+        List<Integer> adultIdx = new ArrayList<>();
+        for (int i = 0; i < connected.size(); i++) {
+            (minorFlags.get(i) ? minorIdx : adultIdx).add(i);
+        }
+        List<BigDecimal> bucketFees = new ArrayList<>();
+        bucketFees.add(quote.getHeadFee());
+        if (!quote.isFamilyHeadBilling()) {
+            minorIdx.forEach(i -> bucketFees.add(quote.getMemberFees().get(i)));
+            adultIdx.forEach(i -> bucketFees.add(quote.getMemberFees().get(i)));
+        }
+        List<List<PaymentSplitDTO>> allocation = pricingService.allocate(paidLegs, bucketFees);
+
+        FamilyMemberDTO[] familyMembers = new FamilyMemberDTO[connected.size()];
+        for (int i = 0; i < connected.size(); i++) {
+            familyMembers[i] = baseFamilyMember(connected.get(i));
+        }
+        if (!quote.isFamilyHeadBilling()) {
+            int bucket = 1;
+            for (int i : minorIdx) {
+                applyMinorPayment(familyMembers[i], quote.getMemberFees().get(i), allocation.get(bucket++), paymentMethodUsed);
+            }
+            for (int i : adultIdx) {
+                applyAdultPayment(familyMembers[i], quote.getMemberPlanNames().get(i), quote.getMemberFees().get(i),
+                        allocation.get(bucket++), paymentMethodUsed);
+            }
+        }
+        return new FamilyBill(quote, paidLegs, allocation.get(0), List.of(familyMembers));
+    }
+
+    private PurchaseOutcome inviteAndRespond(Member headEntity, MembershipPlan plan, FamilyBill bill,
+                                             String tenantSlug, String gymName, boolean approvalPending) {
         List<InvitationEmail> emails = new ArrayList<>();
         List<String> invited = new ArrayList<>();
-        for (Member dep : memberRepository.findByFamilyHeadId(created.getMemberId())) {
+        for (Member dep : memberRepository.findByFamilyHeadId(headEntity.getMemberId())) {
             if (!StringUtils.hasText(dep.getEmail())) continue;
             invitationService.createInvitation(headEntity, dep, tenantSlug, gymName, plan.getName());
             emails.add(new InvitationEmail(dep.getEmail(), dep.getName(), headEntity.getName(), plan.getName()));
@@ -186,11 +284,11 @@ public class MobileFamilyPurchaseService {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "SUCCESS");
-        response.put("memberId", created.getMemberId());
+        response.put("memberId", headEntity.getMemberId());
         response.put("tenantSlug", tenantSlug);
-        response.put("approvalPending", requiresApproval);
-        response.put("totalAmount", quote.getTotal());
-        response.put("paidAmount", MobileFamilyPricingService.sum(paidLegs));
+        response.put("approvalPending", approvalPending);
+        response.put("totalAmount", bill.quote().getTotal());
+        response.put("paidAmount", MobileFamilyPricingService.sum(bill.paidLegs()));
         response.put("invitedEmails", invited);
         return new PurchaseOutcome(toJson(response), emails);
     }
