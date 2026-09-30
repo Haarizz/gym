@@ -1,6 +1,6 @@
 // src/shared/components/DatePicker/YearSelector.tsx
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
@@ -13,6 +13,8 @@ interface YearSelectorProps {
   minimumYear?: number;
   /** Defaults to current year + 10 when omitted. */
   maximumYear?: number;
+  /** List newest year first. */
+  descending?: boolean;
   onSelectYear: (year: number) => void;
 }
 
@@ -36,11 +38,15 @@ export function YearSelector({
   selectedYear,
   minimumYear = 1900,
   maximumYear = new Date().getFullYear() + 10,
+  descending = false,
   onSelectYear,
 }: YearSelectorProps) {
   const theme = useTheme();
   const listRef = useRef<FlatList<number>>(null);
-  const years = buildYearRange(minimumYear, maximumYear);
+  const years = useMemo(() => {
+    const range = buildYearRange(minimumYear, maximumYear);
+    return descending ? range.reverse() : range;
+  }, [minimumYear, maximumYear, descending]);
 
   // Tracks the year currently centered in the wheel while scrolling, so the
   // highlighted row can update live rather than only on scroll-end.

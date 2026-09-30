@@ -6,6 +6,7 @@ import java.time.LocalTime;
 public class AvailableClassDTO {
     private Long classId;
     private String className;
+    private String type; // class | pt | facility
     private String trainerName;
     private LocalDate date;
     private LocalTime startTime;
@@ -23,6 +24,9 @@ public class AvailableClassDTO {
 
     public String getClassName() { return className; }
     public void setClassName(String className) { this.className = className; }
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
 
     public String getTrainerName() { return trainerName; }
     public void setTrainerName(String trainerName) { this.trainerName = trainerName; }

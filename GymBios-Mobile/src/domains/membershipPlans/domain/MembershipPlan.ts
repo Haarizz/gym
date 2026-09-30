@@ -14,8 +14,21 @@ export interface MembershipPlan {
   duration: string;
 
   // Pricing
+  /** Regular price. */
   price: number;
+  /** Legacy percent field — not used for pricing any more; see the offer fields. */
   discount: number;
+
+  // Offer: a manual discount every member gets, optionally between two dates.
+  offerType: 'percentage' | 'fixed' | null;
+  offerValue: number | null;
+  offerLabel: string | null;
+  offerStartDate: string | null; // yyyy-MM-dd
+  offerEndDate: string | null;   // yyyy-MM-dd
+  /** Server-computed for today. */
+  offerActive: boolean;
+  offerDiscountAmount: number;
+  effectivePrice: number;
 
   // Sessions
   maxSessions?: number;

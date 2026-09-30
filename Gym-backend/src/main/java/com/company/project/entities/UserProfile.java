@@ -60,9 +60,7 @@ public class UserProfile extends BaseEntity {
 
     public boolean isProfileCompleted() {
         return fullName != null && !fullName.isBlank() &&
-               phone != null && !phone.isBlank() &&
-               dateOfBirth != null &&
-               gender != null && !gender.isBlank();
+               phone != null && !phone.isBlank();
     }
 
     public Long getId() { return id; }

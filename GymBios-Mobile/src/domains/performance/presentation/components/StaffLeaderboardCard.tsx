@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { LeaderboardItem } from '../../domain/StaffPerformanceData';
 
@@ -35,7 +36,7 @@ export function StaffLeaderboardCard({ leaderboard }: StaffLeaderboardCardProps)
                 <View style={styles.metricsRow}>
                   <Text style={styles.metricsText}>{item.conversions} conversions</Text>
                   <Text style={styles.dot}>•</Text>
-                  <Text style={[styles.metricsText, styles.revenueText]}>{item.revenue}</Text>
+                  <CurrencyValue style={[styles.metricsText, styles.revenueText]} amount={item.revenue} compact />
                 </View>
               </View>
 

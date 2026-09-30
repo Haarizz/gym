@@ -13,10 +13,15 @@ public interface CommunityPostLikeRepository extends JpaRepository<CommunityPost
 
     Optional<CommunityPostLike> findByPostIdAndUserId(Long postId, Long userId);
 
+    Optional<CommunityPostLike> findByPostIdAndMemberId(Long postId, Long memberId);
+
     @Modifying
     @Query("delete from CommunityPostLike l where l.post.id = :postId")
     void deleteByPostId(@Param("postId") Long postId);
 
     @Query("select l.post.id from CommunityPostLike l where l.user.id = :userId and l.post.id in :postIds")
     List<Long> findLikedPostIds(@Param("userId") Long userId, @Param("postIds") List<Long> postIds);
+
+    @Query("select l.post.id from CommunityPostLike l where l.member.id = :memberId and l.post.id in :postIds")
+    List<Long> findLikedPostIdsByMember(@Param("memberId") Long memberId, @Param("postIds") List<Long> postIds);
 }

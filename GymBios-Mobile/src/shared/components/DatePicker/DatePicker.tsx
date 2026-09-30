@@ -26,6 +26,7 @@ export function DatePicker({
   minimumDate,
   maximumDate,
   mode = 'date',
+  initialView = 'calendar',
   required = false,
   disabled = false,
   error,
@@ -140,6 +141,7 @@ export function DatePicker({
         visible={modalVisible}
         value={value ?? null}
         mode={mode}
+        initialView={initialView}
         minimumDate={minimumDate}
         maximumDate={maximumDate}
         onClose={handleClose}

@@ -19,7 +19,8 @@ public class MemberDueDTO {
     private int daysOverdue;   // 0 if not overdue
     private String lastPayment;// ISO date string or null
     private String status;     // "Overdue" | "Due Soon"
-    private String dueType;    // "Membership Due" (unpaid balance on the current cycle) | "Renewal Due" (fully paid but the cycle is ending/ended)
+    private String dueType;    // "Membership Due" (unpaid balance on the current cycle) | "Renewal Due" (fully paid but the cycle is ending/ended) | "Extra Freeze Days" (the whole balance is unpaid freeze charges)
+    private BigDecimal freezeChargeAmount; // part of amount owed for extra freeze days (unpaid "Freeze Charge" bills)
 
     // Getters & Setters
     public Long getId()                              { return id; }
@@ -57,4 +58,7 @@ public class MemberDueDTO {
 
     public String getDueType()                       { return dueType; }
     public void setDueType(String dueType)           { this.dueType = dueType; }
+
+    public BigDecimal getFreezeChargeAmount()                     { return freezeChargeAmount; }
+    public void setFreezeChargeAmount(BigDecimal freezeChargeAmount) { this.freezeChargeAmount = freezeChargeAmount; }
 }

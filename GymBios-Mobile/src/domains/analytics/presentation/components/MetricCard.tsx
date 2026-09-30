@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { Radius, Spacing, BrandColors, TypographyScale } from '@/core/theme';
 
 interface MetricCardProps {
   title: string;
-  value: string;
+  value: React.ReactNode;
   subtitle: string;
   icon: keyof typeof Feather.glyphMap;
   iconColor: string;
@@ -26,7 +27,7 @@ export function MetricCard({
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-          <Feather name={icon} size={16} color={iconColor} />
+          <FeatherIcon name={icon} size={16} color={iconColor} />
         </View>
         <Text style={styles.title}>{title}</Text>
       </View>

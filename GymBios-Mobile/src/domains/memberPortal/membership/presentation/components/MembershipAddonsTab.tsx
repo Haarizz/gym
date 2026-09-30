@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Glass, heroTint, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface, Pagination } from '@/shared/components';
 import { PaymentBottomSheet } from '@/shared/payment';
@@ -87,7 +88,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
               <View key={addon.id} style={styles.addonRow}>
                 <View style={styles.addonInfo}>
                   <Text style={styles.addonName}>{addon.name}</Text>
-                  <Text style={styles.addonPrice}>{addon.currency === 'INR' ? '₹' : addon.currency}{addon.price} / {addon.pricingUnit}</Text>
+                  <CurrencyValue style={styles.addonPrice} amount={addon.price} suffix={` / ${addon.pricingUnit}`} />
                 </View>
                 <Pressable
                   style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
@@ -143,7 +144,6 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
           amount={paymentAddOn.price}
           title={paymentAddOn.name}
           subtitle={`Purchasing ${paymentAddOn.pricingUnit} add-on`}
-          currency={paymentAddOn.currency === 'INR' ? '₹' : paymentAddOn.currency}
           allowDiscount={false}
           onClose={() => setPaymentAddOn(null)}
           onComplete={handlePaymentComplete}

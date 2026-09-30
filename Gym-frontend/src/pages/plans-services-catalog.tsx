@@ -14,7 +14,7 @@ import { AddMember } from "./add-member";
 import { MemberDraftModal } from "../components/shared/member-draft-modal";
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
-import { plansService, Plan } from "../utils/supabase/plans-service";
+import { plansService, Plan, planHasOffer, planOfferPrice } from "../utils/supabase/plans-service";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { trainingStreamsService, TrainingStreamApi } from "../utils/supabase/training-streams-service";
 import { catalogDisplaySectionService } from "../utils/supabase/catalog-display-section-service";
@@ -638,17 +638,22 @@ export function PlansServicesCatalog() {
                           <h3 className={`${isFullscreen ? 'text-xl' : 'text-lg'} font-bold`}>{plan.name}</h3>
                           <p className={`${isFullscreen ? 'text-base' : 'text-sm'} opacity-90`}>{plan.duration}</p>
                         </div>
-                        {plan.discount > 0 && (
+                        {planHasOffer(plan) && (
                           <Badge variant="secondary" className="bg-white/20 text-white">
-                            {plan.discount}% OFF
+                            {plan.offerLabel || 'Offer'}
                           </Badge>
                         )}
                       </div>
 
                       <div className="text-center">
                         <div className={`${isFullscreen ? 'text-4xl' : 'text-3xl'} font-bold mb-1`}>
-                          <CurrencyGlyph /> {plan.price.toLocaleString()}
+                          <CurrencyGlyph /> {planOfferPrice(plan).toLocaleString()}
                         </div>
+                        {planHasOffer(plan) && (
+                          <div className="text-sm opacity-80 line-through">
+                            <CurrencyGlyph /> {plan.price.toLocaleString()}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -984,9 +989,9 @@ export function PlansServicesCatalog() {
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span className="text-2xl">{selectedPlan.name}</span>
-                  {selectedPlan.discount > 0 && (
+                  {planHasOffer(selectedPlan) && (
                     <Badge className={`bg-gradient-to-r ${getPlanColor(Math.max(0, plans.findIndex(p => p.id === selectedPlan.id)))} text-white`}>
-                      {selectedPlan.discount}% OFF
+                      {selectedPlan.offerLabel || 'Offer'}
                     </Badge>
                   )}
                 </DialogTitle>
@@ -1000,7 +1005,10 @@ export function PlansServicesCatalog() {
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-100">
                   <p className="text-sm text-gray-600 mb-1">Plan Price</p>
                   <div className="flex items-baseline space-x-2">
-                    <span className="text-3xl font-bold text-[#2B7A78]"><CurrencyGlyph /> {selectedPlan.price.toLocaleString()}</span>
+                    <span className="text-3xl font-bold text-[#2B7A78]"><CurrencyGlyph /> {planOfferPrice(selectedPlan).toLocaleString()}</span>
+                    {planHasOffer(selectedPlan) && (
+                      <span className="text-sm text-gray-500 line-through"><CurrencyGlyph /> {selectedPlan.price.toLocaleString()}</span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-600 mt-1">Duration: {selectedPlan.duration}</p>
                 </div>
@@ -1225,7 +1233,8 @@ export function PlansServicesCatalog() {
           price: selectedPlan.price,
           duration: selectedPlan.duration,
           benefits: getPlanFeatures(selectedPlan),
-          discount: selectedPlan.discount
+          effectivePrice: planOfferPrice(selectedPlan),
+          offerLabel: planHasOffer(selectedPlan) ? selectedPlan.offerLabel : null,
         } : null}
         onSubmitDraft={(draftData) => {
           setPendingMembers(prev => [...prev, draftData]);

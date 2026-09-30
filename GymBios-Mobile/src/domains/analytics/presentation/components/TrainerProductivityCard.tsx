@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
-import { useCurrency } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 
 interface TrainerProductivityData {
   averageSessionsPerTrainer: number;
@@ -14,7 +14,6 @@ interface TrainerProductivityCardProps {
 }
 
 export function TrainerProductivityCard({ data }: TrainerProductivityCardProps) {
-  const { formatCurrency } = useCurrency();
   const averageSessions = data?.averageSessionsPerTrainer ?? 0;
   const satisfaction = data?.memberSatisfaction ?? 0;
   const ptSales = data?.ptPackageSales ?? 0;
@@ -36,7 +35,7 @@ export function TrainerProductivityCard({ data }: TrainerProductivityCardProps) 
         
         <View style={styles.row}>
           <Text style={styles.label}>PT Package Sales</Text>
-          <Text style={styles.value}>{formatCurrency(ptSales, { maximumFractionDigits: 0 })}</Text>
+          <Text style={styles.value}><CurrencyValue amount={ptSales} options={{ maximumFractionDigits: 0 }} /></Text>
         </View>
       </View>
     </View>

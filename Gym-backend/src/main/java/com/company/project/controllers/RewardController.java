@@ -4,6 +4,7 @@ import com.company.project.dto.ReferralRewardResponseDTO;
 import com.company.project.dto.RewardActionRequestDTO;
 import com.company.project.dto.RewardAuditLogResponseDTO;
 import com.company.project.dto.RewardStatsDTO;
+import com.company.project.enums.PassContext;
 import com.company.project.services.RewardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +38,13 @@ public class RewardController {
     @GetMapping("/stats")
     public ResponseEntity<RewardStatsDTO> getStats() {
         return ResponseEntity.ok(rewardService.getStats());
+    }
+
+    /** GET /api/rewards/passes?memberId=MBR-..|dbId&context=MEMBERSHIP|PT|CLASS — spendable Reward Passes. */
+    @GetMapping("/passes")
+    public ResponseEntity<List<ReferralRewardResponseDTO>> getPasses(@RequestParam String memberId,
+                                                                     @RequestParam PassContext context) {
+        return ResponseEntity.ok(rewardService.getApplicablePasses(memberId, context));
     }
 
     /** GET /api/rewards/{id} */

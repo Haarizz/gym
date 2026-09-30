@@ -71,6 +71,7 @@ import { usePaymentManager } from '../payments/usePaymentManager';
 import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
+import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 
 const membershipPlans = [
@@ -277,7 +278,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [renewalProcessedByStaffId, setRenewalProcessedByStaffId] = useState('');
   const [familyRenewalProcessedByStaffId, setFamilyRenewalProcessedByStaffId] = useState('');
   const [discountAmount, setDiscountAmount] = useState("");
-  const [couponCode, setCouponCode] = useState("");
+  // Reward Pass or referral coupon applied to the renewal (replaces the old free-text
+  // coupon field, which was never sent anywhere).
+  const [renewalReward, setRenewalReward] = useState<RewardDiscountSelection>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [planComparisonOpen, setPlanComparisonOpen] = useState(false);
 
@@ -862,7 +865,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
   };
 
-  const calculateTotalAmount = () => {
+  // Plan price minus the manual discount — what's sent as membership_fee; the backend
+  // takes any Reward Pass / coupon discount off this itself.
+  const calculateFeeBeforeReward = () => {
     if (!selectedNewPlan) return 0;
 
     let total = selectedNewPlan.price;
@@ -873,6 +878,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
     return Math.round(Math.max(0, total) * 100) / 100;
   };
+
+  const calculateRewardDiscount = () => selectionDiscount(renewalReward, calculateFeeBeforeReward());
+
+  // What the member actually pays now (after any Reward Pass / coupon).
+  const calculateTotalAmount = () =>
+    Math.round(Math.max(0, calculateFeeBeforeReward() - calculateRewardDiscount()) * 100) / 100;
+
+  // A Reward Pass belongs to one member — drop the selection when the member changes.
+  useEffect(() => { setRenewalReward(null); }, [selectedMemberForRenewal?.id]);
 
   const renewalPaymentManager = usePaymentManager({ invoiceTotal: calculateTotalAmount() });
 
@@ -978,7 +992,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         await membersService.renewMember(String(memberId), {
           plan_name: selectedNewPlan.name,
           membership_end_date: newEndDate,
-          membership_fee: totalAmount,
+          membership_fee: calculateFeeBeforeReward(),
+          ...selectionRequestFields(renewalReward),
           payment_status: amountReceived >= totalAmount ? 'paid' : (amountReceived > 0 ? 'partial' : 'pending'),
           membership_type: selectedNewPlan.planType,
           membership_status: 'active',
@@ -993,8 +1008,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       // Refresh member list
       loadMembers();
       loadStatusCounts();
-    } catch (err) {
-      toast.error('Failed to process renewal. Please try again.');
+    } catch (err: any) {
+      toast.error('Failed to process renewal. Please try again.', { description: err?.message });
       return;
     }
 
@@ -1010,7 +1025,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setRenewalSearchTerm("");
       renewalPaymentManager.clearLines();
       setDiscountAmount("");
-      setCouponCode("");
+      setRenewalReward(null);
     }, 3000);
   };
 
@@ -2098,12 +2113,20 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <span className="text-muted-foreground">Plan Amount:</span>
                     <span className="text-2xl font-bold text-primary"><CurrencyGlyph /> {selectedNewPlan.price}</span>
                   </div>
-                  {discountAmount && parseFloat(discountAmount) > 0 && (
+                  {((discountAmount && parseFloat(discountAmount) > 0) || calculateRewardDiscount() > 0) && (
                     <>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-muted-foreground">Discount:</span>
-                        <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {discountAmount}</span>
-                      </div>
+                      {discountAmount && parseFloat(discountAmount) > 0 && (
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-muted-foreground">Discount:</span>
+                          <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {discountAmount}</span>
+                        </div>
+                      )}
+                      {calculateRewardDiscount() > 0 && (
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-muted-foreground">{renewalReward?.kind === 'pass' ? 'Reward Pass:' : 'Coupon:'}</span>
+                          <span className="text-lg font-semibold text-green-600">- <CurrencyGlyph /> {calculateRewardDiscount().toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between pt-2 border-t">
                         <span className="font-semibold">Total Amount:</span>
                         <span className="text-2xl font-bold text-primary"><CurrencyGlyph /> {calculateTotalAmount()}</span>
@@ -2125,16 +2148,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       className="mt-2"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="coupon">Coupon Code (Optional)</Label>
-                    <Input
-                      id="coupon"
-                      placeholder="Enter coupon code"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      className="mt-2"
+                  {selectedMemberForRenewal && !isBilledToGuardian(selectedMemberForRenewal) && (
+                    <RewardDiscountPicker
+                      memberId={selectedMemberForRenewal.id}
+                      value={renewalReward}
+                      onChange={setRenewalReward}
+                      currency={currencyCode}
                     />
-                  </div>
+                  )}
                 </div>
 
                 {/* Payment */}

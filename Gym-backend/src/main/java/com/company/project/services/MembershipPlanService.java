@@ -9,6 +9,9 @@ import com.company.project.repositories.MembershipPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -82,6 +85,11 @@ public class MembershipPlanService {
         copy.setDuration(original.getDuration());
         copy.setPrice(original.getPrice());
         copy.setDiscount(original.getDiscount());
+        copy.setOfferType(original.getOfferType());
+        copy.setOfferValue(original.getOfferValue());
+        copy.setOfferLabel(original.getOfferLabel());
+        copy.setOfferStartDate(original.getOfferStartDate());
+        copy.setOfferEndDate(original.getOfferEndDate());
         copy.setStatus("Inactive");
         copy.setDescription(original.getDescription());
         copy.setMaxSessions(original.getMaxSessions());
@@ -125,6 +133,7 @@ public class MembershipPlanService {
         }
         if (req.getPrice()               != null) plan.setPrice(req.getPrice());
         if (req.getDiscount()            != null) plan.setDiscount(req.getDiscount());
+        if (req.getOfferType()           != null) applyOffer(plan, req);
         if (req.getStatus()              != null) plan.setStatus(req.getStatus());
         if (req.getDescription()         != null) plan.setDescription(req.getDescription());
         if (req.getMaxSessions()         != null) plan.setMaxSessions(req.getMaxSessions());
@@ -154,6 +163,53 @@ public class MembershipPlanService {
 
         // Compute human-readable duration string
         plan.setDuration(computeDuration(req.getDurationValue(), req.getDurationType()));
+    }
+
+    /**
+     * Sets or clears the plan's offer. Blank / "none" offerType removes it; otherwise
+     * the whole offer is replaced (value required; dates and label optional).
+     */
+    private void applyOffer(MembershipPlan plan, MembershipPlanRequestDTO req) {
+        String type = req.getOfferType().trim().toLowerCase();
+        if (type.isEmpty() || "none".equals(type)) {
+            plan.setOfferType(null);
+            plan.setOfferValue(null);
+            plan.setOfferLabel(null);
+            plan.setOfferStartDate(null);
+            plan.setOfferEndDate(null);
+            return;
+        }
+        if (!PlanOfferPricing.PERCENTAGE.equals(type) && !PlanOfferPricing.FIXED.equals(type)) {
+            throw new IllegalArgumentException("Offer type must be 'percentage' or 'fixed'");
+        }
+        BigDecimal value = req.getOfferValue();
+        if (value == null || value.signum() <= 0) {
+            throw new IllegalArgumentException("Offer value must be greater than 0");
+        }
+        if (PlanOfferPricing.PERCENTAGE.equals(type) && value.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("A percentage offer can't be more than 100%");
+        }
+        LocalDate start = parseOfferDate(req.getOfferStartDate(), "start");
+        LocalDate end = parseOfferDate(req.getOfferEndDate(), "end");
+        if (start != null && end != null && end.isBefore(start)) {
+            throw new IllegalArgumentException("Offer end date can't be before its start date");
+        }
+        String label = req.getOfferLabel() != null ? req.getOfferLabel().trim() : null;
+        plan.setOfferType(type);
+        plan.setOfferValue(value);
+        plan.setOfferLabel(label == null || label.isEmpty() ? null : label);
+        plan.setOfferStartDate(start);
+        plan.setOfferEndDate(end);
+    }
+
+    private static LocalDate parseOfferDate(String raw, String which) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            // Accept a full ISO timestamp too; only the date part matters.
+            return LocalDate.parse(raw.trim().length() > 10 ? raw.trim().substring(0, 10) : raw.trim());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid offer " + which + " date: " + raw);
+        }
     }
 
     // Guards computeExpiry() (MemberService) against silently backdating a

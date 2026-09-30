@@ -30,4 +30,10 @@ public class BookingRequestDTO {
     private String paymentStatus;
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    // A Free PT / Class Reward Pass (ReferralReward id) that pays for this booking.
+    private Long rewardPassId;
+
+    public Long getRewardPassId() { return rewardPassId; }
+    public void setRewardPassId(Long rewardPassId) { this.rewardPassId = rewardPassId; }
 }

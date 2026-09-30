@@ -1,6 +1,7 @@
 import { Switch, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
@@ -90,13 +91,13 @@ export function AppAccessStep({ data, updateField }: AppAccessStepProps) {
         <View style={styles.reviewRow}>
           <Typography variant="bodySmallBold">Salary</Typography>
           <Typography variant="bodySmall" color="textSecondary">
-            {data.salary ? `$${data.salary}` : 'Not set'}
+            {data.salary ? <CurrencyValue amount={Number(data.salary)} /> : 'Not set'}
           </Typography>
         </View>
         <View style={styles.reviewRow}>
           <Typography variant="bodySmallBold">Monthly Target</Typography>
           <Typography variant="bodySmall" color="textSecondary">
-            {data.monthlyTarget ? `$${data.monthlyTarget}` : 'Not set'}
+            {data.monthlyTarget ? <CurrencyValue amount={Number(data.monthlyTarget)} /> : 'Not set'}
           </Typography>
         </View>
       </FormSection>

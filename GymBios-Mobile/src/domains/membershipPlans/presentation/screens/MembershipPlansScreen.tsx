@@ -57,7 +57,7 @@ export function MembershipPlansScreen({
 
   const handleCreatePress = useCallback(() => {
     if (selectedBranchId === 'ALL') {
-      toast.error('Please select a specific branch from the header menu before creating a new membership plan.', {
+      toast.error('Please select a specific branch from the header menu before creating a new subscription.', {
         title: 'Branch Required'
       });
       return;
@@ -77,7 +77,7 @@ export function MembershipPlansScreen({
       try {
         await duplicatePlan(plan.id);
       } catch {
-        toast.error('Failed to duplicate plan. Please try again.', {
+        toast.error('Failed to duplicate subscription. Please try again.', {
           title: 'Error'
         });
       }
@@ -88,7 +88,7 @@ export function MembershipPlansScreen({
   const handleDelete = useCallback(
     (plan: MembershipPlan) => {
       Alert.alert(
-        'Delete Plan',
+        'Delete Subscription',
         `Are you sure you want to delete "${plan.name}"? This action cannot be undone.`,
         [
           { text: 'Cancel', style: 'cancel' },
@@ -99,7 +99,7 @@ export function MembershipPlansScreen({
               try {
                 await deletePlan(plan.id);
               } catch {
-                toast.error('Failed to delete plan.', {
+                toast.error('Failed to delete subscription.', {
                   title: 'Error'
                 });
               }
@@ -119,10 +119,10 @@ export function MembershipPlansScreen({
         {/* Page title */}
         <View style={styles.titleRow}>
           <Typography variant="subtitle" style={styles.title}>
-            Membership Plans
+            Subscriptions
           </Typography>
           <Button
-            label="+ New Plan"
+            label="+ New Subscription"
             onPress={handleCreatePress}
             size="md"
           />
@@ -132,7 +132,7 @@ export function MembershipPlansScreen({
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search plans by name or type..."
+          placeholder="Search subscriptions by name or type..."
         />
 
         {/* Status filter chips */}
@@ -156,13 +156,13 @@ export function MembershipPlansScreen({
           ListHeaderComponent={listHeader}
           emptyTitle={
             search || statusFilter !== 'All'
-              ? 'No Plans Found'
-              : 'No Membership Plans'
+              ? 'No Subscriptions Found'
+              : 'No Subscriptions'
           }
           emptyDescription={
             search || statusFilter !== 'All'
               ? 'Try adjusting your search or filters.'
-              : 'Create your first membership plan to get started.'
+              : 'Create your first subscription to get started.'
           }
         />
       </View>

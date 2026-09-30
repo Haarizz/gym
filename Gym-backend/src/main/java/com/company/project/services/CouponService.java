@@ -38,7 +38,7 @@ public class CouponService {
             coupon.setCode(generateUniqueCode());
             coupon.setRewardId(reward.getId());
             coupon.setDiscountValue(reward.getRewardValue());
-            coupon.setDiscountUnit("AMOUNT");
+            coupon.setDiscountUnit(reward.getRewardUnit() != null ? reward.getRewardUnit() : "AMOUNT");
             coupon.setCurrency(reward.getCurrency());
             coupon.setExpiryDate(reward.getExpiryDate());
             coupon.setMaxUses(1);

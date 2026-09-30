@@ -4,7 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 import { ReferralStatusBadge } from './ReferralStatusBadge';
 import {
   useMarkReferralSuccessful,
@@ -27,7 +27,6 @@ export function ReferralDetailsSheet({
   referral,
   onSuccess,
 }: ReferralDetailsSheetProps) {
-  const { currencyCode } = useCurrency();
   const markSuccessfulMutation = useMarkReferralSuccessful();
   const markExpiredMutation = useMarkReferralExpired();
 
@@ -143,7 +142,7 @@ export function ReferralDetailsSheet({
                   Reward
                 </Typography>
                 <Typography variant="subtitle" style={[styles.valueText, { color: BrandColors.teal }]}>
-                  <CurrencyGlyph code={currencyCode} /> {rewardVal.toLocaleString()}
+                  <CurrencyValue amount={rewardVal} />
                 </Typography>
               </View>
             </View>

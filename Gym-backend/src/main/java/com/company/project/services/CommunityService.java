@@ -2,11 +2,13 @@ package com.company.project.services;
 
 import com.company.project.dto.*;
 import com.company.project.entities.*;
-import com.company.project.exceptions.CommunityGlobalPrincipalNotSupportedException;
+import com.company.project.exceptions.CommunityMembershipRequiredException;
 import com.company.project.repositories.CommunityPostCommentRepository;
 import com.company.project.repositories.CommunityPostLikeRepository;
 import com.company.project.repositories.CommunityPostRepository;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.UserRepository;
+import com.company.project.security.TenantContextHolder;
 import com.company.project.security.UserDetailsImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,21 +38,75 @@ import java.util.stream.Collectors;
 @Service
 public class CommunityService {
 
+    /**
+     * Notification module for activity on a user's own posts. Deliberately NOT the
+     * "COMMUNITY" permission-catalog module: NotificationService hides catalog modules
+     * from roles without a matching permission, and members/trainers — who can post —
+     * hold no COMMUNITY_* permissions, so they'd never see likes/comments on their posts.
+     */
+    public static final String NOTIFICATION_MODULE = "COMMUNITY_ACTIVITY";
+    private static final String NOTIFICATION_ACTION_URL = "/community";
+    private static final int NOTIFICATION_SNIPPET_LENGTH = 80;
+
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostCommentRepository communityPostCommentRepository;
     private final CommunityPostLikeRepository communityPostLikeRepository;
     private final UserRepository userRepository;
+    private final MemberRepository memberRepository;
+    private final NotificationService notificationService;
 
     public CommunityService(
             CommunityPostRepository communityPostRepository,
             CommunityPostCommentRepository communityPostCommentRepository,
             CommunityPostLikeRepository communityPostLikeRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            MemberRepository memberRepository,
+            NotificationService notificationService
     ) {
         this.communityPostRepository = communityPostRepository;
         this.communityPostCommentRepository = communityPostCommentRepository;
         this.communityPostLikeRepository = communityPostLikeRepository;
         this.userRepository = userRepository;
+        this.memberRepository = memberRepository;
+        this.notificationService = notificationService;
+    }
+
+    /**
+     * Identity of the caller as a community participant. Tenant logins (staff and
+     * gym-issued member credentials) act as their tenant User; GymBios app accounts
+     * have no tenant users row and act as the Member their membership purchase
+     * created in this gym. At most one of userId / memberId is set.
+     */
+    private record Viewer(Long userId, Long memberId, boolean canPost) {
+        static final Viewer ANONYMOUS = new Viewer(null, null, false);
+
+        boolean isAuthorOf(User authorUser, Member authorMember) {
+            if (userId != null) {
+                return authorUser != null && userId.equals(authorUser.getId());
+            }
+            if (memberId != null) {
+                return authorMember != null && memberId.equals(authorMember.getId());
+            }
+            return false;
+        }
+    }
+
+    /** A caller allowed to write; exactly one of user / member is set. */
+    private record Actor(User user, Member member) {
+        Viewer viewer() {
+            return user != null
+                    ? new Viewer(user.getId(), null, true)
+                    : new Viewer(null, member.getId(), true);
+        }
+
+        String displayName() {
+            return user != null ? user.getUsername() : member.getName();
+        }
+
+        /** Distinct across both ID spaces, for notification dedup keys. */
+        String key() {
+            return user != null ? String.valueOf(user.getId()) : "m" + member.getId();
+        }
     }
 
     public CommunityPostsPageResponseDTO getFeed(String q, String type, int page, int limit, Boolean archived) {
@@ -67,12 +123,14 @@ public class CommunityService {
 
         if (archivedOnly) {
             // Archived posts are never public. Allow only the owner (or admin) to view archived items.
-            User currentUser = getCurrentUserOrThrow();
-            boolean admin = isAdmin(currentUser);
+            Actor actor = getCurrentActorOrThrow();
+            boolean admin = isAdmin(actor);
 
             spec = Specification.where((root, query, cb) -> cb.isTrue(root.get("archived")));
             if (!admin) {
-                spec = spec.and((root, query, cb) -> cb.equal(root.get("authorUser").get("id"), currentUser.getId()));
+                spec = actor.user() != null
+                        ? spec.and((root, query, cb) -> cb.equal(root.get("authorUser").get("id"), actor.user().getId()))
+                        : spec.and((root, query, cb) -> cb.equal(root.get("authorMember").get("id"), actor.member().getId()));
             }
         } else {
             // Treat NULL as false for rows created before this flag existed.
@@ -98,17 +156,22 @@ public class CommunityService {
 
         Page<CommunityPost> result = communityPostRepository.findAll(spec, pageable);
 
-        Long currentUserId = getCurrentUserIdOrNull();
+        Viewer viewer = getCurrentViewer();
         final Set<Long> likedByMeSet;
-        if (currentUserId != null && !result.getContent().isEmpty()) {
+        if (result.getContent().isEmpty()) {
+            likedByMeSet = Collections.emptySet();
+        } else if (viewer.userId() != null) {
             List<Long> ids = result.getContent().stream().map(CommunityPost::getId).toList();
-            likedByMeSet = new HashSet<>(communityPostLikeRepository.findLikedPostIds(currentUserId, ids));
+            likedByMeSet = new HashSet<>(communityPostLikeRepository.findLikedPostIds(viewer.userId(), ids));
+        } else if (viewer.memberId() != null) {
+            List<Long> ids = result.getContent().stream().map(CommunityPost::getId).toList();
+            likedByMeSet = new HashSet<>(communityPostLikeRepository.findLikedPostIdsByMember(viewer.memberId(), ids));
         } else {
             likedByMeSet = Collections.emptySet();
         }
 
         List<CommunityPostResponseDTO> posts = result.getContent().stream()
-                .map(post -> toPostResponse(post, likedByMeSet.contains(post.getId())))
+                .map(post -> toPostResponse(post, likedByMeSet.contains(post.getId()), viewer))
                 .collect(Collectors.toList());
 
         PaginationDTO pagination = new PaginationDTO(
@@ -118,12 +181,14 @@ public class CommunityService {
                 result.getTotalPages()
         );
 
-        return new CommunityPostsPageResponseDTO(posts, pagination);
+        CommunityPostsPageResponseDTO response = new CommunityPostsPageResponseDTO(posts, pagination);
+        response.setCanPost(viewer.canPost());
+        return response;
     }
 
     @Transactional
     public CommunityPostResponseDTO createPost(CreateCommunityPostRequestDTO request) {
-        User author = getCurrentUserOrThrow();
+        Actor author = getCurrentActorOrThrow();
 
         String topic = Optional.ofNullable(request.getTopic()).orElse("").trim();
         String content = Optional.ofNullable(request.getContent()).orElse("").trim();
@@ -137,7 +202,8 @@ public class CommunityService {
         }
 
         CommunityPost post = new CommunityPost();
-        post.setAuthorUser(author);
+        post.setAuthorUser(author.user());
+        post.setAuthorMember(author.member());
         post.setTopic(topic);
         post.setContent(content);
         post.setType(type);
@@ -150,7 +216,7 @@ public class CommunityService {
         }
 
         CommunityPost saved = communityPostRepository.save(post);
-        return toPostResponse(saved, false);
+        return toPostResponse(saved, false, author.viewer());
     }
 
     /**
@@ -256,28 +322,52 @@ public class CommunityService {
                 .filter(p -> !p.isArchived())
                 .collect(Collectors.toList());
 
-        // userId → [postCount, totalLikes, totalComments]
-        Map<Long, long[]> agg = new LinkedHashMap<>();
-        Map<Long, String> userNames = new LinkedHashMap<>();
+        // Authors are users or members (separate ID spaces), so key by "u<id>" / "m<id>".
+        // key → author identity; key → [postCount, totalLikes, totalComments]
+        Map<String, LeaderboardEntryDTO> authors = new LinkedHashMap<>();
+        Map<String, long[]> agg = new LinkedHashMap<>();
 
         for (CommunityPost p : posts) {
-            User author = p.getAuthorUser();
-            if (author == null || author.getId() == null) continue;
-            Long uid = author.getId();
-            userNames.putIfAbsent(uid, author.getUsername());
-            long[] counts = agg.computeIfAbsent(uid, k -> new long[3]);
+            String key;
+            if (p.getAuthorUser() != null && p.getAuthorUser().getId() != null) {
+                User author = p.getAuthorUser();
+                key = "u" + author.getId();
+                authors.computeIfAbsent(key, k -> {
+                    LeaderboardEntryDTO entry = new LeaderboardEntryDTO();
+                    entry.setUserId(author.getId());
+                    entry.setUsername(author.getUsername());
+                    return entry;
+                });
+            } else if (p.getAuthorMember() != null && p.getAuthorMember().getId() != null) {
+                Member author = p.getAuthorMember();
+                key = "m" + author.getId();
+                authors.computeIfAbsent(key, k -> {
+                    LeaderboardEntryDTO entry = new LeaderboardEntryDTO();
+                    entry.setMemberId(author.getId());
+                    entry.setUsername(author.getName());
+                    return entry;
+                });
+            } else {
+                continue;
+            }
+            long[] counts = agg.computeIfAbsent(key, k -> new long[3]);
             counts[0]++;
             counts[1] += p.getLikeCount();
             counts[2] += p.getCommentCount();
         }
 
         return agg.entrySet().stream()
-                .map(e -> new LeaderboardEntryDTO(
-                        e.getKey(),
-                        userNames.getOrDefault(e.getKey(), "Unknown"),
-                        (int) e.getValue()[0],
-                        e.getValue()[1],
-                        e.getValue()[2]))
+                .map(e -> {
+                    LeaderboardEntryDTO author = authors.get(e.getKey());
+                    LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
+                            author.getUserId(),
+                            author.getUsername() != null ? author.getUsername() : "Unknown",
+                            (int) e.getValue()[0],
+                            e.getValue()[1],
+                            e.getValue()[2]);
+                    entry.setMemberId(author.getMemberId());
+                    return entry;
+                })
                 .sorted(Comparator.comparingLong(LeaderboardEntryDTO::getEngagementScore).reversed())
                 .limit(10)
                 .collect(Collectors.toList());
@@ -285,12 +375,13 @@ public class CommunityService {
 
     public List<CommunityPostCommentResponseDTO> getComments(Long postId) {
         List<CommunityPostComment> comments = communityPostCommentRepository.findByPostIdOrderByCreatedAtAsc(postId);
-        return comments.stream().map(this::toCommentResponse).collect(Collectors.toList());
+        Viewer viewer = getCurrentViewer();
+        return comments.stream().map(comment -> toCommentResponse(comment, viewer)).collect(Collectors.toList());
     }
 
     @Transactional
     public CommunityPostCommentResponseDTO addComment(Long postId, CreateCommunityCommentRequestDTO request) {
-        User author = getCurrentUserOrThrow();
+        Actor author = getCurrentActorOrThrow();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
@@ -301,23 +392,31 @@ public class CommunityService {
 
         CommunityPostComment comment = new CommunityPostComment();
         comment.setPost(post);
-        comment.setAuthorUser(author);
+        comment.setAuthorUser(author.user());
+        comment.setAuthorMember(author.member());
         comment.setContent(content);
         CommunityPostComment saved = communityPostCommentRepository.save(comment);
 
         post.setCommentCount(post.getCommentCount() + 1);
         communityPostRepository.save(post);
 
-        return toCommentResponse(saved);
+        notifyPostAuthor(post, author,
+                "New comment on your post",
+                author.displayName() + " commented: \"" + snippet(content) + "\"",
+                null);
+
+        return toCommentResponse(saved, author.viewer());
     }
 
     @Transactional
     public ToggleCommunityLikeResponseDTO toggleLike(Long postId) {
-        User user = getCurrentUserOrThrow();
+        Actor actor = getCurrentActorOrThrow();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        Optional<CommunityPostLike> existing = communityPostLikeRepository.findByPostIdAndUserId(postId, user.getId());
+        Optional<CommunityPostLike> existing = actor.user() != null
+                ? communityPostLikeRepository.findByPostIdAndUserId(postId, actor.user().getId())
+                : communityPostLikeRepository.findByPostIdAndMemberId(postId, actor.member().getId());
         if (existing.isPresent()) {
             communityPostLikeRepository.delete(existing.get());
             post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
@@ -325,20 +424,53 @@ public class CommunityService {
             return new ToggleCommunityLikeResponseDTO(false, post.getLikeCount());
         }
 
-        communityPostLikeRepository.save(new CommunityPostLike(post, user));
+        communityPostLikeRepository.save(actor.user() != null
+                ? new CommunityPostLike(post, actor.user())
+                : new CommunityPostLike(post, actor.member()));
         post.setLikeCount(post.getLikeCount() + 1);
         communityPostRepository.save(post);
+
+        // Keyed per (post, liker) so unlike → like again doesn't re-notify the author.
+        notifyPostAuthor(post, actor,
+                "New like on your post",
+                actor.displayName() + " liked your post \"" + snippet(post.getTopic()) + "\"",
+                "COMMUNITY_LIKE_" + post.getId() + "_" + actor.key());
+
         return new ToggleCommunityLikeResponseDTO(true, post.getLikeCount());
+    }
+
+    /**
+     * Notify a post's author about someone else's activity on it; never about their own.
+     * In-app notifications are addressed to tenant users, so posts authored by an app
+     * account's Member get none.
+     */
+    private void notifyPostAuthor(CommunityPost post, Actor actor, String title, String message, String eventKey) {
+        User postAuthor = post.getAuthorUser();
+        if (postAuthor == null || actor.viewer().isAuthorOf(postAuthor, null)) {
+            return;
+        }
+        notificationService.notifyUser(
+                postAuthor.getId(), title, message,
+                "INFO", "LOW", NOTIFICATION_MODULE,
+                post.getId(), NOTIFICATION_ACTION_URL, eventKey
+        );
+    }
+
+    private static String snippet(String text) {
+        String trimmed = text == null ? "" : text.trim();
+        return trimmed.length() <= NOTIFICATION_SNIPPET_LENGTH
+                ? trimmed
+                : trimmed.substring(0, NOTIFICATION_SNIPPET_LENGTH - 1) + "…";
     }
 
     @Transactional
     public void deletePost(Long postId) {
-        User user = getCurrentUserOrThrow();
+        Actor actor = getCurrentActorOrThrow();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = post.getAuthorUser() != null && post.getAuthorUser().getId().equals(user.getId());
-        if (!isOwner && !isAdmin(user)) {
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember());
+        if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this post");
         }
 
@@ -354,7 +486,7 @@ public class CommunityService {
 
     @Transactional
     public void deleteComment(Long postId, Long commentId) {
-        User user = getCurrentUserOrThrow();
+        Actor actor = getCurrentActorOrThrow();
         CommunityPostComment comment = communityPostCommentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
@@ -362,8 +494,8 @@ public class CommunityService {
             throw new IllegalArgumentException("Comment not found");
         }
 
-        boolean isOwner = comment.getAuthorUser() != null && comment.getAuthorUser().getId().equals(user.getId());
-        if (!isOwner && !isAdmin(user)) {
+        boolean isOwner = actor.viewer().isAuthorOf(comment.getAuthorUser(), comment.getAuthorMember());
+        if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this comment");
         }
 
@@ -380,63 +512,77 @@ public class CommunityService {
      * Left in place (rather than removed) as the hook for a future gym-scoped
      * moderator role, if one is ever needed.
      */
-    private boolean isAdmin(User user) {
+    private boolean isAdmin(Actor actor) {
         return false;
     }
 
-    private User getCurrentUserOrThrow() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication.getPrincipal() == null
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            throw new SecurityException("Not authenticated");
-        }
-
-        Object principal = authentication.getPrincipal();
-        if (!(principal instanceof UserDetailsImpl userDetails)) {
-            throw new SecurityException("Not authenticated");
-        }
-
-        // A global principal's ID is a primary-DB users.id; looking it up in this
-        // tenant's users table can match an unrelated tenant user with the same
-        // numeric ID and attribute content to them. Refuse before the lookup.
-        if (userDetails.isGlobal()) {
-            throw new CommunityGlobalPrincipalNotSupportedException();
-        }
-
-        return userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new SecurityException("User not found"));
-    }
-
-    private Long getCurrentUserIdOrNull() {
+    private UserDetailsImpl getCurrentPrincipalOrNull() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication.getPrincipal() == null
                 || "anonymousUser".equals(authentication.getPrincipal())) {
             return null;
         }
-
-        Object principal = authentication.getPrincipal();
-        if (!(principal instanceof UserDetailsImpl userDetails)) {
-            return null;
-        }
-
-        // Same ID-space mismatch as getCurrentUserOrThrow: a global principal's ID
-        // must not be matched against this tenant's community_post_likes.user_id,
-        // or likedByMe reflects some other tenant user's likes.
-        if (userDetails.isGlobal()) {
-            return null;
-        }
-
-        return userDetails.getId();
+        return authentication.getPrincipal() instanceof UserDetailsImpl userDetails ? userDetails : null;
     }
 
-    private CommunityPostResponseDTO toPostResponse(CommunityPost post, boolean likedByMe) {
-        User author = post.getAuthorUser();
-        List<String> roles = author.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getRoleName())
-                .distinct()
-                .collect(Collectors.toList());
+    /**
+     * The caller as a participant allowed to post, comment and like. App accounts
+     * qualify only once they hold a membership in this gym whose app access isn't
+     * held back pending payment approval; until then they can only read the feed.
+     */
+    private Actor getCurrentActorOrThrow() {
+        UserDetailsImpl userDetails = getCurrentPrincipalOrNull();
+        if (userDetails == null) {
+            throw new SecurityException("Not authenticated");
+        }
+
+        if (!userDetails.isGlobal()) {
+            User user = userRepository.findById(userDetails.getId())
+                    .orElseThrow(() -> new SecurityException("User not found"));
+            return new Actor(user, null);
+        }
+
+        Member member = findAppAccountMember(userDetails.getId())
+                .orElseThrow(() -> new CommunityMembershipRequiredException(
+                        "Purchase a membership at this gym to post, comment and like in its community."));
+        if (Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+            throw new CommunityMembershipRequiredException(
+                    "You can post in the community once the gym approves your membership payment.");
+        }
+        return new Actor(null, member);
+    }
+
+    /** Like getCurrentActorOrThrow, but for read paths: never throws, and resolves no User row. */
+    private Viewer getCurrentViewer() {
+        UserDetailsImpl userDetails = getCurrentPrincipalOrNull();
+        if (userDetails == null) {
+            return Viewer.ANONYMOUS;
+        }
+        if (!userDetails.isGlobal()) {
+            return new Viewer(userDetails.getId(), null, true);
+        }
+        return findAppAccountMember(userDetails.getId())
+                .map(member -> new Viewer(null, member.getId(), !Boolean.FALSE.equals(member.getAppAccessEnabled())))
+                .orElse(Viewer.ANONYMOUS);
+    }
+
+    /**
+     * An app account's ID is a primary-DB users.id, so it is only ever matched against
+     * members.global_user_id — never against tenant users.id or members.user_id, where
+     * it could collide with an unrelated tenant user's ID (unlike the mobile services,
+     * there is deliberately no findByUserId fallback here).
+     */
+    private Optional<Member> findAppAccountMember(Long globalUserId) {
+        // No gym selected (e.g. a fresh app account browsing before joining one):
+        // there is no membership to find, and the lookup must not hit the default DB.
+        if (TenantContextHolder.getCurrentTenant() == null) {
+            return Optional.empty();
+        }
+        return memberRepository.findByGlobalUserId(globalUserId);
+    }
+
+    private CommunityPostResponseDTO toPostResponse(CommunityPost post, boolean likedByMe, Viewer viewer) {
 
         CommunityPostImageDTO image = null;
         if (post.getImageDataUrl() != null && !post.getImageDataUrl().isEmpty()) {
@@ -457,9 +603,18 @@ public class CommunityService {
         dto.setCommentCount(post.getCommentCount());
         dto.setLikedByMe(likedByMe);
         dto.setImage(image);
-        dto.setAuthorUserId(author.getId());
-        dto.setAuthorUsername(author.getUsername());
-        dto.setAuthorRoles(roles);
+        if (post.getAuthorUser() != null) {
+            User author = post.getAuthorUser();
+            dto.setAuthorUserId(author.getId());
+            dto.setAuthorUsername(author.getUsername());
+            dto.setAuthorRoles(rolesOf(author));
+        } else if (post.getAuthorMember() != null) {
+            Member author = post.getAuthorMember();
+            dto.setAuthorMemberId(author.getId());
+            dto.setAuthorUsername(author.getName());
+            dto.setAuthorRoles(List.of("MEMBER"));
+        }
+        dto.setOwnedByMe(viewer.isAuthorOf(post.getAuthorUser(), post.getAuthorMember()));
         dto.setCreatedAt(post.getCreatedAt());
         dto.setArchived(post.isArchived());
         return dto;
@@ -476,35 +631,45 @@ public class CommunityService {
     }
 
     private CommunityPostResponseDTO setArchived(Long postId, boolean archived) {
-        User user = getCurrentUserOrThrow();
+        Actor actor = getCurrentActorOrThrow();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = post.getAuthorUser() != null && post.getAuthorUser().getId().equals(user.getId());
-        if (!isOwner && !isAdmin(user)) {
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember());
+        if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to update this post");
         }
 
         post.setArchived(archived);
         CommunityPost saved = communityPostRepository.save(post);
-        return toPostResponse(saved, false);
+        return toPostResponse(saved, false, actor.viewer());
     }
 
-    private CommunityPostCommentResponseDTO toCommentResponse(CommunityPostComment comment) {
-        User author = comment.getAuthorUser();
-        List<String> roles = author.getUserRoles().stream()
-                .map(userRole -> userRole.getRole().getRoleName())
-                .distinct()
-                .collect(Collectors.toList());
-
+    private CommunityPostCommentResponseDTO toCommentResponse(CommunityPostComment comment, Viewer viewer) {
         CommunityPostCommentResponseDTO dto = new CommunityPostCommentResponseDTO();
         dto.setId(comment.getId());
         dto.setPostId(comment.getPost().getId());
         dto.setContent(comment.getContent());
-        dto.setAuthorUserId(author.getId());
-        dto.setAuthorUsername(author.getUsername());
-        dto.setAuthorRoles(roles);
+        if (comment.getAuthorUser() != null) {
+            User author = comment.getAuthorUser();
+            dto.setAuthorUserId(author.getId());
+            dto.setAuthorUsername(author.getUsername());
+            dto.setAuthorRoles(rolesOf(author));
+        } else if (comment.getAuthorMember() != null) {
+            Member author = comment.getAuthorMember();
+            dto.setAuthorMemberId(author.getId());
+            dto.setAuthorUsername(author.getName());
+            dto.setAuthorRoles(List.of("MEMBER"));
+        }
+        dto.setOwnedByMe(viewer.isAuthorOf(comment.getAuthorUser(), comment.getAuthorMember()));
         dto.setCreatedAt(comment.getCreatedAt());
         return dto;
+    }
+
+    private static List<String> rolesOf(User user) {
+        return user.getUserRoles().stream()
+                .map(userRole -> userRole.getRole().getRoleName())
+                .distinct()
+                .collect(Collectors.toList());
     }
 }

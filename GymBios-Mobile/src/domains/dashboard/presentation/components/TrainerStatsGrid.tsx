@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import type { TrainerTodayStats } from '../../domain/TrainerDashboardData';
@@ -28,12 +30,12 @@ export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
       <GlassSurface radius={Radius.md} style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 199, 66, 0.15)' }]}>
-            <Feather name="dollar-sign" size={16} color={BrandColors.memberGold} />
+            <CurrencyIcon size={16} color={BrandColors.memberGold} />
           </View>
           <Text style={styles.cardLabel}>Today's Earnings</Text>
         </View>
         <Text style={[styles.cardValue, { color: BrandColors.memberGold }]}>
-          {stats.todayEarnings}
+          <CurrencyValue amount={stats.todayEarnings} />
         </Text>
       </GlassSurface>
 

@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { CurrencyValue } from '@/core/providers';
 import { Spacing, BrandColors, Radius } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import Feather from '@expo/vector-icons/Feather';
@@ -46,7 +47,7 @@ export function WalkInForm({
       {/* Daily Plan */}
       <View style={styles.section}>
         <Typography variant="bodySmallBold" style={styles.sectionLabel}>
-          Daily Plan *
+          Daily Pass *
         </Typography>
         <DailyPlanSelector
           selectedPlanId={selectedPlanId}
@@ -59,7 +60,7 @@ export function WalkInForm({
           <View style={styles.priceSummary}>
             <Feather name="tag" size={14} color={BrandColors.teal} />
             <Typography variant="bodySmall" style={styles.priceText}>
-              ₹{selectedPlanPrice}
+              <CurrencyValue amount={selectedPlanPrice} />
             </Typography>
             <Typography variant="caption" color="textSecondary">
               · {selectedPlanName}

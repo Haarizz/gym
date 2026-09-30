@@ -67,7 +67,7 @@ export const PendingBillCard = memo(function PendingBillCard({
         </View>
 
         <Typography variant="caption" color="textSecondary">
-          {bill.planName ?? 'Membership Plan'}
+          {bill.planName ?? 'Subscription'}
         </Typography>
 
         <View style={styles.bottomRow}>

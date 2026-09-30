@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { Radius, Spacing } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import type { AdminKpiItem, AdminReportType } from '../../domain/AdminDashboardData';
@@ -26,12 +27,12 @@ export function AdminKpiGrid({ kpis, onSelectKpi }: AdminKpiGridProps) {
             onPress={() => isClickable && onSelectKpi(kpi.id as AdminReportType)}
             disabled={!isClickable}
             accessibilityRole={isClickable ? 'button' : 'none'}
-            accessibilityLabel={`${kpi.label}, ${kpi.value}, ${kpi.change}`}
+            accessibilityLabel={`${kpi.label}, ${kpi.valueText}, ${kpi.change}`}
           >
             <GlassSurface radius={Radius.lg} style={styles.card}>
               {/* Icon Box */}
               <View style={[styles.iconBox, { backgroundColor: kpi.color }]}>
-                <Feather name={kpi.icon as any} size={18} color="#FFFFFF" />
+                <FeatherIcon name={kpi.icon as any} size={18} color="#FFFFFF" />
               </View>
 
               {/* Label */}

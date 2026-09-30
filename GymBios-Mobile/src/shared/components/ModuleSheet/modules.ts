@@ -22,7 +22,7 @@ export const topLevelModules: ModuleItem[] = [
       },
       {
         id: 'membership-plans',
-        title: 'Membership Plans',
+        title: 'Subscriptions',
         icon: 'credit-card',
         route: '/membership-plans',
       },
@@ -102,18 +102,6 @@ export const topLevelModules: ModuleItem[] = [
     ],
   },
   {
-    id: 'sales-purchases',
-    title: 'Sales & Purchases',
-    icon: 'shopping-cart',
-    route: '/sales-purchases',
-  },
-  {
-    id: 'financials',
-    title: 'Financials',
-    icon: 'briefcase',
-    route: '/financials',
-  },
-  {
     id: 'payroll-employees',
     title: 'Payroll & Employees',
     icon: 'users',
@@ -138,11 +126,5 @@ export const topLevelModules: ModuleItem[] = [
         route: '/facilities',
       },
     ],
-  },
-  {
-    id: 'bios',
-    title: 'BIOS',
-    icon: 'cpu',
-    route: '/bios',
   },
 ];

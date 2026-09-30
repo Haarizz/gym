@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 interface BranchRankingData {
@@ -48,7 +49,7 @@ export function BranchRankingCard({ data }: BranchRankingCardProps) {
             <View style={styles.statsGrid}>
               <View style={styles.statCol}>
                 <Text style={styles.statLabel}>Revenue</Text>
-                <Text style={styles.statValue}>₹{(branch.revenue / 1000).toFixed(0)}K</Text>
+                <Text style={styles.statValue}><CurrencyValue amount={branch.revenue} compact /></Text>
               </View>
               <View style={styles.statCol}>
                 <Text style={styles.statLabel}>Members</Text>

@@ -26,7 +26,7 @@ export function EditMembershipPlanScreen({
   useEffect(() => {
     loadPlanById(planId)
       .then((result) => setPlan(result))
-      .catch(() => setLoadError('Failed to load plan. Please go back and try again.'));
+      .catch(() => setLoadError('Failed to load subscription. Please go back and try again.'));
   }, [planId, loadPlanById]);
 
   if (loading && !plan) {

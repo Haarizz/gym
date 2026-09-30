@@ -1,5 +1,7 @@
 export interface ProfileApiModel {
   fullName: string;
+  /** Account email (read-only; not accepted on update). */
+  email?: string;
   phone?: string;
   dateOfBirth?: string;
   gender?: string;

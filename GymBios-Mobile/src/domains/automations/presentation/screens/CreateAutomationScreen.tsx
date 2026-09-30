@@ -59,10 +59,12 @@ export const CreateAutomationScreen = () => {
     { label: 'Low Attendance', value: 'low_attendance' },
     { label: 'New Member Signup', value: 'new_signup' },
     { label: 'Class Reminder', value: 'class_reminder' },
+    { label: 'Outstanding Membership Balance', value: 'outstanding_balance' },
   ];
 
   const actionOptions = [
     { label: 'In-App Notification', value: 'send_in_app' },
+    { label: 'Push Notification', value: 'send_push' },
     { label: 'Send Email', value: 'send_email' },
     { label: 'Send SMS', value: 'send_sms' },
     { label: 'Create Task', value: 'create_task' },

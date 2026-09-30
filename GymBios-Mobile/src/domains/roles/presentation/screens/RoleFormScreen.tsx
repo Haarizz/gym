@@ -13,7 +13,7 @@ import { Typography } from '@/shared/components/Typography';
 import { useRoles } from '../../hooks/useRoles';
 import { useRoleActions } from '../../hooks/useRoleActions';
 import { useRoleForm } from '../hooks/useRoleForm';
-import { ROLE_MODULES } from '../constants/modules';
+import { ROLE_MODULES, moduleLabel } from '../constants/modules';
 
 import { RolePermissionSummary } from '../components/RolePermissionSummary';
 import { RolePermissionModule } from '../components/RolePermissionModule';
@@ -102,7 +102,7 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
   };
 
   const filteredModules = ROLE_MODULES.filter(m => 
-    m.toLowerCase().includes(moduleSearch.toLowerCase())
+    moduleLabel(m).toLowerCase().includes(moduleSearch.toLowerCase())
   );
 
   return (

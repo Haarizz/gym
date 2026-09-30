@@ -28,7 +28,7 @@ export const MEMBER_TABS: TabConfig[] = [
   { name: 'bookings', title: 'Bookings', icon: 'calendar' },
   { name: 'community', title: 'Community', icon: 'users' },
   { name: 'centers', title: 'Centers', icon: 'map-pin' },
-  { name: 'membership', title: 'Membership', icon: 'credit-card' },
+  { name: 'membership', title: 'Subscription', icon: 'credit-card' },
 ];
 
 export const TRAINER_TABS: TabConfig[] = [

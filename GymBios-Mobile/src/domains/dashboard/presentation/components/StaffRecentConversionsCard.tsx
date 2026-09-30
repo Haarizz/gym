@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { Glass, Radius, Spacing } from '@/core/theme';
 import type { RecentConversionItem } from '../../domain/StaffDashboardData';
 
@@ -32,7 +33,7 @@ export function StaffRecentConversionsCard({
               <Text style={styles.itemName}>{item.name}</Text>
               <Text style={styles.itemPlan}>{item.plan}</Text>
             </View>
-            <Text style={styles.itemAmount}>{item.amount}</Text>
+            <CurrencyValue style={styles.itemAmount} amount={item.amount} />
           </View>
         ))}
       </View>

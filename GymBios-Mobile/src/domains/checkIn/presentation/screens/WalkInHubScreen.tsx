@@ -37,7 +37,7 @@ export function WalkInHubScreen() {
       <View style={[styles.content, { paddingBottom: bottomInset }]}>
         <HubFeatureCard
           title="Register Visitor"
-          subtitle="Fill visitor details, select a daily plan, and process payment."
+          subtitle="Fill visitor details, select a daily pass, and process payment."
           iconName="user-plus"
           iconBg="#dcfce7"
           iconColor="#16a34a"

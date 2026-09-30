@@ -5,6 +5,8 @@ import com.company.project.entities.UserProfile;
 public class MobileProfileDTO {
     private String fullName;
     private String phone;
+    // Read-only: account email from User, not persisted via profile updates.
+    private String email;
     private String dateOfBirth;
     private String gender;
     private String nationality;
@@ -13,6 +15,11 @@ public class MobileProfileDTO {
     private String emergencyPhone;
     private String bloodType;
     private String medicalConditions;
+    private String allergies;
+    private String currentMedications;
+    private String chronicIllnesses;
+    private Double height;
+    private Double weight;
     private String photoUrl;
 
     public static MobileProfileDTO fromEntity(UserProfile profile) {
@@ -28,12 +35,20 @@ public class MobileProfileDTO {
         dto.setEmergencyPhone(profile.getEmergencyPhone());
         dto.setBloodType(profile.getBloodType());
         dto.setMedicalConditions(profile.getMedicalConditions());
+        dto.setAllergies(profile.getAllergies());
+        dto.setCurrentMedications(profile.getCurrentMedications());
+        dto.setChronicIllnesses(profile.getChronicIllnesses());
+        dto.setHeight(profile.getHeight());
+        dto.setWeight(profile.getWeight());
         dto.setPhotoUrl(profile.getPhotoUrl());
         return dto;
     }
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
@@ -61,6 +76,21 @@ public class MobileProfileDTO {
 
     public String getMedicalConditions() { return medicalConditions; }
     public void setMedicalConditions(String medicalConditions) { this.medicalConditions = medicalConditions; }
+
+    public String getAllergies() { return allergies; }
+    public void setAllergies(String allergies) { this.allergies = allergies; }
+
+    public String getCurrentMedications() { return currentMedications; }
+    public void setCurrentMedications(String currentMedications) { this.currentMedications = currentMedications; }
+
+    public String getChronicIllnesses() { return chronicIllnesses; }
+    public void setChronicIllnesses(String chronicIllnesses) { this.chronicIllnesses = chronicIllnesses; }
+
+    public Double getHeight() { return height; }
+    public void setHeight(Double height) { this.height = height; }
+
+    public Double getWeight() { return weight; }
+    public void setWeight(Double weight) { this.weight = weight; }
 
     public String getPhotoUrl() { return photoUrl; }
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }

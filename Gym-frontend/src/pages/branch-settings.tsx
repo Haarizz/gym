@@ -33,6 +33,14 @@ const CENTER_TYPES = ["Gym", "Fitness Center", "Wellness Center", "Studio"];
 const ACCESS_TYPES = ["Mixed", "Ladies Only", "Men Only"];
 const BASE_PAYMENT_METHODS = ["Cash", "Card"];
 
+// Branch images are stored as backend-relative paths (/uploads/branch-images/...),
+// served by the API server rather than this app's origin.
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api").replace(/\/api\/?$/, "");
+function resolveImageUrl(url: string): string {
+  if (!url || /^(https?:|data:|blob:)/i.test(url)) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 interface DiscoveryFormState {
   description: string;
   established_year: string;
@@ -420,7 +428,7 @@ export function BranchSettings() {
                   ) : coverImage ? (
                     <>
                       <img
-                        src={coverImage.image_url}
+                        src={resolveImageUrl(coverImage.image_url)}
                         alt="Cover"
                         className="max-h-full max-w-full object-contain"
                       />
@@ -506,7 +514,7 @@ export function BranchSettings() {
                     {galleryImages.map((image) => (
                       <div key={image.id} className="relative group">
                         <div className="w-full h-20 rounded-lg border shadow-sm bg-slate-100 overflow-hidden">
-                          <img src={image.image_url} alt="Gallery" className="w-full h-full object-cover" />
+                          <img src={resolveImageUrl(image.image_url)} alt="Gallery" className="w-full h-full object-cover" />
                         </div>
                         <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
                           <Button

@@ -26,7 +26,7 @@ export function MembershipSection({ member }: MembershipSectionProps) {
 
   return (
     <FormSection title="Membership">
-      <DetailRow label="Plan" value={member.membershipPlanName ?? member.membershipType} />
+      <DetailRow label="Subscription" value={member.membershipPlanName ?? member.membershipType} />
       <DetailRow label="Type" value={member.membershipType} />
       <DetailRow label="Start Date" value={member.startDate} />
       <DetailRow label="Expiry" value={member.endDate ?? '—'} />

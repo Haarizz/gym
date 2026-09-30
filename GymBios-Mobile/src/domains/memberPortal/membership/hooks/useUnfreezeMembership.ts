@@ -12,7 +12,7 @@ export function useUnfreezeMembership() {
       void invalidateMembershipQueries(queryClient);
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to unfreeze membership.';
+      const message = error?.response?.data?.message || 'Failed to unfreeze subscription.';
       toast.error(message, {
         title: 'Unfreeze Failed'
       });

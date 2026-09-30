@@ -48,6 +48,12 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
 
   // Family
   ['family', 'purchase'],
+
+  // Membership payment (outstanding balance)
+  ['membership-payment'],
+
+  // Member marketplace — center detail is a full-screen page with its own sticky CTA
+  ['centers', '[tenantSlug]'],
 ] as const;
 
 /**
@@ -76,6 +82,7 @@ export const MODULE_ROUTES = [
   'catalog/t/[tenantSlug]/b/[branchId]',
   'family',
   'family/purchase',
+  'membership-payment/[membershipId]',
 ] as const;
 
 /**

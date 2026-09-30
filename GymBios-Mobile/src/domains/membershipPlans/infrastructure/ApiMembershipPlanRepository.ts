@@ -16,6 +16,14 @@ interface MembershipPlanResponse {
   duration: string;
   price: number;
   discount: number;
+  offerType?: 'percentage' | 'fixed' | null;
+  offerValue?: number | null;
+  offerLabel?: string | null;
+  offerStartDate?: string | null;
+  offerEndDate?: string | null;
+  offerActive?: boolean;
+  offerDiscountAmount?: number | null;
+  effectivePrice?: number | null;
   status: string;
   description: string;
   maxSessions?: number | null;
@@ -121,6 +129,14 @@ export class ApiMembershipPlanRepository implements MembershipPlanRepository {
 
       price: response.price,
       discount: response.discount,
+      offerType: response.offerType ?? null,
+      offerValue: response.offerValue ?? null,
+      offerLabel: response.offerLabel ?? null,
+      offerStartDate: response.offerStartDate ?? null,
+      offerEndDate: response.offerEndDate ?? null,
+      offerActive: !!response.offerActive,
+      offerDiscountAmount: Number(response.offerDiscountAmount ?? 0),
+      effectivePrice: Number(response.effectivePrice ?? response.price ?? 0),
 
       maxSessions: response.maxSessions ?? undefined,
       assignableTrainers: response.assignableTrainers,

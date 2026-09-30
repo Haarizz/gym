@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { Spacing } from '@/core/theme';
 import { FormSection } from '@/shared/components/FormSection';
 import { Typography } from '@/shared/components/Typography';
@@ -10,7 +11,7 @@ interface PaymentSectionProps {
   member: Member;
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <View style={styles.detailRow}>
       <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
@@ -32,7 +33,7 @@ export function PaymentSection({ member }: PaymentSectionProps) {
       </View>
       <DetailRow
         label="Membership Fee"
-        value={member.membershipPlanPrice !== undefined ? `$${member.membershipPlanPrice.toLocaleString()}` : '—'}
+        value={member.membershipPlanPrice !== undefined ? <CurrencyValue amount={member.membershipPlanPrice} /> : '—'}
       />
       <DetailRow label="Outstanding Balance" value="—" />
       <DetailRow label="Last Payment" value="—" />

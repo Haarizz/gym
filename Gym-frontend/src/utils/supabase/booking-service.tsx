@@ -30,6 +30,8 @@ export interface BookingRequest {
   guestEmail?: string;
   guestPhone?: string;
   status?: string;
+  // A Free PT / Class Reward Pass that pays for the booking.
+  rewardPassId?: number;
 }
 
 class BookingService {
@@ -86,12 +88,17 @@ class BookingService {
       guest_email: payload.guestEmail ?? null,
       guest_phone: payload.guestPhone ?? null,
       status: payload.status ?? null,
+      reward_pass_id: payload.rewardPassId ?? null,
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/bookings`,
       { method: "POST", body: JSON.stringify(body) }
     );
-    if (!response.ok) throw new Error(`Failed to create booking: ${response.status}`);
+    if (!response.ok) {
+      // Surface the backend's reason (e.g. "Reward Pass has expired") instead of a bare status.
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to create booking: ${response.status}`);
+    }
     return this.normalizeBooking(await response.json());
   }
 

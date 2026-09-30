@@ -10,6 +10,7 @@ export const communityKeys = {
   stats: () => [...communityKeys.all, 'stats'] as const,
   trendingTopics: () => [...communityKeys.all, 'trending-topics'] as const,
   leaderboard: () => [...communityKeys.all, 'leaderboard'] as const,
+  canPost: () => [...communityKeys.all, 'can-post'] as const,
   feeds: () => [...communityKeys.all, 'feed'] as const,
   feed: (params: { q?: string; type?: string; archived?: boolean }) =>
     [...communityKeys.feeds(), params] as const,
@@ -36,6 +37,19 @@ export function useCommunityLeaderboard() {
     queryKey: communityKeys.leaderboard(),
     queryFn: () => communityService.getLeaderboard(),
   });
+}
+
+/**
+ * Whether the signed-in account may post, comment and like in this gym's community.
+ * GymBios app accounts are read-only until they buy a membership here (and, for
+ * Cash/Credit/Mixed purchases, until reception approves it).
+ */
+export function useCommunityCanPost(): boolean {
+  const { data } = useQuery({
+    queryKey: communityKeys.canPost(),
+    queryFn: async () => (await communityService.getFeed(undefined, undefined, undefined, 1, 1)).canPost,
+  });
+  return data === true;
 }
 
 export function useCommunityFeed(params: {

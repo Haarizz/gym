@@ -71,6 +71,14 @@ export const discoveryApi = {
       duration: plan.duration,
       price: plan.price,
       discount: plan.discount,
+      offerType: plan.offerType ?? plan.offer_type ?? null,
+      offerValue: plan.offerValue ?? plan.offer_value ?? null,
+      offerLabel: plan.offerLabel ?? plan.offer_label ?? null,
+      offerStartDate: plan.offerStartDate ?? plan.offer_start_date ?? null,
+      offerEndDate: plan.offerEndDate ?? plan.offer_end_date ?? null,
+      offerActive: !!(plan.offerActive ?? plan.offer_active),
+      offerDiscountAmount: Number(plan.offerDiscountAmount ?? plan.offer_discount_amount ?? 0),
+      effectivePrice: Number(plan.effectivePrice ?? plan.effective_price ?? plan.price ?? 0),
       status: plan.status,
       description: plan.description,
       maxSessions: plan.maxSessions ?? plan.max_sessions,
@@ -106,7 +114,8 @@ export const discoveryApi = {
     tenantSlug: string,
     branchId: number,
     planId: number,
-    payment?: PaymentResult
+    payment?: PaymentResult,
+    couponCode?: string
   ): Promise<any> => {
     const response = await apiClient.post<any>(
       `/mobile/discovery/centers/${tenantSlug}/${branchId}/purchase`,
@@ -119,7 +128,11 @@ export const discoveryApi = {
         paymentDueDate: payment?.summary.paymentDueDate,
         bankAccountCode: payment?.bankAccountCode,
         bankAccountName: payment?.bankAccountName,
-      }
+        // A promotion or shareable referral coupon code; the server takes it off the plan price.
+        couponCode,
+      },
+      // PlanPurchaseModal shows its own error UI (incl. the "already a member" 409 sheet).
+      { skipGlobalErrorToast: true }
     );
     return response.data;
   },

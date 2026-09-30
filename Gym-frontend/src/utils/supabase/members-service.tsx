@@ -263,6 +263,10 @@ class MembersService {
     bank_account_code?: string;
     bank_account_name?: string;
     processed_by_staff_id?: number;
+    // At most one: a MEMBERSHIP_DISCOUNT Reward Pass or a shareable referral coupon.
+    // membership_fee is then the fee BEFORE that discount — the backend applies it.
+    reward_pass_id?: number;
+    coupon_code?: string;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew`,

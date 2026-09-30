@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { ApiReferralRepository } from '../infrastructure/ApiReferralRepository';
 import { ReferralService } from '../application/ReferralService';
 import { referralKeys } from './referralKeys';
@@ -19,8 +20,9 @@ export function useReferralStats() {
 }
 
 export function useReferrals(params?: ReferralListParams) {
+  const { selectedBranchId } = useBranchContext();
   return useQuery<ReferralPage, Error>({
-    queryKey: referralKeys.list(params),
+    queryKey: [...referralKeys.list(params), selectedBranchId],
     queryFn: () => referralService.getReferrals(params),
   });
 }

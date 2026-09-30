@@ -14,7 +14,8 @@ import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { Typography } from './Typography';
 
 export interface InputProps extends TextInputProps {
-  label?: string;
+  /** String or inline node (e.g. a <CurrencyGlyph />) rendered in the label text. */
+  label?: React.ReactNode;
   error?: string;
   /** 'default' uses the standard themed style; 'auth' is a white card-style input for login screens; 'glass' is the same shape with a translucent frosted fill for glass-panel screens */
   variant?: 'default' | 'auth' | 'glass';

@@ -91,7 +91,13 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             // release/prod-2026-09-28: main took V56 (ensure_mobile_referral_tables)
             Map.entry("V56__add_social_login_tables.sql", "V57__add_social_login_tables.sql"),
             Map.entry("V57__add_mobile_idempotency_and_invitations.sql", "V58__add_mobile_idempotency_and_invitations.sql"),
-            Map.entry("V58__create_promotion_redemptions.sql", "V59__create_promotion_redemptions.sql")
+            Map.entry("V58__create_promotion_redemptions.sql", "V59__create_promotion_redemptions.sql"),
+            // feature/reward-passes: main took V60-V63 (brands, print templates, supplier scope, sales invoices)
+            Map.entry("V60__reward_pass_and_coupon_usage.sql", "V64__reward_pass_and_coupon_usage.sql"),
+            Map.entry("V61__mobile_push_tokens_and_deliveries.sql", "V65__mobile_push_tokens_and_deliveries.sql"),
+            Map.entry("V62__membership_freezes.sql", "V66__membership_freezes.sql"),
+            Map.entry("V63__community_member_authors.sql", "V67__community_member_authors.sql"),
+            Map.entry("V64__membership_plan_offers.sql", "V68__membership_plan_offers.sql")
     );
 
     /**
@@ -100,7 +106,7 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
      * every INSERT guarded by WHERE NOT EXISTS), so they're safe even where
      * Hibernate's ddl-auto already created some of their tables.
      */
-    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47");
+    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47", "56");
 
     /**
      * Migrations that may have been applied by hand, outside Flyway: a query

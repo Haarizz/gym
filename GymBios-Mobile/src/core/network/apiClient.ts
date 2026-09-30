@@ -54,7 +54,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status ?? 0;
     const body = error.response?.data;
     const message =
-      body?.message ?? error.message ?? 'An unexpected error occurred';
+      body?.message ?? body?.error ?? error.message ?? 'An unexpected error occurred';
 
     if (!error.config?.skipGlobalErrorToast) {
       toast.error(message);

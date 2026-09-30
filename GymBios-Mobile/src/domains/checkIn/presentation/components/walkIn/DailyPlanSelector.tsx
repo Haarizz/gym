@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { useWalkInPlans } from '../../hooks/useWalkInPlans';
@@ -23,10 +24,10 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
   };
 
   const placeholder = isLoading
-    ? 'Loading plans...'
+    ? 'Loading passes...'
     : plans.length === 0
-      ? 'No walk-in plans configured'
-      : 'Select a plan';
+      ? 'No walk-in passes configured'
+      : 'Select a pass';
 
   return (
     <>
@@ -34,7 +35,7 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
         style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
         onPress={() => !isLoading && plans.length > 0 && setModalVisible(true)}
         accessibilityRole="button"
-        accessibilityLabel="Select daily plan"
+        accessibilityLabel="Select daily pass"
       >
         <View style={styles.triggerContent}>
           <Typography
@@ -60,10 +61,10 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
               <View style={styles.sheet}>
                 <View style={styles.sheetHandle} />
                 <Typography variant="subtitle" style={styles.sheetTitle}>
-                  Select Daily Plan
+                  Select Daily Pass
                 </Typography>
                 <Typography variant="bodySmall" color="textSecondary" style={styles.sheetSubtitle}>
-                  Choose a walk-in / daily visitor plan
+                  Choose a walk-in / daily visitor pass
                 </Typography>
 
                 <ScrollView
@@ -94,7 +95,7 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
                         </View>
                         <View style={styles.planRight}>
                           <Typography variant="bodySmallBold" style={styles.planPrice}>
-                            ₹{plan.price}
+                            <CurrencyValue amount={plan.price} />
                           </Typography>
                           {isSelected && (
                             <Feather name="check-circle" size={18} color={BrandColors.teal} />

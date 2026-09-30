@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,9 +75,33 @@ public class MembershipPlan extends BaseEntity implements BranchAware {
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal price;
 
-    /** Discount in percent, e.g. 15.00 = 15% off */
+    /**
+     * Legacy discount (percent). No longer used for pricing — superseded by the
+     * offer fields below; kept so existing data isn't lost.
+     */
     @Column(precision = 5, scale = 2)
     private BigDecimal discount = BigDecimal.ZERO;
+
+    // ── Offer: a manual discount every member gets (see PlanOfferPricing) ────
+
+    /** percentage / fixed; null = no offer */
+    @Column(name = "offer_type", length = 20)
+    private String offerType;
+
+    @Column(name = "offer_value", precision = 10, scale = 2)
+    private BigDecimal offerValue;
+
+    /** Shown to members, e.g. "New Year Offer" */
+    @Column(name = "offer_label", length = 100)
+    private String offerLabel;
+
+    /** Inclusive; null = from now */
+    @Column(name = "offer_start_date")
+    private LocalDate offerStartDate;
+
+    /** Inclusive; null = until removed */
+    @Column(name = "offer_end_date")
+    private LocalDate offerEndDate;
 
     /** Active / Inactive */
     @Column(nullable = false)
@@ -208,6 +233,21 @@ public class MembershipPlan extends BaseEntity implements BranchAware {
 
     public BigDecimal getDiscount() { return discount; }
     public void setDiscount(BigDecimal discount) { this.discount = discount; }
+
+    public String getOfferType() { return offerType; }
+    public void setOfferType(String offerType) { this.offerType = offerType; }
+
+    public BigDecimal getOfferValue() { return offerValue; }
+    public void setOfferValue(BigDecimal offerValue) { this.offerValue = offerValue; }
+
+    public String getOfferLabel() { return offerLabel; }
+    public void setOfferLabel(String offerLabel) { this.offerLabel = offerLabel; }
+
+    public LocalDate getOfferStartDate() { return offerStartDate; }
+    public void setOfferStartDate(LocalDate offerStartDate) { this.offerStartDate = offerStartDate; }
+
+    public LocalDate getOfferEndDate() { return offerEndDate; }
+    public void setOfferEndDate(LocalDate offerEndDate) { this.offerEndDate = offerEndDate; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

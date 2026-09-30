@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TaxDocument, TaxInformation } from '../../domain/StaffLedgerData';
 
@@ -20,7 +21,7 @@ export function StaffLedgerTaxSection({
       <View style={styles.taxAlertCard}>
         <Text style={styles.taxAlertTitle}>Tax Information</Text>
         <Text style={styles.taxAlertBody}>
-          Your YTD earnings: {taxInfo.ytdEarnings}. TDS deducted: {taxInfo.tdsDeducted}
+          Your YTD earnings: <CurrencyValue amount={taxInfo.ytdEarnings} />. TDS deducted: <CurrencyValue amount={taxInfo.tdsDeducted} />
         </Text>
         <Pressable hitSlop={8}>
           <Text style={styles.taxAlertLink}>View Tax Details →</Text>
@@ -33,17 +34,15 @@ export function StaffLedgerTaxSection({
         <View style={styles.summaryList}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Earnings</Text>
-            <Text style={styles.summaryValue}>{taxInfo.ytdEarnings}</Text>
+            <CurrencyValue style={styles.summaryValue} amount={taxInfo.ytdEarnings} />
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Base Salary Paid</Text>
-            <Text style={styles.summaryValue}>{taxInfo.baseSalaryPaid}</Text>
+            <CurrencyValue style={styles.summaryValue} amount={taxInfo.baseSalaryPaid} />
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Commission</Text>
-            <Text style={[styles.summaryValue, { color: '#16A34A' }]}>
-              {taxInfo.totalCommission}
-            </Text>
+            <CurrencyValue style={[styles.summaryValue, { color: '#16A34A' }]} amount={taxInfo.totalCommission} />
           </View>
           <View style={[styles.summaryRow, styles.lastSummaryRow]}>
             <Text style={styles.summaryLabel}>Conversions</Text>

@@ -53,7 +53,7 @@ function resolveTrendIndicator(changeType: ReportMetricProps['changeType']): str
  * ```tsx
  * <ReportMetric
  *   label="Today's Revenue"
- *   value="₹4,250"
+ *   value={<CurrencyValue amount={4250} />}
  *   change="+8%"
  *   changeType="positive"
  * />

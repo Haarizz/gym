@@ -5,6 +5,7 @@ import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.MemberService;
+import com.company.project.services.MembershipFreezeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,9 +16,11 @@ import org.springframework.web.bind.annotation.*;
 public class MemberController {
 
     private final MemberService memberService;
+    private final MembershipFreezeService freezeService;
 
-    public MemberController(MemberService memberService) {
+    public MemberController(MemberService memberService, MembershipFreezeService freezeService) {
         this.memberService = memberService;
+        this.freezeService = freezeService;
     }
 
     /**
@@ -160,7 +163,7 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> renewMember(
             @PathVariable Long id,
             @RequestBody com.company.project.dto.RenewalRequestDTO request) {
-        return ResponseEntity.ok(memberService.renewMember(id, request));
+        return ResponseEntity.ok(freezeService.renewEndingFreeze(id, request));
     }
 
     /**
@@ -185,7 +188,7 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> renewFamily(
             @PathVariable Long headId,
             @RequestBody com.company.project.dto.FamilyRenewalRequestDTO request) {
-        return ResponseEntity.ok(memberService.renewFamily(headId, request));
+        return ResponseEntity.ok(freezeService.renewFamilyEndingFreeze(headId, request));
     }
 
     /**
@@ -215,7 +218,7 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> freezeMember(
             @PathVariable Long id,
             @RequestBody com.company.project.dto.FreezeRequestDTO request) {
-        return ResponseEntity.ok(memberService.freezeMember(id, request));
+        return ResponseEntity.ok(freezeService.freezeByStaff(id, request));
     }
 
     /**
@@ -223,7 +226,7 @@ public class MemberController {
      */
     @PostMapping("/{id}/unfreeze")
     public ResponseEntity<MemberResponseDTO> unfreezeMember(@PathVariable Long id) {
-        return ResponseEntity.ok(memberService.unfreezeMember(id));
+        return ResponseEntity.ok(freezeService.unfreeze(id));
     }
 
     /**

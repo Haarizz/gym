@@ -26,6 +26,7 @@ import { apiClient } from '@/core/network/apiClient';
 interface ReceiptResponse {
   id: string;
   receipt_no?: string;
+  invoice_no?: string;
   transaction_date?: string;
   member_db_id?: string;
   member_id?: string;
@@ -51,6 +52,7 @@ interface ReceiptResponse {
   total_paid_to_date?: number;
   balance_after?: number;
   linked_bill_id?: string;
+  approval_status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -238,6 +240,7 @@ export class ApiBillingRepository implements BillingRepository {
     return {
       id: response.id,
       receiptNo: response.receipt_no,
+      invoiceNo: response.invoice_no,
       transactionDate: response.transaction_date,
       memberDbId: response.member_db_id,
       memberId: response.member_id,
@@ -267,6 +270,7 @@ export class ApiBillingRepository implements BillingRepository {
       totalPaidToDate: response.total_paid_to_date,
       balanceAfter: response.balance_after,
       linkedBillId: response.linked_bill_id,
+      approvalStatus: response.approval_status,
       createdAt: response.created_at,
       updatedAt: response.updated_at,
     };
@@ -392,18 +396,24 @@ export class ApiBillingRepository implements BillingRepository {
     return undefined;
   }
 
-  private toPaymentMethod(value?: string): PaymentMethod | undefined {
-    if (!value) return undefined;
-    const normalized = value.toLowerCase();
+  // The backend stores whatever the paying flow sent, only re-cased to
+  // "First letter upper, rest lower" (ReceiptService.normalizePaymentMethod) —
+  // so "Online Payment" arrives as "Online payment", "UPI" as "Upi", etc.
+  // Known variants map onto the enum; anything else is passed through as-is so
+  // the screen/receipt shows the real method rather than a blank "—".
+  private toPaymentMethod(value?: string): PaymentMethod | string | undefined {
+    const trimmed = value?.trim();
+    if (!trimmed) return undefined;
+    const normalized = trimmed.toLowerCase().replace(/[_-]+/g, ' ');
     if (normalized === 'cash') return PaymentMethod.Cash;
-    if (normalized === 'card') return PaymentMethod.Card;
-    if (normalized === 'online') return PaymentMethod.Online;
+    if (normalized === 'card' || normalized === 'credit card' || normalized === 'debit card') return PaymentMethod.Card;
+    if (normalized === 'online' || normalized === 'online payment' || normalized === 'upi') return PaymentMethod.Online;
     if (normalized === 'wallet') return PaymentMethod.Wallet;
-    if (normalized === 'bank transfer') return PaymentMethod.BankTransfer;
-    if (normalized === 'cheque') return PaymentMethod.Cheque;
+    if (normalized === 'bank transfer' || normalized === 'bank') return PaymentMethod.BankTransfer;
+    if (normalized === 'cheque' || normalized === 'check') return PaymentMethod.Cheque;
     if (normalized === 'mixed') return PaymentMethod.Mixed;
     if (normalized === 'credit') return PaymentMethod.Credit;
-    return undefined;
+    return trimmed;
   }
 
   private toMembershipType(value?: string): MembershipType | undefined {

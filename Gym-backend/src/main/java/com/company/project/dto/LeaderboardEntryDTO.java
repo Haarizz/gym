@@ -3,6 +3,7 @@ package com.company.project.dto;
 public class LeaderboardEntryDTO {
 
     private Long userId;
+    private Long memberId;
     private String username;
     private int totalPosts;
     private long totalLikes;
@@ -22,6 +23,9 @@ public class LeaderboardEntryDTO {
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+
+    public Long getMemberId() { return memberId; }
+    public void setMemberId(Long memberId) { this.memberId = memberId; }
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import type { TrainerTaxDocument, TrainerTaxInformation } from '../../domain/TrainerLedgerData';
 
@@ -20,7 +21,7 @@ export function TrainerLedgerTaxSection({
       <View style={styles.taxAlertCard}>
         <Text style={styles.taxAlertTitle}>Tax Information</Text>
         <Text style={styles.taxAlertBody}>
-          Your YTD earnings: {taxInfo.ytdEarnings}. Download your quarterly tax statement for filing.
+          Your YTD earnings: <MoneyOrDash amount={taxInfo.ytdEarnings} />. Download your quarterly tax statement for filing.
         </Text>
         <Pressable hitSlop={8}>
           <Text style={styles.taxAlertLink}>Download Tax Statement →</Text>
@@ -33,7 +34,7 @@ export function TrainerLedgerTaxSection({
         <View style={styles.summaryList}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Earnings</Text>
-            <Text style={styles.summaryValue}>{taxInfo.ytdEarnings}</Text>
+            <Text style={styles.summaryValue}><MoneyOrDash amount={taxInfo.ytdEarnings} /></Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Sessions</Text>
@@ -42,7 +43,7 @@ export function TrainerLedgerTaxSection({
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Avg. per Session</Text>
             <Text style={[styles.summaryValue, { color: '#16A34A' }]}>
-              {taxInfo.avgPerSession}
+              <MoneyOrDash amount={taxInfo.avgPerSession} />
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.lastSummaryRow]}>
@@ -158,3 +159,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
 });
+
+function MoneyOrDash({ amount }: { amount: number | null }) {
+  return amount != null ? <CurrencyValue amount={amount} /> : <>—</>;
+}

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 
 import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -7,7 +8,8 @@ import { GlassSurface } from '@/shared/components/Glass/GlassSurface';
 
 interface StatCardProps {
   label: string;
-  value: string;
+  /** String or inline node, e.g. <CurrencyValue amount={...} />. */
+  value: React.ReactNode;
   iconName: keyof typeof Feather.glyphMap;
   color: string;
   /** When omitted the card is rendered as non-interactive (disabled state). */
@@ -18,7 +20,7 @@ export function StatCard({ label, value, iconName, color, onPress }: StatCardPro
   const content = (
     <>
       <View style={[styles.icon, { backgroundColor: color }]}>
-        <Feather name={iconName} size={20} color="#ffffff" />
+        <FeatherIcon name={iconName} size={20} color="#ffffff" />
       </View>
       <Typography variant="subtitle" style={styles.value}>
         {value}

@@ -7,20 +7,20 @@ import type {
 export class NotificationService {
   constructor(private readonly repository: ApiNotificationRepository) {}
 
-  async getNotifications(page = 0, size = 20): Promise<NotificationPage> {
-    return this.repository.getNotifications(page, size);
+  async getNotifications(page = 0, size = 20, module?: string): Promise<NotificationPage> {
+    return this.repository.getNotifications(page, size, module);
   }
 
-  async getUnreadCount(): Promise<UnreadCountResponse> {
-    return this.repository.getUnreadCount();
+  async getUnreadCount(module?: string): Promise<UnreadCountResponse> {
+    return this.repository.getUnreadCount(module);
   }
 
   async markRead(id: number): Promise<void> {
     return this.repository.markRead(id);
   }
 
-  async markAllRead(): Promise<void> {
-    return this.repository.markAllRead();
+  async markAllRead(module?: string): Promise<void> {
+    return this.repository.markAllRead(module);
   }
 
   async deleteNotification(id: number): Promise<void> {

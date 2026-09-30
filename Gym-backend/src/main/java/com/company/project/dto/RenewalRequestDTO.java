@@ -29,6 +29,16 @@ public class RenewalRequestDTO {
     private String bankAccountName;
     // Which staff member actually handled this renewal — see MemberRequestDTO.processedByStaffId.
     private Long processedByStaffId;
+    // A Reward Pass (MEMBERSHIP_DISCOUNT reward id) or a shareable coupon code to apply —
+    // at most one. When either is set, membershipFee is the fee BEFORE the discount;
+    // the server subtracts it and spends the pass/coupon in the same transaction.
+    private Long rewardPassId;
+    private String couponCode;
+    // A head moving onto a Family/Couple plan (MemberService.convertToFamilyHead):
+    // the billed-to-head members' fees added on top of membershipFee, itemized on
+    // the renewal receipt like createMember's minorCharges.
+    private BigDecimal billedToHeadFeeTotal;
+    private List<MinorChargeDTO> minorCharges;
 
     public String getPlanName() { return planName; }
     public void setPlanName(String planName) { this.planName = planName; }
@@ -65,4 +75,16 @@ public class RenewalRequestDTO {
 
     public Long getProcessedByStaffId() { return processedByStaffId; }
     public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
+
+    public Long getRewardPassId() { return rewardPassId; }
+    public void setRewardPassId(Long rewardPassId) { this.rewardPassId = rewardPassId; }
+
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
+
+    public BigDecimal getBilledToHeadFeeTotal() { return billedToHeadFeeTotal; }
+    public void setBilledToHeadFeeTotal(BigDecimal billedToHeadFeeTotal) { this.billedToHeadFeeTotal = billedToHeadFeeTotal; }
+
+    public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
+    public void setMinorCharges(List<MinorChargeDTO> minorCharges) { this.minorCharges = minorCharges; }
 }

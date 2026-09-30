@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import type { StaffMonthSummary } from '../../domain/StaffDashboardData';
@@ -24,7 +25,7 @@ export function StaffMonthSummaryCard({ summary }: StaffMonthSummaryCardProps) {
 
       <View style={styles.row}>
         <Text style={styles.label}>Revenue Generated</Text>
-        <Text style={[styles.value, { color: BrandColors.memberGold }]}>{summary.revenueGenerated}</Text>
+        <CurrencyValue style={[styles.value, { color: BrandColors.memberGold }]} amount={summary.revenueGenerated} compact />
       </View>
 
       <View style={[styles.row, styles.lastRow]}>

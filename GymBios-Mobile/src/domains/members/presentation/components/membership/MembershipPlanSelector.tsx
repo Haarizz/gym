@@ -56,7 +56,7 @@ export function MembershipPlanSelector({
   return (
     <View>
       <Typography variant="bodySmallBold" style={styles.label}>
-        Membership Plan
+        Subscription
         <Typography variant="bodySmallBold" style={{ color: theme.error }}>
           {' *'}
         </Typography>
@@ -66,7 +66,7 @@ export function MembershipPlanSelector({
         onPress={openSheet}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel="Membership Plan"
+        accessibilityLabel="Subscription"
         accessibilityState={{ disabled }}
         style={({ pressed }) => [
           styles.field,
@@ -85,14 +85,14 @@ export function MembershipPlanSelector({
             { color: selectedPlan ? theme.text : theme.textSecondary },
           ]}
         >
-          {selectedPlan ? selectedPlan.name : 'Select a membership plan'}
+          {selectedPlan ? selectedPlan.name : 'Select a subscription'}
         </Typography>
         <Feather name="chevron-down" size={18} color={theme.textSecondary} />
       </Pressable>
 
       <AppBottomSheet
         visible={sheetVisible}
-        title="Membership Plan"
+        title="Subscription"
         onClose={() => setSheetVisible(false)}
       >
         {/* Search input */}
@@ -102,7 +102,7 @@ export function MembershipPlanSelector({
             style={[styles.searchInputText, { color: theme.text }]}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search plans..."
+            placeholder="Search subscriptions..."
             placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -120,19 +120,19 @@ export function MembershipPlanSelector({
 
         {loading && (
           <Typography variant="bodySmall" color="textSecondary" style={styles.statusText}>
-            Loading plans...
+            Loading subscriptions...
           </Typography>
         )}
 
         {!loading && error && (
           <Typography variant="bodySmall" color="error" style={styles.statusText}>
-            Failed to load plans
+            Failed to load subscriptions
           </Typography>
         )}
 
         {!loading && !error && filteredPlans.length === 0 && (
           <Typography variant="bodySmall" color="textSecondary" style={styles.statusText}>
-            No plans found
+            No subscriptions found
           </Typography>
         )}
 

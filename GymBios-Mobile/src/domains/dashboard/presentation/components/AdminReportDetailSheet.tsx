@@ -36,7 +36,6 @@ export function AdminReportDetailSheet({
   const title = REPORT_TITLES[selectedReport] ?? 'Report Detail';
   const columns = data?.columns ?? [];
   const rows = data?.rows ?? [];
-  const currency = data?.currency ?? 'INR';
   const reportDateLabel = data
     ? data.from === data.to
       ? format(new Date(`${data.from}T00:00:00`), 'MMM d, yyyy')
@@ -94,7 +93,7 @@ export function AdminReportDetailSheet({
                 >
                   {columns.map((col, colIdx) => (
                     <Text key={colIdx} style={styles.tableCell} numberOfLines={1}>
-                      {formatReportCell(row[col] ?? null, col, currency)}
+                      {formatReportCell(row[col] ?? null, col)}
                     </Text>
                   ))}
                 </View>

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 // Deep-green gradient glass — matches reference `.plan-card`
@@ -15,7 +16,10 @@ export interface MembershipDetails {
   daysRemaining: number;
   totalDays: number;
   autoRenew: boolean;
-  price: string;
+  /** Plan price in the gym's display currency; null when there is no plan. */
+  price: number | null;
+  /** Billing period shown after the price, e.g. "1 Month". */
+  pricePeriod?: string;
   benefits: string[];
   freezeAvailable: boolean;
   freezeDaysAllowed: number;
@@ -33,8 +37,8 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
       <View style={[styles.card, styles.inactiveCard]}>
         <View style={styles.header}>
           <View>
-            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Current Plan</Text>
-            <Text style={[styles.planTitle, styles.inactiveTextDark]}>No Active Plan</Text>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Current Subscription</Text>
+            <Text style={[styles.planTitle, styles.inactiveTextDark]}>No Active Subscription</Text>
             <Text style={[styles.priceText, styles.inactiveTextLight]}>N/A</Text>
           </View>
           <View style={[styles.activeBadge, styles.activeBadgeInactive]}>
@@ -42,7 +46,7 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
           </View>
         </View>
         <Text style={styles.inactivePrompt}>
-          You don't have an active membership plan. Join a gym to unlock benefits and add-ons.
+          You don't have an active subscription. Join a gym to unlock benefits and add-ons.
         </Text>
       </View>
     );
@@ -85,9 +89,15 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
 
       <View style={styles.header}>
         <View>
-          <Text style={styles.badgeLabel}>Current Plan</Text>
-          <Text style={styles.planTitle}>{membership.type || 'Unknown Plan'}</Text>
-          <Text style={styles.priceText}>{membership.price || ''}</Text>
+          <Text style={styles.badgeLabel}>Current Subscription</Text>
+          <Text style={styles.planTitle}>{membership.type || 'Unknown Subscription'}</Text>
+          {membership.price != null && (
+            <CurrencyValue
+              style={styles.priceText}
+              amount={membership.price}
+              suffix={membership.pricePeriod ? ` / ${membership.pricePeriod}` : undefined}
+            />
+          )}
         </View>
         {/* White-glass active pill — matching reference `.active-pill` */}
         <View style={styles.activeBadge}>
@@ -99,7 +109,7 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
       {/* Progress Bar */}
       <View style={styles.progressSection}>
         <View style={styles.progressLabelRow}>
-          <Text style={styles.progressLabel}>Membership Progress</Text>
+          <Text style={styles.progressLabel}>Subscription Progress</Text>
           <Text style={styles.daysRemainingText}>{membership.daysRemaining || 0} days left</Text>
         </View>
         <View style={styles.progressTrack}>

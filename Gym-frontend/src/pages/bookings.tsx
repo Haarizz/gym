@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { membersService } from "../utils/supabase/members-service";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { bookingService, BookingApi } from "../utils/supabase/booking-service";
+import { rewardService, passLabel, type ReferralReward } from "../utils/supabase/reward-service";
 
 interface BookingsProps {
   onNavigate?: (section: string) => void;
@@ -93,6 +94,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
   const [showPhotoDialog, setShowPhotoDialog] = useState(false);
   const [photoToView, setPhotoToView] = useState<{ url: string; name: string } | null>(null);
+  // Free PT / Class Reward Passes the selected member can spend on the selected session.
+  const [availablePasses, setAvailablePasses] = useState<ReferralReward[]>([]);
+  const [selectedPassId, setSelectedPassId] = useState<string>('none');
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   const formatTime = (value?: string | null) => {
@@ -265,6 +269,17 @@ export function Bookings({ onNavigate }: BookingsProps) {
   const guestBookings = bookings.filter(b => b.isGuest).length;
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled' || b.status === 'no-show').length;
 
+  // Reload passes whenever the member or session changes — only PT/class sessions take them.
+  useEffect(() => {
+    setAvailablePasses([]);
+    setSelectedPassId('none');
+    const context = selectedClass?.type === 'pt' ? 'PT' : selectedClass?.type === 'class' ? 'CLASS' : null;
+    if (isGuestBooking || !selectedMember || !context) return;
+    rewardService.getPasses(selectedMember.id, context)
+      .then(setAvailablePasses)
+      .catch(() => setAvailablePasses([])); // no passes to offer — never blocks booking
+  }, [selectedMember?.id, selectedClass?.id, selectedClass?.type, isGuestBooking]);
+
   const handleCreateBooking = async () => {
     if (!selectedClass) {
       toast.error("Please select a class or session");
@@ -287,7 +302,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
         memberId: isGuestBooking ? undefined : Number(selectedMember?.id),
         guestName: isGuestBooking ? guestDetails.name : undefined,
         guestEmail: isGuestBooking ? guestDetails.email : undefined,
-        guestPhone: isGuestBooking ? guestDetails.phone : undefined
+        guestPhone: isGuestBooking ? guestDetails.phone : undefined,
+        rewardPassId: !isGuestBooking && selectedPassId !== 'none' ? Number(selectedPassId) : undefined,
       });
 
       const mapped = mapBooking(created);
@@ -709,9 +725,27 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           <span className="text-sm text-gray-600">Location:</span>
                           <span className="font-medium">{selectedClass.location}</span>
                         </div>
+                        {availablePasses.length > 0 && (
+                          <div className="border-t pt-3">
+                            <Label>Reward Pass</Label>
+                            <Select value={selectedPassId} onValueChange={setSelectedPassId}>
+                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Don't use a Reward Pass</SelectItem>
+                                {availablePasses.map((p) => (
+                                  <SelectItem key={p.id} value={String(p.id)}>{passLabel(p)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center border-t pt-3">
                           <span className="font-medium">Total Amount:</span>
-                          <span className="text-xl font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {selectedClass.price}</span>
+                          <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
+                            {selectedPassId !== 'none'
+                              ? <>Free <span className="text-sm font-normal text-gray-500">(Reward Pass)</span></>
+                              : <><CurrencyGlyph /> {selectedClass.price}</>}
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -765,7 +799,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
         </TabsList>
 
         {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-6">          {/* Row 1: Top Summary Cards */}
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* Row 1: Top Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className={cardShell}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

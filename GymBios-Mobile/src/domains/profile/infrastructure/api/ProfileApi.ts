@@ -14,6 +14,13 @@ export interface ApiAuthMeResponse {
   permissions?: string[];
 }
 
+/** Form fields hold height/weight as text; the backend expects numbers. */
+function toNumberOrUndefined(value?: string): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export class ProfileApi {
   /**
    * GET /api/auth/me
@@ -39,10 +46,13 @@ export class ProfileApi {
    * GET /api/mobile/profile/me
    */
   async getMobileProfile(): Promise<ProfileApiModel> {
-    const response = await apiClient.get<any>('/mobile/profile/me');
+    // Background fetch (avatar photo) shared by every screen via useProfile —
+    // callers fall back to a cached photo, so a failure must not toast.
+    const response = await apiClient.get<any>('/mobile/profile/me', { skipGlobalErrorToast: true });
     const data = response.data;
     return {
       fullName: data.full_name,
+      email: data.email,
       phone: data.phone,
       dateOfBirth: data.date_of_birth,
       gender: data.gender,
@@ -52,6 +62,11 @@ export class ProfileApi {
       emergencyPhone: data.emergency_phone,
       bloodType: data.blood_type,
       medicalConditions: data.medical_conditions,
+      allergies: data.allergies,
+      currentMedications: data.current_medications,
+      chronicIllnesses: data.chronic_illnesses,
+      height: data.height != null ? String(data.height) : undefined,
+      weight: data.weight != null ? String(data.weight) : undefined,
       photoUrl: data.photo_url,
     };
   }
@@ -71,12 +86,18 @@ export class ProfileApi {
       emergency_phone: payload.emergencyPhone,
       blood_type: payload.bloodType,
       medical_conditions: payload.medicalConditions,
+      allergies: payload.allergies,
+      current_medications: payload.currentMedications,
+      chronic_illnesses: payload.chronicIllnesses,
+      height: toNumberOrUndefined(payload.height),
+      weight: toNumberOrUndefined(payload.weight),
       photo_url: payload.photoUrl,
     };
     const response = await apiClient.put<any>('/mobile/profile/me', apiPayload);
     const data = response.data;
     return {
       fullName: data.full_name,
+      email: data.email,
       phone: data.phone,
       dateOfBirth: data.date_of_birth,
       gender: data.gender,
@@ -86,6 +107,11 @@ export class ProfileApi {
       emergencyPhone: data.emergency_phone,
       bloodType: data.blood_type,
       medicalConditions: data.medical_conditions,
+      allergies: data.allergies,
+      currentMedications: data.current_medications,
+      chronicIllnesses: data.chronic_illnesses,
+      height: data.height != null ? String(data.height) : undefined,
+      weight: data.weight != null ? String(data.weight) : undefined,
       photoUrl: data.photo_url,
     };
   }

@@ -269,7 +269,7 @@ export function AddLeadScreen() {
             )}
             <Input
               label="Follow-up subject"
-              placeholder="e.g. Membership plan"
+              placeholder="e.g. Subscription"
               value={form.followUpSubject}
               onChangeText={(t) => updateForm('followUpSubject', t)}
             />

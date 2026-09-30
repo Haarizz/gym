@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { Branch, useMyBranches } from '@/domains/branch';
 import { setApiClientBranch } from '@/core/network/apiClient';
+import { useDisplayCurrencySync } from '@/core/providers/CurrencyProvider';
 import { useAuthStore } from '@/domains/auth/store';
 import { ApiMemberDirectoryRepository } from '@/domains/members/infrastructure/directory/ApiMemberDirectoryRepository';
 import { useQuery } from '@tanstack/react-query';
@@ -65,6 +66,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   useMemo(() => {
     setApiClientBranch(effectiveBranchId);
   }, [effectiveBranchId]);
+
+  // Display currency is branch-scoped (web Settings page) — follow the active branch.
+  useDisplayCurrencySync(effectiveBranchId);
 
   const handleSetSelectedBranch = (id: BranchId) => {
     setUserSelectedBranchId(id);

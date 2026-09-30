@@ -153,6 +153,12 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public Page<NotificationResponseDTO> getForCurrentUser(int page, int size) {
+        return getForCurrentUser(page, size, null);
+    }
+
+    /** Same as getForCurrentUser(page, size), optionally narrowed to one module (null = all). */
+    @Transactional(readOnly = true)
+    public Page<NotificationResponseDTO> getForCurrentUser(int page, int size, String module) {
         UserContext ctx = currentUserContext();
         // allowedModulesForRoles calls RoleService, a separate @Transactional bean
         // whose own proxied call re-triggers BranchFilterAspect on this same
@@ -163,6 +169,7 @@ public class NotificationService {
         List<Notification> visible = notificationRepository
                 .findAllForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
+                .filter(n -> module == null || module.equals(n.getModule()))
                 .toList();
 
         int from = Math.min(page * size, visible.size());
@@ -174,7 +181,7 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public long getUnreadCount() {
+    public long getUnreadCount(String module) {
         UserContext ctx = currentUserContext();
         // allowedModulesForRoles calls RoleService, a separate @Transactional bean
         // whose own proxied call re-triggers BranchFilterAspect on this same
@@ -184,6 +191,7 @@ public class NotificationService {
         disableBranchFilter();
         return notificationRepository.findUnreadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId()).stream()
                 .filter(n -> isModuleVisible(n.getModule(), allowedModules))
+                .filter(n -> module == null || module.equals(n.getModule()))
                 .count();
     }
 
@@ -197,9 +205,9 @@ public class NotificationService {
         });
     }
 
-    public void markAllRead() {
+    public void markAllRead(String module) {
         UserContext ctx = currentUserContext();
-        notificationRepository.markAllReadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId());
+        notificationRepository.markAllReadForUser(ctx.companyId, ctx.userId, ctx.roles, BranchContextHolder.getActiveBranchId(), module);
     }
 
     public void softDelete(Long notificationId) {

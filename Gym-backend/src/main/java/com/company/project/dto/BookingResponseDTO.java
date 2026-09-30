@@ -83,4 +83,10 @@ public class BookingResponseDTO {
     private String paymentStatus;
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    // The Reward Pass this booking was paid with, if any.
+    private Long rewardId;
+
+    public Long getRewardId() { return rewardId; }
+    public void setRewardId(Long rewardId) { this.rewardId = rewardId; }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import { ReceiptBottomSheet } from '@/shared/components/ReceiptBottomSheet';
@@ -50,7 +51,7 @@ export function MembershipPaymentsTab() {
               return (
                 <Pressable key={item.id} style={styles.paymentRow} onPress={() => setSelectedReceiptId(item.id)}>
                   <View>
-                    <Text style={styles.amountText}>₹{displayAmount.toLocaleString()}</Text>
+                    <Text style={styles.amountText}><CurrencyValue amount={displayAmount} /></Text>
                     <Text style={styles.metaText}>
                       {formattedDate} • {item.paymentMethod || item.transactionType}
                     </Text>

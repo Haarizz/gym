@@ -11,13 +11,12 @@ import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyValue } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useReferralRules } from '../../hooks/useReferrals';
 
 export function RewardRulesScreen() {
   const router = useRouter();
-  const { currencyCode } = useCurrency();
   const { data: rules, isLoading, refetch } = useReferralRules();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -118,7 +117,7 @@ export function RewardRulesScreen() {
                         `${rule.value}%`
                       ) : (
                         <>
-                          <CurrencyGlyph code={currencyCode} /> {rule.value}
+                          <CurrencyValue amount={Number(rule.value)} />
                         </>
                       )}
                     </Typography>

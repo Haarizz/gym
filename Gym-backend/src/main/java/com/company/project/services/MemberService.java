@@ -12,6 +12,8 @@ import com.company.project.dto.MinorRenewalRequestDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.dto.RenewalRequestDTO;
+import com.company.project.entities.ReferralReward;
+import com.company.project.enums.PassContext;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.services.NotificationService;
@@ -73,6 +75,8 @@ public class MemberService {
     private final BranchService branchService;
     private final UserBranchRepository userBranchRepository;
     private final UserDirectoryRepository userDirectoryRepository;
+    private final RewardRedemptionService rewardRedemptionService;
+    private final DiscountCodeService discountCodeService;
     private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
 
     @PersistenceContext
@@ -92,6 +96,8 @@ public class MemberService {
                          BranchService branchService,
                          UserBranchRepository userBranchRepository,
                          UserDirectoryRepository userDirectoryRepository,
+                         @Lazy RewardRedemptionService rewardRedemptionService,
+                         @Lazy DiscountCodeService discountCodeService,
                          com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
@@ -107,6 +113,8 @@ public class MemberService {
         this.branchService             = branchService;
         this.userBranchRepository      = userBranchRepository;
         this.userDirectoryRepository   = userDirectoryRepository;
+        this.rewardRedemptionService   = rewardRedemptionService;
+        this.discountCodeService       = discountCodeService;
         this.salesInvoiceRepository    = salesInvoiceRepository;
     }
 
@@ -426,8 +434,9 @@ public class MemberService {
                 }
             } else {
                 // Auto-calculate is off (or no price-per-member configured) — fall
-                // back to the plan's own flat price as the whole family's invoice.
-                combinedHeadFee = resolvedPlan.getPrice() != null ? resolvedPlan.getPrice() : BigDecimal.ZERO;
+                // back to the plan's own flat price (after its running offer, if any)
+                // as the whole family's invoice.
+                combinedHeadFee = PlanOfferPricing.effectivePrice(resolvedPlan);
                 for (FamilyMemberDTO fm : minorFamilyMembers) {
                     billedFeeByMember.put(fm, BigDecimal.ZERO);
                 }
@@ -503,12 +512,22 @@ public class MemberService {
             }
         }
 
+        boolean hasSignupCoupon = request.getCouponCode() != null && !request.getCouponCode().isBlank();
+        if (hasSignupCoupon && familyHeadBillingMode) {
+            // family_head mode recomputes the fee from plan prices above, which would drop the discount.
+            throw new BusinessRuleViolationException("Discount codes can't be applied to family-billed registrations");
+        }
+
         // First save to get the auto-generated DB id
         Member saved = memberRepository.save(member);
 
         // Generate the business member ID: MBR-XXXXXXXXXX (zero-padded sequential)
         saved.setMemberId("MBR-" + String.format("%010d", saved.getId()));
         saved = memberRepository.save(saved);
+
+        if (hasSignupCoupon) {
+            spendSignupCoupon(saved, request.getCouponCode());
+        }
 
         // Auto-create a receipt for the new member — its amount covers the head's own
         // fee plus any minors billed to them, itemized via minorCharges. paidAmount is
@@ -740,7 +759,7 @@ public class MemberService {
      * Couple constraint in createMember() so caps can't be bypassed by calling the
      * API directly. adultCount includes the head.
      */
-    private void enforceFamilyMemberCaps(MembershipPlan plan, long adultCount, long childCount) {
+    public void enforceFamilyMemberCaps(MembershipPlan plan, long adultCount, long childCount) {
         long totalCount = adultCount + childCount;
         boolean allowExtra = !Boolean.FALSE.equals(plan.getAllowAdditionalMembers());
         Integer maxAdults = plan.getMaxAdultMembers();
@@ -764,6 +783,11 @@ public class MemberService {
      * member later never touches any other family member.
      */
     private void registerFamilyAdult(FamilyMemberDTO fm, Member head) {
+        registerFamilyAdult(fm, head, null);
+    }
+
+    /** startDate: when their membership starts — null means the head's start date. */
+    private void registerFamilyAdult(FamilyMemberDTO fm, Member head, LocalDateTime startDate) {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
@@ -773,8 +797,8 @@ public class MemberService {
         dep.setMembershipStatus("active");
         dep.setMembershipPlan(fm.getMembershipPlan() != null && !fm.getMembershipPlan().isBlank()
                 ? fm.getMembershipPlan() : head.getMembershipPlan());
-        dep.setMembershipStartDate(head.getMembershipStartDate() != null
-                ? head.getMembershipStartDate() : LocalDateTime.now());
+        dep.setMembershipStartDate(startDate != null ? startDate
+                : head.getMembershipStartDate() != null ? head.getMembershipStartDate() : LocalDateTime.now());
         dep.setJoinDate(dep.getMembershipStartDate());
         dep.setMembershipFee(fm.getMembershipFee());
         dep.setPaymentStatus(fm.getPaymentStatus() != null ? fm.getPaymentStatus() : "pending");
@@ -850,6 +874,12 @@ public class MemberService {
      * the authoritative amount actually invoiced lives on the head's Receipt.
      */
     private void createBilledToHeadRecord(FamilyMemberDTO fm, Member head, BigDecimal billedFee) {
+        createBilledToHeadRecord(fm, head, billedFee, null);
+    }
+
+    /** startDate: when their membership starts — null means the head's start/join date. */
+    private void createBilledToHeadRecord(FamilyMemberDTO fm, Member head, BigDecimal billedFee,
+                                          LocalDateTime startDate) {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
@@ -859,10 +889,10 @@ public class MemberService {
         dep.setMembershipStatus(head.getMembershipStatus());
         dep.setMembershipPlan(fm.getMembershipPlan() != null && !fm.getMembershipPlan().isBlank()
                 ? fm.getMembershipPlan() : head.getMembershipPlan());
-        dep.setMembershipStartDate(head.getMembershipStartDate());
+        dep.setMembershipStartDate(startDate != null ? startDate : head.getMembershipStartDate());
         dep.setMembershipEndDate(head.getMembershipEndDate());
         dep.setExpiryDate(head.getExpiryDate());
-        dep.setJoinDate(head.getJoinDate());
+        dep.setJoinDate(startDate != null ? startDate : head.getJoinDate());
         dep.setMembershipFee(billedFee);
         dep.setPaymentStatus(null);
         dep.setOutstandingBalance(null);
@@ -929,6 +959,11 @@ public class MemberService {
         if (request.getMembershipType()  != null) member.setMembershipType(request.getMembershipType());
         if (request.getMembershipStatus() != null) member.setMembershipStatus(request.getMembershipStatus());
 
+        // Reward Pass / shareable coupon: membershipFee arrived as the fee before it, so
+        // take the discount off here — before outstanding/amountReceived are derived —
+        // and spend the pass/coupon in this same transaction.
+        String rewardNote = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode());
+
         // Compute new expiry from plan duration, extending from current expiry (or today)
         if (member.getMembershipPlan() != null) {
             Optional<MembershipPlan> planOpt = planRepository.findByName(member.getMembershipPlan());
@@ -952,7 +987,11 @@ public class MemberService {
         // (a "Credit" renewal with something received via a real method), not just a
         // binary paid/pending flag. Falls back to the old binary paymentStatus when
         // the caller doesn't send amountReceived, so existing callers keep working.
-        BigDecimal fee = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal ownFee = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
+        // Billed-to-head members' fees fold onto the head's due, as in createMember.
+        BigDecimal billedToHeadFees = request.getBilledToHeadFeeTotal() != null
+                ? request.getBilledToHeadFeeTotal() : BigDecimal.ZERO;
+        BigDecimal fee = ownFee.add(billedToHeadFees);
         BigDecimal amountReceived = request.getAmountReceived() != null
                 ? request.getAmountReceived().max(BigDecimal.ZERO).min(fee)
                 : ("paid".equalsIgnoreCase(request.getPaymentStatus()) ? fee : BigDecimal.ZERO);
@@ -978,9 +1017,14 @@ public class MemberService {
 
         // Auto-create a receipt for the renewal, reflecting whatever was actually
         // received now (paidAmount is derived from fee − outstandingBalance).
+        boolean itemized = request.getMinorCharges() != null && !request.getMinorCharges().isEmpty();
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
                 saved, "Renewal", saved.getPaymentStatus(), request.getPaymentBreakdown(),
-                request.getBankAccountCode(), request.getBankAccountName(), request.getProcessedByStaffId());
+                request.getBankAccountCode(), request.getBankAccountName(),
+                itemized || billedToHeadFees.signum() > 0 ? fee : null,
+                itemized ? request.getMinorCharges() : null,
+                request.getProcessedByStaffId());
+        if (rewardNote != null) receipt.setRemarks(rewardNote);
 
         // Post to General Ledger for whatever amount was actually received — a partial/
         // credit renewal must still post the real amount through the real method; it
@@ -1003,6 +1047,50 @@ public class MemberService {
         }
 
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Applies a Reward Pass or a shareable coupon to a renewal: member.membershipFee holds
+     * the fee before the discount and is replaced with the net fee. Returns a note for the
+     * receipt, or null when neither was sent.
+     */
+    private String applyRenewalReward(Member member, Long rewardPassId, String couponCode) {
+        boolean hasCoupon = couponCode != null && !couponCode.isBlank();
+        if (rewardPassId == null && !hasCoupon) return null;
+        if (rewardPassId != null && hasCoupon) {
+            throw new BusinessRuleViolationException("Apply either a Reward Pass or a coupon code, not both");
+        }
+        BigDecimal gross = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal discount;
+        String note;
+        if (rewardPassId != null) {
+            discount = rewardRedemptionService.passDiscount(rewardPassId, gross);
+            ReferralReward pass = rewardRedemptionService.consumePass(
+                    rewardPassId, member.getMemberId(), PassContext.MEMBERSHIP, member.getId());
+            note = "Reward Pass " + pass.getRewardCode() + " applied (-" + discount + ")";
+        } else {
+            discount = rewardRedemptionService.redeemCouponAtCheckout(couponCode, gross, member.getId(), member.getName());
+            note = "Coupon " + couponCode.trim().toUpperCase() + " applied (-" + discount + ")";
+        }
+        member.setMembershipFee(gross.subtract(discount));
+        member.setDiscountApplied(discount);
+        return note;
+    }
+
+    /**
+     * Spends a coupon or promotion code used at signup. The client already netted the
+     * discount out of membershipFee, so this only checks that the claimed discountApplied
+     * matches what the code is actually worth on the gross fee.
+     */
+    private void spendSignupCoupon(Member saved, String couponCode) {
+        BigDecimal claimed = saved.getDiscountApplied() != null ? saved.getDiscountApplied() : BigDecimal.ZERO;
+        BigDecimal net = saved.getMembershipFee() != null ? saved.getMembershipFee() : BigDecimal.ZERO;
+        BigDecimal actual = discountCodeService.redeemAtCheckout(
+                couponCode, net.add(claimed), saved.getId(), saved.getName());
+        if (actual.subtract(claimed).abs().compareTo(new BigDecimal("0.01")) > 0) {
+            throw new BusinessRuleViolationException("Discount mismatch: code " + couponCode.trim().toUpperCase()
+                    + " is worth " + actual + " on this fee, but " + claimed + " was applied");
+        }
     }
 
     /**
@@ -1199,6 +1287,60 @@ public class MemberService {
     }
 
     /**
+     * Moves an existing member onto a Family/Couple plan as its head and registers
+     * their family members — the mobile plan-change path for someone who's already
+     * a member here (a new buyer goes through createMember instead). headRenewal
+     * carries the head's own fee and payment plus, via billedToHeadFeeTotal/
+     * minorCharges, the billed-to-head members' fees. Family members are shaped the
+     * way createMember expects: under family_head billing everyone is billed to the
+     * head; otherwise minors are (fee in minorFee) and adults get their own
+     * membership (plan/fee/payment on the DTO). Their memberships start today.
+     */
+    public MemberResponseDTO convertToFamilyHead(Long headId, MembershipPlan plan, RenewalRequestDTO headRenewal,
+                                                 List<FamilyMemberDTO> familyMembers) {
+        Member head = memberRepository.findById(headId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
+        if (head.getFamilyHeadId() != null) {
+            throw new BusinessRuleViolationException("Your membership is part of another member's family — "
+                    + "ask your family head or the gym to change it.");
+        }
+        if (!memberRepository.findByFamilyHeadId(head.getMemberId()).isEmpty()) {
+            throw new BusinessRuleViolationException("You already have family members linked — "
+                    + "contact the gym to change your family plan.");
+        }
+        if (familyMembers == null || familyMembers.isEmpty()) {
+            throw new IllegalArgumentException("Add at least one family member.");
+        }
+        if ("Couple".equalsIgnoreCase(plan.getPlanType())) {
+            if (familyMembers.size() > 1) {
+                throw new IllegalArgumentException("Couple membership allows only one connected member.");
+            }
+            if (Boolean.TRUE.equals(familyMembers.get(0).getIsMinor())) {
+                throw new IllegalArgumentException("Couple membership only supports an adult connected member.");
+            }
+        }
+        long adultCount = 1 + familyMembers.stream().filter(fm -> !Boolean.TRUE.equals(fm.getIsMinor())).count();
+        long childCount = familyMembers.stream().filter(fm -> Boolean.TRUE.equals(fm.getIsMinor())).count();
+        enforceFamilyMemberCaps(plan, adultCount, childCount);
+        boolean familyHeadBillingMode = "family_head".equalsIgnoreCase(plan.getFamilyBillingMode());
+
+        head.setIsFamilyHead(true);
+        headRenewal.setPlanName(plan.getName());
+        headRenewal.setMembershipType(plan.getPlanType());
+        MemberResponseDTO renewed = renewMember(headId, headRenewal);
+
+        LocalDateTime start = LocalDateTime.now();
+        for (FamilyMemberDTO fm : familyMembers) {
+            if (familyHeadBillingMode || Boolean.TRUE.equals(fm.getIsMinor())) {
+                createBilledToHeadRecord(fm, head, fm.getMinorFee(), start);
+            } else {
+                registerFamilyAdult(fm, head, start);
+            }
+        }
+        return renewed;
+    }
+
+    /**
      * Adds a new adult or minor family member to an existing family head after
      * initial registration — dispatches to the same registration logic used at
      * signup time (independent billing for adults, guardian-billed for minors —
@@ -1325,12 +1467,21 @@ public class MemberService {
     }
 
     public MemberResponseDTO unfreezeMember(Long id) {
+        return unfreezeMember(id, LocalDateTime.now());
+    }
+
+    /**
+     * @param frozenUntil when the freeze ended — now for a manual unfreeze, the
+     *                    planned end date for an automatic one (so a late-running
+     *                    job doesn't extend the membership by extra days)
+     */
+    public MemberResponseDTO unfreezeMember(Long id, LocalDateTime frozenUntil) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
 
         long daysFrozen = 0;
         if ("frozen".equalsIgnoreCase(member.getMembershipStatus()) && member.getFreezeStartDate() != null) {
-            daysFrozen = java.time.temporal.ChronoUnit.DAYS.between(member.getFreezeStartDate(), LocalDateTime.now());
+            daysFrozen = java.time.temporal.ChronoUnit.DAYS.between(member.getFreezeStartDate(), frozenUntil);
             if (daysFrozen > 0) {
                 if (member.getExpiryDate() != null) {
                     member.setExpiryDate(member.getExpiryDate().plusDays(daysFrozen));

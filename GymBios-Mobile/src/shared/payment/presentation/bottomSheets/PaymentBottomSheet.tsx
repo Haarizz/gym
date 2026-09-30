@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
@@ -32,7 +33,6 @@ export function PaymentBottomSheet({
   amount,
   title,
   subtitle,
-  currency = '₹',
   allowDiscount = true,
   initialDiscount = { type: 'none', value: 0 },
   isProcessing = false,
@@ -122,7 +122,7 @@ export function PaymentBottomSheet({
     } else if (selectedMethod === 'mixed') {
       const { isValid } = validateSplitPayment(splitRows, finalAmount);
       if (!isValid) {
-        newErrors.rows = `Total split amount must equal final amount (${currency} ${finalAmount.toFixed(2)})`;
+        newErrors.rows = 'Total split amount must equal the final amount';
       }
     }
 
@@ -143,7 +143,6 @@ export function PaymentBottomSheet({
     creditReceivedVia,
     splitRows,
     finalAmount,
-    currency,
     remainingAmount,
     paymentDueDate,
   ]);
@@ -320,7 +319,6 @@ export function PaymentBottomSheet({
           title={title}
           subtitle={subtitle}
           amount={amount}
-          currency={currency}
         />
 
         {/* Optional Discount Selector */}
@@ -328,7 +326,6 @@ export function PaymentBottomSheet({
           <DiscountSelector
             discountType={discountType}
             discountValue={discountValue}
-            currency={currency}
             onChange={(type, val) => {
               setDiscountType(type);
               setDiscountValue(val);
@@ -351,7 +348,6 @@ export function PaymentBottomSheet({
             finalAmount={finalAmount}
             paidAmount={paidAmount}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onPaidAmountChange={setPaidAmount}
             onDueDateChange={setPaymentDueDate}
@@ -365,7 +361,6 @@ export function PaymentBottomSheet({
             cardType={cardType}
             reference={reference}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onPaidAmountChange={setPaidAmount}
             onCardTypeChange={setCardType}
@@ -387,7 +382,6 @@ export function PaymentBottomSheet({
             onlinePaymentType={onlinePaymentType}
             providerName={providerName}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onReceivedAmountChange={setCreditReceivedAmount}
             onReceivedViaChange={setCreditReceivedVia}
@@ -410,7 +404,6 @@ export function PaymentBottomSheet({
             bankName={bankName}
             chequeDate={chequeDate}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onPaidAmountChange={setPaidAmount}
             onChequeNumberChange={setChequeNumber}
@@ -427,7 +420,6 @@ export function PaymentBottomSheet({
             reference={reference}
             bankAccountId={bankAccountId}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onPaidAmountChange={setPaidAmount}
             onReferenceChange={setReference}
@@ -444,7 +436,6 @@ export function PaymentBottomSheet({
             providerName={providerName}
             reference={reference}
             paymentDueDate={paymentDueDate}
-            currency={currency}
             errors={errors}
             onPaidAmountChange={setPaidAmount}
             onOnlinePaymentTypeChange={setOnlinePaymentType}
@@ -458,7 +449,6 @@ export function PaymentBottomSheet({
           <MixedPaymentForm
             finalAmount={finalAmount}
             rows={splitRows}
-            currency={currency}
             errors={errors}
             onRowsChange={setSplitRows}
           />
@@ -466,7 +456,7 @@ export function PaymentBottomSheet({
 
         {/* Action Button */}
         <Button
-          label={`Complete Payment (${currency} ${finalAmount.toFixed(2)})`}
+          label={<>Complete Payment (<CurrencyValue amount={finalAmount} decimals={2} />)</>}
           onPress={handleComplete}
           size="lg"
           style={styles.actionButton}

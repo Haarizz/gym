@@ -126,7 +126,7 @@ export function WalkInRegistrationScreen() {
         visible={isPaymentVisible}
         amount={selectedPlanPrice}
         title={selectedPlanName || 'Walk-In Pass'}
-        subtitle={`Daily visitor plan — ${fullName}`}
+        subtitle={`Daily visitor pass — ${fullName}`}
         allowDiscount={false}
         onClose={handlePaymentClose}
         onComplete={handlePaymentDone}

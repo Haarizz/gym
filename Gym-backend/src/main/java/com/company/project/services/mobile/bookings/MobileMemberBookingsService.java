@@ -125,8 +125,8 @@ public class MobileMemberBookingsService {
         Member member = memberOpt.get();
         final LocalDate targetDate = (date == null) ? LocalDate.now() : date;
 
-        // Use existing TrainingSessionService to fetch all available sessions for the specific date
-        List<com.company.project.dto.TrainingSessionResponseDTO> sessions = trainingSessionService.getSessions("class", null, targetDate, targetDate, null);
+        // Every bookable session type (class, pt, facility) for the specific date
+        List<com.company.project.dto.TrainingSessionResponseDTO> sessions = trainingSessionService.getSessions(null, null, targetDate, targetDate, null);
         
         // Find existing bookings for this member on this date to check memberBookingState
         List<Booking> memberBookings = new java.util.ArrayList<>(bookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT));
@@ -154,6 +154,7 @@ public class MobileMemberBookingsService {
             AvailableClassDTO dto = new AvailableClassDTO();
             dto.setClassId(Long.valueOf(session.getId()));
             dto.setClassName(session.getName());
+            dto.setType(session.getType());
             dto.setTrainerName(session.getTrainerName());
             dto.setDate(session.getDate());
             dto.setStartTime(session.getStartTime());
@@ -190,6 +191,7 @@ public class MobileMemberBookingsService {
         webRequest.setSessionId(request.getClassId());
         webRequest.setMemberId(member.getId());
         webRequest.setStatus("confirmed"); // Default to confirmed as per existing backend logic
+        webRequest.setRewardPassId(request.getRewardPassId());
 
         BookingResponseDTO response = bookingService.createBooking(webRequest);
         

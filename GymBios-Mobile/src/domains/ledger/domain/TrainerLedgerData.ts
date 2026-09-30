@@ -27,9 +27,9 @@ export interface TrainerRecentTransaction {
 }
 
 export interface TrainerTaxInformation {
-  ytdEarnings: string;
+  ytdEarnings: number | null;
   totalSessions: number;
-  avgPerSession: string;
+  avgPerSession: number | null;
   activeClients: number;
 }
 

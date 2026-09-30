@@ -2,6 +2,8 @@ package com.company.project.repositories;
 
 import com.company.project.entities.TrainingStream;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -9,6 +11,10 @@ import java.util.List;
 
 @Repository
 public interface TrainingStreamRepository extends JpaRepository<TrainingStream, Long> {
+
+    @Modifying
+    @Query("UPDATE TrainingStream s SET s.instructor = null WHERE s.instructor.id = :staffId")
+    void clearInstructor(@Param("staffId") Long staffId);
 
     List<TrainingStream> findByStatus(String status);
 

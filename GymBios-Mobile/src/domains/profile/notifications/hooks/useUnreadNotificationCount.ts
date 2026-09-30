@@ -8,10 +8,10 @@ const api = new NotificationApi();
 const repository = new ApiNotificationRepository(api);
 export const notificationService = new NotificationService(repository);
 
-export function useUnreadNotificationCount() {
+export function useUnreadNotificationCount(module?: string) {
   const query = useQuery({
-    queryKey: notificationKeys.unreadCount(),
-    queryFn: () => notificationService.getUnreadCount(),
+    queryKey: notificationKeys.unreadCount(module),
+    queryFn: () => notificationService.getUnreadCount(module),
     staleTime: 1000 * 30, // 30 seconds
     refetchOnWindowFocus: true,
   });

@@ -37,6 +37,41 @@ export interface ReferralReward {
   redeemedDate?: string;
   remarks?: string;
   couponCode?: string;
+  rewardUnit?: 'PERCENT' | 'AMOUNT';
+  consumedContext?: 'MEMBERSHIP' | 'BOOKING' | 'COUPON';
+  consumedRefId?: number;
+}
+
+// Where a Reward Pass is being spent — MEMBERSHIP_DISCOUNT for renewals, FREE_PT/FREE_CLASS for bookings.
+export type PassContext = 'MEMBERSHIP' | 'PT' | 'CLASS';
+
+// Reward types that are only spent by picking them at renewal/booking — never via "Redeem".
+export const REWARD_PASS_TYPES: RewardType[] = ['MEMBERSHIP_DISCOUNT', 'FREE_PT', 'FREE_CLASS'];
+
+/** What a code typed into a promo field resolved to: a promotion, or a shareable referral coupon. */
+export interface DiscountCode {
+  source: 'PROMOTION' | 'COUPON';
+  promotionId?: number;
+  code: string;
+  name: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+}
+
+/** Same maths as the backend's RewardRedemptionService.discountFor — percent or flat, capped at gross. */
+export function rewardDiscount(unit: string | undefined, value: number | undefined, gross: number): number {
+  if (!value || value <= 0 || gross <= 0) return 0;
+  const d = unit === 'PERCENT' || unit === 'percentage' ? (gross * value) / 100 : value;
+  return Math.round(Math.min(d, gross) * 100) / 100;
+}
+
+/** Short label for a Reward Pass in pickers, e.g. "10% off · RWD-0000000007". */
+export function passLabel(p: ReferralReward, currency = ''): string {
+  const what = p.rewardType === 'MEMBERSHIP_DISCOUNT'
+    ? (p.rewardUnit === 'PERCENT' ? `${p.rewardValue}% off` : `${currency ? currency + ' ' : ''}${p.rewardValue} off`)
+    : 'Free session';
+  const expiry = p.expiryDate ? ` · until ${p.expiryDate}` : '';
+  return `${what} · ${p.rewardCode}${expiry}`;
 }
 
 export interface RewardPage {
@@ -183,6 +218,9 @@ function mapReward(r: any): ReferralReward {
     claimedDate: r.claimed_date ?? r.claimedDate,
     redeemedDate: r.redeemed_date ?? r.redeemedDate,
     couponCode: r.coupon_code ?? r.couponCode,
+    rewardUnit: r.reward_unit ?? r.rewardUnit,
+    consumedContext: r.consumed_context ?? r.consumedContext,
+    consumedRefId: r.consumed_ref_id ?? r.consumedRefId,
   };
 }
 
@@ -318,6 +356,14 @@ export const rewardService = {
     if (!res.ok) throw new Error('Failed to fetch member rewards');
     const raw = await res.json();
     return raw.map(mapReward);
+  },
+
+  /** Reward Passes the member can spend now. memberId may be the MBR-... id or the numeric db id. */
+  async getPasses(memberId: string | number, context: PassContext): Promise<ReferralReward[]> {
+    const p = new URLSearchParams({ memberId: String(memberId), context });
+    const res = await fetch(`${BASE_URL}/rewards/passes?${p}`, { headers: await getHeaders() });
+    if (!res.ok) throw new Error('Failed to load reward passes');
+    return ((await res.json()) as any[]).map(mapReward);
   },
 
   async getAuditTrail(rewardId: number): Promise<RewardAuditLogEntry[]> {
@@ -490,5 +536,23 @@ export const couponService = {
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to consume coupon');
     return res.json();
+  },
+};
+
+// ── Discount codes (promotion or shareable coupon) ─────────────────────────────
+
+export const discountCodeService = {
+  async validate(code: string): Promise<DiscountCode> {
+    const res = await fetch(`${BASE_URL}/discount-codes/validate?code=${encodeURIComponent(code)}`, { headers: await getHeaders() });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || 'Invalid code');
+    return {
+      source: body.source,
+      promotionId: body.promotion_id ?? body.promotionId,
+      code: body.code,
+      name: body.name,
+      discountType: body.discount_type ?? body.discountType,
+      discountValue: Number(body.discount_value ?? body.discountValue ?? 0),
+    };
   },
 };

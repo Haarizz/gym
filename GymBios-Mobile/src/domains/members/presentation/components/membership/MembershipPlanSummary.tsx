@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { MembershipPlan } from '@/domains/membershipPlans';
@@ -13,10 +14,7 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
   const theme = useTheme();
   const isFamily = plan.planType?.toUpperCase() === 'FAMILY';
 
-  const discountedPrice =
-    plan.discount > 0
-      ? plan.price - (plan.price * plan.discount) / 100
-      : plan.price;
+  const hasOffer = plan.offerActive && plan.offerDiscountAmount > 0;
 
   return (
     <View style={[styles.container, { borderColor: theme.primary }]}>
@@ -42,13 +40,11 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
             Price
           </Typography>
           <Typography variant="bodySmallBold">
-            {plan.discount > 0
-              ? `₹${discountedPrice.toFixed(2)}`
-              : `₹${plan.price.toFixed(2)}`}
+            <CurrencyValue amount={hasOffer ? plan.effectivePrice : plan.price} decimals={2} />
           </Typography>
-          {plan.discount > 0 && (
+          {hasOffer && (
             <Typography variant="caption" style={styles.originalPrice}>
-              ₹{plan.price.toFixed(2)}
+              <CurrencyValue amount={plan.price} decimals={2} />
             </Typography>
           )}
         </View>

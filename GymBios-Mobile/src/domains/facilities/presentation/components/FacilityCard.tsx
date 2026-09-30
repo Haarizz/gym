@@ -1,5 +1,6 @@
 import { StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
 
 import { Card } from '@/shared/components/Card';
 import { Typography } from '@/shared/components/Typography';
@@ -58,7 +59,7 @@ export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: F
         
         {facility.rates && Object.keys(facility.rates).length > 0 && (
           <View style={styles.detailItem}>
-            <Feather name="dollar-sign" size={14} color={BrandColors.textSecondary} />
+            <CurrencyIcon size={14} color={BrandColors.textSecondary} />
             <Typography variant="caption" color="textSecondary">
               {Object.keys(facility.rates).length} Rates Configured
             </Typography>

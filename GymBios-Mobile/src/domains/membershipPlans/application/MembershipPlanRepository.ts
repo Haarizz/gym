@@ -8,6 +8,12 @@ export interface MembershipPlanRequest {
   durationValue: string;
   price: number;
   discount: number;
+  /** '' removes the offer. */
+  offerType: 'percentage' | 'fixed' | '';
+  offerValue?: number;
+  offerLabel?: string;
+  offerStartDate?: string;
+  offerEndDate?: string;
   status: string;
   description: string;
 

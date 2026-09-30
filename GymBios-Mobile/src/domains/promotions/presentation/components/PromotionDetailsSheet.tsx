@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
@@ -120,7 +121,11 @@ export function PromotionDetailsSheet({
         {/* Discount highlight */}
         <View style={styles.highlightBanner}>
           <Text style={styles.highlightLabel}>Discount Value</Text>
-          <Text style={styles.highlightText}>{discountDisplay}</Text>
+          <Text style={styles.highlightText}>
+            {promotion.discountType === 'fixed'
+              ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix=" OFF" />
+              : discountDisplay}
+          </Text>
         </View>
 
         {/* SECTION: Promotion Details */}
@@ -210,7 +215,7 @@ export function PromotionDetailsSheet({
               <Text style={styles.value}>
                 {promotion.minimumPurchase !== null &&
                 promotion.minimumPurchase !== undefined
-                  ? `$${promotion.minimumPurchase}`
+                  ? <CurrencyValue amount={promotion.minimumPurchase} />
                   : 'None'}
               </Text>
             </View>
@@ -224,13 +229,13 @@ export function PromotionDetailsSheet({
             <View style={styles.gridCol}>
               <Text style={styles.label}>Total Revenue</Text>
               <Text style={[styles.statValue, { color: '#059669' }]}>
-                ${(promotion.totalRevenue ?? 0).toLocaleString()}
+                <CurrencyValue amount={promotion.totalRevenue ?? 0} />
               </Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.label}>Total Savings</Text>
               <Text style={[styles.statValue, { color: '#EA580C' }]}>
-                ${(promotion.totalSavings ?? 0).toLocaleString()}
+                <CurrencyValue amount={promotion.totalSavings ?? 0} />
               </Text>
             </View>
           </View>
@@ -239,7 +244,7 @@ export function PromotionDetailsSheet({
             <View style={styles.gridCol}>
               <Text style={styles.label}>Avg Order Value</Text>
               <Text style={styles.value}>
-                ${(promotion.averageOrderValue ?? 0).toFixed(2)}
+                <CurrencyValue amount={promotion.averageOrderValue ?? 0} decimals={2} />
               </Text>
             </View>
             <View style={styles.gridCol}>
@@ -305,7 +310,7 @@ export function PromotionDetailsSheet({
 
           {promotion.applicablePlans && promotion.applicablePlans.length > 0 && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Applicable Plans</Text>
+              <Text style={styles.label}>Applicable Subscriptions</Text>
               <Text style={styles.value}>{promotion.applicablePlans.join(', ')}</Text>
             </View>
           )}

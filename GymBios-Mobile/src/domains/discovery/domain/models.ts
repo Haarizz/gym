@@ -85,8 +85,19 @@ export interface CenterPlan {
   durationType: string;
   durationValue: string;
   duration: string;
+  /** Regular price. */
   price: number;
+  /** Legacy percent field — not used for pricing; see the offer fields. */
   discount: number;
+  offerType: 'percentage' | 'fixed' | null;
+  offerValue: number | null;
+  offerLabel: string | null;
+  offerStartDate: string | null;
+  offerEndDate: string | null;
+  /** Server-computed for today: is the offer running, what it takes off, and the resulting price. */
+  offerActive: boolean;
+  offerDiscountAmount: number;
+  effectivePrice: number;
   status: string;
   description: string;
   maxSessions: number | null;

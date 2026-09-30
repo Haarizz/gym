@@ -587,6 +587,10 @@ public class ReferralService {
                 .findByReferrerMemberIdAndStatusAndRewardRedeemedFalseOrderByDateAsc(referrerMemberId, "successful")
                 .stream()
                 .filter(r -> r.getRewardAmount() != null && r.getRewardAmount().signum() > 0)
+                // Referrals handled by the reward engine already paid out through their
+                // ReferralReward (wallet credit, pass, coupon, ...) — offering rewardAmount
+                // here too would pay twice, and misreads e.g. extension days as money.
+                .filter(r -> rewardRepository.findByReferralId(r.getId()).isEmpty())
                 .findFirst()
                 .map(this::toDTO)
                 .orElse(null);

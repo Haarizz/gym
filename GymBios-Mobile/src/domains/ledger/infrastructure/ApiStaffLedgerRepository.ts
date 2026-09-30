@@ -1,4 +1,5 @@
 import { apiClient } from '@/core/network/apiClient';
+import { parseAmount } from '@/core/providers/currencyDefinitions';
 import type { StaffLedgerData } from '../domain/StaffLedgerData';
 
 interface RawLedgerSummary {
@@ -30,7 +31,7 @@ interface RawBreakdownItem {
 interface RawCommissionItem {
   type?: string;
   label: string;
-  amount: string;
+  amount: string | number;
 }
 
 interface RawRecentEarning {
@@ -85,11 +86,6 @@ interface RawLedgerResponse {
   tax_documents?: RawTaxDocument[];
 }
 
-function formatCurrency(val?: number): string {
-  if (val === undefined || val === null) return '₹0';
-  return `₹${val.toLocaleString('en-IN')}`;
-}
-
 export class ApiStaffLedgerRepository {
   /**
    * GET /api/mobile/staff/ledger
@@ -135,12 +131,13 @@ export class ApiStaffLedgerRepository {
             { category: 'Bonuses', amount: 1500, percentage: 6.25 },
           ],
       commissionStructure: (raw.commissionStructure || raw.commission_structure || [
-        { label: 'Membership Sale', amount: '₹1,500' },
-        { label: 'PT Package Sale', amount: '₹1,000' },
-        { label: 'Add-on Sale', amount: '₹500' },
+        { label: 'Membership Sale', amount: 1500 },
+        { label: 'PT Package Sale', amount: 1000 },
+        { label: 'Add-on Sale', amount: 500 },
       ]).map((item) => ({
         label: item.label,
-        amount: item.amount,
+        // The backend pre-formats these with a hardcoded "₹"; keep only the number.
+        amount: parseAmount(item.amount),
       })),
       recentEarnings: (raw.recentEarnings || raw.recent_earnings || []).map((item) => ({
         id: item.id,
@@ -151,10 +148,10 @@ export class ApiStaffLedgerRepository {
         status: (item.status?.toLowerCase() === 'paid' ? 'paid' : 'pending') as 'paid' | 'pending',
       })),
       taxInfo: {
-        ytdEarnings: formatCurrency(taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? 268000),
-        tdsDeducted: formatCurrency(taxInfoRaw.tdsDeducted ?? taxInfoRaw.tds_deducted ?? 8040),
-        baseSalaryPaid: formatCurrency(taxInfoRaw.baseSalaryPaid ?? taxInfoRaw.base_salary_paid ?? 200000),
-        totalCommission: formatCurrency(taxInfoRaw.totalCommission ?? taxInfoRaw.total_commission ?? 68000),
+        ytdEarnings: taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? 268000,
+        tdsDeducted: taxInfoRaw.tdsDeducted ?? taxInfoRaw.tds_deducted ?? 8040,
+        baseSalaryPaid: taxInfoRaw.baseSalaryPaid ?? taxInfoRaw.base_salary_paid ?? 200000,
+        totalCommission: taxInfoRaw.totalCommission ?? taxInfoRaw.total_commission ?? 68000,
         conversions: taxInfoRaw.conversions ?? 42,
       },
       taxDocuments: (raw.taxDocuments || raw.tax_documents || [

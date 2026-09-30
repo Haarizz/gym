@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -10,10 +9,14 @@ import {
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { CurrencyValue } from '@/core/providers';
+
+const MAX_2DP = { maximumFractionDigits: 2 };
+import type { FreezeInfo } from '../../domain/models';
 
 interface FreezeMembershipModalProps {
   visible: boolean;
-  daysAvailable: number;
+  freeze: FreezeInfo;
   isLoading: boolean;
   onClose: () => void;
   onConfirm: (days: number, reason: string) => void;
@@ -22,14 +25,23 @@ interface FreezeMembershipModalProps {
 const FREEZE_OPTIONS = [7, 14, 21, 30];
 const FREEZE_REASONS = ['Travel / Vacation', 'Medical / Injury', 'Work / Relocation', 'Other'];
 
+/** Days of a freeze of this length billed at the plan's per-day rate (the rest are free). */
+export function chargeableFreezeDays(days: number, freeze: FreezeInfo): number {
+  return freeze.charge_per_extra_day > 0 ? Math.max(0, days - freeze.free_days_remaining) : 0;
+}
+
+/** Give it a new `key` each time it opens so it starts fresh — the allowance may have changed since. */
 export function FreezeMembershipModal({
   visible,
-  daysAvailable,
+  freeze,
   isLoading,
   onClose,
   onConfirm,
 }: FreezeMembershipModalProps) {
-  const [selectedDays, setSelectedDays] = useState(FREEZE_OPTIONS[0]);
+  const daysAvailable = freeze.allowed_days;
+  const defaultDays = FREEZE_OPTIONS.find((d) => d <= daysAvailable) ?? daysAvailable;
+
+  const [selectedDays, setSelectedDays] = useState(defaultDays);
   const [customDays, setCustomDays] = useState('');
   const [selectedReason, setSelectedReason] = useState(FREEZE_REASONS[0]);
 
@@ -38,6 +50,13 @@ export function FreezeMembershipModal({
   };
 
   const isValidDuration = selectedDays >= 1 && selectedDays <= daysAvailable;
+  const rate = freeze.charge_per_extra_day;
+  const chargedDays = isValidDuration ? chargeableFreezeDays(selectedDays, freeze) : 0;
+  const charge = chargedDays * rate;
+
+  const occurrencesText = freeze.max_occurrences != null
+    ? ` · ${freeze.remaining_occurrences ?? 0} of ${freeze.max_occurrences} freezes left`
+    : '';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -45,8 +64,10 @@ export function FreezeMembershipModal({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Freeze Membership</Text>
-              <Text style={styles.subtitle}>Up to {daysAvailable} days allowed per request</Text>
+              <Text style={styles.title}>Freeze Subscription</Text>
+              <Text style={styles.subtitle}>
+                {daysAvailable} of {freeze.max_days} freeze days left{occurrencesText}
+              </Text>
             </View>
             <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton} disabled={isLoading}>
               <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -54,6 +75,23 @@ export function FreezeMembershipModal({
           </View>
 
           <View style={styles.body}>
+            <View style={styles.policyBox}>
+              {rate > 0 && (
+                <Text style={styles.policyText}>
+                  {freeze.free_days_remaining > 0 ? (
+                    <>{freeze.free_days_remaining} free freeze days left, then <CurrencyValue amount={rate} options={MAX_2DP} /> per extra day.</>
+                  ) : (
+                    <>No free freeze days left — each day costs <CurrencyValue amount={rate} options={MAX_2DP} />.</>
+                  )}
+                </Text>
+              )}
+              <Text style={styles.policyText}>
+                {freeze.auto_unfreeze
+                  ? 'Your subscription resumes automatically at the end of the freeze, and its end date moves forward by the days frozen.'
+                  : 'Unfreeze from this screen when you\'re back — your subscription end date moves forward by the days frozen.'}
+              </Text>
+            </View>
+
             <Text style={styles.sectionLabel}>Select Duration</Text>
             <View style={styles.daysRow}>
               {FREEZE_OPTIONS.map((days) => {
@@ -130,6 +168,20 @@ export function FreezeMembershipModal({
           </View>
 
           <View style={styles.footer}>
+            {isValidDuration && rate > 0 && (
+              chargedDays > 0 ? (
+                <View style={styles.chargeBox}>
+                  <Feather name="info" size={16} color={BrandColors.trainerAmber} />
+                  <Text style={styles.chargeText}>
+                    {chargedDays} extra {chargedDays === 1 ? 'day' : 'days'} × <CurrencyValue amount={rate} options={MAX_2DP} /> ={' '}
+                    <CurrencyValue style={styles.chargeAmount} amount={charge} options={MAX_2DP} />
+                    {' '}will be added to your outstanding balance.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.noChargeText}>No charge — within your free freeze days.</Text>
+              )
+            )}
             <Pressable 
               style={[styles.confirmButton, (isLoading || !isValidDuration) && { opacity: 0.7 }]} 
               onPress={handleFreeze}
@@ -139,7 +191,14 @@ export function FreezeMembershipModal({
                 <Text style={styles.confirmButtonText}>Freezing...</Text>
               ) : (
                 <Text style={styles.confirmButtonText}>
-                  {isValidDuration ? `Freeze for ${selectedDays} Days` : 'Invalid Duration'}
+                  {isValidDuration ? (
+                    <>
+                      Freeze for {selectedDays} Days
+                      {charge > 0 ? <> · <CurrencyValue amount={charge} options={MAX_2DP} /></> : null}
+                    </>
+                  ) : (
+                    `Choose 1–${daysAvailable} days`
+                  )}
                 </Text>
               )}
             </Pressable>
@@ -280,10 +339,47 @@ const styles = StyleSheet.create({
     color: BrandColors.trainerAmber,
     fontWeight: '700',
   },
+  policyBox: {
+    gap: Spacing.one,
+    backgroundColor: 'rgba(120,170,255,0.14)',
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+    marginBottom: Spacing.four,
+  },
+  policyText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#2451A6',
+  },
   footer: {
     padding: Spacing.four,
     borderTopWidth: 1,
     borderColor: '#E2E8F0',
+    gap: Spacing.three,
+  },
+  chargeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: BrandColors.trainerAmber,
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+  },
+  chargeText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: BrandColors.textPrimary,
+  },
+  chargeAmount: {
+    fontWeight: '800',
+  },
+  noChargeText: {
+    fontSize: 13,
+    color: BrandColors.textSecondary,
+    textAlign: 'center',
   },
   confirmButton: {
     backgroundColor: BrandColors.trainerAmber,

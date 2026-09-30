@@ -15,7 +15,9 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet, Typography } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import { useAuthStore } from '@/domains/auth';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
+import { useCommunityCanPost } from '../../hooks/useCommunity';
 import {
   useToggleCommunityLike,
   useDeleteCommunityPost,
@@ -64,8 +66,8 @@ interface CommunityPostCardProps {
 export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardProps) {
   const theme = useTheme();
   const { primaryColor } = useCommunityTheme();
-  const user = useAuthStore((s) => s.user);
   const appRole = useAuthStore((s) => s.appRole);
+  const canPost = useCommunityCanPost();
 
   const [actionsVisible, setActionsVisible] = useState(false);
 
@@ -74,7 +76,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
   const archiveMutation = useArchiveCommunityPost();
   const unarchiveMutation = useUnarchiveCommunityPost();
 
-  const isOwnPost = user?.id != null && Number(user.id) === post.authorUserId;
+  const isOwnPost = post.ownedByMe;
   const isModerator = appRole != null && (MODERATOR_ROLES as readonly string[]).includes(appRole);
 
   const isPendingLike = likeMutation.isPending;
@@ -91,8 +93,14 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
 
   const handleLike = useCallback(() => {
     if (isPendingLike) return;
+    if (!canPost) {
+      toast.info('Purchase a membership at this gym to like and comment on posts.', {
+        title: 'Members only',
+      });
+      return;
+    }
     likeMutation.mutate(post.id);
-  }, [isPendingLike, likeMutation, post.id]);
+  }, [canPost, isPendingLike, likeMutation, post.id]);
 
   const handleActions = useCallback(() => {
     setActionsVisible(true);

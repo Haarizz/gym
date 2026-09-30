@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { CenterCard } from '../components/CenterCard';
@@ -36,7 +37,14 @@ export function MemberCentersScreen({
   const isLocationOn = coords != null;
 
   const goToDetail = (center: CenterSummary, tab: 'overview' | 'plans' = 'overview') => {
-    router.push(`/(member)/centers/${center.tenantSlug}/${center.branchId}?tab=${tab}` as any);
+    // Location only lives on this screen, so hand the already-computed distance to
+    // the detail page's stats bar rather than asking for location again there.
+    const km =
+      coords && center.lat != null && center.lng != null
+        ? getDistanceKm(coords.latitude, coords.longitude, center.lat, center.lng)
+        : null;
+    const distanceParam = km != null ? `&distance=${km.toFixed(1)}` : '';
+    router.push(`/(member)/centers/${center.tenantSlug}/${center.branchId}?tab=${tab}${distanceParam}` as any);
   };
 
   // Idempotent deep-link resolution — navigates to the full detail page the
@@ -161,7 +169,13 @@ export function MemberCentersScreen({
     (filters.paymentMode ? 1 : 0);
 
   const priceRangeLabel =
-    filters.priceRange === 'under2k' ? 'Under ₹2k' : filters.priceRange === '2k-5k' ? '₹2k–₹5k' : 'Above ₹5k';
+    filters.priceRange === 'under2k' ? (
+      <>Under <CurrencyValue amount={2000} compact /></>
+    ) : filters.priceRange === '2k-5k' ? (
+      <><CurrencyValue amount={2000} compact />–<CurrencyValue amount={5000} compact /></>
+    ) : (
+      <>Above <CurrencyValue amount={5000} compact /></>
+    );
 
   return (
     <View style={styles.container}>

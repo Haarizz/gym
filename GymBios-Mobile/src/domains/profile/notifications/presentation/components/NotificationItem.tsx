@@ -15,6 +15,7 @@ function getIconForNotification(module?: string, type?: string): keyof typeof Fe
   const mod = (module || '').toUpperCase();
   const typ = (type || '').toUpperCase();
 
+  if (mod.includes('COMMUNITY')) return 'message-circle';
   if (mod.includes('MEMBER') || typ.includes('MEMBER')) return 'user';
   if (mod.includes('FINANCE') || mod.includes('PAYMENT') || typ.includes('PAY')) return 'credit-card';
   if (mod.includes('LEAD') || typ.includes('LEAD')) return 'user-plus';

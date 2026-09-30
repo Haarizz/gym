@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Spacing } from '@/core/theme';
 
 export type CenterDetailTab = 'overview' | 'plans' | 'trainers' | 'info';
 
@@ -10,7 +10,7 @@ interface CenterDetailTabsProps {
 
 const TABS: { key: CenterDetailTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
-  { key: 'plans', label: 'Plans' },
+  { key: 'plans', label: 'Subscriptions' },
   { key: 'trainers', label: 'Trainers' },
   { key: 'info', label: 'Info' },
 ];
@@ -36,36 +36,31 @@ export function CenterDetailTabs({ activeTab, onSelect }: CenterDetailTabsProps)
   );
 }
 
+// Full-width underline tabs — active tab gets a gold underline and amber label.
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    padding: 4,
-    borderRadius: Radius.lg,
-    marginHorizontal: Spacing.four,
-    marginTop: Spacing.four,
+    backgroundColor: BrandColors.surface,
+    paddingHorizontal: Spacing.four,
+    borderBottomWidth: 1,
+    borderColor: '#F3F4F6',
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: Spacing.three,
     alignItems: 'center',
-    borderRadius: Radius.md,
+    borderBottomWidth: 2,
+    borderColor: 'transparent',
   },
   activeTab: {
-    backgroundColor: BrandColors.surface,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderColor: BrandColors.memberGold,
   },
   label: {
-    fontSize: TypographyScale.small,
-    fontWeight: '500',
-    color: BrandColors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   activeLabel: {
-    color: BrandColors.textPrimary,
-    fontWeight: '700',
+    color: BrandColors.trainerAmber,
   },
 });

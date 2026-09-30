@@ -918,22 +918,29 @@ public class ReceiptService {
         LocalDateTime sevenDaysLater = now.plusDays(7);
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+        // Unpaid extra-freeze-day charges per member, so staff can see what part of a
+        // balance is for extra freeze days rather than the membership itself.
+        Map<Long, BigDecimal> freezeCharges = new java.util.HashMap<>();
+        for (Object[] row : receiptRepository.sumOpenAmountByMemberForType(MembershipFreezeService.FREEZE_CHARGE_TYPE)) {
+            freezeCharges.put((Long) row[0], (BigDecimal) row[1]);
+        }
+
         List<MemberDueDTO> result = new ArrayList<>();
         for (Member m : memberRepository.findOverdueMembers()) {
-            result.add(buildDueDTO(m, "Overdue", now, dateFmt));
+            result.add(buildDueDTO(m, "Overdue", now, dateFmt, freezeCharges));
         }
         for (Member m : memberRepository.findDueSoonMembers(now, sevenDaysLater)) {
-            result.add(buildDueDTO(m, "Due Soon", now, dateFmt));
+            result.add(buildDueDTO(m, "Due Soon", now, dateFmt, freezeCharges));
         }
         for (Member m : memberRepository.findPendingMembersWithBalance(now, sevenDaysLater)) {
             String statusLabel = "partial".equalsIgnoreCase(m.getPaymentStatus()) ? "Partial" : "Pending";
-            result.add(buildDueDTO(m, statusLabel, now, dateFmt));
+            result.add(buildDueDTO(m, statusLabel, now, dateFmt, freezeCharges));
         }
         return result;
     }
 
     private MemberDueDTO buildDueDTO(Member m, String status, LocalDateTime now,
-                                     DateTimeFormatter dateFmt) {
+                                     DateTimeFormatter dateFmt, Map<Long, BigDecimal> freezeCharges) {
         MemberDueDTO dto = new MemberDueDTO();
         dto.setId(m.getId());
         dto.setMemberId(m.getMemberId());
@@ -948,6 +955,14 @@ public class ReceiptService {
         // who paid their current cycle in full but whose cycle is now ending/ended
         // and needs to pay again to renew (Renewal Due).
         dto.setDueType(hasOwnBalance ? "Membership Due" : "Renewal Due");
+        BigDecimal freezeCharge = hasOwnBalance
+                ? freezeCharges.getOrDefault(m.getId(), BigDecimal.ZERO).min(m.getOutstandingBalance())
+                : BigDecimal.ZERO;
+        if (freezeCharge.signum() > 0) {
+            dto.setFreezeChargeAmount(freezeCharge);
+            // The whole balance is for extra freeze days — say so instead of "Membership Due".
+            if (freezeCharge.compareTo(m.getOutstandingBalance()) >= 0) dto.setDueType("Extra Freeze Days");
+        }
         dto.setDueDate(m.getNextPaymentDate() != null ? m.getNextPaymentDate().format(dateFmt) : null);
         dto.setStatus(status);
         if ("Overdue".equals(status) && m.getNextPaymentDate() != null) {

@@ -1,7 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
 import { formatDiscountDisplay } from '../utils/promotionStatistics';
@@ -72,7 +74,11 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
 
       {/* Discount Pill */}
       <View style={styles.discountContainer}>
-        <Text style={styles.discountText}>{discountText}</Text>
+        <Text style={styles.discountText}>
+          {promotion.discountType === 'fixed'
+            ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix=" OFF" />
+            : discountText}
+        </Text>
       </View>
 
       {/* Meta Info */}
@@ -103,9 +109,9 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
         )}
 
         <View style={styles.metaRow}>
-          <Feather name="dollar-sign" size={13} color="#059669" />
+          <CurrencyIcon size={13} color="#059669" />
           <Text style={styles.revenueText} numberOfLines={1}>
-            ${(promotion.totalRevenue ?? 0).toLocaleString()} rev
+            <CurrencyValue amount={promotion.totalRevenue ?? 0} suffix=" rev" />
           </Text>
         </View>
       </View>

@@ -13,6 +13,7 @@ export type {
   CreateCommunityCommentRequest,
   ToggleCommunityLikeResponse,
 } from './domain/community.types';
+export { COMMUNITY_NOTIFICATION_MODULE } from './domain/community.types';
 
 export type { CommunityRepository } from './application/CommunityRepository';
 export { CommunityService } from './application/CommunityService';
@@ -25,6 +26,7 @@ export {
   useCommunityTrendingTopics,
   useCommunityLeaderboard,
   useCommunityFeed,
+  useCommunityCanPost,
   useCommunityComments,
 } from './hooks/useCommunity';
 

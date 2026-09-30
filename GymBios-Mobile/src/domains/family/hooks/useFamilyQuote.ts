@@ -15,5 +15,7 @@ export const useFamilyQuote = (
     queryFn: () => familyApi.getQuote(tenantSlug, branchId, planId as number, memberIsMinor, memberPlanIds),
     enabled: !!tenantSlug && !!branchId && !!planId,
     placeholderData: keepPreviousData,
+    // A 4xx is the plan's own rule (e.g. too many adults) — show it straight away.
+    retry: (failureCount, error: any) => !(error?.status >= 400 && error?.status < 500) && failureCount < 2,
   });
 };

@@ -47,6 +47,51 @@ import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.p
 import { toast } from "sonner";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
+type OfferFormType = "none" | "percentage" | "fixed";
+
+interface OfferFormFields {
+  price: string;
+  offerType: OfferFormType;
+  offerValue: string;
+  offerLabel: string;
+  offerStartDate: string;
+  offerEndDate: string;
+}
+
+/** Why the plan's offer can't be saved as entered, or null when it's fine (or there is none). */
+function offerFormError(f: OfferFormFields): string | null {
+  if (f.offerType === "none") return null;
+  const value = parseFloat(f.offerValue);
+  if (!(value > 0)) return "Enter an offer value greater than 0";
+  if (f.offerType === "percentage" && value > 100) return "A percentage offer can't be more than 100%";
+  if (f.offerStartDate && f.offerEndDate && f.offerEndDate < f.offerStartDate) {
+    return "The offer's end date can't be before its start date";
+  }
+  return null;
+}
+
+/** Offer fields for the create/update request — offerType "" removes the offer. */
+function offerPayload(f: OfferFormFields) {
+  if (f.offerType === "none") return { offerType: "" as const };
+  return {
+    offerType: f.offerType,
+    offerValue: parseFloat(f.offerValue) || 0,
+    offerLabel: f.offerLabel.trim() || null,
+    offerStartDate: f.offerStartDate || null,
+    offerEndDate: f.offerEndDate || null,
+  };
+}
+
+/** Same maths as the backend's PlanOfferPricing, for the form's live preview only. */
+function offerPreview(f: OfferFormFields): { discount: number; pays: number } | null {
+  const price = parseFloat(f.price);
+  const value = parseFloat(f.offerValue);
+  if (f.offerType === "none" || !(price > 0) || !(value > 0)) return null;
+  const raw = f.offerType === "percentage" ? (price * Math.min(value, 100)) / 100 : value;
+  const discount = Math.round(Math.min(raw, price) * 100) / 100;
+  return { discount, pays: Math.round((price - discount) * 100) / 100 };
+}
+
 export function ManagePlans() {
   const { activeBranchId } = useBranch();
   const { currencyCode } = useCurrency();
@@ -108,6 +153,11 @@ export function ManagePlans() {
     durationValue: "",
     price: "",
     discount: "",
+    offerType: "none" as OfferFormType,
+    offerValue: "",
+    offerLabel: "",
+    offerStartDate: "",
+    offerEndDate: "",
     maxSessions: "",
     assignableTrainers: "",
     description: "",
@@ -328,6 +378,11 @@ export function ManagePlans() {
       durationValue: "",
       price: "",
       discount: "",
+      offerType: "none",
+      offerValue: "",
+      offerLabel: "",
+      offerStartDate: "",
+      offerEndDate: "",
       maxSessions: "",
       assignableTrainers: "",
       description: "",
@@ -361,6 +416,8 @@ export function ManagePlans() {
   };
 
   const handleCreatePlan = async () => {
+    const offerProblem = offerFormError(formData);
+    if (offerProblem) { setError(offerProblem); return; }
     try {
       const created = await plansService.createPlan({
         name: formData.name,
@@ -370,6 +427,7 @@ export function ManagePlans() {
         durationValue: formData.durationValue,
         price: parseFloat(formData.price as string) || 0,
         discount: parseFloat(formData.discount as string) || 0,
+        ...offerPayload(formData),
         status: formData.status,
         description: formData.description,
         maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
@@ -414,7 +472,12 @@ export function ManagePlans() {
       durationType: plan.durationType,
       durationValue: plan.durationValue || plan.duration.split(" ")[0],
       price: plan.price.toString(),
-      discount: plan.discount.toString(),
+      discount: (plan.discount ?? 0).toString(),
+      offerType: plan.offerType ?? "none",
+      offerValue: plan.offerValue != null ? plan.offerValue.toString() : "",
+      offerLabel: plan.offerLabel ?? "",
+      offerStartDate: plan.offerStartDate ?? "",
+      offerEndDate: plan.offerEndDate ?? "",
       maxSessions: plan.maxSessions?.toString() || "",
       assignableTrainers: (plan.assignableTrainers || []).join(", "),
       description: plan.description,
@@ -448,6 +511,8 @@ export function ManagePlans() {
 
   const handleUpdatePlan = async () => {
     if (!editingPlan) return;
+    const offerProblem = offerFormError(formData);
+    if (offerProblem) { setError(offerProblem); return; }
     try {
       const updated = await plansService.updatePlan(editingPlan.id, {
         name: formData.name,
@@ -457,6 +522,7 @@ export function ManagePlans() {
         durationValue: formData.durationValue,
         price: parseFloat(formData.price as string) || 0,
         discount: parseFloat(formData.discount as string) || 0,
+        ...offerPayload(formData),
         status: formData.status,
         description: formData.description,
         maxSessions: formData.maxSessions ? parseInt(formData.maxSessions as string) : null,
@@ -545,40 +611,16 @@ export function ManagePlans() {
     return facilityIds.map(id => availableFacilities.find(facility => facility.id === id)?.name).filter(Boolean);
   };
 
-  // Effective price after the best currently-active promotion attached to the
-  // plan. Discounts live on Promotions & Campaigns now (not a manual plan
-  // field), so this is the only place a plan's price reflects them.
+  // What members pay today: the plan's running offer, priced by the server (the same
+  // figure every checkout charges). Attached promotions only apply with their code.
   const getPlanEffectivePrice = (plan: Plan) => {
     const price = Number(plan.price) || 0;
-    const activePromotions = plan.selectedPromotions
-      .map(id => availablePromotions.find(promo => promo.id === id))
-      .filter((promo): promo is NonNullable<typeof promo> => !!promo && promo.status === "Active");
-
-    let bestDiscountAmount = 0;
-    let bestPromotion: typeof activePromotions[number] | null = null;
-
-    for (const promo of activePromotions) {
-      let amount = 0;
-      if (promo.discountType === "percentage") {
-        amount = price * (Number(promo.discountValue) || 0) / 100;
-        if (promo.maximumDiscount != null) amount = Math.min(amount, Number(promo.maximumDiscount));
-      } else if (promo.discountType === "free") {
-        amount = price;
-      } else if (promo.discountValue != null) {
-        amount = Number(promo.discountValue);
-      }
-      amount = Math.max(0, Math.min(amount, price));
-      if (amount > bestDiscountAmount) {
-        bestDiscountAmount = amount;
-        bestPromotion = promo;
-      }
-    }
-
+    const discountAmount = plan.offerActive ? Number(plan.offerDiscountAmount) || 0 : 0;
     return {
       originalPrice: price,
-      effectivePrice: price - bestDiscountAmount,
-      discountAmount: bestDiscountAmount,
-      appliedPromotion: bestPromotion,
+      effectivePrice: discountAmount > 0 ? Number(plan.effectivePrice) : price,
+      discountAmount,
+      offerLabel: plan.offerLabel || "Offer",
     };
   };
 
@@ -899,12 +941,12 @@ export function ManagePlans() {
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      const { effectivePrice, discountAmount, appliedPromotion } = getPlanEffectivePrice(plan);
+                      const { effectivePrice, discountAmount, offerLabel } = getPlanEffectivePrice(plan);
                       return discountAmount > 0 ? (
                         <div>
                           <div className="font-medium"><CurrencyGlyph /> {effectivePrice.toFixed(2)}</div>
                           <div className="text-xs text-muted-foreground line-through"><CurrencyGlyph /> {plan.price}</div>
-                          <div className="text-xs text-green-600">{appliedPromotion?.name}</div>
+                          <div className="text-xs text-green-600">{offerLabel}</div>
                         </div>
                       ) : (
                         <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
@@ -1075,12 +1117,12 @@ export function ManagePlans() {
                 <div className="p-3 rounded-lg border bg-white">
                   <p className="text-xs text-muted-foreground">Price</p>
                   {(() => {
-                    const { effectivePrice, discountAmount, appliedPromotion } = getPlanEffectivePrice(viewingPlan);
+                    const { effectivePrice, discountAmount, offerLabel } = getPlanEffectivePrice(viewingPlan);
                     return discountAmount > 0 ? (
                       <div>
                         <p className="font-semibold text-primary"><CurrencyGlyph /> {effectivePrice.toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground line-through"><CurrencyGlyph /> {viewingPlan.price}</p>
-                        <p className="text-xs text-green-600">{appliedPromotion?.name} applied</p>
+                        <p className="text-xs text-green-600">{offerLabel}</p>
                       </div>
                     ) : (
                       <p className="font-semibold text-primary"><CurrencyGlyph /> {viewingPlan.price}</p>
@@ -1285,6 +1327,93 @@ export function ManagePlans() {
                 value={formData.price}
                 onChange={(e) => setFormData({...formData, price: e.target.value})}
               />
+            </div>
+
+            {/* Offer — a discount every member gets, no code needed */}
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <Label>Offer</Label>
+                <p className="text-xs text-muted-foreground">
+                  Members see the regular price crossed out and pay the offer price — in the app and at the front desk.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="offerType">Offer type</Label>
+                  <Select
+                    value={formData.offerType}
+                    onValueChange={(value) => setFormData({...formData, offerType: value as OfferFormType})}
+                  >
+                    <SelectTrigger id="offerType"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No offer</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Flat amount</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.offerType !== "none" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="offerValue">
+                      {formData.offerType === "percentage" ? "Offer (%) *" : `Amount off (${currencyCode}) *`}
+                    </Label>
+                    <Input
+                      id="offerValue"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={formData.offerType === "percentage" ? "e.g., 10" : "e.g., 50"}
+                      value={formData.offerValue}
+                      onChange={(e) => setFormData({...formData, offerValue: e.target.value})}
+                    />
+                  </div>
+                )}
+              </div>
+              {formData.offerType !== "none" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="offerLabel">Offer label</Label>
+                    <Input
+                      id="offerLabel"
+                      maxLength={100}
+                      placeholder="e.g., New Year Offer"
+                      value={formData.offerLabel}
+                      onChange={(e) => setFormData({...formData, offerLabel: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="offerStartDate">Starts (optional)</Label>
+                      <Input
+                        id="offerStartDate"
+                        type="date"
+                        value={formData.offerStartDate}
+                        onChange={(e) => setFormData({...formData, offerStartDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="offerEndDate">Ends (optional)</Label>
+                      <Input
+                        id="offerEndDate"
+                        type="date"
+                        min={formData.offerStartDate || undefined}
+                        value={formData.offerEndDate}
+                        onChange={(e) => setFormData({...formData, offerEndDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    const problem = offerFormError(formData);
+                    if (problem) return <p className="text-xs text-red-600">{problem}</p>;
+                    const preview = offerPreview(formData);
+                    return preview ? (
+                      <p className="text-sm text-green-700">
+                        Members pay <CurrencyGlyph /> {preview.pays.toFixed(2)} (save <CurrencyGlyph /> {preview.discount.toFixed(2)})
+                      </p>
+                    ) : null;
+                  })()}
+                </>
+              )}
             </div>
 
             {/* Max Sessions (optional) */}

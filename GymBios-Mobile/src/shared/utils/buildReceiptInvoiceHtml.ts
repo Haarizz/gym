@@ -1,3 +1,4 @@
+import { currencyHtml, formatAmount, useCurrencyStore } from '@/core/providers';
 import { MobileReceiptDetail } from '@/domains/memberPortal/membership/domain/models';
 
 function escapeHtml(value: string): string {
@@ -11,7 +12,8 @@ function escapeHtml(value: string): string {
 }
 
 export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColor: string): string {
-  const currencyCode = 'AED';
+  const currencyCode = useCurrencyStore.getState().currencyCode;
+  const money = (n: number) => currencyHtml(currencyCode, formatAmount(n, { code: currencyCode, decimals: 2 }));
   const totalAmt = Number(receipt.amount) || 0;
   const paidAmt = Number(receipt.paidAmount ?? totalAmt);
   const balanceDue = Number(receipt.dueAmount ?? 0);
@@ -35,7 +37,7 @@ export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColo
         <tr>
           <td><strong>${escapeHtml(item.description)}</strong>${item.subtitle ? `<br><span style="color:#888;font-size:12px;">${escapeHtml(item.subtitle)}</span>` : ""}</td>
           <td>${escapeHtml(item.type)}</td>
-          <td class="amount-cell" style="text-align: right;">${currencyCode} ${item.amount.toFixed(2)}</td>
+          <td class="amount-cell" style="text-align: right;">${money(item.amount)}</td>
         </tr>`).join("");
 
   const COMPANY_HEADER_CSS = `
@@ -177,9 +179,9 @@ export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColo
             </tbody>
         </table>
         <div class="totals-section">
-            <div class="total-row grand-total"><span>Invoice Amount:</span><span>${currencyCode} ${totalAmt.toFixed(2)}</span></div>
-            <div class="total-row normal" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"><span>TOTAL PAID:</span><span>${currencyCode} ${paidAmt.toFixed(2)}</span></div>
-            ${balanceDue > 0 ? `<div class="total-row discount"><span>BALANCE DUE:</span><span>${currencyCode} ${balanceDue.toFixed(2)}</span></div>` : ""}
+            <div class="total-row grand-total"><span>Invoice Amount:</span><span>${money(totalAmt)}</span></div>
+            <div class="total-row normal" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"><span>TOTAL PAID:</span><span>${money(paidAmt)}</span></div>
+            ${balanceDue > 0 ? `<div class="total-row discount"><span>BALANCE DUE:</span><span>${money(balanceDue)}</span></div>` : ""}
         </div>
         <div class="payment-info">
             <div class="payment-method"><span class="payment-label">Payment Method:</span><span>${escapeHtml(receipt.paymentMethod || '-')}</span></div>

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
-import { useCurrency, CurrencyGlyph } from '@/core/providers/CurrencyProvider';
+import { CurrencyGlyph } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useReferralSettings } from '../../hooks/useReferrals';
 import { useUpdateReferralSettings } from '../../hooks/useReferralActions';
@@ -15,7 +15,6 @@ import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralSettingsScreen() {
   const router = useRouter();
-  const { currencyCode } = useCurrency();
   const { data: serverSettings, isLoading } = useReferralSettings();
   const updateSettingsMutation = useUpdateReferralSettings();
 
@@ -156,7 +155,7 @@ export function ReferralSettingsScreen() {
               }
             />
             <Typography variant="caption" color="textSecondary" style={styles.helpText}>
-              Limit in <CurrencyGlyph code={currencyCode} />
+              Limit in <CurrencyGlyph />
             </Typography>
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
@@ -189,7 +188,7 @@ export function ReferralSettingsScreen() {
               }
             />
             <Typography variant="caption" color="textSecondary" style={styles.helpText}>
-              Minimum <CurrencyGlyph code={currencyCode} /> amount to trigger rewards
+              Minimum <CurrencyGlyph /> amount to trigger rewards
             </Typography>
 
             <View style={styles.switchRow}>

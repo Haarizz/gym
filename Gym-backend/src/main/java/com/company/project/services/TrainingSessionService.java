@@ -23,15 +23,22 @@ public class TrainingSessionService {
     private final TrainingSessionRepository sessionRepository;
     private final BookingRepository bookingRepository;
     private final StaffRepository staffRepository;
+    private final RewardRedemptionService rewardRedemptionService;
 
     public TrainingSessionService(TrainingSessionRepository sessionRepository,
                                   BookingRepository bookingRepository,
-                                  StaffRepository staffRepository) {
+                                  StaffRepository staffRepository,
+                                  RewardRedemptionService rewardRedemptionService) {
         this.sessionRepository = sessionRepository;
         this.bookingRepository = bookingRepository;
         this.staffRepository = staffRepository;
+        this.rewardRedemptionService = rewardRedemptionService;
     }
 
+    // @Transactional is what makes BranchFilterAspect enable the branch filter;
+    // without it findAll() loads every branch's sessions and BranchSecurityListener
+    // rejects the first foreign-branch row on @PostLoad.
+    @Transactional(readOnly = true)
     public List<TrainingSessionResponseDTO> getSessions(String type,
                                                         Long trainerId,
                                                         LocalDate startDate,
@@ -119,6 +126,9 @@ public class TrainingSessionService {
 
     @Transactional
     public void deleteSession(Long id) {
+        // Deleting the session deletes its bookings — give back any Reward Pass they were paid with.
+        bookingRepository.findBySessionIdAndRewardIdIsNotNull(id)
+                .forEach(b -> rewardRedemptionService.restorePass(b.getRewardId()));
         bookingRepository.deleteBySessionId(id);
         sessionRepository.deleteById(id);
     }

@@ -13,7 +13,7 @@ import type { ReportSectionProps } from './ReportSection.types';
  * @example
  * ```tsx
  * <ReportSection title="Revenue Breakdown">
- *   <ReportMetric label="Total" value="₹4.2L" />
+ *   <ReportMetric label="Total" value={<CurrencyValue amount={420000} compact />} />
  * </ReportSection>
  * ```
  */

@@ -14,18 +14,23 @@ export const usePurchaseFamilyPlan = () => {
       tenantSlug,
       branchId,
       request,
+      isPlanChange = false,
     }: {
       idempotencyKey: string;
       tenantSlug: string;
       branchId: number;
       request: FamilyPurchaseRequest;
+      /** An existing member here switching plans, rather than a new member joining. */
+      isPlanChange?: boolean;
     }) => {
       // The backend rejects a reused Idempotency-Key whose payload differs.
       const fingerprint = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         JSON.stringify(request),
       );
-      return familyApi.purchaseFamilyPlan(tenantSlug, branchId, idempotencyKey, fingerprint, request);
+      return isPlanChange
+        ? familyApi.convertToFamilyPlan(idempotencyKey, fingerprint, request)
+        : familyApi.purchaseFamilyPlan(tenantSlug, branchId, idempotencyKey, fingerprint, request);
     },
     // The success screen routes back to the home tab, which is still mounted with
     // its pre-purchase "No Active Plan" data.

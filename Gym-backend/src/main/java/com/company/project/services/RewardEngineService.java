@@ -255,6 +255,7 @@ public class RewardEngineService {
         }
         reward.setRewardValue(rewardValue);
         reward.setCurrency(rule.getCurrency() != null ? rule.getCurrency() : "AED");
+        reward.setRewardUnit(normalizeUnit(rule.getUnit()));
         reward.setRedemptionAction(rule.getRedemptionAction() != null ? rule.getRedemptionAction() : defaultActionFor(type));
 
         // A per-rule approval requirement always applies; the program-wide "Auto-Process
@@ -294,6 +295,13 @@ public class RewardEngineService {
         if (!approvalRequired) {
             redemptionService.autoProcessOnGeneration(saved);
         }
+    }
+
+    /** Rule units are free text ("%", "percent", "AED", "days", ...) — only PERCENT vs AMOUNT matters for spending a reward. */
+    static String normalizeUnit(String unit) {
+        if (unit == null) return "AMOUNT";
+        String u = unit.trim().toLowerCase();
+        return (u.equals("%") || u.startsWith("percent")) ? "PERCENT" : "AMOUNT";
     }
 
     private RewardType inferLegacyType(String legacyType) {

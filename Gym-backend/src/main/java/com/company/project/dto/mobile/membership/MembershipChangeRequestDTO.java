@@ -4,6 +4,8 @@ import com.company.project.dto.PaymentSplitDTO;
 import java.util.List;
 
 public class MembershipChangeRequestDTO {
+    private Long rewardPassId;
+    private String couponCode;
     private Long planId;
     private String paymentMethodUsed;
     private List<PaymentSplitDTO> paymentBreakdown;
@@ -16,4 +18,10 @@ public class MembershipChangeRequestDTO {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public Long getRewardPassId() { return rewardPassId; }
+    public void setRewardPassId(Long rewardPassId) { this.rewardPassId = rewardPassId; }
+
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
 }

@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { format, parse } from 'date-fns';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Button, Input, Typography, DatePicker } from '@/shared/components';
 import { Dropdown } from '@/shared/components/Dropdown/Dropdown';
@@ -204,7 +205,7 @@ export function StaffClassForm({
               <Input
                 label="Price"
                 keyboardType="numeric"
-                leftIcon={<Typography variant="body" style={{ color: theme.textSecondary }}>₹</Typography>}
+                leftIcon={<Typography variant="body" style={{ color: theme.textSecondary }}><CurrencyGlyph /></Typography>}
                 value={price}
                 onChangeText={setPrice}
               />

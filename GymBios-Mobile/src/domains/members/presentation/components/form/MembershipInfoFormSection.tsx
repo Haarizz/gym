@@ -70,7 +70,7 @@ export function MembershipInfoFormSection({
         error={errors?.status}
       />
       <Input
-        label="Membership Plan ID"
+        label="Subscription ID"
         value={membershipPlanId}
         onChangeText={onChangeMembershipPlanId}
         placeholder="e.g. 1"

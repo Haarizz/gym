@@ -1,3 +1,4 @@
+import { parseAmount } from '@/core/providers/currencyDefinitions';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/domains/profile';
 import type { StaffDashboardData } from '../domain/StaffDashboardData';
@@ -21,7 +22,7 @@ export const DEFAULT_STAFF_DASHBOARD: StaffDashboardData = {
   monthlySummary: {
     targetAchievement: 0,
     totalConversions: 0,
-    revenueGenerated: '₹0',
+    revenueGenerated: 0,
     conversionRate: 0,
   },
 };
@@ -72,12 +73,13 @@ export function useStaffDashboard() {
             id: item.id,
             name: item.name || '',
             plan: item.plan || '',
-            amount: item.amount || '₹0'
+            // The backend pre-formats amounts with a hardcoded "₹"; keep only the number.
+            amount: parseAmount(item.amount) ?? 0
           })) : [],
           monthlySummary: {
             targetAchievement: monthlySummary.targetAchievement ?? monthlySummary.target_achievement ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.targetAchievement,
             totalConversions: monthlySummary.totalConversions ?? monthlySummary.total_conversions ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.totalConversions,
-            revenueGenerated: monthlySummary.revenueGenerated ?? monthlySummary.revenue_generated ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.revenueGenerated,
+            revenueGenerated: parseAmount(monthlySummary.revenueGenerated ?? monthlySummary.revenue_generated) ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.revenueGenerated,
             conversionRate: monthlySummary.conversionRate ?? monthlySummary.conversion_rate ?? DEFAULT_STAFF_DASHBOARD.monthlySummary.conversionRate,
           },
         };

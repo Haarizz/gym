@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -15,7 +16,6 @@ interface CardPaymentFormProps {
   cardType: string;
   reference: string;
   paymentDueDate?: Date | null;
-  currency?: string;
   errors?: Record<string, string>;
   onPaidAmountChange: (value: string) => void;
   onCardTypeChange: (value: string) => void;
@@ -29,7 +29,6 @@ export function CardPaymentForm({
   cardType,
   reference,
   paymentDueDate,
-  currency = '₹',
   errors,
   onPaidAmountChange,
   onCardTypeChange,
@@ -72,7 +71,7 @@ export function CardPaymentForm({
 
         <View style={styles.flex1}>
           <Input
-            label={`Paid Amount (${currency}) *`}
+            label={<>Paid Amount (<CurrencyGlyph />) *</>}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -114,7 +113,7 @@ export function CardPaymentForm({
             Final Amount:
           </Typography>
           <Typography variant="bodySmallBold">
-            {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -122,7 +121,7 @@ export function CardPaymentForm({
             Paid Amount:
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            {currency} {(numPaid || 0).toFixed(2)}
+            <CurrencyValue amount={(numPaid || 0)} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -133,7 +132,7 @@ export function CardPaymentForm({
             variant="bodySmallBold"
             style={{ color: remaining > 0 ? theme.error : '#10B981' }}
           >
-            {currency} {remaining.toFixed(2)}
+            <CurrencyValue amount={remaining} decimals={2} />
           </Typography>
         </View>
 
@@ -143,7 +142,7 @@ export function CardPaymentForm({
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
                 Partial Payment:{' '}
               </Typography>
-              {currency} {remaining.toFixed(2)} will be added to member's outstanding balance.
+              <CurrencyValue amount={remaining} decimals={2} /> will be added to member's outstanding balance.
             </Typography>
           </View>
         ) : null}

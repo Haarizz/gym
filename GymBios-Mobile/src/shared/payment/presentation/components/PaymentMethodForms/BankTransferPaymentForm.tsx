@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -15,7 +16,6 @@ interface BankTransferPaymentFormProps {
   reference: string;
   bankAccountId: string;
   paymentDueDate?: Date | null;
-  currency?: string;
   errors?: Record<string, string>;
   onPaidAmountChange: (val: string) => void;
   onReferenceChange: (val: string) => void;
@@ -29,7 +29,6 @@ export function BankTransferPaymentForm({
   reference,
   bankAccountId,
   paymentDueDate,
-  currency = '₹',
   errors,
   onPaidAmountChange,
   onReferenceChange,
@@ -62,7 +61,7 @@ export function BankTransferPaymentForm({
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={`Amount (${currency}) *`}
+            label={<>Amount (<CurrencyGlyph />) *</>}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -120,7 +119,7 @@ export function BankTransferPaymentForm({
             Final Amount:
           </Typography>
           <Typography variant="bodySmallBold">
-            {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -128,7 +127,7 @@ export function BankTransferPaymentForm({
             Paid Amount:
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            {currency} {(numPaid || 0).toFixed(2)}
+            <CurrencyValue amount={(numPaid || 0)} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -139,7 +138,7 @@ export function BankTransferPaymentForm({
             variant="bodySmallBold"
             style={{ color: remaining > 0 ? theme.error : '#10B981' }}
           >
-            {currency} {remaining.toFixed(2)}
+            <CurrencyValue amount={remaining} decimals={2} />
           </Typography>
         </View>
       </View>

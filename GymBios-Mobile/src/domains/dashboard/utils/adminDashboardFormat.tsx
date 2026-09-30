@@ -1,30 +1,24 @@
+import type { ReactNode } from 'react';
+
+import { CurrencyValue, formatCurrency } from '@/core/providers';
+
 /**
  * Presentation-only formatting for the Admin Dashboard. The backend returns
- * raw numeric values/currency codes; this keeps the existing screen's visual
- * style (compact Indian-notation currency like "₹2.4L") without touching the
- * shared, AED-first CurrencyProvider used elsewhere in the app, which the
- * Admin Dashboard has never used and which doesn't support this compact
- * lakh/crore notation.
+ * raw numeric values; money is shown compactly ("1.2K", "3.4M", or "2.4L" for
+ * INR) in the gym's display currency from the web Settings page. The API's own
+ * `currency` field is the accounting base currency, so it is not used here.
  */
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  INR: '₹',
-  AED: 'AED ',
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  SAR: 'SAR ',
-};
+/** Compact money as a node — renders the real Dirham sign for AED. */
+export function formatCompactCurrency(amount: number | null | undefined): ReactNode {
+  if (amount === null || amount === undefined) return '—';
+  return <CurrencyValue amount={amount} compact />;
+}
 
-export function formatCompactCurrency(amount: number | null | undefined, currency = 'INR'): string {
-  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
-  if (amount === null || amount === undefined) return `${symbol}—`;
-  const abs = Math.abs(amount);
-  const sign = amount < 0 ? '-' : '';
-  if (abs >= 1_00_00_000) return `${sign}${symbol}${(abs / 1_00_00_000).toFixed(1)}Cr`;
-  if (abs >= 1_00_000) return `${sign}${symbol}${(abs / 1_00_000).toFixed(1)}L`;
-  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
-  return `${sign}${symbol}${abs.toLocaleString('en-IN')}`;
+/** Plain-text twin of formatCompactCurrency, for accessibility labels. */
+export function formatCompactCurrencyText(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return formatCurrency(amount, { compact: true });
 }
 
 export function formatCount(value: number | null | undefined): string {
@@ -37,9 +31,16 @@ export function formatPercent(value: number | null | undefined): string {
   return `${value.toFixed(1)}%`;
 }
 
-export function formatKpiValue(unit: string, value: number | null, currency: string): string {
+export function formatKpiValue(unit: string, value: number | null): ReactNode {
   if (value === null) return '—';
-  if (unit === 'currency') return formatCompactCurrency(value, currency);
+  if (unit === 'currency') return formatCompactCurrency(value);
+  if (unit === 'percent') return formatPercent(value);
+  return formatCount(value);
+}
+
+export function formatKpiValueText(unit: string, value: number | null): string {
+  if (value === null) return '—';
+  if (unit === 'currency') return formatCompactCurrencyText(value);
   if (unit === 'percent') return formatPercent(value);
   return formatCount(value);
 }
@@ -52,7 +53,7 @@ export function formatChange(changePercent: number | null): { text: string; tren
 }
 
 /** Formats a value for a generic report-table cell based on its column header. */
-export function formatReportCell(value: string | number | null, columnLabel: string, currency: string): string {
+export function formatReportCell(value: string | number | null, columnLabel: string): ReactNode {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'number') {
     const label = columnLabel.toLowerCase();
@@ -60,7 +61,7 @@ export function formatReportCell(value: string | number | null, columnLabel: str
       return formatPercent(value);
     }
     if (label.includes('amount') || label.includes('sales') || label.includes('revenue') || label.includes('ticket')) {
-      return formatCompactCurrency(value, currency);
+      return formatCompactCurrency(value);
     }
     return formatCount(value);
   }

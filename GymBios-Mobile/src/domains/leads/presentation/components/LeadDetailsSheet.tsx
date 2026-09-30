@@ -12,6 +12,7 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
@@ -258,7 +259,7 @@ export function LeadDetailsSheet({
             <View style={styles.gridCol}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Budget</Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.budget ? `$${lead.budget}` : 'Not specified'}
+                {lead.budget ? <CurrencyValue amount={Number(lead.budget)} /> : 'Not specified'}
               </Text>
             </View>
           </View>

@@ -22,6 +22,12 @@ public class MembershipPlanRequestDTO {
     private String durationValue;
     private BigDecimal price;
     private BigDecimal discount;
+    // Offer — send offerType "" / "none" to remove it; omit (null) to leave it as is.
+    private String offerType;
+    private BigDecimal offerValue;
+    private String offerLabel;
+    private String offerStartDate;  // yyyy-MM-dd, optional
+    private String offerEndDate;    // yyyy-MM-dd, optional
     private String status;
     private String description;
     private Integer maxSessions;
@@ -79,6 +85,17 @@ public class MembershipPlanRequestDTO {
 
     public BigDecimal getDiscount() { return discount; }
     public void setDiscount(BigDecimal discount) { this.discount = discount; }
+
+    public String getOfferType() { return offerType; }
+    public void setOfferType(String offerType) { this.offerType = offerType; }
+    public BigDecimal getOfferValue() { return offerValue; }
+    public void setOfferValue(BigDecimal offerValue) { this.offerValue = offerValue; }
+    public String getOfferLabel() { return offerLabel; }
+    public void setOfferLabel(String offerLabel) { this.offerLabel = offerLabel; }
+    public String getOfferStartDate() { return offerStartDate; }
+    public void setOfferStartDate(String offerStartDate) { this.offerStartDate = offerStartDate; }
+    public String getOfferEndDate() { return offerEndDate; }
+    public void setOfferEndDate(String offerEndDate) { this.offerEndDate = offerEndDate; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

@@ -23,7 +23,7 @@ export function MemberQuickActions() {
       onPress: () => router.push('/(member)/trainer' as any),
     },
     {
-      label: 'Membership',
+      label: 'Subscription',
       icon: 'credit-card' as const,
       color: '#b45309',        // warm amber
       bgColor: '#F59E0B',

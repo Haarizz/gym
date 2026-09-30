@@ -7,12 +7,13 @@ import {
   View,
 } from 'react-native';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Loader } from '@/shared/components/Loader';
 import { Typography } from '@/shared/components/Typography';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
 import { usePromotions } from '../../hooks/usePromotions';
 import { PromotionCard } from '../components/PromotionCard';
@@ -38,6 +39,9 @@ export function PromotionsScreen({
 }: PromotionsScreenProps) {
   const { width } = useWindowDimensions();
   const numColumns = width >= 600 ? 2 : 1;
+  // The tab bar floats over the screen, so the list must scroll its last card
+  // clear of it — a fixed padding left cards stuck behind the bar on short phones.
+  const listBottomPadding = useTabBarBottomInset() + Spacing.four;
 
   const [activeTab, setActiveTab] = useState<PromotionTabType>('promotions');
   const [search, setSearch] = useState('');
@@ -194,7 +198,7 @@ export function PromotionsScreen({
             renderItem={renderPromotionItem}
             numColumns={numColumns}
             ListHeaderComponent={renderHeader}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
             refreshControl={
               <RefreshControl
                 refreshing={isLoading}
@@ -270,14 +274,14 @@ export function PromotionsScreen({
                   <View style={styles.statRow}>
                     <PromotionStatisticsCard
                       title="Total Revenue"
-                      value={`$${statistics.totalRevenue.toLocaleString()}`}
+                      value={<CurrencyValue amount={statistics.totalRevenue} />}
                       iconName="dollar-sign"
                       iconColor="#059669"
                       iconBgColor="#ECFDF5"
                     />
                     <PromotionStatisticsCard
                       title="Total Savings"
-                      value={`$${statistics.totalSavings.toLocaleString()}`}
+                      value={<CurrencyValue amount={statistics.totalSavings} />}
                       iconName="zap"
                       iconColor="#EA580C"
                       iconBgColor="#FFEDD5"
@@ -304,7 +308,7 @@ export function PromotionsScreen({
                 </View>
               </View>
             }
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
             refreshControl={
               <RefreshControl
                 refreshing={isLoading}

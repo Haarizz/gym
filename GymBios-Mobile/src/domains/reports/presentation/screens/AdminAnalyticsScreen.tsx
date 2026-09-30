@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { ScreenLayout } from '@/shared/layouts';
 import type { createUseRestoreSession } from '@/domains/auth/presentation/hooks/useAuthFlow';
@@ -18,8 +19,8 @@ export function createAdminAnalyticsScreen(useRestoreSession: ReturnType<typeof 
     const activeTimeframe = '30 Days';
 
     const revenueMetrics = [
-      { label: 'Total Revenue', value: '₹4.2L', trend: '+15%', isUp: true },
-      { label: 'Avg per Member', value: '₹2,450', trend: '+5%', isUp: true },
+      { label: 'Total Revenue', value: <CurrencyValue amount={420000} compact />, trend: '+15%', isUp: true },
+      { label: 'Avg per Member', value: <CurrencyValue amount={2450} />, trend: '+5%', isUp: true },
     ];
 
     const growthMetrics = [

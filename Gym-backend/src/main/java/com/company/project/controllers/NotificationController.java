@@ -19,7 +19,7 @@ public class NotificationController {
     }
 
     /**
-     * GET /api/notifications?page=0&size=20
+     * GET /api/notifications?page=0&size=20[&module=COMMUNITY_ACTIVITY]
      * Returns paginated notifications for the authenticated user — targeted to them
      * personally or to one of their roles, and further filtered to modules their
      * role currently has permission for (see NotificationService.isModuleVisible).
@@ -27,17 +27,18 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<Page<NotificationResponseDTO>> getNotifications(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(notificationService.getForCurrentUser(page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String module) {
+        return ResponseEntity.ok(notificationService.getForCurrentUser(page, size, module));
     }
 
     /**
-     * GET /api/notifications/unread-count
+     * GET /api/notifications/unread-count[?module=COMMUNITY_ACTIVITY]
      * Returns { "count": N } — used by the frontend bell badge.
      */
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount() {
-        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount()));
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestParam(required = false) String module) {
+        return ResponseEntity.ok(Map.of("count", notificationService.getUnreadCount(module)));
     }
 
     /**
@@ -51,12 +52,12 @@ public class NotificationController {
     }
 
     /**
-     * PUT /api/notifications/read-all
-     * Marks all notifications as read for the current user.
+     * PUT /api/notifications/read-all[?module=COMMUNITY_ACTIVITY]
+     * Marks all notifications (or only those in the given module) as read for the current user.
      */
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllRead() {
-        notificationService.markAllRead();
+    public ResponseEntity<Void> markAllRead(@RequestParam(required = false) String module) {
+        notificationService.markAllRead(module);
         return ResponseEntity.ok().build();
     }
 

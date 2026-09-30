@@ -8,6 +8,7 @@ export type AutomationTriggerType =
   | 'class_reminder'
   | 'goal_achievement'
   | 'payment_failed'
+  | 'outstanding_balance'
   | string;
 
 export type AutomationTargetType = 'ALL' | 'SEGMENT';

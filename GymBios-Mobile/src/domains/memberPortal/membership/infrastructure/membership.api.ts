@@ -1,5 +1,16 @@
 import { apiClient } from '@/core/network/apiClient';
-import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse, MobileReceiptDetail } from '../domain/models';
+import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse, MobileReceiptDetail, FreezeMembershipResult, MobileMembershipPlan } from '../domain/models';
+
+// Snake_case plan from /mobile/member/membership/plans and the change preview.
+function mapPlan(plan: any): MobileMembershipPlan {
+  return {
+    ...plan,
+    planType: plan.plan_type,
+    discount: Number(plan.discount ?? 0),
+    offerLabel: plan.offer_label ?? null,
+    effectivePrice: Number(plan.effective_price ?? plan.price ?? 0),
+  };
+}
 
 export const membershipApi = {
   getMemberMembership: async (): Promise<MemberMembershipState> => {
@@ -9,21 +20,38 @@ export const membershipApi = {
       benefits: response.data.benefits,
       freeze: {
         available: response.data.freeze.available,
-        allowed_days: response.data.freeze.allowedDays || response.data.freeze.allowed_days,
+        allowed_days: response.data.freeze.allowedDays || response.data.freeze.allowed_days || 0,
         is_frozen: response.data.freeze.isFrozen || response.data.freeze.is_frozen || false,
         start_date: response.data.freeze.startDate || response.data.freeze.start_date,
         end_date: response.data.freeze.endDate || response.data.freeze.end_date,
+        max_days: response.data.freeze.max_days ?? 0,
+        used_days: response.data.freeze.used_days ?? 0,
+        max_occurrences: response.data.freeze.max_occurrences ?? null,
+        used_occurrences: response.data.freeze.used_occurrences ?? 0,
+        remaining_occurrences: response.data.freeze.remaining_occurrences ?? null,
+        free_days_remaining: response.data.freeze.free_days_remaining ?? 0,
+        charge_per_extra_day: Number(response.data.freeze.charge_per_extra_day ?? 0),
+        currency_symbol: response.data.freeze.currency_symbol ?? null,
+        auto_unfreeze: response.data.freeze.auto_unfreeze ?? false,
+        unavailable_reason: response.data.freeze.unavailable_reason ?? null,
+        unavailable_message: response.data.freeze.unavailable_message ?? null,
       },
       renewal_offer: response.data.renewal_offer || response.data.renewalOffer,
     };
   },
   
-  freezeMembership: async (durationDays: number, reason: string): Promise<any> => {
+  freezeMembership: async (durationDays: number, reason: string): Promise<FreezeMembershipResult> => {
     const response = await apiClient.post<any>('/mobile/member/membership/freeze', {
       duration_days: durationDays,
       reason,
     });
-    return response.data;
+    return {
+      freezeEnd: response.data.freeze_end,
+      days: response.data.days ?? durationDays,
+      freeDaysApplied: response.data.free_days_applied ?? 0,
+      chargedDays: response.data.charged_days ?? 0,
+      chargeAmount: Number(response.data.charge_amount ?? 0),
+    };
   },
 
   unfreezeMembership: async (): Promise<any> => {
@@ -111,7 +139,7 @@ export const membershipApi = {
       params: { page, limit, search },
     });
     return {
-      plans: response.data.plans || [],
+      plans: (response.data.plans || []).map(mapPlan),
       pagination: {
         page: response.data.pagination?.page || 1,
         limit: response.data.pagination?.limit || 10,
@@ -121,13 +149,26 @@ export const membershipApi = {
     };
   },
 
-  previewMembershipChange: async (planId: number): Promise<any> => {
-    const response = await apiClient.post<any>('/mobile/member/membership/change/preview', { plan_id: planId });
+  previewMembershipChange: async (
+    planId: number,
+    reward?: { rewardPassId?: number; couponCode?: string },
+  ): Promise<any> => {
+    const withReward = !!(reward?.rewardPassId || reward?.couponCode);
+    const response = await apiClient.post<any>('/mobile/member/membership/change/preview', {
+      plan_id: planId,
+      reward_pass_id: reward?.rewardPassId,
+      coupon_code: reward?.couponCode,
+    }, {
+      // A rejected pass/coupon is reported (and dropped) by the renew modal itself.
+      skipGlobalErrorToast: withReward,
+    });
     return {
-      selectedPlan: response.data.selected_plan,
+      selectedPlan: mapPlan(response.data.selected_plan),
       operation: response.data.operation,
       regularAmount: response.data.regular_amount,
       discountAmount: response.data.discount_amount,
+      offerLabel: response.data.offer_label ?? null,
+      rewardDiscountAmount: response.data.reward_discount_amount ?? 0,
       finalAmount: response.data.final_amount,
       features: response.data.features,
     };
@@ -136,6 +177,8 @@ export const membershipApi = {
   changeMembershipPlan: async (request: any): Promise<any> => {
     const response = await apiClient.post<any>('/mobile/member/membership/change', {
       plan_id: request.planId,
+      reward_pass_id: request.rewardPassId,
+      coupon_code: request.couponCode,
       payment_method_used: request.paymentMethodUsed,
       payment_breakdown: request.paymentBreakdown?.map((split: any) => ({
         method: split.method,

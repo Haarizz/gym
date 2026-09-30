@@ -15,6 +15,7 @@ import type { AppRole } from '../../domain/valueObjects/AppRole';
 import { useAuthStore } from '../../store/authStore';
 import type { LoginFormValues } from '../forms/LoginForm';
 import { getRoleHomeHref, MEMBER_AUTH_HREF, ROLE_LOGIN_HREF, ROLE_SELECTION_HREF, VERIFY_EMAIL_HREF } from '../navigation/routes';
+import { unregisterPushNotifications } from '@/domains/notifications';
 
 export function createUseSelectAppRole(authOrchestrator: AuthOrchestrator) {
   return function useSelectAppRole() {
@@ -294,6 +295,8 @@ export function createUseRestoreSession(
 
     const logoutMutation = useMutation({
       mutationFn: async () => {
+        // While still authenticated: stop this member's pushes reaching this device.
+        await unregisterPushNotifications();
         try {
           return await authOrchestrator.signOut();
         } catch {

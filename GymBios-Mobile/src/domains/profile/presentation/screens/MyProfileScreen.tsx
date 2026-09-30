@@ -14,6 +14,7 @@ import { GlassBlob, GlassHeader, GlassSurface, InfoRow, DatePicker, Dropdown } f
 import { useProfile } from '../../hooks/useProfile';
 import { useMobileProfile } from '../../hooks/useMobileProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
+import { getMaxBirthDate, getMinBirthDate } from '../../domain/dateOfBirthRules';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -79,6 +80,11 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
   const [editedNationality, setEditedNationality] = useState('');
   const [editedMedicalConditions, setEditedMedicalConditions] = useState('');
   const [editedBloodType, setEditedBloodType] = useState('');
+  const [editedAllergies, setEditedAllergies] = useState('');
+  const [editedCurrentMedications, setEditedCurrentMedications] = useState('');
+  const [editedChronicIllnesses, setEditedChronicIllnesses] = useState('');
+  const [editedHeight, setEditedHeight] = useState('');
+  const [editedWeight, setEditedWeight] = useState('');
   const [editedEmergencyContact, setEditedEmergencyContact] = useState('');
   const [editedEmergencyPhone, setEditedEmergencyPhone] = useState('');
 
@@ -98,6 +104,11 @@ const handleStartEdit = () => {
       setEditedNationality(mobileProfile?.nationality || '');
       setEditedMedicalConditions(mobileProfile?.medicalConditions || '');
       setEditedBloodType(mobileProfile?.bloodType || '');
+      setEditedAllergies(mobileProfile?.allergies || '');
+      setEditedCurrentMedications(mobileProfile?.currentMedications || '');
+      setEditedChronicIllnesses(mobileProfile?.chronicIllnesses || '');
+      setEditedHeight(mobileProfile?.height || '');
+      setEditedWeight(mobileProfile?.weight || '');
       setEditedEmergencyContact(mobileProfile?.emergencyContact || '');
       setEditedEmergencyPhone(mobileProfile?.emergencyPhone || '');
     }
@@ -127,6 +138,11 @@ const handleSaveProfile = async () => {
           nationality: editedNationality,
           medicalConditions: editedMedicalConditions,
           bloodType: editedBloodType,
+          allergies: editedAllergies,
+          currentMedications: editedCurrentMedications,
+          chronicIllnesses: editedChronicIllnesses,
+          height: editedHeight.trim(),
+          weight: editedWeight.trim(),
           emergencyContact: editedEmergencyContact,
           emergencyPhone: editedEmergencyPhone,
         }, {
@@ -318,7 +334,9 @@ const handleSaveProfile = async () => {
                         placeholder="Select date"
                         value={editedDOB || undefined}
                         onChange={(date: Date | null) => setEditedDOB(date)}
-                        maximumDate={new Date()}
+                        initialView="year"
+                        minimumDate={getMinBirthDate()}
+                        maximumDate={getMaxBirthDate()}
                       />
                     </View>
                     <View style={{ flexDirection: 'row', gap: Spacing.three, zIndex: 9 }}>
@@ -407,6 +425,27 @@ const handleSaveProfile = async () => {
                     onChangeText={setEditedMedicalConditions}
                     placeholder="e.g. Asthma, Diabetes"
                   />
+                  <Input
+                    variant="glass"
+                    label="Allergies"
+                    value={editedAllergies}
+                    onChangeText={setEditedAllergies}
+                    placeholder="e.g. Peanuts, Penicillin, Dust"
+                  />
+                  <Input
+                    variant="glass"
+                    label="Current Medications"
+                    value={editedCurrentMedications}
+                    onChangeText={setEditedCurrentMedications}
+                    placeholder="e.g. Metformin 500mg"
+                  />
+                  <Input
+                    variant="glass"
+                    label="Chronic Illnesses"
+                    value={editedChronicIllnesses}
+                    onChangeText={setEditedChronicIllnesses}
+                    placeholder="e.g. Arthritis, COPD"
+                  />
                   <View style={{ zIndex: 7 }}>
                     <Dropdown
                       label="Blood Type"
@@ -416,11 +455,36 @@ const handleSaveProfile = async () => {
                       onChange={setEditedBloodType}
                     />
                   </View>
+                  <View style={styles.healthRow}>
+                    <Input
+                      variant="glass"
+                      label="Height (cm)"
+                      value={editedHeight}
+                      onChangeText={setEditedHeight}
+                      keyboardType="numeric"
+                      placeholder="170"
+                      containerStyle={styles.healthRowItem}
+                    />
+                    <Input
+                      variant="glass"
+                      label="Weight (kg)"
+                      value={editedWeight}
+                      onChangeText={setEditedWeight}
+                      keyboardType="numeric"
+                      placeholder="70"
+                      containerStyle={styles.healthRowItem}
+                    />
+                  </View>
                 </View>
               ) : (
                 <View>
-                  <InfoRow icon="heart" label="Medical Conditions" value={mobileProfile?.medicalConditions || 'None reported'} divider={false} />
+                  <InfoRow icon="heart" label="Medical Conditions" value={mobileProfile?.medicalConditions || 'None reported'} valueLines={0} divider={false} />
+                  <InfoRow icon="alert-circle" label="Allergies" value={mobileProfile?.allergies || 'None reported'} valueLines={0} />
+                  <InfoRow icon="package" label="Current Medications" value={mobileProfile?.currentMedications || 'None reported'} valueLines={0} />
+                  <InfoRow icon="activity" label="Chronic Illnesses" value={mobileProfile?.chronicIllnesses || 'None reported'} valueLines={0} />
                   <InfoRow icon="droplet" label="Blood Type" value={mobileProfile?.bloodType || 'Not specified'} />
+                  <InfoRow icon="arrow-up" label="Height" value={mobileProfile?.height ? `${mobileProfile.height} cm` : 'Not specified'} />
+                  <InfoRow icon="bar-chart-2" label="Weight" value={mobileProfile?.weight ? `${mobileProfile.weight} kg` : 'Not specified'} />
                 </View>
               )}
             </GlassSurface>
@@ -552,6 +616,13 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: Spacing.three,
+  },
+  healthRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  healthRowItem: {
+    flex: 1,
   },
   field: {
     zIndex: 1,

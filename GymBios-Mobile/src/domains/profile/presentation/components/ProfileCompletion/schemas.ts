@@ -1,12 +1,19 @@
 import { z } from 'zod';
+import { validateDateOfBirth } from '../../../domain/dateOfBirthRules';
 
 export const personalInfoSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
   phone: z.string().min(1, 'Phone number is required'),
-  dateOfBirth: z.string().min(1, 'Date of birth is required'),
-  gender: z.string().min(1, 'Gender is required'),
-  nationality: z.string().min(1, 'Nationality is required'),
-  address: z.string().min(1, 'Address is required'),
+  dateOfBirth: z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      const error = value ? validateDateOfBirth(value) : null;
+      if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+    }),
+  gender: z.string().optional(),
+  nationality: z.string().optional(),
+  address: z.string().optional(),
 });
 
 export const emergencyInfoSchema = z.object({

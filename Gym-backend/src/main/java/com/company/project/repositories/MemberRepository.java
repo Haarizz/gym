@@ -57,6 +57,10 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     // All family members (adults and minors) linked to a given family head's business id
     List<Member> findByFamilyHeadId(String familyHeadId);
 
+    // Frozen members whose freeze end date has passed (auto-unfreeze candidates)
+    @Query("SELECT m FROM Member m WHERE LOWER(m.membershipStatus) = 'frozen' AND m.freezeEndDate IS NOT NULL AND m.freezeEndDate <= :now")
+    List<Member> findFrozenWithFreezeEndBefore(@Param("now") LocalDateTime now);
+
     // Members with overdue payment status
     @Query("SELECT m FROM Member m WHERE m.paymentStatus = 'overdue' ORDER BY m.nextPaymentDate ASC")
     List<Member> findOverdueMembers();

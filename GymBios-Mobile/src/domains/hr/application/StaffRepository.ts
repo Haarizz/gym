@@ -51,6 +51,8 @@ export interface StaffRepository {
     request: UpdateStaffRequest,
   ): Promise<Staff>;
 
+  updateStaffStatus(id: string, status: string): Promise<Staff>;
+
   deleteStaff(id: string): Promise<void>;
 
   getTargets(filters?: StaffTargetFilters): Promise<StaffTarget[]>;

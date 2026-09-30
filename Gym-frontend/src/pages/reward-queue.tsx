@@ -9,6 +9,7 @@ import {
   type RewardStats,
   type RewardStatus,
   type RewardType,
+  REWARD_PASS_TYPES,
 } from '../utils/supabase/reward-service';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -398,7 +399,9 @@ export function RewardQueue() {
               {!loading && rewards.map((reward) => {
                 const canApprove = reward.status === 'PENDING';
                 const canReject = reward.status === 'PENDING';
-                const canRedeem = reward.status === 'AVAILABLE' || reward.status === 'CLAIMED';
+                // Reward Passes are only spent at renewal/booking — "Mark Redeemed" would burn them unused.
+                const canRedeem = (reward.status === 'AVAILABLE' || reward.status === 'CLAIMED')
+                  && !REWARD_PASS_TYPES.includes(reward.rewardType);
                 const canCancel = !['REDEEMED', 'CANCELLED', 'EXPIRED'].includes(reward.status);
                 const noActions = !canApprove && !canReject && !canRedeem && !canCancel;
                 const pastDue = isPastExpiry(reward);

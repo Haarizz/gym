@@ -20,9 +20,12 @@ export interface BookingStatsData {
   attended: number;
 }
 
+export type SessionType = 'class' | 'pt' | 'facility';
+
 export interface AvailableClassData {
   classId: number;
   className: string;
+  type: SessionType;
   trainerName: string | null;
   date: string;
   startTime: string;
@@ -36,4 +39,6 @@ export interface AvailableClassData {
 
 export interface CreateMemberBookingRequest {
   classId: number;
+  // A Free PT / Class Reward Pass that pays for this booking.
+  rewardPassId?: number;
 }

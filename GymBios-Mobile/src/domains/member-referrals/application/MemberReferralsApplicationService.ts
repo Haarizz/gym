@@ -7,6 +7,7 @@ import {
   MyReferralClaim,
   MobileReferralStatus,
   MyReferralReward,
+  PassContext,
 } from '../domain/types';
 
 export class MemberReferralsApplicationService {
@@ -34,5 +35,9 @@ export class MemberReferralsApplicationService {
 
   async getMyRewards(): Promise<MyReferralReward[]> {
     return this.repository.getMyRewards();
+  }
+
+  async getMyPasses(context: PassContext): Promise<MyReferralReward[]> {
+    return this.repository.getMyPasses(context);
   }
 }

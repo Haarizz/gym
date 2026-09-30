@@ -6,6 +6,7 @@ import com.company.project.dto.RewardAuditLogResponseDTO;
 import com.company.project.dto.RewardStatsDTO;
 import com.company.project.entities.Coupon;
 import com.company.project.entities.ReferralReward;
+import com.company.project.enums.PassContext;
 import com.company.project.enums.RewardStatus;
 import com.company.project.enums.RewardType;
 import com.company.project.exceptions.EntityNotFoundException;
@@ -26,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -112,6 +114,35 @@ public class RewardService {
     public List<ReferralRewardResponseDTO> getByMember(String memberId) {
         return rewardRepository.findByMemberIdOrderByGeneratedDateDesc(memberId).stream()
                 .map(this::toDTO).collect(Collectors.toList());
+    }
+
+    /**
+     * Reward Passes the member can spend right now in the given context — what the
+     * renewal/booking screens offer. memberId may be the business id (MBR-...) or the
+     * numeric database id, since booking screens only carry the latter.
+     */
+    @Transactional(readOnly = true)
+    public List<ReferralRewardResponseDTO> getApplicablePasses(String memberId, PassContext context) {
+        String businessId = resolveBusinessMemberId(memberId);
+        if (businessId == null) return List.of();
+        List<RewardType> types = Arrays.stream(RewardType.values()).filter(context::accepts).toList();
+        LocalDate today = LocalDate.now();
+        return rewardRepository.findByMemberIdAndRewardTypeInAndStatusInOrderByExpiryDateAsc(
+                        businessId, types, List.of(RewardStatus.AVAILABLE, RewardStatus.CLAIMED)).stream()
+                .filter(r -> r.getExpiryDate() == null || !r.getExpiryDate().isBefore(today))
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    private String resolveBusinessMemberId(String memberId) {
+        if (memberId == null || memberId.isBlank()) return null;
+        if (memberRepository.findByMemberId(memberId).isPresent()) return memberId;
+        try {
+            return memberRepository.findById(Long.parseLong(memberId))
+                    .map(com.company.project.entities.Member::getMemberId).orElse(null);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @Transactional(readOnly = true)

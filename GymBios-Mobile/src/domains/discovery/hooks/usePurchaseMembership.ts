@@ -12,13 +12,15 @@ export const usePurchaseMembership = () => {
       branchId,
       planId,
       payment,
+      couponCode,
     }: {
       tenantSlug: string;
       branchId: number;
       planId: number;
       payment?: PaymentResult;
+      couponCode?: string;
     }) => {
-      return discoveryApi.purchaseMembership(tenantSlug, branchId, planId, payment);
+      return discoveryApi.purchaseMembership(tenantSlug, branchId, planId, payment, couponCode);
     },
     // Refresh the approval gate (a Cash/Credit/Mixed purchase flips the gym to
     // PENDING) and every screen showing the plan, e.g. the already-mounted home tab.

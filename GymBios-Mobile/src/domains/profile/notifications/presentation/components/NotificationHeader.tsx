@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Spacing } from '@/core/theme';
 
 interface NotificationHeaderProps {
+  title?: string;
   unreadCount: number;
   isRefreshing?: boolean;
   onClose: () => void;
@@ -11,6 +12,7 @@ interface NotificationHeaderProps {
 }
 
 export function NotificationHeader({
+  title = 'Notifications',
   unreadCount,
   isRefreshing = false,
   onClose,
@@ -31,7 +33,7 @@ export function NotificationHeader({
           </Pressable>
 
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Notifications</Text>
+            <Text style={styles.title}>{title}</Text>
             <Text style={styles.unreadSubtitle}>
               {unreadCount} {unreadCount === 1 ? 'unread' : 'unread'}
             </Text>

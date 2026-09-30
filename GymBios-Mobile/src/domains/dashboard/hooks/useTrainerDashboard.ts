@@ -14,7 +14,7 @@ const DEFAULT_TRAINER_DASHBOARD: TrainerDashboardData = {
     sessionsScheduled: 0,
     sessionsCompleted: 0,
     activeMembers: 0,
-    todayEarnings: '₹0',
+    todayEarnings: 0,
     monthlyTargetPercentage: 0,
   },
   todaySessions: [],

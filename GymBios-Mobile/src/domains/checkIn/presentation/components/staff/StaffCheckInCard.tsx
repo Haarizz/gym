@@ -66,7 +66,7 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
             >
               <Feather name="log-in" size={12} color={hasMembership ? "#ffffff" : "#a3b8b2"} />
               <Text style={[styles.actionText, styles.actionTextIn, !hasMembership && styles.actionTextInDisabled]}>
-                {hasMembership ? 'Check In' : 'No Plan'}
+                {hasMembership ? 'Check In' : 'No Subscription'}
               </Text>
             </Pressable>
           </>

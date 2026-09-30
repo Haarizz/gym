@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -27,7 +28,6 @@ interface CreditPaymentFormProps {
   onlinePaymentType: string;
   providerName: string;
   paymentDueDate?: Date | null;
-  currency?: string;
   errors?: Record<string, string>;
   onReceivedAmountChange: (val: string) => void;
   onReceivedViaChange: (val: PaymentMethod | '') => void;
@@ -61,7 +61,6 @@ export function CreditPaymentForm({
   onlinePaymentType,
   providerName,
   paymentDueDate,
-  currency = '₹',
   errors,
   onReceivedAmountChange,
   onReceivedViaChange,
@@ -96,7 +95,7 @@ export function CreditPaymentForm({
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={`Received Amount (${currency})`}
+            label={<>Received Amount (<CurrencyGlyph />)</>}
             value={receivedAmount}
             onChangeText={onReceivedAmountChange}
             keyboardType="decimal-pad"
@@ -227,7 +226,7 @@ export function CreditPaymentForm({
             Final Amount:
           </Typography>
           <Typography variant="bodySmallBold">
-            {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -235,7 +234,7 @@ export function CreditPaymentForm({
             Received Amount:
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: '#10B981' }}>
-            {currency} {(showReceivedVia ? numReceived : 0).toFixed(2)}
+            <CurrencyValue amount={(showReceivedVia ? numReceived : 0)} decimals={2} />
           </Typography>
         </View>
         <View style={styles.summaryRow}>
@@ -243,7 +242,7 @@ export function CreditPaymentForm({
             Remaining (On Credit):
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: '#B45309' }}>
-            {currency} {remaining.toFixed(2)}
+            <CurrencyValue amount={remaining} decimals={2} />
           </Typography>
         </View>
 
@@ -253,7 +252,7 @@ export function CreditPaymentForm({
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
                 Full Credit:{' '}
               </Typography>
-              Member will have the entire {currency} {finalAmount.toFixed(2)} on credit.
+              Member will have the entire <CurrencyValue amount={finalAmount} decimals={2} /> on credit.
             </Typography>
           </View>
         ) : (
@@ -262,7 +261,7 @@ export function CreditPaymentForm({
               <Typography variant="caption" style={{ fontWeight: '700', color: '#047857' }}>
                 Partial Received:{' '}
               </Typography>
-              {currency} {numReceived.toFixed(2)} received via {receivedVia || 'other method'}. Remaining {currency} {remaining.toFixed(2)} recorded on credit.
+              <CurrencyValue amount={numReceived} decimals={2} /> received via {receivedVia || 'other method'}. Remaining <CurrencyValue amount={remaining} decimals={2} /> recorded on credit.
             </Typography>
           </View>
         )}

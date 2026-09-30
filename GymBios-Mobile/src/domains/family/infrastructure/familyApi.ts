@@ -103,6 +103,24 @@ export const familyApi = {
     return response.data;
   },
 
+  /**
+   * An existing member switching onto a Family/Couple plan at their current gym —
+   * tenant-routed by X-Tenant-ID like any member endpoint, unlike purchase.
+   */
+  convertToFamilyPlan: async (
+    idempotencyKey: string,
+    fingerprint: string,
+    request: FamilyPurchaseRequest,
+  ): Promise<FamilyPurchaseResponse> => {
+    const response = await apiClient.post<FamilyPurchaseResponse>('/mobile/family/convert', request, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+        'Payload-Fingerprint': fingerprint,
+      },
+    });
+    return response.data;
+  },
+
   /** Claims every pending family invitation sent to the logged-in account's email. */
   claimPendingInvitations: async (): Promise<FamilyClaimResult[]> => {
     const response = await apiClient.post<FamilyClaimResult[]>(

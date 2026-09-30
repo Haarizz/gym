@@ -60,6 +60,10 @@ public class MemberRequestDTO {
     private String bankAccountCode;
     private String bankAccountName;
     private java.math.BigDecimal discountApplied;
+    // A shareable COUPON reward code used at signup. Same contract as a promo code:
+    // membershipFee is already net of the discount and discountApplied carries it —
+    // the server re-checks that discount against the coupon and spends the coupon.
+    private String couponCode;
 
     // Family plan fields
     private Boolean isFamilyHead;
@@ -208,6 +212,9 @@ public class MemberRequestDTO {
 
     public java.math.BigDecimal getDiscountApplied() { return discountApplied; }
     public void setDiscountApplied(java.math.BigDecimal discountApplied) { this.discountApplied = discountApplied; }
+
+    public String getCouponCode() { return couponCode; }
+    public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
 
     public Boolean getIsFamilyHead() { return isFamilyHead; }
     public void setIsFamilyHead(Boolean isFamilyHead) { this.isFamilyHead = isFamilyHead; }

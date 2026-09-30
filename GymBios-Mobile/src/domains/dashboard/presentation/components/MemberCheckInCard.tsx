@@ -166,7 +166,7 @@ export function MemberCheckInCard() {
         ]}
         accessibilityRole="button"
         accessibilityLabel={
-          !isActiveMembership ? 'Membership Required' : isCheckedIn ? 'Check Out of Gym' : 'Check In Now'
+          !isActiveMembership ? 'Subscription Required' : isCheckedIn ? 'Check Out of Gym' : 'Check In Now'
         }
       >
         {!isActiveMembership ? (
@@ -177,7 +177,7 @@ export function MemberCheckInCard() {
             </View>
             <View style={styles.textContainer}>
               <Text style={[styles.title, styles.textDisabled]}>Check In Locked</Text>
-              <Text style={[styles.subtitle, styles.textDisabled]}>Requires an active gym membership</Text>
+              <Text style={[styles.subtitle, styles.textDisabled]}>Requires an active gym subscription</Text>
             </View>
             <Feather name="chevron-right" size={20} color={BrandColors.textSecondary} />
           </View>

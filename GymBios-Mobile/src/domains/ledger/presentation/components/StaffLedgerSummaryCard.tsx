@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { EarningsSummary } from '../../domain/StaffLedgerData';
 
@@ -20,12 +21,12 @@ export function StaffLedgerSummaryCard({ summary }: StaffLedgerSummaryCardProps)
       <View style={styles.gridRow}>
         <View style={styles.gridCol}>
           <Text style={styles.label}>This Month</Text>
-          <Text style={styles.largeValue}>₹{(summary.thisMonth / 1000).toFixed(0)}K</Text>
+          <Text style={styles.largeValue}><CurrencyValue amount={summary.thisMonth} compact /></Text>
         </View>
 
         <View style={styles.gridCol}>
           <Text style={styles.label}>Last Month</Text>
-          <Text style={styles.mediumValue}>₹{(summary.lastMonth / 1000).toFixed(0)}K</Text>
+          <Text style={styles.mediumValue}><CurrencyValue amount={summary.lastMonth} compact /></Text>
         </View>
       </View>
 
@@ -34,13 +35,13 @@ export function StaffLedgerSummaryCard({ summary }: StaffLedgerSummaryCardProps)
       <View style={styles.gridRow}>
         <View style={styles.gridCol}>
           <Text style={styles.label}>Base Salary</Text>
-          <Text style={styles.smallValue}>₹{(summary.baseSalary / 1000).toFixed(0)}K</Text>
+          <Text style={styles.smallValue}><CurrencyValue amount={summary.baseSalary} compact /></Text>
         </View>
 
         <View style={styles.gridCol}>
           <Text style={styles.label}>Commission</Text>
           <Text style={[styles.smallValue, styles.commissionValue]}>
-            ₹{(summary.commission / 1000).toFixed(0)}K
+            <CurrencyValue amount={summary.commission} compact />
           </Text>
         </View>
       </View>

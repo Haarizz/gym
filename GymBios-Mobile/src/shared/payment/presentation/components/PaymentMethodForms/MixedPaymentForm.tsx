@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
+import { CurrencyGlyph, CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -20,7 +21,6 @@ import type { PaymentMethod, PaymentSplitRow } from '@/shared/payment/types';
 interface MixedPaymentFormProps {
   finalAmount: number;
   rows: PaymentSplitRow[];
-  currency?: string;
   errors?: Record<string, string>;
   onRowsChange: (rows: PaymentSplitRow[]) => void;
 }
@@ -36,7 +36,6 @@ const SPLIT_METHOD_OPTIONS = [
 export function MixedPaymentForm({
   finalAmount,
   rows,
-  currency = '₹',
   errors,
   onRowsChange,
 }: MixedPaymentFormProps) {
@@ -123,7 +122,7 @@ export function MixedPaymentForm({
 
             <View style={styles.flex1}>
               <Input
-                label={`Amount (${currency}) *`}
+                label={<>Amount (<CurrencyGlyph />) *</>}
                 value={row.amount > 0 ? String(row.amount) : ''}
                 onChangeText={(txt) => {
                   const num = parseFloat(txt);
@@ -256,7 +255,7 @@ export function MixedPaymentForm({
             variant="bodySmallBold"
             style={{ color: isValid ? '#10B981' : theme.error }}
           >
-            {currency} {splitTotal.toFixed(2)} / {currency} {finalAmount.toFixed(2)}
+            <CurrencyValue amount={splitTotal} decimals={2} /> / <CurrencyValue amount={finalAmount} decimals={2} />
           </Typography>
         </View>
 
@@ -265,9 +264,8 @@ export function MixedPaymentForm({
             variant="caption"
             style={{ color: theme.error, marginTop: 4 }}
           >
-            {difference > 0
-              ? `Split amounts exceed final amount by ${currency} ${difference.toFixed(2)}`
-              : `Split amounts fall short by ${currency} ${Math.abs(difference).toFixed(2)}`}
+            {difference > 0 ? 'Split amounts exceed final amount by ' : 'Split amounts fall short by '}
+            <CurrencyValue amount={Math.abs(difference)} decimals={2} />
           </Typography>
         ) : (
           <Typography

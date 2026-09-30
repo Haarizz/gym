@@ -47,6 +47,10 @@ public class Booking extends BaseEntity implements BranchAware {
     @Column(name = "payment_status")
     private String paymentStatus;
 
+    // The Reward Pass (ReferralReward id) that paid for this booking, if any.
+    @Column(name = "reward_id")
+    private Long rewardId;
+
     public Booking() {}
 
     public Long getId() { return id; }
@@ -81,6 +85,9 @@ public class Booking extends BaseEntity implements BranchAware {
 
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    public Long getRewardId() { return rewardId; }
+    public void setRewardId(Long rewardId) { this.rewardId = rewardId; }
 
     @Column(name = "branch_id")
     private Long branchId;
