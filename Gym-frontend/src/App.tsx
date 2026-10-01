@@ -1126,7 +1126,7 @@ export default function App() {
       <Route path="/member-history-analytics" element={<MemberHistoryAnalytics onNavigate={handleNavClick} memberId={navigationParams.memberId} />} />
       <Route path="/check-in" element={<CheckIn />} />
       <Route path="/training-streams" element={<TrainingStreams onNavigate={handleNavClick} />} />
-      <Route path="/facilities" element={<Facilities onNavigate={handleNavClick} />} />
+      <Route path="/facilities" element={<Navigate to="/manage-plans?tab=facilities" replace />} />
       <Route path="/reports" element={<ReportsAnalytics onNavigate={handleNavClick} />} />
       <Route path="/custom-reports" element={<CustomReports onNavigate={handleNavClick} />} />
       <Route path="/member-addons" element={<MemberAddons onNavigate={handleNavClick} />} />

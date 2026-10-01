@@ -133,6 +133,57 @@ public class MembershipFreezeService {
                 autoUnfreeze, reason);
     }
 
+    /**
+     * Web staff view of a member's freeze allowance in the current plan period.
+     * camelCase Map keys (the global SNAKE_CASE strategy doesn't touch Map keys).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getAllowanceView(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        FreezeAllowance a = getAllowance(member, findPlan(member));
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("planName", member.getMembershipPlan());
+        m.put("maxDays", a.maxDays());
+        m.put("usedDays", a.usedDays());
+        m.put("remainingDays", a.remainingDays());
+        m.put("maxOccurrences", a.maxOccurrences());
+        m.put("usedOccurrences", a.usedOccurrences());
+        m.put("remainingOccurrences", a.remainingOccurrences());
+        m.put("freeDays", a.freeDays());
+        m.put("freeDaysRemaining", a.freeDaysRemaining());
+        m.put("chargePerExtraDay", a.chargePerExtraDay());
+        m.put("autoUnfreeze", a.autoUnfreeze());
+        m.put("canFreeze", a.canFreeze());
+        m.put("unavailableMessage", a.unavailableReason() == null ? null : unavailableMessage(a.unavailableReason(), a));
+        return m;
+    }
+
+    /** Every freeze recorded for a member, newest first (web Freeze History). */
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getHistoryView(Long memberId) {
+        memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        for (MembershipFreeze f : freezeRepository.findByMemberDbIdOrderByFreezeStartDesc(memberId)) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", f.getId());
+            m.put("planName", f.getPlanName());
+            m.put("freezeStart", f.getFreezeStart() != null ? f.getFreezeStart().toLocalDate().toString() : null);
+            m.put("plannedEnd", f.getPlannedEnd() != null ? f.getPlannedEnd().toLocalDate().toString() : null);
+            m.put("endedAt", f.getEndedAt() != null ? f.getEndedAt().toLocalDate().toString() : null);
+            m.put("days", daysUsed(f));
+            m.put("freeDays", f.getFreeDaysApplied());
+            m.put("chargedDays", f.getChargedDays());
+            m.put("chargeAmount", f.getChargeAmount() != null ? f.getChargeAmount() : BigDecimal.ZERO);
+            m.put("reason", f.getReason());
+            m.put("source", f.getSource());
+            m.put("status", f.getEndedAt() == null ? "Active" : "Completed");
+            rows.add(m);
+        }
+        return rows;
+    }
+
     public static String unavailableMessage(UnavailableReason reason, FreezeAllowance allowance) {
         return switch (reason) {
             case PLAN_DOES_NOT_ALLOW -> "Your membership plan does not allow freezing.";

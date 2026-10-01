@@ -1,6 +1,7 @@
 import type { Receipt } from './supabase/receipts-service';
 import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, COMPANY_HEADER_CSS, type CompanyDetails } from './company-details';
 import { getVatRate, splitVatInclusive, DEFAULT_VAT_RATE } from './tax';
+import { getReceiptColors, receiptColorsCss, DEFAULT_RECEIPT_COLORS, type ReceiptColors } from './receipt-colors';
 
 export interface ReceiptPrintItem {
   description: string;
@@ -55,7 +56,7 @@ function escapeHtml(value: string): string {
 // The exact receipt UI approved for print — structure, class names and CSS
 // values transcribed from the demo mockup so every printed/downloaded
 // receipt matches it pixel for pixel, just with real data filled in.
-export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDetails): string {
+export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDetails, colors: ReceiptColors = DEFAULT_RECEIPT_COLORS): string {
   const { currencyCode } = data;
 
   const rows = data.items.map(item => `
@@ -77,6 +78,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        ${receiptColorsCss(colors)}
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
         .invoice {
@@ -96,35 +98,35 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
         }
         ${COMPANY_HEADER_CSS}
         .receipt-title { text-align: center; font-size: 28px; color: #333; margin: 30px 0; font-weight: 600; letter-spacing: 1px; }
-        .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .receipt-info { display: flex; justify-content: space-between; margin-bottom: 30px; padding: 20px; background: var(--rc-panel, #f9fafb); border-radius: 6px; }
         .info-block { flex: 1; }
         .info-label { color: #888; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
         .info-value { color: #333; font-size: 14px; font-weight: 600; }
-        .receipt-number { color: #327F74; font-size: 18px; font-weight: bold; }
+        .receipt-number { color: var(--rc-primary, #327F74); font-size: 18px; font-weight: bold; }
         .invoice-number { color: #888; font-size: 11px; margin-top: 3px; }
         .status-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #166534; }
-        .customer-section { margin-bottom: 30px; padding: 20px; background: #f9fafb; border-left: 4px solid #327F74; border-radius: 6px; }
-        .section-title { color: #327F74; font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px; }
+        .customer-section { margin-bottom: 30px; padding: 20px; background: var(--rc-panel, #f9fafb); border-left: 4px solid var(--rc-primary, #327F74); border-radius: 6px; }
+        .section-title { color: var(--rc-primary, #327F74); font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px; }
         .customer-name { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 5px; }
         .customer-detail { color: #666; font-size: 14px; margin-bottom: 3px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
-        .items-table thead { background: #327F74; color: white; }
+        .items-table thead { background: var(--rc-primary, #327F74); color: white; }
         .items-table th { padding: 15px; text-align: left; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
         .items-table td { padding: 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; color: #333; }
-        .items-table tbody tr:hover { background: #f9fafb; }
-        .amount-cell { font-weight: 600; color: #327F74; }
-        .totals-section { margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 6px; }
+        .items-table tbody tr:hover { background: var(--rc-panel, #f9fafb); }
+        .amount-cell { font-weight: 600; color: var(--rc-primary, #327F74); }
+        .totals-section { margin-top: 30px; padding: 20px; background: var(--rc-panel, #f9fafb); border-radius: 6px; }
         .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 14px; }
         .total-row.normal { color: #666; }
         .total-row.discount { color: #E63946; font-weight: 600; }
         .total-row.gross { color: #333; font-weight: 600; padding-top: 10px; border-top: 1px solid #e5e7eb; }
         .total-row.vat { color: #666; }
-        .total-row.grand-total { font-size: 20px; font-weight: bold; color: #327F74; padding-top: 15px; margin-top: 10px; border-top: 2px solid #327F74; }
-        .payment-info { margin: 30px 0; padding: 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; }
+        .total-row.grand-total { font-size: 20px; font-weight: bold; color: var(--rc-primary, #327F74); padding-top: 15px; margin-top: 10px; border-top: 2px solid var(--rc-primary, #327F74); }
+        .payment-info { margin: 30px 0; padding: 20px; background: var(--rc-highlight, #fef3c7); border-left: 4px solid var(--rc-highlight-border, #f59e0b); border-radius: 6px; }
         .payment-method { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #333; }
         .payment-label { font-weight: 600; color: #78350f; }
         .footer { margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center; }
-        .thank-you { font-size: 18px; color: #327F74; font-weight: 600; margin-bottom: 15px; }
+        .thank-you { font-size: 18px; color: var(--rc-primary, #327F74); font-weight: 600; margin-bottom: 15px; }
         .footer-note { color: #888; font-size: 12px; line-height: 1.6; margin-bottom: 10px; }
         .contact-info { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 12px; }
         .print-info { margin-top: 30px; padding: 15px; background: #f3f4f6; border-radius: 6px; font-size: 11px; color: #666; text-align: center; }
@@ -215,7 +217,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
             <div class="total-row grand-total"><span>Invoice Amount:</span><span>${currencyCode} ${data.invoiceAmount.toFixed(2)}</span></div>
             <div class="total-row normal" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"><span>TOTAL PAID:</span><span>${currencyCode} ${data.totalPaid.toFixed(2)}</span></div>
             ${data.balanceDue ? `<div class="total-row discount"><span>BALANCE DUE:</span><span>${currencyCode} ${data.balanceDue.toFixed(2)}</span></div>` : ""}
-            ${data.validity ? `<br><span style="color: #327F74; font-size: 12px; font-weight: 600;">Subscription validity: from ${escapeHtml(data.validity.from)} To: ${escapeHtml(data.validity.to)}</span>` : ""}
+            ${data.validity ? `<br><span style="color: var(--rc-primary, #327F74); font-size: 12px; font-weight: 600;">Subscription validity: from ${escapeHtml(data.validity.from)} To: ${escapeHtml(data.validity.to)}</span>` : ""}
         </div>
         <div class="payment-info">
             <div class="payment-method"><span class="payment-label">Payment Method:</span><span>${escapeHtml(data.paymentMethod)}</span></div>
@@ -241,7 +243,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
 // vatRatePercent defaults to the standard UAE rate but should be the actual
 // configured rate (see getVatRate()) so the printed breakdown always matches
 // what FinancialEventService posted to the ledger for this same payment.
-export function buildReceiptInvoiceHtml(receipt: Receipt, currencyCode: string, company: CompanyDetails, vatRatePercent: number = DEFAULT_VAT_RATE): string {
+export function buildReceiptInvoiceHtml(receipt: Receipt, currencyCode: string, company: CompanyDetails, vatRatePercent: number = DEFAULT_VAT_RATE, colors: ReceiptColors = DEFAULT_RECEIPT_COLORS): string {
   const totalAmt   = Number(receipt.amount);
   const paidAmt    = Number(receipt.paid_amount ?? totalAmt);
   const balanceDue = Number(receipt.due_amount ?? 0);
@@ -289,7 +291,7 @@ export function buildReceiptInvoiceHtml(receipt: Receipt, currencyCode: string, 
     } : undefined,
   };
 
-  return buildFullReceiptHtml(data, company);
+  return buildFullReceiptHtml(data, company, colors);
 }
 
 // Guards against a stray double-click (or a duplicate event firing before the
@@ -304,8 +306,8 @@ export async function downloadReceiptInvoice(receipt: Receipt, currencyCode: str
   printInFlight = true;
   try {
     const win = window.open("", "_blank", "width=820,height=900");
-    const [company, vatRate] = await Promise.all([getCompanyDetails(), getVatRate()]);
-    const html = buildReceiptInvoiceHtml(receipt, currencyCode, company, vatRate);
+    const [company, vatRate, colors] = await Promise.all([getCompanyDetails(), getVatRate(), getReceiptColors()]);
+    const html = buildReceiptInvoiceHtml(receipt, currencyCode, company, vatRate, colors);
     if (win) { win.document.write(html); win.document.close(); }
   } finally {
     printInFlight = false;

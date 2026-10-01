@@ -1,0 +1,290 @@
+/* Create / Edit Promotion wizard. Layout lives here rather than in Tailwind classes:
+   the app ships a frozen Tailwind build, so most sizing/breakpoint utilities don't exist.
+   Unlayered module CSS also beats the Tailwind utilities baked into DialogContent. */
+
+.dialog {
+  /* The app body runs at zoom 0.9, so 1000px renders ~900px wide on screen */
+  width: min(92vw, 1000px);
+  max-width: none;
+  /* % of the viewport (the dialog is position: fixed). vh units get scaled twice by the
+     app-wide body zoom and would leave the modal far shorter than intended. */
+  max-height: 90%;
+  padding: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.subtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+
+/* ── Step navigation ── */
+
+.stepsBar {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepItem {
+  min-width: 0;
+}
+
+.step {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.step[data-state="current"] {
+  background: #fff;
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.step[data-state="complete"] {
+  color: #0f172a;
+}
+
+.step[data-state="complete"]:hover,
+.step[data-state="available"]:hover {
+  background: #fff;
+}
+
+.step[data-state="locked"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.stepBadge {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted-foreground);
+}
+
+.step[data-state="current"] .stepBadge {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.step[data-state="complete"] .stepBadge {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
+
+.stepLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Scrollable body ── */
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sectionHint {
+  margin: 2px 0 16px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 18px;
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.subsection {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 16px;
+  margin-top: 8px;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.checkRow label {
+  font-weight: 400;
+}
+
+.stackedChecks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.inlineError {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--destructive);
+}
+
+/* ── Footer ── */
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+
+.footerMeta {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .dialog {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    border: 0;
+  }
+
+  .header,
+  .stepsBar,
+  .body,
+  .footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .steps {
+    gap: 4px;
+  }
+
+  .step {
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 2px;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .stepLabel {
+    max-width: 100%;
+  }
+
+  .footerMeta {
+    display: none;
+  }
+
+  .footerActions {
+    width: 100%;
+  }
+
+  .footerActions > * {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}

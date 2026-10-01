@@ -79,4 +79,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT a FROM Attendance a WHERE a.status = 'active' AND a.checkInTime < :before")
     List<Attendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
+
+    // Check-in timestamps in [start, end) — web dashboard "Attendance by Time Slot"
+    @Query("SELECT a.checkInTime FROM Attendance a WHERE a.checkInTime >= :start AND a.checkInTime < :end")
+    List<LocalDateTime> findCheckInTimesBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

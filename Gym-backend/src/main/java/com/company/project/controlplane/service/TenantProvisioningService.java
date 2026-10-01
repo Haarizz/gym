@@ -507,6 +507,9 @@ public class TenantProvisioningService {
                         // an actual ordering dependency violation.
                         .outOfOrder(true)
                         .load();
+                // See TenantMigrationRunner: realign checksums of migrations edited after
+                // this tenant ran them (never re-executes SQL), or migrate() refuses to run.
+                com.company.project.controlplane.migration.FlywayHistoryInspector.repairIfSafe(flyway, tenantDs);
                 int applied = flyway.migrate().migrationsExecuted;
                 log.info("Tenant migration catch-up: slug='{}' applied={}", slug, applied);
                 results.add(new TenantMigrationResult(slug, true, applied + " migration(s) applied", null));

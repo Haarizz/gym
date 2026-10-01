@@ -57,6 +57,9 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
+import { RenewalTransactionHistory } from "../components/members/RenewalTransactionHistory";
+import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
+import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
@@ -257,6 +260,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       setFamilyRenewalHead(null);
       loadMembers();
       loadStatusCounts();
+      setRenewalHistoryKey((k) => k + 1);
     } catch (e: any) {
       toast.error('Failed to renew family', { description: e?.message || 'Please try again.' });
     } finally {
@@ -266,6 +270,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Renewals & Upgrades states
   const [renewalSearchTerm, setRenewalSearchTerm] = useState("");
+  // Bumped after a renewal/upgrade is processed so the history table reloads
+  const [renewalHistoryKey, setRenewalHistoryKey] = useState(0);
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMemberForRenewal, setSelectedMemberForRenewal] = useState<any>(null);
@@ -496,7 +502,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       const filters: { transactionType?: string; status?: string } = {};
       if (transactionType !== "all") {
         const typeMap: Record<string, string> = {
-          "New": "Membership",
+          "New": "New",
           "Renewal": "Renewal",
           "Add-on": "Add-on",
           "Single Day": "Daily Entry",
@@ -504,12 +510,25 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         filters.transactionType = typeMap[transactionType] || transactionType;
       }
 
-      const res = await receiptsService.getReceipts(filters, { limit: 500 });
+      const res = await receiptsService.getReceipts(filters, { limit: 2000 });
       let receipts = res.receipts;
 
       // Apply date range filter
       const today = new Date();
-      if (dateRange === "last-7-days") {
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const inDay = (r: { transaction_date?: string }, day: Date) => {
+        if (!r.transaction_date) return false;
+        const d = new Date(r.transaction_date);
+        return d >= day && d < new Date(day.getTime() + 24 * 60 * 60 * 1000);
+      };
+      if (dateRange === "today") {
+        receipts = receipts.filter(r => inDay(r, startOfToday));
+      } else if (dateRange === "yesterday") {
+        receipts = receipts.filter(r => inDay(r, new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000)));
+      } else if (dateRange === "last-12-months") {
+        const cutoff = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+        receipts = receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff);
+      } else if (dateRange === "last-7-days") {
         const cutoff = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
         receipts = receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff);
       } else if (dateRange === "last-30-days") {
@@ -522,8 +541,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         receipts = receipts.filter(r => {
           if (!r.transaction_date) return false;
           const d = new Date(r.transaction_date);
-          return d >= customDateFrom && d <= customDateTo;
+          // The "to" day is inclusive
+          return d >= customDateFrom && d < new Date(customDateTo.getFullYear(), customDateTo.getMonth(), customDateTo.getDate() + 1);
         });
+      }
+
+      // Apply membership type filter
+      if (membershipType !== "all") {
+        receipts = receipts.filter(r => (r.membership_type || "").toLowerCase() === membershipType.toLowerCase());
       }
 
       // Apply payment mode filter
@@ -583,6 +608,24 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     totalDue: 0,
   });
 
+  const isLifecycleReport = reportType !== "membership";
+  const reportTypeSelectEl = (
+    <div>
+      <Label className="text-sm mb-2 block">Report Type</Label>
+      <Select value={reportType} onValueChange={(v) => { setReportType(v); setReportGenerated(false); }}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="membership">Membership Transactions</SelectItem>
+          {LIFECYCLE_REPORT_TYPES.map(t => (
+            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   // Pagination for report
   const reportStartIndex = (reportPage - 1) * reportPageSize;
   const reportEndIndex = reportStartIndex + reportPageSize;
@@ -591,7 +634,36 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Handle export
   const handleExport = (format: string) => {
-    toast.success(`Exporting as ${format.toUpperCase()}`, {
+    if (reportData.length === 0) {
+      toast.error('Nothing to export');
+      return;
+    }
+    if (format === 'pdf') {
+      // Print-friendly copy of the results; the browser's print dialog saves it as PDF
+      const esc = (v: unknown) => String(v ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+      const head = ['#', 'Doc. Date', 'Doc. No.', 'Member ID', 'Member Name', 'Mobile', 'Membership Type', 'Transaction Type', 'Plan', 'Amount', 'Mode', 'Cash', 'Card', 'Due', 'Due Date'];
+      const body = reportData.map((r: any, i: number) => [i + 1, r.docDate, r.docNo, r.memberId, r.memberName, r.mobile, r.membershipType, r.transactionType, r.plan, r.amount, r.mode, r.cash, r.card, r.due, r.dueDate]);
+      const win = window.open('', '_blank', 'width=1100,height=800');
+      if (win) {
+        win.document.write(`<!doctype html><html><head><title>Membership Report</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:16px}h2{margin:0 0 8px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}th{background:#f1f5f9}</style></head><body><h2>Membership Report</h2><p>Total records: ${reportData.length} · Total amount: ${currencyCode} ${reportSummary.totalAmount.toLocaleString()} · Cash: ${reportSummary.totalCash.toLocaleString()} · Card: ${reportSummary.totalCard.toLocaleString()} · Due: ${reportSummary.totalDue.toLocaleString()}</p><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+        win.document.close();
+      }
+      return;
+    }
+    const cell = (v: unknown) => {
+      const str = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const header = ['Doc. Date', 'Doc. No.', 'Member ID', 'Member Name', 'Mobile', 'Membership Type', 'Transaction Type', 'Plan', `Amount (${currencyCode})`, 'Mode', 'Cash', 'Card', 'Due', 'Due Date'];
+    const lines = reportData.map((r: any) => [r.docDate, r.docNo, r.memberId, r.memberName, r.mobile, r.membershipType, r.transactionType, r.plan, r.amount, r.mode, r.cash, r.card, r.due, r.dueDate]);
+    const csv = [header, ...lines].map(l => l.map(cell).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `membership-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${reportData.length} transactions`, {
       description: 'Your report will be downloaded shortly.',
     });
   };
@@ -1008,6 +1080,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       // Refresh member list
       loadMembers();
       loadStatusCounts();
+      setRenewalHistoryKey((k) => k + 1);
     } catch (err: any) {
       toast.error('Failed to process renewal. Please try again.', { description: err?.message });
       return;
@@ -2359,6 +2432,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             </DialogContent>
           </Dialog>
 
+          {/* Renewal & Upgrade Transaction History */}
+          <RenewalTransactionHistory refreshKey={renewalHistoryKey} />
+
           {/* Empty State */}
           {!selectedMemberForRenewal && (
             <Card className="border-primary/10 shadow-md">
@@ -2476,6 +2552,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Freeze / Unfreeze Transaction History */}
+              <FreezeTransactionHistory />
             </CardContent>
           </Card>
         </TabsContent>
@@ -2495,26 +2574,23 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           <div className="flex items-center space-x-3 mb-6">
             <div>
               <h2 className="text-2xl font-bold">Membership Report</h2>
-              <p className="text-sm text-muted-foreground">Generate comprehensive membership transaction reports</p>
+              <p className="text-sm text-muted-foreground">Track transactions, renewals, expiries, new joiners and freezes</p>
             </div>
           </div>
 
+          {isLifecycleReport ? (
+            <MembershipLifecycleReport
+              reportType={reportType as LifecycleReportType}
+              reportTypeSelect={reportTypeSelectEl}
+            />
+          ) : (
+          <>
           {/* Report Filters Panel */}
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 {/* Report Type */}
-                <div>
-                  <Label className="text-sm mb-2 block">Report Type</Label>
-                  <Select value={reportType} onValueChange={setReportType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="membership">Membership Report</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {reportTypeSelectEl}
 
                 {/* Date Range */}
                 <div>
@@ -2705,7 +2781,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <span className="font-bold ml-1">{reportSummary.totalRecords}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm px-4 border-l shrink-0">
-                    <DollarSign className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                    <CurrencyGlyph className="text-green-600 shrink-0" />
                     <span className="text-muted-foreground whitespace-nowrap">Total Amount</span>
                     <span className="font-bold text-green-600 ml-1"><CurrencyGlyph /> {reportSummary.totalAmount.toLocaleString()}</span>
                   </div>
@@ -2868,6 +2944,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 </p>
               </CardContent>
             </Card>
+          )}
+          </>
           )}
 
           {/* Schedule Report Modal */}

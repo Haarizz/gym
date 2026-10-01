@@ -1,5 +1,8 @@
 package com.company.project.dto.dashboard;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,6 +24,8 @@ public class DashboardDTOs {
         public void setData(T data) { this.data = data; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class KPIData {
         private BigDecimal revenue;
         private double revenueChange;
@@ -29,6 +34,7 @@ public class DashboardDTOs {
         private long todayAttendance;
         private double attendanceChange;
         private long availableStaff;
+        private long clockedInStaff;
 
         public BigDecimal getRevenue() { return revenue; }
         public void setRevenue(BigDecimal revenue) { this.revenue = revenue; }
@@ -44,6 +50,8 @@ public class DashboardDTOs {
         public void setAttendanceChange(double attendanceChange) { this.attendanceChange = attendanceChange; }
         public long getAvailableStaff() { return availableStaff; }
         public void setAvailableStaff(long availableStaff) { this.availableStaff = availableStaff; }
+        public long getClockedInStaff() { return clockedInStaff; }
+        public void setClockedInStaff(long clockedInStaff) { this.clockedInStaff = clockedInStaff; }
     }
 
     public static class RevenueDataPoint {
@@ -65,6 +73,8 @@ public class DashboardDTOs {
         public void setTarget(BigDecimal target) { this.target = target; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class MembershipDistribution {
         private String name;
         private long value;
@@ -88,6 +98,8 @@ public class DashboardDTOs {
         public void setAmount(BigDecimal amount) { this.amount = amount; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class ClassAttendance {
         @JsonProperty("class")
         private String className;
@@ -112,6 +124,8 @@ public class DashboardDTOs {
         public void setPercentage(int percentage) { this.percentage = percentage; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class DashboardMember {
         private String id;
         private String name;
@@ -137,6 +151,8 @@ public class DashboardDTOs {
         public void setStatus(String status) { this.status = status; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class SalesPipeline {
         private String status;
         private long count;
@@ -156,6 +172,8 @@ public class DashboardDTOs {
         public void setColor(String color) { this.color = color; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class PendingTask {
         private String id;
         private String leadName;
@@ -178,6 +196,8 @@ public class DashboardDTOs {
         public void setSubject(String subject) { this.subject = subject; }
     }
 
+    // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)
+    @JsonNaming(PropertyNamingStrategies.LowerCamelCaseStrategy.class)
     public static class MemberChurnData {
         private String month;
         private int newMembers;

@@ -17,4 +17,6 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     List<Staff> findTop5ByOrderByCreatedAtDesc();
     long countByRole(String role);
     long countByRoleContainingIgnoreCase(String role);
+
+    List<Staff> findByStatusIgnoreCaseOrderByNameAsc(String status);
 }

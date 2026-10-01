@@ -21,6 +21,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
 
     List<Expense> findByDateBetweenOrderByDateDesc(LocalDate from, LocalDate to);
 
+    // Expenses that count as spent (approved or paid) dated in [from, to] — web Revenue Dashboard
+    @Query("SELECT e FROM Expense e WHERE LOWER(e.status) IN ('approved', 'paid') AND e.date >= :from AND e.date <= :to")
+    List<Expense> findSpentBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
     @Query("SELECT COALESCE(SUM(e.totalAmount), 0) FROM Expense e WHERE e.status = 'APPROVED'")
     BigDecimal sumApprovedTotal();
 
