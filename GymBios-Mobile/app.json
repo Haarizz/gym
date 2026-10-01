@@ -4,11 +4,11 @@
     "slug": "GymBios-Mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "gymbiosmobile",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/app-icon.png",
       "associatedDomains": [
         "applinks:TODO_PRODUCTION_DOMAIN"
       ],
@@ -17,9 +17,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#3D8078",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/app-icon-foreground.png",
+        "monochromeImage": "./assets/images/app-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anandu389.GymBiosMobile",
@@ -51,9 +50,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A3F34",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#327f74"
         }
       ],
       "expo-secure-store",

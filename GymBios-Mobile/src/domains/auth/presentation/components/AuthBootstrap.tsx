@@ -1,13 +1,10 @@
 import { useSegments, useRouter } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { Loader } from '@/shared/components';
 import { ROLE_SELECTION_HREF, MEMBER_AUTH_HREF } from '../navigation/routes';
 
 import type { createUseRestoreSession } from '../hooks/useAuthFlow';
-
-SplashScreen.preventAutoHideAsync();
 
 interface AuthBootstrapProps {
   useRestoreSession: ReturnType<typeof createUseRestoreSession>;
@@ -23,12 +20,6 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
   useEffect(() => {
     restore();
   }, [restore]);
-
-  useEffect(() => {
-    if (isHydrated) {
-      SplashScreen.hideAsync();
-    }
-  }, [isHydrated]);
 
   useEffect(() => {
     if (!isHydrated || isRestoring) return;

@@ -1,12 +1,13 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { Typography } from '@/shared/components';
 
 const SPLASH_DURATION_MS = 2500;
+const LOGO = require('../../../../../assets/icons/dumbbell-icon-white-circle.svg');
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -40,7 +41,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     <LinearGradient colors={[BrandColors.teal, BrandColors.tealDark]} style={styles.container}>
       <Animated.View style={[styles.logoWrap, { transform: [{ scale: logoScale }] }]}>
         <View style={styles.logoCircle}>
-          <Feather name="activity" size={48} color={BrandColors.teal} />
+          <Image source={LOGO} style={styles.logo} contentFit="contain" />
         </View>
       </Animated.View>
 
@@ -84,6 +85,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     color: '#ffffff',

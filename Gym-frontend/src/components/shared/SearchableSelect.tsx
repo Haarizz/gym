@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
+import React, { useId, useState } from "react";
+import { Check, ChevronDown, ChevronsUpDown, Plus, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { overlaySize } from "../ui/overlay-root";
@@ -30,6 +30,10 @@ export function SearchableSelect({
   ariaDescribedBy,
   ariaLabel,
   onClose,
+  searchable = true,
+  chevron = "up-down",
+  className,
+  contentClassName,
 }: {
   value: string;
   options: SearchableOption[];
@@ -50,9 +54,16 @@ export function SearchableSelect({
   ariaLabel?: string;
   /** Fires whenever the list closes (selection, Escape, click outside) — use it to mark the field touched */
   onClose?: () => void;
+  /** false hides the search box (short lists); arrow keys/Enter still work */
+  searchable?: boolean;
+  chevron?: "up-down" | "down";
+  className?: string;
+  contentClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const listId = useId();
+  const itemValue = (o: SearchableOption) => `${o.label} ${o.hint ?? ""} ${o.value}`.trim();
   const selected = options.find(o => o.value === value);
   const typed = search.trim();
   const exactMatch = typed && options.some(o => o.label.toLowerCase() === typed.toLowerCase());
@@ -76,6 +87,7 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           aria-haspopup="listbox"
+          aria-controls={open ? listId : undefined}
           aria-invalid={invalid || undefined}
           aria-describedby={ariaDescribedBy}
           aria-label={ariaLabel}
@@ -87,7 +99,7 @@ export function SearchableSelect({
               onChange("");
             }
           }}
-          className="w-full justify-between font-normal"
+          className={cn("w-full justify-between font-normal", className)}
           style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(230, 57, 70, 0.15)" } : undefined}
         >
           <span className={cn("truncate", !selected && "text-muted-foreground")}>
@@ -104,13 +116,25 @@ export function SearchableSelect({
                 <X className="h-4 w-4" />
               </span>
             )}
-            <ChevronsUpDown className="h-4 w-4 opacity-50" />
+            {chevron === "down"
+              ? <ChevronDown className="h-4 w-4 opacity-50" aria-hidden="true" />
+              : <ChevronsUpDown className="h-4 w-4 opacity-50" />}
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent style={{ width: overlaySize("--radix-popover-trigger-width") }} className="p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
+      <PopoverContent
+        style={{ width: overlaySize("--radix-popover-trigger-width") }}
+        className={cn("p-0", contentClassName)}
+        align="start"
+        onOpenAutoFocus={e => {
+          // No search box to focus — focus the list itself so arrow keys/Enter work.
+          if (searchable) return;
+          e.preventDefault();
+          document.getElementById(listId)?.focus();
+        }}
+      >
+        <Command id={listId} tabIndex={-1} defaultValue={selected ? itemValue(selected) : undefined} className="outline-none">
+          {searchable && <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />}
           <CommandList>
             {loading ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Loading...</div>
@@ -121,7 +145,7 @@ export function SearchableSelect({
               {options.map(o => (
                 <CommandItem
                   key={o.value}
-                  value={`${o.label} ${o.hint ?? ""} ${o.value}`}
+                  value={itemValue(o)}
                   onSelect={() => { onChange(o.value); close(); }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", value === o.value ? "opacity-100" : "opacity-0")} />

@@ -1,0 +1,733 @@
+/* Public lead form (/f/{formKey}). Standalone page, light theme only.
+   Unlayered module rules win over the layered Tailwind utilities on the shared
+   ui/* components, so those can be restyled here through className. */
+
+.page {
+  --lf-ink: #0f172a;
+  --lf-text: #334155;
+  --lf-muted: #64748b;
+  --lf-placeholder: #8c98a9;
+  --lf-line: rgba(15, 23, 42, 0.12);
+  --lf-line-strong: rgba(15, 23, 42, 0.22);
+  --lf-field: rgba(255, 255, 255, 0.88);
+  --lf-brand: var(--primary, #2b7a78);
+  --lf-brand-soft: rgba(43, 122, 120, 0.14);
+  --lf-danger: #c62a37;
+  --lf-danger-soft: rgba(230, 57, 70, 0.12);
+  --lf-radius-field: 12px;
+  --lf-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(24px, calc(env(safe-area-inset-bottom) + 16px))
+    max(16px, env(safe-area-inset-left));
+  color: var(--lf-text);
+  background: #f3f6f6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft brand-tinted light behind the glass; fixed so it doesn't scroll away. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 32rem at 8% -8%, rgba(43, 122, 120, 0.2), transparent 62%),
+    radial-gradient(36rem 30rem at 100% 8%, rgba(94, 196, 186, 0.16), transparent 60%),
+    radial-gradient(44rem 30rem at 50% 112%, rgba(43, 122, 120, 0.1), transparent 60%),
+    radial-gradient(30rem 24rem at 0% 90%, rgba(245, 190, 110, 0.08), transparent 60%);
+}
+
+.shell {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+}
+
+.shellNarrow {
+  max-width: 480px;
+}
+
+/* ---------- Glass card ---------- */
+
+.card {
+  position: relative;
+  border-radius: 20px;
+  padding: 24px 20px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 24px 48px -28px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.7));
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+  }
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding-top: clamp(32px, 7vh, 80px);
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+  .card {
+    border-radius: 24px;
+    padding: 36px 40px 32px;
+  }
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  margin-bottom: 24px;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(145deg, #3a9592, var(--lf-brand));
+  box-shadow: 0 4px 10px -4px rgba(43, 122, 120, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--lf-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(26px, 6vw, 32px);
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--lf-ink);
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--lf-muted);
+  white-space: pre-line;
+  max-width: 56ch;
+}
+
+/* ---------- Sections & grid ---------- */
+
+.section {
+  margin-top: 28px;
+}
+
+.section:first-child {
+  margin-top: 0;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--lf-muted);
+}
+
+.sectionTitle::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--lf-line);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 16px;
+  }
+  .full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Fields ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.required {
+  color: var(--lf-danger);
+  font-weight: 600;
+}
+
+.optional {
+  margin-left: 4px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--lf-muted);
+}
+
+.control {
+  width: 100%;
+  height: 50px;
+  padding: 0 14px;
+  border-radius: var(--lf-radius-field);
+  border: 1px solid var(--lf-line);
+  background: var(--lf-field);
+  color: var(--lf-ink);
+  font-size: 16px; /* 16px keeps iOS Safari from zooming on focus */
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color 0.16s var(--lf-ease),
+    box-shadow 0.16s var(--lf-ease),
+    background-color 0.16s var(--lf-ease);
+}
+
+.control::placeholder {
+  color: var(--lf-placeholder);
+  opacity: 1;
+}
+
+.control:hover:not(:focus):not([aria-invalid="true"]) {
+  border-color: var(--lf-line-strong);
+}
+
+.control:focus,
+.control:focus-visible {
+  outline: none;
+  border-color: var(--lf-brand);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--lf-brand-soft);
+}
+
+.control[aria-invalid="true"] {
+  border-color: var(--lf-danger);
+}
+
+.control[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 4px var(--lf-danger-soft);
+}
+
+.textarea {
+  height: auto;
+  min-height: 112px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+/* Dropdown trigger (SearchableSelect's outline Button). */
+.selectTrigger {
+  height: 50px;
+  padding: 0 14px;
+  gap: 8px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectTrigger:hover:not(:focus-visible) {
+  background: #fff;
+  color: var(--lf-ink);
+}
+
+.selectTrigger[aria-expanded="true"] {
+  border-color: var(--lf-brand);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--lf-brand-soft);
+}
+
+.selectTrigger :global(.text-muted-foreground) {
+  color: var(--lf-placeholder);
+}
+
+.selectTrigger svg {
+  width: 18px;
+  height: 18px;
+  color: var(--lf-muted);
+  opacity: 1;
+  transition: transform 0.18s var(--lf-ease);
+}
+
+.selectTrigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Dropdown panel — portaled, so these are reached via contentClassName. */
+.menu {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 16px 36px -12px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+.menu [cmdk-list] {
+  max-height: min(288px, calc(var(--radix-popover-content-available-height, 320px) - 12px));
+  padding: 6px;
+}
+
+.menu [cmdk-group] {
+  padding: 0;
+}
+
+.menu [data-slot="command-input-wrapper"] {
+  height: 46px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--lf-line);
+}
+
+.menu [cmdk-input] {
+  font-size: 16px;
+}
+
+.menu [cmdk-item] {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 15px;
+  color: var(--lf-ink);
+  cursor: pointer;
+}
+
+.menu [cmdk-item][data-selected="true"] {
+  background: rgba(43, 122, 120, 0.08);
+  color: var(--lf-ink);
+}
+
+.menu [cmdk-item] svg {
+  color: var(--lf-brand);
+}
+
+.menu [cmdk-empty] {
+  padding: 20px 12px;
+  font-size: 14px;
+  color: var(--lf-muted);
+}
+
+/* ---------- Phone ---------- */
+
+.phone {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.phone:focus-within {
+  border-color: var(--lf-brand);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--lf-brand-soft);
+}
+
+.phone[data-invalid="true"] {
+  border-color: var(--lf-danger);
+}
+
+.phone[data-invalid="true"]:focus-within {
+  box-shadow: 0 0 0 4px var(--lf-danger-soft);
+}
+
+.dial {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 10px 0 14px;
+  border-right: 1px solid var(--lf-line);
+  color: var(--lf-ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.16s var(--lf-ease);
+}
+
+.dial:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.flag {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.dial svg {
+  width: 16px;
+  height: 16px;
+  color: var(--lf-muted);
+}
+
+/* Native select stretched invisibly over the flag/code: best picker on phones. */
+.dialSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.phoneInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 14px 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--lf-ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.phoneInput::placeholder {
+  color: var(--lf-placeholder);
+  opacity: 1;
+}
+
+.phoneInput:focus {
+  outline: none;
+}
+
+/* ---------- Messages ---------- */
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--lf-danger);
+  animation: lfFadeIn 0.18s var(--lf-ease);
+}
+
+.error svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+
+.formAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(230, 57, 70, 0.25);
+  background: rgba(254, 242, 242, 0.9);
+  color: #9f1d2a;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.formAlert svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+/* ---------- Consent ---------- */
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(43, 122, 120, 0.14);
+  background: rgba(43, 122, 120, 0.05);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--lf-text);
+  cursor: pointer;
+  transition: border-color 0.16s var(--lf-ease), background-color 0.16s var(--lf-ease);
+}
+
+.consent:hover {
+  border-color: rgba(43, 122, 120, 0.28);
+}
+
+.consent[data-invalid="true"] {
+  border-color: rgba(230, 57, 70, 0.45);
+  background: rgba(254, 242, 242, 0.7);
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(15, 23, 42, 0.28);
+  background: #fff;
+  cursor: pointer;
+  transition: background-color 0.14s var(--lf-ease), border-color 0.14s var(--lf-ease), box-shadow 0.14s var(--lf-ease);
+}
+
+.checkbox:focus-visible {
+  outline: none;
+  border-color: var(--lf-brand);
+  box-shadow: 0 0 0 4px var(--lf-brand-soft);
+}
+
+.checkbox[data-state="checked"] {
+  background: var(--lf-brand);
+  border-color: var(--lf-brand);
+}
+
+.checkbox[aria-invalid="true"]:not([data-state="checked"]) {
+  border-color: var(--lf-danger);
+}
+
+.checkbox svg {
+  width: 14px;
+  height: 14px;
+}
+
+.link {
+  color: var(--lf-brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(43, 122, 120, 0.35);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.16s var(--lf-ease);
+}
+
+.link:hover {
+  text-decoration-color: currentColor;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--lf-brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- Submit ---------- */
+
+.actions {
+  margin-top: 24px;
+}
+
+.submit {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(180deg, #33908d 0%, var(--lf-brand) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(15, 23, 42, 0.12),
+    0 10px 24px -12px rgba(43, 122, 120, 0.75);
+  transition:
+    transform 0.16s var(--lf-ease),
+    box-shadow 0.16s var(--lf-ease),
+    filter 0.16s var(--lf-ease);
+}
+
+.submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 4px rgba(15, 23, 42, 0.12),
+    0 14px 28px -12px rgba(43, 122, 120, 0.85);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+  filter: brightness(0.97);
+}
+
+.submit:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px rgba(43, 122, 120, 0.45);
+}
+
+.submit:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.submit svg {
+  width: 18px;
+  height: 18px;
+}
+
+.spin {
+  animation: lfSpin 0.8s linear infinite;
+}
+
+.footnote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 0;
+  font-size: 13.5px;
+  color: var(--lf-muted);
+  text-align: center;
+}
+
+.footnote svg {
+  width: 14px;
+  height: 14px;
+}
+
+.footnote a {
+  color: var(--lf-ink);
+  font-weight: 600;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.footnote a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Status cards (loading / missing / success) ---------- */
+
+.status {
+  text-align: center;
+  padding-top: 36px;
+  padding-bottom: 36px;
+}
+
+.statusIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--lf-muted);
+}
+
+.statusIconSuccess {
+  background: rgba(43, 122, 120, 0.12);
+  color: var(--lf-brand);
+}
+
+.statusIcon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.statusTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--lf-ink);
+}
+
+.statusText {
+  margin: 8px auto 0;
+  max-width: 36ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--lf-muted);
+  white-space: pre-line;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  padding-top: 96px;
+  color: var(--lf-brand);
+}
+
+.loader svg {
+  width: 28px;
+  height: 28px;
+}
+
+@keyframes lfSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lfFadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .menu * {
+    transition: none !important;
+    animation: none !important;
+  }
+  .spin {
+    animation: lfSpin 1.6s linear infinite !important;
+  }
+}
