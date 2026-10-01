@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -65,6 +66,9 @@ const getIcon = (iconName: string | null): React.ElementType =>
 
 interface FacilitiesProps {
   onNavigate?: (section: string) => void;
+  embedded?: boolean;
+  /** Embedded only: element to render the summary cards into (e.g. above the parent's tabs) */
+  summaryContainer?: HTMLElement | null;
 }
 
 const emptyForm = () => ({
@@ -77,7 +81,7 @@ const emptyForm = () => ({
   description: '',
 });
 
-export function Facilities({ onNavigate }: FacilitiesProps) {
+export function Facilities({ onNavigate, embedded, summaryContainer }: FacilitiesProps) {
   const { currencyCode } = useCurrency();
   const [facilities, setFacilities] = useState<FacilityApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -260,6 +264,389 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
     );
   }
 
+  const summaryCards = (
+    <>
+    {/* Summary Cards */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium text-primary">Total Facilities</CardTitle>
+          <div className="bg-emerald-50 p-2 rounded-lg">
+            <Building2 className="h-4 w-4 text-emerald-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-emerald-700">{facilities.length}</div>
+          <p className="text-xs text-muted-foreground mt-1">All facilities</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium text-primary">Active Facilities</CardTitle>
+          <div className="bg-green-50 p-2 rounded-lg">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-700">{activeFacilitiesCount}</div>
+          <p className="text-xs text-muted-foreground mt-1">Currently available</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium text-primary">Bookings This Month</CardTitle>
+          <div className="bg-blue-50 p-2 rounded-lg">
+            <Calendar className="h-4 w-4 text-blue-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-700">{totalBookings}</div>
+          <p className="text-xs text-muted-foreground mt-1">Monthly activity</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm font-medium text-primary">Avg. Occupancy Limit</CardTitle>
+          <div className="bg-purple-50 p-2 rounded-lg">
+            <Users className="h-4 w-4 text-purple-600" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-purple-700">{avgOccupancy}</div>
+          <p className="text-xs text-muted-foreground mt-1">Across facilities</p>
+        </CardContent>
+      </Card>
+    </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {summaryContainer ? createPortal(summaryCards, summaryContainer) : summaryCards}
+
+        {/* Search & Filters */}
+        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Facilities Overview</CardTitle>
+                <CardDescription>View and manage all physical facilities</CardDescription>
+              </div>
+              <Button onClick={handleAddFacility} size="sm" className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm">
+                <Plus className="h-4 w-4" />
+                Add Facility
+              </Button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Search facilities by name or ID..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                {(['all', 'active', 'inactive'] as const).map(f => (
+                  <Button
+                    key={f}
+                    variant={statusFilter === f ? 'default' : 'outline'}
+                    onClick={() => setStatusFilter(f)}
+                    size="sm"
+                    className={statusFilter === f ? 'bg-primary hover:bg-primary/90 text-white' : ''}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* Facilities Grid */}
+        {filteredFacilities.length === 0 ? (
+          <Card className="border-primary/10 shadow-md">
+            <CardContent className="py-12 text-center">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-lg mb-1">No Facilities Found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {searchTerm ? 'Try adjusting your search' : 'Get started by adding your first facility'}
+              </p>
+              {!searchTerm && (
+                <Button onClick={handleAddFacility} className="bg-primary text-white">
+                  <Plus className="h-4 w-4 mr-2" /> Add Facility
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredFacilities.map(facility => {
+              const Icon = getIcon(facility.icon_name);
+              return (
+                <Card
+                  key={facility.id}
+                  className={`border-primary/10 shadow-md hover:shadow-lg transition-shadow ${
+                    facility.status === 'Active' ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-red-500'
+                  }`}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-lg bg-slate-50">
+                          <Icon className="h-6 w-6 text-slate-600" />
+                        </div>
+                        <div>
+                          <CardTitle>{facility.name}</CardTitle>
+                          <CardDescription>{facility.facility_id ?? `ID: ${facility.id}`}</CardDescription>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={facility.status === 'Active'}
+                        onCheckedChange={() => handleToggleStatus(facility)}
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Badge className={facility.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          {facility.status}
+                        </Badge>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>{facility.bookings_this_month} bookings</span>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground flex items-center gap-2">
+                            <Users className="h-4 w-4" /> Occupancy Limit:
+                          </span>
+                          <span className="font-medium">{facility.occupancy_limit} people</span>
+                        </div>
+                        {facility.description && (
+                          <p className="text-muted-foreground text-xs line-clamp-2 pt-1">{facility.description}</p>
+                        )}
+                      </div>
+
+                      <Separator />
+
+                      <div>
+                        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-primary" /> Pricing
+                        </p>
+                        <div className="space-y-1">
+                          {Object.entries(facility.rates).map(([rateType, rate]) => (
+                            <div key={rateType} className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">{rateType}:</span>
+                              <span className="font-medium"><CurrencyGlyph /> {rate}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditFacility(facility)}
+                          className="flex-1 gap-2 shadow-sm hover:shadow-md transition-all"
+                        >
+                          <Pencil className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteFacility(facility.id, facility.name)}
+                          className="gap-2 shadow-sm hover:shadow-md transition-all text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Add / Edit Dialog */}
+        <Dialog open={showAddDialog || showEditDialog} onOpenChange={open => { if (!open) closeDialog(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <Building2 className="h-6 w-6 text-primary" />
+                {showEditDialog ? 'Edit Facility' : 'Add New Facility'}
+              </DialogTitle>
+              <DialogDescription>
+                {showEditDialog ? 'Update facility details and rates' : 'Configure your new facility with rates and availability'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Name */}
+              <div>
+                <Label htmlFor="facilityName">Facility Name *</Label>
+                <Input
+                  id="facilityName"
+                  placeholder="e.g., Basketball Court, Swimming Pool"
+                  value={formData.name}
+                  onChange={e => setFormData(f => ({ ...f, name: e.target.value }))}
+                  className="mt-2"
+                />
+              </div>
+
+              {/* Icon */}
+              <div>
+                <Label>Select Icon</Label>
+                <div className="grid grid-cols-5 sm:grid-cols-9 gap-2 mt-2">
+                  {FACILITY_ICONS.map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        title={item.label}
+                        onClick={() => setFormData(f => ({ ...f, iconName: item.label }))}
+                        className={`p-3 rounded-lg border-2 transition-all hover:scale-105 flex items-center justify-center ${
+                          formData.iconName === item.label
+                            ? 'border-primary bg-primary/10'
+                            : 'border-gray-200 hover:border-primary'
+                        }`}
+                      >
+                        <Icon className="h-5 w-5 text-gray-700" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Occupancy */}
+              <div>
+                <Label htmlFor="occupancy">Occupancy Limit (Max People) *</Label>
+                <div className="relative mt-2">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="occupancy"
+                    type="number"
+                    placeholder="e.g., 10"
+                    value={formData.occupancyLimit}
+                    onChange={e => setFormData(f => ({ ...f, occupancyLimit: e.target.value }))}
+                    className="pl-10"
+                    min="1"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Rate Configuration */}
+              <div>
+                <Label className="text-base mb-1 block">Rate Configuration *</Label>
+                <p className="text-sm text-muted-foreground mb-3">Select applicable rate types and set pricing for each</p>
+                <div className="space-y-3">
+                  {RATE_TYPE_OPTIONS.map(rateType => (
+                    <div key={rateType} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={formData.selectedRateTypes.includes(rateType)}
+                            onCheckedChange={() => handleToggleRateType(rateType)}
+                          />
+                          <Label className="cursor-pointer" onClick={() => handleToggleRateType(rateType)}>
+                            {rateType}
+                          </Label>
+                        </div>
+                        {formData.selectedRateTypes.includes(rateType) && (
+                          <Clock className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      {formData.selectedRateTypes.includes(rateType) && (
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencyCode}):</Label>
+                          <Input
+                            type="text"
+                            placeholder="0.00"
+                            value={formData.rates[rateType] || ''}
+                            onChange={e => handleRateChange(rateType, e.target.value)}
+                            className="flex-1"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {formData.selectedRateTypes.length === 0 && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 flex items-center gap-2">
+                      <Info className="h-4 w-4" /> Please select at least one rate type
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Status */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <Label className="text-base">Status</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.status === 'Active'
+                      ? 'Facility is available for bookings'
+                      : 'Facility is hidden from bookings'}
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.status === 'Active'}
+                  onCheckedChange={checked => setFormData(f => ({ ...f, status: checked ? 'Active' : 'Inactive' }))}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add facility guidelines, amenities, or special notes..."
+                  value={formData.description}
+                  onChange={e => setFormData(f => ({ ...f, description: e.target.value }))}
+                  rows={3}
+                  className="mt-2"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={closeDialog} className="border-red-300 text-red-600 hover:bg-red-50">
+                Cancel
+              </Button>
+              <Button onClick={handleSaveFacility} disabled={saving} className="bg-primary text-white gap-2">
+                {saving
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <CheckCircle className="h-4 w-4" />}
+                {showEditDialog ? 'Update Facility' : 'Add Facility'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -272,15 +659,6 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
             </div>
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                onClick={() => onNavigate && onNavigate('training-streams')}
-                size="sm"
-                className="gap-2 shadow-sm hover:shadow-md transition-all"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Training Streams
-              </Button>
-              <Button
                 onClick={handleAddFacility}
                 size="sm"
                 className="gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all"
@@ -291,60 +669,7 @@ export function Facilities({ onNavigate }: FacilitiesProps) {
             </div>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-primary">Total Facilities</CardTitle>
-                <div className="bg-emerald-50 p-2 rounded-lg">
-                  <Building2 className="h-4 w-4 text-emerald-600" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-700">{facilities.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">All facilities</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-primary">Active Facilities</CardTitle>
-                <div className="bg-green-50 p-2 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-700">{activeFacilitiesCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">Currently available</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-primary">Bookings This Month</CardTitle>
-                <div className="bg-blue-50 p-2 rounded-lg">
-                  <Calendar className="h-4 w-4 text-blue-600" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-700">{totalBookings}</div>
-                <p className="text-xs text-muted-foreground mt-1">Monthly activity</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-primary">Avg. Occupancy Limit</CardTitle>
-                <div className="bg-purple-50 p-2 rounded-lg">
-                  <Users className="h-4 w-4 text-purple-600" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-700">{avgOccupancy}</div>
-                <p className="text-xs text-muted-foreground mt-1">Across facilities</p>
-              </CardContent>
-            </Card>
-          </div>
+          {summaryCards}
 
           {/* Search & Filters */}
           <Card className="mt-6 bg-white border-0 shadow-sm">

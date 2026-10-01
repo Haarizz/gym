@@ -16,7 +16,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +35,8 @@ public class DashboardService {
     private final BookingRepository bookingRepository;
     private final LeadRepository leadRepository;
     private final FollowUpRepository followUpRepository;
+    private final StaffAttendanceRepository staffAttendanceRepository;
+    private final RevenueDashboardService revenueDashboardService;
 
     public DashboardService(
             MemberRepository memberRepository,
@@ -42,7 +47,9 @@ public class DashboardService {
             TrainingSessionRepository trainingSessionRepository,
             BookingRepository bookingRepository,
             LeadRepository leadRepository,
-            FollowUpRepository followUpRepository) {
+            FollowUpRepository followUpRepository,
+            StaffAttendanceRepository staffAttendanceRepository,
+            RevenueDashboardService revenueDashboardService) {
         this.memberRepository = memberRepository;
         this.receiptRepository = receiptRepository;
         this.attendanceRepository = attendanceRepository;
@@ -52,67 +59,128 @@ public class DashboardService {
         this.bookingRepository = bookingRepository;
         this.leadRepository = leadRepository;
         this.followUpRepository = followUpRepository;
+        this.staffAttendanceRepository = staffAttendanceRepository;
+        this.revenueDashboardService = revenueDashboardService;
     }
 
+    /**
+     * The Overview tab's period selector: "today", "week" (last 7 days incl. today),
+     * "month" (this calendar month) and "lastMonth". Each is compared with the
+     * period of the same kind immediately before it.
+     */
+    record Period(LocalDate from, LocalDate to, LocalDate prevFrom, LocalDate prevTo, String key) {
+        LocalDateTime start() { return from.atStartOfDay(); }
+        LocalDateTime end() { return to.plusDays(1).atStartOfDay(); }
+        LocalDateTime prevStart() { return prevFrom.atStartOfDay(); }
+        LocalDateTime prevEnd() { return prevTo.plusDays(1).atStartOfDay(); }
+    }
+
+    static Period resolvePeriod(String period, LocalDate today) {
+        String p = period == null ? "today" : period;
+        switch (p) {
+            case "week": {
+                LocalDate from = today.minusDays(6);
+                return new Period(from, today, from.minusDays(7), from.minusDays(1), "week");
+            }
+            case "month": {
+                LocalDate from = today.withDayOfMonth(1);
+                LocalDate to = from.plusMonths(1).minusDays(1);
+                return new Period(from, to, from.minusMonths(1), from.minusDays(1), "month");
+            }
+            case "lastMonth": {
+                LocalDate from = today.withDayOfMonth(1).minusMonths(1);
+                LocalDate to = today.withDayOfMonth(1).minusDays(1);
+                return new Period(from, to, from.minusMonths(1), from.minusDays(1), "lastMonth");
+            }
+            default:
+                return new Period(today, today, today.minusDays(1), today.minusDays(1), "today");
+        }
+    }
+
+    /** This calendar month — what the mobile admin analytics screens have always shown. */
     public KPIData getKPIs() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
-        LocalDateTime startOfLastMonth = startOfMonth.minusMonths(1);
-        LocalDateTime startOfToday = now.withHour(0).withMinute(0).withSecond(0).withNano(0);
-        LocalDateTime startOfYesterday = startOfToday.minusDays(1);
-        LocalDateTime startOf30DaysAgo = now.minusDays(30);
-        LocalDateTime startOf60DaysAgo = startOf30DaysAgo.minusDays(30);
+        return getKPIs("month");
+    }
 
-        // Revenue MTD vs Last MTD
-        BigDecimal revenueMTD = receiptRepository.sumPaidInPeriod(startOfMonth, now);
-        BigDecimal revenueLastMTD = receiptRepository.sumPaidInPeriod(startOfLastMonth, startOfMonth);
-        double revChange = calculatePercentageChange(revenueMTD, revenueLastMTD);
+    public KPIData getKPIs(String period) {
+        Period pr = resolvePeriod(period, LocalDate.now());
 
-        // Active Members
+        // Same cash-basis figure as the Revenue Dashboard tab's Total Collection
+        BigDecimal revenue = revenueDashboardService.totalCollection(pr.from(), pr.to());
+        BigDecimal previousRevenue = revenueDashboardService.totalCollection(pr.prevFrom(), pr.prevTo());
+
         long activeMembers = memberRepository.countByMembershipStatus("active");
-        long membersLast30 = memberRepository.countByMembershipStatusAndJoinDateAfter("active", startOf30DaysAgo);
-        long membersPrev30 = memberRepository.countByMembershipStatusAndJoinDateAfter("active", startOf60DaysAgo) - membersLast30;
-        double membersChange = membersPrev30 == 0 ? (membersLast30 > 0 ? 100.0 : 0.0) : ((double) (membersLast30 - membersPrev30) / membersPrev30) * 100.0;
+        long joined = memberRepository.countByJoinDateBetween(pr.start(), pr.end());
+        long previousJoined = memberRepository.countByJoinDateBetween(pr.prevStart(), pr.prevEnd());
 
-        // Today's Attendance
-        long todayAttendance = attendanceRepository.countByDateRange(startOfToday, now);
-        long yesterdayAttendance = attendanceRepository.countByDateRange(startOfYesterday, startOfToday);
-        double attChange = calculatePercentageChange(BigDecimal.valueOf(todayAttendance), BigDecimal.valueOf(yesterdayAttendance));
-
-        // Available Staff
-        long availableStaff = staffRepository.countByStatus("active"); // or clocked in, depending on schema
+        long attendance = attendanceRepository.countByDateRange(pr.start(), pr.end());
+        long previousAttendance = attendanceRepository.countByDateRange(pr.prevStart(), pr.prevEnd());
 
         KPIData kpi = new KPIData();
-        kpi.setRevenue(revenueMTD != null ? revenueMTD : BigDecimal.ZERO);
-        kpi.setRevenueChange(revChange);
+        kpi.setRevenue(revenue);
+        kpi.setRevenueChange(calculatePercentageChange(revenue, previousRevenue));
         kpi.setActiveMembers(activeMembers);
-        kpi.setMembersChange(membersChange);
-        kpi.setTodayAttendance(todayAttendance);
-        kpi.setAttendanceChange(attChange);
-        kpi.setAvailableStaff(availableStaff);
-
+        kpi.setMembersChange(calculatePercentageChange(BigDecimal.valueOf(joined), BigDecimal.valueOf(previousJoined)));
+        kpi.setTodayAttendance(attendance);
+        kpi.setAttendanceChange(calculatePercentageChange(BigDecimal.valueOf(attendance), BigDecimal.valueOf(previousAttendance)));
+        kpi.setAvailableStaff(staffRepository.countByStatus("active"));
+        kpi.setClockedInStaff(staffAttendanceRepository.findClockedInStaffIds().size());
         return kpi;
     }
 
-    public List<RevenueDataPoint> getRevenueData() {
-        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
-        List<Receipt> receiptsToday = receiptRepository.findPaidSince(startOfDay);
-
-        // Group by 3-hour blocks or similar for intraday
-        List<RevenueDataPoint> points = new ArrayList<>();
-        int[] hours = {9, 12, 15, 18, 21};
-        BigDecimal cumulative = BigDecimal.ZERO;
-
-        for (int h : hours) {
-            LocalDateTime blockEnd = startOfDay.plusHours(h);
-            BigDecimal blockSum = receiptsToday.stream()
-                    .filter(r -> r.getTransactionDate().isBefore(blockEnd) || r.getTransactionDate().equals(blockEnd))
-                    .map(Receipt::getPaidAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            // No revenue-target feature exists yet, so target is left unset rather than fabricated
-            points.add(new RevenueDataPoint(h + (h < 12 ? " AM" : (h == 12 ? " PM" : " PM")), blockSum, null));
+    /**
+     * Revenue chart points for the period: hourly for "today" (key "time"), daily for
+     * "week" (key "day"), weekly for the month options (key "week") — the keys the
+     * Overview chart reads for each period.
+     */
+    public List<Map<String, Object>> getRevenueData(String period) {
+        Period pr = resolvePeriod(period, LocalDate.now());
+        String bucket = switch (pr.key()) {
+            case "today" -> "hourly";
+            case "week" -> "daily";
+            default -> "weekly";
+        };
+        String key = switch (pr.key()) {
+            case "today" -> "time";
+            case "week" -> "day";
+            default -> "week";
+        };
+        DateTimeFormatter dayLabel = DateTimeFormatter.ofPattern("EEE d", Locale.ENGLISH);
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (Map<String, Object> p : revenueDashboardService.collectionTrend(pr.from(), pr.to(), bucket)) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            String label = (String) p.get("label");
+            if (bucket.equals("daily")) {
+                label = LocalDateTime.parse((String) p.get("start")).format(dayLabel);
+            }
+            point.put(key, label);
+            point.put("revenue", p.get("revenue"));
+            points.add(point);
         }
         return points;
+    }
+
+    /** Check-ins in the period, grouped into four slots that together cover the whole day. */
+    public List<Map<String, Object>> getAttendanceBySlot(String period) {
+        Period pr = resolvePeriod(period, LocalDate.now());
+        String[] names = {"Morning (5-11 AM)", "Midday (11 AM-4 PM)", "Evening (4-10 PM)", "Night (10 PM-5 AM)"};
+        long[] counts = new long[4];
+        for (LocalDateTime t : attendanceRepository.findCheckInTimesBetween(pr.start(), pr.end())) {
+            if (t == null) continue;
+            int h = t.getHour();
+            int slot = (h >= 5 && h < 11) ? 0 : (h >= 11 && h < 16) ? 1 : (h >= 16 && h < 22) ? 2 : 3;
+            counts[slot]++;
+        }
+        long total = counts[0] + counts[1] + counts[2] + counts[3];
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("type", names[i]);
+            row.put("members", counts[i]);
+            row.put("percentage", total == 0 ? 0 : Math.round(counts[i] * 100.0 / total));
+            rows.add(row);
+        }
+        return rows;
     }
 
     public List<MembershipDistribution> getMembershipDistribution() {
@@ -146,7 +214,8 @@ public class DashboardService {
         List<Member> members = memberRepository.findTop5ByOrderByJoinDateDesc();
         return members.stream().map(m -> {
             DashboardMember dm = new DashboardMember();
-            dm.setId(m.getMemberId());
+            // Numeric DB id — the dashboard opens /member-history-analytics with it (see searchMembers)
+            dm.setId(String.valueOf(m.getId()));
             dm.setName(m.getName());
             dm.setEmail(m.getEmail());
             dm.setPhone(m.getPhone());
@@ -157,19 +226,19 @@ public class DashboardService {
         }).collect(Collectors.toList());
     }
 
-    public List<Object> getNotifications() {
+    public List<Map<String, Object>> getNotifications() {
         List<NotificationResponseDTO> notifs = notificationService.getForCurrentUser(0, 5).getContent();
         return notifs.stream().map(n -> {
-            // Map DTO to anonymous object for quick JSON
-            return new Object() {
-                public String id = n.getId().toString();
-                public String type = mapNotificationType(n.getType());
-                public String title = n.getTitle();
-                public String message = n.getMessage();
-                public String timestamp = n.getCreatedAt().toString();
-                public boolean isRead = n.isRead();
-                public String actionUrl = n.getActionUrl();
-            };
+            // Map keys aren't touched by the global SNAKE_CASE strategy, so the page reads isRead/actionUrl as-is
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", n.getId().toString());
+            m.put("type", mapNotificationType(n.getType()));
+            m.put("title", n.getTitle());
+            m.put("message", n.getMessage());
+            m.put("timestamp", n.getCreatedAt() != null ? n.getCreatedAt().toString() : null);
+            m.put("isRead", n.isRead());
+            m.put("actionUrl", n.getActionUrl());
+            return m;
         }).collect(Collectors.toList());
     }
 
@@ -183,17 +252,22 @@ public class DashboardService {
         };
     }
 
-    public List<Object> getStaffStatus() {
-        List<Staff> staffs = staffRepository.findTop5ByOrderByCreatedAtDesc();
-        return staffs.stream().map(s -> {
-            return new Object() {
-                public String id = s.getStaffId();
-                public String name = s.getName();
-                public String role = s.getRole();
-                public String status = s.getStatus() != null ? s.getStatus().toLowerCase() : "available";
-                public boolean clockedIn = "active".equalsIgnoreCase(s.getStatus());
-            };
-        }).collect(Collectors.toList());
+    public List<Map<String, Object>> getStaffStatus() {
+        java.util.Set<Long> clockedIn = new java.util.HashSet<>(staffAttendanceRepository.findClockedInStaffIds());
+        // Active staff, clocked-in first, so the panel shows who's on the floor right now
+        return staffRepository.findByStatusIgnoreCaseOrderByNameAsc("active").stream()
+                .sorted((a, b) -> Boolean.compare(clockedIn.contains(b.getId()), clockedIn.contains(a.getId())))
+                .limit(10)
+                .map(s -> {
+                    boolean in = clockedIn.contains(s.getId());
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", s.getStaffId() != null ? s.getStaffId() : String.valueOf(s.getId()));
+                    m.put("name", s.getName());
+                    m.put("role", s.getRole());
+                    m.put("status", in ? "available" : "offline");
+                    m.put("clockedIn", in);
+                    return m;
+                }).collect(Collectors.toList());
     }
 
     public List<DashboardMember> searchMembers(String query) {
@@ -247,17 +321,20 @@ public class DashboardService {
     }
 
     public List<PendingTask> getPendingTasks() {
-        List<com.company.project.entities.FollowUp> followUps = followUpRepository.findTop5ByStatusOrderByDueDateAsc("pending");
+        List<com.company.project.entities.FollowUp> followUps =
+                followUpRepository.findTop5ByStatusInOrderByDueDateAsc(List.of("pending", "overdue"));
         return followUps.stream().map(f -> {
             PendingTask pt = new PendingTask();
-            pt.setId(f.getFollowUpId());
+            // Numeric id: the dashboard's "Resolve" button posts to /follow-ups/{id}/complete
+            pt.setId(String.valueOf(f.getId()));
             pt.setLeadName(f.getLead() != null
                     ? (f.getLead().getFirstName() + " " + (f.getLead().getLastName() != null ? f.getLead().getLastName() : "")).trim()
                     : "Unknown");
             pt.setType(f.getType() != null ? f.getType() : "General");
             pt.setDueDate(f.getDueDate() != null ? f.getDueDate().toLocalDate().toString() : "");
-            pt.setPriority("High"); // You can map this dynamically if priority exists in FollowUp entity
-            pt.setSubject(f.getNotes() != null && f.getNotes().length() > 20 ? f.getNotes().substring(0, 20) + "..." : f.getNotes());
+            pt.setPriority(f.getPriority() != null ? f.getPriority() : "medium");
+            String subject = f.getSubject() != null && !f.getSubject().isBlank() ? f.getSubject() : f.getNotes();
+            pt.setSubject(subject != null && subject.length() > 60 ? subject.substring(0, 60) + "..." : subject);
             return pt;
         }).collect(Collectors.toList());
     }

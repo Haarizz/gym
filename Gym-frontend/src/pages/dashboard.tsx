@@ -19,9 +19,14 @@ import {
   type MembershipDistribution, 
   type ClassAttendance, 
   type Member, 
-  type Notification, 
-  type StaffMember 
+  type Notification,
+  type StaffMember,
+  type SalesPipelineData,
+  type PendingTaskData,
+  type AttendanceSlot
 } from "../utils/supabase/dashboard-service";
+import { notificationService } from "../utils/supabase/notification-service";
+import { followUpService } from "../utils/supabase/follow-up-service";
 import { 
   BarChart, 
   Bar, 
@@ -85,10 +90,12 @@ import {
   Building,
   UserX,
   Timer,
-  Gauge
+  Gauge,
+  BarChart3
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, isYesterday } from 'date-fns';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
+import { RevenueDashboard } from '../components/dashboard/RevenueDashboard';
 
 // Types
 interface QuickAction {
@@ -103,36 +110,6 @@ interface QuickAction {
 // Interface for navigation with params
 interface NavigationHandler {
   (section: string, params?: Record<string, any>): void;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  membershipType: string;
-  joinDate: Date;
-  avatar?: string;
-  status: 'active' | 'expired' | 'suspended';
-}
-
-interface Notification {
-  id: string;
-  type: 'alert' | 'warning' | 'info' | 'success';
-  title: string;
-  message: string;
-  timestamp: Date;
-  isRead: boolean;
-  actionUrl?: string;
-}
-
-interface StaffMember {
-  id: string;
-  name: string;
-  role: string;
-  status: 'available' | 'busy' | 'offline';
-  clockedIn: boolean;
-  avatar?: string;
 }
 
 interface DashboardProps {
@@ -154,7 +131,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+  const [activeDashboardTab, setActiveDashboardTab] = useState('overview');
+  const [revenueRefreshKey, setRevenueRefreshKey] = useState(0);
+
   // Data states
   const [kpiData, setKpiData] = useState<KPIData | null>(null);
   const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
@@ -168,11 +147,14 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
-  const attendanceByType = [
-    { type: 'Morning (6-10 AM)', members: 85, percentage: 34 },
-    { type: 'Afternoon (12-4 PM)', members: 65, percentage: 26 },
-    { type: 'Evening (6-10 PM)', members: 100, percentage: 40 }
-  ];
+  const [attendanceByType, setAttendanceByType] = useState<AttendanceSlot[]>([]);
+  const [periodSelectOpen, setPeriodSelectOpen] = useState(false);
+  const [resolvingTaskId, setResolvingTaskId] = useState<string | null>(null);
+
+  const periodLabel =
+    dateFilter === 'today' ? 'Today' :
+    dateFilter === 'week' ? 'Last 7 Days' :
+    dateFilter === 'month' ? 'This Month' : 'Last Month';
 
   // Load initial dashboard data
   const loadDashboardData = useCallback(async () => {
@@ -188,7 +170,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         notificationsResponse,
         staffResponse,
         salesPipelineResponse,
-        pendingTasksResponse
+        pendingTasksResponse,
+        attendanceSlotsResponse
       ] = await Promise.all([
         dashboardService.getKPIs(dateFilter),
         dashboardService.getRevenueData(dateFilter),
@@ -198,8 +181,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         dashboardService.getNotifications(),
         dashboardService.getStaffMembers(),
         dashboardService.getSalesPipeline(),
-        dashboardService.getPendingTasks()
-      ]);
+        dashboardService.getPendingTasks(),
+        dashboardService.getAttendanceSlots(dateFilter)
+      ].map((p) => p.catch((error: unknown) => ({ success: false, error }))));
+      // One failing panel shouldn't blank the whole dashboard — each settles on its own
 
       if (kpiResponse.success) {
         const data = kpiResponse.data;
@@ -210,7 +195,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           membersChange: data.membersChange ?? data.members_change ?? 0,
           todayAttendance: data.todayAttendance ?? data.today_attendance ?? 0,
           attendanceChange: data.attendanceChange ?? data.attendance_change ?? 0,
-          availableStaff: data.availableStaff ?? data.available_staff ?? 0
+          availableStaff: data.availableStaff ?? data.available_staff ?? 0,
+          clockedInStaff: data.clockedInStaff ?? data.clocked_in_staff
         } as any);
       } else {
         console.error('KPI data error:', kpiResponse.error);
@@ -262,6 +248,12 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         setPendingTasks(pendingTasksResponse.data);
       } else {
         console.error('Pending tasks data error:', pendingTasksResponse.error);
+      }
+
+      if (attendanceSlotsResponse.success) {
+        setAttendanceByType(attendanceSlotsResponse.data);
+      } else {
+        console.error('Attendance slots data error:', attendanceSlotsResponse.error);
       }
 
       // Show success message only if some data was loaded successfully
@@ -323,6 +315,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const refreshData = useCallback(async () => {
     try {
       setIsRefreshing(true);
+      setRevenueRefreshKey((k) => k + 1);
       const isServerHealthy = await checkServerHealth();
       
       if (isServerHealthy) {
@@ -360,6 +353,83 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       handleMemberSelect(searchResults[0]);
     }
   }, [searchResults, handleMemberSelect]);
+
+  const openMemberAnalytics = useCallback((memberId: string, name?: string) => {
+    if (!onNavigate) return;
+    onNavigate('member-history-analytics', { memberId });
+    if (name) {
+      toast.success(`Opening analytics for ${name}`, { duration: 2000 });
+    }
+  }, [onNavigate]);
+
+  const handleNotificationClick = useCallback(async (notification: Notification) => {
+    if (!notification.isRead) {
+      try {
+        await notificationService.markAsRead(Number(notification.id));
+        setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)));
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    }
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    }
+  }, [navigate]);
+
+  const handleResolveTask = useCallback(async (task: PendingTaskData) => {
+    try {
+      setResolvingTaskId(task.id);
+      await followUpService.complete(Number(task.id), 'successful');
+      setPendingTasks((prev) => prev.filter((t) => t.id !== task.id));
+      toast.success(`Follow-up with ${task.leadName} marked as done`);
+    } catch (error) {
+      console.error('Failed to resolve follow-up:', error);
+      toast.error('Could not resolve this follow-up. Please try again.');
+    } finally {
+      setResolvingTaskId(null);
+    }
+  }, []);
+
+  // Downloads what the Overview tab currently shows as a CSV
+  const handleExport = useCallback(() => {
+    if (!kpiData) {
+      toast.error('Nothing to export yet — dashboard data has not loaded');
+      return;
+    }
+    const csvCell = (v: unknown) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows: unknown[][] = [
+      ['GymBios Dashboard', periodLabel, format(new Date(), 'yyyy-MM-dd HH:mm')],
+      [],
+      ['Metric', 'Value', 'Change %'],
+      [`Total Revenue (${currencyCode})`, kpiData.revenue, kpiData.revenueChange],
+      ['Active Members', kpiData.activeMembers, kpiData.membersChange],
+      ['Attendance', kpiData.todayAttendance, kpiData.attendanceChange],
+      ['Available Staff', kpiData.availableStaff, ''],
+      [],
+      ['Revenue', `Amount (${currencyCode})`],
+      ...revenueData.map((p: any) => [p.time ?? p.day ?? p.week, p.revenue]),
+      [],
+      ['Membership Type', 'Members', `Amount (${currencyCode})`],
+      ...membershipDistribution.map((m) => [m.name, m.value, m.amount]),
+      [],
+      ['Time Slot', 'Check-ins', 'Share %'],
+      ...attendanceByType.map((a) => [a.type, a.members, a.percentage]),
+      [],
+      ['Lead Status', 'Count'],
+      ...salesPipeline.map((s) => [s.status, s.count]),
+    ];
+    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dashboard-${dateFilter}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Dashboard exported');
+  }, [kpiData, revenueData, membershipDistribution, attendanceByType, salesPipeline, dateFilter, periodLabel, currencyCode]);
 
   // Quick Actions with GymBios gradient theme
   const quickActions: QuickAction[] = [
@@ -627,7 +697,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               </span>
             </div>
             
-            <Select value={dateFilter} onValueChange={setDateFilter}>
+            <Select value={dateFilter} onValueChange={setDateFilter} open={periodSelectOpen} onOpenChange={setPeriodSelectOpen}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
@@ -647,11 +717,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button variant="outline" className={dashboardHeaderActionButton}>
+            <Button variant="outline" className={dashboardHeaderActionButton} onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
-            <Button variant="outline" className={dashboardHeaderActionButton}>
+            <Button variant="outline" className={dashboardHeaderActionButton} onClick={() => setPeriodSelectOpen(true)}>
               <Filter className="mr-2 h-4 w-4" />
               Filter
             </Button>
@@ -669,7 +739,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             }}
             onKeyPress={handleSearchKeyPress}
             className="pl-10 h-12 text-base"
-            disabled={isSearching}
           />
           
           {/* Search Loading Indicator */}
@@ -726,6 +795,21 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         </div>
       </div>
 
+      {/* Main Dashboard Tabs */}
+      <Tabs value={activeDashboardTab} onValueChange={setActiveDashboardTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2 h-11">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="revenue" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Revenue Dashboard
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab Content */}
+        <TabsContent value="overview" className="space-y-6 mt-0">
       {/* Quick Action Tabs */}
       <div className={cn(dashboardSurfaceShell, "p-6")}>
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
@@ -818,7 +902,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     )}>
                       {kpiData.membersChange >= 0 ? '+' : ''}{kpiData.membersChange}%
                     </span>
-                    <span className="text-sm text-muted-foreground ml-1">valid memberships</span>
+                    <span className="text-sm text-muted-foreground ml-1">new joins vs previous period</span>
                   </div>
                 </div>
                 <div className="bg-blue-100 dark:bg-blue-950/20 p-3 rounded-full">
@@ -889,7 +973,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="flex items-center mt-2">
                     <Clock className="h-4 w-4 text-blue-500 mr-1" />
                     <span className="text-sm text-muted-foreground">
-                      {staffMembers.filter(s => s.clockedIn).length} clocked in
+                      {kpiData.clockedInStaff ?? staffMembers.filter(s => s.clockedIn).length} clocked in
                     </span>
                   </div>
                 </div>
@@ -911,7 +995,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Revenue Overview</span>
-              <Badge variant="outline">{dateFilter}</Badge>
+              <Badge variant="outline">{periodLabel}</Badge>
             </CardTitle>
             <CardDescription>
               {dateFilter === 'today' ? 'Hourly revenue tracking for today' :
@@ -1018,11 +1102,15 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <CardContent>
             {isLoading ? (
               <Skeleton className="w-full h-[250px]" />
+            ) : (salesPipeline || []).length === 0 ? (
+              <div className="text-center p-6 text-muted-foreground">
+                <p className="text-sm">No leads yet</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={salesPipeline || []} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
+                  <XAxis type="number" allowDecimals={false} />
                   <YAxis dataKey="status" type="category" width={100} tickFormatter={(tick) => tick.charAt(0).toUpperCase() + tick.slice(1)} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
@@ -1071,8 +1159,14 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         <Clock className="w-3 h-3 mr-1" />
                         Due: {task.dueDate}
                       </span>
-                      <Button size="sm" variant="outline" className="h-7 text-xs bg-white hover:bg-red-50 hover:text-red-700">
-                        Resolve
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs bg-white hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleResolveTask(task)}
+                        disabled={resolvingTaskId === task.id}
+                      >
+                        {resolvingTaskId === task.id ? 'Resolving...' : 'Resolve'}
                       </Button>
                     </div>
                   </div>
@@ -1110,6 +1204,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   </div>
                 ))}
               </div>
+            ) : (classAttendanceData || []).length === 0 ? (
+              <div className="text-center p-6 text-muted-foreground">
+                <p className="text-sm">No active classes scheduled</p>
+              </div>
             ) : (
               <div className="space-y-4">
                 {(classAttendanceData || []).map((item) => (
@@ -1139,10 +1237,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               <Skeleton className="w-full h-[250px]" />
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={attendanceByType || []} layout="horizontal">
+                <BarChart data={attendanceByType || []} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="type" type="category" width={120} />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis dataKey="type" type="category" width={160} tick={{ fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="members" fill="#8b5cf6" name="Members" />
                 </BarChart>
@@ -1181,6 +1279,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   </div>
                 ))}
               </div>
+            ) : (recentMembers || []).length === 0 ? (
+              <div className="text-center p-6 text-muted-foreground">
+                <p className="text-sm">No members yet</p>
+              </div>
             ) : (
               <div className="space-y-4">
                 {(recentMembers || []).map((member) => {
@@ -1190,10 +1292,14 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   }
                   
                   // Ensure membershipType exists for badge rendering
-                  const membershipType = member.membershipType || member.membership_type || 'Basic';
+                  const membershipType = member.membershipType || 'Basic';
                   
                   return (
-                <div key={member.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted cursor-pointer">
+                <div
+                  key={member.id}
+                  className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted cursor-pointer"
+                  onClick={() => openMemberAnalytics(member.id, member.name)}
+                >
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={member.avatar} />
                     <AvatarFallback>
@@ -1211,18 +1317,35 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <div className="flex items-center space-x-4 mt-1">
                       <span className="text-xs text-muted-foreground">{member.phone}</span>
                       <span className="text-xs text-muted-foreground">
-                        Joined {formatJoinDate(member.joinDate || member.join_date)}
+                        Joined {formatJoinDate(member.joinDate)}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="ghost">
+                  <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={member.phone ? `Call ${member.phone}` : 'No phone number'}
+                      disabled={!member.phone}
+                      onClick={() => { window.location.href = `tel:${member.phone}`; }}
+                    >
                       <Phone className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={member.email && !member.email.includes('@family.local') ? `Email ${member.email}` : 'No email address'}
+                      disabled={!member.email || member.email.includes('@family.local')}
+                      onClick={() => { window.location.href = `mailto:${member.email}`; }}
+                    >
                       <Mail className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="View member analytics"
+                      onClick={() => openMemberAnalytics(member.id, member.name)}
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1243,7 +1366,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <Badge variant="destructive" className="text-xs">
                   {(notifications || []).filter(n => n && !n.isRead).length} new
                 </Badge>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" title="Open notifications" onClick={() => navigate('/notifications')}>
                   <Bell className="h-4 w-4" />
                 </Button>
               </div>
@@ -1267,6 +1390,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   </div>
                 ))}
               </div>
+            ) : (notifications || []).length === 0 ? (
+              <div className="text-center p-6 text-muted-foreground">
+                <p className="text-sm">You're all caught up</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {(notifications || []).slice(0, 5).map((notification) => {
@@ -1288,6 +1415,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         "flex items-start space-x-3 p-3 rounded-lg cursor-pointer transition-colors",
                         !notification.isRead ? "bg-muted/50" : "hover:bg-muted/50"
                       )}
+                      onClick={() => handleNotificationClick(notification)}
                     >
                       <div className={cn("p-2 rounded-full", style.color)}>
                         <IconComponent className="h-4 w-4" />
@@ -1296,7 +1424,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         <div className="flex items-center justify-between">
                           <p className="font-medium text-sm truncate">{notification.title}</p>
                           <span className="text-xs text-muted-foreground">
-                            {formatSafeDate(notification.timestamp || notification.created_at)}
+                            {formatSafeDate(notification.timestamp)}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
@@ -1360,6 +1488,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 </div>
               ))}
             </div>
+          ) : (staffMembers || []).length === 0 ? (
+            <div className="text-center p-6 text-muted-foreground">
+              <p className="text-sm">No active staff</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               {(staffMembers || []).map((staff) => {
@@ -1403,6 +1535,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Revenue Dashboard Tab Content */}
+        <TabsContent value="revenue" className="mt-0">
+          <RevenueDashboard refreshKey={revenueRefreshKey} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

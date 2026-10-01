@@ -1,0 +1,78 @@
+/* Smooth open/close for the Create/Edit Plan collapsible sections. Radix exposes the
+   content's measured height as --radix-collapsible-content-height and keeps the content
+   mounted until the closing animation finishes. */
+
+.collapsibleContent {
+  overflow: hidden;
+}
+
+.collapsibleContent[data-state="open"] {
+  animation: collapsibleOpen 220ms ease-out;
+}
+
+.collapsibleContent[data-state="closed"] {
+  animation: collapsibleClose 180ms ease-in;
+}
+
+@keyframes collapsibleOpen {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsibleClose {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+/* Chevron rotates instead of swapping icons abruptly */
+.chevron {
+  transition: transform 200ms ease;
+}
+
+.chevron[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+/* Tab panes (stats row + content) for Manage Plans / Facilities. Both stay mounted;
+   the inactive one is hidden, the active one eases in without starting from blank. */
+.tabPane[data-state="inactive"] {
+  display: none;
+}
+
+.tabPane[data-state="active"] {
+  animation: tabFadeIn 200ms ease-out;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0.35;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabPane[data-state="active"] {
+    animation: none;
+  }
+
+  .collapsibleContent[data-state="open"],
+  .collapsibleContent[data-state="closed"] {
+    animation: none;
+  }
+}

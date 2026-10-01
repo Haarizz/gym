@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Textarea } from "../components/ui/textarea";
 import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Facilities } from "./facilities";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { 
   Plus, 
@@ -43,6 +45,7 @@ import {
 } from 'lucide-react';
 import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
+import planStyles from "./manage-plans.module.css";
 import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.png';
 import { toast } from "sonner";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
@@ -107,6 +110,11 @@ export function ManagePlans() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
+  // ?tab=facilities (or navigation state { tab: "facilities" }) opens the Facilities tab directly
+  const [activeTab, setActiveTab] = useState(() =>
+    new URLSearchParams(window.location.search).get("tab") === "facilities" ? "facilities" : "plans");
+  // Where the Facilities tab renders its stat cards (the row above the tab bar)
+  const [facilitySummaryHost, setFacilitySummaryHost] = useState<HTMLDivElement | null>(null);
 
   // Promotions & Campaigns loaded from Member Connect (real data, not mock)
   const [availablePromotions, setAvailablePromotions] = useState<{
@@ -124,6 +132,9 @@ export function ManagePlans() {
   // Facilities loaded from Facilities Management (real data, not mock)
   const [availableFacilities, setAvailableFacilities] = useState<FacilityApi[]>([]);
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
+  const [showAddFacilityDialog, setShowAddFacilityDialog] = useState(false);
+  const [newFacilityName, setNewFacilityName] = useState("");
+  const [isSavingFacility, setIsSavingFacility] = useState(false);
 
   // Plan Groups: admin-managed list (not hardcoded) — replaces the old fixed
   // Membership/Class Package/Personal Training dropdown.
@@ -189,14 +200,20 @@ export function ManagePlans() {
     autoCalculateTotal: true
   });
 
-  // Training streams access state
-  const [isTrainingAccessOpen, setIsTrainingAccessOpen] = useState(true);
-  // Facilities access state
-  const [isFacilitiesAccessOpen, setIsFacilitiesAccessOpen] = useState(true);
-  // Promotions and campaigns state
-  const [isPromotionsCampaignsOpen, setIsPromotionsCampaignsOpen] = useState(false);
-  // Freeze Policy Configuration state
-  const [isFreezePolicyOpen, setIsFreezePolicyOpen] = useState(false);
+  // Collapsible plan sections (Training / Facilities / Promotions / Freeze Policy):
+  // all collapsed by default, and opening one collapses whichever was open.
+  type PlanSection = "training" | "facilities" | "promotions" | "freeze";
+  const [openPlanSection, setOpenPlanSection] = useState<PlanSection | null>(null);
+  const togglePlanSection = (section: PlanSection) => (open: boolean) =>
+    setOpenPlanSection(open ? section : null);
+  const isTrainingAccessOpen = openPlanSection === "training";
+  const setIsTrainingAccessOpen = togglePlanSection("training");
+  const isFacilitiesAccessOpen = openPlanSection === "facilities";
+  const setIsFacilitiesAccessOpen = togglePlanSection("facilities");
+  const isPromotionsCampaignsOpen = openPlanSection === "promotions";
+  const setIsPromotionsCampaignsOpen = togglePlanSection("promotions");
+  const isFreezePolicyOpen = openPlanSection === "freeze";
+  const setIsFreezePolicyOpen = togglePlanSection("freeze");
   // Family Plan Settings state
   const [isFamilyPlanSettingsOpen, setIsFamilyPlanSettingsOpen] = useState(false);
 
@@ -643,6 +660,7 @@ export function ManagePlans() {
     setShowCreateDialog(false);
     setEditingPlan(null);
     resetForm();
+    setOpenPlanSection(null); // next open starts with every section collapsed
   };
 
   // Training streams handlers
@@ -694,6 +712,38 @@ export function ManagePlans() {
   };
 
   // Facilities handlers
+  const handleSaveFacility = async () => {
+    if (!newFacilityName.trim()) {
+      toast.error('Facility name is required');
+      return;
+    }
+    setIsSavingFacility(true);
+    try {
+      const payload = {
+        name: newFacilityName,
+        occupancy_limit: 100,
+        status: 'Active',
+        rates: { default: 0 },
+      };
+      
+      const newFacility = await facilitiesService.createFacility(payload);
+      setAvailableFacilities(prev => [...prev, newFacility]);
+      
+      setFormData(prev => ({
+        ...prev,
+        selectedFacilities: [...(prev.selectedFacilities as string[]), newFacility.id] as never[]
+      }));
+      
+      setShowAddFacilityDialog(false);
+      setNewFacilityName("");
+      toast.success('Facility added successfully');
+    } catch (error: any) {
+      toast.error('Failed to add facility', { description: error.message });
+    } finally {
+      setIsSavingFacility(false);
+    }
+  };
+
   const handleFacilityToggle = (facilityId: string) => {
     setFormData(prev => ({
       ...prev,
@@ -738,101 +788,122 @@ export function ManagePlans() {
           <h1 className="text-3xl font-bold">Manage Plans</h1>
           <p className="text-muted-foreground">Create and manage membership plans, class packages, and training programs.</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Plan
-        </Button>
+        {activeTab === 'plans' && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Plan
+          </Button>
+        )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={filterType === 'all' && filterStatus === 'all' && priceSort === 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
-          onClick={() => { setFilterType('all'); setFilterStatus('all'); setPriceSort('none'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Plans</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-100">
-              <CreditCard className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{plans.length}</div>
-            <p className="text-xs text-muted-foreground">All membership plans</p>
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <Tabs defaultValue="plans" value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        {/* Stat cards: plans on the Plans tab, facilities (portaled in) on the Facilities tab.
+            Both stay mounted so switching tabs doesn't rebuild or refetch anything. */}
+        <div>
+            <div className={planStyles.tabPane} data-state={activeTab === 'plans' ? 'active' : 'inactive'}>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card
+                className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                style={filterType === 'all' && filterStatus === 'all' && priceSort === 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+                onClick={() => { setFilterType('all'); setFilterStatus('all'); setPriceSort('none'); }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Plans</CardTitle>
+                  <div className="p-2 rounded-lg bg-blue-100">
+                    <CreditCard className="h-4 w-4 text-blue-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{plans.length}</div>
+                  <p className="text-xs text-muted-foreground">All membership plans</p>
+                </CardContent>
+              </Card>
 
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={filterStatus === 'active' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
-          onClick={() => {
-            setFilterStatus(filterStatus === 'active' ? 'all' : 'active');
-            setFilterType('all');
-            setPriceSort('none');
-          }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Plans</CardTitle>
-            <div className="p-2 rounded-lg bg-green-100">
-              <Settings className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {plans.filter(p => p.status === "Active").length}
-            </div>
-            <p className="text-xs text-muted-foreground">Currently available</p>
-          </CardContent>
-        </Card>
+              <Card
+                className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                style={filterStatus === 'active' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
+                onClick={() => {
+                  setFilterStatus(filterStatus === 'active' ? 'all' : 'active');
+                  setFilterType('all');
+                  setPriceSort('none');
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Active Plans</CardTitle>
+                  <div className="p-2 rounded-lg bg-green-100">
+                    <Settings className="h-4 w-4 text-green-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {plans.filter(p => p.status === "Active").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Currently available</p>
+                </CardContent>
+              </Card>
 
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={priceSort !== 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
-          title="Click to sort plans by price"
-          onClick={() => {
-            setPriceSort(priceSort === 'desc' ? 'asc' : priceSort === 'asc' ? 'none' : 'desc');
-            setFilterStatus('all');
-            setFilterType('all');
-          }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average Price</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-100">
-              {priceSort === 'asc' ? <ChevronUp className="h-4 w-4 text-blue-600" /> : priceSort === 'desc' ? <ChevronDown className="h-4 w-4 text-blue-600" /> : <DollarSign className="h-4 w-4 text-blue-600" />}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              <CurrencyGlyph /> {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
-            </div>
-            <p className="text-xs text-muted-foreground">Across all plans{priceSort !== 'none' ? ` — sorted ${priceSort === 'asc' ? 'low to high' : 'high to low'}` : ''}</p>
-          </CardContent>
-        </Card>
+              <Card
+                className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                style={priceSort !== 'none' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
+                title="Click to sort plans by price"
+                onClick={() => {
+                  setPriceSort(priceSort === 'desc' ? 'asc' : priceSort === 'asc' ? 'none' : 'desc');
+                  setFilterStatus('all');
+                  setFilterType('all');
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Average Price</CardTitle>
+                  <div className="p-2 rounded-lg bg-blue-100">
+                    {priceSort === 'asc' ? <ChevronUp className="h-4 w-4 text-blue-600" /> : priceSort === 'desc' ? <ChevronDown className="h-4 w-4 text-blue-600" /> : <DollarSign className="h-4 w-4 text-blue-600" />}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    <CurrencyGlyph /> {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Across all plans{priceSort !== 'none' ? ` — sorted ${priceSort === 'asc' ? 'low to high' : 'high to low'}` : ''}</p>
+                </CardContent>
+              </Card>
 
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={filterType === 'family' ? { boxShadow: '0 0 0 2px #9333ea' } : undefined}
-          onClick={() => {
-            setFilterType(filterType === 'family' ? 'all' : 'family');
-            setFilterStatus('all');
-            setPriceSort('none');
-          }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
-            <div className="p-2 rounded-lg bg-purple-100">
-              <Users className="h-4 w-4 text-purple-600" />
+              <Card
+                className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+                style={filterType === 'family' ? { boxShadow: '0 0 0 2px #9333ea' } : undefined}
+                onClick={() => {
+                  setFilterType(filterType === 'family' ? 'all' : 'family');
+                  setFilterStatus('all');
+                  setPriceSort('none');
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Family Plans</CardTitle>
+                  <div className="p-2 rounded-lg bg-purple-100">
+                    <Users className="h-4 w-4 text-purple-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {plans.filter(p => p.planType === "Family" || p.planType === "Couple").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Multi-member plans</p>
+                </CardContent>
+              </Card>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {plans.filter(p => p.planType === "Family" || p.planType === "Couple").length}
             </div>
-            <p className="text-xs text-muted-foreground">Multi-member plans</p>
-          </CardContent>
-        </Card>
-      </div>
+            <div ref={setFacilitySummaryHost} className={planStyles.tabPane} data-state={activeTab === 'facilities' ? 'active' : 'inactive'} />
+        </div>
+
+        <TabsList className="w-full flex">
+          <TabsTrigger value="plans" className="flex-1">
+            Manage Plans
+          </TabsTrigger>
+          <TabsTrigger value="facilities" className="flex-1">
+            Facilities Management
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="plans" forceMount className={`space-y-6 ${planStyles.tabPane}`}>
 
       {/* Plan Overview / List */}
       <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
@@ -1469,21 +1540,18 @@ export function ManagePlans() {
             <Collapsible 
               open={isTrainingAccessOpen} 
               onOpenChange={setIsTrainingAccessOpen}
-              className="border rounded-lg p-4 space-y-4"
+              className="border rounded-lg p-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
                   <Key className="h-5 w-5 text-blue-600" />
                   <Label className="text-base cursor-pointer">Access To Training</Label>
                 </div>
-                {isTrainingAccessOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isTrainingAccessOpen} />
               </CollapsibleTrigger>
               
-              <CollapsibleContent className="space-y-4">
+              <CollapsibleContent className={planStyles.collapsibleContent}>
+                <div className="space-y-4 pt-4">
                 <p className="text-sm text-muted-foreground">
                   Set program and class access for the membership.
                 </p>
@@ -1659,6 +1727,7 @@ export function ManagePlans() {
                     {formData.trainingStreams.length} of {availableTrainingStreams.length} training streams selected
                   </div>
                 </div>
+              </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -1666,21 +1735,18 @@ export function ManagePlans() {
             <Collapsible 
               open={isFacilitiesAccessOpen} 
               onOpenChange={setIsFacilitiesAccessOpen}
-              className="border rounded-lg p-4 space-y-4"
+              className="border rounded-lg p-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
                   <Building2 className="h-5 w-5" style={{ color: '#2B7A78' }} />
                   <Label className="text-base cursor-pointer">Access to Facilities</Label>
                 </div>
-                {isFacilitiesAccessOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isFacilitiesAccessOpen} />
               </CollapsibleTrigger>
               
-              <CollapsibleContent className="space-y-4">
+              <CollapsibleContent className={planStyles.collapsibleContent}>
+                <div className="space-y-4 pt-4">
                 <p className="text-sm text-muted-foreground">
                   Select which facilities members with this plan can access (only active facilities are shown).
                 </p>
@@ -1704,6 +1770,14 @@ export function ManagePlans() {
                         onClick={handleDeselectAllFacilities}
                       >
                         Deselect All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAddFacilityDialog(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add
                       </Button>
                     </div>
                   </div>
@@ -1746,12 +1820,16 @@ export function ManagePlans() {
                     <div className="border rounded-md p-6 text-center">
                       <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                       <p className="text-sm font-medium mb-1">No Active Facilities</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground mb-4">
                         No facilities are currently active. Add facilities in Training Streams → Facilities.
                       </p>
+                      <Button onClick={() => setShowAddFacilityDialog(true)} variant="outline">
+                        <Plus className="h-4 w-4 mr-2" /> Quick Add Facility
+                      </Button>
                     </div>
                   )}
                 </div>
+              </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -1759,21 +1837,18 @@ export function ManagePlans() {
             <Collapsible
               open={isPromotionsCampaignsOpen}
               onOpenChange={setIsPromotionsCampaignsOpen}
-              className="border rounded-lg p-4 space-y-4"
+              className="border rounded-lg p-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
                   <Megaphone className="h-5 w-5 text-orange-600" />
                   <Label className="text-base cursor-pointer">Promotions</Label>
                 </div>
-                {isPromotionsCampaignsOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isPromotionsCampaignsOpen} />
               </CollapsibleTrigger>
 
-              <CollapsibleContent className="space-y-4">
+              <CollapsibleContent className={planStyles.collapsibleContent}>
+                <div className="space-y-4 pt-4">
                 <p className="text-sm text-muted-foreground">
                   Attach promotional offers from Member Connect to this membership plan.
                 </p>
@@ -1858,6 +1933,7 @@ export function ManagePlans() {
                     </div>
                   </div>
                 )}
+              </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -1865,21 +1941,18 @@ export function ManagePlans() {
             <Collapsible 
               open={isFreezePolicyOpen} 
               onOpenChange={setIsFreezePolicyOpen}
-              className="border rounded-lg p-4 space-y-4"
+              className="border rounded-lg p-4"
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
                   <Snowflake className="h-5 w-5 text-[#2B7A78]" />
                   <Label className="text-base cursor-pointer">Freeze Policy Configuration</Label>
                 </div>
-                {isFreezePolicyOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isFreezePolicyOpen} />
               </CollapsibleTrigger>
               
-              <CollapsibleContent className="space-y-4">
+              <CollapsibleContent className={planStyles.collapsibleContent}>
+                <div className="space-y-4 pt-4">
                 <p className="text-sm text-muted-foreground">
                   Configure membership freeze policies for this plan. These settings control how members can temporarily pause their memberships.
                 </p>
@@ -2000,6 +2073,7 @@ export function ManagePlans() {
                     </div>
                   </div>
                 </div>
+              </div>
               </CollapsibleContent>
             </Collapsible>
 
@@ -2008,7 +2082,7 @@ export function ManagePlans() {
               <Collapsible
                 open={isFamilyPlanSettingsOpen}
                 onOpenChange={setIsFamilyPlanSettingsOpen}
-                className="border rounded-lg p-4 space-y-4"
+                className="border rounded-lg p-4"
               >
                 <CollapsibleTrigger className="flex items-center justify-between w-full">
                   <div className="flex items-center space-x-2">
@@ -2017,14 +2091,11 @@ export function ManagePlans() {
                       {formData.planType === "Couple" ? "Couple Plan Settings" : "Family Plan Settings"}
                     </Label>
                   </div>
-                  {isFamilyPlanSettingsOpen ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
+                  <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isFamilyPlanSettingsOpen} />
                 </CollapsibleTrigger>
 
-                <CollapsibleContent className="space-y-4">
+                <CollapsibleContent className={planStyles.collapsibleContent}>
+                <div className="space-y-4 pt-4">
                   <p className="text-sm text-muted-foreground">
                     {formData.planType === "Couple"
                       ? "Configure how this Couple plan bills its two members."
@@ -2193,7 +2264,8 @@ export function ManagePlans() {
                       </div>
                     </div>
                   )}
-                </CollapsibleContent>
+                </div>
+              </CollapsibleContent>
               </Collapsible>
             )}
           </div>
@@ -2301,6 +2373,40 @@ export function ManagePlans() {
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={showAddFacilityDialog} onOpenChange={setShowAddFacilityDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Add Facility</DialogTitle>
+            <DialogDescription>
+              Quickly create a new active facility to assign to this plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newFacilityName">Facility Name *</Label>
+              <Input
+                id="newFacilityName"
+                placeholder="e.g. Main Gym Floor, Swimming Pool"
+                value={newFacilityName}
+                onChange={(e) => setNewFacilityName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveFacility(); }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowAddFacilityDialog(false)}>Cancel</Button>
+            <Button onClick={handleSaveFacility} disabled={isSavingFacility}>
+              {isSavingFacility ? "Adding..." : "Add Facility"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+        </TabsContent>
+        <TabsContent value="facilities" forceMount className={`space-y-6 ${planStyles.tabPane}`}>
+          <Facilities embedded summaryContainer={facilitySummaryHost} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

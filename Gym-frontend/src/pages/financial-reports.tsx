@@ -67,6 +67,13 @@ import {
 } from "lucide-react";
 import { format, subMonths, subYears, subDays, differenceInCalendarDays, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subQuarters } from "date-fns";
 import { cn } from "../components/ui/utils";
+import { AttendanceReports } from "./attendance-reports";
+import { SalesReports } from "./sales-reports";
+import { MemberConnectReports } from "./member-connect-reports";
+import { ReportsAnalytics } from "./reports-analytics";
+import { CustomReports } from "./custom-reports";
+import { Select as UISelect, SelectContent as UISelectContent, SelectItem as UISelectItem, SelectTrigger as UISelectTrigger, SelectValue as UISelectValue } from "../components/ui/select";
+import { MembershipLifecycleReport, ALL_MEMBERSHIP_REPORT_TYPES, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import {
   BarChart,
   Bar,
@@ -116,10 +123,7 @@ const GROUP_META: Record<string, { icon: React.ElementType }> = {
   "Ledgers": { icon: ScrollText },
   "Membership": { icon: Users },
   "Sales & Revenue": { icon: ShoppingCart },
-  "Payroll": { icon: Banknote },
-  "Assets": { icon: Package },
   "Member Connect": { icon: Megaphone },
-  "Aging & Recoverables": { icon: Clock },
   "Revenue Recognition": { icon: Hourglass },
   "Tax & Compliance": { icon: Landmark },
   "Analytics & Custom": { icon: Activity },
@@ -185,22 +189,6 @@ const reportDefinitions: ReportDefinition[] = [
     tags: ["ledger", "postings"],
   },
   {
-    id: "member-aging",
-    title: "Member Aging",
-    description: "Outstanding member balances bucketed by days overdue",
-    group: "Aging & Recoverables",
-    type: "table",
-    tags: ["receivables", "aging"],
-  },
-  {
-    id: "supplier-aging",
-    title: "Supplier Aging",
-    description: "Outstanding supplier bills bucketed by days overdue",
-    group: "Aging & Recoverables",
-    type: "table",
-    tags: ["payables", "aging"],
-  },
-  {
     id: "deferred-revenue",
     title: "Deferred Revenue",
     description: "Unrecognized membership revenue and its amortization schedules",
@@ -244,24 +232,6 @@ const reportDefinitions: ReportDefinition[] = [
     type: "chart",
     tags: ["sales", "receipts"],
     external: { route: "/sales-reports" },
-  },
-  {
-    id: "payroll-reports",
-    title: "Payroll Reports",
-    description: "Detailed payroll register for staff and trainers",
-    group: "Payroll",
-    type: "table",
-    tags: ["payroll", "salary"],
-    external: { route: "/payroll-reports" },
-  },
-  {
-    id: "asset-reports",
-    title: "Asset Reports",
-    description: "Asset, maintenance and compliance report catalogue",
-    group: "Assets",
-    type: "table",
-    tags: ["assets", "maintenance"],
-    external: { route: "/asset-reports" },
   },
   {
     id: "member-connect-reports",
@@ -354,13 +324,47 @@ export function FinancialReports() {
     }
   }, [selectedPeriod]);
 
+  // One group open at a time: opening a group collapses every other one
   const toggleGroup = (group: string) => {
     setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
+      const opening = prev.has(group);
+      const next = new Set(GROUP_ORDER);
+      if (opening) next.delete(group);
       return next;
     });
+  };
+
+  // Reports that used to open their own page now render inside the right panel
+  const [membershipReportType, setMembershipReportType] = useState<LifecycleReportType>("transactions");
+  const goTo = (section: string) => navigate(section.startsWith("/") ? section : `/${section}`);
+  const renderInPageReport = (id: string) => {
+    switch (id) {
+      case "membership-report":
+        return (
+          <MembershipLifecycleReport
+            reportType={membershipReportType}
+            reportTypeSelect={
+              <div>
+                <Label className="text-sm mb-2 block">Report Type</Label>
+                <UISelect value={membershipReportType} onValueChange={(v) => setMembershipReportType(v as LifecycleReportType)}>
+                  <UISelectTrigger><UISelectValue /></UISelectTrigger>
+                  <UISelectContent>
+                    {ALL_MEMBERSHIP_REPORT_TYPES.map((t) => (
+                      <UISelectItem key={t.value} value={t.value}>{t.label}</UISelectItem>
+                    ))}
+                  </UISelectContent>
+                </UISelect>
+              </div>
+            }
+          />
+        );
+      case "attendance-reports": return <AttendanceReports onNavigate={goTo} />;
+      case "sales-reports": return <SalesReports />;
+      case "member-connect-reports": return <MemberConnectReports />;
+      case "reports-analytics": return <ReportsAnalytics onNavigate={goTo} />;
+      case "custom-reports": return <CustomReports embedded onNavigate={goTo} />;
+      default: return null;
+    }
   };
 
   const filteredReports = useMemo(() => {
@@ -793,7 +797,7 @@ export function FinancialReports() {
                           <button
                             type="button"
                             key={r.id}
-                            onClick={() => (r.external ? navigate(r.external.route, { state: r.external.state }) : handleGenerateReport(r.id))}
+                            onClick={() => (r.external ? setSelectedReport(r.id) : handleGenerateReport(r.id))}
                             className={cn(
                               "w-full text-left rounded-lg border p-2 transition-all",
                               selectedReport === r.id
@@ -803,15 +807,9 @@ export function FinancialReports() {
                           >
                             <div className="flex items-start justify-between gap-2">
                               <span className="text-xs font-semibold leading-tight">{r.title}</span>
-                              {r.external ? (
-                                <Badge variant="outline" className="text-xs shrink-0">
-                                  <ExternalLink /> Opens page
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs shrink-0">
-                                  {r.type === "chart" ? "Chart" : "Table"}
-                                </Badge>
-                              )}
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {r.type === "chart" ? "Chart" : "Table"}
+                              </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -838,8 +836,15 @@ export function FinancialReports() {
           </CardContent>
         </Card>
 
-        {/* Right: filters + generated report */}
+        {/* Right: filters + generated report (or an in-page report view) */}
         <div className="lg:col-span-8 space-y-6">
+          {selectedReportDef?.external ? (
+            <div key={selectedReportDef.id} className="min-w-0 rounded-xl border border-primary/10 bg-white shadow-md overflow-hidden" style={{ animation: "finReportIn 220ms ease-out" }}>
+              <style>{`@keyframes finReportIn { from { opacity: 0.4; transform: translateY(4px); } to { opacity: 1; transform: none; } }`}</style>
+              <div className="p-4">{renderInPageReport(selectedReportDef.id)}</div>
+            </div>
+          ) : (
+          <>
           <Card className="border-primary/10 shadow-md">
             <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
               <div>
@@ -1543,6 +1548,8 @@ export function FinancialReports() {
               )}
             </CardContent>
           </Card>
+          </>
+          )}
         </div>
       </div>
     </div>

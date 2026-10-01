@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,6 +22,21 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import PolicyRuleBuilder from "../components/shared/PolicyRuleBuilder";
 import EligibilityPreview from "../components/shared/EligibilityPreview";
 import { Rule, Member } from "../utils/policyRuleEngine";
+import { SearchableSelect, type SearchableOption } from "../components/shared/SearchableSelect";
+import { DatePickerField } from "../components/shared/DatePickerField";
+import { FormField, fieldA11y } from "../components/shared/FormField";
+import { WizardSteps, type WizardStepState } from "../components/promotions/WizardSteps";
+import promoStyles from "../components/promotions/PromotionFormDialog.module.css";
+import {
+  PROMOTION_STEPS,
+  STEP_FIELD_ORDER,
+  validateStep,
+  validateDraft,
+  hasErrors,
+  firstInvalidStepIndex,
+  type FieldErrors,
+  type PromotionStepId,
+} from "../components/promotions/promotionFormValidation";
 import { 
   Search, 
   Filter, 
@@ -70,6 +85,8 @@ import {
   CreditCard, 
   Calendar as CalendarAlt, 
   CalendarDays, 
+  ChevronLeft,
+  ChevronRight,
   CalendarCheck, 
   CalendarX, 
   Timer,
@@ -152,6 +169,55 @@ interface PromotionAnalytics {
   redemptionGrowth: number;
 }
 
+const PROMOTION_TYPE_OPTIONS: SearchableOption[] = [
+  { value: "discount", label: "Discount" },
+  { value: "voucher", label: "Voucher" },
+  { value: "combo", label: "Combo" },
+  { value: "bogo", label: "BOGO" },
+  { value: "seasonal", label: "Seasonal" },
+  { value: "loyalty", label: "Loyalty" },
+  { value: "promotional-access-days", label: "Promotional Access Days" },
+];
+
+const PROMOTION_CATEGORY_OPTIONS: SearchableOption[] = [
+  { value: "membership", label: "Membership" },
+  { value: "services", label: "Services" },
+  { value: "special-events", label: "Special Events" },
+  { value: "loyalty", label: "Loyalty" },
+  { value: "demographics", label: "Demographics" },
+];
+
+const DISCOUNT_TYPE_OPTIONS: SearchableOption[] = [
+  { value: "percentage", label: "Percentage" },
+  { value: "fixed", label: "Fixed Amount" },
+  { value: "free", label: "Free/BOGO" },
+  { value: "promotional-access-days", label: "Promotional Access Days" },
+];
+
+const TARGET_AUDIENCE_OPTIONS: SearchableOption[] = [
+  { value: "all", label: "All Members" },
+  { value: "new-members", label: "New Members" },
+  { value: "existing-members", label: "Existing Members" },
+  { value: "vip", label: "VIP Members" },
+  { value: "specific", label: "Specific Members" },
+];
+
+const PRIORITY_OPTIONS: SearchableOption[] = [
+  { value: "1", label: "High (1)" },
+  { value: "2", label: "Medium (2)" },
+  { value: "3", label: "Low (3)" },
+];
+
+const CHANNEL_OPTIONS = [
+  { value: "website", label: "Website" },
+  { value: "app", label: "Mobile App" },
+  { value: "email", label: "Email" },
+  { value: "sms", label: "SMS" },
+  { value: "in-person", label: "In-Person" },
+];
+
+const APPLICABLE_PLAN_OPTIONS = ["Standard Monthly", "Standard Annual", "Premium Monthly", "Premium Annual"];
+
 export function PromotionsCampaign() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
@@ -217,6 +283,8 @@ export function PromotionsCampaign() {
     includeGuests: false
   });
   const [policyRules, setPolicyRules] = useState<Rule[]>([]);
+  // Set once the wizard state below exists; lets resetPromotionForm (declared earlier) reset it too
+  const resetWizardRef = useRef<() => void>(() => {});
 
   // Real members for the Promotional Access Days eligibility preview, loaded from
   // the backend (previously a hardcoded 10-entry sample array).
@@ -282,6 +350,7 @@ export function PromotionsCampaign() {
   });
 
   const resetPromotionForm = useCallback(() => {
+    resetWizardRef.current();
     setPromotionForm({
       name: "",
       type: "",
@@ -345,6 +414,7 @@ export function PromotionsCampaign() {
 
   const openEditPromotion = useCallback((promotion: Promotion) => {
     const toDateInput = (d: Date) => d.toISOString().slice(0, 10);
+    resetWizardRef.current();
     setEditingPromotionId(promotion.id);
     setPromotionForm({
       name: promotion.name || "",
@@ -526,6 +596,126 @@ export function PromotionsCampaign() {
       setIsSavingPromotion(false);
     }
   };
+
+  // ── Create / Edit wizard ────────────────────────────────────────────────────
+  // Steps unlock in order: a step can be entered only once every step before it
+  // passes validateStep(). Form values live in promotionForm, so nothing is lost
+  // when moving between steps.
+  const [currentStep, setCurrentStep] = useState(0);
+  const [furthestStep, setFurthestStep] = useState(0);
+  const [attemptedSteps, setAttemptedSteps] = useState<PromotionStepId[]>([]);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const promoBodyRef = useRef<HTMLFormElement>(null);
+
+  const resetWizard = useCallback(() => {
+    setCurrentStep(0);
+    setFurthestStep(0);
+    setAttemptedSteps([]);
+    setTouchedFields({});
+  }, []);
+  resetWizardRef.current = resetWizard;
+
+  const validationContext = useMemo(() => ({ policyRuleCount: policyRules.length }), [policyRules]);
+  const stepErrors = useMemo(
+    () => PROMOTION_STEPS.map(step => validateStep(step.id, promotionForm, validationContext)),
+    [promotionForm, validationContext],
+  );
+  const stepValid = stepErrors.map(errors => !hasErrors(errors));
+  const currentStepId = PROMOTION_STEPS[currentStep].id;
+  const isLastStep = currentStep === PROMOTION_STEPS.length - 1;
+  const isAccessDaysPromotion =
+    promotionForm.type === PROMO_ACCESS_DAYS || promotionForm.discountType === PROMO_ACCESS_DAYS;
+  const discountValueRequired =
+    !isAccessDaysPromotion && !!promotionForm.discountType && promotionForm.discountType !== "free";
+
+  const stepStates: WizardStepState[] = PROMOTION_STEPS.map((_, i) => {
+    if (i === currentStep) return "current";
+    const reachable = stepValid.slice(0, i).every(Boolean);
+    if (!reachable) return "locked";
+    return stepValid[i] && i <= furthestStep ? "complete" : "available";
+  });
+
+  const touchField = useCallback((field: string) => {
+    setTouchedFields(prev => (prev[field] ? prev : { ...prev, [field]: true }));
+  }, []);
+
+  /** Error for a field on the current step, once the user has left the field or tried to move on */
+  const fieldError = (field: string): string | undefined => {
+    const message = stepErrors[currentStep][field];
+    if (!message) return undefined;
+    return attemptedSteps.includes(currentStepId) || touchedFields[field] ? message : undefined;
+  };
+
+  const focusFirstInvalid = (stepIndex: number, errors: FieldErrors) => {
+    const field = STEP_FIELD_ORDER[PROMOTION_STEPS[stepIndex].id].find(f => errors[f]);
+    if (!field) return;
+    // Wait for the step to render (it may have just been switched to)
+    window.setTimeout(() => {
+      const el = document.getElementById(`promo-${field}`);
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  /** Shows the step's errors and focuses the first one. Returns true when the step is valid. */
+  const checkStep = (stepIndex: number): boolean => {
+    const errors = stepErrors[stepIndex];
+    if (!hasErrors(errors)) return true;
+    const id = PROMOTION_STEPS[stepIndex].id;
+    setAttemptedSteps(prev => (prev.includes(id) ? prev : [...prev, id]));
+    setCurrentStep(stepIndex);
+    focusFirstInvalid(stepIndex, errors);
+    return false;
+  };
+
+  const enterStep = (stepIndex: number) => {
+    setCurrentStep(stepIndex);
+    setFurthestStep(prev => Math.max(prev, stepIndex));
+    promoBodyRef.current?.scrollTo({ top: 0 });
+  };
+
+  const handleStepSelect = (target: number) => {
+    if (target === currentStep) return;
+    if (target < currentStep) {
+      enterStep(target); // going back is always allowed
+      return;
+    }
+    const firstInvalid = stepValid.slice(0, target).findIndex(valid => !valid);
+    if (firstInvalid === -1) {
+      enterStep(target);
+    } else if (target === currentStep + 1) {
+      // The step right after this one: explain why it's locked instead of ignoring the click
+      checkStep(currentStep);
+    }
+    // Further-out locked steps do nothing
+  };
+
+  const handleWizardPrimary = () => {
+    if (!isLastStep) {
+      if (checkStep(currentStep)) enterStep(currentStep + 1);
+      return;
+    }
+    const firstInvalid = firstInvalidStepIndex(promotionForm, validationContext);
+    if (firstInvalid !== -1) {
+      checkStep(firstInvalid);
+      return;
+    }
+    submitPromotion();
+  };
+
+  const handleSaveDraft = () => {
+    const draftErrors = validateDraft(promotionForm, validationContext);
+    if (hasErrors(draftErrors)) {
+      // Only the fields a draft actually needs get flagged, on Basic Info
+      setTouchedFields(prev => ({ ...prev, ...Object.fromEntries(Object.keys(draftErrors).map(f => [f, true])) }));
+      setCurrentStep(0);
+      focusFirstInvalid(0, draftErrors);
+      return;
+    }
+    submitPromotion("draft");
+  };
+
   // Calculate analytics
   const analytics = useMemo((): PromotionAnalytics => {
     const totalPromotions = promotions.length;
@@ -1564,7 +1754,7 @@ export function PromotionsCampaign() {
         </SheetContent>
       </Sheet>
 
-      {/* Add New Promotion Dialog */}
+      {/* Add / Edit Promotion wizard */}
       <Dialog
         open={showAddPromotion}
         onOpenChange={(open) => {
@@ -1572,424 +1762,449 @@ export function PromotionsCampaign() {
           if (!open) resetPromotionForm();
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Promotion" : "Create New Promotion"}</DialogTitle>
-            <DialogDescription>
+        <DialogContent
+          className={promoStyles.dialog}
+          // A stray click on the backdrop must not throw away a half-filled form
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          aria-describedby="promo-dialog-description"
+        >
+          <div className={promoStyles.header}>
+            <DialogTitle className={promoStyles.title}>{isEditing ? "Edit Promotion" : "Create New Promotion"}</DialogTitle>
+            <DialogDescription id="promo-dialog-description" className={promoStyles.subtitle}>
               {isEditing ? "Update details for this promotion" : "Design and configure a new promotional campaign"}
             </DialogDescription>
-          </DialogHeader>
-          
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="discount">Discount</TabsTrigger>
-              <TabsTrigger value="targeting">Targeting</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="basic" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Promotion Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Enter promotion name"
-                    value={promotionForm.name}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="type">Promotion Type</Label>
-                  <Select value={promotionForm.type} onValueChange={(val) => {
-                    setPromotionType(val);
-                    setPromotionForm(prev => ({ ...prev, type: val }));
-                    if (val === PROMO_ACCESS_DAYS) {
-                      setDiscountType(PROMO_ACCESS_DAYS);
-                      setPromotionForm(prev => ({ ...prev, discountType: PROMO_ACCESS_DAYS }));
-                    }
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="discount">Discount</SelectItem>
-                      <SelectItem value="voucher">Voucher</SelectItem>
-                      <SelectItem value="combo">Combo</SelectItem>
-                      <SelectItem value="bogo">BOGO</SelectItem>
-                      <SelectItem value="seasonal">Seasonal</SelectItem>
-                      <SelectItem value="loyalty">Loyalty</SelectItem>
-                      <SelectItem value={PROMO_ACCESS_DAYS}>Promotional Access Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your promotion"
-                    value={promotionForm.description}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={promotionForm.startDate}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, startDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={promotionForm.endDate}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, endDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={promotionForm.category}
-                    onValueChange={(val) => setPromotionForm(prev => ({ ...prev, category: val }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="membership">Membership</SelectItem>
-                      <SelectItem value="services">Services</SelectItem>
-                      <SelectItem value="special-events">Special Events</SelectItem>
-                      <SelectItem value="loyalty">Loyalty</SelectItem>
-                      <SelectItem value="demographics">Demographics</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="code">Promotion Code (Optional)</Label>
-                  <Input
-                    id="code"
-                    placeholder="e.g., NEWYEAR2024"
-                    value={promotionForm.code}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, code: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="discount" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="discountType">Discount Type</Label>
-                  <Select value={promotionForm.discountType} onValueChange={(val) => {
-                    setDiscountType(val);
-                    setPromotionForm(prev => ({ ...prev, discountType: val }));
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select discount type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount</SelectItem>
-                      <SelectItem value="free">Free/BOGO</SelectItem>
-                      <SelectItem value={PROMO_ACCESS_DAYS}>Promotional Access Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Hide Discount Value when Promotional Access Days is selected */}
-                {promotionType !== PROMO_ACCESS_DAYS && discountType !== PROMO_ACCESS_DAYS && (
-                  <div>
-                    <Label htmlFor="discountValue">Discount Value</Label>
+          </div>
+
+          <div className={promoStyles.stepsBar}>
+            <WizardSteps
+              steps={PROMOTION_STEPS}
+              states={stepStates}
+              onSelect={handleStepSelect}
+              ariaLabel="Promotion setup steps"
+            />
+          </div>
+
+          <form
+            id="promotion-form"
+            className={promoStyles.body}
+            ref={promoBodyRef}
+            noValidate
+            onSubmit={(e) => { e.preventDefault(); handleWizardPrimary(); }}
+          >
+            {currentStepId === "basic" && (
+              <section aria-labelledby="promo-step-basic">
+                <h3 id="promo-step-basic" className={promoStyles.sectionTitle}>Basic Info</h3>
+                <p className={promoStyles.sectionHint}>Name the promotion, choose its type and when it runs.</p>
+                <div className={promoStyles.grid}>
+                  <FormField htmlFor="promo-name" label="Promotion Name" required error={fieldError("name")}>
                     <Input
-                      id="discountValue"
-                      type="number"
-                      placeholder="Enter value"
-                      value={promotionForm.discountValue}
-                      onChange={(e) => setPromotionForm(prev => ({ ...prev, discountValue: e.target.value }))}
+                      {...fieldA11y("promo-name", fieldError("name"))}
+                      placeholder="e.g., New Year Membership Offer"
+                      maxLength={255}
+                      autoComplete="off"
+                      value={promotionForm.name}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, name: e.target.value }))}
+                      onBlur={() => touchField("name")}
                     />
-                  </div>
-                )}
-                
-                <div>
-                  <Label htmlFor="minimumPurchase">Minimum Purchase ({currencyCode})</Label>
-                  <Input
-                    id="minimumPurchase"
-                    type="number"
-                    placeholder="Optional"
-                    value={promotionForm.minimumPurchase}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, minimumPurchase: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="maximumDiscount">Maximum Discount ({currencyCode})</Label>
-                  <Input
-                    id="maximumDiscount"
-                    type="number"
-                    placeholder="Optional"
-                    value={promotionForm.maximumDiscount}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, maximumDiscount: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="usageLimit">Total Usage Limit</Label>
-                  <Input
-                    id="usageLimit"
-                    type="number"
-                    placeholder="Leave empty for unlimited"
-                    value={promotionForm.usageLimit}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimit: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="memberLimit">Usage Limit Per Member</Label>
-                  <Input
-                    id="memberLimit"
-                    type="number"
-                    placeholder="Leave empty for unlimited"
-                    value={promotionForm.usageLimitPerMember}
-                    onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimitPerMember: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              {/* Promotional Access Days - Advanced Policy Rule Builder */}
-              {(promotionType === PROMO_ACCESS_DAYS || discountType === PROMO_ACCESS_DAYS) && (
-                <div className="space-y-6 mt-6">
-                  <Separator />
-                  
-                  {/* Policy Rule Builder */}
-                  <div>
-                    <h3 className="text-lg font-semibold text-[#1E293B] mb-2 flex items-center gap-2">
-                      <CalendarDays className="h-5 w-5 text-[#2B7A78]" />
-                      Configure Access Days Rules
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Create flexible rules to determine which members are eligible and how many days they receive
-                    </p>
-                    <PolicyRuleBuilder
-                      rules={policyRules}
-                      onChange={(newRules) => setPolicyRules(newRules)}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Eligibility Preview */}
-                  <div>
-                    {!editingPromotionId && (
-                      <Alert className="mb-4 border-amber-200 bg-amber-50">
-                        <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-amber-800">
-                          Save this promotion first — Apply Promotion needs a saved promotion to record which members already received their days.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <EligibilityPreview
-                      members={eligibilityMembers}
-                      rules={policyRules}
-                      onApply={async (matches) => {
-                        if (!editingPromotionId) {
-                          throw new Error("Save this promotion before applying it to members");
-                        }
-                        const result = await promotionsService.applyAccessDays(editingPromotionId, matches);
-                        if (result.skippedCount > 0) {
-                          toast.info(`${result.skippedCount} member(s) already had this promotion applied and were skipped`);
-                        }
+                  </FormField>
+                  <FormField htmlFor="promo-type" label="Promotion Type" required error={fieldError("type")}>
+                    <SearchableSelect
+                      id="promo-type"
+                      value={promotionForm.type}
+                      options={PROMOTION_TYPE_OPTIONS}
+                      placeholder="Select promotion type"
+                      searchPlaceholder="Search types..."
+                      emptyText="No matching type."
+                      clearable
+                      invalid={!!fieldError("type")}
+                      ariaDescribedBy={fieldError("type") ? "promo-type-error" : undefined}
+                      onClose={() => touchField("type")}
+                      onChange={(val) => {
+                        setPromotionType(val);
+                        setPromotionForm(prev => ({
+                          ...prev,
+                          type: val,
+                          ...(val === PROMO_ACCESS_DAYS ? { discountType: PROMO_ACCESS_DAYS } : {}),
+                        }));
+                        if (val === PROMO_ACCESS_DAYS) setDiscountType(PROMO_ACCESS_DAYS);
                       }}
                     />
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="targeting" className="space-y-4">
-              <div>
-                <Label htmlFor="targetAudience">Target Audience</Label>
-                <Select
-                  value={promotionForm.targetAudience}
-                  onValueChange={(val) => setPromotionForm(prev => ({ ...prev, targetAudience: val }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select target audience" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Members</SelectItem>
-                    <SelectItem value="new-members">New Members</SelectItem>
-                    <SelectItem value="existing-members">Existing Members</SelectItem>
-                    <SelectItem value="vip">VIP Members</SelectItem>
-                    <SelectItem value="specific">Specific Members</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Distribution Channels</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="website"
-                      checked={promotionForm.channels.includes("website")}
-                      onCheckedChange={(checked) => updateArrayField("channels", "website", checked === true)}
-                    />
-                    <Label htmlFor="website">Website</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="app"
-                      checked={promotionForm.channels.includes("app")}
-                      onCheckedChange={(checked) => updateArrayField("channels", "app", checked === true)}
-                    />
-                    <Label htmlFor="app">Mobile App</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="email"
-                      checked={promotionForm.channels.includes("email")}
-                      onCheckedChange={(checked) => updateArrayField("channels", "email", checked === true)}
-                    />
-                    <Label htmlFor="email">Email</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="sms"
-                      checked={promotionForm.channels.includes("sms")}
-                      onCheckedChange={(checked) => updateArrayField("channels", "sms", checked === true)}
-                    />
-                    <Label htmlFor="sms">SMS</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="in-person"
-                      checked={promotionForm.channels.includes("in-person")}
-                      onCheckedChange={(checked) => updateArrayField("channels", "in-person", checked === true)}
-                    />
-                    <Label htmlFor="in-person">In-Person</Label>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <Label>Applicable Plans</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="standard-monthly"
-                      checked={promotionForm.applicablePlans.includes("Standard Monthly")}
-                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Standard Monthly", checked === true)}
-                    />
-                    <Label htmlFor="standard-monthly">Standard Monthly</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="standard-annual"
-                      checked={promotionForm.applicablePlans.includes("Standard Annual")}
-                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Standard Annual", checked === true)}
-                    />
-                    <Label htmlFor="standard-annual">Standard Annual</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="premium-monthly"
-                      checked={promotionForm.applicablePlans.includes("Premium Monthly")}
-                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Premium Monthly", checked === true)}
-                    />
-                    <Label htmlFor="premium-monthly">Premium Monthly</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="premium-annual"
-                      checked={promotionForm.applicablePlans.includes("Premium Annual")}
-                      onCheckedChange={(checked) => updateArrayField("applicablePlans", "Premium Annual", checked === true)}
-                    />
-                    <Label htmlFor="premium-annual">Premium Annual</Label>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="settings" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="priority">Priority Level</Label>
-                  <Select
-                    value={promotionForm.priority}
-                    onValueChange={(val) => setPromotionForm(prev => ({ ...prev, priority: val }))}
+                  </FormField>
+                  <FormField
+                    htmlFor="promo-description"
+                    label="Description"
+                    className={promoStyles.full}
+                    hint="Shown to staff and, for public promotions, to members."
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">High (1)</SelectItem>
-                      <SelectItem value="2">Medium (2)</SelectItem>
-                      <SelectItem value="3">Low (3)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <Textarea
+                      {...fieldA11y("promo-description", undefined, true)}
+                      className={promoStyles.textarea}
+                      placeholder="What does this promotion offer, and who is it for?"
+                      value={promotionForm.description}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField htmlFor="promo-startDate" label="Start Date" required error={fieldError("startDate")}>
+                    <DatePickerField
+                      id="promo-startDate"
+                      value={promotionForm.startDate}
+                      max={promotionForm.endDate || undefined}
+                      invalid={!!fieldError("startDate")}
+                      ariaDescribedBy={fieldError("startDate") ? "promo-startDate-error" : undefined}
+                      onClose={() => touchField("startDate")}
+                      onChange={(val) => setPromotionForm(prev => ({ ...prev, startDate: val }))}
+                    />
+                  </FormField>
+                  <FormField htmlFor="promo-endDate" label="End Date" required error={fieldError("endDate")}>
+                    <DatePickerField
+                      id="promo-endDate"
+                      value={promotionForm.endDate}
+                      min={promotionForm.startDate || undefined}
+                      invalid={!!fieldError("endDate")}
+                      ariaDescribedBy={fieldError("endDate") ? "promo-endDate-error" : undefined}
+                      onClose={() => touchField("endDate")}
+                      onChange={(val) => setPromotionForm(prev => ({ ...prev, endDate: val }))}
+                    />
+                  </FormField>
+                  <FormField htmlFor="promo-category" label="Category" required error={fieldError("category")}>
+                    <SearchableSelect
+                      id="promo-category"
+                      value={promotionForm.category}
+                      options={PROMOTION_CATEGORY_OPTIONS}
+                      placeholder="Select category"
+                      searchPlaceholder="Search categories..."
+                      emptyText="No matching category."
+                      clearable
+                      invalid={!!fieldError("category")}
+                      ariaDescribedBy={fieldError("category") ? "promo-category-error" : undefined}
+                      onClose={() => touchField("category")}
+                      onChange={(val) => setPromotionForm(prev => ({ ...prev, category: val }))}
+                    />
+                  </FormField>
+                  <FormField
+                    htmlFor="promo-code"
+                    label="Promotion Code"
+                    error={fieldError("code")}
+                    hint="Optional. Members enter this code to redeem the offer."
+                  >
+                    <Input
+                      {...fieldA11y("promo-code", fieldError("code"), true)}
+                      placeholder="e.g., NEWYEAR2026"
+                      maxLength={255}
+                      autoComplete="off"
+                      value={promotionForm.code}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                      onBlur={() => touchField("code")}
+                    />
+                  </FormField>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="autoApply"
-                      checked={promotionForm.autoApply}
-                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, autoApply: checked === true }))}
+              </section>
+            )}
+
+            {currentStepId === "discount" && (
+              <section aria-labelledby="promo-step-discount">
+                <h3 id="promo-step-discount" className={promoStyles.sectionTitle}>Discount</h3>
+                <p className={promoStyles.sectionHint}>Set what members get and any limits on how it can be used.</p>
+                <div className={promoStyles.grid}>
+                  <FormField htmlFor="promo-discountType" label="Discount Type" required error={fieldError("discountType")}>
+                    <SearchableSelect
+                      id="promo-discountType"
+                      value={promotionForm.discountType}
+                      options={DISCOUNT_TYPE_OPTIONS}
+                      placeholder="Select discount type"
+                      searchPlaceholder="Search discount types..."
+                      emptyText="No matching discount type."
+                      clearable
+                      invalid={!!fieldError("discountType")}
+                      ariaDescribedBy={fieldError("discountType") ? "promo-discountType-error" : undefined}
+                      onClose={() => touchField("discountType")}
+                      onChange={(val) => {
+                        setDiscountType(val);
+                        setPromotionForm(prev => ({ ...prev, discountType: val }));
+                      }}
                     />
-                    <Label htmlFor="autoApply">Auto-apply at checkout</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="stackable"
-                      checked={promotionForm.stackable}
-                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, stackable: checked === true }))}
+                  </FormField>
+
+                  {!isAccessDaysPromotion && (
+                    <FormField
+                      htmlFor="promo-discountValue"
+                      label={promotionForm.discountType === "percentage"
+                        ? "Discount Value (%)"
+                        : promotionForm.discountType === "fixed"
+                        ? `Discount Value (${currencyCode})`
+                        : "Discount Value"}
+                      required={discountValueRequired}
+                      error={fieldError("discountValue")}
+                      hint={promotionForm.discountType === "free" ? "Not needed for Free/BOGO offers." : undefined}
+                    >
+                      <Input
+                        {...fieldA11y("promo-discountValue", fieldError("discountValue"), promotionForm.discountType === "free")}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={promotionForm.discountType === "percentage" ? 100 : undefined}
+                        step="0.01"
+                        placeholder={promotionForm.discountType === "percentage" ? "e.g., 15" : "e.g., 100"}
+                        value={promotionForm.discountValue}
+                        onChange={(e) => setPromotionForm(prev => ({ ...prev, discountValue: e.target.value }))}
+                        onBlur={() => touchField("discountValue")}
+                      />
+                    </FormField>
+                  )}
+
+                  <FormField htmlFor="promo-minimumPurchase" label={`Minimum Purchase (${currencyCode})`} error={fieldError("minimumPurchase")} hint="Optional">
+                    <Input
+                      {...fieldA11y("promo-minimumPurchase", fieldError("minimumPurchase"), true)}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="No minimum"
+                      value={promotionForm.minimumPurchase}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, minimumPurchase: e.target.value }))}
+                      onBlur={() => touchField("minimumPurchase")}
                     />
-                    <Label htmlFor="stackable">Can be combined with other promotions</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="isPublic"
-                      checked={promotionForm.isPublic}
-                      onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, isPublic: checked === true }))}
+                  </FormField>
+                  <FormField htmlFor="promo-maximumDiscount" label={`Maximum Discount (${currencyCode})`} error={fieldError("maximumDiscount")} hint="Optional cap on the discount amount">
+                    <Input
+                      {...fieldA11y("promo-maximumDiscount", fieldError("maximumDiscount"), true)}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="No cap"
+                      value={promotionForm.maximumDiscount}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, maximumDiscount: e.target.value }))}
+                      onBlur={() => touchField("maximumDiscount")}
                     />
-                    <Label htmlFor="isPublic">Publicly visible</Label>
-                  </div>
+                  </FormField>
+                  <FormField htmlFor="promo-usageLimit" label="Total Usage Limit" error={fieldError("usageLimit")} hint="Leave empty for unlimited">
+                    <Input
+                      {...fieldA11y("promo-usageLimit", fieldError("usageLimit"), true)}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step="1"
+                      placeholder="Unlimited"
+                      value={promotionForm.usageLimit}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimit: e.target.value }))}
+                      onBlur={() => touchField("usageLimit")}
+                    />
+                  </FormField>
+                  <FormField htmlFor="promo-usageLimitPerMember" label="Usage Limit Per Member" error={fieldError("usageLimitPerMember")} hint="Leave empty for unlimited">
+                    <Input
+                      {...fieldA11y("promo-usageLimitPerMember", fieldError("usageLimitPerMember"), true)}
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step="1"
+                      placeholder="Unlimited"
+                      value={promotionForm.usageLimitPerMember}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, usageLimitPerMember: e.target.value }))}
+                      onBlur={() => touchField("usageLimitPerMember")}
+                    />
+                  </FormField>
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="terms">Terms & Conditions</Label>
-                <Textarea
-                  id="terms"
-                  placeholder="Enter terms and conditions..."
-                  value={promotionForm.termsAndConditions}
-                  onChange={(e) => setPromotionForm(prev => ({ ...prev, termsAndConditions: e.target.value }))}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input
-                  id="tags"
-                  placeholder="e.g., new-year, discount, annual"
-                  value={promotionForm.tags}
-                  onChange={(e) => setPromotionForm(prev => ({ ...prev, tags: e.target.value }))}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddPromotion(false)}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => submitPromotion("draft")} disabled={isSavingPromotion}>
-              Save as Draft
-            </Button>
-            <Button onClick={() => submitPromotion()} disabled={isSavingPromotion}>
-              {isSavingPromotion ? "Saving..." : isEditing ? "Save Changes" : "Create Promotion"}
-            </Button>
-          </DialogFooter>
+
+                {/* Promotional Access Days - Advanced Policy Rule Builder */}
+                {isAccessDaysPromotion && (
+                  <div className={promoStyles.subsection}>
+                    <div id="promo-policyRules" tabIndex={-1} aria-describedby={fieldError("policyRules") ? "promo-policyRules-error" : undefined}>
+                      <h4 className="text-base font-semibold text-[#1E293B] mb-1 flex items-center gap-2">
+                        <CalendarDays className="h-5 w-5 text-[#2B7A78]" />
+                        Configure Access Days Rules <span style={{ color: "var(--destructive)" }} aria-hidden="true">*</span>
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Create flexible rules to determine which members are eligible and how many days they receive
+                      </p>
+                      <PolicyRuleBuilder
+                        rules={policyRules}
+                        onChange={(newRules) => setPolicyRules(newRules)}
+                      />
+                      {fieldError("policyRules") && (
+                        <p id="promo-policyRules-error" className={promoStyles.inlineError} role="alert">{fieldError("policyRules")}</p>
+                      )}
+                    </div>
+
+                    <div className={promoStyles.subsection}>
+                      {!editingPromotionId && (
+                        <Alert className="mb-4 border-amber-200 bg-amber-50">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <AlertDescription className="text-amber-800">
+                            Save this promotion first — Apply Promotion needs a saved promotion to record which members already received their days.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <EligibilityPreview
+                        members={eligibilityMembers}
+                        rules={policyRules}
+                        onApply={async (matches) => {
+                          if (!editingPromotionId) {
+                            throw new Error("Save this promotion before applying it to members");
+                          }
+                          const result = await promotionsService.applyAccessDays(editingPromotionId, matches);
+                          if (result.skippedCount > 0) {
+                            toast.info(`${result.skippedCount} member(s) already had this promotion applied and were skipped`);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {currentStepId === "targeting" && (
+              <section aria-labelledby="promo-step-targeting">
+                <h3 id="promo-step-targeting" className={promoStyles.sectionTitle}>Targeting</h3>
+                <p className={promoStyles.sectionHint}>Choose who can use the promotion and where it is promoted.</p>
+                <div className={promoStyles.grid}>
+                  <FormField htmlFor="promo-targetAudience" label="Target Audience" required error={fieldError("targetAudience")}>
+                    <SearchableSelect
+                      id="promo-targetAudience"
+                      value={promotionForm.targetAudience}
+                      options={TARGET_AUDIENCE_OPTIONS}
+                      placeholder="Select target audience"
+                      searchPlaceholder="Search audiences..."
+                      emptyText="No matching audience."
+                      invalid={!!fieldError("targetAudience")}
+                      ariaDescribedBy={fieldError("targetAudience") ? "promo-targetAudience-error" : undefined}
+                      onClose={() => touchField("targetAudience")}
+                      onChange={(val) => setPromotionForm(prev => ({ ...prev, targetAudience: val }))}
+                    />
+                  </FormField>
+                </div>
+
+                <fieldset className={promoStyles.subsection}>
+                  <legend className="text-sm font-medium">Distribution Channels</legend>
+                  <div className={promoStyles.optionGrid}>
+                    {CHANNEL_OPTIONS.map(opt => (
+                      <div key={opt.value} className={promoStyles.checkRow}>
+                        <Checkbox
+                          id={`promo-channel-${opt.value}`}
+                          checked={promotionForm.channels.includes(opt.value)}
+                          onCheckedChange={(checked) => updateArrayField("channels", opt.value, checked === true)}
+                        />
+                        <Label htmlFor={`promo-channel-${opt.value}`}>{opt.label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <fieldset className={promoStyles.subsection}>
+                  <legend className="text-sm font-medium">Applicable Plans</legend>
+                  <div className={promoStyles.optionGrid}>
+                    {APPLICABLE_PLAN_OPTIONS.map(plan => {
+                      const planId = `promo-plan-${plan.toLowerCase().replace(/\s+/g, "-")}`;
+                      return (
+                        <div key={plan} className={promoStyles.checkRow}>
+                          <Checkbox
+                            id={planId}
+                            checked={promotionForm.applicablePlans.includes(plan)}
+                            onCheckedChange={(checked) => updateArrayField("applicablePlans", plan, checked === true)}
+                          />
+                          <Label htmlFor={planId}>{plan}</Label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              </section>
+            )}
+
+            {currentStepId === "settings" && (
+              <section aria-labelledby="promo-step-settings">
+                <h3 id="promo-step-settings" className={promoStyles.sectionTitle}>Settings</h3>
+                <p className={promoStyles.sectionHint}>Control how the promotion behaves at checkout.</p>
+                <div className={promoStyles.grid}>
+                  <FormField htmlFor="promo-priority" label="Priority Level" required error={fieldError("priority")} hint="Higher priority applies first when promotions overlap.">
+                    <SearchableSelect
+                      id="promo-priority"
+                      value={promotionForm.priority}
+                      options={PRIORITY_OPTIONS}
+                      placeholder="Select priority"
+                      searchPlaceholder="Search priority..."
+                      invalid={!!fieldError("priority")}
+                      ariaDescribedBy={fieldError("priority") ? "promo-priority-error" : "promo-priority-hint"}
+                      onClose={() => touchField("priority")}
+                      onChange={(val) => setPromotionForm(prev => ({ ...prev, priority: val }))}
+                    />
+                  </FormField>
+                  <fieldset className={promoStyles.stackedChecks}>
+                    <legend className="sr-only">Promotion options</legend>
+                    <div className={promoStyles.checkRow}>
+                      <Checkbox
+                        id="promo-autoApply"
+                        checked={promotionForm.autoApply}
+                        onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, autoApply: checked === true }))}
+                      />
+                      <Label htmlFor="promo-autoApply">Auto-apply at checkout</Label>
+                    </div>
+                    <div className={promoStyles.checkRow}>
+                      <Checkbox
+                        id="promo-stackable"
+                        checked={promotionForm.stackable}
+                        onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, stackable: checked === true }))}
+                      />
+                      <Label htmlFor="promo-stackable">Can be combined with other promotions</Label>
+                    </div>
+                    <div className={promoStyles.checkRow}>
+                      <Checkbox
+                        id="promo-isPublic"
+                        checked={promotionForm.isPublic}
+                        onCheckedChange={(checked) => setPromotionForm(prev => ({ ...prev, isPublic: checked === true }))}
+                      />
+                      <Label htmlFor="promo-isPublic">Publicly visible</Label>
+                    </div>
+                  </fieldset>
+                  <FormField htmlFor="promo-terms" label="Terms & Conditions" className={promoStyles.full}>
+                    <Textarea
+                      id="promo-terms"
+                      className={promoStyles.textarea}
+                      placeholder="e.g., Valid for new memberships only. Cannot be exchanged for cash."
+                      value={promotionForm.termsAndConditions}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, termsAndConditions: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField htmlFor="promo-tags" label="Tags" className={promoStyles.full} hint="Separate tags with commas, e.g. new-year, discount, annual">
+                    <Input
+                      {...fieldA11y("promo-tags", undefined, true)}
+                      placeholder="new-year, discount, annual"
+                      value={promotionForm.tags}
+                      onChange={(e) => setPromotionForm(prev => ({ ...prev, tags: e.target.value }))}
+                    />
+                  </FormField>
+                </div>
+              </section>
+            )}
+          </form>
+
+          <div className={promoStyles.footer}>
+            <span className={promoStyles.footerMeta}>
+              Step {currentStep + 1} of {PROMOTION_STEPS.length}
+            </span>
+            <div className={promoStyles.footerActions}>
+              {currentStep === 0 ? (
+                <Button type="button" variant="outline" onClick={() => setShowAddPromotion(false)}>
+                  Cancel
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setCurrentStep(s => Math.max(0, s - 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isSavingPromotion}>
+                Save as Draft
+              </Button>
+              <Button type="submit" form="promotion-form" disabled={isSavingPromotion}>
+                {isLastStep
+                  ? (isSavingPromotion ? "Saving..." : isEditing ? "Save Changes" : "Create Promotion")
+                  : <>Next <ChevronRight className="h-4 w-4" /></>}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

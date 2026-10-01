@@ -347,6 +347,20 @@ class MembersService {
     return response.json();
   }
 
+  /** Freeze days / occurrences left in the member's current plan period */
+  async getFreezeAllowance(id: string | number): Promise<FreezeAllowance> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/members/${id}/freeze-allowance`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load freeze allowance: ${response.status}`));
+    return response.json();
+  }
+
+  /** Every freeze recorded for the member, newest first */
+  async getFreezeHistory(id: string | number): Promise<FreezeHistoryEntry[]> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/members/${id}/freezes`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load freeze history: ${response.status}`));
+    return response.json();
+  }
+
   async searchMembers(query: string): Promise<Member[]> {
     if (!query.trim()) return [];
     const result = await this.getMembers({ search: query }, { limit: 10 });
@@ -384,6 +398,38 @@ class MembersService {
       }, {} as Record<string, number>),
     };
   }
+}
+
+// camelCase: returned as Maps by the backend, which the SNAKE_CASE strategy leaves alone
+export interface FreezeAllowance {
+  planName?: string | null;
+  maxDays: number;
+  usedDays: number;
+  remainingDays: number;
+  maxOccurrences: number | null;
+  usedOccurrences: number;
+  remainingOccurrences: number | null;
+  freeDays: number;
+  freeDaysRemaining: number;
+  chargePerExtraDay: number;
+  autoUnfreeze: boolean;
+  canFreeze: boolean;
+  unavailableMessage: string | null;
+}
+
+export interface FreezeHistoryEntry {
+  id: number;
+  planName?: string | null;
+  freezeStart: string | null;
+  plannedEnd: string | null;
+  endedAt: string | null;
+  days: number;
+  freeDays: number;
+  chargedDays: number;
+  chargeAmount: number;
+  reason?: string | null;
+  source?: string | null;
+  status: "Active" | "Completed";
 }
 
 export const membersService = new MembersService();

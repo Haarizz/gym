@@ -222,6 +222,22 @@ public class MemberController {
     }
 
     /**
+     * GET /api/members/{id}/freeze-allowance — freeze days/occurrences left in the current plan period
+     */
+    @GetMapping("/{id}/freeze-allowance")
+    public ResponseEntity<java.util.Map<String, Object>> freezeAllowance(@PathVariable Long id) {
+        return ResponseEntity.ok(freezeService.getAllowanceView(id));
+    }
+
+    /**
+     * GET /api/members/{id}/freezes — every freeze recorded for the member, newest first
+     */
+    @GetMapping("/{id}/freezes")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> freezeHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(freezeService.getHistoryView(id));
+    }
+
+    /**
      * POST /api/members/{id}/unfreeze
      */
     @PostMapping("/{id}/unfreeze")

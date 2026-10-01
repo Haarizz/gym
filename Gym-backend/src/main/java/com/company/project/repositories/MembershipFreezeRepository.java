@@ -15,6 +15,9 @@ public interface MembershipFreezeRepository extends JpaRepository<MembershipFree
     List<MembershipFreeze> findByMemberDbIdAndFreezeStartGreaterThanEqualOrderByFreezeStartAsc(
             Long memberDbId, LocalDateTime periodStart);
 
+    /** All of a member's freezes, newest first. */
+    List<MembershipFreeze> findByMemberDbIdOrderByFreezeStartDesc(Long memberDbId);
+
     /** The member's freeze in progress, if any. */
     Optional<MembershipFreeze> findFirstByMemberDbIdAndEndedAtIsNullOrderByFreezeStartDesc(Long memberDbId);
 }

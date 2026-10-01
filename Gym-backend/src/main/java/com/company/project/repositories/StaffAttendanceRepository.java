@@ -36,4 +36,8 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     List<StaffAttendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
 
     List<StaffAttendance> findByStaff_IdOrderByClockInTimeDesc(Long staffId);
+
+    // Ids of staff with an open (clocked-in) session — web dashboard live staff status
+    @Query("SELECT DISTINCT sa.staff.id FROM StaffAttendance sa WHERE sa.status = 'working' AND sa.clockOutTime IS NULL")
+    List<Long> findClockedInStaffIds();
 }

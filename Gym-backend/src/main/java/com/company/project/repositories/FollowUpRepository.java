@@ -21,4 +21,6 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long>, JpaSp
     // Earliest still-active follow-up for a lead — used to keep Lead.nextFollowUp in sync
     // whenever a follow-up is created/rescheduled/completed/cancelled.
     List<FollowUp> findByLeadIdAndStatusNotInOrderByDueDateAsc(Long leadId, List<String> excludedStatuses);
+
+    List<FollowUp> findTop5ByStatusInOrderByDueDateAsc(List<String> statuses);
 }
