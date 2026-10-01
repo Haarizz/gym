@@ -19,6 +19,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // Bookings on a session that were paid with a Reward Pass (to give passes back before deleting).
     List<Booking> findBySessionIdAndRewardIdIsNotNull(Long sessionId);
 
+    // (sessionName, sessionType, sessionDate, sessionStartTime, price) for paid, priced bookings
+    // (PT and classes) whose session falls in [start, end] — web Revenue Dashboard
+    @Query("SELECT s.name, s.type, s.date, s.startTime, b.price FROM Booking b JOIN b.session s " +
+           "WHERE LOWER(b.paymentStatus) = 'paid' AND b.price > 0 AND LOWER(b.status) <> 'cancelled' " +
+           "AND s.date BETWEEN :start AND :end")
+    List<Object[]> findPaidBySessionDateBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
     // (className, bookedCount) for group classes (PT excluded) in the period
     @Query("SELECT s.name, COUNT(b) FROM Booking b JOIN b.session s " +
            "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled' " +

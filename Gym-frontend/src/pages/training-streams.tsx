@@ -296,16 +296,6 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           <p className="text-gray-600 mt-1">Manage live and on-demand fitness streaming content.</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-sm hover:shadow-md transition-all"
-            onClick={() => onNavigate && onNavigate("facilities")}
-          >
-            <Building2 className="mr-2 h-4 w-4" />
-            Manage Facilities
-          </Button>
-
           {/* Upload Recording Dialog */}
           <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
             <DialogTrigger asChild>

@@ -26,6 +26,10 @@ export function SearchableSelect({
   disabled = false,
   loading = false,
   id,
+  invalid = false,
+  ariaDescribedBy,
+  ariaLabel,
+  onClose,
 }: {
   value: string;
   options: SearchableOption[];
@@ -39,6 +43,13 @@ export function SearchableSelect({
   disabled?: boolean;
   loading?: boolean;
   id?: string;
+  /** Error styling + aria-invalid on the trigger */
+  invalid?: boolean;
+  /** Id(s) of the element(s) describing the field, e.g. its error message */
+  ariaDescribedBy?: string;
+  ariaLabel?: string;
+  /** Fires whenever the list closes (selection, Escape, click outside) — use it to mark the field touched */
+  onClose?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -46,10 +57,17 @@ export function SearchableSelect({
   const typed = search.trim();
   const exactMatch = typed && options.some(o => o.label.toLowerCase() === typed.toLowerCase());
 
-  const close = () => { setOpen(false); setSearch(""); };
+  const setOpenState = (o: boolean) => {
+    setOpen(o);
+    if (!o) {
+      setSearch("");
+      onClose?.();
+    }
+  };
+  const close = () => setOpenState(false);
 
   return (
-    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setSearch(""); }}>
+    <Popover open={open} onOpenChange={setOpenState}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -57,8 +75,20 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-invalid={invalid || undefined}
+          aria-describedby={ariaDescribedBy}
+          aria-label={ariaLabel}
           disabled={disabled}
+          onKeyDown={e => {
+            // Backspace/Delete clears a clearable field without opening the list
+            if (clearable && selected && !disabled && (e.key === "Backspace" || e.key === "Delete")) {
+              e.preventDefault();
+              onChange("");
+            }
+          }}
           className="w-full justify-between font-normal"
+          style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(230, 57, 70, 0.15)" } : undefined}
         >
           <span className={cn("truncate", !selected && "text-muted-foreground")}>
             {loading ? "Loading..." : selected ? selected.label : placeholder}
@@ -82,7 +112,11 @@ export function SearchableSelect({
         <Command>
           <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
           <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
+            {loading ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">Loading...</div>
+            ) : (
+              <CommandEmpty>{emptyText}</CommandEmpty>
+            )}
             <CommandGroup>
               {options.map(o => (
                 <CommandItem

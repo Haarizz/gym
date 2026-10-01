@@ -146,13 +146,13 @@ function buildReceiptQrPayload(company: CompanyDetails, receiptNo: string, detai
 // sizes, the 120x120 verification box) — company on the top-left, a
 // scannable QR box on the top-right.
 export const COMPANY_HEADER_CSS = `
-  .header{border-bottom:3px solid #327F74;padding-bottom:20px;margin-bottom:30px;display:flex;justify-content:space-between;align-items:flex-start}
+  .header{border-bottom:3px solid var(--rc-primary, #327F74);padding-bottom:20px;margin-bottom:30px;display:flex;justify-content:space-between;align-items:flex-start}
   .header-left{flex:1}
   .header-left .company-logo{max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block}
-  .company-name{color:#327F74;font-size:32px;font-weight:bold;margin-bottom:5px}
+  .company-name{color:var(--rc-primary, #327F74);font-size:32px;font-weight:bold;margin-bottom:5px}
   .company-details{color:#888;font-size:12px;line-height:1.6}
   .qr-top-right{width:120px;height:120px;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .qr-inner{text-align:center;color:#327F74}
+  .qr-inner{text-align:center;color:var(--rc-primary, #327F74)}
   .qr-inner svg{display:block;margin:0 auto;width:84px;height:84px}
   .qr-inner .qr-label{font-size:9px;font-weight:600;margin-top:5px;line-height:1.2}
   .qr-inner .qr-rcpt{font-size:9px;margin-top:3px;word-break:break-all}

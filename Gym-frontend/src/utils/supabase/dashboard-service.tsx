@@ -58,6 +58,11 @@ export const dashboardService = {
     return apiCall(`/dashboard/revenue?period=${period}`);
   },
 
+  // Check-ins grouped by time of day for the period
+  async getAttendanceSlots(period: string = 'today') {
+    return apiCall(`/dashboard/attendance-slots?period=${period}`);
+  },
+
   // Get membership distribution data
   async getMembershipDistribution() {
     return apiCall('/dashboard/membership-distribution');
@@ -98,6 +103,13 @@ export const dashboardService = {
     return apiCall('/dashboard/pending-tasks');
   },
 
+  // Revenue Dashboard tab — dates are inclusive yyyy-MM-dd
+  async getRevenueSummary(from: string, to: string, granularity?: RevenueGranularity) {
+    const params = new URLSearchParams({ from, to });
+    if (granularity) params.set('granularity', granularity);
+    return apiCall(`/dashboard/revenue-summary?${params.toString()}`) as Promise<ApiResponse<RevenueSummary>>;
+  },
+
   // Update KPI data
   async updateKPI(period: string, kpiData: any) {
     return apiCall('/dashboard/update-kpi', {
@@ -126,6 +138,13 @@ export interface KPIData {
   todayAttendance: number;
   attendanceChange: number;
   availableStaff: number;
+  clockedInStaff?: number;
+}
+
+export interface AttendanceSlot {
+  type: string;
+  members: number;
+  percentage: number;
 }
 
 export interface RevenueDataPoint {
@@ -192,6 +211,40 @@ export interface PendingTaskData {
   dueDate: string;
   priority: string;
   subject: string;
+}
+
+export type RevenueGranularity = 'hourly' | 'daily' | 'weekly' | 'monthly';
+
+export interface RevenueBreakdownRow {
+  name: string;
+  count: number;
+  amount: number;
+}
+
+export interface RevenueStreamSummary {
+  total: number;
+  cash: number;
+  card: number;
+  other: number;
+  count: number;
+  breakdown: RevenueBreakdownRow[];
+}
+
+export type RevenueStreamKey = 'membership' | 'services' | 'merchandise' | 'cafe' | 'equipment';
+
+export interface RevenueSummary {
+  from: string;
+  to: string;
+  previousFrom: string;
+  previousTo: string;
+  granularity: RevenueGranularity;
+  totalCollection: Omit<RevenueStreamSummary, 'breakdown'> & { trend: number };
+  expenses: { total: number; count: number; trend: number; breakdown: RevenueBreakdownRow[] };
+  netRevenue: { total: number; trend: number };
+  activeMembers: { count: number; newInPeriod: number };
+  paymentMethods: RevenueBreakdownRow[];
+  streams: Record<RevenueStreamKey, RevenueStreamSummary>;
+  trend: { label: string; start: string; revenue: number; expenses: number | null }[];
 }
 
 export interface ApiResponse<T> {

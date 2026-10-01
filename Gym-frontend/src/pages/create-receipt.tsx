@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { getCompanyDetails } from "../utils/company-details";
 import { getVatRate, splitVatInclusive } from "../utils/tax";
 import { buildFullReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
+import { getReceiptColors } from "../utils/receipt-colors";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Checkbox } from "../components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
@@ -340,7 +341,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       transactionRef: transactionReference || undefined,
     };
 
-    const html = buildFullReceiptHtml(printData, company);
+    const html = buildFullReceiptHtml(printData, company, await getReceiptColors());
 
     if (win) { win.document.write(html); win.document.close(); }
     printInFlightRef.current = false;

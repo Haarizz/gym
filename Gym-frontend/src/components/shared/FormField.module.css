@@ -1,0 +1,31 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  gap: 2px;
+}
+
+.required {
+  color: var(--destructive);
+  margin-left: 2px;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--destructive);
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+}

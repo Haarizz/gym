@@ -22,12 +22,17 @@ import {
   Users,
   RefreshCcw,
   ArrowLeft,
+  Printer,
 } from 'lucide-react';
+import { PeriodComparison } from "../components/reports/PeriodComparison";
+import { PAY_METHOD_ORDER, splitPaid } from "../utils/payment-split";
 import { toast } from "sonner";
 import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
 
 interface CustomReportsProps {
   onNavigate?: (section: string) => void;
+  /** Rendered inside another page (e.g. the Reports & Analytics tab): no back link or page padding */
+  embedded?: boolean;
 }
 
 interface ReportRecord {
@@ -44,6 +49,10 @@ interface ReportRecord {
   dueAmount: number;
   dueDate: string | null;
   transactionDate: string;
+  /** Money actually received on this receipt */
+  paidAmount: number;
+  /** paidAmount split by payment method bucket (Cash, Card, Online, ...) */
+  paidByMethod: Record<string, number>;
 }
 
 function mapReceiptToRecord(r: Receipt): ReportRecord {
@@ -58,13 +67,18 @@ function mapReceiptToRecord(r: Receipt): ReportRecord {
     planName: r.plan_name || '',
     planAmount: r.amount ? Number(r.amount) : 0,
     paymentMode: r.payment_method || '',
-    dueAmount: r.status?.toLowerCase() === 'pending' ? (r.amount ? Number(r.amount) : 0) : 0,
+    // What's still owed on this bill (partial payments included)
+    dueAmount: ['pending', 'partial', 'overdue'].includes((r.status || '').toLowerCase())
+      ? Math.max(0, Number(r.amount || 0) - Number(r.total_paid_to_date ?? r.paid_amount ?? 0))
+      : 0,
     dueDate: r.valid_till || null,
     transactionDate: r.transaction_date ? r.transaction_date.split('T')[0] : '',
+    paidAmount: Number(r.paid_amount ?? r.amount ?? 0),
+    paidByMethod: splitPaid(r, Number(r.paid_amount ?? r.amount ?? 0)),
   };
 }
 
-export function CustomReports({ onNavigate }: CustomReportsProps) {
+export function CustomReports({ onNavigate, embedded = false }: CustomReportsProps) {
   const { currencyCode } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
 
@@ -73,7 +87,6 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<string>('all');
-  const [showSummary, setShowSummary] = useState(false);
   const [reportData, setReportData] = useState<ReportRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -150,24 +163,22 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
     const totalPlans = filteredData.length;
     const totalRevenue = filteredData.reduce((sum, record) => sum + record.planAmount, 0);
     const totalDue = filteredData.reduce((sum, record) => sum + record.dueAmount, 0);
+    const totalPaid = filteredData.reduce((sum, record) => sum + record.paidAmount, 0);
+    const byMethod: Record<string, number> = {};
+    for (const record of filteredData) {
+      for (const [m, amt] of Object.entries(record.paidByMethod)) byMethod[m] = (byMethod[m] || 0) + amt;
+    }
+    const methods = PAY_METHOD_ORDER.filter(m => (byMethod[m] || 0) > 0).map(m => ({ method: m, amount: byMethod[m] }));
 
     return {
       totalPlans,
       totalRevenue,
       totalDue,
+      totalPaid,
+      methods,
     };
   }, [filteredData]);
 
-  // Apply date range
-  const handleApply = () => {
-    if (dateRange === 'custom' && (!customStartDate || !customEndDate)) {
-      toast.error('Please select both start and end dates');
-      return;
-    }
-    setShowSummary(true);
-    setTimeout(() => setShowSummary(false), 5000);
-    toast.success('Report generated successfully!');
-  };
 
   // Export functions
   const downloadBlob = (filename: string, blob: Blob) => {
@@ -369,35 +380,82 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className={embedded ? "" : "min-h-screen bg-gray-50 p-6"} id="custom-report-print">
+      {/* Print only this report: hide the rest of the app and every on-screen control */}
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body * { visibility: hidden !important; }
+          #custom-report-print, #custom-report-print * { visibility: visible !important; }
+          #custom-report-print { position: absolute; left: 0; top: 0; width: 100%; min-height: 0; background: #fff; padding: 0; }
+          #custom-report-print [data-print-hide] { display: none !important; }
+          #custom-report-print .shadow-md, #custom-report-print .shadow-lg { box-shadow: none !important; }
+          #custom-report-print [data-slot="card"] { break-inside: avoid; border: 1px solid #e5e7eb !important; }
+          #custom-report-print tr { break-inside: avoid; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-2 -ml-2 text-gray-600 hover:text-gray-900"
-          onClick={() => onNavigate?.('reports')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Reports
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          {!embedded && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-2 -ml-2 text-gray-600 hover:text-gray-900"
+              onClick={() => onNavigate?.('reports')}
+              data-print-hide
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Reports
+            </Button>
+          )}
+          <h1 className="text-3xl font-bold text-gray-900">Custom Reports</h1>
+          <p className="text-gray-600 mt-1">
+            Comparisons, profit analytics and detailed membership reports
+          </p>
+        </div>
+        <Button onClick={() => window.print()} className="bg-primary text-white" data-print-hide>
+          <Printer className="h-4 w-4 mr-2" />
+          Print Report
         </Button>
-        <h1 className="text-3xl font-bold text-gray-900">Custom Reports</h1>
-        <p className="text-gray-600 mt-1">
-          Generate detailed membership reports with custom date ranges
-        </p>
       </div>
 
-      {/* Date Range Filter Card */}
-      <Card className={`${panelCardShell} mb-6`}>
+      {/* Today vs Yesterday and This Month vs Last Month */}
+      <PeriodComparison />
+
+      {/* Membership Report Table */}
+      <Card className={panelCardShell}>
         <CardHeader className="bg-gradient-light border-b border-slate-100">
-          <CardTitle className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            <span>Date Range Filter</span>
-          </CardTitle>
-          <CardDescription>Select a date range to generate your report</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <span>Membership Report (Detailed)</span>
+              </CardTitle>
+              <CardDescription>
+                Complete transaction history for the selected date range, with cash / card / online totals
+              </CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <FileText className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="space-y-4">
+          {/* Date range (filters the report instantly) */}
+          <div className="space-y-4 mb-6" data-print-hide>
             {/* Quick Select Buttons */}
             <div className="flex flex-wrap items-center gap-3">
               <Button
@@ -477,83 +535,44 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Apply Button */}
-            <div className="flex justify-end">
-              <Button className="btn-primary" onClick={handleApply}>
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Apply & Generate Report
-              </Button>
+          {/* Totals and payment method split for the selected range */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-gray-500 mb-1">Transactions</p>
+              <p className="text-xl font-bold text-primary">{summary.totalPlans}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-gray-500 mb-1">Total Billed</p>
+              <p className="text-xl font-bold text-gray-900"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-gray-500 mb-1">Collected</p>
+              <p className="text-xl font-bold text-green-600"><CurrencyGlyph /> {summary.totalPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-xs text-gray-500 mb-1">Outstanding Dues</p>
+              <p className="text-xl font-bold text-red-600"><CurrencyGlyph /> {summary.totalDue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Toast */}
-      {showSummary && (
-        <Card className={`${panelCardShell} mb-6 animate-in slide-in-from-top duration-200`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900 flex items-center">
-                <DollarSign className="h-5 w-5 text-primary mr-2" />
-                Summary ({getRangeDisplayLabel()})
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSummary(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 mb-1">Total Transactions</p>
-                <p className="text-2xl font-bold text-blue-700">{summary.totalPlans}</p>
-              </div>
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <p className="text-xs text-green-600 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-700"><CurrencyGlyph /> {summary.totalRevenue.toLocaleString()}</p>
-              </div>
-              <div className="text-center p-3 bg-red-50 rounded-lg">
-                <p className="text-xs text-red-600 mb-1">Total Dues</p>
-                <p className="text-2xl font-bold text-red-700"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Membership Report Table */}
-      <Card className={panelCardShell}>
-        <CardHeader className="bg-gradient-light border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-primary" />
-                <span>Membership Report (Detailed)</span>
-              </CardTitle>
-              <CardDescription>
-                Complete transaction history for selected date range
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={handleExportPDF}>
-                <FileText className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="text-sm font-medium text-gray-700 mr-1">Collected by method:</span>
+            {summary.methods.length === 0 ? (
+              <span className="text-sm text-gray-500">No payments in this range</span>
+            ) : (
+              summary.methods.map(m => (
+                <span key={m.method} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm">
+                  <span className="text-gray-600">{m.method}</span>
+                  <span className="font-semibold text-gray-900"><CurrencyGlyph /> {m.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  {summary.totalPaid > 0 && (
+                    <span className="text-xs text-gray-500">{Math.round((m.amount / summary.totalPaid) * 100)}%</span>
+                  )}
+                </span>
+              ))
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="p-6">
+
           {/* Filters and Search */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-1">
@@ -717,6 +736,16 @@ export function CustomReports({ onNavigate }: CustomReportsProps) {
                   <p className="text-xl font-bold text-red-600"><CurrencyGlyph /> {summary.totalDue.toLocaleString()}</p>
                 </div>
               </div>
+              {summary.methods.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-primary/10 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                  {summary.methods.map(m => (
+                    <span key={m.method}>
+                      <span className="text-gray-600">{m.method}: </span>
+                      <span className="font-semibold"><CurrencyGlyph /> {m.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
