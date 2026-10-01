@@ -6,3 +6,4 @@ export * from './useMyTargets';
 export * from './useMyPerformance';
 export * from './useMyTransactions';
 export * from './useMySettings';
+export * from './useStaffProfile';

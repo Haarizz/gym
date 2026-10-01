@@ -2,6 +2,9 @@ import type { ProfileRepository } from '../../application/repository/ProfileRepo
 import type {
   Profile,
   ProfileSummary,
+  PerformanceRole,
+  StaffProfile,
+  SummaryRole,
   UserPerformance,
   UserSettings,
   UserTarget,
@@ -12,9 +15,10 @@ import type {
   ChangePasswordDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdateStaffContactDto,
 } from '../../application/dto/ProfileDtos';
 import { ProfileApi, type ApiAuthMeResponse } from '../api/ProfileApi';
-import type { ProfileApiModel } from '../api/ProfileApiModels';
+import type { ProfileApiModel, StaffProfileApiModel } from '../api/ProfileApiModels';
 import { useAuthStore } from '@/domains/auth/store';
 import { secureStorage } from '@/core/platform/storage';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
@@ -71,11 +75,17 @@ export class ApiProfileRepository implements ProfileRepository {
       photoUrl = localPhoto || undefined;
     }
 
-    const name = localProfile.name || primaryName;
-    const email = remoteProfile?.email || localProfile.email || currentUser?.email || `${username}@gymbios.local`;
-    const phone = remoteProfile?.phone || localProfile.phone || '';
-    const address = remoteProfile?.address || localProfile.address || '';
     const roleDisplay = primaryRole.toUpperCase();
+
+    // 4. Staff/trainer accounts: the employee record the admin maintains on the
+    // web Staffs & Trainers page is the source of truth for contact and
+    // employment details.
+    const staff = roleDisplay !== 'MEMBER' ? await this.getStaffProfile().catch(() => null) : null;
+
+    const name = staff?.name || localProfile.name || primaryName;
+    const email = staff?.email || remoteProfile?.email || localProfile.email || currentUser?.email || `${username}@gymbios.local`;
+    const phone = staff?.phone || remoteProfile?.phone || localProfile.phone || '';
+    const address = staff?.address || remoteProfile?.address || localProfile.address || '';
 
     return {
       id: userId,
@@ -85,21 +95,43 @@ export class ApiProfileRepository implements ProfileRepository {
       phone,
       address,
       role: roleDisplay,
-      department: 'Management',
-      branch: 'All branches',
-      staffId: `EMP-${userId.padStart(4, '0')}`,
-      joinDate: '2024-01-15',
+      department: staff?.department,
+      branch: staff?.branch,
+      staffId: staff?.staffId,
+      joinDate: staff?.joinDate,
       photoUrl,
       status: authMe?.enabled !== false ? 'Active' : 'Inactive',
     };
   }
 
-  async getSummary(): Promise<ProfileSummary> {
+  async getStaffProfile(): Promise<StaffProfile | null> {
+    const raw = await this.api.getMyStaffProfile();
+    return raw ? toStaffProfile(raw) : null;
+  }
+
+  async updateStaffContact(data: UpdateStaffContactDto): Promise<StaffProfile> {
+    return toStaffProfile(await this.api.updateMyStaffContact(data.phone.trim(), data.address.trim()));
+  }
+
+  async getSummary(role: SummaryRole): Promise<ProfileSummary> {
+    if (role === 'member') {
+      const raw = await this.api.getMemberDashboardSummary();
+      return {
+        kind: 'member',
+        totalVisits: raw.activity_stats?.total_visits ?? 0,
+        streakDays: raw.activity_stats?.current_streak_days ?? 0,
+        membershipDaysLeft: raw.membership?.active ? raw.membership.days_remaining ?? null : null,
+      };
+    }
+
+    const performance = await this.getPerformance(role);
+    const isTrainer = performance.role === 'trainer';
     return {
-      performanceScore: 94,
-      completedTargets: 24,
-      totalTargets: 32,
-      attendanceRate: 98,
+      kind: 'employee',
+      performanceScore: performance.performanceScore,
+      targetAchieved: (isTrainer ? performance.classesCompleted : performance.leadsConverted) ?? 0,
+      targetTotal: (isTrainer ? performance.sessionsTarget : performance.conversionTarget) ?? 0,
+      attendanceRate: performance.attendanceRate,
     };
   }
 
@@ -152,35 +184,29 @@ export class ApiProfileRepository implements ProfileRepository {
     ];
   }
 
-  async getPerformance(): Promise<UserPerformance> {
+  async getPerformance(role: PerformanceRole): Promise<UserPerformance> {
+    const raw = await this.api.getMyPerformance(role);
     return {
-      performanceScore: 94,
-      classesCompleted: 156,
-      hoursWorked: 340,
-      clientSatisfaction: 96,
-      kpis: [
-        {
-          label: 'Performance Growth',
-          value: '+12%',
-          growth: '+12%',
-          isPositive: true,
-          subtitle: 'vs last month',
-        },
-        {
-          label: 'Client Retention',
-          value: '+8%',
-          growth: '+8%',
-          isPositive: true,
-          subtitle: 'vs last quarter',
-        },
-        {
-          label: 'Session Quality',
-          value: '+15%',
-          growth: '+15%',
-          isPositive: true,
-          subtitle: 'avg rating improvement',
-        },
-      ],
+      role: raw.role,
+      periodLabel: raw.period_label,
+      performanceScore: raw.performance_score,
+      classesCompleted: raw.classes_completed,
+      sessionsTarget: raw.sessions_target,
+      sessionTargetPercentage: raw.session_target_percentage,
+      sessionGrowth: raw.session_growth,
+      leadsConverted: raw.leads_converted,
+      conversionTarget: raw.conversion_target,
+      conversionRate: raw.conversion_rate,
+      conversionGrowth: raw.conversion_growth,
+      followUpCompletion: raw.follow_up_completion,
+      hoursWorked: raw.hours_worked ?? 0,
+      daysPresent: raw.days_present ?? 0,
+      daysScheduled: raw.days_scheduled ?? 0,
+      attendanceRate: raw.attendance_rate,
+      revenueAchieved: Number(raw.revenue_achieved ?? 0),
+      revenueTarget: Number(raw.revenue_target ?? 0),
+      revenueGrowth: raw.revenue_growth,
+      message: raw.message ?? '',
     };
   }
 
@@ -327,4 +353,31 @@ export class ApiProfileRepository implements ProfileRepository {
     await secureStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
     return updated;
   }
+}
+
+function toStaffProfile(raw: StaffProfileApiModel): StaffProfile {
+  return {
+    staffId: raw.staff_id ?? undefined,
+    name: raw.name,
+    email: raw.email,
+    phone: raw.phone ?? undefined,
+    address: raw.address ?? undefined,
+    role: raw.role ?? undefined,
+    department: raw.department ?? undefined,
+    branch: raw.branch ?? undefined,
+    status: raw.status ?? undefined,
+    joinDate: raw.join_date ?? undefined,
+    monthlyTarget: raw.monthly_target ?? undefined,
+    baseSalary: raw.base_salary ?? undefined,
+    appUsername: raw.app_username ?? undefined,
+    certifications: (raw.certifications ?? []).map((c) => ({
+      id: c.id != null ? String(c.id) : undefined,
+      name: c.cert_name ?? '',
+      issuer: c.issuer ?? undefined,
+      issueDate: c.issue_date ?? undefined,
+      expiryDate: c.expiry_date ?? undefined,
+      documentUrl: c.document_url ?? undefined,
+    })),
+    schedule: raw.schedule ?? {},
+  };
 }

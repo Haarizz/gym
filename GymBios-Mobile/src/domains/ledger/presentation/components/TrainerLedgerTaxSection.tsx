@@ -21,11 +21,8 @@ export function TrainerLedgerTaxSection({
       <View style={styles.taxAlertCard}>
         <Text style={styles.taxAlertTitle}>Tax Information</Text>
         <Text style={styles.taxAlertBody}>
-          Your YTD earnings: <MoneyOrDash amount={taxInfo.ytdEarnings} />. Download your quarterly tax statement for filing.
+          Your YTD earnings: <MoneyOrDash amount={taxInfo.ytdEarnings} />.
         </Text>
-        <Pressable hitSlop={8}>
-          <Text style={styles.taxAlertLink}>Download Tax Statement →</Text>
-        </Pressable>
       </View>
 
       {/* Year to Date Summary */}
@@ -57,6 +54,9 @@ export function TrainerLedgerTaxSection({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tax Documents</Text>
         <View style={styles.docsList}>
+          {taxDocuments.length === 0 && (
+            <Text style={styles.emptyText}>No tax documents have been issued yet.</Text>
+          )}
           {taxDocuments.map((doc) => (
             <Pressable
               key={doc.id}
@@ -152,6 +152,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: Radius.sm,
     padding: Spacing.three,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   docTitle: {
     fontSize: 13,

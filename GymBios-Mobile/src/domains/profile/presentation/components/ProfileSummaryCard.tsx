@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -21,11 +22,7 @@ export function ProfileSummaryCard({
   firstName,
   onEditPhoto,
 }: ProfileSummaryCardProps) {
-  const performanceScore = summary?.performanceScore ?? 94;
-  const targetsCompleted = summary?.completedTargets ?? 24;
-  const totalTargets = summary?.totalTargets ?? 32;
-  const attendanceRate = summary?.attendanceRate ?? 98;
-
+  const metrics = summary ? buildMetrics(summary) : null;
   const roleDisplay = profile?.role ? profile.role.toUpperCase() : 'MEMBER';
 
   return (
@@ -63,41 +60,57 @@ export function ProfileSummaryCard({
         </View>
       </View>
 
-      {/* Three Summary Metrics */}
-      <GlassSurface radius={Radius.lg} style={styles.metricsContainer}>
-        <View style={styles.metricBox}>
-          <Typography variant="caption" style={styles.metricLabel}>
-            Performance
-          </Typography>
-          <Typography variant="subtitle" style={[styles.metricValue, styles.performanceValue]}>
-            {performanceScore}%
-          </Typography>
-        </View>
-
-        <View style={styles.metricDivider} />
-
-        <View style={styles.metricBox}>
-          <Typography variant="caption" style={styles.metricLabel}>
-            Targets
-          </Typography>
-          <Typography variant="subtitle" style={[styles.metricValue, styles.targetsValue]}>
-            {targetsCompleted}/{totalTargets}
-          </Typography>
-        </View>
-
-        <View style={styles.metricDivider} />
-
-        <View style={styles.metricBox}>
-          <Typography variant="caption" style={styles.metricLabel}>
-            Attendance
-          </Typography>
-          <Typography variant="subtitle" style={[styles.metricValue, styles.attendanceValue]}>
-            {attendanceRate}%
-          </Typography>
-        </View>
-      </GlassSurface>
+      {/* Three Summary Metrics — hidden for admins, who have no personal stats */}
+      {metrics && (
+        <GlassSurface radius={Radius.lg} style={styles.metricsContainer}>
+          {metrics.map((metric, index) => (
+            <Fragment key={metric.label}>
+              {index > 0 && <View style={styles.metricDivider} />}
+              <View style={styles.metricBox}>
+                <Typography variant="caption" style={styles.metricLabel}>
+                  {metric.label}
+                </Typography>
+                <Typography variant="subtitle" style={[styles.metricValue, { color: metric.color }]}>
+                  {metric.value}
+                </Typography>
+              </View>
+            </Fragment>
+          ))}
+        </GlassSurface>
+      )}
     </View>
   );
+}
+
+interface SummaryMetric {
+  label: string;
+  value: string;
+  color: string;
+}
+
+const GREEN = '#16a34a';
+const BLUE = '#2563eb';
+
+const percentOrDash = (value: number | null) => (value == null ? '—' : `${value}%`);
+
+function buildMetrics(summary: ProfileSummary): SummaryMetric[] {
+  if (summary.kind === 'member') {
+    const daysLeft = summary.membershipDaysLeft;
+    return [
+      { label: 'Visits', value: `${summary.totalVisits}`, color: GREEN },
+      { label: 'Streak', value: `${summary.streakDays} ${summary.streakDays === 1 ? 'day' : 'days'}`, color: BrandColors.teal },
+      { label: 'Plan Days Left', value: daysLeft == null ? '—' : `${daysLeft}`, color: BLUE },
+    ];
+  }
+  return [
+    { label: 'Performance', value: percentOrDash(summary.performanceScore), color: GREEN },
+    {
+      label: 'Targets',
+      value: summary.targetTotal > 0 ? `${summary.targetAchieved}/${summary.targetTotal}` : '—',
+      color: BrandColors.teal,
+    },
+    { label: 'Attendance', value: percentOrDash(summary.attendanceRate), color: BLUE },
+  ];
 }
 
 const styles = StyleSheet.create({
@@ -175,15 +188,6 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 16,
     fontWeight: '800',
-  },
-  performanceValue: {
-    color: '#16a34a',
-  },
-  targetsValue: {
-    color: BrandColors.teal,
-  },
-  attendanceValue: {
-    color: '#2563eb',
   },
   metricDivider: {
     width: 1,

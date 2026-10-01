@@ -95,6 +95,7 @@ public class MobileMemberMembershipService {
         membershipInfo.setStatus(member.getMembershipStatus());
         membershipInfo.setStartDate(member.getMembershipStartDate());
         membershipInfo.setExpiryDate(member.getExpiryDate());
+        membershipInfo.setBranchId(member.getBranchId());
         
         // Determine plan details
         MembershipPlan plan = null;

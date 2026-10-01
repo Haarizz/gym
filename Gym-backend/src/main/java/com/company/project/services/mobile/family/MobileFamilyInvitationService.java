@@ -7,6 +7,7 @@ import com.company.project.entities.MobileFamilyInvitation;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.mobile.family.MobileFamilyInvitationRepository;
 import com.company.project.services.EmailService;
+import com.company.project.services.GlobalMembershipService;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ public class MobileFamilyInvitationService {
     private final MobileFamilyInvitationRepository invitationRepository;
     private final MemberRepository memberRepository;
     private final FamilyInvitationDirectoryRepository directoryRepository;
+    private final GlobalMembershipService globalMembershipService;
     private final EmailService emailService;
 
     @Value("${mobile.app.download-url:}")
@@ -49,11 +51,13 @@ public class MobileFamilyInvitationService {
     public MobileFamilyInvitationService(MobileFamilyInvitationRepository invitationRepository,
                                          MemberRepository memberRepository,
                                          FamilyInvitationDirectoryRepository directoryRepository,
-                                         EmailService emailService) {
+                                         EmailService emailService,
+                                         GlobalMembershipService globalMembershipService) {
         this.invitationRepository = invitationRepository;
         this.memberRepository = memberRepository;
         this.directoryRepository = directoryRepository;
         this.emailService = emailService;
+        this.globalMembershipService = globalMembershipService;
     }
 
     public static String normalizeEmail(String email) {
@@ -171,6 +175,7 @@ public class MobileFamilyInvitationService {
         }
         dependent.setGlobalUserId(globalUserId);
         memberRepository.saveAndFlush(dependent);
+        globalMembershipService.recordLink(globalUserId, dependent.getId());
         return ClaimStatus.CLAIMED;
     }
 

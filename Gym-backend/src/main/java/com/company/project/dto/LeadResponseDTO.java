@@ -19,6 +19,8 @@ public class LeadResponseDTO {
     private String source;
     private String priority;
     private String assignedStaff;
+    // Member this lead was registered as, or null if not registered yet
+    private Long memberId;
     private LocalDateTime nextFollowUp;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime lastContactDate;
@@ -67,6 +69,8 @@ public class LeadResponseDTO {
 
     public String getAssignedStaff() { return assignedStaff; }
     public void setAssignedStaff(String assignedStaff) { this.assignedStaff = assignedStaff; }
+    public Long getMemberId() { return memberId; }
+    public void setMemberId(Long memberId) { this.memberId = memberId; }
 
     public LocalDateTime getNextFollowUp() { return nextFollowUp; }
     public void setNextFollowUp(LocalDateTime nextFollowUp) { this.nextFollowUp = nextFollowUp; }

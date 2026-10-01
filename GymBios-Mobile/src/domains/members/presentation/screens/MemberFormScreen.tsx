@@ -1,19 +1,25 @@
-import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BackHandler,
+  KeyboardAvoidingView,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
-import { Radius, Spacing } from '@/core/theme';
+import { useTheme } from '@/core/hooks';
+import { ApiError } from '@/core/platform/api/types';
+import { BrandColors, MaxContentWidth, Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
-import {
-  ProgressIndicator,
-  WizardHeader,
-  WizardNavigation,
-} from '@/shared/components/Wizard';
 import { PaymentBottomSheet, type PaymentResult } from '@/shared/payment';
 import type { Member } from '../../domain/Member';
-import { useMemberWizard } from '../../hooks/useMemberWizard';
+import { useMemberWizard, type MemberPrefill } from '../../hooks/useMemberWizard';
 
 import { PersonalStep } from '../components/form/PersonalStep';
 import { MembershipStep } from '../components/form/MembershipStep';
@@ -27,41 +33,83 @@ interface MemberFormScreenProps {
   mode: 'create' | 'edit';
   initialData?: Member;
   memberId?: number;
+  prefill?: MemberPrefill;
   onSuccess: () => void;
 }
 
-const STEP_LABELS = [
-  'Personal',
-  'Membership',
-  'Medical',
-  'Family',
-  'Access',
+const STEPS = [
+  { label: 'Personal', title: 'Personal details' },
+  { label: 'Plan', title: 'Membership' },
+  { label: 'Health', title: 'Health information' },
+  { label: 'Family', title: 'Family' },
+  { label: 'Review', title: 'App access & review' },
 ];
+
+const SCREEN_BACKGROUND = BrandColors.screenBackground;
 
 export function MemberFormScreen({
   mode,
   initialData,
   memberId,
+  prefill,
   onSuccess,
 }: MemberFormScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const theme = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
+  // Errors stay hidden until the user tries to move on, so a fresh form isn't all red.
+  const [showErrors, setShowErrors] = useState(false);
+  const [furthestStep, setFurthestStep] = useState(mode === 'edit' ? STEPS.length : 1);
 
-  const handleError = useCallback((_error: Error) => {
-    toast.error('An error occurred. Please try again.', {
-      title: 'Error'
-    });
+  const handleError = useCallback((error: Error) => {
+    // API failures are already toasted (with the server's reason) by apiClient.
+    if (error instanceof ApiError) return;
+    toast.error('An error occurred. Please try again.', { title: 'Error' });
   }, []);
 
-  const handleCancel = useCallback(() => {
-    setShowDiscardDialog(true);
-  }, []);
+  const wizard = useMemberWizard({
+    mode,
+    initialData,
+    memberId,
+    prefill,
+    onSuccess,
+    onError: handleError,
+  });
 
-  const handleKeepEditing = useCallback(() => {
-    setShowDiscardDialog(false);
-  }, []);
+  const {
+    step,
+    totalSteps,
+    data,
+    stepErrors,
+    validateStep,
+    canGoNext,
+    loading,
+    updateField,
+    goToStep,
+    submit,
+    addFamilyMember,
+    removeFamilyMember,
+  } = wizard;
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  // Every step change goes through here so error display and the furthest
+  // reachable step stay in sync with navigation.
+  const navigateTo = useCallback(
+    (target: number, withErrors = false) => {
+      goToStep(target);
+      setShowErrors(withErrors);
+      setFurthestStep((prev) => Math.max(prev, target));
+    },
+    [goToStep],
+  );
+
+  const handleKeepEditing = useCallback(() => setShowDiscardDialog(false), []);
 
   const handleDiscard = useCallback(() => {
     setShowDiscardDialog(false);
@@ -72,35 +120,71 @@ export function MemberFormScreen({
     }
   }, [router]);
 
-  const wizard = useMemberWizard({
-    mode,
-    initialData,
-    memberId,
-    onSuccess,
-    onError: handleError,
-  });
+  // Android back: step back through the wizard, then confirm before leaving.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showPaymentSheet) return false;
+      if (step > 1) {
+        navigateTo(step - 1);
+      } else {
+        setShowDiscardDialog(true);
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [step, navigateTo, showPaymentSheet]);
 
-  const {
-    step,
-    totalSteps,
-    data,
-    updateField,
-    canGoNext,
-    loading,
-    next,
-    previous,
-    submit,
-    addFamilyMember,
-    removeFamilyMember,
-  } = wizard;
+  const warnInvalid = useCallback(() => {
+    toast.warning('Please fix the highlighted fields to continue.');
+  }, []);
 
-  const handleFinalSubmit = useCallback(() => {
+  /** Jumps to the first step (up to `upTo`, exclusive) with errors. Returns true if one was found. */
+  const goToFirstInvalidStep = useCallback(
+    (upTo: number) => {
+      for (let s = 1; s < upTo; s++) {
+        if (Object.keys(validateStep(s)).length > 0) {
+          navigateTo(s, true);
+          warnInvalid();
+          return true;
+        }
+      }
+      return false;
+    },
+    [validateStep, navigateTo, warnInvalid],
+  );
+
+  const handleNext = useCallback(() => {
+    if (!canGoNext) {
+      setShowErrors(true);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      warnInvalid();
+      return;
+    }
+    navigateTo(step + 1);
+  }, [canGoNext, navigateTo, step, warnInvalid]);
+
+  const handleSubmit = useCallback(() => {
+    if (goToFirstInvalidStep(totalSteps + 1)) return;
     if (mode === 'create') {
       setShowPaymentSheet(true);
     } else {
       submit();
     }
-  }, [mode, submit]);
+  }, [goToFirstInvalidStep, totalSteps, mode, submit]);
+
+  const handleStepPress = useCallback(
+    (target: number) => {
+      if (target === step) return;
+      if (target < step) {
+        navigateTo(target);
+        return;
+      }
+      if (target > furthestStep) return;
+      // Moving forward: every step in between has to be valid first.
+      if (!goToFirstInvalidStep(target)) navigateTo(target);
+    },
+    [step, furthestStep, navigateTo, goToFirstInvalidStep],
+  );
 
   const handlePaymentComplete = useCallback(
     async (result: PaymentResult) => {
@@ -110,25 +194,26 @@ export function MemberFormScreen({
     [submit],
   );
 
-  const currentStepTitle = useMemo(() => {
-    const titles: Record<number, string> = {
-      1: 'Personal Information',
-      2: 'Membership Information',
-      3: 'Medical Information',
-      4: 'Family Configuration',
-      5: 'App Access & Review',
-    };
-    return titles[step] ?? '';
-  }, [step]);
+  const errors = showErrors ? stepErrors : undefined;
+  const isFirst = step === 1;
+  const isLast = step === totalSteps;
 
-  const renderStep = useCallback(() => {
+  const renderStep = () => {
     switch (step) {
       case 1:
-        return <PersonalStep data={data} updateField={updateField} />;
+        return <PersonalStep data={data} updateField={updateField} errors={errors} />;
       case 2:
-        return <MembershipStep data={data} updateField={updateField} />;
+        return (
+          <MembershipStep
+            data={data}
+            updateField={updateField}
+            errors={errors}
+            showProcessedBy={mode === 'create'}
+            allowPastDates={mode === 'edit'}
+          />
+        );
       case 3:
-        return <MedicalStep data={data} updateField={updateField} />;
+        return <MedicalStep data={data} updateField={updateField} errors={errors} />;
       case 4:
         return (
           <FamilyStep
@@ -139,61 +224,146 @@ export function MemberFormScreen({
           />
         );
       case 5:
-        return <AppAccessStep data={data} updateField={updateField} />;
+        return (
+          <AppAccessStep
+            data={data}
+            updateField={updateField}
+            errors={errors}
+            mode={mode}
+            hasExistingLogin={mode === 'edit' && !!initialData?.appUsername}
+            goToStep={navigateTo}
+            validateStep={validateStep}
+          />
+        );
       default:
         return null;
     }
-  }, [step, data, updateField, addFamilyMember, removeFamilyMember]);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
-        <WizardHeader
-          title={mode === 'create' ? 'New Member' : 'Edit Member'}
-          subtitle={currentStepTitle}
-        />
+      {/* iOS and Android (edge-to-edge, so no adjustResize) both need padding to lift the footer and last fields above the keyboard. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => setShowDiscardDialog(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Close form"
+              style={({ pressed }) => [
+                styles.iconButton,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Feather name="x" size={20} color={theme.text} />
+            </Pressable>
 
-        <View style={styles.indicatorContainer}>
-          <ProgressIndicator
-            current={step}
-            total={totalSteps}
-            labels={STEP_LABELS}
-          />
-        </View>
+            <View style={styles.headerText}>
+              <Typography variant="body" style={styles.headerTitle} numberOfLines={1}>
+                {mode === 'create' ? 'New member' : 'Edit member'}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" numberOfLines={1}>
+                Step {step} of {totalSteps} · {STEPS[step - 1]?.title}
+              </Typography>
+            </View>
 
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {renderStep()}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
+            {mode === 'edit' ? (
+              <Pressable
+                onPress={handleSubmit}
+                disabled={loading}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Save changes"
+                style={({ pressed }) => [styles.saveLink, (pressed || loading) && styles.pressed]}
+              >
+                <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
+                  Save
+                </Typography>
+              </Pressable>
+            ) : null}
+          </View>
 
-        <View
-          style={[
-            styles.stickyFooter,
-            { paddingBottom: Math.max(insets.bottom, Spacing.two) },
-          ]}
-        >
-          <WizardNavigation
-            isFirst={step === 1}
-            isLast={step === totalSteps}
-            loading={loading}
-            canProceed={canGoNext}
-            onCancel={handleCancel}
-            onNext={next}
-            onPrevious={previous}
-            onSubmit={handleFinalSubmit}
-            mode={mode}
-            submitLabelOverride={
-              mode === 'edit' ? 'Save Changes' : 'Continue to Payment'
-            }
-          />
+          <View style={styles.stepper}>
+            {STEPS.map((s, index) => {
+              const n = index + 1;
+              const active = n === step;
+              const done = n < step;
+              const reachable = n <= furthestStep;
+              return (
+                <Pressable
+                  key={s.label}
+                  onPress={() => handleStepPress(n)}
+                  disabled={!reachable || active}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active, disabled: !reachable }}
+                  accessibilityLabel={`Step ${n}: ${s.title}`}
+                  style={styles.stepItem}
+                >
+                  <View
+                    style={[
+                      styles.stepBar,
+                      { backgroundColor: active || done ? theme.primary : theme.muted },
+                      done && styles.stepBarDone,
+                    ]}
+                  />
+                  <Typography
+                    variant="caption"
+                    numberOfLines={1}
+                    style={[
+                      styles.stepLabel,
+                      {
+                        color: active ? theme.primary : done ? theme.text : theme.textSecondary,
+                        fontWeight: active ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {s.label}
+                  </Typography>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            {renderStep()}
+          </ScrollView>
+
+          <View
+            style={[
+              styles.footer,
+              { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, Spacing.md) },
+            ]}
+          >
+            <Button
+              label={isFirst ? 'Cancel' : 'Back'}
+              variant="outline"
+              size="lg"
+              onPress={isFirst ? () => setShowDiscardDialog(true) : () => navigateTo(step - 1)}
+              style={styles.secondaryAction}
+            />
+            <Button
+              label={
+                isLast
+                  ? mode === 'edit'
+                    ? 'Save changes'
+                    : 'Continue to payment'
+                  : 'Next'
+              }
+              size="lg"
+              loading={loading}
+              onPress={isLast ? handleSubmit : handleNext}
+              style={styles.primaryAction}
+            />
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -214,38 +384,30 @@ export function MemberFormScreen({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Typography variant="subtitle" color="text">
-              Discard changes?
+            <View style={[styles.modalIcon, { backgroundColor: 'rgba(212,24,61,0.10)' }]}>
+              <Feather name="alert-triangle" size={22} color={theme.error} />
+            </View>
+            <Typography variant="body" style={styles.modalTitle}>
+              Discard {mode === 'edit' ? 'changes' : 'this member'}?
             </Typography>
-
-            <View style={styles.modalSpacer} />
-
-            <Typography variant="body" color="textSecondary">
-              All entered information will be lost.
+            <Typography variant="bodySmall" color="textSecondary" style={styles.modalText}>
+              Everything you&apos;ve entered on this form will be lost.
             </Typography>
 
             <View style={styles.modalActions}>
-              <View style={styles.modalButtonWrapper}>
-                <Button
-                  label="Keep Editing"
-                  variant="secondary"
-                  onPress={handleKeepEditing}
-                  size="lg"
-                  style={styles.modalButton}
-                />
-              </View>
-
-              <View style={styles.modalButtonSpacer} />
-
-              <View style={styles.modalButtonWrapper}>
-                <Button
-                  label="Discard"
-                  variant="primary"
-                  onPress={handleDiscard}
-                  size="lg"
-                  style={styles.modalButton}
-                />
-              </View>
+              <Button
+                label="Keep editing"
+                variant="outline"
+                onPress={handleKeepEditing}
+                size="lg"
+                style={styles.modalButton}
+              />
+              <Button
+                label="Discard"
+                onPress={handleDiscard}
+                size="lg"
+                style={[styles.modalButton, { backgroundColor: theme.error }]}
+              />
             </View>
           </View>
         </View>
@@ -257,56 +419,125 @@ export function MemberFormScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafe',
+    backgroundColor: SCREEN_BACKGROUND,
   },
   flex: {
     flex: 1,
   },
-  indicatorContainer: {
-    paddingBottom: Spacing.one,
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.md,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: BrandColors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  saveLink: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.two,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  stepper: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.md,
+  },
+  stepItem: {
+    flex: 1,
+    gap: 6,
+  },
+  stepBar: {
+    height: 4,
+    borderRadius: 2,
+  },
+  stepBarDone: {
+    opacity: 0.45,
+  },
+  stepLabel: {
+    fontSize: 11,
+    textAlign: 'center',
   },
   scrollContent: {
-    flexGrow: 1,
     paddingTop: Spacing.one,
+    paddingBottom: Spacing.four,
   },
-  bottomSpacer: {
-    height: Spacing.three,
-  },
-  stickyFooter: {
-    backgroundColor: '#f9fafe',
+  footer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.md,
+    backgroundColor: BrandColors.white,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e2e8f0',
+  },
+  secondaryAction: {
+    flex: 1,
+  },
+  primaryAction: {
+    flex: 1.6,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.four,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
-    padding: Spacing.five,
+    backgroundColor: BrandColors.white,
+    borderRadius: Radius.xl,
+    padding: Spacing.four,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 380,
     alignItems: 'center',
   },
-  modalSpacer: {
-    height: Spacing.two,
+  modalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalText: {
+    textAlign: 'center',
+    marginTop: Spacing.one,
   },
   modalActions: {
     flexDirection: 'row',
-    marginTop: Spacing.five,
+    gap: Spacing.md,
+    marginTop: Spacing.four,
     width: '100%',
-  },
-  modalButtonWrapper: {
-    flex: 1,
   },
   modalButton: {
-    width: '100%',
-  },
-  modalButtonSpacer: {
-    width: Spacing.three,
+    flex: 1,
   },
 });

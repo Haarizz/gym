@@ -1,4 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+
+import { dashboardKeys } from '@/domains/dashboard/hooks/useStaffDashboard';
+import { leadKeys } from '@/domains/leads/hooks/leadKeys';
+import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance';
+import { scheduleKeys } from '@/domains/schedule/hooks/useStaffSchedule';
 
 import type {
   AddCommunicationRecordRequest,
@@ -9,14 +14,26 @@ import type {
 import { followUpKeys } from './followUpKeys';
 import { followUpService } from './useFollowUps';
 
+/**
+ * Follow-up state also feeds the staff dashboard (urgent follow-ups, today's
+ * stats), the staff schedule and performance (follow-up completion %), so
+ * refresh those alongside the follow-up lists.
+ */
+function invalidateFollowUpViews(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
+  queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+  queryClient.invalidateQueries({ queryKey: dashboardKeys.staff() });
+  queryClient.invalidateQueries({ queryKey: scheduleKeys.staff() });
+  queryClient.invalidateQueries({ queryKey: performanceKeys.staff() });
+}
+
 export function useCreateFollowUp() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (request: FollowUpRequest) => followUpService.create(request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
     },
   });
 }
@@ -31,8 +48,7 @@ export function useUpdateFollowUp() {
       queryClient.invalidateQueries({
         queryKey: followUpKeys.detail(variables.id),
       });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
     },
   });
 }
@@ -43,8 +59,7 @@ export function useDeleteFollowUp() {
   return useMutation({
     mutationFn: (id: number) => followUpService.delete(id),
     onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
       queryClient.removeQueries({ queryKey: followUpKeys.detail(id) });
     },
   });
@@ -65,8 +80,11 @@ export function useCompleteFollowUp() {
       queryClient.invalidateQueries({
         queryKey: followUpKeys.detail(variables.id),
       });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
+      // A "converted" outcome also flips the lead's status on the backend.
+      if (variables.request.outcome === 'converted') {
+        queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      }
     },
   });
 }
@@ -78,8 +96,7 @@ export function useCancelFollowUp() {
     mutationFn: (id: number) => followUpService.cancel(id),
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: followUpKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
     },
   });
 }
@@ -99,8 +116,7 @@ export function useRescheduleFollowUp() {
       queryClient.invalidateQueries({
         queryKey: followUpKeys.detail(variables.id),
       });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: followUpKeys.stats() });
+      invalidateFollowUpViews(queryClient);
     },
   });
 }

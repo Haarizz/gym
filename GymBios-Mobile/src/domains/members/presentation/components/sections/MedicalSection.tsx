@@ -1,48 +1,38 @@
-import { StyleSheet, View } from 'react-native';
-
-import { Spacing } from '@/core/theme';
-import { FormSection } from '@/shared/components/FormSection';
 import { Typography } from '@/shared/components/Typography';
 import type { Member } from '../../../domain/Member';
+import { DetailCard, DetailField, DetailGrid } from './DetailCard';
 
 interface MedicalSectionProps {
   member: Member;
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
-        {label}
-      </Typography>
-      <Typography variant="bodySmall">{value}</Typography>
-    </View>
-  );
-}
-
 export function MedicalSection({ member }: MedicalSectionProps) {
+  const notes = [
+    { label: 'Medical conditions', value: member.medicalConditions },
+    { label: 'Chronic illnesses', value: member.chronicIllnesses },
+    { label: 'Allergies', value: member.allergies },
+    { label: 'Current medications', value: member.currentMedications },
+    { label: 'Health notes', value: member.healthNotes },
+  ].filter((n) => n.value);
+
+  const hasVitals = member.bloodGroup || member.height || member.weight;
+
   return (
-    <FormSection title="Medical Information">
-      <DetailRow label="Blood Group" value="—" />
-      <DetailRow label="Height" value="—" />
-      <DetailRow label="Weight" value="—" />
-      <DetailRow label="Medical Conditions" value="—" />
-      <DetailRow label="Chronic Illnesses" value="—" />
-      <DetailRow label="Allergies" value="—" />
-      <DetailRow label="Current Medications" value="—" />
-      <DetailRow label="Health Notes" value="—" />
-    </FormSection>
+    <DetailCard title="Medical information" icon="heart">
+      {!hasVitals && notes.length === 0 ? (
+        <Typography variant="bodySmall" color="textSecondary">
+          No medical information on file.
+        </Typography>
+      ) : (
+        <DetailGrid>
+          <DetailField label="Blood group" value={member.bloodGroup} />
+          <DetailField label="Height" value={member.height} />
+          <DetailField label="Weight" value={member.weight} />
+          {notes.map((n) => (
+            <DetailField key={n.label} label={n.label} value={n.value} full />
+          ))}
+        </DetailGrid>
+      )}
+    </DetailCard>
   );
 }
-
-const styles = StyleSheet.create({
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-  },
-  detailLabel: {
-    flex: 1,
-  },
-});

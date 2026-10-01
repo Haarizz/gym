@@ -50,7 +50,7 @@ export function StaffLedgerBreakdownSection({
           {commissionStructure.map((item, idx) => (
             <View key={idx} style={styles.commissionRow}>
               <Text style={styles.commissionLabel}>{item.label}</Text>
-              <Text style={styles.commissionAmount}>{item.amount != null ? <CurrencyValue amount={item.amount} /> : '—'}</Text>
+              <Text style={styles.commissionAmount}>{item.value}</Text>
             </View>
           ))}
         </View>

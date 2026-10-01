@@ -2,6 +2,9 @@ import type { ProfileRepository } from '../repository/ProfileRepository';
 import type {
   Profile,
   ProfileSummary,
+  PerformanceRole,
+  StaffProfile,
+  SummaryRole,
   UserPerformance,
   UserSettings,
   UserTarget,
@@ -12,6 +15,7 @@ import type {
   ChangePasswordDto,
   UpdateProfileDto,
   UpdateSettingsDto,
+  UpdateStaffContactDto,
 } from '../dto/ProfileDtos';
 
 export class ProfileService {
@@ -21,16 +25,16 @@ export class ProfileService {
     return this.repository.getProfile();
   }
 
-  async getSummary(): Promise<ProfileSummary> {
-    return this.repository.getSummary();
+  async getSummary(role: SummaryRole): Promise<ProfileSummary> {
+    return this.repository.getSummary(role);
   }
 
   async getTargets(): Promise<UserTarget[]> {
     return this.repository.getTargets();
   }
 
-  async getPerformance(): Promise<UserPerformance> {
-    return this.repository.getPerformance();
+  async getPerformance(role: PerformanceRole): Promise<UserPerformance> {
+    return this.repository.getPerformance(role);
   }
 
   async getTransactions(): Promise<{
@@ -52,6 +56,14 @@ export class ProfileService {
       throw new Error('Email is required');
     }
     return this.repository.updateProfile(data);
+  }
+
+  async getStaffProfile(): Promise<StaffProfile | null> {
+    return this.repository.getStaffProfile();
+  }
+
+  async updateStaffContact(data: UpdateStaffContactDto): Promise<StaffProfile> {
+    return this.repository.updateStaffContact(data);
   }
 
   async updateProfilePhoto(photoUriOrDataUrl: string): Promise<string> {

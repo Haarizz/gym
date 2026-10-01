@@ -146,7 +146,7 @@ export function CenterDetailScreen() {
   };
 
   const handleSelectPlan = (plan: CenterPlan) => {
-    const type = plan.planType?.toLowerCase();
+    const type = plan.planType?.trim().toLowerCase();
     if (type === 'couple' || type === 'family') {
       router.push({
         pathname: '/(member)/family/purchase' as any,

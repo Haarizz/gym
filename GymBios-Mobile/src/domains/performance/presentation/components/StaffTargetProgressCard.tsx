@@ -9,10 +9,14 @@ interface StaffTargetProgressCardProps {
 }
 
 export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProps) {
-  const convPct = Math.min(
-    Math.round((targets.conversionsAchieved / targets.conversionsTarget) * 100),
-    100
-  );
+  // No target set for the month (e.g. "New Clients Target" left blank on the web) — show the
+  // count on its own instead of dividing by zero, which read as "1 / 0 · 100% achieved".
+  const hasConversionsTarget = targets.conversionsTarget > 0;
+  const convPct = hasConversionsTarget
+    ? Math.min(Math.round((targets.conversionsAchieved / targets.conversionsTarget) * 100), 100)
+    : 0;
+  const hasRevenueTarget = targets.monthlyTarget > 0;
+  const revenueBarPct = Math.min(Math.max(targets.percentage, 0), 100);
 
   return (
     <LinearGradient
@@ -32,9 +36,11 @@ export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProp
           </Text>
         </View>
         <View style={styles.progressBarTrack}>
-          <View style={[styles.progressBarFill, { width: `${targets.percentage}%` }]} />
+          <View style={[styles.progressBarFill, { width: `${revenueBarPct}%` }]} />
         </View>
-        <Text style={styles.percentageAchieved}>{targets.percentage}% achieved</Text>
+        <Text style={styles.percentageAchieved}>
+          {hasRevenueTarget ? `${targets.percentage}% achieved` : 'No target set'}
+        </Text>
       </View>
 
       {/* Conversions Target */}
@@ -42,13 +48,17 @@ export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProp
         <View style={styles.targetHeader}>
           <Text style={styles.targetLabel}>Conversions Target</Text>
           <Text style={styles.targetValues}>
-            {targets.conversionsAchieved} / {targets.conversionsTarget}
+            {hasConversionsTarget
+              ? `${targets.conversionsAchieved} / ${targets.conversionsTarget}`
+              : targets.conversionsAchieved}
           </Text>
         </View>
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: `${convPct}%` }]} />
         </View>
-        <Text style={styles.percentageAchieved}>{convPct}% achieved</Text>
+        <Text style={styles.percentageAchieved}>
+          {hasConversionsTarget ? `${convPct}% achieved` : 'No target set'}
+        </Text>
       </View>
     </LinearGradient>
   );

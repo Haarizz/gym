@@ -105,8 +105,12 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
      * fully re-runnable (CREATE ... IF NOT EXISTS, ADD COLUMN IF NOT EXISTS, and
      * every INSERT guarded by WHERE NOT EXISTS), so they're safe even where
      * Hibernate's ddl-auto already created some of their tables.
+     * 60-63 (main's brands, print templates, supplier scope, sales invoices) land below
+     * feature/reward-passes' relabelled V64-V68 on tenants that ran that branch first;
+     * V62's backfill only touches suppliers with no branch_id, so it's a no-op when
+     * TenantSupplierBranchBackfillRunner already applied it.
      */
-    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47", "56");
+    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47", "56", "60", "61", "62", "63");
 
     /**
      * Migrations that may have been applied by hand, outside Flyway: a query

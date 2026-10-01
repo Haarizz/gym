@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
 import { leadService } from '../utils/supabase/lead-service';
 import { staffService } from '../utils/supabase/staff-service';
@@ -112,6 +112,8 @@ interface FollowUp {
   leadName: string;
   leadEmail?: string;
   leadPhone?: string;
+  /** Member the lead was registered as, if already registered. */
+  leadMemberId?: number;
   leadAvatar?: string;
   type: 'call' | 'email' | 'sms' | 'whatsapp' | 'in-app' | 'meeting' | 'visit';
   status: 'pending' | 'completed' | 'overdue' | 'cancelled' | 'rescheduled';
@@ -218,6 +220,34 @@ export function FollowUps() {
   // Arriving from Leads' "Schedule follow-up" quick action — open the Add
   // dialog pre-filled with that lead instead of requiring it to be re-picked.
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // A follow-up closed as "Converted" (on the web or by staff in the mobile app) still needs
+  // the member registered and paid for — Add Member links the lead and credits its staff.
+  const isConvertedFollowUp = (f: FollowUp) => f.status === 'completed' && f.outcome === 'converted';
+  // Converted but not registered yet — once registered the lead is linked to its member.
+  const needsRegistration = (f: FollowUp) => isConvertedFollowUp(f) && !f.leadMemberId;
+  const openRegisterMember = async (leadId: number): Promise<boolean> => {
+    try {
+      const lead = await leadService.getById(Number(leadId));
+      navigate('/members/add', {
+        state: {
+          prefillLead: {
+            leadId: String(lead.id),
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            email: lead.email ?? '',
+            phone: lead.phone ?? '',
+            assignedStaff: lead.assignedStaff,
+          },
+        },
+      });
+      return true;
+    } catch {
+      toast.error('Could not load the lead — register them from the Leads page.');
+      return false;
+    }
+  };
   useEffect(() => {
     const state = location.state as { prefillLeadId?: number; prefillLeadName?: string } | null;
     if (state?.prefillLeadId) {
@@ -234,6 +264,7 @@ export function FollowUps() {
     leadName: f.leadName,
     leadEmail: f.leadEmail || '',
     leadPhone: f.leadPhone || '',
+    leadMemberId: f.leadMemberId,
     type: (f.type === 'in_app' ? 'in-app' : f.type) as FollowUp['type'],
     status: f.status as FollowUp['status'],
     priority: f.priority as FollowUp['priority'],
@@ -937,6 +968,11 @@ export function FollowUps() {
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
+                        {needsRegistration(followUp) && (
+                          <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700" title="Register as Member" onClick={() => openRegisterMember(followUp.leadId)}>
+                            <UserPlus2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" onClick={() => handleFollowUpClick(followUp)}>
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -1039,6 +1075,14 @@ export function FollowUps() {
                               handleQuickAction(followUp, 'complete');
                             }}>
                               <CheckCircle className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {needsRegistration(followUp) && (
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-green-600" title="Register as Member" onClick={(e) => {
+                              e.stopPropagation();
+                              openRegisterMember(followUp.leadId);
+                            }}>
+                              <UserPlus2 className="h-3 w-3" />
                             </Button>
                           )}
                         </div>
@@ -1150,6 +1194,29 @@ export function FollowUps() {
                         <Badge variant="outline" className="capitalize">
                           {selectedFollowUp.outcome.replace('-', ' ')}
                         </Badge>
+                      </div>
+                    )}
+
+                    {isConvertedFollowUp(selectedFollowUp) && selectedFollowUp.leadMemberId && (
+                      <div className="flex items-center rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        This lead has been registered as a member.
+                      </div>
+                    )}
+
+                    {needsRegistration(selectedFollowUp) && (
+                      <div className="rounded-md border border-green-200 bg-green-50 p-3 space-y-2">
+                        <p className="text-sm text-green-800">
+                          This lead agreed to join. Register them and take payment to record the sale
+                          — &quot;Processed By&quot; will be preset to the lead&apos;s assigned staff.
+                        </p>
+                        <Button
+                          className="w-full bg-green-600 hover:bg-green-700"
+                          onClick={() => openRegisterMember(selectedFollowUp.leadId)}
+                        >
+                          <UserPlus2 className="mr-2 h-4 w-4" />
+                          Register as Member
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -1498,6 +1565,12 @@ export function FollowUps() {
                 setCompletingFollowUp(null);
                 setCompleteOutcome('successful');
                 setCompleteNotes('');
+                // A "converted" outcome marks the lead converted on the backend; hand off to
+                // Add Member so the sale is recorded and credited to the lead's staff.
+                if (completeOutcome === 'converted' && completingFollowUp.leadId
+                    && await openRegisterMember(completingFollowUp.leadId)) {
+                  return;
+                }
                 loadFollowUps();
               } catch {
                 toast.error('Failed to complete follow-up');

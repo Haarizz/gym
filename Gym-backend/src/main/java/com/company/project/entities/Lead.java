@@ -55,6 +55,10 @@ public class Lead extends BaseEntity implements BranchAware {
     @Column(name = "last_contact_date")
     private LocalDateTime lastContactDate;
 
+    // Member this lead was registered as (set when Add Member is saved from the lead)
+    @Column(name = "member_id")
+    private Long memberId;
+
     // 1–10 scale
     @Column(name = "interest_level")
     private Integer interestLevel;
@@ -125,6 +129,8 @@ public class Lead extends BaseEntity implements BranchAware {
 
     public LocalDateTime getLastContactDate() { return lastContactDate; }
     public void setLastContactDate(LocalDateTime lastContactDate) { this.lastContactDate = lastContactDate; }
+    public Long getMemberId() { return memberId; }
+    public void setMemberId(Long memberId) { this.memberId = memberId; }
 
     public Integer getInterestLevel() { return interestLevel; }
     public void setInterestLevel(Integer interestLevel) { this.interestLevel = interestLevel; }

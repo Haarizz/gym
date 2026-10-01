@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { Avatar } from '@/shared/components/Avatar';
 import { Radius, Spacing } from '@/core/theme';
+import { getCheckInEligibility } from '../../../domain/membershipEligibility';
 
 export interface StaffCheckInCardProps {
   person: any; // Can be a member or staff
@@ -19,7 +20,9 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
   const avatarUrl = person.photoUrl;
   
   const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-  const hasMembership = !!person.membershipPlanId || !!person.membershipPlanName || person.status === 'active' || isActive;
+  const { eligible, label: statusLabel } = getCheckInEligibility(person);
+  // Someone already in the gym can always be checked out, whatever their status.
+  const hasMembership = isActive || eligible;
 
   return (
     <View style={[styles.card, isActive && styles.cardActive, !isActive && !hasMembership && styles.cardDisabled]}>
@@ -35,6 +38,11 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
             </Text>
             <View style={[styles.tag, !hasMembership && styles.tagDisabled]}>
               <Text style={styles.tagText}>{role}</Text>
+            </View>
+            <View style={[styles.tag, hasMembership ? styles.membershipOk : styles.membershipBad]}>
+              <Text style={[styles.tagText, hasMembership ? styles.membershipOkText : styles.membershipBadText]}>
+                {statusLabel}
+              </Text>
             </View>
           </View>
         </View>
@@ -63,10 +71,11 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
             <Pressable 
               style={[styles.actionBtn, styles.actionIn, !hasMembership && styles.actionInDisabled]} 
               onPress={() => hasMembership && onCheckIn(person)}
+              disabled={!hasMembership}
             >
               <Feather name="log-in" size={12} color={hasMembership ? "#ffffff" : "#a3b8b2"} />
               <Text style={[styles.actionText, styles.actionTextIn, !hasMembership && styles.actionTextInDisabled]}>
-                {hasMembership ? 'Check In' : 'No Subscription'}
+                {hasMembership ? 'Check In' : 'Not Eligible'}
               </Text>
             </Pressable>
           </>
@@ -196,6 +205,18 @@ const styles = StyleSheet.create({
   cardDisabled: {
     opacity: 0.7,
     backgroundColor: '#fafcfb',
+  },
+  membershipOk: {
+    backgroundColor: '#e7f6ef',
+  },
+  membershipOkText: {
+    color: '#2f9e6e',
+  },
+  membershipBad: {
+    backgroundColor: '#fbeceb',
+  },
+  membershipBadText: {
+    color: '#c2453d',
   },
   tagDisabled: {
     backgroundColor: '#eef2f1',

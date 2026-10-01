@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useRestoreSession } from '@/domains/auth';
+import { useAuthStore, useRestoreSession } from '@/domains/auth';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
 
 import { ProfileHubScreen } from './ProfileHubScreen';
@@ -28,6 +28,10 @@ export function ProfileScreen() {
   const router = useRouter();
   const { logout } = useRestoreSession();
   const { view } = useLocalSearchParams<{ view?: string }>();
+  const appRole = useAuthStore((s) => s.appRole);
+  // Performance metrics are per-employee — admins and members have no data here —
+  // while Referrals is a member/admin feature hidden from staff and trainers.
+  const isEmployee = appRole === 'staff' || appRole === 'trainer';
   const [activeView, setActiveView] = useState<ProfileView>('hub');
   const [isExiting, setIsExiting] = useState(false);
   const [enterKey, setEnterKey] = useState(0);
@@ -36,9 +40,11 @@ export function ProfileScreen() {
   // to a specific section — /profile?view=referrals — instead of always opening the hub.
   useEffect(() => {
     if (view && (VALID_VIEWS as string[]).includes(view)) {
+      if (view === 'my-performance' && !isEmployee) return;
+      if (view === 'referrals' && isEmployee) return;
       setActiveView(view as ProfileView);
     }
-  }, [view]);
+  }, [view, isEmployee]);
 
   // The Tabs navigator keeps this screen mounted across blur/focus rather
   // than remounting it, so SlideIn's own mount-triggered entrance wouldn't

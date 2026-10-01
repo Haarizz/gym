@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -9,6 +9,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Avatar } from '@/shared/components/Avatar';
 import { AppHeader } from '@/shared/components/AppHeader';
+import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { useStaff } from '../hooks/useStaff';
@@ -21,6 +22,14 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactive', icon: 'user-x', color: BrandColors.danger },
   { value: 'on_leave', label: 'On Leave', icon: 'clock', color: BrandColors.trainerAmber },
 ] as const;
+
+const WEEKDAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+// Schedule keys come back in insertion order; show them Monday → Sunday.
+function weekdayRank(day: string) {
+  const i = WEEKDAY_ORDER.indexOf(day.toLowerCase());
+  return i === -1 ? WEEKDAY_ORDER.length : i;
+}
 
 interface StaffDetailScreenProps {
   staffId: string;
@@ -39,33 +48,25 @@ export function StaffDetailScreen({
   const router = useRouter();
   const { selectedStaff, loadStaff, deleteStaff, updateStaffStatus, submitting } = useStaff();
   const [statusSheetVisible, setStatusSheetVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   useEffect(() => {
     loadStaff(staffId);
   }, [staffId, loadStaff]);
 
-  const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Staff',
-      'Are you sure you want to delete this staff member? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteStaff(staffId);
-              onDeleted();
-            } catch {
-              toast.error('Failed to delete staff member.', {
-                title: 'Error'
-              });
-            }
-          },
-        },
-      ],
-    );
+  // ConfirmationModal rather than Alert.alert: react-native-web's Alert is a no-op,
+  // so the confirm (and the delete call) never happened in the browser.
+  const handleDelete = useCallback(async () => {
+    try {
+      await deleteStaff(staffId);
+      setDeleteConfirmVisible(false);
+      onDeleted();
+    } catch {
+      setDeleteConfirmVisible(false);
+      toast.error('Failed to delete staff member.', {
+        title: 'Error'
+      });
+    }
   }, [staffId, deleteStaff, onDeleted]);
 
   const handleChangeStatus = useCallback(
@@ -163,7 +164,11 @@ export function StaffDetailScreen({
               <Feather name="target" size={15} color={theme.text} />
               <Typography variant="caption">Set target</Typography>
             </Pressable>
-            <Pressable style={styles.actionButton} onPress={handleDelete} disabled={submitting}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => setDeleteConfirmVisible(true)}
+              disabled={submitting}
+            >
               <Feather name="trash-2" size={15} color={BrandColors.danger} />
               <Typography variant="caption" style={{ color: BrandColors.danger }}>Delete</Typography>
             </Pressable>
@@ -220,7 +225,9 @@ export function StaffDetailScreen({
           {Object.keys(selectedStaff.schedule).length === 0 ? (
             <Typography variant="bodySmall" color="textSecondary">No shifts scheduled this week.</Typography>
           ) : (
-            Object.entries(selectedStaff.schedule).map(([day, ranges]) => (
+            Object.entries(selectedStaff.schedule)
+              .sort(([a], [b]) => weekdayRank(a) - weekdayRank(b))
+              .map(([day, ranges]) => (
               <View key={day} style={styles.scheduleRow}>
                 <Typography variant="bodySmall" style={{ width: 100 }}>{day}</Typography>
                 <Typography variant="bodySmall" color="textSecondary">{ranges.join(', ')}</Typography>
@@ -279,6 +286,18 @@ export function StaffDetailScreen({
           );
         })}
       </AppBottomSheet>
+
+      <ConfirmationModal
+        visible={deleteConfirmVisible}
+        title="Delete Staff"
+        message="Are you sure you want to delete this staff member? This action cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+        icon="trash-2"
+        loading={submitting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteConfirmVisible(false)}
+      />
     </ScreenLayout>
   );
 }

@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface MessageCampaignRepository extends JpaRepository<MessageCampaign, Long> {
     List<MessageCampaign> findTop200ByOrderByCreatedAtDesc();
+    List<MessageCampaign> findTop200ByCreatedByOrderByCreatedAtDesc(String createdBy);
     List<MessageCampaign> findByStatusAndScheduledAtBefore(String status, LocalDateTime scheduledAt);
 }

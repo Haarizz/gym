@@ -7,11 +7,13 @@ import type { TrainerEarningsBreakdownItem, TrainerEarningsSummary } from '../..
 interface TrainerLedgerBreakdownSectionProps {
   breakdown: TrainerEarningsBreakdownItem[];
   summary: TrainerEarningsSummary;
+  growth: string;
 }
 
 export function TrainerLedgerBreakdownSection({
   breakdown,
   summary,
+  growth,
 }: TrainerLedgerBreakdownSectionProps) {
   return (
     <View style={styles.container}>
@@ -66,7 +68,7 @@ export function TrainerLedgerBreakdownSection({
           </View>
           <View style={[styles.comparisonRow, styles.growthRow]}>
             <Text style={styles.comparisonLabel}>Growth</Text>
-            <Text style={[styles.comparisonValue, styles.growthValue]}>+5.4%</Text>
+            <Text style={[styles.comparisonValue, styles.growthValue]}>{growth}</Text>
           </View>
         </View>
       </LinearGradient>

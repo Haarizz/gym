@@ -22,6 +22,8 @@ export interface FollowUpResponse {
   leadName: string;
   leadEmail?: string;
   leadPhone?: string;
+  /** Member the lead was registered as, if already registered. */
+  leadMemberId?: number;
   type: 'call' | 'email' | 'sms' | 'whatsapp' | 'in_app' | 'meeting' | 'visit';
   status: 'pending' | 'completed' | 'overdue' | 'cancelled' | 'rescheduled';
   priority: 'high' | 'medium' | 'low';
@@ -91,6 +93,7 @@ function mapToFollowUpResponse(f: any): FollowUpResponse {
     leadName: f.lead_name || f.leadName,
     leadEmail: f.lead_email || f.leadEmail,
     leadPhone: f.lead_phone || f.leadPhone,
+    leadMemberId: f.lead_member_id ?? f.leadMemberId ?? undefined,
     type: f.type,
     status: f.status,
     priority: f.priority,

@@ -22,10 +22,12 @@ export interface LeadResponse {
   lastName: string;
   email?: string;
   phone?: string;
-  status: 'new' | 'contacted' | 'follow_up' | 'converted' | 'lost';
+  status: 'new' | 'contacted' | 'follow-up' | 'converted' | 'lost';
   source?: string;
   priority?: 'high' | 'medium' | 'low';
   assignedStaff?: string;
+  /** Member this lead was registered as; set once "Register as Member" is saved. */
+  memberId?: number;
   nextFollowUp?: string;
   lastContactDate?: string;
   interestLevel?: number;
@@ -97,6 +99,7 @@ function mapToLeadResponse(l: any): LeadResponse {
     source: l.source,
     priority: l.priority,
     assignedStaff: l.assigned_staff || l.assignedStaff,
+    memberId: l.member_id ?? l.memberId ?? undefined,
     nextFollowUp: l.next_follow_up || l.nextFollowUp,
     lastContactDate: l.last_contact_date || l.lastContactDate,
     interestLevel: l.interest_level || l.interestLevel,

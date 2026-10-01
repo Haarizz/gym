@@ -153,7 +153,7 @@ public class MobileTrainerPerformanceService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private int countCompletedSessions(Long trainerId, LocalDate start, LocalDate end) {
+    public int countCompletedSessions(Long trainerId, LocalDate start, LocalDate end) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> cq = cb.createQuery(Long.class);
         Root<TrainingSession> sessionRoot = cq.from(TrainingSession.class);

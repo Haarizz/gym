@@ -24,7 +24,8 @@ export function StaffUrgentFollowUpsCard({
     if (onViewAll) {
       onViewAll();
     } else {
-      router.push('/(staff)/followUps' as any);
+      // Staff work their follow-ups from the Schedule tab.
+      router.push('/(staff)/schedule' as any);
     }
   };
 

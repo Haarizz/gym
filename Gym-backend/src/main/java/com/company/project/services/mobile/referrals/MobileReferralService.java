@@ -166,8 +166,13 @@ public class MobileReferralService {
             throw new IllegalStateException("User has already claimed a referral code");
         }
         
-        MobileReferralAttribution attribution = new MobileReferralAttribution(
-                referrerGlobalUserId, refereeGlobalUserId, MobileReferralStatus.PENDING);
+        // Insert (and flush) the attribution BEFORE the signup referral below. That runs in its
+        // own REQUIRES_NEW transaction and commits immediately, so if the unique
+        // referee_global_user_id insert failed after it (a double-submitted or concurrent claim),
+        // the referrer would keep a SIGNUP reward for a claim that never happened. Flushing first
+        // makes a concurrent claim block on the unique index and fail here instead.
+        MobileReferralAttribution attribution = attributionRepository.saveAndFlush(new MobileReferralAttribution(
+                referrerGlobalUserId, refereeGlobalUserId, MobileReferralStatus.PENDING));
 
         // Best-effort: fires any SIGNUP-triggered reward for the referrer right now, without
         // waiting for the referee to ever purchase a membership. Runs in its own transaction and

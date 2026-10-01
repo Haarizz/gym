@@ -27,6 +27,7 @@ export {
   useCommunityLeaderboard,
   useCommunityFeed,
   useCommunityCanPost,
+  useCommunityCanInteract,
   useCommunityComments,
 } from './hooks/useCommunity';
 

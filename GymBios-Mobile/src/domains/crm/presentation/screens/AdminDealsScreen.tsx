@@ -12,6 +12,8 @@ import type { createUseRestoreSession } from '@/domains/auth/presentation/hooks/
 import { usePromotions, usePromotionImpact } from '@/domains/promotions/hooks/usePromotions';
 import type { PromotionCampaignResponse } from '@/domains/promotions/domain/PromotionCampaign';
 import { useReferrals } from '@/domains/referrals/hooks/useReferrals';
+import { useMembershipPlans } from '@/domains/membershipPlans';
+import type { MembershipPlan } from '@/domains/membershipPlans';
 import { formatCompactCurrency, formatCount } from '@/domains/dashboard/utils/adminDashboardFormat';
 
 // Local yyyy-MM-dd, matching the date-only format the backend sends.
@@ -33,6 +35,14 @@ function getEffectiveStatus(deal: PromotionCampaignResponse, today: string): str
   return status;
 }
 
+// A plan's offer is live when the server says so for today and the plan itself
+// is sellable. The end-date check covers a cached list that outlived midnight.
+function isPlanOfferRunning(plan: MembershipPlan, today: string): boolean {
+  if ((plan.status || '').toUpperCase() !== 'ACTIVE') return false;
+  if (!plan.offerActive || !(plan.offerDiscountAmount > 0)) return false;
+  return !plan.offerEndDate || plan.offerEndDate.slice(0, 10) >= today;
+}
+
 const STATUS_COLORS: Record<string, { bg: string; border: string; fg: string }> = {
   active: { bg: '#dcfce7', border: '#bbf7d0', fg: '#15803d' },
   scheduled: { bg: '#dbeafe', border: '#bfdbfe', fg: '#1d4ed8' },
@@ -50,6 +60,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
     const { data: allPromotions, isLoading: isLoadingAll } = usePromotions();
     const { data: referralPage, isLoading: isLoadingReferrals, error: referralsError } = useReferrals();
     const { data: impact, isLoading: isLoadingImpact, error: impactError } = usePromotionImpact();
+    const { plans, loading: isLoadingPlans, error: plansError } = useMembershipPlans();
 
     const handleCreateOffer = () => {
       router.push('/(admin)/promotions/create');
@@ -59,6 +70,9 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
     const activeDeals = (activePromotions || []).filter(
       (deal) => getEffectiveStatus(deal, today) === 'active',
     );
+    const planOffers = plans.filter((plan) => isPlanOfferRunning(plan, today));
+    const isLoadingOffers = isLoadingActive || (isLoadingPlans && plans.length === 0);
+    const activeOfferCount = activeDeals.length + planOffers.length;
 
     const handleCopy = async (code: string) => {
       try {
@@ -86,7 +100,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Active Offers</Text>
               <Text style={[styles.statValue, { color: BrandColors.teal }]}>
-                {isLoadingActive ? '-' : activeDeals.length}
+                {isLoadingOffers ? '-' : activeOfferCount}
               </Text>
             </View>
             <View style={styles.statCard}>
@@ -106,14 +120,72 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
               </TouchableOpacity>
             </View>
 
-            {isLoadingActive ? (
+            {isLoadingOffers ? (
               <ActivityIndicator size="small" color={BrandColors.teal} />
-            ) : activeError ? (
+            ) : activeError && plansError ? (
               <Text style={{ color: 'red' }}>Failed to load offers.</Text>
-            ) : activeDeals.length === 0 ? (
+            ) : activeOfferCount === 0 ? (
               <Text style={{ color: '#6b7280' }}>No active offers found.</Text>
             ) : (
               <View style={styles.dealsList}>
+                {activeError ? (
+                  <Text style={{ color: 'red' }}>Failed to load promo code offers.</Text>
+                ) : null}
+                {plansError ? (
+                  <Text style={{ color: 'red' }}>Failed to load plan offers.</Text>
+                ) : null}
+                {planOffers.map((plan) => (
+                  <TouchableOpacity
+                    key={`plan-${plan.id}`}
+                    style={styles.dealCard}
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/(admin)/membership-plans/edit/${plan.id}` as any)}>
+                    <View style={styles.dealHeader}>
+                      <View style={styles.dealHeaderInfo}>
+                        <Text style={styles.dealTitle}>{plan.offerLabel || `${plan.name} Offer`}</Text>
+                        <View style={styles.discountBadge}>
+                          <Text style={styles.discountText}>
+                            {plan.offerType === 'percentage'
+                              ? `${plan.offerValue}% OFF`
+                              : <CurrencyValue amount={plan.offerDiscountAmount} suffix=" OFF" />}
+                          </Text>
+                        </View>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: STATUS_COLORS.active.bg, borderColor: STATUS_COLORS.active.border },
+                        ]}>
+                        <Text style={[styles.statusText, { color: STATUS_COLORS.active.fg }]}>PLAN OFFER</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.dealDetails}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Plan:</Text>
+                        <Text style={styles.detailValue}>{plan.name}</Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Price:</Text>
+                        <Text style={styles.detailValue}>
+                          <Text style={styles.strikePrice}><CurrencyValue amount={plan.price} /></Text>
+                          {'  '}
+                          <CurrencyValue amount={plan.effectivePrice} />
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Valid Until:</Text>
+                        <Text style={styles.detailValue}>
+                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString() : 'No Expiry'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Applies:</Text>
+                        <Text style={styles.detailValue}>Automatically, no code needed</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
                 {activeDeals.map((deal) => {
                   // Plain text for the share message; the card itself shows the currency glyph.
                   const discountText = deal.discountType === 'percentage'
@@ -450,6 +522,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#111827',
+  },
+  strikePrice: {
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+    fontWeight: '400',
   },
   progressContainer: {
     marginTop: Spacing.three,

@@ -6,6 +6,7 @@ import type { AddLeadInteractionRequest, LeadRequest } from '../domain/LeadReque
 import type { LeadStats } from '../domain/LeadStats';
 
 import { apiClient } from '@/core/network/apiClient';
+import { camelizeKeys, snakeizeKeys } from '@/shared/utils/caseKeys';
 
 interface LeadInteractionDTO {
   id: number;
@@ -28,6 +29,7 @@ interface LeadResponseDTO {
   source: string;
   priority: string;
   assignedStaff?: string | null;
+  memberId?: number | null;
   nextFollowUp?: string | null;
   lastContactDate?: string | null;
   interestLevel?: number | null;
@@ -73,32 +75,35 @@ export class ApiLeadRepository implements LeadRepository {
     if (filters?.priority) params.priority = filters.priority;
     if (filters?.search) params.search = filters.search;
 
-    const response = await apiClient.get<LeadPageResponseDTO>('/leads', {
+    const response = await apiClient.get('/leads', {
       params,
     });
+    // The API speaks snake_case; the DTO types here are camelCase.
+    const data = camelizeKeys<LeadPageResponseDTO>(response.data);
 
     return {
-      leads: (response.data.leads ?? []).map(item => this.toLeadDomain(item)),
+      leads: (data.leads ?? []).map(item => this.toLeadDomain(item)),
       pagination: {
-        page: response.data.pagination?.page ?? 1,
-        limit: response.data.pagination?.limit ?? 20,
-        total: response.data.pagination?.total ?? 0,
-        totalPages: response.data.pagination?.totalPages ?? 0,
+        page: data.pagination?.page ?? 1,
+        limit: data.pagination?.limit ?? 20,
+        total: data.pagination?.total ?? 0,
+        totalPages: data.pagination?.totalPages ?? 0,
       },
     };
   }
 
   async getStats(): Promise<LeadStats> {
-    const response = await apiClient.get<LeadStatsDTO>('/leads/stats');
+    const response = await apiClient.get('/leads/stats');
+    const data = camelizeKeys<LeadStatsDTO>(response.data);
 
     return {
-      totalLeads: response.data.totalLeads ?? 0,
-      newLeads: response.data.newLeads ?? 0,
-      contactedLeads: response.data.contactedLeads ?? 0,
-      followUpLeads: response.data.followUpLeads ?? 0,
-      convertedLeads: response.data.convertedLeads ?? 0,
-      lostLeads: response.data.lostLeads ?? 0,
-      conversionRate: response.data.conversionRate ?? 0,
+      totalLeads: data.totalLeads ?? 0,
+      newLeads: data.newLeads ?? 0,
+      contactedLeads: data.contactedLeads ?? 0,
+      followUpLeads: data.followUpLeads ?? 0,
+      convertedLeads: data.convertedLeads ?? 0,
+      lostLeads: data.lostLeads ?? 0,
+      conversionRate: data.conversionRate ?? 0,
     };
   }
 
@@ -109,15 +114,15 @@ export class ApiLeadRepository implements LeadRepository {
   }
 
   async create(request: LeadRequest): Promise<Lead> {
-    const response = await apiClient.post<LeadResponseDTO>('/leads', request);
+    const response = await apiClient.post('/leads', snakeizeKeys(request));
 
     return this.toLeadDomain(response.data);
   }
 
   async update(id: number, request: LeadRequest): Promise<Lead> {
-    const response = await apiClient.put<LeadResponseDTO>(
+    const response = await apiClient.put(
       `/leads/${id}`,
-      request,
+      snakeizeKeys(request),
     );
 
     return this.toLeadDomain(response.data);
@@ -140,9 +145,9 @@ export class ApiLeadRepository implements LeadRepository {
     id: number,
     interaction: AddLeadInteractionRequest,
   ): Promise<LeadInteraction> {
-    const response = await apiClient.post<LeadInteractionDTO>(
+    const response = await apiClient.post(
       `/leads/${id}/interactions`,
-      interaction,
+      snakeizeKeys(interaction),
     );
 
     return this.toInteractionDomain(response.data);
@@ -152,7 +157,8 @@ export class ApiLeadRepository implements LeadRepository {
     await apiClient.delete(`/leads/interactions/${interactionId}`);
   }
 
-  private toLeadDomain(response: LeadResponseDTO): Lead {
+  private toLeadDomain(raw: unknown): Lead {
+    const response = camelizeKeys<LeadResponseDTO>(raw);
     return {
       id: response.id,
       leadId: response.leadId,
@@ -164,6 +170,7 @@ export class ApiLeadRepository implements LeadRepository {
       source: response.source,
       priority: response.priority,
       assignedStaff: response.assignedStaff ?? undefined,
+      memberId: response.memberId ?? undefined,
       nextFollowUp: response.nextFollowUp ?? undefined,
       lastContactDate: response.lastContactDate ?? undefined,
       interestLevel: response.interestLevel ?? undefined,
@@ -182,7 +189,8 @@ export class ApiLeadRepository implements LeadRepository {
     };
   }
 
-  private toInteractionDomain(response: LeadInteractionDTO): LeadInteraction {
+  private toInteractionDomain(raw: unknown): LeadInteraction {
+    const response = camelizeKeys<LeadInteractionDTO>(raw);
     return {
       id: response.id,
       type: response.type,

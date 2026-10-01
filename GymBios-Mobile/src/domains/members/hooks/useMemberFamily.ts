@@ -12,13 +12,14 @@ export const memberFamilyKeys = {
   detail: (memberId: number) => [...memberFamilyKeys.all, memberId] as const,
 };
 
-export function useMemberFamily(memberId: number) {
+export function useMemberFamily(memberId: number, enabled = true) {
   const queryClient = useQueryClient();
 
   const familyQuery = useQuery({
     queryKey: memberFamilyKeys.detail(memberId),
     queryFn: () => familyService.getFamily(memberId),
-    enabled: memberId > 0,
+    enabled: enabled && memberId > 0,
+    retry: false,
   });
 
   const addFamilyMember = async (

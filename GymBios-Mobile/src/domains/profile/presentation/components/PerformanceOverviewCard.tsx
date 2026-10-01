@@ -9,58 +9,107 @@ interface PerformanceOverviewCardProps {
   performance: UserPerformance;
 }
 
+interface Tile {
+  value: string;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  dark: boolean;
+}
+
+interface Kpi {
+  label: string;
+  value: string;
+  subtitle: string;
+  trend: 'up' | 'down' | 'flat';
+}
+
+const percent = (value: number | null) => (value == null ? '—' : `${value}%`);
+
+function growthKpi(label: string, growth: number | null): Kpi {
+  if (growth == null) {
+    return { label, value: '—', subtitle: 'no data last month', trend: 'flat' };
+  }
+  return {
+    label,
+    value: `${growth > 0 ? '+' : ''}${growth}%`,
+    subtitle: 'vs last month',
+    trend: growth > 0 ? 'up' : growth < 0 ? 'down' : 'flat',
+  };
+}
+
+function rateKpi(label: string, value: number | null, subtitle: string): Kpi {
+  return { label, value: percent(value), subtitle, trend: 'flat' };
+}
+
+/** Trainers are measured on sessions delivered, staff on lead conversions. */
+function buildTiles(p: UserPerformance): Tile[] {
+  const score: Tile = { value: percent(p.performanceScore), label: 'Performance Score', icon: 'trending-up', dark: false };
+  const hours: Tile = { value: `${p.hoursWorked}`, label: 'Hours Worked', icon: 'clock', dark: true };
+
+  if (p.role === 'trainer') {
+    return [
+      score,
+      { value: `${p.classesCompleted ?? 0}`, label: 'Classes Completed', icon: 'activity', dark: true },
+      hours,
+      { value: percent(p.sessionTargetPercentage), label: 'Session Target', icon: 'target', dark: false },
+    ];
+  }
+  return [
+    score,
+    { value: `${p.leadsConverted ?? 0}`, label: 'Leads Converted', icon: 'user-check', dark: true },
+    hours,
+    { value: percent(p.conversionRate), label: 'Conversion Rate', icon: 'percent', dark: false },
+  ];
+}
+
+function buildKpis(p: UserPerformance): Kpi[] {
+  if (p.role === 'trainer') {
+    return [
+      growthKpi('Session Growth', p.sessionGrowth),
+      growthKpi('Revenue Growth', p.revenueGrowth),
+      rateKpi('Attendance', p.attendanceRate, p.daysScheduled > 0 ? `${p.daysPresent} of ${p.daysScheduled} days` : 'no schedule set'),
+    ];
+  }
+  return [
+    growthKpi('Conversion Growth', p.conversionGrowth),
+    growthKpi('Revenue Growth', p.revenueGrowth),
+    rateKpi('Follow-ups', p.followUpCompletion, 'completed'),
+  ];
+}
+
+const TREND_ICON: Record<Kpi['trend'], keyof typeof Feather.glyphMap> = {
+  up: 'arrow-up-right',
+  down: 'arrow-down-right',
+  flat: 'minus',
+};
+
+const TREND_COLOR: Record<Kpi['trend'], string> = {
+  up: '#16a34a',
+  down: '#dc2626',
+  flat: BrandColors.teal,
+};
+
 export function PerformanceOverviewCard({ performance }: PerformanceOverviewCardProps) {
+  const tiles = buildTiles(performance);
+  const kpis = buildKpis(performance);
+
   return (
     <View style={styles.container}>
       {/* 4 Overview Metric Cards */}
       <View style={styles.grid}>
-        <View style={[styles.tile, styles.tealTile]}>
-          <View style={styles.tileHeader}>
-            <Typography variant="title" style={styles.tileNumber}>
-              {performance.performanceScore}%
+        {tiles.map((tile) => (
+          <View key={tile.label} style={[styles.tile, tile.dark ? styles.tealDarkTile : styles.tealTile]}>
+            <View style={styles.tileHeader}>
+              <Typography variant="title" style={styles.tileNumber}>
+                {tile.value}
+              </Typography>
+              <Feather name={tile.icon} size={20} color="rgba(255,255,255,0.85)" />
+            </View>
+            <Typography variant="caption" style={styles.tileLabel}>
+              {tile.label}
             </Typography>
-            <Feather name="trending-up" size={20} color="rgba(255,255,255,0.85)" />
           </View>
-          <Typography variant="caption" style={styles.tileLabel}>
-            Performance Score
-          </Typography>
-        </View>
-
-        <View style={[styles.tile, styles.tealDarkTile]}>
-          <View style={styles.tileHeader}>
-            <Typography variant="title" style={styles.tileNumber}>
-              {performance.classesCompleted}
-            </Typography>
-            <Feather name="activity" size={20} color="rgba(255,255,255,0.85)" />
-          </View>
-          <Typography variant="caption" style={styles.tileLabel}>
-            Classes Completed
-          </Typography>
-        </View>
-
-        <View style={[styles.tile, styles.tealDarkTile]}>
-          <View style={styles.tileHeader}>
-            <Typography variant="title" style={styles.tileNumber}>
-              {performance.hoursWorked}
-            </Typography>
-            <Feather name="clock" size={20} color="rgba(255,255,255,0.85)" />
-          </View>
-          <Typography variant="caption" style={styles.tileLabel}>
-            Hours Worked
-          </Typography>
-        </View>
-
-        <View style={[styles.tile, styles.tealTile]}>
-          <View style={styles.tileHeader}>
-            <Typography variant="title" style={styles.tileNumber}>
-              {performance.clientSatisfaction}%
-            </Typography>
-            <Feather name="heart" size={20} color="rgba(255,255,255,0.85)" />
-          </View>
-          <Typography variant="caption" style={styles.tileLabel}>
-            Client Satisfaction
-          </Typography>
-        </View>
+        ))}
       </View>
 
       {/* KPI Trends Section */}
@@ -70,18 +119,18 @@ export function PerformanceOverviewCard({ performance }: PerformanceOverviewCard
         </Typography>
 
         <View style={styles.kpiList}>
-          {performance.kpis.map((kpi, index) => (
-            <View key={index} style={styles.kpiCard}>
+          {kpis.map((kpi) => (
+            <View key={kpi.label} style={styles.kpiCard}>
               <View style={styles.kpiValueRow}>
-                <Feather name="arrow-up-right" size={18} color="#16a34a" />
-                <Typography variant="subtitle" style={styles.kpiValue}>
+                <Feather name={TREND_ICON[kpi.trend]} size={18} color={TREND_COLOR[kpi.trend]} />
+                <Typography variant="subtitle" style={[styles.kpiValue, { color: TREND_COLOR[kpi.trend] }]}>
                   {kpi.value}
                 </Typography>
               </View>
               <Typography variant="bodySmall" style={styles.kpiLabel}>
                 {kpi.label}
               </Typography>
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" color="textSecondary" style={styles.kpiSubtitle}>
                 {kpi.subtitle}
               </Typography>
             </View>
@@ -158,7 +207,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   kpiValue: {
-    color: '#16a34a',
     fontWeight: '800',
     fontSize: 16,
     marginLeft: 2,
@@ -169,5 +217,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: BrandColors.textPrimary,
     marginBottom: 2,
+  },
+  kpiSubtitle: {
+    textAlign: 'center',
   },
 });

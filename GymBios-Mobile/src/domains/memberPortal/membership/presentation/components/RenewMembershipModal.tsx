@@ -118,9 +118,13 @@ export function RenewMembershipModal({
   // goes through the family screen; renewing the family plan you're already on
   // stays a plain renewal here.
   const handleSelectPlan = (plan: MobileMembershipPlan) => {
-    const type = plan.planType?.toLowerCase();
+    const type = plan.planType?.trim().toLowerCase();
     if ((type === 'family' || type === 'couple') && plan.id !== currentPlanId) {
-      if (!activeTenant || typeof selectedBranchId !== 'number') {
+      // The member's own branch from the server; the app's selected branch can still
+      // be 'ALL' when it couldn't be resolved on the device.
+      const branchId = memberState?.membership?.branch_id
+        ?? (typeof selectedBranchId === 'number' ? selectedBranchId : null);
+      if (!activeTenant || !branchId) {
         toast.error('Could not open the family subscription — please try again.');
         return;
       }
@@ -130,7 +134,7 @@ export function RenewMembershipModal({
         pathname: '/(member)/family/purchase' as any,
         params: {
           tenantSlug: activeTenant,
-          branchId: String(selectedBranchId),
+          branchId: String(branchId),
           planId: String(plan.id),
           mode: 'change',
         },

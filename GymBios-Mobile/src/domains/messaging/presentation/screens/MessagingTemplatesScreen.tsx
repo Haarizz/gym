@@ -115,7 +115,7 @@ export function MessagingTemplatesScreen() {
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
                 <Feather 
-                  name={item.type === 'sms' ? 'message-circle' : item.type === 'push' ? 'bell' : 'mail'} 
+                  name={item.type === 'sms' ? 'message-circle' : item.type === 'in-app' ? 'bell' : 'mail'} 
                   size={16} 
                   color={MessagingColors.muted} 
                 />

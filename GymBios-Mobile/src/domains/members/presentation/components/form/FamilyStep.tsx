@@ -8,13 +8,14 @@ import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
-import { FormSection } from '@/shared/components/FormSection';
 import { Typography } from '@/shared/components/Typography';
 import { RELATIONSHIPS } from '@/domains/members/constants';
 import type {
   DraftFamilyMember,
   MemberWizardData,
 } from '@/domains/members/hooks/useMemberWizard';
+
+import { FormCard } from './FormCard';
 
 interface FamilyStepProps {
   data: MemberWizardData;
@@ -62,31 +63,38 @@ export function FamilyStep({
   if (!isFamily) {
     return (
       <View style={styles.container}>
-        <FormSection title="Family Configuration">
+        <FormCard icon="users" title="Family">
           <View style={styles.disabledContainer}>
-            <Feather name="users" size={32} color={theme.textSecondary} />
+            <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
+              <Feather name="users" size={24} color={theme.textSecondary} />
+            </View>
             <Typography
               variant="body"
               color="textSecondary"
               style={styles.disabledText}
             >
-              This member is not enrolled under a Family membership.
+              Not a family membership
             </Typography>
-            <Typography variant="caption" color="textSecondary">
-              Select "Family" as the Membership Type in Step 2 to configure
-              family members.
+            <Typography variant="caption" color="textSecondary" style={styles.centered}>
+              Nothing to set up here. Choose &quot;Family&quot; as the membership type
+              in the previous step to link relatives.
             </Typography>
           </View>
-        </FormSection>
+        </FormCard>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <FormSection title="Family Configuration">
+      <FormCard icon="users" title="Family" description="Link this member to a family membership">
         <View style={styles.switchRow}>
-          <Typography variant="bodySmallBold">Is Family Head</Typography>
+          <View style={styles.switchText}>
+            <Typography variant="bodySmallBold">Family head</Typography>
+            <Typography variant="caption" color="textSecondary">
+              The head pays for and manages the family plan
+            </Typography>
+          </View>
           <Switch
             value={data.isFamilyHead}
             onValueChange={(v) => updateField('isFamilyHead', v)}
@@ -134,7 +142,7 @@ export function FamilyStep({
           variant="secondary"
           onPress={handleOpenModal}
         />
-      </FormSection>
+      </FormCard>
 
       <AppBottomSheet
         visible={modalVisible}
@@ -184,14 +192,28 @@ export function FamilyStep({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
   disabledContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.five,
+    paddingVertical: Spacing.four,
     gap: Spacing.two,
+  },
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centered: {
+    textAlign: 'center',
+  },
+  switchText: {
+    flex: 1,
+    paddingRight: Spacing.md,
   },
   disabledText: {
     textAlign: 'center',

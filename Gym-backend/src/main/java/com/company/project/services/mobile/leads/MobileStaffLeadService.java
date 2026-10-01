@@ -52,7 +52,9 @@ public class MobileStaffLeadService {
         leadRequest.setBudget(request.getBudget());
         leadRequest.setPreferredContactMethod(request.getPreferredContactMethod());
         leadRequest.setLeadScore(request.getLeadScore());
-        // Deliberately NOT setting assignedStaff here to preserve existing lead behavior
+        // The staff member who captured the lead owns it — same as assigning it on the web, so it
+        // shows under their name in the web Leads list and their sale is credited when it converts.
+        leadRequest.setAssignedStaff(staff.getName());
 
         LeadResponseDTO createdLead = leadService.createLead(leadRequest);
 
@@ -86,7 +88,7 @@ public class MobileStaffLeadService {
         mobileLead.setPhone(createdLead.getPhone());
         mobileLead.setStatus(createdLead.getStatus());
         mobileLead.setPriority(createdLead.getPriority());
-        mobileLead.setAssignedStaff(createdLead.getAssignedStaff()); // Will be whatever the existing LeadService set it to (likely null)
+        mobileLead.setAssignedStaff(createdLead.getAssignedStaff());
         mobileLead.setNotes(createdLead.getNotes());
         mobileLead.setTags(createdLead.getTags());
         mobileLead.setCreatedAt(createdLead.getCreatedAt());

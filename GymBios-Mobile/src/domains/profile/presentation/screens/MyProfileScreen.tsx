@@ -14,8 +14,10 @@ import { GlassBlob, GlassHeader, GlassSurface, InfoRow, DatePicker, Dropdown } f
 import { useProfile } from '../../hooks/useProfile';
 import { useMobileProfile } from '../../hooks/useMobileProfile';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
+import { useStaffProfile } from '../../hooks/useStaffProfile';
 import { getMaxBirthDate, getMinBirthDate } from '../../domain/dateOfBirthRules';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
+import { CertificationsCard, EmploymentCard, ScheduleCard } from '../components/StaffProfileSections';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -75,6 +77,11 @@ export function MyProfileScreen({ onBack }: MyProfileScreenProps) {
   
   const isMember = profile?.role === 'MEMBER';
 
+  // Staff/trainers linked to an employee record: that record (managed on the web
+  // Staffs & Trainers page) drives the profile, and only phone/address are editable.
+  const { staffProfile, updateContact, isUpdatingContact } = useStaffProfile(!!profile && !isMember);
+  const isLinkedStaff = !isMember && !!staffProfile;
+
   const [editedDOB, setEditedDOB] = useState<Date | null>(null);
   const [editedGender, setEditedGender] = useState('');
   const [editedNationality, setEditedNationality] = useState('');
@@ -120,6 +127,21 @@ const handleStartEdit = () => {
   };
 
 const handleSaveProfile = async () => {
+    if (isLinkedStaff) {
+      try {
+        await updateContact({ phone: editedPhone, address: editedAddress });
+        setIsEditing(false);
+        toast.success('Profile updated successfully.', {
+          title: 'Success'
+        });
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to update profile.', {
+          title: 'Error'
+        });
+      }
+      return;
+    }
+
     if (!editedName.trim() || !editedEmail.trim()) {
       toast.error('Name and email are required.', {
         title: 'Validation Error'
@@ -237,8 +259,9 @@ const handleSaveProfile = async () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Avatar Section with AvatarPicker */}
-          <View style={styles.avatarSection}>
+          <GlassSurface radius={Radius.lg} style={styles.avatarSection}>
             <AvatarPicker
+              variant="compact"
               name={profile?.name || 'User'}
               photoUri={photoUri}
               photoUrl={profile?.photoUrl}
@@ -257,13 +280,15 @@ const handleSaveProfile = async () => {
                 }
               }}
             />
-            <Typography variant="title" style={styles.profileName}>
-              {profile?.name}
-            </Typography>
-            <Typography variant="bodySmall" color="textSecondary">
-              {profile?.role}{profile?.department && !isMember ? ` · ${profile?.department}` : ''}
-            </Typography>
-          </View>
+            <View style={styles.avatarText}>
+              <Typography variant="title" style={styles.profileName} numberOfLines={1}>
+                {profile?.name}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" style={styles.profileRole} numberOfLines={1}>
+                {profile?.role}{profile?.department && !isMember ? ` · ${profile?.department}` : ''}
+              </Typography>
+            </View>
+          </GlassSurface>
 
           {/* Personal Information Card */}
           <GlassSurface radius={Radius.lg} style={styles.card}>
@@ -291,23 +316,31 @@ const handleSaveProfile = async () => {
 
             {isEditing ? (
               <View style={styles.form}>
-                <Input
-                  variant="glass"
-                  label="Full Name"
-                  value={editedName}
-                  onChangeText={setEditedName}
-                  placeholder="Enter full name"
-                />
+                {isLinkedStaff ? (
+                  <Typography variant="caption" color="textSecondary">
+                    Your name, email and employment details are managed by your gym admin.
+                  </Typography>
+                ) : (
+                  <>
+                    <Input
+                      variant="glass"
+                      label="Full Name"
+                      value={editedName}
+                      onChangeText={setEditedName}
+                      placeholder="Enter full name"
+                    />
 
-                <Input
-                  variant="glass"
-                  label="Email Address"
-                  value={editedEmail}
-                  onChangeText={setEditedEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  placeholder="Enter email address"
-                />
+                    <Input
+                      variant="glass"
+                      label="Email Address"
+                      value={editedEmail}
+                      onChangeText={setEditedEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      placeholder="Enter email address"
+                    />
+                  </>
+                )}
 
                 <Input
                   variant="glass"
@@ -365,7 +398,7 @@ const handleSaveProfile = async () => {
                 <Button
                   title="Save Changes"
                   variant="primary"
-                  loading={isUpdatingProfile}
+                  loading={isUpdatingProfile || isUpdatingContact}
                   onPress={handleSaveProfile}
                   style={styles.saveButton}
                 />
@@ -384,29 +417,17 @@ const handleSaveProfile = async () => {
                   </>
                 )}
 
-                {profile?.staffId && !isMember && (
-                  <View style={styles.metaRow}>
-                    <View style={styles.metaCell}>
-                      <Typography variant="caption" color="textSecondary" style={styles.metaLabel}>
-                        Employee ID
-                      </Typography>
-                      <Typography variant="body" style={styles.metaValue}>
-                        {profile.staffId}
-                      </Typography>
-                    </View>
-                    <View style={styles.metaCell}>
-                      <Typography variant="caption" color="textSecondary" style={styles.metaLabel}>
-                        Join Date
-                      </Typography>
-                      <Typography variant="body" style={styles.metaValue}>
-                        {profile.joinDate || '—'}
-                      </Typography>
-                    </View>
-                  </View>
-                )}
               </View>
             )}
           </GlassSurface>
+
+          {isLinkedStaff && staffProfile && (
+            <>
+              <EmploymentCard staff={staffProfile} />
+              <CertificationsCard certifications={staffProfile.certifications} />
+              <ScheduleCard schedule={staffProfile.schedule} />
+            </>
+          )}
 
           {/* Health Information Card */}
           {isMember && (
@@ -591,14 +612,23 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six,
   },
   avatarSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.two,
+    gap: Spacing.four,
+    padding: Spacing.four,
+  },
+  avatarText: {
+    flex: 1,
+    gap: 2,
   },
   profileName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: BrandColors.textPrimary,
-    marginTop: Spacing.two,
+  },
+  profileRole: {
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   card: {
     padding: Spacing.four,
@@ -643,24 +673,6 @@ const styles = StyleSheet.create({
   editPillText: {
     color: BrandColors.tealDark,
     fontWeight: '700',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-    marginTop: Spacing.two,
-    paddingTop: Spacing.three,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(30,42,58,0.08)',
-  },
-  metaCell: {
-    flex: 1,
-  },
-  metaLabel: {
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  metaValue: {
-    fontWeight: '800',
   },
   saveButton: {
     marginTop: Spacing.two,

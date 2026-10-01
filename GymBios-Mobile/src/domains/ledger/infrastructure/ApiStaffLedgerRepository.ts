@@ -1,5 +1,4 @@
 import { apiClient } from '@/core/network/apiClient';
-import { parseAmount } from '@/core/providers/currencyDefinitions';
 import type { StaffLedgerData } from '../domain/StaffLedgerData';
 
 interface RawLedgerSummary {
@@ -7,8 +6,8 @@ interface RawLedgerSummary {
   this_month?: number;
   lastMonth?: number;
   last_month?: number;
-  growthPercentage?: number;
-  growth_percentage?: number;
+  growthPercentage?: number | null;
+  growth_percentage?: number | null;
   baseSalary?: number;
   base_salary?: number;
   commission?: number;
@@ -99,13 +98,15 @@ export class ApiStaffLedgerRepository {
     const quickStatsRaw: RawQuickStats = raw.quickStats || raw.quick_stats || {};
     const taxInfoRaw: RawTaxInfo = raw.taxInfo || raw.tax_info || {};
 
-    const thisMonth = summaryRaw.thisMonth ?? summaryRaw.this_month ?? 24000;
-    const lastMonth = summaryRaw.lastMonth ?? summaryRaw.last_month ?? 22000;
-    const baseSalary = summaryRaw.baseSalary ?? summaryRaw.base_salary ?? 18000;
-    const commission = summaryRaw.commission ?? 6000;
+    const thisMonth = summaryRaw.thisMonth ?? summaryRaw.this_month ?? 0;
+    const lastMonth = summaryRaw.lastMonth ?? summaryRaw.last_month ?? 0;
+    const baseSalary = summaryRaw.baseSalary ?? summaryRaw.base_salary ?? 0;
+    const commission = summaryRaw.commission ?? 0;
 
-    const growthVal = summaryRaw.growthPercentage ?? summaryRaw.growth_percentage ?? 9;
-    const growthStr = quickStatsRaw.growth || (growthVal >= 0 ? `+${growthVal}%` : `${growthVal}%`);
+    const growthVal = summaryRaw.growthPercentage ?? summaryRaw.growth_percentage;
+    const growthStr =
+      quickStatsRaw.growth ||
+      (growthVal == null ? '—' : growthVal >= 0 ? `+${growthVal}%` : `${growthVal}%`);
 
     return {
       summary: {
@@ -116,28 +117,17 @@ export class ApiStaffLedgerRepository {
       },
       quickStats: {
         growth: growthStr,
-        nextPayoutDate: quickStatsRaw.nextPayoutDate || quickStatsRaw.next_payout_date || 'Mar 30',
-        daysRemaining: quickStatsRaw.daysRemaining || quickStatsRaw.days_remaining || '5 days',
+        nextPayoutDate: quickStatsRaw.nextPayoutDate || quickStatsRaw.next_payout_date || '—',
+        daysRemaining: quickStatsRaw.daysRemaining || quickStatsRaw.days_remaining || '',
       },
-      breakdown: Array.isArray(raw.breakdown) && raw.breakdown.length > 0
-        ? raw.breakdown.map((item) => ({
-            category: item.category,
-            amount: item.amount ?? 0,
-            percentage: item.percentage ?? 0,
-          }))
-        : [
-            { category: 'Base Salary', amount: baseSalary, percentage: 75 },
-            { category: 'Commission', amount: commission, percentage: 18.75 },
-            { category: 'Bonuses', amount: 1500, percentage: 6.25 },
-          ],
-      commissionStructure: (raw.commissionStructure || raw.commission_structure || [
-        { label: 'Membership Sale', amount: 1500 },
-        { label: 'PT Package Sale', amount: 1000 },
-        { label: 'Add-on Sale', amount: 500 },
-      ]).map((item) => ({
+      breakdown: (raw.breakdown || []).map((item) => ({
+        category: item.category,
+        amount: item.amount ?? 0,
+        percentage: item.percentage ?? 0,
+      })),
+      commissionStructure: (raw.commissionStructure || raw.commission_structure || []).map((item) => ({
         label: item.label,
-        // The backend pre-formats these with a hardcoded "₹"; keep only the number.
-        amount: parseAmount(item.amount),
+        value: String(item.amount),
       })),
       recentEarnings: (raw.recentEarnings || raw.recent_earnings || []).map((item) => ({
         id: item.id,
@@ -148,17 +138,13 @@ export class ApiStaffLedgerRepository {
         status: (item.status?.toLowerCase() === 'paid' ? 'paid' : 'pending') as 'paid' | 'pending',
       })),
       taxInfo: {
-        ytdEarnings: taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? 268000,
-        tdsDeducted: taxInfoRaw.tdsDeducted ?? taxInfoRaw.tds_deducted ?? 8040,
-        baseSalaryPaid: taxInfoRaw.baseSalaryPaid ?? taxInfoRaw.base_salary_paid ?? 200000,
-        totalCommission: taxInfoRaw.totalCommission ?? taxInfoRaw.total_commission ?? 68000,
-        conversions: taxInfoRaw.conversions ?? 42,
+        ytdEarnings: taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? 0,
+        tdsDeducted: taxInfoRaw.tdsDeducted ?? taxInfoRaw.tds_deducted ?? 0,
+        baseSalaryPaid: taxInfoRaw.baseSalaryPaid ?? taxInfoRaw.base_salary_paid ?? 0,
+        totalCommission: taxInfoRaw.totalCommission ?? taxInfoRaw.total_commission ?? 0,
+        conversions: taxInfoRaw.conversions ?? 0,
       },
-      taxDocuments: (raw.taxDocuments || raw.tax_documents || [
-        { id: 1, title: 'Q1 2026 Statement' },
-        { id: 2, title: 'Q4 2025 Statement' },
-        { id: 3, title: 'Annual 2025 Summary' },
-      ]).map((doc) => ({
+      taxDocuments: (raw.taxDocuments || raw.tax_documents || []).map((doc) => ({
         id: doc.id,
         title: doc.title,
       })),

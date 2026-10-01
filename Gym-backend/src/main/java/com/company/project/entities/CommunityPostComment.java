@@ -14,9 +14,11 @@ public class CommunityPostComment extends BaseEntity {
     @JoinColumn(name = "post_id", nullable = false)
     private CommunityPost post;
 
-    // Exactly one of authorUser / authorMember is set: tenant logins (staff, gym-issued
-    // member credentials) author as a User; GymBios app accounts have no tenant users
-    // row and author as the Member their membership purchase created in this gym.
+    // Exactly one of authorUser / authorMember / authorGlobalUserId is set: tenant logins
+    // (staff, gym-issued member credentials) author as a User; GymBios app accounts have
+    // no tenant users row and author as the Member their membership purchase created in
+    // this gym — or, when their membership is at another gym, as the global account
+    // itself, with their name captured here since that profile lives in another database.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_user_id")
     private User authorUser;
@@ -24,6 +26,12 @@ public class CommunityPostComment extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_member_id")
     private Member authorMember;
+
+    @Column(name = "author_global_user_id")
+    private Long authorGlobalUserId;
+
+    @Column(name = "author_display_name")
+    private String authorDisplayName;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
@@ -41,6 +49,12 @@ public class CommunityPostComment extends BaseEntity {
 
     public Member getAuthorMember() { return authorMember; }
     public void setAuthorMember(Member authorMember) { this.authorMember = authorMember; }
+
+    public Long getAuthorGlobalUserId() { return authorGlobalUserId; }
+    public void setAuthorGlobalUserId(Long authorGlobalUserId) { this.authorGlobalUserId = authorGlobalUserId; }
+
+    public String getAuthorDisplayName() { return authorDisplayName; }
+    public void setAuthorDisplayName(String authorDisplayName) { this.authorDisplayName = authorDisplayName; }
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }

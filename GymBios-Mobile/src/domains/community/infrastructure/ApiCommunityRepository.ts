@@ -84,6 +84,7 @@ export class ApiCommunityRepository implements CommunityRepository {
         totalPages: response.data.pagination.total_pages,
       },
       canPost: response.data.can_post === true,
+      canInteract: response.data.can_interact === true,
     };
   }
 

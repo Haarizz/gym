@@ -1,6 +1,8 @@
 import { authService } from './auth-service';
+import api from '../../api/axiosConfig';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+const backendOrigin = backendBaseUrl.replace(/\/api\/?$/, "");
 
 export interface StaffCertification {
   id?: string;
@@ -191,6 +193,23 @@ class StaffService {
     );
     if (!response.ok) throw new Error(`Failed to update staff member: ${response.status}`);
     return response.json();
+  }
+
+  /** Uploads a certification file (PDF / image) and returns its relative URL to store as document_url. */
+  async uploadCertificationDocument(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await api.post<{ url: string }>('/mobile/uploads/documents', formData);
+      return res.data.url;
+    } catch (e: any) {
+      throw new Error(e?.response?.data?.message || 'Failed to upload document');
+    }
+  }
+
+  /** Turns a stored document_url (e.g. /uploads/documents/x.pdf) into an openable absolute URL. */
+  resolveDocumentUrl(path: string): string {
+    return /^https?:\/\//i.test(path) ? path : `${backendOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
   }
 
   async deleteStaff(id: string): Promise<void> {

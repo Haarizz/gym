@@ -78,6 +78,7 @@ public class MemberService {
     private final RewardRedemptionService rewardRedemptionService;
     private final DiscountCodeService discountCodeService;
     private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
+    private final GlobalMembershipService globalMembershipService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -98,7 +99,8 @@ public class MemberService {
                          UserDirectoryRepository userDirectoryRepository,
                          @Lazy RewardRedemptionService rewardRedemptionService,
                          @Lazy DiscountCodeService discountCodeService,
-                         com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository) {
+                         com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository,
+                         GlobalMembershipService globalMembershipService) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -116,6 +118,7 @@ public class MemberService {
         this.rewardRedemptionService   = rewardRedemptionService;
         this.discountCodeService       = discountCodeService;
         this.salesInvoiceRepository    = salesInvoiceRepository;
+        this.globalMembershipService   = globalMembershipService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -222,7 +225,7 @@ public class MemberService {
         // a normal active member before staff confirmed the payment — now that it's
         // confirmed, they're a normal active member.
         if ("pending_approval".equals(member.getMembershipStatus())) {
-            member.setMembershipStatus("Active");
+            member.setMembershipStatus("active");
         }
         Member saved = memberRepository.save(member);
 
@@ -239,7 +242,7 @@ public class MemberService {
             dep.setApprovedAt(LocalDateTime.now());
             dep.setAppAccessEnabled(true);
             if ("pending_approval".equals(dep.getMembershipStatus())) {
-                dep.setMembershipStatus("Active");
+                dep.setMembershipStatus("active");
             }
             memberRepository.save(dep);
         }
@@ -661,6 +664,7 @@ public class MemberService {
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
         member.setGlobalUserId(globalUserId);
         memberRepository.save(member);
+        globalMembershipService.recordLink(globalUserId, member.getId());
     }
 
     public MemberResponseDTO setMemberCredentials(Long id, String appUsername, String appPassword) {
@@ -726,8 +730,14 @@ public class MemberService {
     public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
-        if (member.getGlobalUserId() != null) {
-            throw new BusinessRuleViolationException("Cannot toggle access for global mobile accounts");
+        if (member.getGlobalUserId() != null && member.getUserId() == null) {
+            // Global mobile accounts have no local User row to enable/disable — the
+            // member flag alone gates them (TenantContextFilter rejects FALSE).
+            if (enabled && "pending_approval".equalsIgnoreCase(member.getMembershipStatus())) {
+                throw new BusinessRuleViolationException(
+                        "Access is locked until the pending payment is approved");
+            }
+            return setAppAccessEnabled(id, enabled);
         }
         if (member.getUserId() == null) {
             throw new EntityNotFoundException("This member has no linked app account");
@@ -1668,16 +1678,16 @@ public class MemberService {
                         cb.lessThan(effectiveEndDate, startOfToday)
                 );
                 if ("expired".equalsIgnoreCase(status)) {
-                    predicates.add(cb.or(cb.equal(root.get("membershipStatus"), status), expiredByDate));
+                    predicates.add(cb.or(cb.equal(cb.lower(root.get("membershipStatus")), status.toLowerCase()), expiredByDate));
                 } else {
-                    predicates.add(cb.and(cb.equal(root.get("membershipStatus"), status), cb.not(expiredByDate)));
+                    predicates.add(cb.and(cb.equal(cb.lower(root.get("membershipStatus")), status.toLowerCase()), cb.not(expiredByDate)));
                 }
             }
             if (membershipType != null && !membershipType.isBlank()) {
-                predicates.add(cb.equal(root.get("membershipType"), membershipType));
+                predicates.add(cb.equal(cb.lower(root.get("membershipType")), membershipType.toLowerCase()));
             }
             if (paymentStatus != null && !paymentStatus.isBlank()) {
-                predicates.add(cb.equal(root.get("paymentStatus"), paymentStatus));
+                predicates.add(cb.equal(cb.lower(root.get("paymentStatus")), paymentStatus.toLowerCase()));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

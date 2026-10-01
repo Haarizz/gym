@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { addDays, addMonths, addYears, format, isBefore, parseISO, startOfDay } from 'date-fns';
 
 import type { PaymentResult } from '@/shared/payment';
 import type { Member } from '../domain/Member';
@@ -10,6 +11,18 @@ import type {
 import { useMemberActions } from './useMemberActions';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
+import { leadKeys } from '@/domains/leads/hooks/leadKeys';
+import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance';
+
+/** Contact details carried over when a converted lead is registered as a member. */
+export interface MemberPrefill {
+  leadId?: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  /** The lead's assigned staff name — preselected as "Processed By". */
+  assignedStaff?: string;
+}
 
 export interface DraftFamilyMember {
   name: string;
@@ -31,6 +44,8 @@ export interface MemberWizardData {
   address: string;
   photoUrl: string;
   photoUri?: string;
+  /** Upload state of photoUri — submit is blocked while 'uploading'. */
+  photoStatus: 'idle' | 'uploading' | 'error';
 
   // Step 2: Membership
   membershipType: string;
@@ -43,6 +58,12 @@ export interface MemberWizardData {
   membershipFee: string;
   paymentStatus: string;
   discount: string;
+  /** Staff DB id credited with this sale toward their revenue target ('' = none). */
+  processedByStaffId: string;
+
+  // Source lead (create from a converted lead only)
+  leadId: number | null;
+  leadAssignedStaff: string;
 
   // Step 3: Medical
   bloodGroup: string;
@@ -66,49 +87,107 @@ export interface MemberWizardData {
   confirmPassword: string;
 }
 
+export type WizardMode = 'create' | 'edit';
+
+/** Field-level validation messages, keyed by the wizard field they belong to. */
+export type StepErrors = Partial<Record<keyof MemberWizardData, string>>;
+
 export interface WizardStep {
   id: string;
   title: string;
-  validate: (data: MemberWizardData) => boolean;
+  validate: (data: MemberWizardData, mode: WizardMode) => StepErrors;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[0-9\s\-()]{7,20}$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+function validatePersonal(data: MemberWizardData): StepErrors {
+  const errors: StepErrors = {};
+  if (data.name.trim().length < 2) errors.name = 'Enter the member\'s full name';
+
+  const phone = data.phone.trim();
+  if (!phone) errors.phone = 'Phone number is required';
+  else if (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, '').length < 7) {
+    errors.phone = 'Enter a valid phone number';
+  }
+
+  const email = data.email.trim();
+  if (email && !EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
+
+  if (data.photoStatus === 'uploading') errors.photoUrl = 'Wait for the photo to finish uploading';
+  return errors;
+}
+
+function validateMembership(data: MemberWizardData, mode: WizardMode): StepErrors {
+  const errors: StepErrors = {};
+  if (!data.membershipType.trim()) errors.membershipType = 'Choose a membership type';
+  if (!data.membershipPlanId.trim()) errors.membershipPlanId = 'Choose a membership plan';
+
+  const today = startOfDay(new Date());
+  if (!data.joinDate) {
+    errors.joinDate = 'Joining date is required';
+  } else if (mode === 'create' && isBefore(startOfDay(data.joinDate), today)) {
+    // Existing members keep their historical join date; new ones can't be backdated.
+    errors.joinDate = 'Joining date can\'t be in the past';
+  }
+
+  if (!data.startDate) {
+    errors.startDate = 'Start date is required';
+  } else if (mode === 'create' && isBefore(startOfDay(data.startDate), today)) {
+    errors.startDate = 'Start date can\'t be in the past';
+  } else if (data.joinDate && isBefore(startOfDay(data.startDate), startOfDay(data.joinDate))) {
+    errors.startDate = 'Start date can\'t be before the joining date';
+  }
+  return errors;
+}
+
+function validateAccess(data: MemberWizardData, mode: WizardMode): StepErrors {
+  const errors: StepErrors = {};
+  if (!data.appAccessEnabled) return errors;
+
+  const username = data.username.trim();
+  if (!username) errors.username = 'Username is required';
+  else if (/\s/.test(username)) errors.username = 'Username can\'t contain spaces';
+  else if (username.length < 3) errors.username = 'Username must be at least 3 characters';
+
+  // The backend only sets credentials on registration, so an existing login
+  // can be left alone when editing.
+  const passwordOptional = mode === 'edit';
+  if (!data.password) {
+    if (!passwordOptional) errors.password = 'Password is required';
+  } else if (data.password.length < MIN_PASSWORD_LENGTH) {
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  if ((data.password || data.confirmPassword) && data.password !== data.confirmPassword) {
+    errors.confirmPassword = 'Passwords don\'t match';
+  }
+  return errors;
 }
 
 export const STEPS: WizardStep[] = [
-  {
-    id: 'personal',
-    title: 'Personal Information',
-    validate: (data) =>
-      data.name.trim().length > 0 && data.phone.trim().length > 0,
-  },
-  {
-    id: 'membership',
-    title: 'Membership Information',
-    validate: (data) =>
-      data.membershipType.trim().length > 0 &&
-      data.membershipPlanId.trim().length > 0,
-  },
-  {
-    id: 'medical',
-    title: 'Medical Information',
-    validate: () => true,
-  },
-  {
-    id: 'family',
-    title: 'Family Configuration',
-    validate: () => true,
-  },
-  {
-    id: 'access',
-    title: 'App Access & Review',
-    validate: (data) => {
-      if (!data.appAccessEnabled) return true;
-      return (
-        data.username.trim().length > 0 &&
-        data.password.length > 0 &&
-        data.password === data.confirmPassword
-      );
-    },
-  },
+  { id: 'personal', title: 'Personal Information', validate: validatePersonal },
+  { id: 'membership', title: 'Membership Information', validate: validateMembership },
+  { id: 'medical', title: 'Medical Information', validate: () => ({}) },
+  { id: 'family', title: 'Family Configuration', validate: () => ({}) },
+  { id: 'access', title: 'App Access & Review', validate: validateAccess },
 ];
+
+/** Membership end date for a plan starting on `start`, or null if the duration is unknown. */
+export function computeEndDate(
+  start: Date,
+  durationValue: string | number | undefined,
+  durationType: string | undefined,
+): Date | null {
+  const value = parseInt(String(durationValue ?? ''), 10);
+  if (isNaN(value)) return null;
+  const type = durationType?.toLowerCase() ?? '';
+  if (type === 'month' || type === 'months') return addMonths(start, value);
+  if (type === 'year' || type === 'years') return addYears(start, value);
+  if (type === 'day' || type === 'days') return addDays(start, value);
+  if (type === 'week' || type === 'weeks') return addDays(start, value * 7);
+  return null;
+}
 
 function parseDate(value?: string | null): Date | null {
   if (!value) return null;
@@ -122,18 +201,19 @@ function parseDate(value?: string | null): Date | null {
 
 const today = () => new Date();
 
-function mapMemberToWizardData(member?: Member): MemberWizardData {
+function mapMemberToWizardData(member?: Member, prefill?: MemberPrefill): MemberWizardData {
   const todayDate = today();
   return {
-    name: member?.name ?? '',
+    name: member?.name ?? prefill?.name ?? '',
     gender: member?.gender ?? '',
     dateOfBirth: parseDate(member?.dateOfBirth),
     nationality: '',
-    phone: member?.phone ?? '',
-    email: member?.email ?? '',
+    phone: member?.phone ?? prefill?.phone ?? '',
+    email: member?.email ?? prefill?.email ?? '',
     address: member?.address ?? '',
     photoUrl: resolveImageUrl(member?.photoUrl) ?? '',
     photoUri: undefined,
+    photoStatus: 'idle',
 
     membershipType: member?.membershipType ?? '',
     membershipPlanId: member?.membershipPlanId
@@ -149,6 +229,10 @@ function mapMemberToWizardData(member?: Member): MemberWizardData {
       : '',
     paymentStatus: member?.paymentStatus ?? 'PAID',
     discount: '',
+    processedByStaffId: '',
+
+    leadId: prefill?.leadId ?? null,
+    leadAssignedStaff: prefill?.assignedStaff ?? '',
 
     bloodGroup: member?.bloodGroup ?? '',
     height: member?.height ?? '',
@@ -205,6 +289,8 @@ function buildCreateRequest(
     outstandingBalance: paymentResult?.outstandingBalance,
     bankAccountCode: paymentResult?.bankAccountCode,
     bankAccountName: paymentResult?.bankAccountName,
+    processedByStaffId: data.processedByStaffId ? Number(data.processedByStaffId) : undefined,
+    leadId: data.leadId ?? undefined,
 
     bloodGroup: data.bloodGroup || undefined,
     height: data.height || undefined,
@@ -226,7 +312,8 @@ function buildCreateRequest(
 }
 
 function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
-  const base = buildCreateRequest(data);
+  // Sale credit and lead linking only apply when the member is first registered.
+  const { processedByStaffId: _processedBy, leadId: _leadId, ...base } = buildCreateRequest(data);
   return {
     ...base,
     endDate: formatDateStr(data.endDate),
@@ -234,9 +321,10 @@ function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
 }
 
 interface UseMemberWizardOptions {
-  mode: 'create' | 'edit';
+  mode: WizardMode;
   initialData?: Member;
   memberId?: number;
+  prefill?: MemberPrefill;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
@@ -246,6 +334,10 @@ export interface UseMemberWizardReturn {
   totalSteps: number;
   currentStep: WizardStep;
   data: MemberWizardData;
+  /** Validation messages for the current step (empty when it's valid). */
+  stepErrors: StepErrors;
+  /** Validation messages for any step, e.g. to flag steps on the review screen. */
+  validateStep: (step: number) => StepErrors;
   canGoNext: boolean;
   canGoPrevious: boolean;
   loading: boolean;
@@ -265,22 +357,31 @@ export function useMemberWizard({
   mode,
   initialData,
   memberId,
+  prefill,
   onSuccess,
   onError,
 }: UseMemberWizardOptions): UseMemberWizardReturn {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<MemberWizardData>(() =>
-    mapMemberToWizardData(initialData),
+    mapMemberToWizardData(initialData, mode === 'create' ? prefill : undefined),
   );
+  const queryClient = useQueryClient();
   const { createMember, updateMember, submitting } = useMemberActions();
   const { selectedBranchId } = useBranchContext();
 
   const currentStep = STEPS[step - 1];
   const totalSteps = STEPS.length;
 
-  const canGoNext = useMemo(
-    () => currentStep.validate(data),
-    [currentStep, data],
+  const stepErrors = useMemo(
+    () => currentStep.validate(data, mode),
+    [currentStep, data, mode],
+  );
+
+  const canGoNext = Object.keys(stepErrors).length === 0;
+
+  const validateStep = useCallback(
+    (target: number) => STEPS[target - 1]?.validate(data, mode) ?? {},
+    [data, mode],
   );
 
   const canGoPrevious = useMemo(() => step > 1, [step]);
@@ -330,6 +431,11 @@ export function useMemberWizard({
             request.branchId = selectedBranchId;
           }
           await createMember(request);
+          if (request.leadId) {
+            // The backend marked the lead converted and credited the sale to a staff member.
+            queryClient.invalidateQueries({ queryKey: leadKeys.all });
+            queryClient.invalidateQueries({ queryKey: performanceKeys.all });
+          }
         } else if (mode === 'edit' && memberId) {
           const request = buildUpdateRequest(data);
           if (selectedBranchId && selectedBranchId !== 'ALL') {
@@ -342,7 +448,7 @@ export function useMemberWizard({
         onError?.(err as Error);
       }
     },
-    [mode, data, memberId, createMember, updateMember, onSuccess, onError, selectedBranchId],
+    [mode, data, memberId, createMember, updateMember, onSuccess, onError, selectedBranchId, queryClient],
   );
 
   return {
@@ -350,6 +456,8 @@ export function useMemberWizard({
     totalSteps,
     currentStep,
     data,
+    stepErrors,
+    validateStep,
     canGoNext,
     canGoPrevious,
     loading: submitting,

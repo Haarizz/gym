@@ -6,6 +6,7 @@ import com.company.project.entities.MobileFamilyInvitation;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.mobile.family.MobileFamilyInvitationRepository;
 import com.company.project.services.EmailService;
+import com.company.project.services.GlobalMembershipService;
 import com.company.project.services.mobile.family.MobileFamilyInvitationService.ClaimStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +30,7 @@ class MobileFamilyInvitationServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private FamilyInvitationDirectoryRepository directoryRepository;
     @Mock private EmailService emailService;
+    @Mock private GlobalMembershipService globalMembershipService;
 
     @InjectMocks
     private MobileFamilyInvitationService invitationService;
@@ -47,6 +49,7 @@ class MobileFamilyInvitationServiceTest {
         invitation.setExpiresAt(LocalDateTime.now().plusMonths(1));
 
         dependent = new Member();
+        dependent.setId(43L);
         dependent.setMemberId("MBR-43");
         dependent.setEmail("jane@example.com");
     }
@@ -61,6 +64,7 @@ class MobileFamilyInvitationServiceTest {
         assertEquals(ClaimStatus.CLAIMED, invitationService.claimInTenant(5L, "jane@example.com", 200L));
         assertEquals(200L, dependent.getGlobalUserId());
         verify(memberRepository).saveAndFlush(dependent);
+        verify(globalMembershipService).recordLink(200L, 43L);
     }
 
     @Test

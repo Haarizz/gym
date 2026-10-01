@@ -1,6 +1,7 @@
 export const profileKeys = {
   all: ['profile'] as const,
   current: () => [...profileKeys.all, 'current'] as const,
+  staff: () => [...profileKeys.all, 'staff'] as const,
   summary: () => [...profileKeys.all, 'summary'] as const,
   targets: () => [...profileKeys.all, 'targets'] as const,
   performance: () => [...profileKeys.all, 'performance'] as const,

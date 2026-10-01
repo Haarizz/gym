@@ -4,6 +4,7 @@ import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.LeadService;
 import com.company.project.services.MemberService;
 import com.company.project.services.MembershipFreezeService;
 import org.springframework.http.HttpStatus;
@@ -17,10 +18,13 @@ public class MemberController {
 
     private final MemberService memberService;
     private final MembershipFreezeService freezeService;
+    private final LeadService leadService;
 
-    public MemberController(MemberService memberService, MembershipFreezeService freezeService) {
+    public MemberController(MemberService memberService, MembershipFreezeService freezeService,
+                            LeadService leadService) {
         this.memberService = memberService;
         this.freezeService = freezeService;
+        this.leadService = leadService;
     }
 
     /**
@@ -134,7 +138,20 @@ public class MemberController {
      */
     @PostMapping
     public ResponseEntity<MemberResponseDTO> createMember(@RequestBody MemberRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(memberService.createMember(request));
+        // Registering a converted lead: credit the sale to the lead's staff unless someone
+        // else was picked as "Processed By", and close the lead out as converted.
+        Long leadId = request.getLeadId();
+        if (leadId != null) {
+            leadService.assertNotRegistered(leadId);
+            if (request.getProcessedByStaffId() == null) {
+                request.setProcessedByStaffId(leadService.resolveCreditedStaffId(leadId));
+            }
+        }
+        MemberResponseDTO created = memberService.createMember(request);
+        if (leadId != null) {
+            leadService.linkRegisteredMember(leadId, Long.valueOf(created.getId()));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     /**
@@ -153,6 +170,7 @@ public class MemberController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMember(@PathVariable Long id) {
         memberService.deleteMember(id);
+        leadService.unlinkMember(id);
         return ResponseEntity.noContent().build();
     }
 

@@ -79,6 +79,8 @@ export class ApiMemberFamilyRepository implements MemberFamilyRepository {
   async getFamily(memberId: number): Promise<FamilyGroup> {
     const response = await apiClient.get<FamilyGroupResponse>(
       `/members/${memberId}/family`,
+      // A 4xx here just means the member has no family group — not worth a toast.
+      { skipGlobalErrorToast: true },
     );
 
     const data = response.data;

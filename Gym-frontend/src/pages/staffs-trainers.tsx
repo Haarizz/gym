@@ -82,182 +82,24 @@ interface StaffsTrainersProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
 }
 
-// ── Certifications sub-component ──────────────────────────────────────────
-function AddCertificationsTab() {
-  const [certs, setCerts] = React.useState([
-    { name: '', issuer: '', issueDate: '', expiryDate: '' }
-  ]);
-
-  const addCert = () =>
-    setCerts(prev => [...prev, { name: '', issuer: '', issueDate: '', expiryDate: '' }]);
-
-  const removeCert = (i: number) =>
-    setCerts(prev => prev.filter((_, idx) => idx !== i));
-
-  const updateCert = (i: number, field: string, value: string) =>
-    setCerts(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Add professional certifications and qualifications</p>
-        <Button size="sm" variant="outline" onClick={addCert} className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Certification
-        </Button>
-      </div>
-
-      {certs.map((cert, i) => (
-        <div key={i} className="p-4 rounded-lg border border-primary/10 bg-muted/20 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-primary/10">
-                <GraduationCap className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm font-medium text-foreground">Certification {i + 1}</span>
-            </div>
-            {certs.length > 1 && (
-              <Button size="sm" variant="ghost" onClick={() => removeCert(i)} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Certification Name</Label>
-              <Input
-                placeholder="e.g. CPT, ACE, NASM"
-                value={cert.name}
-                onChange={e => updateCert(i, 'name', e.target.value)}
-                className="mt-1 h-8 text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Issuing Body</Label>
-              <Input
-                placeholder="e.g. NASM, ACE, CrossFit"
-                value={cert.issuer}
-                onChange={e => updateCert(i, 'issuer', e.target.value)}
-                className="mt-1 h-8 text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Issue Date</Label>
-              <Input
-                type="date"
-                value={cert.issueDate}
-                onChange={e => updateCert(i, 'issueDate', e.target.value)}
-                className="mt-1 h-8 text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Expiry Date</Label>
-              <Input
-                type="date"
-                value={cert.expiryDate}
-                onChange={e => updateCert(i, 'expiryDate', e.target.value)}
-                className="mt-1 h-8 text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">Upload Document</Label>
-            <div className="mt-1 flex items-center gap-2">
-              <label className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-dashed border-primary/30 bg-primary/5 text-xs text-primary cursor-pointer hover:bg-primary/10 transition-colors">
-                <Upload className="h-3.5 w-3.5" />
-                Choose file (PDF / Image)
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" />
-              </label>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Schedule sub-component ─────────────────────────────────────────────────
+// ── Schedule options ───────────────────────────────────────────────────────
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
 // Single set of roles used both as the employee's job role and their app login/RBAC role,
 // so Add/Edit Employee only asks for one "Role" instead of two confusingly similar fields.
 const SECURITY_ROLES = ['Gymbios_Admin', 'Receptionist', 'Trainer', 'Accountant', 'Manager'];
 
-function AddScheduleTab() {
-  const [schedule, setSchedule] = React.useState<Record<string, string[]>>(() =>
-    Object.fromEntries(DAYS.map(d => [d, []]))
-  );
+// "Add Certification" rows the admin left empty shouldn't be saved as nameless certificates.
+const withoutBlankCerts = (certs: StaffCertification[]) => certs.filter(c => c.cert_name?.trim());
 
-  const toggle = (day: string, slot: string) => {
-    setSchedule(prev => {
-      const current = prev[day];
-      return {
-        ...prev,
-        [day]: current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot]
-      };
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Select the working days and time slots for this employee</p>
-      <div className="rounded-lg border border-primary/10 overflow-hidden">
-        {/* Header row */}
-        <div className="grid bg-slate-50/80" style={{ gridTemplateColumns: '140px repeat(3, 1fr)' }}>
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-primary/10">Day</div>
-          {SLOTS.map(slot => (
-            <div key={slot} className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-l border-primary/10 text-center">{slot}</div>
-          ))}
-        </div>
-        {/* Day rows */}
-        {DAYS.map((day, di) => (
-          <div
-            key={day}
-            className={`grid items-center ${di % 2 === 0 ? 'bg-white' : 'bg-muted/10'}`}
-            style={{ gridTemplateColumns: '140px repeat(3, 1fr)' }}
-          >
-            <div className="px-3 py-3 text-sm font-medium text-foreground border-r border-primary/10">{day}</div>
-            {SLOTS.map(slot => {
-              const active = schedule[day].includes(slot);
-              return (
-                <div key={slot} className="flex justify-center px-3 py-3 border-l border-primary/10">
-                  <button
-                    type="button"
-                    onClick={() => toggle(day, slot)}
-                    className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                      active
-                        ? 'bg-primary border-primary text-white'
-                        : 'bg-white border-muted-foreground/30 hover:border-primary/50'
-                    }`}
-                  >
-                    {active && <CheckCircle className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-        <span className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-md bg-primary inline-block" />
-          Selected
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-md border-2 border-muted-foreground/30 inline-block" />
-          Not working
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ── Controlled Certifications tab (for Edit modal) ─────────────────────────
-interface EditCertificationsTabProps {
+// ── Controlled Certifications tab (Add & Edit modals) ──────────────────────
+interface CertificationsTabProps {
   certifications: StaffCertification[];
   onChange: (certs: StaffCertification[]) => void;
 }
-function EditCertificationsTab({ certifications, onChange }: EditCertificationsTabProps) {
+function CertificationsTab({ certifications, onChange }: CertificationsTabProps) {
+  const [uploadingIndex, setUploadingIndex] = React.useState<number | null>(null);
+
   const addCert = () =>
     onChange([...certifications, { cert_name: '', issuer: '', issue_date: '', expiry_date: '' }]);
 
@@ -269,7 +111,7 @@ function EditCertificationsTab({ certifications, onChange }: EditCertificationsT
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Edit professional certifications</p>
+        <p className="text-sm text-muted-foreground">Add professional certifications and qualifications</p>
         <Button size="sm" variant="outline" onClick={addCert} className="gap-1">
           <Plus className="h-4 w-4" />
           Add Certification
@@ -313,18 +155,54 @@ function EditCertificationsTab({ certifications, onChange }: EditCertificationsT
                 onChange={e => updateCert(i, 'expiry_date', e.target.value)} />
             </div>
           </div>
+          <div>
+            <Label className="text-xs">Document</Label>
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              {cert.document_url && (
+                <a href={staffService.resolveDocumentUrl(cert.document_url)} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-primary/20 bg-white text-xs text-primary hover:underline">
+                  <FileText className="h-3.5 w-3.5" />
+                  View document
+                </a>
+              )}
+              <label className={`flex items-center gap-2 px-3 py-1.5 rounded-md border border-dashed border-primary/30 bg-primary/5 text-xs text-primary transition-colors ${uploadingIndex === i ? 'opacity-60 pointer-events-none' : 'cursor-pointer hover:bg-primary/10'}`}>
+                {uploadingIndex === i ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {uploadingIndex === i ? 'Uploading…' : cert.document_url ? 'Replace file' : 'Choose file (PDF / Image)'}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setUploadingIndex(i);
+                    try {
+                      updateCert(i, 'document_url', await staffService.uploadCertificationDocument(file));
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to upload document');
+                    } finally {
+                      setUploadingIndex(null);
+                    }
+                  }} />
+              </label>
+              {cert.document_url && (
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => updateCert(i, 'document_url', '')}>
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-// ── Controlled Schedule tab (for Edit modal) ────────────────────────────────
-interface EditScheduleTabProps {
+// ── Controlled Schedule tab (Add & Edit modals) ─────────────────────────────
+interface ScheduleTabProps {
   schedule: Record<string, string[]>;
   onChange: (schedule: Record<string, string[]>) => void;
 }
-function EditScheduleTab({ schedule, onChange }: EditScheduleTabProps) {
+function ScheduleTab({ schedule, onChange }: ScheduleTabProps) {
   const toggle = (day: string, slot: string) => {
     const current = schedule[day] || [];
     onChange({
@@ -398,6 +276,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0],
     appUsername: '', appPassword: ''
   });
+  const [newEmployeeCerts, setNewEmployeeCerts] = useState<StaffCertification[]>([]);
+  const [newEmployeeSchedule, setNewEmployeeSchedule] = useState<Record<string, string[]>>({});
   const [showNewEmpPassword, setShowNewEmpPassword] = useState(false);
   const [isTogglingStaffAccess, setIsTogglingStaffAccess] = useState(false);
   const [editAppUsername, setEditAppUsername] = useState('');
@@ -497,8 +377,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         ...newEmployeeBasicInfo,
         status: 'active',
         join_date: newEmployeeBasicInfo.join_date || new Date().toISOString().split('T')[0],
-        certifications: [],
-        schedule: {},
+        certifications: withoutBlankCerts(newEmployeeCerts),
+        schedule: newEmployeeSchedule,
         photo_url: newEmployeeBasicInfo.photo_url,
         ...(newEmployeeBasicInfo.appUsername && newEmployeeBasicInfo.appPassword ? {
           app_username: newEmployeeBasicInfo.appUsername,
@@ -507,6 +387,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         } : {}),
       });
       setShowAddEmployee(false);
+      setNewEmployeeCerts([]);
+      setNewEmployeeSchedule({});
       setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0], appUsername: '', appPassword: '' });
       await loadStaff();
     } catch (e) { console.error('Failed to create employee', e); }
@@ -562,7 +444,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         status: editEmployeeData.status,
         join_date: editEmployeeData.join_date,
         photo_url: editEmployeeData.photo_url,
-        certifications: editEmployeeData.certifications || [],
+        certifications: withoutBlankCerts(editEmployeeData.certifications || []),
         schedule: editEmployeeData.schedule || {},
       });
       setShowEditEmployee(false);
@@ -1313,20 +1195,34 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <CardHeader>
                       <CardTitle>Certifications & Skills</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <Label className="text-base">Certifications</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {(selectedEmployee.certifications || []).length === 0 ? (
-                            <span className="text-sm text-muted-foreground">No certifications on file</span>
-                          ) : (selectedEmployee.certifications || []).map((cert: any, index: number) => (
-                            <Badge key={index} variant="secondary">
-                              <Award className="h-3 w-3 mr-1" />
-                              {cert.cert_name || cert}
-                            </Badge>
-                          ))}
+                    <CardContent className="space-y-3">
+                      {(selectedEmployee.certifications || []).length === 0 ? (
+                        <span className="text-sm text-muted-foreground">No certifications on file</span>
+                      ) : (selectedEmployee.certifications as StaffCertification[]).map((cert, index) => (
+                        <div key={cert.id ?? index} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-primary/10">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <Award className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium">{cert.cert_name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {[cert.issuer,
+                                  cert.issue_date && `Issued ${new Date(cert.issue_date).toLocaleDateString()}`,
+                                  cert.expiry_date && `Expires ${new Date(cert.expiry_date).toLocaleDateString()}`,
+                                ].filter(Boolean).join(' • ')}
+                              </div>
+                            </div>
+                          </div>
+                          {cert.document_url ? (
+                            <a href={staffService.resolveDocumentUrl(cert.document_url)} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0">
+                              <FileText className="h-3.5 w-3.5" />
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground shrink-0">No file</span>
+                          )}
                         </div>
-                      </div>
+                      ))}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -1650,12 +1546,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
             {/* Certifications Tab */}
             <TabsContent value="certifications" className="space-y-4 mt-0">
-              <AddCertificationsTab />
+              <CertificationsTab certifications={newEmployeeCerts} onChange={setNewEmployeeCerts} />
             </TabsContent>
 
             {/* Schedule Tab */}
             <TabsContent value="schedule" className="space-y-4 mt-0">
-              <AddScheduleTab />
+              <ScheduleTab schedule={newEmployeeSchedule} onChange={setNewEmployeeSchedule} />
             </TabsContent>
           </Tabs>
 
@@ -1847,14 +1743,14 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </TabsContent>
 
               <TabsContent value="certifications" className="mt-0">
-                <EditCertificationsTab
+                <CertificationsTab
                   certifications={editEmployeeData.certifications || []}
                   onChange={certs => setEditEmployeeData(p => p ? {...p, certifications: certs} : p)}
                 />
               </TabsContent>
 
               <TabsContent value="schedule" className="mt-0">
-                <EditScheduleTab
+                <ScheduleTab
                   schedule={editEmployeeData.schedule || {}}
                   onChange={sched => setEditEmployeeData(p => p ? {...p, schedule: sched} : p)}
                 />

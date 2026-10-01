@@ -99,6 +99,9 @@ public class MobileReferralController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Lost the race on the unique referee_global_user_id against a concurrent claim.
+            return ResponseEntity.status(409).body(Map.of("error", "User has already claimed a referral code"));
         } finally {
             com.company.project.security.TenantContextHolder.clear();
         }

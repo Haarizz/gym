@@ -33,6 +33,11 @@ export interface CreateMemberRequest {
   bankAccountCode?: string;
   bankAccountName?: string;
 
+  /** Staff credited with this sale toward their revenue target. */
+  processedByStaffId?: number;
+  /** Lead this member was converted from — the backend marks it converted. */
+  leadId?: number;
+
   // Medical
   bloodGroup?: string;
   height?: string;

@@ -29,6 +29,8 @@ interface LeadDetailsSheetProps {
   onClose: () => void;
   onEdit?: (lead: Lead) => void;
   onDelete?: (lead: Lead) => void;
+  /** Opens member registration pre-filled from this lead. */
+  onRegisterMember?: (lead: Lead) => void;
 }
 
 const INTERACTION_TYPES: Array<{ label: string; value: LeadInteractionType }> = [
@@ -46,6 +48,7 @@ export function LeadDetailsSheet({
   onClose,
   onEdit,
   onDelete,
+  onRegisterMember,
 }: LeadDetailsSheetProps) {
   const theme = useTheme();
 
@@ -305,6 +308,20 @@ export function LeadDetailsSheet({
               <Feather name="message-square" size={16} color={BrandColors.teal} />
               <Text style={[styles.actionGridText, { color: theme.text }]}>Message</Text>
             </TouchableOpacity>
+
+            {/* Hidden once registered — a second registration would duplicate the member. */}
+            {onRegisterMember && !lead.memberId && lead.status !== 'lost' && (
+              <TouchableOpacity
+                style={styles.actionGridBtn}
+                onPress={() => {
+                  onClose();
+                  onRegisterMember(lead);
+                }}
+              >
+                <Feather name="user-plus" size={16} color={BrandColors.teal} />
+                <Text style={[styles.actionGridText, { color: theme.text }]}>Register as Member</Text>
+              </TouchableOpacity>
+            )}
 
             {onEdit && (
               <TouchableOpacity

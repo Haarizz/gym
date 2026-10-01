@@ -2,18 +2,15 @@ package com.company.project.services;
 
 import com.company.project.dto.StaffTargetRequestDTO;
 import com.company.project.dto.StaffTargetResponseDTO;
-import com.company.project.entities.CommissionRule;
 import com.company.project.entities.Staff;
 import com.company.project.entities.StaffTarget;
 import com.company.project.exceptions.EntityNotFoundException;
-import com.company.project.repositories.CommissionRuleRepository;
 import com.company.project.repositories.StaffRepository;
 import com.company.project.repositories.StaffTargetRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,19 +21,15 @@ import java.util.stream.Collectors;
 @Transactional
 public class StaffTargetService {
 
-    private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("5");
-
     private final StaffTargetRepository targetRepository;
     private final StaffRepository staffRepository;
     private final StaffProgressCalculator progressCalculator;
-    private final CommissionRuleRepository commissionRuleRepository;
 
     public StaffTargetService(StaffTargetRepository targetRepository, StaffRepository staffRepository,
-                               StaffProgressCalculator progressCalculator, CommissionRuleRepository commissionRuleRepository) {
+                               StaffProgressCalculator progressCalculator) {
         this.targetRepository = targetRepository;
         this.staffRepository = staffRepository;
         this.progressCalculator = progressCalculator;
-        this.commissionRuleRepository = commissionRuleRepository;
     }
 
     @Transactional(readOnly = true)
@@ -99,29 +92,8 @@ public class StaffTargetService {
         String username = staff.getAppUsername() != null ? staff.getAppUsername() : "";
         BigDecimal liveRevenue = progressCalculator.computeRevenue(staff, username, start, end);
         int liveConversions = progressCalculator.computeConversions(staff, username, start, end);
-        BigDecimal liveCommission = computeLiveCommission(staff, username, start, end, liveRevenue);
+        BigDecimal liveCommission = progressCalculator.computeCommission(staff, username, start, end, liveRevenue);
         return StaffTargetResponseDTO.fromEntity(t, liveRevenue, liveConversions, liveCommission);
-    }
-
-    /**
-     * Admission (new-member) revenue is commissioned at the role's admissionCommission rate;
-     * everything else (renewals, add-ons, walk-ins) at baseCommission. Falls back to a flat
-     * 5% when the staff's role has no configured CommissionRule.
-     */
-    private BigDecimal computeLiveCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end, BigDecimal totalRevenue) {
-        Optional<CommissionRule> rule = staff.getRole() != null
-                ? commissionRuleRepository.findByRoleIgnoreCase(staff.getRole())
-                : Optional.empty();
-        BigDecimal baseRate = rule.map(CommissionRule::getBaseCommission).orElse(DEFAULT_COMMISSION_RATE);
-        BigDecimal admissionRate = rule.map(CommissionRule::getAdmissionCommission).orElse(baseRate);
-
-        BigDecimal admissionRevenue = progressCalculator.computeRevenue(staff, username, start, end, "New");
-        BigDecimal otherRevenue = totalRevenue.subtract(admissionRevenue).max(BigDecimal.ZERO);
-
-        BigDecimal hundred = BigDecimal.valueOf(100);
-        BigDecimal admissionCommission = admissionRevenue.multiply(admissionRate).divide(hundred, 2, RoundingMode.HALF_UP);
-        BigDecimal otherCommission = otherRevenue.multiply(baseRate).divide(hundred, 2, RoundingMode.HALF_UP);
-        return admissionCommission.add(otherCommission);
     }
 
     public StaffTargetResponseDTO createTarget(StaffTargetRequestDTO req) {

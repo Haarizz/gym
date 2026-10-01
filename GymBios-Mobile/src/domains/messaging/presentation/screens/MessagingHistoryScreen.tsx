@@ -49,7 +49,7 @@ export function MessagingHistoryScreen() {
               </View>
               <View style={styles.stat}>
                 <Text style={styles.statLabel}>Open Rate</Text>
-                <Text style={styles.statValue}>{(item.openRate * 100).toFixed(1)}%</Text>
+                <Text style={styles.statValue}>{item.openRate.toFixed(1)}%</Text>
               </View>
               <View style={styles.stat}>
                 <Text style={styles.statLabel}>Sent Date</Text>

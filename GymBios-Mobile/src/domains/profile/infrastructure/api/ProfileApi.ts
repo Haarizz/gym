@@ -1,5 +1,12 @@
 import { apiClient } from '@/core/network/apiClient';
-import type { ProfileApiModel, UpdateProfileRequestApiModel } from './ProfileApiModels';
+import { ApiError } from '@/core/platform/api/types';
+import type {
+  MemberDashboardSummaryApiModel,
+  MyPerformanceApiModel,
+  ProfileApiModel,
+  StaffProfileApiModel,
+  UpdateProfileRequestApiModel,
+} from './ProfileApiModels';
 
 export interface ApiAuthMeResponse {
   userId?: number;
@@ -125,8 +132,53 @@ export class ProfileApi {
   }
 
   /**
+   * GET /api/mobile/profile/staff/me
+   * The caller's employee record; null when the account isn't linked to one
+   * (e.g. a gym owner login that was never added as an employee).
+   */
+  async getMyStaffProfile(): Promise<StaffProfileApiModel | null> {
+    try {
+      const response = await apiClient.get<StaffProfileApiModel>('/mobile/profile/staff/me', {
+        skipGlobalErrorToast: true,
+      });
+      return response.data;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  /**
+   * PUT /api/mobile/profile/staff/me — staff may only change their phone and address.
+   */
+  async updateMyStaffContact(phone: string, address: string): Promise<StaffProfileApiModel> {
+    const response = await apiClient.put<StaffProfileApiModel>('/mobile/profile/staff/me', { phone, address });
+    return response.data;
+  }
+
+  /**
    * GET /api/mobile/profile/transactions
    */
+  /**
+   * GET /api/mobile/performance/me
+   * `role` only picks the metric set (sessions vs. lead conversions); the data is always the caller's own.
+   */
+  async getMyPerformance(role: 'staff' | 'trainer'): Promise<MyPerformanceApiModel> {
+    const response = await apiClient.get<MyPerformanceApiModel>('/mobile/performance/me', {
+      params: { role },
+    });
+    return response.data;
+  }
+
+  /**
+   * GET /api/mobile/member/dashboard
+   * Reused for the profile hub's member stats (visits, streak, membership days left).
+   */
+  async getMemberDashboardSummary(): Promise<MemberDashboardSummaryApiModel> {
+    const response = await apiClient.get<MemberDashboardSummaryApiModel>('/mobile/member/dashboard');
+    return response.data;
+  }
+
   async getTransactions(): Promise<any> {
     const response = await apiClient.get<any>('/mobile/profile/transactions');
     return response.data;

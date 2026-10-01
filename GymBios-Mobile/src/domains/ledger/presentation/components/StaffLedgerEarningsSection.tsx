@@ -37,6 +37,11 @@ export function StaffLedgerEarningsSection({
         </View>
 
         <View style={styles.earningsList}>
+          {recentEarnings.length === 0 && (
+            <Text style={styles.emptyText}>
+              No earnings yet. Salary payments and commission from your sales will appear here.
+            </Text>
+          )}
           {recentEarnings.map((item) => {
             const isPaid = item.status === 'paid';
             return (
@@ -119,6 +124,10 @@ const styles = StyleSheet.create({
   },
   earningsList: {
     gap: Spacing.two,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   earningItem: {
     borderWidth: 1,

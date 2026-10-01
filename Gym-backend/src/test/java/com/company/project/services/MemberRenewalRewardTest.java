@@ -57,7 +57,7 @@ class MemberRenewalRewardTest {
         service = new MemberService(memberRepository, planRepository, receiptService, userRepository,
                 roleRepository, userRoleRepository, passwordEncoder, notificationService,
                 automationExecutorService, receiptVoucherService, financialEventService, branchService,
-                userBranchRepository, userDirectoryRepository, rewardRedemptionService, null, null);
+                userBranchRepository, userDirectoryRepository, rewardRedemptionService, null, null, null);
 
         member = new Member();
         member.setId(10L);

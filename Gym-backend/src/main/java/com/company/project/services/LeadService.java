@@ -11,8 +11,10 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Lead;
 import com.company.project.entities.LeadInteraction;
 import com.company.project.entities.FollowUp;
+import com.company.project.entities.Staff;
 import com.company.project.repositories.LeadInteractionRepository;
 import com.company.project.repositories.LeadRepository;
+import com.company.project.repositories.StaffRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,12 +38,14 @@ public class LeadService {
     private final LeadRepository leadRepository;
     private final LeadInteractionRepository interactionRepository;
     private final NotificationService notificationService;
+    private final StaffRepository staffRepository;
 
     public LeadService(LeadRepository leadRepository, LeadInteractionRepository interactionRepository,
-                       NotificationService notificationService) {
+                       NotificationService notificationService, StaffRepository staffRepository) {
         this.leadRepository = leadRepository;
         this.interactionRepository = interactionRepository;
         this.notificationService = notificationService;
+        this.staffRepository = staffRepository;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -49,7 +53,7 @@ public class LeadService {
     public LeadResponseDTO createLead(LeadRequestDTO req) {
         Lead lead = new Lead();
         mapRequestToEntity(req, lead);
-        lead.setStatus(req.getStatus() != null ? req.getStatus() : "new");
+        lead.setStatus(req.getStatus() != null ? normalizeStatus(req.getStatus()) : "new");
 
         Lead saved = leadRepository.save(lead);
 
@@ -88,9 +92,64 @@ public class LeadService {
         leadRepository.delete(lead);
     }
 
+    /**
+     * Staff member to credit when this lead becomes a paying member: the lead's assigned staff,
+     * else whoever created it (leads added from the mobile app carry no assignee). Null when
+     * neither resolves to exactly one Staff record, so the sale falls back to "Admin".
+     */
+    @Transactional(readOnly = true)
+    public Long resolveCreditedStaffId(Long leadId) {
+        Lead lead = leadRepository.findById(leadId).orElse(null);
+        if (lead == null) return null;
+        if (lead.getAssignedStaff() != null && !lead.getAssignedStaff().isBlank()) {
+            List<Staff> byName = staffRepository.findByNameIgnoreCase(lead.getAssignedStaff().trim());
+            if (byName.size() == 1) return byName.get(0).getId();
+        }
+        if (lead.getCreatedBy() != null && !lead.getCreatedBy().isBlank()) {
+            List<Staff> byUsername = staffRepository.findByAppUsername(lead.getCreatedBy());
+            if (byUsername.size() == 1) return byUsername.get(0).getId();
+        }
+        return null;
+    }
+
+    /**
+     * Blocks registering the same lead twice — a second Add Member from the lead would create
+     * a duplicate member (and double-count the sale).
+     */
+    @Transactional(readOnly = true)
+    public void assertNotRegistered(Long leadId) {
+        Lead lead = leadRepository.findById(leadId)
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + leadId));
+        if (lead.getMemberId() != null) {
+            throw new IllegalStateException("This lead has already been registered as a member.");
+        }
+    }
+
+    /**
+     * Records the member a lead was registered as and marks the lead converted. An already
+     * converted lead keeps its status and date, so its conversion stays dated to when it
+     * actually happened.
+     */
+    public void linkRegisteredMember(Long leadId, Long memberId) {
+        leadRepository.findById(leadId).ifPresent(lead -> {
+            lead.setMemberId(memberId);
+            if (!"converted".equals(lead.getStatus())) {
+                lead.setStatus("converted");
+                lead.setLastContactDate(LocalDateTime.now());
+            }
+            leadRepository.save(lead);
+        });
+    }
+
+    /** Called when a member is deleted: its source lead becomes registrable again. */
+    public void unlinkMember(Long memberId) {
+        leadRepository.clearMemberLink(memberId);
+    }
+
     public LeadResponseDTO updateStatus(Long id, String status) {
         Lead lead = leadRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + id));
+        status = normalizeStatus(status);
         lead.setStatus(status);
         if ("converted".equals(status) || "contacted".equals(status)) {
             lead.setLastContactDate(LocalDateTime.now());
@@ -105,7 +164,11 @@ public class LeadService {
         Specification<Lead> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
-                predicates.add(cb.equal(root.get("status"), status));
+                String normalized = normalizeStatus(status);
+                // Older rows may still hold the legacy "follow_up" spelling.
+                predicates.add("follow-up".equals(normalized)
+                        ? root.get("status").in("follow-up", "follow_up")
+                        : cb.equal(root.get("status"), normalized));
             }
             if (source != null && !source.isBlank()) {
                 predicates.add(cb.equal(root.get("source"), source));
@@ -188,12 +251,20 @@ public class LeadService {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /**
+     * The web's status dialogs used to send "follow_up" while the filters, the mobile app and
+     * the status badges all use "follow-up" — store the one spelling so filtering matches.
+     */
+    private static String normalizeStatus(String status) {
+        return "follow_up".equals(status) ? "follow-up" : status;
+    }
+
     private void mapRequestToEntity(LeadRequestDTO req, Lead lead) {
         if (req.getFirstName() != null) lead.setFirstName(req.getFirstName());
         if (req.getLastName() != null) lead.setLastName(req.getLastName());
         if (req.getEmail() != null) lead.setEmail(req.getEmail());
         if (req.getPhone() != null) lead.setPhone(req.getPhone());
-        if (req.getStatus() != null) lead.setStatus(req.getStatus());
+        if (req.getStatus() != null) lead.setStatus(normalizeStatus(req.getStatus()));
         if (req.getSource() != null) lead.setSource(req.getSource());
         if (req.getPriority() != null) lead.setPriority(req.getPriority());
         if (req.getAssignedStaff() != null) lead.setAssignedStaff(req.getAssignedStaff());
@@ -220,6 +291,7 @@ public class LeadService {
         dto.setSource(lead.getSource());
         dto.setPriority(lead.getPriority());
         dto.setAssignedStaff(lead.getAssignedStaff());
+        dto.setMemberId(lead.getMemberId());
         dto.setNextFollowUp(lead.getNextFollowUp());
         dto.setLastContactDate(lead.getLastContactDate());
         dto.setInterestLevel(lead.getInterestLevel());

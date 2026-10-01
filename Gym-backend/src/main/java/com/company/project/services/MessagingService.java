@@ -5,7 +5,11 @@ import com.company.project.entities.*;
 import com.company.project.repositories.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -56,6 +60,10 @@ public class MessagingService {
         this.objectMapper = objectMapper;
     }
 
+    // @Transactional is what makes BranchFilterAspect enable the branch filter for
+    // these findAll() calls. Without it, a branch-scoped caller (staff/trainer app)
+    // loads every branch's rows and BranchSecurityListener rejects the foreign ones.
+    @Transactional(readOnly = true)
     public List<MessagingRecipientDTO> getRecipients(String type, String search) {
         String lowered = search == null ? "" : search.toLowerCase();
         List<MessagingRecipientDTO> results = new ArrayList<>();
@@ -170,8 +178,30 @@ public class MessagingService {
     }
 
     public List<MessageHistoryDTO> getHistory() {
-        List<MessageCampaign> campaigns = campaignRepository.findTop200ByOrderByCreatedAtDesc();
-        return campaigns.stream().map(this::toHistoryDTO).collect(Collectors.toList());
+        return findVisibleCampaigns().stream().map(this::toHistoryDTO).collect(Collectors.toList());
+    }
+
+    /**
+     * Campaigns the caller may see in history/analytics. Admins get the gym-wide
+     * view (the web Messaging page is their management console); everyone else —
+     * staff, trainers — only sees what they sent themselves. created_by is the
+     * sender's username, stamped by AuditConfig's AuditorAware.
+     */
+    private List<MessageCampaign> findVisibleCampaigns() {
+        String owner = campaignOwnerScope();
+        return owner == null
+                ? campaignRepository.findTop200ByOrderByCreatedAtDesc()
+                : campaignRepository.findTop200ByCreatedByOrderByCreatedAtDesc(owner);
+    }
+
+    /** The username to restrict campaigns to, or null when the caller sees everything. */
+    private String campaignOwnerScope() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return null; // background jobs
+        boolean isAdmin = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN"));
+        return isAdmin ? null : auth.getName();
     }
 
     // Member-scoped view for the member analytics page — a campaign has no direct
@@ -195,12 +225,22 @@ public class MessagingService {
 
     @Transactional
     public void deleteHistory(Long campaignId) {
+        String owner = campaignOwnerScope();
+        if (owner != null) {
+            // Non-admins may only delete their own campaigns; report others as missing
+            // rather than confirming they exist.
+            MessageCampaign campaign = campaignRepository.findById(campaignId)
+                    .orElseThrow(() -> new EntityNotFoundException("Message not found"));
+            if (!owner.equals(campaign.getCreatedBy())) {
+                throw new EntityNotFoundException("Message not found");
+            }
+        }
         recipientRepository.deleteByCampaignId(campaignId);
         campaignRepository.deleteById(campaignId);
     }
 
     public MessagingAnalyticsDTO getAnalytics() {
-        List<MessageCampaign> campaigns = campaignRepository.findTop200ByOrderByCreatedAtDesc();
+        List<MessageCampaign> campaigns = findVisibleCampaigns();
         LocalDate today = LocalDate.now();
         int sentToday = (int) campaigns.stream()
                 .filter(c -> c.getSentAt() != null && c.getSentAt().toLocalDate().isEqual(today))

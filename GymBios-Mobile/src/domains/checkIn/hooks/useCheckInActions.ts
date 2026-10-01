@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { checkInKeys } from './checkInKeys';
+import { attendanceKeys } from '@/domains/attendance/hooks/attendanceKeys';
 import { CheckInService } from '../application/CheckInService';
 import { CheckInApiRepository } from '../infrastructure/CheckInApiRepository';
 import { ManualCheckInProvider } from '../application/ManualCheckInProvider';
@@ -16,6 +17,8 @@ export function useCheckIn() {
     mutationFn: (request: CheckInRequest) => checkInService.checkIn(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: checkInKeys.today() });
+      // Keep the Attendance screens in step with check-outs (see useCheckout).
+      queryClient.invalidateQueries({ queryKey: attendanceKeys.all });
     },
   });
 }

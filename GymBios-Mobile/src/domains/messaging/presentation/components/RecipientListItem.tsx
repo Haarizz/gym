@@ -18,9 +18,9 @@ interface RecipientListItemProps {
 
 export function RecipientListItem({ recipient, isSelected, onToggle, index }: RecipientListItemProps) {
   const avatarColor = AV[index % AV.length];
-  // Determine if branch is downtown or uptown for mock purposes if it's stored in tags or location
-  const branch = recipient.location || 'Downtown';
-  const isExpiring = recipient.membershipStatus?.toLowerCase() === 'expiring' || recipient.membershipStatus?.toLowerCase() === 'expiring soon';
+  const typeLabel = recipient.type === 'prospect' ? 'Prospect' : recipient.type === 'staff' ? 'Staff' : 'Member';
+  const status = recipient.membershipStatus?.toLowerCase();
+  const isActive = status === 'active';
 
   return (
     <Pressable
@@ -41,13 +41,15 @@ export function RecipientListItem({ recipient, isSelected, onToggle, index }: Re
       <View style={styles.infoContainer}>
         <Text style={styles.name}>{recipient.name}</Text>
         <View style={styles.tagsRow}>
-          <Text style={[styles.tag, styles.branchTag]}>{branch}</Text>
-          <Text style={[
-            styles.tag, 
-            isExpiring ? styles.expiringTag : styles.activeTag
-          ]}>
-            {isExpiring ? 'Expiring soon' : 'Active'}
-          </Text>
+          <Text style={[styles.tag, styles.branchTag]}>{typeLabel}</Text>
+          {!!recipient.membershipStatus && (
+            <Text style={[styles.tag, isActive ? styles.activeTag : styles.expiringTag]}>
+              {recipient.membershipStatus}
+            </Text>
+          )}
+          {recipient.isVip && (
+            <Text style={[styles.tag, styles.vipTag]}>VIP</Text>
+          )}
         </View>
       </View>
     </Pressable>
@@ -113,5 +115,9 @@ const styles = StyleSheet.create({
   expiringTag: {
     backgroundColor: '#FCEFDD',
     color: '#B4711F',
+  },
+  vipTag: {
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
   },
 });

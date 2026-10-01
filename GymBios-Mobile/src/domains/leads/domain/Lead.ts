@@ -62,6 +62,8 @@ export interface Lead {
   source: LeadSource;
   priority: LeadPriority;
   assignedStaff?: string;
+  /** Member this lead was registered as; set once registration is saved. */
+  memberId?: number;
   nextFollowUp?: string;
   lastContactDate?: string;
   interestLevel?: number;

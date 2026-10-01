@@ -1,6 +1,6 @@
 import { apiClient } from '@/core/network/apiClient';
 import type { TrainerScheduleData, MobileSessionRequestDTO, MobileAvailabilityDTO } from '../domain/TrainerScheduleData';
-import { format, parseISO } from 'date-fns';
+import { format, isToday, parseISO } from 'date-fns';
 
 export class ApiTrainerScheduleRepository {
   static async getSchedule(startDate: string, endDate: string): Promise<TrainerScheduleData> {
@@ -20,6 +20,8 @@ export class ApiTrainerScheduleRepository {
       },
       weekSchedule: (data.days || []).map((day: any) => ({
         day: format(parseISO(day.date), 'EEE'),
+        dayName: format(parseISO(day.date), 'EEEE'),
+        isToday: isToday(parseISO(day.date)),
         date: parseInt(format(parseISO(day.date), 'd'), 10),
         sessions: (day.sessions || []).map((session: any) => ({
           id: session.id,

@@ -15,6 +15,7 @@ import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Typography } from '@/shared/components/Typography';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { ApiError } from '@/core/platform/api/types';
 import { CurrencyValue, useCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { PaymentBottomSheet } from '@/shared/payment/presentation/bottomSheets/PaymentBottomSheet';
@@ -28,7 +29,8 @@ import type { FamilyPurchaseRequest } from '../../infrastructure/familyApi';
 
 const familyMemberSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  // Required: every family member becomes a member record, and members.email is NOT NULL.
+  email: z.string().trim().min(1, 'Email is required').email('Enter a valid email'),
   phone: z.string().trim().optional(),
   relationship: z.string().min(1, 'Relationship is required'),
   isMinor: z.boolean(),
@@ -162,7 +164,7 @@ export function FamilyPurchaseScreen() {
       toast.error(`This subscription allows up to ${limits.children} child member${limits.children === 1 ? '' : 's'}.`);
       return;
     }
-    const emails = data.members.map((m) => m.email?.trim().toLowerCase()).filter(Boolean);
+    const emails = data.members.map((m) => m.email.trim().toLowerCase());
     if (new Set(emails).size !== emails.length) {
       toast.error('Each family member needs a different email.');
       return;
@@ -194,7 +196,7 @@ export function FamilyPurchaseScreen() {
       bankAccountName: paymentResult.bankAccountName,
       connectedMembers: getValues('members').map((m, i) => ({
         name: m.name.trim(),
-        email: m.email?.trim() || undefined,
+        email: m.email.trim(),
         phone: m.phone?.trim() || undefined,
         relationship: m.relationship,
         isMinor: minorFlags[i],
@@ -226,6 +228,21 @@ export function FamilyPurchaseScreen() {
         },
         // The API client already shows the server's error message; the sheet stays
         // open so a retry reuses this attempt's idempotency key.
+        onError: (error) => {
+          // The server rejected this attempt outright and rolled it back, so nothing
+          // was charged. The retry will likely carry a different payload (edited
+          // payment details), which the backend refuses under the same key
+          // ("Idempotency key already used with different payload") — start a new
+          // attempt instead. Network errors / 5xx / "already in progress"
+          // (INVALID_STATE) keep the key, since that request may still land.
+          if (
+            error instanceof ApiError &&
+            error.status >= 400 && error.status < 500 &&
+            error.body?.code !== 'INVALID_STATE'
+          ) {
+            setIdempotencyKey(Crypto.randomUUID());
+          }
+        },
       },
     );
   };
@@ -280,7 +297,7 @@ export function FamilyPurchaseScreen() {
           <View style={styles.sectionHeader}>
             <Typography variant="subtitle">{isCouple ? 'Your partner' : 'Family members'}</Typography>
             <Typography variant="bodySmall" color="textSecondary">
-              Anyone with an email gets an invite to use the app with this membership.
+              Each member gets an email invite to use the app with this membership.
             </Typography>
           </View>
 
@@ -383,7 +400,7 @@ export function FamilyPurchaseScreen() {
                   name={`members.${index}.email`}
                   render={({ field: { onChange, value } }) => (
                     <Input
-                      label={isMinor ? 'Email (optional)' : 'Email (for their app invite)'}
+                      label={isMinor ? 'Email' : 'Email (for their app invite)'}
                       placeholder="name@example.com"
                       keyboardType="email-address"
                       autoCapitalize="none"

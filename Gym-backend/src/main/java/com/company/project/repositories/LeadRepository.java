@@ -12,6 +12,11 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
 
     long countByStatus(String status);
 
+    /** Unlinks leads from a member that is being deleted, so they can be registered again. */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE Lead l SET l.memberId = null WHERE l.memberId = :memberId")
+    int clearMemberLink(@org.springframework.data.repository.query.Param("memberId") Long memberId);
+
     @org.springframework.data.jpa.repository.Query("SELECT l.status, COUNT(l) FROM Lead l GROUP BY l.status")
     java.util.List<Object[]> countLeadsByStatus();
 

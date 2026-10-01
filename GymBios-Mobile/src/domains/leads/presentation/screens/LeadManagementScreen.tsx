@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useRouter } from 'expo-router';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -32,6 +33,7 @@ import { LeadDetailsSheet } from '../components/LeadDetailsSheet';
 import { LeadFilters } from '../components/LeadFilters';
 import { LeadList } from '../components/LeadList';
 import { LeadSelectionToolbar } from '../components/LeadSelectionToolbar';
+import { registerLeadAsMember } from '../navigation/registerLeadAsMember';
 import { useLeadSelection } from '../hooks/useLeadSelection';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -103,6 +105,11 @@ export function LeadManagementScreen({
   const [formNotes, setFormNotes] = useState('');
 
   const [bulkStaffName, setBulkStaffName] = useState('');
+  const router = useRouter();
+  const handleRegisterMember = useCallback(
+    (lead: Lead) => registerLeadAsMember(router, lead),
+    [router],
+  );
 
   // Domain & Query Hooks
   const { staff } = useStaff();
@@ -288,6 +295,19 @@ export function LeadManagementScreen({
       return;
     }
 
+    // Marking a lead converted only flips its status — like the web, offer to register the
+    // member right away so the sale is recorded and credited to the lead's staff.
+    const newlyConverted =
+      formStatus === 'converted' && selectedLead.status !== 'converted' && !selectedLead.memberId;
+    const convertedLead: Lead = {
+      ...selectedLead,
+      firstName: formFirstName.trim(),
+      lastName: formLastName.trim(),
+      email: formEmail.trim(),
+      phone: formPhone.trim(),
+      assignedStaff: formAssignedStaff.trim() || undefined,
+    };
+
     updateMutation.mutate(
       {
         id: selectedLead.id,
@@ -308,6 +328,16 @@ export function LeadManagementScreen({
           setEditModalVisible(false);
           setSelectedLead(null);
           resetForm();
+          if (newlyConverted) {
+            Alert.alert(
+              'Register as member?',
+              `${convertedLead.firstName} is marked converted. Register them now to record the sale and credit it to their staff member.`,
+              [
+                { text: 'Later', style: 'cancel' },
+                { text: 'Register', onPress: () => handleRegisterMember(convertedLead) },
+              ],
+            );
+          }
         },
         onError: err => {
           toast.error(err.message || 'Failed to update lead.', {
@@ -526,6 +556,7 @@ export function LeadManagementScreen({
         onClose={() => setDetailModalVisible(false)}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onRegisterMember={handleRegisterMember}
       />
 
       {/* Create Lead Modal / Sheet */}

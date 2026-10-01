@@ -96,14 +96,17 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
               </Pressable>
             )}
 
+            {/* Classes are tracked on the class schedule, not completed from here. */}
+            {task.type !== 'Class' && (
             <Pressable
               style={[
                 styles.doneButton,
                 task.completed && styles.doneButtonActive,
               ]}
               onPress={() => onToggleComplete?.(task.id)}
+              disabled={task.completed}
               accessibilityRole="button"
-              accessibilityLabel={task.completed ? 'Mark incomplete' : 'Mark done'}
+              accessibilityLabel={task.completed ? 'Completed' : 'Mark done'}
             >
               <Text
                 style={[
@@ -114,6 +117,7 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
                 {task.completed ? 'Completed ✓' : 'Mark Done'}
               </Text>
             </Pressable>
+            )}
           </View>
         </View>
       </View>

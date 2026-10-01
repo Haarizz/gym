@@ -15,7 +15,7 @@ import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
 import { GlassBlob } from '@/shared/components';
-import { useRestoreSession } from '@/domains/auth';
+import { useAuthStore, useRestoreSession } from '@/domains/auth';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileSummary } from '../../hooks/useProfileSummary';
@@ -47,6 +47,9 @@ export function ProfileHubScreen({
   const { summary } = useProfileSummary();
   const { updatePhoto } = useProfileMutations();
   const { logout, isLoggingOut } = useRestoreSession();
+  const appRole = useAuthStore((s) => s.appRole);
+  // Staff and trainers get My Performance; Referrals is for members and admins.
+  const isEmployee = appRole === 'staff' || appRole === 'trainer';
 
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -135,23 +138,27 @@ export function ProfileHubScreen({
               onPress={onNavigateToProfile}
             />
 
-            <ProfileNavigationRow
-              icon="gift"
-              title="Referrals"
-              subtitle="Invite friends & earn rewards"
-              iconBgColor="#fef3c7"
-              iconColor="#d97706"
-              onPress={onNavigateToReferrals}
-            />
+            {!isEmployee && (
+              <ProfileNavigationRow
+                icon="gift"
+                title="Referrals"
+                subtitle="Invite friends & earn rewards"
+                iconBgColor="#fef3c7"
+                iconColor="#d97706"
+                onPress={onNavigateToReferrals}
+              />
+            )}
 
-            <ProfileNavigationRow
-              icon="activity"
-              title="My Performance"
-              subtitle="Score, trends & activity stats"
-              iconBgColor="#dbeafe"
-              iconColor="#2563eb"
-              onPress={onNavigateToPerformance}
-            />
+            {isEmployee && (
+              <ProfileNavigationRow
+                icon="activity"
+                title="My Performance"
+                subtitle="Score, trends & activity stats"
+                iconBgColor="#dbeafe"
+                iconColor="#2563eb"
+                onPress={onNavigateToPerformance}
+              />
+            )}
 
             {profile?.role?.toLowerCase() !== 'admin' && (
               <ProfileNavigationRow

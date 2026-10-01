@@ -36,4 +36,7 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     List<StaffAttendance> findActiveSessionsBefore(@Param("before") LocalDateTime before);
 
     List<StaffAttendance> findByStaff_IdOrderByClockInTimeDesc(Long staffId);
+
+    List<StaffAttendance> findByStaff_IdAndClockInTimeGreaterThanEqualAndClockInTimeLessThan(
+            Long staffId, LocalDateTime start, LocalDateTime end);
 }

@@ -1,19 +1,28 @@
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { toast } from '@/shared/components/Toasts/toastStore';
+import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
+
+import { usePhotoPicker } from './usePhotoPicker';
+
+/** AppBottomSheet's close animation (220ms) plus time for the native Modal to dismiss. */
+const SHEET_DISMISS_DELAY_MS = 400;
 
 export interface AvatarPickerProps {
   photoUri?: string;
   photoUrl?: string;
   name: string;
   onChangePhoto: (uri?: string) => void;
+  /**
+   * 'compact' drops the "Tap to change photo" caption and shows a camera badge on a
+   * teal-ringed avatar instead — used in the My Profile header card.
+   */
+  variant?: 'default' | 'compact';
 }
 
 export function AvatarPicker({
@@ -21,6 +30,7 @@ export function AvatarPicker({
   photoUrl,
   name,
   onChangePhoto,
+  variant = 'default',
 }: AvatarPickerProps) {
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -36,55 +46,21 @@ export function AvatarPicker({
         .toUpperCase()
     : '?';
 
-  const handleTakePhoto = useCallback(async () => {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        toast.warning('Camera access is needed to take a profile photo.', { title: 'Permission Required' });
-        return;
-      }
+  const { takePhoto, chooseFromGallery } = usePhotoPicker();
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        onChangePhoto(result.assets[0].uri);
-      }
-    } catch (_err) {
-      toast.error('Camera is unavailable or an error occurred.');
-    }
-  }, [onChangePhoto]);
-
-  const handleChooseGallery = useCallback(async () => {
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('[AvatarPicker] gallery permission granted=', permission.granted);
-      if (!permission.granted) {
-        toast.warning('Gallery access is needed to select a photo.', { title: 'Permission Required' });
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      console.log('[AvatarPicker] gallery result canceled=', result.canceled, 'uri=', result.assets?.[0]?.uri);
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        onChangePhoto(result.assets[0].uri);
-      }
-    } catch (err) {
-      console.error('[AvatarPicker] handleChooseGallery threw', err);
-      toast.error('Unable to open image gallery.');
-    }
-  }, [onChangePhoto]);
+  // Close the sheet first and launch the picker only once its Modal has gone:
+  // iOS won't present the camera/gallery over a modal that is still dismissing,
+  // which made these options silently do nothing on device.
+  const closeSheetThen = useCallback(
+    (pick: () => Promise<string | undefined>) => {
+      setSheetVisible(false);
+      setTimeout(async () => {
+        const uri = await pick();
+        if (uri) onChangePhoto(uri);
+      }, SHEET_DISMISS_DELAY_MS);
+    },
+    [onChangePhoto],
+  );
 
   const handleRemovePhoto = useCallback(() => {
     onChangePhoto(undefined);
@@ -95,28 +71,50 @@ export function AvatarPicker({
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Pressable
-        onPress={handlePress}
-        style={({ pressed }) => [
-          styles.avatarWrapper,
-          { borderColor: theme.border },
-          pressed && styles.pressed,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="Tap to select photo"
-      >
-        <Avatar
-          initials={initials}
-          imageUrl={currentImage || undefined}
-          size={76}
-        />
-      </Pressable>
-      <Pressable onPress={handlePress} hitSlop={8}>
-        <Typography variant="caption" color="primary" style={styles.hint}>
-          {currentImage ? 'Tap to change photo' : 'Tap to add photo'}
-        </Typography>
-      </Pressable>
+    <View style={variant === 'compact' ? undefined : styles.container}>
+      {variant === 'compact' ? (
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => [styles.compactRing, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={currentImage ? 'Change profile photo' : 'Add profile photo'}
+        >
+          <Avatar
+            initials={initials}
+            imageUrl={currentImage || undefined}
+            size={64}
+            backgroundColor="rgba(50,127,116,0.12)"
+            textColor={BrandColors.tealDark}
+          />
+          <View style={styles.cameraBadge}>
+            <Feather name="camera" size={11} color={BrandColors.white} />
+          </View>
+        </Pressable>
+      ) : (
+        <>
+          <Pressable
+            onPress={handlePress}
+            style={({ pressed }) => [
+              styles.avatarWrapper,
+              { borderColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Tap to select photo"
+          >
+            <Avatar
+              initials={initials}
+              imageUrl={currentImage || undefined}
+              size={76}
+            />
+          </Pressable>
+          <Pressable onPress={handlePress} hitSlop={8}>
+            <Typography variant="caption" color="primary" style={styles.hint}>
+              {currentImage ? 'Tap to change photo' : 'Tap to add photo'}
+            </Typography>
+          </Pressable>
+        </>
+      )}
 
       <AppBottomSheet
         visible={sheetVisible}
@@ -130,10 +128,7 @@ export function AvatarPicker({
             { borderBottomColor: theme.border },
             pressed && { backgroundColor: theme.backgroundElement },
           ]}
-          onPress={() => {
-            setSheetVisible(false);
-            handleTakePhoto();
-          }}
+          onPress={() => closeSheetThen(takePhoto)}
         >
           <Typography variant="body" style={{ color: theme.text }}>
             Take Photo
@@ -145,10 +140,7 @@ export function AvatarPicker({
             { borderBottomColor: theme.border },
             pressed && { backgroundColor: theme.backgroundElement },
           ]}
-          onPress={() => {
-            setSheetVisible(false);
-            handleChooseGallery();
-          }}
+          onPress={() => closeSheetThen(chooseFromGallery)}
         >
           <Typography variant="body" style={{ color: theme.text }}>
             Choose from Gallery
@@ -189,6 +181,25 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  compactRing: {
+    borderRadius: Radius.full,
+    borderWidth: 2,
+    borderColor: BrandColors.teal,
+    padding: 3,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    left: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: BrandColors.teal,
+    borderWidth: 2,
+    borderColor: BrandColors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hint: {
     textAlign: 'center',

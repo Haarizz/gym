@@ -55,8 +55,18 @@ public class MobileMemberMembershipResponseDTO {
         private Boolean autoRenew;
         private Integer totalDays;
         private Integer remainingDays;
+        // The member's branch — the family screen loads this gym's plans/quote by it.
+        private Long branchId;
 
         public MembershipInfo() {
+        }
+
+        public Long getBranchId() {
+            return branchId;
+        }
+
+        public void setBranchId(Long branchId) {
+            this.branchId = branchId;
         }
 
         public Long getId() {

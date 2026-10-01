@@ -139,6 +139,19 @@ public class StaffService {
         return StaffResponseDTO.fromEntity(staff);
     }
 
+    /**
+     * Self-service contact update from the mobile profile screen. Only phone and
+     * address are staff-editable — everything else (name, email, role, salary,
+     * certifications, schedule…) stays admin-managed via the Staffs & Trainers page.
+     */
+    public StaffResponseDTO updateMyContact(Long userId, String phone, String address) {
+        Staff staff = staffRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("No staff record linked to this account"));
+        if (phone != null) staff.setPhone(phone.trim());
+        if (address != null) staff.setAddress(address.trim());
+        return StaffResponseDTO.fromEntity(staffRepository.save(staff));
+    }
+
     public StaffResponseDTO createStaff(StaffRequestDTO req) {
         Staff staff = new Staff();
         Long branchId = branchService.resolveBranchForCreate(null); // primary/home branch

@@ -13,11 +13,19 @@ export interface TrainerAvailabilitySheetProps {
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+// `value` is the slot string stored in the backend; it must match the web admin and HR
+// onboarding (e.g. "Morning (6am–12pm)") so every screen reads the same schedule.
 const SLOTS = [
-  { key: "morning", label: "Morning", range: "6am – 12pm", icon: "sunrise" },
-  { key: "afternoon", label: "Afternoon", range: "12pm – 5pm", icon: "sun" },
-  { key: "evening", label: "Evening", range: "5pm – 10pm", icon: "moon" },
+  { key: "morning", value: "Morning (6am–12pm)", label: "Morning", range: "6am – 12pm", icon: "sunrise" },
+  { key: "afternoon", value: "Afternoon (12pm–5pm)", label: "Afternoon", range: "12pm – 5pm", icon: "sun" },
+  { key: "evening", value: "Evening (5pm–10pm)", label: "Evening", range: "5pm – 10pm", icon: "moon" },
 ] as const;
+
+// Matches both the canonical value and older lowercase keys ("morning") saved by this sheet.
+function slotKeyFromValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return SLOTS.find((s) => normalized.startsWith(s.key))?.key;
+}
 
 const DEFAULT_SCHEDULE: Record<string, any> = {
   Monday: { morning: true, afternoon: true, evening: false },
@@ -43,9 +51,9 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
   const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
   const [expanded, setExpanded] = useState<string | null>("Monday");
 
-  // Sync server data to local state
+  // Sync server data to local state (also on reopen, discarding unsaved edits)
   useEffect(() => {
-    if (availabilityData && availabilityData.slots) {
+    if (visible && availabilityData && availabilityData.slots) {
       const newSchedule = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
       
       // Clear all first (assuming backend data is absolute)
@@ -57,14 +65,15 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
       
       // Apply active slots
       availabilityData.slots.forEach((slotInfo) => {
-        if (newSchedule[slotInfo.day]) {
-          newSchedule[slotInfo.day][slotInfo.slot] = true;
+        const key = slotInfo.slot ? slotKeyFromValue(slotInfo.slot) : undefined;
+        if (newSchedule[slotInfo.day] && key) {
+          newSchedule[slotInfo.day][key] = true;
         }
       });
       
       setSchedule(newSchedule);
     }
-  }, [availabilityData]);
+  }, [visible, availabilityData]);
 
   const toggleSlot = (day: string, key: string) => {
     setSchedule((prev) => ({
@@ -90,7 +99,7 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
     DAYS.forEach(day => {
       SLOTS.forEach(slot => {
         if (schedule[day][slot.key]) {
-          slots.push({ day, slot: slot.key });
+          slots.push({ day, slot: slot.value });
         }
       });
     });
@@ -98,7 +107,10 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
     updateMutation.mutate({ slots }, {
       onSuccess: () => {
         onClose();
-      }
+      },
+      onError: (err) => {
+        alert(`Failed to save availability: ${err.message}`);
+      },
     });
   };
 

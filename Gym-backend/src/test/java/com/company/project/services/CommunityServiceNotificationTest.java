@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,7 +52,8 @@ class CommunityServiceNotificationTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new CommunityService(postRepository, commentRepository, likeRepository, userRepository, memberRepository, notificationService);
+        service = new CommunityService(postRepository, commentRepository, likeRepository, userRepository, memberRepository, notificationService,
+                mock(GlobalMembershipService.class));
 
         CommunityPost post = new CommunityPost();
         post.setId(POST_ID);

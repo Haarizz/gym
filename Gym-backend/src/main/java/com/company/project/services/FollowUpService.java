@@ -114,6 +114,14 @@ public class FollowUpService {
 
         if (fu.getLead() != null) {
             fu.getLead().setLastContactDate(LocalDateTime.now());
+            // A "converted" outcome means the lead signed up — reflect that on the lead so it
+            // counts toward the staff member's conversions without a separate status update.
+            if ("converted".equalsIgnoreCase(outcome)) {
+                fu.getLead().setStatus("converted");
+            } else if ("not-interested".equalsIgnoreCase(outcome) || "not_interested".equalsIgnoreCase(outcome)) {
+                // The lead turned it down — close it out so it stops showing as an open lead.
+                fu.getLead().setStatus("lost");
+            }
             leadRepository.save(fu.getLead());
         }
 
@@ -285,6 +293,7 @@ public class FollowUpService {
             dto.setLeadName(fu.getLead().getFirstName() + " " + (fu.getLead().getLastName() != null ? fu.getLead().getLastName() : ""));
             dto.setLeadEmail(fu.getLead().getEmail());
             dto.setLeadPhone(fu.getLead().getPhone());
+            dto.setLeadMemberId(fu.getLead().getMemberId());
         }
         dto.setType(fu.getType());
         dto.setStatus(fu.getStatus());
