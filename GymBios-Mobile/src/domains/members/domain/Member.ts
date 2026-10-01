@@ -20,6 +20,8 @@ export interface Member {
   status: string;
   startDate: string;
   endDate?: string;
+  /** members.expiry_date — the backend checks this before endDate when gating check-in. */
+  expiryDate?: string;
   paymentStatus: string;
 
   // Freeze
@@ -33,11 +35,17 @@ export interface Member {
   familyHeadName?: string;
   familyBillingMode?: string;
   familyRole?: string;
+  isMinor?: boolean;
+  /** Billed into the family head's receipt (minors, and adults under family_head billing). */
+  billedToHead?: boolean;
 
   // App Access
   userId?: number;
+  /** Set when the member signed up through the app with a GymBios account (no local login). */
+  globalUserId?: number;
   appUsername?: string;
-  appAccessEnabled: boolean;
+  /** Only an explicit false blocks the app — the backend treats null as allowed. */
+  appAccessEnabled?: boolean;
 
   // Medical
   bloodGroup?: string;

@@ -7,6 +7,13 @@ import type {
 import type { Member } from '../../domain/Member';
 
 import { apiClient } from '@/core/network/apiClient';
+import { snakeizeKeys } from '@/shared/utils/caseKeys';
+
+// The backend's global Jackson naming is SNAKE_CASE; camelCase keys are silently dropped.
+// The base URL already ends in /api, so paths here start at /members.
+function toBody(request: object) {
+  return snakeizeKeys(JSON.parse(JSON.stringify(request)));
+}
 
 interface MemberResponse {
   id: string;
@@ -57,8 +64,8 @@ export class ApiMemberMembershipRepository
     request: RenewalRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${id}/renew`,
-      request,
+      `/members/${id}/renew`,
+      toBody(request),
     );
 
     return this.toDomain(response.data);
@@ -69,8 +76,8 @@ export class ApiMemberMembershipRepository
     request: MinorRenewalRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${id}/renew-minor`,
-      request,
+      `/members/${id}/renew-minor`,
+      toBody(request),
     );
 
     return this.toDomain(response.data);
@@ -81,8 +88,8 @@ export class ApiMemberMembershipRepository
     request: FamilyRenewalRequest,
   ): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
-      `/api/members/${headId}/renew-family`,
-      request,
+      `/members/${headId}/renew-family`,
+      toBody(request),
     );
 
     return this.toDomain(response.data);

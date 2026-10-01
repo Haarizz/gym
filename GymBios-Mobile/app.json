@@ -58,6 +58,14 @@
       ],
       "expo-secure-store",
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to set profile pictures.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to take profile pictures.",
+          "microphonePermission": false
+        }
+      ],
       "expo-sharing",
       [
         "expo-location",

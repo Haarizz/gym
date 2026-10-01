@@ -221,6 +221,13 @@ export function FollowUpManagementScreen() {
         onSuccess: () => {
           setCompleteSheetVisible(false);
           setCompletingFollowUp(null);
+          if (outcome === 'converted') {
+            // The lead now counts as a conversion, but revenue only moves once the member
+            // is registered and pays — which happens at the front desk, not in the app.
+            toast.success('Lead marked as converted. Register them as a member at the front desk to credit the sale to you.', {
+              title: 'Lead Converted'
+            });
+          }
         },
         onError: err => {
           toast.error(err.message || 'Failed to complete follow-up.', {

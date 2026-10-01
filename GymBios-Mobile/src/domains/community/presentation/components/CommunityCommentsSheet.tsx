@@ -15,7 +15,7 @@ import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet, EmptyState, Loader, Typography } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
-import { useCommunityCanPost, useCommunityComments } from '../../hooks/useCommunity';
+import { useCommunityCanInteract, useCommunityComments } from '../../hooks/useCommunity';
 import {
   useAddCommunityComment,
   useDeleteCommunityComment,
@@ -37,7 +37,7 @@ interface CommunityCommentsSheetProps {
 export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCommentsSheetProps) {
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
-  const canPost = useCommunityCanPost();
+  const canInteract = useCommunityCanInteract();
   const [commentText, setCommentText] = useState('');
 
   // Only fetch when a post is actually selected.
@@ -153,11 +153,11 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
         </View>
       )}
 
-      {/* Input — app accounts without a membership here can only read. */}
-      {!canPost ? (
+      {/* Input — app accounts without an active membership at any gym can only read. */}
+      {!canInteract ? (
         <View style={[styles.inputRow, { borderTopColor: theme.border }]}>
           <Typography variant="caption" color="textSecondary">
-            Purchase a membership at this gym to join the conversation.
+            Get an active membership at any gym to join the conversation.
           </Typography>
         </View>
       ) : (

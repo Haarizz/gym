@@ -1,100 +1,122 @@
-import { StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
-import { Card } from '@/shared/components/Card';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { Member } from '../../../domain/Member';
-import { MemberAvatar } from '../MemberAvatar';
-import { PaymentStatusBadge } from '../PaymentStatusBadge';
+import { getInitials, getMemberStatusTone, getPaymentStatusTone } from '../../utils/memberDisplay';
+import { TonePill } from '../TonePill';
+import { DetailCard } from './DetailCard';
 
 interface MemberHeaderProps {
   member: Member;
+  onEdit: () => void;
+  onRenew: () => void;
+  onFreeze: () => void;
+  onDelete: () => void;
 }
 
-export function MemberHeader({ member }: MemberHeaderProps) {
+export function MemberHeader({ member, onEdit, onRenew, onFreeze, onDelete }: MemberHeaderProps) {
   const theme = useTheme();
 
+  const actions = [
+    { key: 'edit', label: 'Edit', icon: 'edit-2', color: theme.text, onPress: onEdit },
+    { key: 'renew', label: 'Renew', icon: 'refresh-cw', color: theme.text, onPress: onRenew },
+    {
+      key: 'freeze',
+      label: member.isFrozen ? 'Unfreeze' : 'Freeze',
+      icon: member.isFrozen ? 'sun' : 'pause-circle',
+      color: theme.text,
+      onPress: onFreeze,
+    },
+    { key: 'delete', label: 'Delete', icon: 'trash-2', color: BrandColors.danger, onPress: onDelete },
+  ] as const;
+
   return (
-    <Card style={styles.container}>
-      <View style={styles.header}>
-        <MemberAvatar
-          name={member.name}
-          photoUrl={member.photoUrl}
-          size={72}
+    <DetailCard>
+      <View style={styles.profileRow}>
+        <Avatar
+          initials={getInitials(member.name)}
+          imageUrl={member.photoUrl}
+          size={60}
+          backgroundColor={BrandColors.teal}
+          textColor={BrandColors.white}
         />
-        <View style={styles.info}>
-          <Typography variant="subtitle" style={styles.name}>
+        <View style={styles.profileInfo}>
+          <Typography variant="subtitle" numberOfLines={2}>
             {member.name}
           </Typography>
-          <Typography variant="caption" color="textSecondary">
-            ID: {member.memberId}
-          </Typography>
           <Typography variant="caption" color="textSecondary" numberOfLines={1}>
-            {member.membershipPlanName ?? member.membershipType}
+            {member.memberId}
+            {member.membershipPlanName ? ` · ${member.membershipPlanName}` : ''}
           </Typography>
+          <View style={styles.pills}>
+            <TonePill tone={getMemberStatusTone(member)} />
+            <TonePill tone={getPaymentStatusTone(member.paymentStatus)} />
+          </View>
         </View>
       </View>
 
-      <View style={styles.badges}>
-        <StatusBadge status={member.status} />
-        <PaymentStatusBadge status={member.paymentStatus} />
+      <View style={[styles.actionsRow, { borderTopColor: theme.border }]}>
+        {actions.map((action) => (
+          <Pressable
+            key={action.key}
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            onPress={action.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: theme.backgroundSelected }]}>
+              <Feather name={action.icon} size={16} color={action.color} />
+            </View>
+            <Typography variant="caption" style={{ color: action.color }}>
+              {action.label}
+            </Typography>
+          </Pressable>
+        ))}
       </View>
-
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryBox, { backgroundColor: theme.backgroundElement }]}>
-          <Typography variant="caption" color="textSecondary">Subscription</Typography>
-          <Typography variant="bodySmallBold" numberOfLines={1}>
-            {member.membershipType}
-          </Typography>
-        </View>
-        <View style={[styles.summaryBox, { backgroundColor: theme.backgroundElement }]}>
-          <Typography variant="caption" color="textSecondary">Start</Typography>
-          <Typography variant="bodySmallBold">
-            {member.startDate}
-          </Typography>
-        </View>
-        <View style={[styles.summaryBox, { backgroundColor: theme.backgroundElement }]}>
-          <Typography variant="caption" color="textSecondary">Expiry</Typography>
-          <Typography variant="bodySmallBold">
-            {member.endDate ?? '—'}
-          </Typography>
-        </View>
-      </View>
-    </Card>
+    </DetailCard>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.three,
-  },
-  header: {
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.md,
   },
-  info: {
+  profileInfo: {
     flex: 1,
     gap: Spacing.half,
   },
-  name: {
-    marginBottom: 2,
-  },
-  badges: {
+  pills: {
     flexDirection: 'row',
-    gap: Spacing.two,
     flexWrap: 'wrap',
+    gap: Spacing.one,
+    marginTop: Spacing.one,
   },
-  summaryRow: {
+  actionsRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    justifyContent: 'space-between',
+    marginTop: Spacing.three,
+    paddingTop: Spacing.md,
+    borderTopWidth: 0.5,
   },
-  summaryBox: {
+  action: {
     flex: 1,
-    borderRadius: Radius.sm,
-    padding: Spacing.two,
-    gap: Spacing.half,
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  actionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

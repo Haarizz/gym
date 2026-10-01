@@ -39,6 +39,17 @@ interface BackendStaffScheduleResponse {
   upcoming_follow_ups: BackendUpcomingFollowUp[];
 }
 
+export interface NextFollowUpRequest {
+  /** yyyy-MM-dd */
+  dueDate: string;
+  /** HH:mm */
+  scheduledTime?: string;
+  type?: string;
+  priority?: string;
+  subject?: string;
+  notes?: string;
+}
+
 export class ApiStaffScheduleRepository {
   /**
    * GET /api/mobile/staff/schedule
@@ -127,9 +138,25 @@ export class ApiStaffScheduleRepository {
 
   /**
    * PATCH /api/mobile/staff/schedule/{id}/complete
+   * The outcome drives the lead: "converted" marks it converted, "not-interested" marks it lost.
    */
-  async completeTask(taskId: string | number): Promise<void> {
-    await apiClient.patch(`/mobile/staff/schedule/${taskId}/complete`);
+  async completeTask(taskId: string | number, outcome?: string, notes?: string): Promise<void> {
+    await apiClient.patch(`/mobile/staff/schedule/${taskId}/complete`, { outcome, notes });
+  }
+
+  /**
+   * POST /api/mobile/staff/schedule/{id}/next-follow-up
+   * Books another follow-up for the same lead, assigned to the calling staff member.
+   */
+  async scheduleNextFollowUp(taskId: string | number, request: NextFollowUpRequest): Promise<void> {
+    await apiClient.post(`/mobile/staff/schedule/${taskId}/next-follow-up`, {
+      due_date: request.dueDate,
+      scheduled_time: request.scheduledTime,
+      type: request.type,
+      priority: request.priority,
+      subject: request.subject,
+      notes: request.notes,
+    });
   }
 }
 

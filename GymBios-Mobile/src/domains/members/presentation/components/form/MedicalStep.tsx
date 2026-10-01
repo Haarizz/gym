@@ -3,78 +3,103 @@ import { StyleSheet, View } from 'react-native';
 import { Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
-import { FormSection } from '@/shared/components/FormSection';
 import { BLOOD_GROUPS } from '@/domains/members/constants';
-import type { MemberWizardData } from '@/domains/members/hooks/useMemberWizard';
 
-interface MedicalStepProps {
-  data: MemberWizardData;
-  updateField: (field: keyof MemberWizardData, value: any) => void;
-}
+import { FormCard } from './FormCard';
+import type { MemberStepProps } from './stepTypes';
 
-export function MedicalStep({ data, updateField }: MedicalStepProps) {
+export function MedicalStep({ data, updateField }: MemberStepProps) {
   return (
     <View style={styles.container}>
-      <FormSection title="Medical Information">
+      <FormCard icon="activity" title="Body" description="All fields on this step are optional">
         <Dropdown
-          label="Blood Group"
+          label="Blood group"
           placeholder="Select blood group"
           value={data.bloodGroup}
           options={BLOOD_GROUPS}
           onChange={(v) => updateField('bloodGroup', v)}
         />
+        <View style={styles.row}>
+          <Input
+            label="Height (cm)"
+            value={data.height}
+            onChangeText={(v) => updateField('height', v)}
+            placeholder="175"
+            keyboardType="decimal-pad"
+            containerStyle={styles.half}
+          />
+          <Input
+            label="Weight (kg)"
+            value={data.weight}
+            onChangeText={(v) => updateField('weight', v)}
+            placeholder="70"
+            keyboardType="decimal-pad"
+            containerStyle={styles.half}
+          />
+        </View>
+      </FormCard>
+
+      <FormCard icon="heart" title="Health history" description="Shared with trainers to keep sessions safe">
         <Input
-          label="Height (cm)"
-          value={data.height}
-          onChangeText={(v) => updateField('height', v)}
-          placeholder="e.g. 175"
-          keyboardType="decimal-pad"
-        />
-        <Input
-          label="Weight (kg)"
-          value={data.weight}
-          onChangeText={(v) => updateField('weight', v)}
-          placeholder="e.g. 70"
-          keyboardType="decimal-pad"
-        />
-        <Input
-          label="Medical Conditions"
+          label="Medical conditions"
           value={data.medicalConditions}
           onChangeText={(v) => updateField('medicalConditions', v)}
-          placeholder="List any medical conditions"
+          placeholder="e.g. Asthma, past knee injury"
+          multiline
+          style={styles.multiline}
         />
         <Input
-          label="Chronic Illnesses"
+          label="Chronic illnesses"
           value={data.chronicIllnesses}
           onChangeText={(v) => updateField('chronicIllnesses', v)}
-          placeholder="List any chronic illnesses"
+          placeholder="e.g. Diabetes, hypertension"
+          multiline
+          style={styles.multiline}
         />
         <Input
           label="Allergies"
           value={data.allergies}
           onChangeText={(v) => updateField('allergies', v)}
-          placeholder="List any allergies"
+          placeholder="e.g. Peanuts, latex"
+          multiline
+          style={styles.multiline}
         />
         <Input
-          label="Current Medications"
+          label="Current medications"
           value={data.currentMedications}
           onChangeText={(v) => updateField('currentMedications', v)}
-          placeholder="List current medications"
+          placeholder="Name and dosage"
+          multiline
+          style={styles.multiline}
         />
         <Input
-          label="Health Notes"
+          label="Notes"
           value={data.healthNotes}
           onChangeText={(v) => updateField('healthNotes', v)}
-          placeholder="Additional health notes"
+          placeholder="Anything else trainers should know"
+          multiline
+          style={styles.multiline}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  half: {
+    flex: 1,
+  },
+  multiline: {
+    minHeight: 64,
+    paddingTop: Spacing.md,
+    textAlignVertical: 'top',
   },
 });

@@ -156,7 +156,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
   // A lead converted on the Leads page hands its contact info off here via router state
   // instead of the member being fabricated with no plan/payment info.
-  const prefillLead = (location.state as { prefillLead?: { leadId: string; firstName: string; lastName: string; email: string; phone: string } } | null)?.prefillLead;
+  const prefillLead = (location.state as { prefillLead?: { leadId: string; firstName: string; lastName: string; email: string; phone: string; assignedStaff?: string } } | null)?.prefillLead;
 
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
@@ -193,8 +193,16 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const [processedByStaffId, setProcessedByStaffId] = useState('');
   useEffect(() => {
     staffService.getStaff({}, 1, 500)
-      .then(res => setStaffOptions(res.items))
+      .then(res => {
+        setStaffOptions(res.items);
+        // A converted lead's sale belongs to the staff member who worked it — preselect
+        // them so it's visible (and changeable) before saving.
+        const assigned = prefillLead?.assignedStaff?.trim().toLowerCase();
+        const match = assigned ? res.items.find(s => s.name?.trim().toLowerCase() === assigned) : undefined;
+        if (match) setProcessedByStaffId(prev => prev || String(match.id));
+      })
       .catch(err => console.error('Failed to load staff list:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Discount management state
@@ -1422,6 +1430,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       bank_account_name: selectedBankAccount?.name,
       payment_breakdown: paymentBreakdownForPayload,
       processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
+      // Links the new member back to the lead it came from — the backend marks the lead
+      // converted and, if Processed By is empty, credits the lead's staff.
+      lead_id: !isEditMode && prefillLead?.leadId ? Number(prefillLead.leadId) : undefined,
       discount_applied: discountAmount || 0,
       // A referral coupon: the backend checks discount_applied against it and spends it.
       coupon_code: selectedDiscount.startsWith(COUPON_DISCOUNT_PREFIX) && discountAmount > 0

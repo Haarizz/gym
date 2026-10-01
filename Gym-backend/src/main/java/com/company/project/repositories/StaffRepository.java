@@ -10,6 +10,8 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     Optional<Staff> findByEmail(String email);
     Optional<Staff> findByStaffId(String staffId);
     Optional<Staff> findByUserId(Long userId);
+    List<Staff> findByNameIgnoreCase(String name);
+    List<Staff> findByAppUsername(String appUsername);
     boolean existsByEmail(String email);
     long countByStatus(String status);
     List<Staff> findTop5ByOrderByCreatedAtDesc();

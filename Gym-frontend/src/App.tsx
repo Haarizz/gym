@@ -758,6 +758,13 @@ function buildRoutePermissionMap(items: typeof menuItems): Record<string, string
 }
 const routePermissionMap = buildRoutePermissionMap(menuItems);
 
+// Old Add Member URL. Forward router state so callers handing off data (e.g. a converted
+// lead's prefill) don't lose it in the redirect — a bare <Navigate> drops it.
+function AddMemberRedirect() {
+  const location = useLocation();
+  return <Navigate to="/members/add" replace state={location.state} />;
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1110,7 +1117,7 @@ export default function App() {
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
       <Route path="/members/add" element={<AddMember onNavigate={handleNavClick} />} />
       <Route path="/members/edit/:memberId" element={<AddMember onNavigate={handleNavClick} />} />
-      <Route path="/add-member" element={<Navigate to="/members/add" replace />} />
+      <Route path="/add-member" element={<AddMemberRedirect />} />
       <Route path="/billing" element={<Billing onNavigate={handleNavClick} />} />
       <Route path="/create-receipt" element={<CreateReceipt onNavigate={handleNavClick} />} />
       <Route path="/manage-plans" element={<ManagePlans />} />

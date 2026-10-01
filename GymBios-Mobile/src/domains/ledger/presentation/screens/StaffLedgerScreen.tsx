@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { useStaffLedger } from '../../hooks/useStaffLedger';
 import { staffLedgerRepository } from '../../infrastructure/ApiStaffLedgerRepository';
 import type { TaxDocument } from '../../domain/StaffLedgerData';
@@ -17,7 +18,7 @@ type LedgerTab = 'breakdown' | 'earnings' | 'tax';
 
 export function StaffLedgerScreen() {
   const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
-  const { data, isLoading, refetch, isRefetching } = useStaffLedger();
+  const { data, isLoading, isError, refetch, isRefetching } = useStaffLedger();
 
   const handleDownloadSalarySlip = async () => {
     try {
@@ -49,6 +50,20 @@ export function StaffLedgerScreen() {
     return (
       <View style={styles.loaderContainer}>
         <Loader message="Loading ledger..." />
+      </View>
+    );
+  }
+
+  if (!data) {
+    return (
+      <View style={styles.loaderContainer}>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load your ledger"
+          description={isError ? 'Check your connection and try again.' : 'No ledger data is available yet.'}
+          buttonLabel="Retry"
+          onPress={() => refetch()}
+        />
       </View>
     );
   }

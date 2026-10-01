@@ -1,5 +1,7 @@
 package com.company.project.services.mobile.schedule;
 
+import com.company.project.dto.FollowUpRequestDTO;
+import com.company.project.dto.FollowUpResponseDTO;
 import com.company.project.dto.mobile.schedule.*;
 import com.company.project.entities.FollowUp;
 import com.company.project.entities.Lead;
@@ -19,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
+import java.util.Map;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
@@ -117,24 +122,92 @@ public class MobileStaffScheduleService {
     }
 
     @Transactional
-    public void markTaskDone(UserDetailsImpl principal, Long taskId) {
+    public void markTaskDone(UserDetailsImpl principal, Long taskId, String outcome, String notes) {
+        requireOwnFollowUp(principal, taskId);
+        // The outcome drives the lead: "converted" marks it converted, "not-interested" marks it lost.
+        followUpService.complete(taskId,
+                outcome != null && !outcome.isBlank() ? outcome : "Completed via Mobile",
+                notes != null && !notes.isBlank() ? notes : "Marked done from staff schedule");
+    }
+
+    /**
+     * Books the next follow-up for the same lead, assigned to the calling staff member — the
+     * "call them back on Friday" step after completing one.
+     */
+    @Transactional
+    public FollowUpResponseDTO scheduleNextFollowUp(UserDetailsImpl principal, Long taskId, Map<String, String> body) {
+        Staff staff = requireOwnFollowUp(principal, taskId);
+        FollowUp previous = followUpRepository.findById(taskId)
+                .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + taskId));
+        if (previous.getLead() == null) {
+            throw new IllegalArgumentException("This follow-up is not linked to a lead");
+        }
+        String dueDateRaw = body.get("due_date");
+        if (dueDateRaw == null || dueDateRaw.isBlank()) {
+            throw new IllegalArgumentException("due_date is required");
+        }
+        LocalDate dueDate = LocalDate.parse(dueDateRaw);
+        String scheduledTime = body.get("scheduled_time");
+        LocalTime time = parseTime(scheduledTime);
+
+        FollowUpRequestDTO req = new FollowUpRequestDTO();
+        req.setLeadId(previous.getLead().getId());
+        req.setAssignedStaff(staff.getName() != null ? staff.getName() : principal.getUsername());
+        req.setType(firstNonBlank(body.get("type"), previous.getType(), "call"));
+        req.setPriority(firstNonBlank(body.get("priority"), previous.getPriority(), "medium"));
+        req.setSubject(firstNonBlank(body.get("subject"), previous.getSubject(), "Follow-up"));
+        req.setNotes(body.get("notes"));
+        req.setStatus("pending");
+        req.setDueDate(time != null ? dueDate.atTime(time) : dueDate.atStartOfDay());
+        req.setScheduledTime(time != null ? scheduledTime : null);
+        return followUpService.createFollowUp(req);
+    }
+
+    /** Resolves the calling staff member and checks the follow-up is assigned to them. */
+    private Staff requireOwnFollowUp(UserDetailsImpl principal, Long taskId) {
         if (principal == null || principal.getId() == null) {
             throw new EntityNotFoundException("User not authenticated");
         }
 
         Staff staff = staffRepository.findByUserId(principal.getId())
                 .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
-                
+
         FollowUp followUp = followUpRepository.findById(taskId)
                 .orElseThrow(() -> new EntityNotFoundException("Follow-up not found: " + taskId));
-                
+
         String staffName = staff.getName() != null ? staff.getName() : principal.getUsername();
         if (followUp.getAssignedStaff() == null || !followUp.getAssignedStaff().toLowerCase().contains(staffName.toLowerCase())) {
-             throw new IllegalArgumentException("Unauthorized to complete this follow-up");
+             throw new IllegalArgumentException("Unauthorized to update this follow-up");
         }
-        
-        // Delegate completion to existing service
-        followUpService.complete(taskId, "Completed via Mobile", "Marked done from staff schedule");
+        return staff;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
+    }
+
+    /** Parses "HH:mm" / "HH:mm:ss" scheduled times; null when absent or unparseable. */
+    private static LocalTime parseTime(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return LocalTime.parse(raw.trim());
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Follow-ups created with a separate scheduled time keep dueDate at midnight — fold the
+     * time in so the schedule shows when the call is actually due instead of 12:00 AM.
+     */
+    private static LocalDateTime effectiveDueAt(FollowUp fu) {
+        LocalDateTime due = fu.getDueDate();
+        LocalTime time = parseTime(fu.getScheduledTime());
+        if (due == null || time == null || !due.toLocalTime().equals(LocalTime.MIDNIGHT)) return due;
+        return due.toLocalDate().atTime(time);
     }
 
     private Specification<FollowUp> buildSpec(String staffName, LocalDateTime start, LocalDateTime end, String status, String priority) {
@@ -162,7 +235,7 @@ public class MobileStaffScheduleService {
     private StaffScheduleTaskDTO mapToTaskDTO(FollowUp fu) {
         return new StaffScheduleTaskDTO(
                 fu.getId(),
-                fu.getDueDate(),
+                effectiveDueAt(fu),
                 fu.getType(),
                 fu.getPriority(),
                 fu.getStatus(),
@@ -174,7 +247,7 @@ public class MobileStaffScheduleService {
     private UpcomingFollowUpDTO mapToUpcomingDTO(FollowUp fu) {
         return new UpcomingFollowUpDTO(
                 fu.getId(),
-                fu.getDueDate(),
+                effectiveDueAt(fu),
                 fu.getSubject(),
                 fu.getType(),
                 mapToContactDTO(fu.getLead())

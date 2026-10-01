@@ -34,6 +34,7 @@ interface MemberResponse {
   membership_status: string;
   membership_start_date: string;
   membership_end_date?: string | null;
+  expiry_date?: string | null;
   payment_status: string;
 
   freeze_start_date?: string | null;
@@ -45,9 +46,12 @@ interface MemberResponse {
   family_billing_mode?: string | null;
   family_role?: string | null;
 
+  is_minor?: boolean | null;
+  billed_to_head?: boolean | null;
   user_id?: number | null;
+  global_user_id?: number | null;
   app_username?: string | null;
-  app_access_enabled: boolean;
+  app_access_enabled?: boolean | null;
 
   blood_group?: string | null;
   height?: string | null;
@@ -168,6 +172,7 @@ export class ApiMemberDirectoryRepository
       status: response.membership_status,
       startDate: response.membership_start_date,
       endDate: response.membership_end_date ?? undefined,
+      expiryDate: response.expiry_date ?? undefined,
       paymentStatus: response.payment_status,
 
       // The DTO has no boolean is_frozen field — derive it the same way the
@@ -183,9 +188,12 @@ export class ApiMemberDirectoryRepository
       familyBillingMode: response.family_billing_mode ?? undefined,
       familyRole: response.family_role ?? undefined,
 
+      isMinor: response.is_minor ?? undefined,
+      billedToHead: response.billed_to_head ?? undefined,
       userId: response.user_id ?? undefined,
+      globalUserId: response.global_user_id ?? undefined,
       appUsername: response.app_username ?? undefined,
-      appAccessEnabled: response.app_access_enabled,
+      appAccessEnabled: response.app_access_enabled ?? undefined,
 
       bloodGroup: response.blood_group ?? undefined,
       height: response.height ?? undefined,
@@ -243,7 +251,9 @@ export class ApiMemberDirectoryRepository
             bank_account_name: request.bankAccountName,
           }
         : {}),
-      
+      ...('processedByStaffId' in request ? { processed_by_staff_id: request.processedByStaffId } : {}),
+      ...('leadId' in request ? { lead_id: request.leadId } : {}),
+
       blood_group: request.bloodGroup,
       height: request.height,
       weight: request.weight,

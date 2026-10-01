@@ -72,11 +72,17 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriEquals("/api/mobile/family/invitations/claim-pending")
     );
 
+    // Claiming a referral code targets the REFERRER's gym, which the referee is normally
+    // not a member of yet — MobileReferralController.claimCode looks the tenant up from
+    // the code itself, so whatever X-Tenant-ID the app sends must not gate it.
+    private static final RequestMatcher STRICTLY_GLOBAL_REFERRAL_PATH = uriEquals("/api/mobile/referrals/claim");
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
-            STRICTLY_GLOBAL_FAMILY_PATH
+            STRICTLY_GLOBAL_FAMILY_PATH,
+            STRICTLY_GLOBAL_REFERRAL_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -85,6 +91,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
+            STRICTLY_GLOBAL_REFERRAL_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );

@@ -297,7 +297,11 @@ public class MobileFamilyPurchaseService {
         Set<String> seen = new HashSet<>();
         for (MobileFamilyConnectedMemberDTO c : connected) {
             String email = MobileFamilyInvitationService.normalizeEmail(c.getEmail());
-            if (!StringUtils.hasText(email)) continue;
+            // Every family member becomes a Member row, whose email is NOT NULL —
+            // reject here with a clear message rather than at the DB constraint.
+            if (!StringUtils.hasText(email)) {
+                throw new IllegalArgumentException("Enter an email for " + c.getName() + ".");
+            }
             if (email.equals(buyerEmail)) {
                 throw new IllegalArgumentException("Use a different email for " + c.getName() + " — that one is yours.");
             }

@@ -308,7 +308,7 @@ export function CheckIn() {
       toast.error(`${person.name} is already checked in`);
       return;
     }
-    if (person.status !== 'active') {
+    if (person.status?.toLowerCase() !== 'active') {
       toast.error(`Cannot check in — membership is ${person.status}`);
       return;
     }
@@ -1058,7 +1058,7 @@ function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaf
   isActing: boolean;
 }) {
   const isMember  = person.kind === 'member';
-  const isActive  = person.status === 'active';
+  const isActive  = person.status?.toLowerCase() === 'active';
 
   const statusColor = isActive
     ? 'bg-green-100 text-green-800'

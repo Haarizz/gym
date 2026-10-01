@@ -6,7 +6,6 @@ import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { useClaimReferral } from '../hooks/useMemberReferrals';
-import { useAuthStore } from '@/domains/auth/store/authStore';
 import { Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -19,7 +18,6 @@ export const ClaimReferralScreen = () => {
 
 
 
-  const setActiveTenant = useAuthStore((state) => state.setActiveTenant);
 
   const handleClaim = () => {
     if (!code) {
@@ -28,14 +26,14 @@ export const ClaimReferralScreen = () => {
     }
     
     claimReferral(code, {
-      onSuccess: (res: any) => {
+      onSuccess: () => {
         setMessage({ text: 'Referral claimed successfully!', type: 'success' });
-        
-        // Save the tenant locally so the discovery flow knows where to look
-        if (res?.tenantSlug) {
-            setActiveTenant(res.tenantSlug);
-        }
 
+        // Deliberately NOT calling setActiveTenant(res.tenantSlug): claiming a code
+        // doesn't make the user a member of the referrer's gym, and pinning
+        // X-Tenant-ID there makes the backend 403 every request as "not a member
+        // of this Gym". The tenant is set once a purchase actually creates the
+        // membership (see MemberCentersScreen.handleViewDetails).
         setTimeout(() => {
           // Route the user to the gym discovery screen
           router.replace('/(member)/centers');

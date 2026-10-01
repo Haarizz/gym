@@ -8,6 +8,12 @@ interface TrainerLedgerStatsGridProps {
 }
 
 export function TrainerLedgerStatsGrid({ stats }: TrainerLedgerStatsGridProps) {
+  const growthColor = stats.growth.startsWith('+')
+    ? '#16A34A'
+    : stats.growth.startsWith('-')
+      ? '#DC2626'
+      : '#64748B';
+
   return (
     <View style={styles.container}>
       {/* Growth */}
@@ -18,8 +24,10 @@ export function TrainerLedgerStatsGrid({ stats }: TrainerLedgerStatsGridProps) {
           </View>
           <Text style={styles.label}>Growth</Text>
         </View>
-        <Text style={[styles.value, { color: '#16A34A' }]}>{stats.growth}</Text>
-        <Text style={styles.subtext}>vs last month</Text>
+        <Text style={[styles.value, { color: growthColor }]}>{stats.growth}</Text>
+        <Text style={styles.subtext}>
+          {stats.growth === '—' ? 'No earnings last month' : 'vs last month'}
+        </Text>
       </View>
 
       {/* Next Payout */}

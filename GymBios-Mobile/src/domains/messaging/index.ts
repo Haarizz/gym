@@ -51,3 +51,4 @@ export { RecipientSelectionScreen } from './presentation/screens/RecipientSelect
 export { ComposeMessageScreen } from './presentation/screens/ComposeMessageScreen';
 export { MessagingHistoryScreen } from './presentation/screens/MessagingHistoryScreen';
 export { MessagingTemplatesScreen } from './presentation/screens/MessagingTemplatesScreen';
+export { MessagingAnalyticsScreen } from './presentation/screens/MessagingAnalyticsScreen';

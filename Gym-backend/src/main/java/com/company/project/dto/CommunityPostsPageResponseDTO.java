@@ -6,7 +6,10 @@ public class CommunityPostsPageResponseDTO {
 
     private List<CommunityPostResponseDTO> posts;
     private PaginationDTO pagination;
+    // canPost: may create posts in this gym. canInteract: may like and comment —
+    // wider than canPost, since an active membership at any gym unlocks it.
     private boolean canPost;
+    private boolean canInteract;
 
     public CommunityPostsPageResponseDTO() {}
 
@@ -23,5 +26,8 @@ public class CommunityPostsPageResponseDTO {
 
     public boolean isCanPost() { return canPost; }
     public void setCanPost(boolean canPost) { this.canPost = canPost; }
+
+    public boolean isCanInteract() { return canInteract; }
+    public void setCanInteract(boolean canInteract) { this.canInteract = canInteract; }
 }
 

@@ -149,13 +149,13 @@ public class StaffLedgerResponseDTO {
     public static class EarningsSummaryDTO {
         private BigDecimal thisMonth;
         private BigDecimal lastMonth;
-        private int growthPercentage;
+        private Integer growthPercentage;
         private BigDecimal baseSalary;
         private BigDecimal commission;
 
         public EarningsSummaryDTO() {}
 
-        public EarningsSummaryDTO(BigDecimal thisMonth, BigDecimal lastMonth, int growthPercentage, BigDecimal baseSalary, BigDecimal commission) {
+        public EarningsSummaryDTO(BigDecimal thisMonth, BigDecimal lastMonth, Integer growthPercentage, BigDecimal baseSalary, BigDecimal commission) {
             this.thisMonth = thisMonth != null ? thisMonth : BigDecimal.ZERO;
             this.lastMonth = lastMonth != null ? lastMonth : BigDecimal.ZERO;
             this.growthPercentage = growthPercentage;
@@ -167,8 +167,8 @@ public class StaffLedgerResponseDTO {
         public void setThisMonth(BigDecimal thisMonth) { this.thisMonth = thisMonth; }
         public BigDecimal getLastMonth() { return lastMonth; }
         public void setLastMonth(BigDecimal lastMonth) { this.lastMonth = lastMonth; }
-        public int getGrowthPercentage() { return growthPercentage; }
-        public void setGrowthPercentage(int growthPercentage) { this.growthPercentage = growthPercentage; }
+        public Integer getGrowthPercentage() { return growthPercentage; }
+        public void setGrowthPercentage(Integer growthPercentage) { this.growthPercentage = growthPercentage; }
         public BigDecimal getBaseSalary() { return baseSalary; }
         public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
         public BigDecimal getCommission() { return commission; }

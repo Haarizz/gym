@@ -73,6 +73,8 @@ export function useUpdateTrainerAvailability() {
     mutationFn: (request: MobileAvailabilityDTO) => ApiTrainerScheduleRepository.updateAvailability(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: trainerScheduleKeys.availability });
+      // The profile's Work Schedule card renders the same slots.
+      queryClient.invalidateQueries({ queryKey: ['mobileProfile'] });
     },
   });
 }

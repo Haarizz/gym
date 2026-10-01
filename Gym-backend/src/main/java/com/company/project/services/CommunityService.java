@@ -48,12 +48,20 @@ public class CommunityService {
     private static final String NOTIFICATION_ACTION_URL = "/community";
     private static final int NOTIFICATION_SNIPPET_LENGTH = 80;
 
+    private static final String INTERACT_REQUIRES_MEMBERSHIP =
+            "Get an active membership at any gym to like and comment on posts.";
+    private static final String POST_REQUIRES_MEMBERSHIP =
+            "Only active members of this gym can post in its community.";
+    private static final String AWAITING_APPROVAL =
+            "You can post in the community once the gym approves your membership payment.";
+
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostCommentRepository communityPostCommentRepository;
     private final CommunityPostLikeRepository communityPostLikeRepository;
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
+    private final GlobalMembershipService globalMembershipService;
 
     public CommunityService(
             CommunityPostRepository communityPostRepository,
@@ -61,7 +69,8 @@ public class CommunityService {
             CommunityPostLikeRepository communityPostLikeRepository,
             UserRepository userRepository,
             MemberRepository memberRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            GlobalMembershipService globalMembershipService
     ) {
         this.communityPostRepository = communityPostRepository;
         this.communityPostCommentRepository = communityPostCommentRepository;
@@ -69,43 +78,66 @@ public class CommunityService {
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
+        this.globalMembershipService = globalMembershipService;
     }
 
     /**
      * Identity of the caller as a community participant. Tenant logins (staff and
      * gym-issued member credentials) act as their tenant User; GymBios app accounts
      * have no tenant users row and act as the Member their membership purchase
-     * created in this gym. At most one of userId / memberId is set.
+     * created in this gym — or, with no members row here, as the global account
+     * itself (globalUserId). At most one of the three is set.
      */
-    private record Viewer(Long userId, Long memberId, boolean canPost) {
-        static final Viewer ANONYMOUS = new Viewer(null, null, false);
+    private record Viewer(Long userId, Long memberId, Long globalUserId) {
+        static final Viewer ANONYMOUS = new Viewer(null, null, null);
 
-        boolean isAuthorOf(User authorUser, Member authorMember) {
+        boolean isAuthorOf(User authorUser, Member authorMember, Long authorGlobalUserId) {
             if (userId != null) {
                 return authorUser != null && userId.equals(authorUser.getId());
             }
             if (memberId != null) {
                 return authorMember != null && memberId.equals(authorMember.getId());
             }
+            if (globalUserId != null) {
+                return globalUserId.equals(authorGlobalUserId);
+            }
             return false;
         }
     }
 
-    /** A caller allowed to write; exactly one of user / member is set. */
-    private record Actor(User user, Member member) {
+    /**
+     * An authenticated caller: user, member, or — an app account with no members
+     * row in this gym — just globalUserId (then guestName is its profile name, set
+     * once it has been cleared to write). Says nothing about what they may do; see
+     * requirePoster / requireInteractor.
+     */
+    private record Actor(User user, Member member, Long globalUserId, String guestName) {
+        boolean isGuest() {
+            return user == null && member == null;
+        }
+
         Viewer viewer() {
-            return user != null
-                    ? new Viewer(user.getId(), null, true)
-                    : new Viewer(null, member.getId(), true);
+            if (user != null) {
+                return new Viewer(user.getId(), null, null);
+            }
+            return member != null
+                    ? new Viewer(null, member.getId(), null)
+                    : new Viewer(null, null, globalUserId);
         }
 
         String displayName() {
-            return user != null ? user.getUsername() : member.getName();
+            if (user != null) {
+                return user.getUsername();
+            }
+            return member != null ? member.getName() : guestName;
         }
 
-        /** Distinct across both ID spaces, for notification dedup keys. */
+        /** Distinct across all three ID spaces, for notification dedup keys. */
         String key() {
-            return user != null ? String.valueOf(user.getId()) : "m" + member.getId();
+            if (user != null) {
+                return String.valueOf(user.getId());
+            }
+            return member != null ? "m" + member.getId() : "g" + globalUserId;
         }
     }
 
@@ -123,14 +155,19 @@ public class CommunityService {
 
         if (archivedOnly) {
             // Archived posts are never public. Allow only the owner (or admin) to view archived items.
-            Actor actor = getCurrentActorOrThrow();
+            Actor actor = resolveActor();
             boolean admin = isAdmin(actor);
 
             spec = Specification.where((root, query, cb) -> cb.isTrue(root.get("archived")));
             if (!admin) {
-                spec = actor.user() != null
-                        ? spec.and((root, query, cb) -> cb.equal(root.get("authorUser").get("id"), actor.user().getId()))
-                        : spec.and((root, query, cb) -> cb.equal(root.get("authorMember").get("id"), actor.member().getId()));
+                if (actor.user() != null) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("authorUser").get("id"), actor.user().getId()));
+                } else if (actor.member() != null) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("authorMember").get("id"), actor.member().getId()));
+                } else {
+                    // Without a members row here they can't have authored a post in this gym.
+                    spec = spec.and((root, query, cb) -> cb.disjunction());
+                }
             }
         } else {
             // Treat NULL as false for rows created before this flag existed.
@@ -166,6 +203,9 @@ public class CommunityService {
         } else if (viewer.memberId() != null) {
             List<Long> ids = result.getContent().stream().map(CommunityPost::getId).toList();
             likedByMeSet = new HashSet<>(communityPostLikeRepository.findLikedPostIdsByMember(viewer.memberId(), ids));
+        } else if (viewer.globalUserId() != null) {
+            List<Long> ids = result.getContent().stream().map(CommunityPost::getId).toList();
+            likedByMeSet = new HashSet<>(communityPostLikeRepository.findLikedPostIdsByGlobalUser(viewer.globalUserId(), ids));
         } else {
             likedByMeSet = Collections.emptySet();
         }
@@ -182,13 +222,15 @@ public class CommunityService {
         );
 
         CommunityPostsPageResponseDTO response = new CommunityPostsPageResponseDTO(posts, pagination);
-        response.setCanPost(viewer.canPost());
+        Access access = currentAccess();
+        response.setCanPost(access.canPost());
+        response.setCanInteract(access.canInteract());
         return response;
     }
 
     @Transactional
     public CommunityPostResponseDTO createPost(CreateCommunityPostRequestDTO request) {
-        Actor author = getCurrentActorOrThrow();
+        Actor author = requirePoster();
 
         String topic = Optional.ofNullable(request.getTopic()).orElse("").trim();
         String content = Optional.ofNullable(request.getContent()).orElse("").trim();
@@ -381,7 +423,7 @@ public class CommunityService {
 
     @Transactional
     public CommunityPostCommentResponseDTO addComment(Long postId, CreateCommunityCommentRequestDTO request) {
-        Actor author = getCurrentActorOrThrow();
+        Actor author = requireInteractor();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
@@ -394,6 +436,10 @@ public class CommunityService {
         comment.setPost(post);
         comment.setAuthorUser(author.user());
         comment.setAuthorMember(author.member());
+        if (author.isGuest()) {
+            comment.setAuthorGlobalUserId(author.globalUserId());
+            comment.setAuthorDisplayName(author.guestName());
+        }
         comment.setContent(content);
         CommunityPostComment saved = communityPostCommentRepository.save(comment);
 
@@ -410,13 +456,18 @@ public class CommunityService {
 
     @Transactional
     public ToggleCommunityLikeResponseDTO toggleLike(Long postId) {
-        Actor actor = getCurrentActorOrThrow();
+        Actor actor = requireInteractor();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        Optional<CommunityPostLike> existing = actor.user() != null
-                ? communityPostLikeRepository.findByPostIdAndUserId(postId, actor.user().getId())
-                : communityPostLikeRepository.findByPostIdAndMemberId(postId, actor.member().getId());
+        Optional<CommunityPostLike> existing;
+        if (actor.user() != null) {
+            existing = communityPostLikeRepository.findByPostIdAndUserId(postId, actor.user().getId());
+        } else if (actor.member() != null) {
+            existing = communityPostLikeRepository.findByPostIdAndMemberId(postId, actor.member().getId());
+        } else {
+            existing = communityPostLikeRepository.findByPostIdAndGlobalUserId(postId, actor.globalUserId());
+        }
         if (existing.isPresent()) {
             communityPostLikeRepository.delete(existing.get());
             post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
@@ -424,9 +475,15 @@ public class CommunityService {
             return new ToggleCommunityLikeResponseDTO(false, post.getLikeCount());
         }
 
-        communityPostLikeRepository.save(actor.user() != null
-                ? new CommunityPostLike(post, actor.user())
-                : new CommunityPostLike(post, actor.member()));
+        CommunityPostLike like;
+        if (actor.user() != null) {
+            like = new CommunityPostLike(post, actor.user());
+        } else if (actor.member() != null) {
+            like = new CommunityPostLike(post, actor.member());
+        } else {
+            like = CommunityPostLike.byGlobalUser(post, actor.globalUserId());
+        }
+        communityPostLikeRepository.save(like);
         post.setLikeCount(post.getLikeCount() + 1);
         communityPostRepository.save(post);
 
@@ -446,7 +503,7 @@ public class CommunityService {
      */
     private void notifyPostAuthor(CommunityPost post, Actor actor, String title, String message, String eventKey) {
         User postAuthor = post.getAuthorUser();
-        if (postAuthor == null || actor.viewer().isAuthorOf(postAuthor, null)) {
+        if (postAuthor == null || actor.viewer().isAuthorOf(postAuthor, null, null)) {
             return;
         }
         notificationService.notifyUser(
@@ -465,11 +522,11 @@ public class CommunityService {
 
     @Transactional
     public void deletePost(Long postId) {
-        Actor actor = getCurrentActorOrThrow();
+        Actor actor = resolveActor();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember());
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null);
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this post");
         }
@@ -486,7 +543,7 @@ public class CommunityService {
 
     @Transactional
     public void deleteComment(Long postId, Long commentId) {
-        Actor actor = getCurrentActorOrThrow();
+        Actor actor = resolveActor();
         CommunityPostComment comment = communityPostCommentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
@@ -494,7 +551,8 @@ public class CommunityService {
             throw new IllegalArgumentException("Comment not found");
         }
 
-        boolean isOwner = actor.viewer().isAuthorOf(comment.getAuthorUser(), comment.getAuthorMember());
+        boolean isOwner = actor.viewer().isAuthorOf(
+                comment.getAuthorUser(), comment.getAuthorMember(), comment.getAuthorGlobalUserId());
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this comment");
         }
@@ -527,11 +585,11 @@ public class CommunityService {
     }
 
     /**
-     * The caller as a participant allowed to post, comment and like. App accounts
-     * qualify only once they hold a membership in this gym whose app access isn't
-     * held back pending payment approval; until then they can only read the feed.
+     * Who the caller is in this gym's community, with no permission check — enough
+     * for acting on content they already own. App accounts are matched to their
+     * members row here; without one they act as their global account.
      */
-    private Actor getCurrentActorOrThrow() {
+    private Actor resolveActor() {
         UserDetailsImpl userDetails = getCurrentPrincipalOrNull();
         if (userDetails == null) {
             throw new SecurityException("Not authenticated");
@@ -540,31 +598,105 @@ public class CommunityService {
         if (!userDetails.isGlobal()) {
             User user = userRepository.findById(userDetails.getId())
                     .orElseThrow(() -> new SecurityException("User not found"));
-            return new Actor(user, null);
+            return new Actor(user, null, null, null);
         }
 
-        Member member = findAppAccountMember(userDetails.getId())
-                .orElseThrow(() -> new CommunityMembershipRequiredException(
-                        "Purchase a membership at this gym to post, comment and like in its community."));
-        if (Boolean.FALSE.equals(member.getAppAccessEnabled())) {
-            throw new CommunityMembershipRequiredException(
-                    "You can post in the community once the gym approves your membership payment.");
+        // No gym selected: there is no community here to act in.
+        if (TenantContextHolder.getCurrentTenant() == null) {
+            throw new CommunityMembershipRequiredException(INTERACT_REQUIRES_MEMBERSHIP);
         }
-        return new Actor(null, member);
+        Long globalUserId = userDetails.getId();
+        return findAppAccountMember(globalUserId)
+                .map(member -> new Actor(null, member, globalUserId, null))
+                .orElseGet(() -> new Actor(null, null, globalUserId, null));
     }
 
-    /** Like getCurrentActorOrThrow, but for read paths: never throws, and resolves no User row. */
+    /** Posting stays with this gym's own active members (and its tenant logins). */
+    private Actor requirePoster() {
+        Actor actor = resolveActor();
+        if (actor.user() != null) {
+            return actor;
+        }
+        Member member = actor.member();
+        if (member == null) {
+            throw new CommunityMembershipRequiredException(POST_REQUIRES_MEMBERSHIP);
+        }
+        if (Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+            throw new CommunityMembershipRequiredException(AWAITING_APPROVAL);
+        }
+        if (!GlobalMembershipService.isActive(member)) {
+            throw new CommunityMembershipRequiredException(POST_REQUIRES_MEMBERSHIP);
+        }
+        return actor;
+    }
+
+    /**
+     * Liking and commenting: an active membership at any gym is enough. A caller
+     * with a members row here acts as it even when the active membership is
+     * elsewhere, so their likes and comments stay under one identity in this gym.
+     */
+    private Actor requireInteractor() {
+        Actor actor = resolveActor();
+        if (actor.user() != null) {
+            return actor;
+        }
+        if (actor.member() != null && GlobalMembershipService.isActive(actor.member())) {
+            return actor;
+        }
+        if (!globalMembershipService.hasActiveMembershipInAnotherGym(actor.globalUserId())) {
+            throw new CommunityMembershipRequiredException(INTERACT_REQUIRES_MEMBERSHIP);
+        }
+        if (actor.member() != null) {
+            return actor;
+        }
+        String name = globalMembershipService.findDisplayName(actor.globalUserId())
+                .orElse("GymBios member");
+        return new Actor(null, null, actor.globalUserId(), name);
+    }
+
+    /** What the caller may do here, for the feed's canPost / canInteract flags. */
+    private record Access(boolean canPost, boolean canInteract) {
+        static final Access NONE = new Access(false, false);
+        static final Access FULL = new Access(true, true);
+    }
+
+    private Access currentAccess() {
+        UserDetailsImpl userDetails = getCurrentPrincipalOrNull();
+        if (userDetails == null) {
+            return Access.NONE;
+        }
+        if (!userDetails.isGlobal()) {
+            return Access.FULL;
+        }
+        if (TenantContextHolder.getCurrentTenant() == null) {
+            return Access.NONE;
+        }
+        Long globalUserId = userDetails.getId();
+        Optional<Member> member = findAppAccountMember(globalUserId);
+        // Indexes members linked before user_memberships existed, so other gyms can
+        // see them without waiting for the backfill. A no-op once indexed.
+        member.ifPresent(m -> globalMembershipService.recordLink(globalUserId, m.getId()));
+
+        boolean activeHere = member.map(GlobalMembershipService::isActive).orElse(false);
+        boolean canInteract = activeHere || globalMembershipService.hasActiveMembershipInAnotherGym(globalUserId);
+        return new Access(activeHere, canInteract);
+    }
+
+    /** Like resolveActor, but for read paths: never throws, and resolves no User row. */
     private Viewer getCurrentViewer() {
         UserDetailsImpl userDetails = getCurrentPrincipalOrNull();
         if (userDetails == null) {
             return Viewer.ANONYMOUS;
         }
         if (!userDetails.isGlobal()) {
-            return new Viewer(userDetails.getId(), null, true);
+            return new Viewer(userDetails.getId(), null, null);
+        }
+        if (TenantContextHolder.getCurrentTenant() == null) {
+            return Viewer.ANONYMOUS;
         }
         return findAppAccountMember(userDetails.getId())
-                .map(member -> new Viewer(null, member.getId(), !Boolean.FALSE.equals(member.getAppAccessEnabled())))
-                .orElse(Viewer.ANONYMOUS);
+                .map(member -> new Viewer(null, member.getId(), null))
+                .orElseGet(() -> new Viewer(null, null, userDetails.getId()));
     }
 
     /**
@@ -614,7 +746,7 @@ public class CommunityService {
             dto.setAuthorUsername(author.getName());
             dto.setAuthorRoles(List.of("MEMBER"));
         }
-        dto.setOwnedByMe(viewer.isAuthorOf(post.getAuthorUser(), post.getAuthorMember()));
+        dto.setOwnedByMe(viewer.isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null));
         dto.setCreatedAt(post.getCreatedAt());
         dto.setArchived(post.isArchived());
         return dto;
@@ -631,11 +763,11 @@ public class CommunityService {
     }
 
     private CommunityPostResponseDTO setArchived(Long postId, boolean archived) {
-        Actor actor = getCurrentActorOrThrow();
+        Actor actor = resolveActor();
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember());
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null);
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to update this post");
         }
@@ -660,8 +792,13 @@ public class CommunityService {
             dto.setAuthorMemberId(author.getId());
             dto.setAuthorUsername(author.getName());
             dto.setAuthorRoles(List.of("MEMBER"));
+        } else if (comment.getAuthorGlobalUserId() != null) {
+            // A member of another gym; their name was captured when they commented.
+            dto.setAuthorUsername(comment.getAuthorDisplayName() != null ? comment.getAuthorDisplayName() : "GymBios member");
+            dto.setAuthorRoles(List.of("MEMBER"));
         }
-        dto.setOwnedByMe(viewer.isAuthorOf(comment.getAuthorUser(), comment.getAuthorMember()));
+        dto.setOwnedByMe(viewer.isAuthorOf(
+                comment.getAuthorUser(), comment.getAuthorMember(), comment.getAuthorGlobalUserId()));
         dto.setCreatedAt(comment.getCreatedAt());
         return dto;
     }

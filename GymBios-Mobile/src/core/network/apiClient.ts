@@ -53,8 +53,11 @@ apiClient.interceptors.response.use(
   (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status ?? 0;
     const body = error.response?.data;
+    // Some controllers (e.g. member access) return the reason as a plain-text body.
+    const rawBody: unknown = body;
+    const textBody = typeof rawBody === 'string' && rawBody.trim() ? rawBody : undefined;
     const message =
-      body?.message ?? body?.error ?? error.message ?? 'An unexpected error occurred';
+      textBody ?? body?.message ?? body?.error ?? error.message ?? 'An unexpected error occurred';
 
     if (!error.config?.skipGlobalErrorToast) {
       toast.error(message);

@@ -5,6 +5,7 @@ import { AttendanceService } from '../application/AttendanceService';
 import { AttendanceApiRepository } from '../infrastructure/AttendanceApiRepository';
 
 import { attendanceKeys } from './attendanceKeys';
+import { checkInKeys } from '@/domains/checkIn/hooks/checkInKeys';
 
 const repository = new AttendanceApiRepository();
 const attendanceService = new AttendanceService(repository);
@@ -25,8 +26,8 @@ export function useCheckout() {
       queryClient.invalidateQueries({ queryKey: attendanceKeys.detail(id) });
       // Stats and reports may have changed after a checkout.
       queryClient.invalidateQueries({ queryKey: attendanceKeys.stats });
-      // Also invalidate check-in today list because checkout modifies recent check-ins
-      queryClient.invalidateQueries({ queryKey: ['checkIns', 'today'] });
+      // Checkout closes a visit in the check-in screens' "today" list too.
+      queryClient.invalidateQueries({ queryKey: checkInKeys.today() });
     },
   });
 }

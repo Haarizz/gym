@@ -18,6 +18,8 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
     long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
 
+    long countByTrainer_IdAndStatusAndDateBetween(Long trainerId, String status, LocalDate start, LocalDate end);
+
     @Query("SELECT COUNT(s) FROM TrainingSession s " +
            "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled'")
     long countNonCancelledBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);

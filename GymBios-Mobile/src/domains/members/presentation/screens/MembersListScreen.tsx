@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
-import { Button } from '@/shared/components/Button';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { EmptyState } from '@/shared/components/EmptyState';
-import { Input } from '@/shared/components/Input';
+import { Pagination } from '@/shared/components/Pagination';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
@@ -13,6 +14,13 @@ import { toast } from '@/shared/components/Toasts/toastStore';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { MemberCard } from '../components/MemberCard';
+import {
+  EMPTY_MEMBER_FILTERS,
+  FilterChip,
+  MEMBER_STATUS_OPTIONS,
+  MemberFilterSheet,
+  type MemberListFilters,
+} from '../components/MemberFilterSheet';
 import { useMembers } from '../../hooks/useMembers';
 import type { Member } from '../../domain/Member';
 
@@ -21,13 +29,50 @@ interface MembersListScreenProps {
   onNavigateToCreate: () => void;
 }
 
+// RoleTabsLayout already pads the top inset and the list pads past the tab bar.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
+
+const SEARCH_DEBOUNCE_MS = 350;
+
 export function MembersListScreen({
   onNavigateToDetail,
   onNavigateToCreate,
 }: MembersListScreenProps) {
   const theme = useTheme();
-  const { members, loading, error, totalElements, refresh } = useMembers();
+  const insets = useSafeAreaInsets();
   const { selectedBranchId } = useBranchContext();
+
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filters, setFilters] = useState<MemberListFilters>(EMPTY_MEMBER_FILTERS);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  // Filtering happens server-side so it covers every page, not just the one loaded.
+  const queryFilters = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      status: filters.status || undefined,
+      membershipType: filters.membershipType || undefined,
+      paymentStatus: filters.paymentStatus || undefined,
+    }),
+    [debouncedSearch, filters],
+  );
+
+  const { members, loading, error, page, totalPages, totalElements, refresh, goToPage } =
+    useMembers(queryFilters);
+
+  useEffect(() => {
+    goToPage(1);
+  }, [queryFilters, goToPage]);
+
+  const activeFilterCount =
+    (filters.status ? 1 : 0) + (filters.membershipType ? 1 : 0) + (filters.paymentStatus ? 1 : 0);
+  const isFiltered = activeFilterCount > 0 || !!debouncedSearch;
 
   const handleCreate = useCallback(() => {
     if (selectedBranchId === 'ALL') {
@@ -37,121 +82,117 @@ export function MembersListScreen({
     onNavigateToCreate();
   }, [selectedBranchId, onNavigateToCreate]);
 
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [membershipTypeFilter, setMembershipTypeFilter] = useState('');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
-
-  const filteredMembers = useMemo(() => {
-    return members.filter(member => {
-      const query = search.toLowerCase();
-      const matchesSearch =
-        !query ||
-        member.name.toLowerCase().includes(query) ||
-        String(member.id).includes(query) ||
-        (member.membershipPlanName ?? '').toLowerCase().includes(query);
-
-      const matchesStatus =
-        !statusFilter || (member.status ?? '').toUpperCase() === statusFilter.toUpperCase();
-      const matchesMembershipType =
-        !membershipTypeFilter ||
-        (member.membershipType ?? '').toUpperCase() === membershipTypeFilter.toUpperCase();
-      const matchesPaymentStatus =
-        !paymentStatusFilter ||
-        (member.paymentStatus ?? '').toUpperCase() === paymentStatusFilter.toUpperCase();
-
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesMembershipType &&
-        matchesPaymentStatus
-      );
+  const handleCall = useCallback((member: Member) => {
+    if (!member.phone) {
+      toast.info('This member does not have a phone number recorded.', {
+        title: 'No Phone Number',
+      });
+      return;
+    }
+    Linking.openURL(`tel:${member.phone.replace(/\s+/g, '')}`).catch(() => {
+      toast.error('Unable to start a call on this device.', { title: 'Error' });
     });
-  }, [members, search, statusFilter, membershipTypeFilter, paymentStatusFilter]);
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setFilters(EMPTY_MEMBER_FILTERS);
+    setSearch('');
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: Member }) => (
-      <MemberCard member={item} onPress={onNavigateToDetail} />
+      <MemberCard member={item} onPress={onNavigateToDetail} onCall={handleCall} />
     ),
-    [onNavigateToDetail],
+    [onNavigateToDetail, handleCall],
   );
 
-  const renderHeader = useCallback(
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
-        <SearchBar
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search members by name or ID..."
-        />
-
-        <View style={styles.filterRow}>
-          <View style={styles.filterWrap}>
-            <Input
-              label="Status"
-              value={statusFilter}
-              onChangeText={setStatusFilter}
-              placeholder="ACTIVE"
+        <View style={styles.searchRow}>
+          <View style={styles.searchWrap}>
+            <SearchBar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by name, ID or phone..."
             />
           </View>
-          <View style={styles.filterWrap}>
-            <Input
-              label="Membership"
-              value={membershipTypeFilter}
-              onChangeText={setMembershipTypeFilter}
-              placeholder="STANDARD"
+          <Pressable
+            style={[
+              styles.filterButton,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              activeFilterCount > 0 && { borderColor: BrandColors.teal },
+            ]}
+            onPress={() => setFilterSheetVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open filters"
+          >
+            <Feather
+              name="sliders"
+              size={18}
+              color={activeFilterCount > 0 ? BrandColors.teal : theme.text}
             />
-          </View>
-          <View style={styles.filterWrap}>
-            <Input
-              label="Payment"
-              value={paymentStatusFilter}
-              onChangeText={setPaymentStatusFilter}
-              placeholder="PAID"
-            />
-          </View>
+            {activeFilterCount > 0 ? (
+              <View style={styles.filterCount}>
+                <Typography variant="caption" style={styles.filterCountLabel}>
+                  {activeFilterCount}
+                </Typography>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
 
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="caption" color="textSecondary">
-              Total Members
-            </Typography>
-            <Typography variant="title" style={styles.summaryValue}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {MEMBER_STATUS_OPTIONS.map((opt) => (
+            <FilterChip
+              key={opt.value || 'all'}
+              label={opt.label}
+              active={filters.status === opt.value}
+              onPress={() => setFilters((prev) => ({ ...prev, status: opt.value }))}
+            />
+          ))}
+        </ScrollView>
+
+        <View style={styles.resultsRow}>
+          <View style={styles.resultsText}>
+            <Typography variant="subtitle" style={styles.resultsCount}>
               {totalElements}
             </Typography>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: theme.backgroundElement }]}>
             <Typography variant="caption" color="textSecondary">
-              Showing
+              {isFiltered ? 'matching members' : 'members'}
             </Typography>
-            <Typography variant="title" style={styles.summaryValue}>
-              {filteredMembers.length}
-            </Typography>
+            {isFiltered ? (
+              <Pressable onPress={handleClearFilters} hitSlop={8} accessibilityRole="button">
+                <Typography variant="caption" style={styles.clearLink}>
+                  Clear
+                </Typography>
+              </Pressable>
+            ) : null}
           </View>
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+            onPress={handleCreate}
+            accessibilityRole="button"
+          >
+            <Feather name="plus" size={16} color={BrandColors.white} />
+            <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
+              Add Member
+            </Typography>
+          </Pressable>
         </View>
-
-        <Button
-          label="+ Add Member"
-          onPress={handleCreate}
-          size="lg"
-        />
       </View>
     ),
-    [
-      search,
-      statusFilter,
-      membershipTypeFilter,
-      paymentStatusFilter,
-      totalElements,
-      filteredMembers.length,
-      theme,
-      handleCreate,
-    ],
+    [search, filters, activeFilterCount, isFiltered, totalElements, theme, handleCreate, handleClearFilters],
   );
 
   const renderEmpty = useCallback(() => {
-    if (loading) return null;
+    if (loading) return <LoadingSkeleton count={3} />;
     if (error) {
       return (
         <EmptyState
@@ -165,40 +206,51 @@ export function MembersListScreen({
       <EmptyState
         title="No Members Found"
         description={
-          search
+          isFiltered
             ? 'Try adjusting your search or filters.'
             : 'Add your first member to get started.'
         }
         icon="users"
-        buttonLabel={!search ? 'Add Member' : undefined}
-        onPress={!search ? handleCreate : undefined}
+        buttonLabel={isFiltered ? 'Clear Filters' : 'Add Member'}
+        onPress={isFiltered ? handleClearFilters : handleCreate}
       />
     );
-  }, [loading, error, search, handleCreate]);
+  }, [loading, error, isFiltered, handleCreate, handleClearFilters]);
 
-  if (loading && members.length === 0) {
+  const renderFooter = useCallback(() => {
+    if (members.length === 0) return null;
     return (
-      <ScreenLayout>
-        <LoadingSkeleton count={3} />
-      </ScreenLayout>
+      <Pagination currentPage={page} totalPages={totalPages} onPageChange={goToPage} />
     );
-  }
+  }, [members.length, page, totalPages, goToPage]);
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <View style={styles.container}>
         <FlatList
-          data={filteredMembers}
-          keyExtractor={item => String(item.id)}
+          data={members}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
-          refreshing={loading}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 120 }]}
+          refreshing={loading && members.length > 0}
           onRefresh={refresh}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         />
       </View>
+
+      <MemberFilterSheet
+        visible={filterSheetVisible}
+        filters={filters}
+        onApply={(next) => {
+          setFilters(next);
+          setFilterSheetVisible(false);
+        }}
+        onClose={() => setFilterSheetVisible(false)}
+      />
     </ScreenLayout>
   );
 }
@@ -208,31 +260,84 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    padding: Spacing.four,
-    gap: Spacing.four,
+    paddingTop: Spacing.three,
+    gap: Spacing.md,
   },
-  filterRow: {
+  searchRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
   },
-  filterWrap: {
+  searchWrap: {
     flex: 1,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  summaryCard: {
-    flex: 1,
+  filterButton: {
+    width: 46,
+    height: 46,
     borderRadius: Radius.md,
-    padding: Spacing.three,
-    gap: Spacing.one,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  summaryValue: {
-    fontSize: 20,
+  filterCount: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: BrandColors.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterCountLabel: {
+    color: BrandColors.white,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chipsRow: {
+    gap: Spacing.two,
+    paddingVertical: Spacing.half,
+  },
+  resultsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  resultsText: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.one,
+    flexShrink: 1,
+  },
+  resultsCount: {
+    fontWeight: '700',
+  },
+  clearLink: {
+    color: BrandColors.teal,
+    fontWeight: '700',
+    marginLeft: Spacing.one,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: BrandColors.teal,
+  },
+  addButtonPressed: {
+    backgroundColor: BrandColors.tealDark,
+  },
+  addButtonLabel: {
+    color: BrandColors.white,
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
 });

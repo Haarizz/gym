@@ -17,7 +17,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import { useAuthStore } from '@/domains/auth';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
-import { useCommunityCanPost } from '../../hooks/useCommunity';
+import { useCommunityCanInteract } from '../../hooks/useCommunity';
 import {
   useToggleCommunityLike,
   useDeleteCommunityPost,
@@ -67,7 +67,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
   const theme = useTheme();
   const { primaryColor } = useCommunityTheme();
   const appRole = useAuthStore((s) => s.appRole);
-  const canPost = useCommunityCanPost();
+  const canInteract = useCommunityCanInteract();
 
   const [actionsVisible, setActionsVisible] = useState(false);
 
@@ -93,14 +93,14 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
 
   const handleLike = useCallback(() => {
     if (isPendingLike) return;
-    if (!canPost) {
-      toast.info('Purchase a membership at this gym to like and comment on posts.', {
+    if (!canInteract) {
+      toast.info('Get an active membership at any gym to like and comment on posts.', {
         title: 'Members only',
       });
       return;
     }
     likeMutation.mutate(post.id);
-  }, [canPost, isPendingLike, likeMutation, post.id]);
+  }, [canInteract, isPendingLike, likeMutation, post.id]);
 
   const handleActions = useCallback(() => {
     setActionsVisible(true);

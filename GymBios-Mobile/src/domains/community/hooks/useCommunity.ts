@@ -10,7 +10,7 @@ export const communityKeys = {
   stats: () => [...communityKeys.all, 'stats'] as const,
   trendingTopics: () => [...communityKeys.all, 'trending-topics'] as const,
   leaderboard: () => [...communityKeys.all, 'leaderboard'] as const,
-  canPost: () => [...communityKeys.all, 'can-post'] as const,
+  access: () => [...communityKeys.all, 'access'] as const,
   feeds: () => [...communityKeys.all, 'feed'] as const,
   feed: (params: { q?: string; type?: string; archived?: boolean }) =>
     [...communityKeys.feeds(), params] as const,
@@ -39,17 +39,31 @@ export function useCommunityLeaderboard() {
   });
 }
 
+function useCommunityAccess() {
+  return useQuery({
+    queryKey: communityKeys.access(),
+    queryFn: async () => {
+      const { canPost, canInteract } = await communityService.getFeed(undefined, undefined, undefined, 1, 1);
+      return { canPost, canInteract };
+    },
+  });
+}
+
 /**
- * Whether the signed-in account may post, comment and like in this gym's community.
- * GymBios app accounts are read-only until they buy a membership here (and, for
- * Cash/Credit/Mixed purchases, until reception approves it).
+ * Whether the signed-in account may create posts in this gym's community: only
+ * with an active membership here (for Cash/Credit/Mixed purchases, once reception
+ * approves it).
  */
 export function useCommunityCanPost(): boolean {
-  const { data } = useQuery({
-    queryKey: communityKeys.canPost(),
-    queryFn: async () => (await communityService.getFeed(undefined, undefined, undefined, 1, 1)).canPost,
-  });
-  return data === true;
+  return useCommunityAccess().data?.canPost === true;
+}
+
+/**
+ * Whether the signed-in account may like and comment. An active membership at
+ * any gym is enough; an account with none anywhere can only read.
+ */
+export function useCommunityCanInteract(): boolean {
+  return useCommunityAccess().data?.canInteract === true;
 }
 
 export function useCommunityFeed(params: {

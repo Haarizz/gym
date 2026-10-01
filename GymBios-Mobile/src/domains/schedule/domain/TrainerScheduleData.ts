@@ -34,7 +34,9 @@ export interface TrainerSessionItem {
 
 export interface TrainerDaySchedule {
   day: string;
+  dayName: string;
   date: number;
+  isToday: boolean;
   sessions: TrainerSessionItem[];
 }
 

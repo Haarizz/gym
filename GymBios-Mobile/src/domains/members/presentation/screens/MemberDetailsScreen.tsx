@@ -1,35 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '@/core/hooks';
 import { Spacing } from '@/core/theme';
-import { Button } from '@/shared/components/Button';
-import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
+import { AppHeader } from '@/shared/components/AppHeader';
+import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { Typography } from '@/shared/components/Typography';
+import type { MembershipPlan } from '@/domains/membershipPlans';
+import { PaymentBottomSheet, type PaymentResult } from '@/shared/payment';
 import { showDeleteMemberDialog } from '../components/DeleteMemberDialog';
 import { CredentialsBottomSheet } from '../components/bottomSheets/CredentialsBottomSheet';
 import { FamilyMemberBottomSheet } from '../components/bottomSheets/FamilyMemberBottomSheet';
 import { FreezeMembershipBottomSheet } from '../components/bottomSheets/FreezeMembershipBottomSheet';
-import { RenewMembershipBottomSheet } from '../components/bottomSheets/RenewMembershipBottomSheet';
+import {
+  RenewMembershipBottomSheet,
+  planPrice,
+} from '../components/bottomSheets/RenewMembershipBottomSheet';
 import { AppAccessSection } from '../components/sections/AppAccessSection';
-import { EmergencyContactSection } from '../components/sections/EmergencyContactSection';
+import { ContactSection } from '../components/sections/ContactSection';
 import { FamilySection } from '../components/sections/FamilySection';
 import { MedicalSection } from '../components/sections/MedicalSection';
 import { MemberHeader } from '../components/sections/MemberHeader';
 import { MembershipSection } from '../components/sections/MembershipSection';
-import { PaymentSection } from '../components/sections/PaymentSection';
-import { QuickActionsSection } from '../components/sections/QuickActionsSection';
 import { useMembers } from '../../hooks/useMembers';
 import { useMemberActions } from '../../hooks/useMemberActions';
 import { useMemberFamily } from '../../hooks/useMemberFamily';
 import type { Member } from '../../domain/Member';
 import type { AddFamilyMemberRequest } from '../../application/family/MemberFamilyRepository';
-import type {
-  RenewalRequest,
-  MinorRenewalRequest,
-  FamilyRenewalRequest,
-} from '../../application/membership/MemberMembershipRepository';
 import type { FreezeRequest } from '../../application/freeze/MemberFreezeRepository';
 import type { SetCredentialsRequest } from '../../application/access/MemberAccessRepository';
+import { toRenewalPayment } from '../utils/renewalPayment';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -48,26 +48,34 @@ export function MemberDetailsScreen({
   onSelectFamilyMember,
   onDeleted,
 }: MemberDetailsScreenProps) {
+  const theme = useTheme();
+  const tabBarInset = useTabBarBottomInset();
   const { selectedMember, loadMember } = useMembers();
   const {
     submitting,
     deleteMember,
     renewMember,
     renewMinor,
-    renewFamily,
     freezeMember,
     unfreezeMember,
     setCredentials,
     toggleAccess,
   } = useMemberActions();
 
-  const { family, loadingFamily, addFamilyMember: addFamilyMemberHook } =
-    useMemberFamily(memberId);
+  // Only family memberships have a family group; asking for anyone else's just 404s.
+  const isFamilyMember =
+    selectedMember?.membershipType?.toUpperCase() === 'FAMILY' || !!selectedMember?.familyHeadId;
+  const { family, addFamilyMember: addFamilyMemberHook } =
+    useMemberFamily(memberId, isFamilyMember);
 
   const [renewVisible, setRenewVisible] = useState(false);
   const [freezeVisible, setFreezeVisible] = useState(false);
   const [familyMemberVisible, setFamilyMemberVisible] = useState(false);
   const [credentialsVisible, setCredentialsVisible] = useState(false);
+  // Plan chosen in the renew sheet, awaiting payment in the shared payment sheet.
+  const [renewPlan, setRenewPlan] = useState<MembershipPlan | null>(null);
+  const [paymentVisible, setPaymentVisible] = useState(false);
+  const [renewing, setRenewing] = useState(false);
 
   useEffect(() => {
     loadMember(memberId).catch(() => { });
@@ -91,15 +99,54 @@ export function MemberDetailsScreen({
     });
   }, [selectedMember, deleteMember, onDeleted]);
 
-  const handleRenew = useCallback(
-    async (
-      id: number,
-      request: RenewalRequest | MinorRenewalRequest | FamilyRenewalRequest,
-    ) => {
-      await renewMember(id, request);
-      loadMember(id);
+  const handleContinueToPayment = useCallback((plan: MembershipPlan) => {
+    setRenewPlan(plan);
+    setRenewVisible(false);
+    // Let the renew sheet finish its close animation before the next modal mounts —
+    // presenting a Modal while another is dismissing is dropped on iOS.
+    setTimeout(() => setPaymentVisible(true), 300);
+  }, []);
+
+  const handleRenewalPayment = useCallback(
+    async (result: PaymentResult) => {
+      if (!selectedMember || !renewPlan) return;
+      const payment = toRenewalPayment(result);
+      const fee = planPrice(renewPlan);
+      try {
+        setRenewing(true);
+        // Members billed to their family head carry no balance of their own, so they renew
+        // through the guardian-billed endpoint (same routing as the web admin's renewal).
+        const billedToGuardian =
+          selectedMember.isMinor ||
+          selectedMember.billedToHead ||
+          selectedMember.familyRole?.toUpperCase() === 'MINOR';
+        if (billedToGuardian) {
+          await renewMinor(selectedMember.id, {
+            ...payment,
+            planName: renewPlan.name,
+            fee,
+            paidAmount: payment.amountReceived,
+          });
+        } else {
+          await renewMember(selectedMember.id, {
+            ...payment,
+            planName: renewPlan.name,
+            membershipFee: fee,
+            membershipType: renewPlan.planType || undefined,
+            membershipStatus: 'active',
+          });
+        }
+        setPaymentVisible(false);
+        setRenewPlan(null);
+        toast.success(`${selectedMember.name}'s membership was renewed.`, { title: 'Renewed' });
+        loadMember(selectedMember.id).catch(() => {});
+      } catch {
+        // The API client already surfaced the server's message as a toast.
+      } finally {
+        setRenewing(false);
+      }
     },
-    [renewMember, loadMember],
+    [selectedMember, renewPlan, renewMember, renewMinor, loadMember],
   );
 
   const handleFreeze = useCallback(
@@ -136,15 +183,29 @@ export function MemberDetailsScreen({
   const handleToggleAccess = useCallback(
     async (enabled: boolean) => {
       if (!selectedMember) return;
-      await toggleAccess(selectedMember.id, enabled);
-      loadMember(selectedMember.id);
+      try {
+        await toggleAccess(selectedMember.id, enabled);
+        toast.success(enabled ? 'App access restored.' : 'App access blocked.');
+        loadMember(selectedMember.id).catch(() => {});
+      } catch {
+        // Toasted by the API client.
+      }
     },
     [selectedMember, toggleAccess, loadMember],
   );
 
+  const header = (
+    <AppHeader
+      title="Member Details"
+      colors={[theme.primary, theme.primary]}
+      onBack={onBack}
+    />
+  );
+
   if (!selectedMember) {
     return (
-      <ScreenLayout>
+      <ScreenLayout edges={TAB_SCREEN_EDGES}>
+        {header}
         <View style={styles.loadingContainer}>
           <Typography variant="body" color="textSecondary">
             Loading...
@@ -155,20 +216,23 @@ export function MemberDetailsScreen({
   }
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
+      {header}
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarInset + Spacing.four }]}
         showsVerticalScrollIndicator={false}
       >
-        <MemberHeader member={selectedMember} />
+        <MemberHeader
+          member={selectedMember}
+          onEdit={() => onEdit(selectedMember)}
+          onRenew={() => setRenewVisible(true)}
+          onFreeze={() => setFreezeVisible(true)}
+          onDelete={handleDelete}
+        />
 
         <MembershipSection member={selectedMember} />
 
-        <PaymentSection member={selectedMember} />
-
-        <MedicalSection member={selectedMember} />
-
-        <EmergencyContactSection member={selectedMember} />
+        <ContactSection member={selectedMember} />
 
         <FamilySection
           member={selectedMember}
@@ -179,27 +243,33 @@ export function MemberDetailsScreen({
 
         <AppAccessSection
           member={selectedMember}
-          onGrantAccess={() => setCredentialsVisible(true)}
-          onDisableAccess={() => handleToggleAccess(false)}
-          onResetCredentials={() => setCredentialsVisible(true)}
+          onSetCredentials={() => setCredentialsVisible(true)}
+          onToggleAccess={handleToggleAccess}
+          busy={submitting}
         />
 
-        <QuickActionsSection
-          onEdit={() => onEdit(selectedMember)}
-          onRenew={() => setRenewVisible(true)}
-          onFreeze={() => setFreezeVisible(true)}
-          onDelete={handleDelete}
-          isFrozen={selectedMember.isFrozen}
-        />
-
-        <Button label="Back" variant="secondary" onPress={onBack} size="lg" />
+        <MedicalSection member={selectedMember} />
       </ScrollView>
 
       <RenewMembershipBottomSheet
         visible={renewVisible}
         member={selectedMember}
         onClose={() => setRenewVisible(false)}
-        onRenew={handleRenew}
+        onContinue={handleContinueToPayment}
+      />
+
+      <PaymentBottomSheet
+        visible={paymentVisible}
+        amount={renewPlan ? planPrice(renewPlan) : 0}
+        title={renewPlan ? `Renewal · ${renewPlan.name}` : 'Renewal'}
+        subtitle={`Member: ${selectedMember.name}`}
+        // The plan's offer is already in its price; reward passes aren't supported here yet.
+        allowDiscount={false}
+        isProcessing={renewing}
+        onClose={() => {
+          if (!renewing) setPaymentVisible(false);
+        }}
+        onComplete={handleRenewalPayment}
       />
 
       <FreezeMembershipBottomSheet
@@ -228,11 +298,13 @@ export function MemberDetailsScreen({
   );
 }
 
+// RoleTabsLayout already pads the top inset; the floating tab bar is cleared via padding.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
+
 const styles = StyleSheet.create({
   scrollContent: {
-    padding: Spacing.four,
-    gap: Spacing.four,
-    paddingBottom: Spacing.six,
+    padding: Spacing.three,
+    gap: Spacing.md,
   },
   loadingContainer: {
     flex: 1,

@@ -163,7 +163,7 @@ class MobileFamilyPurchaseServiceTest {
         // plan 1000 + spouse 1000 + child 300
         String response = purchase(request("2300",
                 connected("Jane", "jane@example.com", false),
-                connected("Kid", null, true)));
+                connected("Kid", "kid@example.com", true)));
 
         ArgumentCaptor<MemberRequestDTO> captor = ArgumentCaptor.forClass(MemberRequestDTO.class);
         verify(memberService).createMember(captor.capture());
@@ -221,7 +221,7 @@ class MobileFamilyPurchaseServiceTest {
 
         String response = purchaseService.convert(key, "fp", request("2300",
                 connected("Jane", "jane@example.com", false),
-                connected("Kid", null, true)), 42L, "acme", "Acme Gym").responseJson();
+                connected("Kid", "kid@example.com", true)), 42L, "acme", "Acme Gym").responseJson();
 
         ArgumentCaptor<RenewalRequestDTO> renewal = ArgumentCaptor.forClass(RenewalRequestDTO.class);
         @SuppressWarnings("unchecked")
@@ -256,7 +256,7 @@ class MobileFamilyPurchaseServiceTest {
         when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
         when(memberRepository.findById(42L)).thenReturn(Optional.of(existingMember()));
 
-        purchaseService.convert(key, "fp", request("600", connected("Jane", null, false)), 42L, "acme", null);
+        purchaseService.convert(key, "fp", request("600", connected("Jane", "jane@example.com", false)), 42L, "acme", null);
 
         ArgumentCaptor<RenewalRequestDTO> renewal = ArgumentCaptor.forClass(RenewalRequestDTO.class);
         verify(memberService).convertToFamilyHead(eq(42L), eq(plan), renewal.capture(), anyList());

@@ -96,6 +96,7 @@ interface Lead {
   source: 'website' | 'referral' | 'walk-in' | 'social-media' | 'google-ads' | 'facebook-ads' | 'instagram' | 'other';
   priority: 'high' | 'medium' | 'low';
   assignedStaff?: string;
+  memberId?: number;
   nextFollowUp?: Date;
   createdDate: Date;
   lastContactDate?: Date;
@@ -230,6 +231,7 @@ export function Leads() {
     source: (l.source as Lead['source']) || 'other',
     priority: (l.priority as Lead['priority']) || 'medium',
     assignedStaff: l.assignedStaff,
+    memberId: l.memberId,
     nextFollowUp: parseOptionalDate(l.nextFollowUp),
     createdDate: parseSafeDate(l.createdAt),
     lastContactDate: parseOptionalDate(l.lastContactDate),
@@ -390,7 +392,7 @@ export function Leads() {
 
   const handleUpdateLeadStatus = useCallback(async (leadId: string, status: Lead['status']) => {
     try {
-      await leadService.updateStatus(Number(leadId), status === 'follow-up' ? 'follow_up' : status);
+      await leadService.updateStatus(Number(leadId), status);
       toast.success(`Lead status updated to ${status}`);
       loadLeads();
     } catch { toast.error('Failed to update lead status'); }
@@ -437,7 +439,7 @@ export function Leads() {
       source: lead.source,
       priority: lead.priority,
       notes: lead.notes,
-      status: lead.status === 'follow-up' ? 'follow_up' : lead.status,
+      status: lead.status,
       assignedStaff: lead.assignedStaff || '',
       nextFollowUp: lead.nextFollowUp ? lead.nextFollowUp.toISOString().split('T')[0] : '',
       membershipInterest: lead.membershipInterest || '',
@@ -1131,10 +1133,37 @@ export function Leads() {
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         Follow Up
                       </Button>
-                      <Button onClick={() => { setStatusLeadId(selectedLead.id); setNewStatus(selectedLead.status === 'follow-up' ? 'follow_up' : selectedLead.status); setShowUpdateStatus(true); }} className="justify-start">
+                      <Button onClick={() => { setStatusLeadId(selectedLead.id); setNewStatus(selectedLead.status); setShowUpdateStatus(true); }} className="justify-start">
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Update Status
                       </Button>
+                      {selectedLead.memberId ? (
+                        <div className="col-span-2 flex items-center rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Registered as a member
+                        </div>
+                      ) : selectedLead.status !== 'lost' && (
+                        // Registering creates the member + receipt, marks the lead converted and
+                        // credits the sale to the lead's staff (Processed By is preselected).
+                        <Button
+                          onClick={() => navigate('/members/add', {
+                            state: {
+                              prefillLead: {
+                                leadId: selectedLead.id,
+                                firstName: selectedLead.firstName,
+                                lastName: selectedLead.lastName,
+                                email: selectedLead.email,
+                                phone: selectedLead.phone,
+                                assignedStaff: selectedLead.assignedStaff,
+                              },
+                            },
+                          })}
+                          className="justify-start col-span-2 bg-green-600 hover:bg-green-700"
+                        >
+                          <UserPlus2 className="mr-2 h-4 w-4" />
+                          Register as Member
+                        </Button>
+                      )}
                       <Button variant="outline" onClick={() => { setInteractionLeadId(selectedLead.id); setNewInteraction({ type: 'call', staffMember: '', notes: '', outcome: 'positive', duration: '' }); setShowAddInteraction(true); }} className="justify-start col-span-2">
                         <Plus className="mr-2 h-4 w-4" />
                         Add Interaction
@@ -1378,7 +1407,7 @@ export function Leads() {
                 <SelectContent>
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="follow_up">Follow-up</SelectItem>
+                  <SelectItem value="follow-up">Follow-up</SelectItem>
                   <SelectItem value="converted">Converted</SelectItem>
                   <SelectItem value="lost">Lost</SelectItem>
                 </SelectContent>
@@ -1555,7 +1584,7 @@ export function Leads() {
               <SelectContent>
                 <SelectItem value="new">New</SelectItem>
                 <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="follow_up">Follow-up</SelectItem>
+                <SelectItem value="follow-up">Follow-up</SelectItem>
                 <SelectItem value="converted">Converted</SelectItem>
                 <SelectItem value="lost">Lost</SelectItem>
               </SelectContent>
@@ -1576,8 +1605,9 @@ export function Leads() {
                 // so staff aren't left to re-type everything from scratch.
                 if (newStatus === 'converted' && ids.length === 1) {
                   const convertedLead = displayLeads.find(l => l.id === ids[0]);
-                  if (convertedLead) {
-                    navigate('/add-member', {
+                  // Already registered — don't offer a second (duplicate) registration.
+                  if (convertedLead && !convertedLead.memberId) {
+                    navigate('/members/add', {
                       state: {
                         prefillLead: {
                           leadId: convertedLead.id,
@@ -1585,6 +1615,7 @@ export function Leads() {
                           lastName: convertedLead.lastName,
                           email: convertedLead.email,
                           phone: convertedLead.phone,
+                          assignedStaff: convertedLead.assignedStaff,
                         },
                       },
                     });

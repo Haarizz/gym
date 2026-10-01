@@ -12,6 +12,8 @@ public class FollowUpResponseDTO {
     private String followUpId;
     private Long leadId;
     private String leadName;
+    // Member the follow-up's lead was registered as, or null if not registered yet
+    private Long leadMemberId;
     private String leadEmail;
     private String leadPhone;
     private String type;
@@ -49,6 +51,8 @@ public class FollowUpResponseDTO {
 
     public String getLeadName() { return leadName; }
     public void setLeadName(String leadName) { this.leadName = leadName; }
+    public Long getLeadMemberId() { return leadMemberId; }
+    public void setLeadMemberId(Long leadMemberId) { this.leadMemberId = leadMemberId; }
 
     public String getLeadEmail() { return leadEmail; }
     public void setLeadEmail(String leadEmail) { this.leadEmail = leadEmail; }

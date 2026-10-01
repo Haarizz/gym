@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
@@ -6,21 +6,34 @@ interface StaffScheduleHeaderCardProps {
   dateText: string;
   tasksCount: number;
   urgentCount?: number;
+  title?: string;
+  onCalendarPress?: () => void;
 }
 
 export function StaffScheduleHeaderCard({
   dateText,
   tasksCount,
   urgentCount = 3,
+  title = "Today's Schedule",
+  onCalendarPress,
 }: StaffScheduleHeaderCardProps) {
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View style={styles.titleInfo}>
-          <Text style={styles.title}>Today's Schedule</Text>
+          <Text style={styles.title}>{title}</Text>
           <Text style={styles.date}>{dateText}</Text>
         </View>
-        <Feather name="calendar" size={24} color={BrandColors.teal} />
+        <Pressable
+          onPress={onCalendarPress}
+          disabled={!onCalendarPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Pick a date"
+          style={({ pressed }) => [styles.calendarButton, pressed && { opacity: 0.6 }]}
+        >
+          <Feather name="calendar" size={24} color={BrandColors.teal} />
+        </Pressable>
       </View>
 
       <View style={styles.footerRow}>
@@ -47,6 +60,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.three,
+  },
+  calendarButton: {
+    padding: Spacing.one,
   },
   titleInfo: {
     flex: 1,

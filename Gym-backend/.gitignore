@@ -34,3 +34,20 @@ build/
 .vscode/
 
 node_modules/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Local env ###
+.env
+.env*.local
+
+### Runtime data ###
+# Files users upload at runtime (branch images, member photos) belong on the
+# server's disk, not in git. The few already tracked are left in place.
+/uploads/
+
+### Local debug scripts (hardcoded local DB credentials) ###
+/src/main/java/com/company/project/AuditDB.java
+/src/test/java/com/company/project/AuditDBTest.java

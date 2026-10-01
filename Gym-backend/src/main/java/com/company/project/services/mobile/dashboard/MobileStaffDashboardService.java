@@ -6,6 +6,7 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.StaffProgressCalculator;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -351,7 +352,7 @@ public class MobileStaffDashboardService {
         // Live calculation if no explicit StaffTarget entity is seeded
         Specification<Receipt> monthReceiptsSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
+            predicates.add(root.get("status").in(StaffProgressCalculator.REVENUE_RECEIPT_STATUSES));
             predicates.add(cb.or(
                     cb.and(cb.isNotNull(root.get("transactionDate")),
                             cb.greaterThanOrEqualTo(root.get("transactionDate"), startOfMonth),
@@ -371,7 +372,7 @@ public class MobileStaffDashboardService {
 
         List<Receipt> monthReceipts = receiptRepository.findAll(monthReceiptsSpec);
         BigDecimal totalRevenue = monthReceipts.stream()
-                .map(r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO))
+                .map(StaffProgressCalculator::receivedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         int totalConversions = monthReceipts.size();

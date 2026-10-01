@@ -20,6 +20,7 @@ import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 import { useCheckIn } from '../../../hooks/useCheckInActions';
 import { useCheckout } from '@/domains/attendance/hooks/useAttendanceActions';
 import { useProfile } from '@/domains/profile';
+import { isOpenVisit } from '../../../domain';
 
 const CHECK_IN_COLORS: [string, string] = ['#155c4c', '#0f4a3d'];
 
@@ -46,11 +47,8 @@ export function StaffCheckInScreen() {
   // --- Computed State ---
   const activeMemberIds = useMemo(() => {
     const ids = new Set<number>();
-    recentMembers.forEach((r: any) => {
-      // Checked in if 'active', 'In Gym', or checkOutTime is null
-      if ((r.status === 'In Gym' || r.status === 'active' || r.checkOutTime === null || r.check_out_time === null) && (r.memberDbId || r.member_id)) {
-        ids.add(r.memberDbId || r.member_id);
-      }
+    recentMembers.forEach((r) => {
+      if (isOpenVisit(r) && r.memberDbId) ids.add(r.memberDbId);
     });
     return ids;
   }, [recentMembers]);
@@ -93,11 +91,10 @@ export function StaffCheckInScreen() {
         await performMemberCheckIn({ memberId: selectedPerson.id });
       } else {
         // Member check out requires the attendance record ID, which we need to find
-        const activeRecord = recentMembers.find((r: any) => {
-           const matchesId = (r.memberDbId === selectedPerson.id || r.member_id === selectedPerson.id);
-           const isActive = (r.status === 'In Gym' || r.status === 'active' || !r.checkOutTime || !r.check_out_time);
-           return matchesId && isActive;
-        });
+        // Must be the open visit — the member may also have finished visits earlier today.
+        const activeRecord = recentMembers.find(
+          (r) => r.memberDbId === selectedPerson.id && isOpenVisit(r)
+        );
         if (activeRecord) {
           await performMemberCheckOut(activeRecord.id);
         }

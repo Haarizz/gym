@@ -6,6 +6,7 @@ export interface EarningsSummary {
 }
 
 export interface QuickLedgerStats {
+  /** "+8%", "-4%", or "—" when there were no earnings last month to compare against. */
   growth: string;
   nextPayoutDate: string;
   daysRemaining: string;
@@ -19,8 +20,8 @@ export interface EarningsBreakdownItem {
 
 export interface CommissionStructureItem {
   label: string;
-  /** Null when the backend value has no number in it. */
-  amount: number | null;
+  /** A rate as configured in the web commission rules, e.g. "10%" or "+2%". */
+  value: string;
 }
 
 export interface RecentEarningTransaction {

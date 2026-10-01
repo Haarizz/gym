@@ -5,7 +5,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Loader } from '@/shared/components/Loader';
-import { GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
+import { Badge, EmptyState, GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
+import { useCurrency } from '@/core/providers';
 
 import { useMyPerformance } from '../../hooks/useMyPerformance';
 import { PerformanceOverviewCard } from '../components/PerformanceOverviewCard';
@@ -15,7 +16,8 @@ interface MyPerformanceScreenProps {
 }
 
 export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
-  const { performance, isLoading } = useMyPerformance();
+  const { performance, isLoading, error, refetch } = useMyPerformance();
+  const { formatCurrency } = useCurrency();
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -31,6 +33,14 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {isLoading ? (
           <Loader />
+        ) : error || !performance ? (
+          <EmptyState
+            icon="bar-chart-2"
+            title="Performance unavailable"
+            description="We couldn't load your performance right now. Make sure your account is linked to a staff profile."
+            buttonLabel="Try again"
+            onPress={() => refetch()}
+          />
         ) : (
           <>
             <PerformanceOverviewCard performance={performance} />
@@ -44,36 +54,59 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                 </Typography>
               </View>
 
+              <Typography variant="caption" color="textSecondary" style={styles.periodLabel}>
+                {performance.periodLabel}
+              </Typography>
+
               <Typography variant="bodySmall" color="textSecondary" style={styles.insightsDescription}>
-                You are currently in the top 5% of staff across all gym branches for client satisfaction and attendance rate. Keep up the great consistency!
+                {performance.message}
               </Typography>
 
               <View>
-                <InfoRow
-                  icon="star"
-                  iconColor="#eab308"
-                  iconBackground="rgba(234,179,8,0.14)"
-                  label="Average Rating"
-                  value="4.9 / 5.0"
-                  divider={false}
-                />
-
-                <InfoRow
-                  icon="message-square"
-                  label="Review Feedback Count"
-                  value="128 reviews"
-                />
-
                 <InfoRow
                   icon="check-circle"
                   iconColor="#16a34a"
                   iconBackground="rgba(22,163,74,0.14)"
                   label="Attendance Rate"
                   value={
-                    <Typography variant="body" style={styles.attendanceValue}>
-                      98.5%
-                    </Typography>
+                    performance.attendanceRate == null ? undefined : (
+                      <Typography variant="body" style={styles.attendanceValue}>
+                        {performance.attendanceRate}%
+                      </Typography>
+                    )
                   }
+                  emptyText="No schedule set"
+                  divider={false}
+                />
+
+                <InfoRow
+                  icon="calendar"
+                  label="Days Present"
+                  value={
+                    performance.daysScheduled > 0
+                      ? `${performance.daysPresent} of ${performance.daysScheduled} scheduled`
+                      : `${performance.daysPresent}`
+                  }
+                />
+
+                <InfoRow
+                  icon="dollar-sign"
+                  label="Revenue This Month"
+                  value={
+                    performance.revenueTarget > 0
+                      ? `${formatCurrency(performance.revenueAchieved)} of ${formatCurrency(performance.revenueTarget)}`
+                      : formatCurrency(performance.revenueAchieved)
+                  }
+                />
+
+                {/* Ratings need feedback linked to individual staff/trainers — not built yet. */}
+                <InfoRow
+                  icon="star"
+                  iconColor="#eab308"
+                  iconBackground="rgba(234,179,8,0.14)"
+                  label="Ratings & Reviews"
+                  value="Member ratings for you are on the way"
+                  right={<Badge label="Coming soon" tone="muted" />}
                 />
               </View>
             </GlassSurface>
@@ -109,6 +142,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: BrandColors.textPrimary,
+  },
+  periodLabel: {
+    marginBottom: Spacing.one,
   },
   insightsDescription: {
     lineHeight: 20,

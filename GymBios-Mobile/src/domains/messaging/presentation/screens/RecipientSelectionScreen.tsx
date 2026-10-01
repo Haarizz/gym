@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList, Text, Pressable, TextInput, ScrollView } from 'react-native';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { MessagingFlowHeader } from '../components/MessagingFlowHeader';
@@ -9,24 +9,34 @@ import { RecipientListItem } from '../components/RecipientListItem';
 import { getRecipientKey } from '../../domain/utils';
 import { MessagingColors } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useMessagingSelectionStore } from '../../store/messagingSelectionStore';
 
+// Mirrors the recipient filter on the web messaging page.
 const FILTERS = [
   { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
-  { id: 'expiring', label: 'Expiring soon' },
-  { id: 'downtown', label: 'Downtown' },
-  { id: 'uptown', label: 'Uptown' },
+  { id: 'active', label: 'Active Members' },
+  { id: 'expired', label: 'Expired Members' },
+  { id: 'vip', label: 'VIP' },
+  { id: 'staff', label: 'Staff' },
+  { id: 'prospects', label: 'Prospects' },
 ];
 
 export function RecipientSelectionScreen() {
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
+  // Draft forwarded from compose when it was opened without recipients.
+  const draft = useLocalSearchParams<{ templateSubject?: string; templateContent?: string; templateType?: string }>();
   
   const { data: recipients = [], isLoading } = useMessagingRecipients();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const storedSelection = useMessagingSelectionStore((s) => s.selectedRecipients);
+  const setSelectedRecipients = useMessagingSelectionStore((s) => s.setSelectedRecipients);
+  // Seeded from the store so "Tap to edit list" on compose comes back with the same picks.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(storedSelection.map(getRecipientKey))
+  );
 
   const filteredRecipients = useMemo(() => {
     let result = recipients;
@@ -34,18 +44,20 @@ export function RecipientSelectionScreen() {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(
         (r) =>
-          r.name.toLowerCase().includes(lowerQuery) ||
-          r.email.toLowerCase().includes(lowerQuery) ||
-          r.phone.includes(searchQuery)
+          (r.name || '').toLowerCase().includes(lowerQuery) ||
+          (r.email || '').toLowerCase().includes(lowerQuery) ||
+          (r.phone || '').includes(searchQuery)
       );
     }
     
     if (activeFilter !== 'all') {
       result = result.filter(r => {
-        if (activeFilter === 'active') return r.membershipStatus?.toLowerCase() !== 'expiring' && r.membershipStatus?.toLowerCase() !== 'expiring soon';
-        if (activeFilter === 'expiring') return r.membershipStatus?.toLowerCase() === 'expiring' || r.membershipStatus?.toLowerCase() === 'expiring soon';
-        if (activeFilter === 'downtown') return r.location?.toLowerCase() === 'downtown';
-        if (activeFilter === 'uptown') return r.location?.toLowerCase() === 'uptown';
+        const status = r.membershipStatus?.toLowerCase();
+        if (activeFilter === 'active') return r.type === 'member' && status === 'active';
+        if (activeFilter === 'expired') return r.type === 'member' && status === 'expired';
+        if (activeFilter === 'vip') return r.isVip === true;
+        if (activeFilter === 'staff') return r.type === 'staff';
+        if (activeFilter === 'prospects') return r.type === 'prospect';
         return true;
       });
     }
@@ -80,15 +92,21 @@ export function RecipientSelectionScreen() {
   };
 
   const handleSendPress = () => {
-    // In a real app we'd pass selectedIds via store or router params.
-    router.push(`/${roleGroup}/messaging/compose-message` as any);
+    setSelectedRecipients(recipients.filter(r => selectedIds.has(getRecipientKey(r))));
+    const hasDraft = !!(draft.templateSubject || draft.templateContent);
+    router.push({
+      pathname: `/${roleGroup}/messaging/compose-message` as any,
+      params: hasDraft
+        ? { templateSubject: draft.templateSubject, templateContent: draft.templateContent, templateType: draft.templateType }
+        : undefined,
+    });
   };
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <MessagingFlowHeader 
         title="Select Recipients"
-        subtitle="Choose members to message"
+        subtitle="Choose members, staff or prospects"
         step={1}
         onBack={() => router.back()}
       />
@@ -150,7 +168,7 @@ export function RecipientSelectionScreen() {
           !isLoading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyTitle}>No members match</Text>
+              <Text style={styles.emptyTitle}>No recipients match</Text>
               <Text style={styles.emptySubtitle}>Try a different search term or clear the filter.</Text>
             </View>
           ) : null

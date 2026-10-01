@@ -18,7 +18,7 @@ export const trainerLedgerRepository = {
         paid: summaryRaw.paid ?? 0,
       },
       quickStats: {
-        growth: quickStatsRaw.growth ?? '',
+        growth: quickStatsRaw.growth || '—',
         nextPayoutDate: quickStatsRaw.nextPayoutDate ?? quickStatsRaw.next_payout_date ?? '',
         daysRemaining: quickStatsRaw.daysRemaining ?? quickStatsRaw.days_remaining ?? '',
       },
@@ -36,7 +36,7 @@ export const trainerLedgerRepository = {
         status: item.status,
       })),
       taxInfo: {
-        // The backend pre-formats these with a hardcoded "₹"; keep only the number.
+        // Sent as strings; null when the figure isn't tracked (shown as "—").
         ytdEarnings: parseAmount(taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings),
         totalSessions: taxInfoRaw.totalSessions ?? taxInfoRaw.total_sessions ?? 0,
         avgPerSession: parseAmount(taxInfoRaw.avgPerSession ?? taxInfoRaw.avg_per_session),

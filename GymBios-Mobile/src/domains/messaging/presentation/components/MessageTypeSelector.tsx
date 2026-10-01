@@ -12,7 +12,7 @@ export function MessageTypeSelector({ selectedType, onSelectType }: MessageTypeS
   const types = [
     { id: 'email', label: 'Email', icon: 'mail', color: MessagingColors.dark, tint: MessagingColors.tint, border: MessagingColors.accent },
     { id: 'sms', label: 'SMS', icon: 'message-circle', color: MessagingColors.sms, tint: MessagingColors.smsTint, border: MessagingColors.sms },
-    { id: 'push', label: 'Push', icon: 'bell', color: MessagingColors.push, tint: MessagingColors.pushTint, border: MessagingColors.push },
+    { id: 'in-app', label: 'Push', icon: 'bell', color: MessagingColors.push, tint: MessagingColors.pushTint, border: MessagingColors.push },
   ] as const;
 
   return (

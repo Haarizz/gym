@@ -39,6 +39,11 @@ export function TrainerLedgerTransactionsSection({
         </View>
 
         <View style={styles.list}>
+          {recentTransactions.length === 0 && (
+            <Text style={styles.emptyText}>
+              No transactions yet. Salary payments and commission from your sales will appear here.
+            </Text>
+          )}
           {recentTransactions.map((transaction) => {
             const isPaid = transaction.status === 'paid';
             return (
@@ -137,6 +142,10 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.two,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   item: {
     borderWidth: 1,

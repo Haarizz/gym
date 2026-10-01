@@ -80,6 +80,10 @@ public class MemberRequestDTO {
     // to "Admin" (see ReceiptService.resolveProcessedByName).
     private Long processedByStaffId;
 
+    // The lead this member was converted from, if any. Marks that lead converted and,
+    // when processedByStaffId is left empty, credits the sale to the lead's staff.
+    private Long leadId;
+
     // Set to "PENDING" by MobileDiscoveryController when a mobile self-service
     // purchase was paid by Cash/Credit/Mixed and needs reception approval before
     // the member gets app access. Null (the default) for every other creation path.
@@ -236,6 +240,8 @@ public class MemberRequestDTO {
 
     public Long getProcessedByStaffId() { return processedByStaffId; }
     public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
+    public Long getLeadId() { return leadId; }
+    public void setLeadId(Long leadId) { this.leadId = leadId; }
 
     public String getApprovalStatus() { return approvalStatus; }
     public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }

@@ -21,7 +21,12 @@ export function StaffLedgerTaxSection({
       <View style={styles.taxAlertCard}>
         <Text style={styles.taxAlertTitle}>Tax Information</Text>
         <Text style={styles.taxAlertBody}>
-          Your YTD earnings: <CurrencyValue amount={taxInfo.ytdEarnings} />. TDS deducted: <CurrencyValue amount={taxInfo.tdsDeducted} />
+          Your YTD earnings: <CurrencyValue amount={taxInfo.ytdEarnings} />.
+          {taxInfo.tdsDeducted > 0 ? (
+            <>
+              {' '}TDS deducted: <CurrencyValue amount={taxInfo.tdsDeducted} />
+            </>
+          ) : null}
         </Text>
         <Pressable hitSlop={8}>
           <Text style={styles.taxAlertLink}>View Tax Details →</Text>
@@ -37,7 +42,7 @@ export function StaffLedgerTaxSection({
             <CurrencyValue style={styles.summaryValue} amount={taxInfo.ytdEarnings} />
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Base Salary Paid</Text>
+            <Text style={styles.summaryLabel}>Salary Paid</Text>
             <CurrencyValue style={styles.summaryValue} amount={taxInfo.baseSalaryPaid} />
           </View>
           <View style={styles.summaryRow}>
@@ -55,6 +60,9 @@ export function StaffLedgerTaxSection({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tax Documents</Text>
         <View style={styles.docsList}>
+          {taxDocuments.length === 0 && (
+            <Text style={styles.emptyText}>No tax documents have been issued yet.</Text>
+          )}
           {taxDocuments.map((doc) => (
             <Pressable
               key={doc.id}
@@ -150,6 +158,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: Radius.sm,
     padding: Spacing.three,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   docTitle: {
     fontSize: 13,

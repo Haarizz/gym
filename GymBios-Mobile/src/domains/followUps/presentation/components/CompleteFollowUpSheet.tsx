@@ -18,7 +18,8 @@ import type { FollowUp } from '../../domain/FollowUp';
 
 interface CompleteFollowUpSheetProps {
   visible: boolean;
-  followUp: FollowUp | null;
+  /** Only the lead's name is shown, so callers outside the follow-ups domain can pass just that. */
+  followUp: Pick<FollowUp, 'leadName'> | null;
   onClose: () => void;
   onSubmit: (outcome: string, notes: string) => void;
   submitting?: boolean;

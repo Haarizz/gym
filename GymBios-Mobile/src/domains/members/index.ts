@@ -73,12 +73,10 @@ export { showDeleteMemberDialog } from './presentation/components/DeleteMemberDi
 
 export { MemberHeader } from './presentation/components/sections/MemberHeader';
 export { MembershipSection } from './presentation/components/sections/MembershipSection';
-export { PaymentSection } from './presentation/components/sections/PaymentSection';
+export { ContactSection } from './presentation/components/sections/ContactSection';
 export { MedicalSection } from './presentation/components/sections/MedicalSection';
-export { EmergencyContactSection } from './presentation/components/sections/EmergencyContactSection';
 export { FamilySection } from './presentation/components/sections/FamilySection';
 export { AppAccessSection } from './presentation/components/sections/AppAccessSection';
-export { QuickActionsSection } from './presentation/components/sections/QuickActionsSection';
 
 export { RenewMembershipBottomSheet } from './presentation/components/bottomSheets/RenewMembershipBottomSheet';
 export { FreezeMembershipBottomSheet } from './presentation/components/bottomSheets/FreezeMembershipBottomSheet';

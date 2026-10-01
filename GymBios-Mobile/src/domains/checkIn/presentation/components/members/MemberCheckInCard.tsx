@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button';
 import { Surface } from '@/shared/components/Surface';
 import { Radius, Spacing } from '@/core/theme';
 import { MemberStatusBadge } from './MemberStatusBadge';
+import { getCheckInEligibility } from '../../../domain/membershipEligibility';
 
 export interface MemberCheckInCardProps {
   member: any; // Assuming member domain type isn't fully exported or structured here
@@ -17,6 +18,7 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
   const id = member.bizId || member.memberNumber || member.id;
   const type = member.membershipType || 'INDIVIDUAL';
   const avatarUrl = member.photoUrl;
+  const { eligible, label } = getCheckInEligibility(member);
 
   return (
     <Surface style={styles.card}>
@@ -31,13 +33,15 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
       </View>
       
       <View style={styles.actions}>
-        {isActive && <MemberStatusBadge isActive={true} statusText="Active" />}
+        {isActive
+          ? <MemberStatusBadge isActive={true} statusText="Checked In" />
+          : <MemberStatusBadge isActive={eligible} statusText={label} />}
         <Button 
-          label={isActive ? "Checked In" : "Check In"} 
-          onPress={() => !isActive && onCheckIn(member)}
-          disabled={isActive}
-          variant={isActive ? "ghost" : "primary"}
-          style={[styles.button, isActive && styles.buttonDisabled]}
+          label={isActive ? "Checked In" : eligible ? "Check In" : "Not Eligible"} 
+          onPress={() => !isActive && eligible && onCheckIn(member)}
+          disabled={isActive || !eligible}
+          variant={isActive || !eligible ? "ghost" : "primary"}
+          style={[styles.button, (isActive || !eligible) && styles.buttonDisabled]}
         />
       </View>
     </Surface>

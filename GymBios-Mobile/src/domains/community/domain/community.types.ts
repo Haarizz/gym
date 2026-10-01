@@ -85,8 +85,10 @@ export interface PaginationInfo {
 export interface CommunityPostsPageResponse {
   posts: CommunityPost[];
   pagination: PaginationInfo;
-  /** False for app accounts without a (payment-approved) membership in this gym: read-only. */
+  /** May create posts: tenant logins, or app accounts with an active (payment-approved) membership in this gym. */
   canPost: boolean;
+  /** May like and comment: an active membership at any gym is enough. False means read-only. */
+  canInteract: boolean;
 }
 
 export interface CreateCommunityPostRequest {

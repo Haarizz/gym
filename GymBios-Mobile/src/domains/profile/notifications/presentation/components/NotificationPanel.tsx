@@ -8,9 +8,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments, type Href } from 'expo-router';
 import { BrandColors } from '@/core/theme';
 import type { NotificationItem } from '../../domain/notification.types';
+import { resolveNotificationRoute } from '../../domain/notificationRoutes';
+import { toast } from '@/shared/components/Toasts';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
 import { useNotificationMutations } from '../../hooks/useNotificationMutations';
@@ -34,6 +36,7 @@ interface NotificationPanelProps {
 
 export function NotificationPanel({ visible, onClose, module, title, onItemPress }: NotificationPanelProps) {
   const router = useRouter();
+  const segments = useSegments();
   const screenWidth = Dimensions.get('window').width;
   const panelWidth = Math.min(screenWidth * 0.9, 420);
 
@@ -110,13 +113,13 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
       return;
     }
 
-    if (item.actionUrl) {
-      onClose();
-      try {
-        router.push(item.actionUrl as any);
-      } catch (err) {
-        // Fallback gracefully if route does not exist
-      }
+    // Close first either way: the toast host sits under this Modal and would be hidden.
+    onClose();
+    const route = resolveNotificationRoute(item, segments[0] ?? '');
+    if (route) {
+      router.push(route as Href);
+    } else {
+      toast.info('This isn’t available in the mobile app yet. Please check the web app.');
     }
   };
 

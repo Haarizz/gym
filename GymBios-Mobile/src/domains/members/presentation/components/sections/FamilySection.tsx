@@ -1,11 +1,14 @@
-import { StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Spacing } from '@/core/theme';
-import { Button } from '@/shared/components/Button';
-import { FormSection } from '@/shared/components/FormSection';
+import { useTheme } from '@/core/hooks';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import type { FamilyGroup } from '../../../domain/FamilyGroup';
 import type { Member } from '../../../domain/Member';
+import { getInitials, titleCase } from '../../utils/memberDisplay';
+import { DetailCard } from './DetailCard';
 
 interface FamilySectionProps {
   member: Member;
@@ -20,72 +23,105 @@ export function FamilySection({
   onAddFamilyMember,
   onSelectMember,
 }: FamilySectionProps) {
+  const theme = useTheme();
   const isFamily = member.membershipType?.toUpperCase() === 'FAMILY';
 
   if (!isFamily) {
     return null;
   }
 
-  const adults = family?.members.filter(m => m.familyRole?.toUpperCase() === 'ADULT') ?? [];
-  const minors = family?.members.filter(m => m.familyRole?.toUpperCase() === 'MINOR') ?? [];
+  const others = family?.members.filter((m) => m.id !== member.id) ?? [];
+  const headName = family?.headName ?? member.familyHeadName;
 
   return (
-    <FormSection title="Family">
-      <View style={styles.detailRow}>
-        <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
-          Family Head
+    <DetailCard title="Family" icon="users">
+      {headName ? (
+        <Typography variant="caption" color="textSecondary" style={styles.headLine}>
+          Family head: <Typography variant="caption" style={styles.headName}>{headName}</Typography>
         </Typography>
-        <Typography variant="bodySmall">
-          {family?.headName ?? member.familyHeadName ?? '—'}
-        </Typography>
-      </View>
+      ) : null}
 
-      <View style={styles.detailRow}>
-        <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
-          Adults
+      {others.length === 0 ? (
+        <Typography variant="bodySmall" color="textSecondary" style={styles.empty}>
+          No other family members yet.
         </Typography>
-        <Typography variant="bodySmall">{adults.length}</Typography>
-      </View>
-
-      <View style={styles.detailRow}>
-        <Typography variant="caption" color="textSecondary" style={styles.detailLabel}>
-          Minors
-        </Typography>
-        <Typography variant="bodySmall">{minors.length}</Typography>
-      </View>
-
-      {family && family.members.length > 0 && (
-        <View style={styles.memberList}>
-          {family.members.map(fm => (
-            <Button
-              key={fm.id}
-              label={`${fm.name} (${fm.familyRole})`}
-              variant="secondary"
-              onPress={() => onSelectMember(fm.id)}
+      ) : (
+        others.map((fm, idx) => (
+          <Pressable
+            key={fm.id}
+            style={({ pressed }) => [
+              styles.row,
+              idx > 0 && { borderTopWidth: 0.5, borderTopColor: theme.border },
+              pressed && styles.pressed,
+            ]}
+            onPress={() => onSelectMember(fm.id)}
+            accessibilityRole="button"
+          >
+            <Avatar
+              initials={getInitials(fm.name)}
+              imageUrl={fm.photoUrl}
+              size={36}
+              backgroundColor={BrandColors.teal}
+              textColor={BrandColors.white}
             />
-          ))}
-        </View>
+            <View style={styles.rowInfo}>
+              <Typography variant="bodySmallBold" numberOfLines={1}>
+                {fm.name}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                {titleCase(fm.familyRole)}
+              </Typography>
+            </View>
+            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+          </Pressable>
+        ))
       )}
 
-      <Button
-        label="Add Family Member"
+      <Pressable
+        style={({ pressed }) => [styles.addButton, { borderColor: BrandColors.teal }, pressed && styles.pressed]}
         onPress={onAddFamilyMember}
-      />
-    </FormSection>
+        accessibilityRole="button"
+      >
+        <Feather name="user-plus" size={15} color={BrandColors.teal} />
+        <Typography variant="bodySmallBold" style={{ color: BrandColors.teal }}>
+          Add family member
+        </Typography>
+      </Pressable>
+    </DetailCard>
   );
 }
 
 const styles = StyleSheet.create({
-  detailRow: {
+  headLine: {
+    marginBottom: Spacing.two,
+  },
+  headName: {
+    fontWeight: '700',
+  },
+  empty: {
+    marginBottom: Spacing.two,
+  },
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: Spacing.md,
     paddingVertical: Spacing.two,
   },
-  detailLabel: {
+  rowInfo: {
     flex: 1,
   },
-  memberList: {
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.two,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

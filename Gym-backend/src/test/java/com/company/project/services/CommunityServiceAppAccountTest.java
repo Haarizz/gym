@@ -45,10 +45,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * GymBios app accounts (global principals) can read any gym's community, but
- * can only post, comment and like once they hold a membership in that gym.
- * Their ID is a primary-DB users.id, so it must only ever be matched against
- * members.global_user_id — never tenant users.id / members.user_id.
+ * GymBios app accounts (global principals) can read any gym's community. They
+ * can like and comment once they hold an active membership at any gym, and post
+ * only with an active membership in this gym. Their ID is a primary-DB users.id,
+ * so it must only ever be matched against members.global_user_id (or the
+ * global-account columns of likes/comments) — never tenant users.id / members.user_id.
  */
 class CommunityServiceAppAccountTest {
 
@@ -61,6 +62,7 @@ class CommunityServiceAppAccountTest {
     @Mock private UserRepository userRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private NotificationService notificationService;
+    @Mock private GlobalMembershipService globalMembershipService;
 
     private CommunityService service;
 
@@ -68,7 +70,7 @@ class CommunityServiceAppAccountTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new CommunityService(postRepository, commentRepository, likeRepository, userRepository,
-                memberRepository, notificationService);
+                memberRepository, notificationService, globalMembershipService);
         TenantContextHolder.setCurrentTenant("demo-gym");
         when(postRepository.save(any(CommunityPost.class))).thenAnswer(inv -> inv.getArgument(0));
         when(commentRepository.save(any(CommunityPostComment.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -87,11 +89,16 @@ class CommunityServiceAppAccountTest {
     }
 
     private Member memberInThisGym(Boolean appAccessEnabled) {
+        return memberInThisGym(appAccessEnabled, "active");
+    }
+
+    private Member memberInThisGym(Boolean appAccessEnabled, String membershipStatus) {
         Member member = new Member();
         member.setId(MEMBER_ID);
         member.setName("Asha Menon");
         member.setGlobalUserId(GLOBAL_ID);
         member.setAppAccessEnabled(appAccessEnabled);
+        member.setMembershipStatus(membershipStatus);
         when(memberRepository.findByGlobalUserId(GLOBAL_ID)).thenReturn(Optional.of(member));
         return member;
     }
@@ -136,6 +143,7 @@ class CommunityServiceAppAccountTest {
         var page = service.getFeed(null, null, 1, 20, false);
         assertEquals(1, page.getPosts().size());
         assertFalse(page.isCanPost());
+        assertFalse(page.isCanInteract());
 
         CreateCommunityCommentRequestDTO comment = new CreateCommunityCommentRequestDTO();
         comment.setContent("hi");
@@ -224,6 +232,7 @@ class CommunityServiceAppAccountTest {
         var page = service.getFeed(null, null, 1, 20, false);
 
         assertTrue(page.isCanPost());
+        assertTrue(page.isCanInteract());
         assertFalse(page.getPosts().get(0).isOwnedByMe());
         verify(likeRepository, never()).findLikedPostIds(anyLong(), anyList());
         assertThrows(SecurityException.class, () -> service.deletePost(7L));
@@ -245,6 +254,124 @@ class CommunityServiceAppAccountTest {
     @Test
     void membershipRequiredIsNotASecurityExceptionSoControllerCannotMapItTo401() {
         assertFalse(SecurityException.class.isAssignableFrom(CommunityMembershipRequiredException.class));
+    }
+
+    @Test
+    void memberOfAnotherGymCanLikeAndCommentButNotPost() {
+        authenticate(GLOBAL_ID, true);
+        when(memberRepository.findByGlobalUserId(GLOBAL_ID)).thenReturn(Optional.empty());
+        when(globalMembershipService.hasActiveMembershipInAnotherGym(GLOBAL_ID)).thenReturn(true);
+        when(globalMembershipService.findDisplayName(GLOBAL_ID)).thenReturn(Optional.of("Ravi Kumar"));
+        CommunityPost post = postBy(user(3L), null);
+        when(postRepository.findById(7L)).thenReturn(Optional.of(post));
+        when(likeRepository.findByPostIdAndGlobalUserId(7L, GLOBAL_ID)).thenReturn(Optional.empty());
+        feedReturns(post);
+        when(likeRepository.findLikedPostIdsByGlobalUser(GLOBAL_ID, List.of(7L))).thenReturn(List.of(7L));
+
+        var page = service.getFeed(null, null, 1, 20, false);
+        assertFalse(page.isCanPost());
+        assertTrue(page.isCanInteract());
+        assertTrue(page.getPosts().get(0).isLikedByMe());
+
+        assertTrue(service.toggleLike(7L).isLiked());
+        ArgumentCaptor<CommunityPostLike> like = ArgumentCaptor.forClass(CommunityPostLike.class);
+        verify(likeRepository).save(like.capture());
+        assertEquals(GLOBAL_ID, like.getValue().getGlobalUserId());
+        assertNull(like.getValue().getMember());
+        assertNull(like.getValue().getUser());
+
+        CreateCommunityCommentRequestDTO comment = new CreateCommunityCommentRequestDTO();
+        comment.setContent("Great form!");
+        var commentResponse = service.addComment(7L, comment);
+        ArgumentCaptor<CommunityPostComment> saved = ArgumentCaptor.forClass(CommunityPostComment.class);
+        verify(commentRepository).save(saved.capture());
+        assertEquals(GLOBAL_ID, saved.getValue().getAuthorGlobalUserId());
+        assertEquals("Ravi Kumar", saved.getValue().getAuthorDisplayName());
+        assertNull(saved.getValue().getAuthorMember());
+        assertNull(saved.getValue().getAuthorUser());
+        assertEquals("Ravi Kumar", commentResponse.getAuthorUsername());
+        assertNull(commentResponse.getAuthorMemberId());
+        assertNull(commentResponse.getAuthorUserId());
+        assertTrue(commentResponse.isOwnedByMe());
+
+        assertThrows(CommunityMembershipRequiredException.class, () -> service.createPost(postRequest()));
+        verify(userRepository, never()).findById(anyLong());
+        verify(memberRepository, never()).findByUserId(anyLong());
+    }
+
+    @Test
+    void globalAccountCommentIsOwnedOnlyByThatAccount() {
+        authenticate(GLOBAL_ID, true);
+        when(memberRepository.findByGlobalUserId(GLOBAL_ID)).thenReturn(Optional.empty());
+        CommunityPost post = postBy(user(3L), null);
+        CommunityPostComment own = new CommunityPostComment();
+        own.setId(1L);
+        own.setPost(post);
+        own.setAuthorGlobalUserId(GLOBAL_ID);
+        own.setAuthorDisplayName("Ravi Kumar");
+        CommunityPostComment someoneElses = new CommunityPostComment();
+        someoneElses.setId(2L);
+        someoneElses.setPost(post);
+        someoneElses.setAuthorGlobalUserId(GLOBAL_ID + 1);
+        when(commentRepository.findByPostIdOrderByCreatedAtAsc(7L)).thenReturn(List.of(own, someoneElses));
+        when(commentRepository.findById(1L)).thenReturn(Optional.of(own));
+        when(commentRepository.findById(2L)).thenReturn(Optional.of(someoneElses));
+
+        var comments = service.getComments(7L);
+        assertTrue(comments.get(0).isOwnedByMe());
+        assertFalse(comments.get(1).isOwnedByMe());
+        assertEquals("GymBios member", comments.get(1).getAuthorUsername());
+
+        // Deleting your own comment needs no current membership.
+        service.deleteComment(7L, 1L);
+        verify(commentRepository).delete(own);
+        assertThrows(SecurityException.class, () -> service.deleteComment(7L, 2L));
+    }
+
+    @Test
+    void lapsedMemberHereWithActiveMembershipElsewhereInteractsAsTheirMember() {
+        authenticate(GLOBAL_ID, true);
+        Member member = memberInThisGym(true, "expired");
+        when(globalMembershipService.hasActiveMembershipInAnotherGym(GLOBAL_ID)).thenReturn(true);
+        when(postRepository.findById(7L)).thenReturn(Optional.of(postBy(user(3L), null)));
+        when(likeRepository.findByPostIdAndMemberId(7L, MEMBER_ID)).thenReturn(Optional.empty());
+        feedReturns();
+
+        var page = service.getFeed(null, null, 1, 20, false);
+        assertFalse(page.isCanPost());
+        assertTrue(page.isCanInteract());
+
+        service.toggleLike(7L);
+        ArgumentCaptor<CommunityPostLike> like = ArgumentCaptor.forClass(CommunityPostLike.class);
+        verify(likeRepository).save(like.capture());
+        assertSame(member, like.getValue().getMember());
+        assertNull(like.getValue().getGlobalUserId());
+        assertThrows(CommunityMembershipRequiredException.class, () -> service.createPost(postRequest()));
+    }
+
+    @Test
+    void lapsedMembershipEverywhereIsReadOnly() {
+        authenticate(GLOBAL_ID, true);
+        memberInThisGym(true, "active").setExpiryDate(java.time.LocalDateTime.now().minusDays(1));
+        when(globalMembershipService.hasActiveMembershipInAnotherGym(GLOBAL_ID)).thenReturn(false);
+        feedReturns();
+
+        var page = service.getFeed(null, null, 1, 20, false);
+        assertFalse(page.isCanPost());
+        assertFalse(page.isCanInteract());
+        assertThrows(CommunityMembershipRequiredException.class, () -> service.toggleLike(7L));
+        assertThrows(CommunityMembershipRequiredException.class, () -> service.createPost(postRequest()));
+    }
+
+    @Test
+    void openingTheFeedIndexesTheLocalMembership() {
+        authenticate(GLOBAL_ID, true);
+        memberInThisGym(true);
+        feedReturns();
+
+        service.getFeed(null, null, 1, 20, false);
+
+        verify(globalMembershipService).recordLink(GLOBAL_ID, MEMBER_ID);
     }
 
     @Test

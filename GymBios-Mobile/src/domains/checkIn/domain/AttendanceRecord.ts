@@ -19,3 +19,11 @@ export interface AttendanceRecord {
   checkInMethod?: string;
   deviceId?: string;
 }
+
+/**
+ * A visit is still open (member in the gym) until it has a check-out time. The API
+ * sends check_out_time: null for open visits, mapped here to checkOutTime.
+ */
+export function isOpenVisit(record: AttendanceRecord): boolean {
+  return !record.checkOutTime;
+}

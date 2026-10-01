@@ -289,7 +289,7 @@ public class MobileStaffPerformanceService {
         return items;
     }
 
-    private int computeFollowUpCompletion(Staff staff) {
+    public int computeFollowUpCompletion(Staff staff) {
         Specification<FollowUp> staffFUSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {

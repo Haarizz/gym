@@ -9,6 +9,12 @@ import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { useSendMessage, useMessagingTemplates } from '../../hooks/useMessagingHooks';
 import { MessagingColors } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useMessagingSelectionStore } from '../../store/messagingSelectionStore';
+
+const AV = ['#2F8A73', '#4FA3D1', '#8E7CC3'];
+
+const initials = (name: string) =>
+  (name || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
 
 const VAR_GROUPS = [
   { g: 'Member', vars: ['FirstName', 'LastName', 'FullName', 'Email', 'Phone'] },
@@ -31,9 +37,11 @@ export function ComposeMessageScreen() {
     templateSubject?: string;
     templateContent?: string;
     templateType?: string;
-    // Real app might pass recipient count or ids here
   }>();
   const { mutate: sendMessage, isPending } = useSendMessage();
+  const selectedRecipients = useMessagingSelectionStore((s) => s.selectedRecipients);
+  const clearSelectedRecipients = useMessagingSelectionStore((s) => s.clearSelectedRecipients);
+  const recipientCount = selectedRecipients.length;
   const { data: templates = [] } = useMessagingTemplates();
 
   const [messageType, setMessageType] = useState('email');
@@ -45,6 +53,7 @@ export function ComposeMessageScreen() {
   const [templateSheetVisible, setTemplateSheetVisible] = useState(false);
   const [varSheetVisible, setVarSheetVisible] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.templateSubject) {
@@ -60,26 +69,49 @@ export function ComposeMessageScreen() {
     setVarSheetVisible(false);
   };
 
+  const canSend = recipientCount > 0 && content.trim().length > 0 && (messageType !== 'email' || subject.trim().length > 0);
+
   const handleSend = () => {
-    setSent(true);
+    if (!canSend) return;
+    setSendError(null);
     sendMessage(
       {
         type: messageType,
         subject,
         content,
-        recipients: [], 
+        recipients: selectedRecipients.map(r => ({ id: r.id, type: r.type })),
+        personalization: true,
       },
       {
         onSuccess: () => {
+          setSent(true);
+          clearSelectedRecipients();
           setTimeout(() => {
             router.replace(`/${roleGroup}/messaging/history` as any);
           }, 1500);
+        },
+        onError: (error: any) => {
+          setSendError(error?.response?.data?.message || error?.message || 'Failed to send message');
         },
       }
     );
   };
 
-  const renderPreviewText = (text: string) => {
+  // Normal flow arrives here from the picker, so going back keeps its state. When
+  // opened straight from the template library there's no picker behind us, so open
+  // one and carry the draft through it.
+  const openRecipientPicker = () => {
+    if (recipientCount > 0 && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.push({
+      pathname: `/${roleGroup}/messaging/compose` as any,
+      params: { templateSubject: subject, templateContent: content, templateType: messageType },
+    });
+  };
+
+    const renderPreviewText = (text: string) => {
     return text.replace(/\{(\w+)\}/g, (match, key) => (SAMPLE as any)[key] ? (SAMPLE as any)[key] : match);
   };
 
@@ -129,23 +161,37 @@ export function ComposeMessageScreen() {
       />
       
       <ScrollView contentContainerStyle={styles.scrollContent} automaticallyAdjustKeyboardInsets>
-        <Pressable style={styles.recipChip} onPress={() => router.back()}>
+        <Pressable style={styles.recipChip} onPress={openRecipientPicker}>
           <View style={styles.avatarStack}>
-            {/* Mock avatars since we don't have recipient data passed in this limited scope */}
-            <View style={[styles.avatarMicro, { backgroundColor: '#2F8A73' }]}><Text style={styles.avatarMicroTxt}>JB</Text></View>
-            <View style={[styles.avatarMicro, { backgroundColor: '#4FA3D1', marginLeft: -8 }]}><Text style={styles.avatarMicroTxt}>LC</Text></View>
-            <View style={[styles.avatarMicro, { backgroundColor: '#8E7CC3', marginLeft: -8 }]}><Text style={styles.avatarMicroTxt}>DP</Text></View>
+            {selectedRecipients.slice(0, 3).map((r, i) => (
+              <View
+                key={`${r.type}:${r.id}`}
+                style={[styles.avatarMicro, { backgroundColor: AV[i % AV.length] }, i > 0 && { marginLeft: -8 }]}
+              >
+                <Text style={styles.avatarMicroTxt}>{initials(r.name)}</Text>
+              </View>
+            ))}
           </View>
           <View style={styles.recipTextWrap}>
-            <Text style={styles.recipTextCount}>3 recipients selected</Text>
-            <Text style={styles.recipTextSub}>Tap to edit list</Text>
+            <Text style={styles.recipTextCount}>
+              {recipientCount === 0
+                ? 'No recipients selected'
+                : `${recipientCount} recipient${recipientCount === 1 ? '' : 's'} selected`}
+            </Text>
+            <Text style={styles.recipTextSub}>{recipientCount === 0 ? 'Tap to choose recipients' : 'Tap to edit list'}</Text>
           </View>
           <Feather name="chevron-right" size={18} color={MessagingColors.muted} />
         </Pressable>
 
         {sent && (
           <View style={styles.sentBanner}>
-            <Text style={styles.sentBannerText}>✅  Message queued for 3 recipients</Text>
+            <Text style={styles.sentBannerText}>✅  Message sent</Text>
+          </View>
+        )}
+
+        {sendError && (
+          <View style={[styles.sentBanner, styles.errorBanner]}>
+            <Text style={[styles.sentBannerText, styles.errorBannerText]}>{sendError}</Text>
           </View>
         )}
 
@@ -226,15 +272,15 @@ export function ComposeMessageScreen() {
         <Pressable style={styles.ghostBtn} onPress={() => setTab(tab === 'edit' ? 'preview' : 'edit')}>
           <Text style={styles.ghostBtnText}>{tab === 'edit' ? 'Preview' : 'Edit'}</Text>
         </Pressable>
-        <Pressable onPress={handleSend} disabled={isPending || sent}>
+        <Pressable onPress={handleSend} disabled={isPending || sent || !canSend}>
           {({ pressed }) => (
             <LinearGradient
-              colors={isPending || sent ? ['#D6D5DE', '#D6D5DE'] : [MessagingColors.accent, MessagingColors.dark]}
+              colors={isPending || sent || !canSend ? ['#D6D5DE', '#D6D5DE'] : [MessagingColors.accent, MessagingColors.dark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.primaryBtn, !(isPending || sent) && styles.primaryBtnShadow, pressed && { opacity: 0.9 }]}
+              style={[styles.primaryBtn, !(isPending || sent || !canSend) && styles.primaryBtnShadow, pressed && { opacity: 0.9 }]}
             >
-              <Text style={styles.primaryBtnText}>{isPending ? 'Sending...' : 'Send to 3'}</Text>
+              <Text style={styles.primaryBtnText}>{isPending ? 'Sending...' : `Send to ${recipientCount}`}</Text>
             </LinearGradient>
           )}
         </Pressable>
@@ -263,7 +309,7 @@ export function ComposeMessageScreen() {
               }}
             >
               <View style={styles.stplIc}>
-                <Feather name={t.type === 'sms' ? 'message-circle' : t.type === 'push' ? 'bell' : 'mail'} size={16} color={MessagingColors.muted} />
+                <Feather name={t.type === 'sms' ? 'message-circle' : t.type === 'in-app' ? 'bell' : 'mail'} size={16} color={MessagingColors.muted} />
               </View>
               <View style={styles.stplMeta}>
                 <Text style={styles.stplT1}>{t.name}</Text>
@@ -365,6 +411,13 @@ const styles = StyleSheet.create({
     padding: 13,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  errorBanner: {
+    backgroundColor: '#FDECEC',
+    borderColor: '#E5484D',
+  },
+  errorBannerText: {
+    color: '#B42318',
   },
   sentBannerText: {
     color: MessagingColors.inkA,

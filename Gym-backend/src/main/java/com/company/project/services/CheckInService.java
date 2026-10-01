@@ -117,7 +117,7 @@ public class CheckInService {
             throw new IllegalArgumentException("Provide at least one of: qr, face_id, member_id");
         }
 
-        boolean allowed = "active".equals(member.getMembershipStatus());
+        boolean allowed = "active".equalsIgnoreCase(member.getMembershipStatus());
 
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay   = LocalDate.now().atTime(LocalTime.MAX);
@@ -238,7 +238,7 @@ public class CheckInService {
 
     private void validateMembership(Member member) {
         String status = member.getMembershipStatus();
-        if (!"active".equals(status)) {
+        if (!"active".equalsIgnoreCase(status)) {
             throw new RuntimeException(
                     "Check-in denied — membership is " + status +
                     " for member: " + member.getName());

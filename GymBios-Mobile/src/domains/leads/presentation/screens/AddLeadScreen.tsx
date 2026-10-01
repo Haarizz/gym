@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { ScrollView, View, StyleSheet, Pressable, Text } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -118,7 +119,8 @@ export function AddLeadScreen() {
         notes: form.notes || undefined,
         followUpType: form.followUpType,
         followUpSubject: form.followUpSubject || 'Follow-up',
-        followUpDueDate: form.followUpDueDate!.toISOString().split('T')[0] + 'T00:00:00',
+        // Local calendar date — toISOString() would shift it back a day in timezones ahead of UTC.
+        followUpDueDate: format(form.followUpDueDate!, 'yyyy-MM-dd') + 'T00:00:00',
         followUpScheduledTime: form.followUpScheduledTime || undefined,
         followUpEstimatedDuration: form.followUpEstimatedDuration ? parseInt(form.followUpEstimatedDuration, 10) : undefined,
         followUpPriority: form.followUpPriority as 'low' | 'medium' | 'high',

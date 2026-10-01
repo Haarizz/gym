@@ -14,6 +14,8 @@ export interface MembershipInfo {
   auto_renew: boolean;
   total_days: number;
   remaining_days: number;
+  /** The member's branch at this gym (null when they have no membership). */
+  branch_id?: number | null;
 }
 
 export interface BenefitInfo {

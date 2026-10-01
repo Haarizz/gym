@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { useTrainerLedger } from '../../hooks/useTrainerLedger';
 import { TrainerLedgerSummaryCard } from '../components/TrainerLedgerSummaryCard';
 import { TrainerLedgerStatsGrid } from '../components/TrainerLedgerStatsGrid';
@@ -13,7 +14,7 @@ type LedgerTab = 'breakdown' | 'transactions' | 'tax';
 
 export function TrainerLedgerScreen() {
   const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
-  const { data, isLoading, refetch, isRefetching } = useTrainerLedger();
+  const { data, isLoading, isError, refetch, isRefetching } = useTrainerLedger();
 
   if (isLoading && !data) {
     return (
@@ -26,7 +27,13 @@ export function TrainerLedgerScreen() {
   if (!data) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={{ color: '#64748B' }}>Unable to load ledger data.</Text>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load your ledger"
+          description={isError ? 'Check your connection and try again.' : 'No ledger data is available yet.'}
+          buttonLabel="Retry"
+          onPress={() => refetch()}
+        />
       </View>
     );
   }
@@ -87,6 +94,7 @@ export function TrainerLedgerScreen() {
         <TrainerLedgerBreakdownSection
           breakdown={data.breakdown}
           summary={data.summary}
+          growth={data.quickStats.growth}
         />
       )}
 
