@@ -697,6 +697,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               </span>
             </div>
             
+            {/* Only drives the Overview tab — the Revenue tab has its own period buttons,
+                so showing this there made the two disagree. */}
+            {activeDashboardTab !== 'revenue' && (
             <Select value={dateFilter} onValueChange={setDateFilter} open={periodSelectOpen} onOpenChange={setPeriodSelectOpen}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
@@ -708,6 +711,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <SelectItem value="lastMonth">Last Month</SelectItem>
               </SelectContent>
             </Select>
+            )}
             <Button
               variant="outline"
               className={dashboardHeaderActionButton}

@@ -24,7 +24,6 @@ import {
   Apple,
   ArrowRight,
   Shield,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { GymBiosPricing } from "./gymbios-pricing";
@@ -522,20 +521,13 @@ export function Login({ onLogin }: LoginProps) {
       {/* Request a Demo - GymBios Pricing Overlay */}
       {showPricing && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50">
-          {!onboardingOpen && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPricing(false)}
-              className="fixed top-4 right-4 h-9 w-9 p-0 rounded-full bg-white shadow-md border-gray-200 hover:bg-gray-50"
-              style={{ zIndex: 60 }}
-              aria-label="Close pricing"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-          <GymBiosPricing onOnboardingOpenChange={setOnboardingOpen} />
+          <GymBiosPricing
+            onOnboardingOpenChange={setOnboardingOpen}
+            onSignIn={() => {
+              setOnboardingOpen(false);
+              setShowPricing(false);
+            }}
+          />
         </div>
       )}
     </div>

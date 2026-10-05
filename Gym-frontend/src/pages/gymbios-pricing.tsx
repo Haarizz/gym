@@ -30,7 +30,8 @@ import {
   Dumbbell,
   Heart,
   Brain,
-  Gauge
+  Gauge,
+  LogIn
 } from "lucide-react";
 import { BusinessOnboardingFullscreen } from "./business-onboarding-fullscreen";
 
@@ -205,8 +206,12 @@ const faqs = [
 
 export function GymBiosPricing({
   onOnboardingOpenChange,
+  onSignIn,
 }: {
   onOnboardingOpenChange?: (open: boolean) => void;
+  // Shown as a "Sign in" button when the page is opened from the login screen
+  // (BG_73) — without it a prospect had no labelled way back to login.
+  onSignIn?: () => void;
 } = {}) {
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [onboardingOpen, setOnboardingOpenState] = useState(false);
@@ -229,6 +234,19 @@ export function GymBiosPricing({
           background-color: #f8fafc;
         }
       `}</style>
+      {onSignIn && !onboardingOpen && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onSignIn}
+          className="fixed top-4 right-4 bg-white shadow-md border-gray-200 hover:bg-gray-50"
+          style={{ zIndex: 60 }}
+        >
+          <LogIn className="h-4 w-4 mr-2" />
+          Sign in
+        </Button>
+      )}
       {/* Hero Banner Section */}
       <motion.div 
         initial={{ opacity: 0 }}
@@ -665,6 +683,7 @@ export function GymBiosPricing({
         open={onboardingOpen}
         onOpenChange={setOnboardingOpen}
         selectedPlan={selectedPlan}
+        onSignIn={onSignIn ? () => { setOnboardingOpen(false); onSignIn(); } : undefined}
       />
     </div>
   );

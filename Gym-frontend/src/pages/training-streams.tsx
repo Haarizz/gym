@@ -5,6 +5,7 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import { TimeSelect12h } from "../components/shared/time-select-12h";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
@@ -427,10 +428,13 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                   </div>
                   <div className="space-y-2">
                     <Label>Schedule Time</Label>
-                    <Input type="time" onChange={e => {
-                      const date = createForm.scheduled_time?.split('T')[0] ?? new Date().toISOString().split('T')[0];
-                      setCreateForm(f => ({ ...f, scheduled_time: `${date}T${e.target.value}` }));
-                    }} />
+                    <TimeSelect12h
+                      value={createForm.scheduled_time?.split('T')[1]?.slice(0, 5) ?? ''}
+                      onChange={v => {
+                        const date = createForm.scheduled_time?.split('T')[0] ?? new Date().toISOString().split('T')[0];
+                        setCreateForm(f => ({ ...f, scheduled_time: `${date}T${v}` }));
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -606,7 +610,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                                 {stream.scheduled_time && (
                                   <div className="flex items-center">
                                     <Calendar className="h-4 w-4 mr-1" />
-                                    {new Date(stream.scheduled_time).toLocaleString()}
+                                    {new Date(stream.scheduled_time).toLocaleString(undefined, { hour12: true })}
                                   </div>
                                 )}
                               </div>
@@ -740,7 +744,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                           <div className="font-medium">{stream.title}</div>
                           <div className="text-sm text-muted-foreground">
                             {stream.instructor_name ?? 'No instructor'}
-                            {stream.scheduled_time && ` • ${new Date(stream.scheduled_time).toLocaleString()}`}
+                            {stream.scheduled_time && ` • ${new Date(stream.scheduled_time).toLocaleString(undefined, { hour12: true })}`}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             {stream.category} • {stream.duration} min • {stream.difficulty}

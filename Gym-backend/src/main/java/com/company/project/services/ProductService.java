@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -125,11 +126,32 @@ public class ProductService {
     public ProductsPageResponseDTO getProducts(String search, Long categoryId, String status,
                                                Boolean enabledForPos, int page, int size) {
         Specification<Product> spec = buildSpec(search, categoryId, status, enabledForPos);
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt");
 
         // Preload all warehouses once
         List<Warehouse> warehouses = warehouseRepository.findAll();
+
+        // Stock statuses are derived from stock rows, not a column, so they can't go in
+        // the Specification. Filter on the DTO's computed stockStatus — the same value
+        // the list badge shows — then paginate in memory (BG_77: "Low Stock" used to
+        // return every product in the category, including In Stock ones).
+        if (status != null && STOCK_STATUSES.contains(status.toUpperCase())) {
+            String wanted = status.toUpperCase();
+            List<ProductResponseDTO> matching = productRepository.findAll(spec, sort).stream()
+                    .map(p -> buildResponseDTOWithWarehouses(p, warehouses))
+                    .filter(dto -> wanted.equals(dto.getStockStatus()))
+                    .collect(Collectors.toList());
+            int from = Math.min((page - 1) * size, matching.size());
+            int to = Math.min(from + size, matching.size());
+            int totalPages = size > 0 ? (int) Math.ceil(matching.size() / (double) size) : 0;
+            return new ProductsPageResponseDTO(
+                    new ArrayList<>(matching.subList(from, to)),
+                    new PaginationDTO(page, size, matching.size(), totalPages)
+            );
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size, sort);
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
 
         List<ProductResponseDTO> dtos = productPage.getContent().stream()
                 .map(p -> buildResponseDTOWithWarehouses(p, warehouses))
@@ -401,11 +423,21 @@ public class ProductService {
 
     // ── Private Helpers ─────────────────────────────────────────────────────
 
+    private static final int MAX_DESCRIPTION_LENGTH = 1000;
+
+    private static final Set<String> STOCK_STATUSES = Set.of("IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK");
+
     private void mapRequestToProduct(ProductRequestDTO req, Product product) {
         if (req.getName() != null) product.setName(req.getName());
         if (req.getCategoryId() != null) product.setCategoryId(req.getCategoryId());
         if (req.getBrand() != null) product.setBrand(req.getBrand());
-        if (req.getDescription() != null) product.setDescription(req.getDescription());
+        if (req.getDescription() != null) {
+            // Column is TEXT, so cap it here — mirrors the 1000-char limit on the form (BG_76).
+            if (req.getDescription().length() > MAX_DESCRIPTION_LENGTH) {
+                throw new IllegalArgumentException("Description must be " + MAX_DESCRIPTION_LENGTH + " characters or fewer");
+            }
+            product.setDescription(req.getDescription());
+        }
         if (req.getIsActive() != null) product.setIsActive(req.getIsActive());
         if (req.getHasVariants() != null) product.setHasVariants(req.getHasVariants());
         if (req.getHasRecipe() != null) product.setHasRecipe(req.getHasRecipe());
@@ -512,7 +544,7 @@ public class ProductService {
                 } else if ("inactive".equalsIgnoreCase(status)) {
                     predicates.add(cb.isFalse(root.get("isActive")));
                 }
-                // out-of-stock filtering is done post-query via stock data
+                // IN_STOCK / LOW_STOCK / OUT_OF_STOCK are filtered post-query in getProducts
             }
 
             if (Boolean.TRUE.equals(enabledForPos)) {

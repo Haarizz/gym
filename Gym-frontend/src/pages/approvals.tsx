@@ -106,6 +106,8 @@ export function Approvals() {
       }
       setActionDialog(null);
       await loadMembers();
+      // Lets the sidebar clear its pending-approvals dot right away.
+      window.dispatchEvent(new Event('approvals_updated'));
     } catch (err: any) {
       toast.error(err.message || `Failed to ${type} payment`);
     } finally {

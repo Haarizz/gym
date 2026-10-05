@@ -33,6 +33,8 @@ public class ReceiptVoucherResponseDTO {
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime updatedAt;
     private Long journalVoucherId;
+    // Generated from a real payment — amount is read-only (BG_47).
+    private boolean systemGenerated;
 
     public ReceiptVoucherResponseDTO() {}
 
@@ -48,6 +50,7 @@ public class ReceiptVoucherResponseDTO {
     public static ReceiptVoucherResponseDTO fromEntity(ReceiptVoucher rv, Long journalVoucherId) {
         ReceiptVoucherResponseDTO dto = new ReceiptVoucherResponseDTO();
         dto.setJournalVoucherId(journalVoucherId);
+        dto.setSystemGenerated(Boolean.TRUE.equals(rv.getSystemGenerated()));
         dto.setId(rv.getId());
         dto.setVoucherNo(rv.getVoucherNo());
         dto.setDate(rv.getDate());
@@ -126,6 +129,9 @@ public class ReceiptVoucherResponseDTO {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public boolean isSystemGenerated() { return systemGenerated; }
+    public void setSystemGenerated(boolean systemGenerated) { this.systemGenerated = systemGenerated; }
 
     public Long getJournalVoucherId() { return journalVoucherId; }
     public void setJournalVoucherId(Long journalVoucherId) { this.journalVoucherId = journalVoucherId; }

@@ -92,6 +92,13 @@ const SECURITY_ROLES = ['Gymbios_Admin', 'Receptionist', 'Trainer', 'Accountant'
 // "Add Certification" rows the admin left empty shouldn't be saved as nameless certificates.
 const withoutBlankCerts = (certs: StaffCertification[]) => certs.filter(c => c.cert_name?.trim());
 
+const ERROR_BORDER: React.CSSProperties = { borderColor: '#dc2626' };
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{message}</p>;
+}
+
 // ── Controlled Certifications tab (Add & Edit modals) ──────────────────────
 interface CertificationsTabProps {
   certifications: StaffCertification[];
@@ -278,6 +285,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   });
   const [newEmployeeCerts, setNewEmployeeCerts] = useState<StaffCertification[]>([]);
   const [newEmployeeSchedule, setNewEmployeeSchedule] = useState<Record<string, string[]>>({});
+  // Per-field messages for Add Employee (BG_80): the Create button used to sit
+  // disabled with no hint of which field was missing.
+  const [addEmpErrors, setAddEmpErrors] = useState<Record<string, string>>({});
+  const [addEmpTab, setAddEmpTab] = useState('basic');
+  const [isCreatingEmployee, setIsCreatingEmployee] = useState(false);
   const [showNewEmpPassword, setShowNewEmpPassword] = useState(false);
   const [isTogglingStaffAccess, setIsTogglingStaffAccess] = useState(false);
   const [editAppUsername, setEditAppUsername] = useState('');
@@ -370,11 +382,52 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     } catch (e) { console.error('Failed to load commission rules', e); }
   };
 
+  const ADD_EMP_FIELD_LABELS: Record<string, string> = {
+    name: 'Full Name', email: 'Email Address', role: 'Role', branch: 'Branch',
+    appUsername: 'App Username', appPassword: 'App Password',
+  };
+
+  const validateNewEmployee = (): Record<string, string> => {
+    const info = newEmployeeBasicInfo;
+    const errors: Record<string, string> = {};
+    if (!info.name.trim()) errors.name = 'Full name is required';
+    if (!info.email.trim()) errors.email = 'Email address is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(info.email.trim())) errors.email = 'Enter a valid email address';
+    if (!info.role) errors.role = 'Select a role';
+    if (!info.branch) errors.branch = 'Select a branch';
+    const username = (info.appUsername || '').trim();
+    const password = info.appPassword || '';
+    // App access is optional, but half-filled credentials used to be dropped silently.
+    if (username && !password) errors.appPassword = 'Enter a password, or clear the username to skip app access';
+    else if (password && !username) errors.appUsername = 'Enter a username, or clear the password to skip app access';
+    else if (password && password.length < 6) errors.appPassword = 'Password must be at least 6 characters';
+    return errors;
+  };
+
+  const clearAddEmpError = (field: string) =>
+    setAddEmpErrors(prev => {
+      if (!prev[field]) return prev;
+      const { [field]: _removed, ...rest } = prev;
+      return rest;
+    });
+
   const handleCreateEmployee = async () => {
-    if (!newEmployeeBasicInfo.name || !newEmployeeBasicInfo.email) return;
+    const errors = validateNewEmployee();
+    setAddEmpErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      // Every required field lives on Basic Info — jump there so the highlights are visible.
+      setAddEmpTab('basic');
+      toast.error('Please complete the required fields', {
+        description: Object.keys(errors).map(f => ADD_EMP_FIELD_LABELS[f] || f).join(', '),
+      });
+      return;
+    }
+    setIsCreatingEmployee(true);
     try {
       await staffService.createStaff({
         ...newEmployeeBasicInfo,
+        name: newEmployeeBasicInfo.name.trim(),
+        email: newEmployeeBasicInfo.email.trim(),
         status: 'active',
         join_date: newEmployeeBasicInfo.join_date || new Date().toISOString().split('T')[0],
         certifications: withoutBlankCerts(newEmployeeCerts),
@@ -390,8 +443,16 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
       setNewEmployeeCerts([]);
       setNewEmployeeSchedule({});
       setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0], appUsername: '', appPassword: '' });
+      setAddEmpErrors({});
+      setAddEmpTab('basic');
+      toast.success('Employee created');
       await loadStaff();
-    } catch (e) { console.error('Failed to create employee', e); }
+    } catch (e: any) {
+      console.error('Failed to create employee', e);
+      toast.error(e?.message || 'Failed to create employee');
+    } finally {
+      setIsCreatingEmployee(false);
+    }
   };
 
   const handleDeleteEmployee = async () => {
@@ -773,7 +834,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             Settings
           </Button>
           <PermissionGate permission="STAFF_CREATE">
-            <Button onClick={() => setShowAddEmployee(true)}>
+            <Button onClick={() => { setAddEmpErrors({}); setAddEmpTab('basic'); setShowAddEmployee(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Employee
             </Button>
@@ -1077,7 +1138,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" sideOffset={40}>
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setSelectedEmployee(employee)}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Profile
@@ -1314,11 +1375,14 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
           <Separator className="my-3" />
 
-          <Tabs defaultValue="basic" className="space-y-4">
+          <Tabs value={addEmpTab} onValueChange={setAddEmpTab} className="space-y-4">
             <TabsList className="bg-muted/50 p-1 w-full">
               <TabsTrigger value="basic" className="flex-1 flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
                 Basic Info
+                {Object.keys(addEmpErrors).length > 0 && (
+                  <span aria-label="Has errors" className="rounded-full" style={{ width: 8, height: 8, backgroundColor: '#dc2626' }} />
+                )}
               </TabsTrigger>
               <TabsTrigger value="certifications" className="flex-1 flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
@@ -1389,31 +1453,35 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Full Name</Label>
+                  <Label>Full Name *</Label>
                   <Input
                     placeholder="Enter full name"
                     className="mt-1"
+                    style={addEmpErrors.name ? ERROR_BORDER : undefined}
                     value={newEmployeeBasicInfo.name}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, name: e.target.value}))}
+                    onChange={e => { clearAddEmpError('name'); setNewEmployeeBasicInfo(p => ({...p, name: e.target.value})); }}
                   />
+                  <FieldError message={addEmpErrors.name} />
                 </div>
                 <div>
-                  <Label>Email Address</Label>
+                  <Label>Email Address *</Label>
                   <Input
                     type="email"
                     placeholder="employee@gymbios.com"
                     className="mt-1"
+                    style={addEmpErrors.email ? ERROR_BORDER : undefined}
                     value={newEmployeeBasicInfo.email}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, email: e.target.value}))}
+                    onChange={e => { clearAddEmpError('email'); setNewEmployeeBasicInfo(p => ({...p, email: e.target.value})); }}
                   />
+                  <FieldError message={addEmpErrors.email} />
                 </div>
                 <div>
-                  <Label>Role <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
+                  <Label>Role * <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
                   <Select
                     value={newEmployeeBasicInfo.role}
-                    onValueChange={v => setNewEmployeeBasicInfo(p => ({...p, role: v}))}
+                    onValueChange={v => { clearAddEmpError('role'); setNewEmployeeBasicInfo(p => ({...p, role: v})); }}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" style={addEmpErrors.role ? ERROR_BORDER : undefined}>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1422,6 +1490,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FieldError message={addEmpErrors.role} />
                 </div>
                 <div>
                   <Label>Department</Label>
@@ -1441,12 +1510,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   </Select>
                 </div>
                 <div>
-                  <Label>Branch</Label>
+                  <Label>Branch *</Label>
                   <Select
                     value={newEmployeeBasicInfo.branch}
-                    onValueChange={v => setNewEmployeeBasicInfo(p => ({...p, branch: v}))}
+                    onValueChange={v => { clearAddEmpError('branch'); setNewEmployeeBasicInfo(p => ({...p, branch: v})); }}
                   >
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1" style={addEmpErrors.branch ? ERROR_BORDER : undefined}>
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1455,6 +1524,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FieldError message={addEmpErrors.branch} />
                 </div>
                 <div>
                   <Label>Monthly Target ({currencyCode})</Label>
@@ -1515,10 +1585,12 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                     <Input
                       placeholder="e.g. john.trainer"
                       className="mt-1"
+                      style={addEmpErrors.appUsername ? ERROR_BORDER : undefined}
                       value={newEmployeeBasicInfo.appUsername || ''}
-                      onChange={e => setNewEmployeeBasicInfo(p => ({...p, appUsername: e.target.value}))}
+                      onChange={e => { clearAddEmpError('appUsername'); clearAddEmpError('appPassword'); setNewEmployeeBasicInfo(p => ({...p, appUsername: e.target.value})); }}
                       autoComplete="off"
                     />
+                    <FieldError message={addEmpErrors.appUsername} />
                   </div>
                   <div>
                     <Label>App Password</Label>
@@ -1527,8 +1599,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                         type={showNewEmpPassword ? 'text' : 'password'}
                         placeholder="Min 6 characters"
                         className="pr-10"
+                        style={addEmpErrors.appPassword ? ERROR_BORDER : undefined}
                         value={newEmployeeBasicInfo.appPassword || ''}
-                        onChange={e => setNewEmployeeBasicInfo(p => ({...p, appPassword: e.target.value}))}
+                        onChange={e => { clearAddEmpError('appPassword'); clearAddEmpError('appUsername'); setNewEmployeeBasicInfo(p => ({...p, appPassword: e.target.value})); }}
                         autoComplete="new-password"
                       />
                       <button
@@ -1539,6 +1612,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                         {showNewEmpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    <FieldError message={addEmpErrors.appPassword} />
                   </div>
                 </div>
               </div>
@@ -1556,13 +1630,17 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           </Tabs>
 
           <Separator className="my-3" />
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setShowAddEmployee(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateEmployee} disabled={!newEmployeeBasicInfo.name || !newEmployeeBasicInfo.email}>
-              Create Employee
-            </Button>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={() => setShowAddEmployee(false)}>
+                Cancel
+              </Button>
+              {/* Never silently disabled — clicking with gaps highlights exactly what's missing (BG_80). */}
+              <Button onClick={handleCreateEmployee} disabled={isCreatingEmployee}>
+                {isCreatingEmployee ? 'Creating...' : 'Create Employee'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

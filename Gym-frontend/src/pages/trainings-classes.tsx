@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { TimeSelect12h } from "../components/shared/time-select-12h";
 import { Label } from "../components/ui/label";
 import {
   Card,
@@ -132,6 +133,14 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   const formatTime = (value?: string | null) => {
     if (!value) return "";
     return value.length >= 5 ? value.slice(0, 5) : value;
+  };
+
+  // Display-only "HH:mm" → "1:30 PM". Stored values stay 24h (duration/slot logic use them).
+  const formatTime12h = (value?: string | null) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(value || "");
+    if (!m) return value || "";
+    const h = Number(m[1]);
+    return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h >= 12 ? "PM" : "AM"}`;
   };
 
   const calculateDurationMinutes = (start?: string, end?: string) => {
@@ -655,7 +664,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                         {new Date(`${classItem.date}T00:00:00`).toLocaleDateString('en-GB')}
                       </div>
                       <div className="text-gray-500">
-                        {classItem.startTime} - {classItem.endTime}
+                        {formatTime12h(classItem.startTime)} - {formatTime12h(classItem.endTime)}
                       </div>
                     </div>
                   </TableCell>
@@ -796,7 +805,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                     </div>
                     <div className="flex items-center space-x-2">
                       <Clock className="h-4 w-4 text-gray-400" />
-                      <span>{selectedClass.startTime} - {selectedClass.endTime}</span>
+                      <span>{formatTime12h(selectedClass.startTime)} - {formatTime12h(selectedClass.endTime)}</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <MapPin className="h-4 w-4 text-gray-400" />
@@ -1186,23 +1195,19 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start-time" className="block mb-2">Start Time</Label>
-                <Input
+                <TimeSelect12h
                   id="start-time"
-                  type="time"
                   value={newClassData.startTime}
-                  onChange={(e) => setNewClassData((prev) => ({ ...prev, startTime: e.target.value }))}
-                  className="border-primary/20 focus:border-primary"
+                  onChange={(v) => setNewClassData((prev) => ({ ...prev, startTime: v }))}
                 />
               </div>
               
               <div>
                 <Label htmlFor="end-time" className="block mb-2">End Time</Label>
-                <Input
+                <TimeSelect12h
                   id="end-time"
-                  type="time"
                   value={newClassData.endTime}
-                  onChange={(e) => setNewClassData((prev) => ({ ...prev, endTime: e.target.value }))}
-                  className="border-primary/20 focus:border-primary"
+                  onChange={(v) => setNewClassData((prev) => ({ ...prev, endTime: v }))}
                 />
               </div>
             </div>
@@ -1293,7 +1298,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 <div className="font-medium text-gray-900">{classToDelete.name}</div>
                 <div className="text-gray-600">{classToDelete.trainer.name}</div>
                 <div className="text-xs text-gray-500">
-                  {classToDelete.date} at {classToDelete.startTime}
+                  {classToDelete.date} at {formatTime12h(classToDelete.startTime)}
                 </div>
               </div>
 
