@@ -188,8 +188,20 @@ public class ReceiptVoucherService {
                 .orElseThrow(() -> new EntityNotFoundException("Receipt Voucher not found: " + id));
         assertNotSalesInvoicePayment(rv);
 
-        // Once a voucher is posted to the General Ledger (either auto-created from a
-        // real payment event, or a manual voucher that has since been marked
+        boolean amountChanged = req.getAmount() != null && rv.getAmount().compareTo(req.getAmount()) != 0;
+
+        // A voucher generated from a real payment (member receipt, POS sale, add-on)
+        // is only proof of that payment — the source record owns the amount. Letting
+        // it be edited here made the voucher, the receipt and the books disagree
+        // (BG_47, reopened: the earlier lock only covered vouchers with a
+        // "ReceiptVoucher" journal link, which module-created vouchers never have).
+        if (Boolean.TRUE.equals(rv.getSystemGenerated()) && amountChanged) {
+            throw new BusinessRuleViolationException("Receipt " + rv.getVoucherNo()
+                    + " was generated from a recorded payment, so its amount can't be changed. "
+                    + "Correct the original payment instead.");
+        }
+
+        // Once a manual voucher is posted to the General Ledger (marked
         // "completed"), its amount is the source the original journal entry was built
         // from. If the amount changes, that entry is now wrong — silently leaving it
         // in place would desync the voucher document from the books it's supposed to
@@ -198,7 +210,6 @@ public class ReceiptVoucherService {
         // correction date), same as reversing any other posted journal entry.
         var existingSource = journalEntrySourceRepository
                 .findBySourceEntityTypeAndSourceEntityId("ReceiptVoucher", rv.getId());
-        boolean amountChanged = req.getAmount() != null && rv.getAmount().compareTo(req.getAmount()) != 0;
 
         if (existingSource.isPresent() && amountChanged) {
             journalVoucherRepository.findByIdAndDeletedAtIsNull(existingSource.get().getJournalVoucherId())
@@ -337,6 +348,7 @@ public class ReceiptVoucherService {
         rv.setNotes(notes);
         rv.setStatus("completed");   // "completed" matches FinancialAnalyticsService query
         rv.setVoucherType("Receipt");
+        rv.setSystemGenerated(true);
         rv.setBranchId(branchId);
         if (branchId != null) {
             branchRepository.findById(branchId).map(Branch::getBranchName).ifPresent(rv::setBranch);

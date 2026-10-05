@@ -81,13 +81,15 @@ const COLORS = {
 
 const CHART_COLORS = ['#2B7A78', '#3B82F6', '#10B981', '#F59E0B', '#E63946', '#8B5CF6', '#EC4899'];
 
+// Labelled by the period each preset covers (see presetRange) — "Daily" used to read
+// as "today" although it shows the last 7 days, one point per day.
 const PRESETS: { type: Exclude<FilterType, 'custom'>; label: string }[] = [
-  { type: 'hourly', label: 'Hourly' },
-  { type: 'daily', label: 'Daily' },
-  { type: 'weekly', label: 'Weekly' },
-  { type: 'monthly', label: 'Monthly' },
-  { type: 'quarterly', label: 'Quarterly' },
-  { type: 'yearly', label: 'Yearly' },
+  { type: 'hourly', label: 'Today' },
+  { type: 'daily', label: 'Last 7 Days' },
+  { type: 'weekly', label: 'This Week' },
+  { type: 'monthly', label: 'This Month' },
+  { type: 'quarterly', label: 'This Quarter' },
+  { type: 'yearly', label: 'This Year' },
 ];
 
 /** Each preset is a window plus the trend-chart bucket size that suits it. */

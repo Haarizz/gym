@@ -126,4 +126,14 @@ public class ReceiptVoucher extends BaseEntity implements BranchAware {
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
 
+    // True when created by createVoucherFromModule() from a real payment (member
+    // receipt, POS sale, add-on, invoice). Its amount belongs to that source record,
+    // so it is read-only here (BG_47). Backfilled for older rows by V74.
+    // DEFAULT so Hibernate ddl-auto can add it to non-empty tables before Flyway runs.
+    @Column(name = "system_generated", nullable = false, columnDefinition = "boolean default false")
+    private Boolean systemGenerated = false;
+
+    public Boolean getSystemGenerated() { return systemGenerated; }
+    public void setSystemGenerated(Boolean systemGenerated) { this.systemGenerated = systemGenerated; }
+
 }

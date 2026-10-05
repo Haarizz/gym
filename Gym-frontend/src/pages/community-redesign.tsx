@@ -30,6 +30,7 @@ import {
   Flame,
   Heart,
   Image as ImageIcon,
+  Loader2,
   MapPin,
   Medal,
   MessageCircle,
@@ -265,6 +266,11 @@ export function Community() {
   // network than on localhost) resolving AFTER a newer local update — like the
   // optimistic post-create prepend — and clobbering it back to the stale list.
   const fetchRequestIdRef = useRef(0);
+  // BG_08: Post to Feed had no in-flight guard, so each extra click created another
+  // identical post. The ref blocks clicks that land before React re-renders; the
+  // state drives the disabled button / "Posting..." label.
+  const isSubmittingPostRef = useRef(false);
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
   const softButton = "border-0 bg-white text-slate-700 shadow-sm hover:bg-red-50 hover:text-red-600";
 
@@ -500,6 +506,8 @@ export function Community() {
   };
 
   const handleCreatePostOpenChange = (open: boolean) => {
+    // Don't let the dialog close (and the draft reset) while a post is still sending.
+    if (!open && isSubmittingPostRef.current) return;
     setIsCreatePostOpen(open);
 
     if (!open) {
@@ -560,6 +568,7 @@ export function Community() {
   };
 
   const handleCreatePost = () => {
+    if (isSubmittingPostRef.current) return;
     const topic = postDraft.topic.trim();
     const content = postDraft.content.trim();
 
@@ -582,6 +591,8 @@ export function Community() {
       payload.image_crop_zoom = postDraft.cropZoom;
     }
 
+    isSubmittingPostRef.current = true;
+    setIsSubmittingPost(true);
     api.post("/community/posts", payload)
       .then((response) => {
         const post = response.data;
@@ -618,6 +629,8 @@ export function Community() {
         setFeedPosts((currentPosts) => [normalized, ...currentPosts]);
         setSearchTerm("");
         setFeedFilter("all");
+        isSubmittingPostRef.current = false;
+        setIsSubmittingPost(false);
         setIsCreatePostOpen(false);
         resetPostDraft();
 
@@ -632,6 +645,10 @@ export function Community() {
         toast.error("Unable to publish community post.", {
           description: "Make sure you are logged in.",
         });
+      })
+      .finally(() => {
+        isSubmittingPostRef.current = false;
+        setIsSubmittingPost(false);
       });
   };
 
@@ -1469,12 +1486,16 @@ export function Community() {
 
             <div className="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" className={softButton} onClick={() => handleCreatePostOpenChange(false)}>
+                <Button variant="outline" className={softButton} onClick={() => handleCreatePostOpenChange(false)} disabled={isSubmittingPost}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreatePost}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Post to Feed
+                <Button onClick={handleCreatePost} disabled={isSubmittingPost}>
+                  {isSubmittingPost ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  {isSubmittingPost ? "Posting..." : "Post to Feed"}
                 </Button>
               </div>
             </div>

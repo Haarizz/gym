@@ -796,8 +796,11 @@ public class MemberService {
         registerFamilyAdult(fm, head, null);
     }
 
-    /** startDate: when their membership starts — null means the head's start date. */
-    private void registerFamilyAdult(FamilyMemberDTO fm, Member head, LocalDateTime startDate) {
+    /**
+     * startDate: when their membership starts — null means the head's start date.
+     * Public for FamilyPlanChangeService (staff renewals that add family members).
+     */
+    public void registerFamilyAdult(FamilyMemberDTO fm, Member head, LocalDateTime startDate) {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()
@@ -887,9 +890,12 @@ public class MemberService {
         createBilledToHeadRecord(fm, head, billedFee, null);
     }
 
-    /** startDate: when their membership starts — null means the head's start/join date. */
-    private void createBilledToHeadRecord(FamilyMemberDTO fm, Member head, BigDecimal billedFee,
-                                          LocalDateTime startDate) {
+    /**
+     * startDate: when their membership starts — null means the head's start/join date.
+     * Public for FamilyPlanChangeService (staff renewals that add family members).
+     */
+    public void createBilledToHeadRecord(FamilyMemberDTO fm, Member head, BigDecimal billedFee,
+                                         LocalDateTime startDate) {
         Member dep = new Member();
         dep.setName(fm.getName());
         dep.setEmail(fm.getEmail() != null && !fm.getEmail().isBlank()

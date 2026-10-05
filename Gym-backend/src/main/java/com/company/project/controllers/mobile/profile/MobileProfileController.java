@@ -5,6 +5,7 @@ import com.company.project.dto.mobile.profile.MobileProfileDTO;
 import com.company.project.dto.mobile.profile.MobileStaffContactUpdateDTO;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.StaffService;
+import com.company.project.services.mobile.profile.MemberPhotoSyncService;
 import com.company.project.services.mobile.profile.MobileProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,28 +17,45 @@ public class MobileProfileController {
 
     private final MobileProfileService mobileProfileService;
     private final StaffService staffService;
+    private final MemberPhotoSyncService memberPhotoSyncService;
 
-    public MobileProfileController(MobileProfileService mobileProfileService, StaffService staffService) {
+    public MobileProfileController(MobileProfileService mobileProfileService, StaffService staffService,
+                                   MemberPhotoSyncService memberPhotoSyncService) {
         this.mobileProfileService = mobileProfileService;
         this.staffService = staffService;
+        this.memberPhotoSyncService = memberPhotoSyncService;
     }
 
     @GetMapping("/me")
-    public ResponseEntity<MobileProfileDTO> getMyProfile(@AuthenticationPrincipal UserDetailsImpl principal) {
+    public ResponseEntity<MobileProfileDTO> getMyProfile(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestHeader(value = "X-Tenant-ID", required = false) String tenantSlug) {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(mobileProfileService.getProfileByUserId(principal.getId()));
+        MobileProfileDTO profile = mobileProfileService.getProfileByUserId(principal.getId());
+        // BG_82: heal members created before the photo was copied at purchase time —
+        // fills the selected gym's photo only when it has none.
+        if (principal.isGlobal()) {
+            memberPhotoSyncService.syncToGym(principal.getId(), tenantSlug, profile.getPhotoUrl(), true);
+        }
+        return ResponseEntity.ok(profile);
     }
 
     @PutMapping("/me")
     public ResponseEntity<MobileProfileDTO> updateMyProfile(
             @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestHeader(value = "X-Tenant-ID", required = false) String tenantSlug,
             @RequestBody MobileProfileDTO request) {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(mobileProfileService.updateProfile(principal.getId(), request));
+        MobileProfileDTO updated = mobileProfileService.updateProfile(principal.getId(), request);
+        // BG_82: a new photo also shows in the Member Directory of every gym they belong to.
+        if (principal.isGlobal() && request.getPhotoUrl() != null) {
+            memberPhotoSyncService.syncToAllGyms(principal.getId(), tenantSlug, updated.getPhotoUrl());
+        }
+        return ResponseEntity.ok(updated);
     }
 
     /**

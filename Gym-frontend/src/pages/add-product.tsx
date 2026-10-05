@@ -129,6 +129,9 @@ interface AddProductProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
 }
 
+// Must match ProductService.MAX_DESCRIPTION_LENGTH on the backend (BG_76).
+const MAX_DESCRIPTION_LENGTH = 1000;
+
 export function AddProduct({ onNavigate }: AddProductProps) {
   const { currencyCode } = useCurrency();
   const location = useLocation();
@@ -764,6 +767,13 @@ export function AddProduct({ onNavigate }: AddProductProps) {
       return;
     }
 
+    // Legacy products may already hold a longer description; maxLength only stops new typing.
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer`);
+      setActiveTab("basic-info");
+      return;
+    }
+
     if (!selectedCategory) {
       toast.error("Category is required");
       setActiveTab("basic-info");
@@ -1047,11 +1057,18 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   <Textarea
                     id="description"
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
+                    maxLength={MAX_DESCRIPTION_LENGTH}
                     placeholder="Enter product description"
                     rows={4}
                     className="input-focus"
                   />
+                  <p
+                    className="text-xs text-right"
+                    style={{ color: description.length >= MAX_DESCRIPTION_LENGTH ? '#dc2626' : '#64748b' }}
+                  >
+                    {description.length}/{MAX_DESCRIPTION_LENGTH}
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-2">

@@ -348,6 +348,9 @@ public class MobileDiscoveryController {
             memberRequest.setAddress(profile.getAddress());
             memberRequest.setHeight(profile.getHeight());
             memberRequest.setWeight(profile.getWeight());
+            // BG_82: the photo taken at registration lives on the global profile —
+            // copy it so the gym's Member Directory shows it too.
+            memberRequest.setPhotoUrl(profile.getPhotoUrl());
 
             // Set Membership details
             memberRequest.setMembershipPlanId(request.getPlanId());

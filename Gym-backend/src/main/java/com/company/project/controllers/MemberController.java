@@ -19,12 +19,15 @@ public class MemberController {
     private final MemberService memberService;
     private final MembershipFreezeService freezeService;
     private final LeadService leadService;
+    private final com.company.project.services.FamilyPlanChangeService familyPlanChangeService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
-                            LeadService leadService) {
+                            LeadService leadService,
+                            com.company.project.services.FamilyPlanChangeService familyPlanChangeService) {
         this.memberService = memberService;
         this.freezeService = freezeService;
         this.leadService = leadService;
+        this.familyPlanChangeService = familyPlanChangeService;
     }
 
     /**
@@ -207,6 +210,29 @@ public class MemberController {
             @PathVariable Long headId,
             @RequestBody com.company.project.dto.FamilyRenewalRequestDTO request) {
         return ResponseEntity.ok(freezeService.renewFamilyEndingFreeze(headId, request));
+    }
+
+    /**
+     * POST /api/members/{headId}/family-plan-change/quote
+     * What a Couple/Family renewal or plan change would do and cost — nothing is saved.
+     */
+    @PostMapping("/{headId}/family-plan-change/quote")
+    public ResponseEntity<com.company.project.dto.FamilyPlanChangeQuoteDTO> quoteFamilyPlanChange(
+            @PathVariable Long headId,
+            @RequestBody com.company.project.dto.FamilyPlanChangeRequestDTO request) {
+        return ResponseEntity.ok(familyPlanChangeService.quote(headId, request));
+    }
+
+    /**
+     * POST /api/members/{headId}/family-plan-change
+     * Renews the head on a plan and sets who is in their Couple/Family: keep, add new
+     * people, link existing members, detach the rest (BG_75).
+     */
+    @PostMapping("/{headId}/family-plan-change")
+    public ResponseEntity<MemberResponseDTO> applyFamilyPlanChange(
+            @PathVariable Long headId,
+            @RequestBody com.company.project.dto.FamilyPlanChangeRequestDTO request) {
+        return ResponseEntity.ok(familyPlanChangeService.apply(headId, request));
     }
 
     /**

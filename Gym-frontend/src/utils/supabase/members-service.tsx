@@ -117,6 +117,48 @@ export interface FamilyGroup {
   members: Member[];
 }
 
+// POST /members/{headId}/family-plan-change(/quote) — see FamilyPlanChangeService.
+export interface FamilyPlanChangeRequest {
+  plan_name: string;
+  /** DB ids of current family members to keep; omitted = keep all. */
+  keep_member_ids?: number[];
+  link_members?: { member_id: number; relationship: string; is_minor?: boolean }[];
+  new_members?: { name: string; relationship: string; is_minor: boolean; date_of_birth?: string; email?: string; phone?: string }[];
+  discount_amount?: number;
+  reward_pass_id?: number;
+  coupon_code?: string;
+  amount_received?: number;
+  payment_method?: string;
+  payment_breakdown?: PaymentSplitLeg[];
+  bank_account_code?: string;
+  bank_account_name?: string;
+  processed_by_staff_id?: number;
+}
+
+export interface FamilyPlanChangeQuoteLine {
+  member_id: number | null;
+  name: string;
+  relationship: string | null;
+  minor: boolean;
+  /** HEAD, KEEP, NEW, LINK or DETACH */
+  action: string;
+  /** HEAD (on the head's invoice), OWN (own receipt now) or NONE (not charged now) */
+  billing: string;
+  fee: number;
+  note: string | null;
+}
+
+export interface FamilyPlanChangeQuote {
+  plan_name: string;
+  plan_type: string;
+  family_head_billing: boolean;
+  lines: FamilyPlanChangeQuoteLine[];
+  subtotal: number;
+  reward_discount: number;
+  total_due: number;
+  notes: string[];
+}
+
 export interface MemberFilters {
   search?: string;
   status?: string;
@@ -315,6 +357,26 @@ class MembersService {
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${headId}/renew-family`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to renew family: ${response.status}`));
+    return response.json();
+  }
+
+  // BG_75: Couple/Family renewal or plan change with family members kept / added /
+  // linked / detached. quote = dry run (same validation + pricing), nothing saved.
+  async quoteFamilyPlanChange(headId: string, data: FamilyPlanChangeRequest): Promise<FamilyPlanChangeQuote> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${headId}/family-plan-change/quote`,
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to price family change: ${response.status}`));
+    return response.json();
+  }
+
+  async applyFamilyPlanChange(headId: string, data: FamilyPlanChangeRequest): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${headId}/family-plan-change`,
       { method: 'POST', body: JSON.stringify(data) }
     );
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to renew family: ${response.status}`));

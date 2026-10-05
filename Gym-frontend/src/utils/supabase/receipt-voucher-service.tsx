@@ -30,6 +30,8 @@ export interface ReceiptVoucher {
   updatedAt?: string;
   /** Id of the journal entry this voucher posted to the ledger, or undefined if not yet posted. */
   journalVoucherId?: string;
+  /** Generated from a real payment (member receipt, POS, add-on, invoice) — amount is read-only. */
+  systemGenerated: boolean;
 }
 
 export interface ReceiptVoucherCreateRequest {
@@ -86,6 +88,7 @@ function mapReceiptVoucher(r: any): ReceiptVoucher {
     updatedAt: r.updated_at ?? r.updatedAt,
     journalVoucherId:
       r.journal_voucher_id != null ? String(r.journal_voucher_id) : undefined,
+    systemGenerated: Boolean(r.system_generated ?? r.systemGenerated),
   };
 }
 

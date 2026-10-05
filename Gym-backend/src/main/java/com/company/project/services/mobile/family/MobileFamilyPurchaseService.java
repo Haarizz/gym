@@ -330,6 +330,7 @@ public class MobileFamilyPurchaseService {
         m.setAddress(profile.getAddress());
         m.setHeight(profile.getHeight());
         m.setWeight(profile.getWeight());
+        m.setPhotoUrl(profile.getPhotoUrl()); // BG_82: registration photo → gym's Member Directory
 
         m.setMembershipPlanId(plan.getId());
         m.setMembershipType(plan.getPlanType());

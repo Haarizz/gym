@@ -977,6 +977,30 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       return;
     }
 
+    // Emergency contact is mandatory for new members (BG_71). Edit mode is left
+    // lenient so legacy members saved without one can still be updated.
+    if (!isEditMode) {
+      const emergencyName = formData.emergencyContactName.trim();
+      const emergencyPhoneDigits = formData.emergencyContactPhone.replace(/\D/g, '');
+      const invalidField = !emergencyName
+        ? 'emergencyContactName'
+        : (emergencyPhoneDigits.length < 7 || emergencyPhoneDigits.length > 15)
+          ? 'emergencyContactPhone'
+          : null;
+      if (invalidField) {
+        toast.error('Please fill in the emergency contact', {
+          description: invalidField === 'emergencyContactName'
+            ? 'Emergency contact name is required.'
+            : 'Enter a valid emergency contact number (7–15 digits).',
+          duration: 4000
+        });
+        const el = document.getElementById(invalidField);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el?.focus({ preventScroll: true });
+        return;
+      }
+    }
+
     // Joining/Start Date must be explicit — leaving them blank previously let the
     // backend silently default Start Date to "now" and still compute a real expiry
     // date from it, with no indication to the user that a substitution happened.

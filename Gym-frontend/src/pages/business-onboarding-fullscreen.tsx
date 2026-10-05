@@ -8,6 +8,7 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import {
   X,
+  LogIn,
   Building2,
   MapPin,
   Settings,
@@ -166,10 +167,12 @@ export function BusinessOnboardingFullscreen({
   open,
   onOpenChange,
   selectedPlan,
+  onSignIn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedPlan: string | null;
+  onSignIn?: () => void;
 }) {
   const [step, setStep] = useState<number>(1);
   const totalSteps = 4;
@@ -579,13 +582,25 @@ export function BusinessOnboardingFullscreen({
                     {stepConfig[step - 1].description}
                   </p>
                 </div>
-                <button
-                  onClick={() => onOpenChange(false)}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg ob-close-btn"
-                  aria-label="Close onboarding"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-3">
+                  {onSignIn && (
+                    <button
+                      type="button"
+                      onClick={onSignIn}
+                      className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      Already a customer? Sign in
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onOpenChange(false)}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg ob-close-btn"
+                    aria-label="Close onboarding"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Content area */}

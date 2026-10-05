@@ -128,6 +128,7 @@ import { PendingApproval } from "./pages/pending-approval";
 import { PlatformLeads } from "./pages/platform-leads";
 import { PlatformFollowUp } from "./pages/platform-follow-up";
 import { usePermissions, hasPermission } from "./utils/permissions";
+import { membersService } from "./utils/supabase/members-service";
 
 import ErrorBoundary from "./components/shared/error-boundary";
 import {
@@ -857,6 +858,35 @@ export default function App() {
   }, [visibleMenuItems]);
   const isMemberRole = roles.some(r => r.toLowerCase().replace("role_", "") === "member");
 
+  // Red dot on the Approvals sidebar item while mobile cash/credit purchases are
+  // waiting on reception. Re-checked on navigation, branch switch, a 60s poll, and
+  // the 'approvals_updated' event the Approvals page fires after approve/reject.
+  const canSeeApprovals = isAuthenticated && !isGymbiosAdmin && permissions.includes("MEMBERS_APPROVE");
+  const [hasPendingApprovals, setHasPendingApprovals] = useState(false);
+  useEffect(() => {
+    if (!canSeeApprovals) {
+      setHasPendingApprovals(false);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await membersService.getPendingApprovals({ page: 1, limit: 1 });
+        if (!cancelled) setHasPendingApprovals((res.pagination?.total ?? res.members?.length ?? 0) > 0);
+      } catch {
+        // Leave the last known state; a transient failure shouldn't flicker the dot.
+      }
+    };
+    check();
+    const interval = window.setInterval(check, 60000);
+    window.addEventListener('approvals_updated', check);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('approvals_updated', check);
+    };
+  }, [canSeeApprovals, activeBranchId, location.pathname]);
+
   // Blocks direct URL navigation to a gated page too — sidebar hiding alone
   // doesn't stop typing e.g. /payroll-employees straight into the address bar.
   const requiredRoutePermission = routePermissionMap[location.pathname];
@@ -912,6 +942,31 @@ export default function App() {
     initializeAuth();
   }, []);
 
+  // BG_74: the login / public plans screen used to render at whatever URL the browser
+  // was on (e.g. qa.gymbios.com/journal-voucher after a session expired), exposing
+  // internal page paths on a public page. Logged out → always /login (remembering
+  // where they were so login can return them there); logged in on /login → dashboard.
+  const RETURN_TO_KEY = 'gymbios_return_to';
+  useEffect(() => {
+    if (isLoading || isEmergencyRoute) return;
+    const here = location.pathname;
+    if (!isAuthenticated) {
+      if (here !== '/login') {
+        if (here !== '/' && here !== '/dashboard') {
+          try { sessionStorage.setItem(RETURN_TO_KEY, here + location.search); } catch { /* ignore */ }
+        }
+        navigate('/login', { replace: true });
+      }
+    } else if (here === '/login') {
+      let returnTo: string | null = null;
+      try {
+        returnTo = sessionStorage.getItem(RETURN_TO_KEY);
+        sessionStorage.removeItem(RETURN_TO_KEY);
+      } catch { /* ignore */ }
+      navigate(returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login') ? returnTo : '/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, isEmergencyRoute, location.pathname, location.search, navigate]);
+
   // Authentication handlers
   const handleLogin = useCallback(
     async (email: string, password: string, rememberMe: boolean) => {
@@ -944,16 +999,16 @@ export default function App() {
   const handleLogout = useCallback(async () => {
     try {
       await authService.signOut();
-      setIsAuthenticated(false);
-      setUser(null);
-      navigate("/dashboard");
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout on error
-      setIsAuthenticated(false);
-      setUser(null);
-      navigate("/dashboard");
     }
+    // Deliberate logout: next login lands on the dashboard, not the last page.
+    // Navigate first so the redirect effect never records the page being left.
+    try { sessionStorage.removeItem('gymbios_return_to'); } catch { /* ignore */ }
+    navigate("/login", { replace: true });
+    setIsAuthenticated(false);
+    setUser(null);
   }, [navigate]);
 
   const toggleExpanded = useCallback((itemId: string) => {
@@ -1376,6 +1431,14 @@ export default function App() {
                   >
                     <item.icon className="mr-3 h-4 w-4 sidebar-icon" />
                     {item.title}
+                    {item.id === 'approvals' && hasPendingApprovals && (
+                      <span
+                        aria-label="Pending approvals"
+                        title="Pending approvals"
+                        className="ml-auto rounded-full"
+                        style={{ width: 8, height: 8, backgroundColor: '#ef4444', boxShadow: '0 0 0 2px rgba(255,255,255,0.35)', flexShrink: 0 }}
+                      />
+                    )}
                     {item.subItems && (
                       <div className="ml-auto">
                         <ChevronRight

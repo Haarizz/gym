@@ -22,7 +22,9 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(nullable = false)
     private String name;
 
-    @Column(unique = true, nullable = false)
+    // Nullable: family/couple dependents may have no email (V73, BG_81). Primary
+    // members still require one — enforced by the Add Member form.
+    @Column(unique = true)
     private String email;
 
     private String phone;

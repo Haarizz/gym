@@ -193,6 +193,7 @@ export function ReceiptVoucher() {
         cashierName: '',
         transactionId: rv.transactionId ?? '',
         journalVoucherId: rv.journalVoucherId,
+        systemGenerated: rv.systemGenerated,
       })));
     } catch (err: any) {
       toast.error(err.message || 'Failed to load receipt vouchers');
@@ -204,6 +205,15 @@ export function ReceiptVoucher() {
   useEffect(() => { loadReceipts(); }, [loadReceipts]);
 
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  // BG_47: vouchers generated from a real payment are proof of that payment, so their
+  // amount is read-only (the backend rejects changes too); so is anything already
+  // posted to the ledger.
+  const amountLocked = !!selectedReceipt?.systemGenerated || !!selectedReceipt?.journalVoucherId;
+  const amountLockReason = selectedReceipt?.systemGenerated
+    ? `Amount is locked — this voucher was generated from a recorded payment${selectedReceipt?.reference ? ` (${selectedReceipt.reference})` : ''}. Correct the original payment instead.`
+    : selectedReceipt?.journalVoucherId
+      ? `Amount is locked — this voucher is already posted to the general ledger (JV #${selectedReceipt.journalVoucherId}).`
+      : '';
   const [showAddReceipt, setShowAddReceipt] = useState(false);
   const [showReceiptDetails, setShowReceiptDetails] = useState(false);
   const [showEditReceipt, setShowEditReceipt] = useState(false);
@@ -1358,21 +1368,22 @@ export function ReceiptVoucher() {
                     placeholder="0.00"
                     value={editForm.amount}
                     onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
-                    disabled={!!selectedReceipt?.journalVoucherId}
+                    disabled={amountLocked}
+                    readOnly={amountLocked}
                   />
-                  {!!selectedReceipt?.journalVoucherId && (
+                  {amountLocked && (
                     <p className="text-xs text-muted-foreground">
-                      Amount is locked — this voucher is already posted to the general ledger (JV #{selectedReceipt.journalVoucherId}).
+                      {amountLockReason}
                     </p>
                   )}
                 </div>
               </div>
 
-              {selectedReceipt?.journalVoucherId ? (
+              {amountLocked ? (
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
                   <p className="text-sm font-medium">Payment allocation is locked</p>
                   <p className="text-xs text-muted-foreground">
-                    This voucher is already posted to the general ledger (JV #{selectedReceipt.journalVoucherId}) — the payment method and amount can no longer be changed here.
+                    {amountLockReason} The payment method and amount can't be changed here.
                   </p>
                   <p className="text-sm mt-2">{editReceiptPaymentManager.summary ?? '—'}</p>
                 </div>

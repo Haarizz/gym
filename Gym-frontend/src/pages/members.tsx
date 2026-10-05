@@ -75,6 +75,8 @@ import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
 import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
+import { FamilyRenewalPanel, type FamilyPanelState } from '../components/members/FamilyRenewalPanel';
+import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 
 const membershipPlans = [
@@ -775,7 +777,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       member?.photo_url ||
       member?.profile_photo ||
       member?.image;
-    if (explicit) return explicit;
+    if (explicit) return resolveBackendImageUrl(explicit) as string; // mobile uploads are /uploads/… paths (BG_82)
     const seed = String(getMemberId(member) || member?.name || "");
     const hash = seed.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
     return avatarPool[hash % avatarPool.length];
@@ -937,9 +939,20 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
   };
 
+  // BG_75: Couple/Family renewals (and switching into or out of one) go through the
+  // family flow, which lets staff choose who is in the membership. Not for a member
+  // who is themselves someone's dependent — they renew from their head or alone.
+  const [familyPanel, setFamilyPanel] = useState<FamilyPanelState | null>(null);
+  const isFamilyFlow = !!selectedMemberForRenewal && !!selectedNewPlan
+    && !selectedMemberForRenewal.family_head_id
+    && !isBilledToGuardian(selectedMemberForRenewal)
+    && (/^(couple|family)$/i.test(selectedNewPlan.planType || '') || !!selectedMemberForRenewal.is_family_head);
+  useEffect(() => { setFamilyPanel(null); }, [selectedMemberForRenewal?.id, selectedNewPlan?.id]);
+
   // Plan price minus the manual discount — what's sent as membership_fee; the backend
   // takes any Reward Pass / coupon discount off this itself.
   const calculateFeeBeforeReward = () => {
+    if (isFamilyFlow) return familyPanel?.quote ? Number(familyPanel.quote.subtotal) : 0;
     if (!selectedNewPlan) return 0;
 
     let total = selectedNewPlan.price;
@@ -951,7 +964,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return Math.round(Math.max(0, total) * 100) / 100;
   };
 
-  const calculateRewardDiscount = () => selectionDiscount(renewalReward, calculateFeeBeforeReward());
+  // Family flow: the server's quote already prices the reward on the head's own fee.
+  const calculateRewardDiscount = () => isFamilyFlow
+    ? Number(familyPanel?.quote?.reward_discount ?? 0)
+    : selectionDiscount(renewalReward, calculateFeeBeforeReward());
 
   // What the member actually pays now (after any Reward Pass / coupon).
   const calculateTotalAmount = () =>
@@ -971,6 +987,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
 
     const totalAmount = calculateTotalAmount();
+
+    if (isFamilyFlow && (!familyPanel?.quote || familyPanel.error || familyPanel.loading)) {
+      toast.error('Family details incomplete', {
+        description: familyPanel?.error || 'Wait for the family total to load, then try again.',
+      });
+      return;
+    }
 
     if (!renewalPaymentManager.settleable) {
       toast.error('Payment Incomplete', {
@@ -1045,7 +1068,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       // (Long), not the human-readable "MBR-..." member_id — getMemberId()
       // prefers the latter for display purposes, so it can't be used here.
       const memberId = selectedMemberForRenewal.id;
-      if (isBilledToGuardian(selectedMemberForRenewal)) {
+      if (isFamilyFlow && familyPanel?.quote) {
+        // BG_75: renew the head and set who is in the Couple/Family in one call; the
+        // backend splits the payment across the head's and any own-paying adults' receipts.
+        await membersService.applyFamilyPlanChange(String(memberId), {
+          plan_name: selectedNewPlan.name,
+          ...familyPanel.composition,
+          discount_amount: discountAmount && parseFloat(discountAmount) > 0 ? parseFloat(discountAmount) : undefined,
+          ...selectionRequestFields(renewalReward),
+          amount_received: amountReceived,
+          payment_method: effectivePaymentMethod,
+          payment_breakdown: paymentBreakdown,
+          bank_account_code: bankAccountCode,
+          bank_account_name: bankAccountName,
+          processed_by_staff_id: renewalProcessedByStaffId ? Number(renewalProcessedByStaffId) : undefined,
+        });
+      } else if (isBilledToGuardian(selectedMemberForRenewal)) {
         // Same payment inputs collected above for the regular renewal path
         // (amountReceived/effectivePaymentMethod/paymentBreakdown) apply here
         // too — whatever wasn't collected now folds onto the guardian's due.
@@ -2165,6 +2203,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             </Card>
           )}
 
+          {/* Couple/Family members (BG_75) */}
+          {isFamilyFlow && selectedMemberForRenewal && selectedNewPlan && (
+            <FamilyRenewalPanel
+              key={`${selectedMemberForRenewal.id}-${selectedNewPlan.id}`}
+              head={selectedMemberForRenewal}
+              planName={selectedNewPlan.name}
+              planType={selectedNewPlan.planType}
+              discountAmount={discountAmount ? parseFloat(discountAmount) || 0 : 0}
+              reward={selectionRequestFields(renewalReward)}
+              onStateChange={setFamilyPanel}
+            />
+          )}
+
           {/* Step 3: Payment Section */}
           {selectedNewPlan && (
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
@@ -2183,8 +2234,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 {/* Plan Amount */}
                 <div className="bg-gradient-light p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-muted-foreground">Plan Amount:</span>
-                    <span className="text-2xl font-bold text-primary"><CurrencyGlyph /> {selectedNewPlan.price}</span>
+                    <span className="text-muted-foreground">{isFamilyFlow ? 'Family Total:' : 'Plan Amount:'}</span>
+                    <span className="text-2xl font-bold text-primary">
+                      <CurrencyGlyph /> {isFamilyFlow
+                        ? (familyPanel?.quote
+                          ? (Number(familyPanel.quote.subtotal) + (discountAmount ? parseFloat(discountAmount) || 0 : 0)).toFixed(2)
+                          : '—')
+                        : selectedNewPlan.price}
+                    </span>
                   </div>
                   {((discountAmount && parseFloat(discountAmount) > 0) || calculateRewardDiscount() > 0) && (
                     <>

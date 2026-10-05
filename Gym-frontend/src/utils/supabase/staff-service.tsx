@@ -1,5 +1,6 @@
 import { authService } from './auth-service';
 import api from '../../api/axiosConfig';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 const backendOrigin = backendBaseUrl.replace(/\/api\/?$/, "");
@@ -182,7 +183,7 @@ class StaffService {
       `${backendBaseUrl}/staff`,
       { method: 'POST', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to create staff member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to create staff member: ${response.status}`));
     return response.json();
   }
 
