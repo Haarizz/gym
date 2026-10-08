@@ -24,10 +24,8 @@ import {
   Apple,
   ArrowRight,
   Shield,
-  X,
 } from "lucide-react";
 import { toast } from "sonner@2.0.3";
-import { GymBiosPricing } from "./gymbios-pricing";
 
 interface LoginProps {
   onLogin: (
@@ -45,7 +43,6 @@ export function Login({ onLogin }: LoginProps) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
   const [errors, setErrors] = useState({
     email: "",
     password: "",
@@ -480,11 +477,9 @@ export function Login({ onLogin }: LoginProps) {
               <p className="text-center text-sm text-gray-600 w-full">
                 New to GymBios?{" "}
                 <Button
-                  type="button"
                   variant="link"
                   size="sm"
                   className="text-blue-600 hover:text-blue-700 p-0 h-auto"
-                  onClick={() => setShowPricing(true)}
                 >
                   Request a demo
                 </Button>
@@ -521,23 +516,6 @@ export function Login({ onLogin }: LoginProps) {
           </div>
         </div>
       </div>
-
-      {/* Request a Demo - GymBios Pricing Overlay */}
-      {showPricing && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPricing(false)}
-            className="fixed top-4 right-4 z-[60] h-9 w-9 p-0 rounded-full bg-white shadow-md border-gray-200 hover:bg-gray-50"
-            aria-label="Close pricing"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          <GymBiosPricing />
-        </div>
-      )}
     </div>
   );
 }

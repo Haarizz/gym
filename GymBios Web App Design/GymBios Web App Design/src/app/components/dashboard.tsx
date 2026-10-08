@@ -91,13 +91,15 @@ import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfM
 import { RevenueDashboard } from './dashboard/RevenueDashboard';
 
 // Types
-interface QuickAction {
+interface SubscriptionCard {
   id: string;
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
-  color: string;
-  onClick: () => void;
+  count: number;
+  collected: number;
+  accent: string;
+  iconBg: string;
+  navigateTo: string;
+  navParams?: Record<string, any>;
 }
 
 // Interface for navigation with params
@@ -348,88 +350,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   }, [searchResults, handleMemberSelect]);
 
-  // Quick Actions with GymBios gradient theme
-  const quickActions: QuickAction[] = [
-    {
-      id: 'add-member',
-      title: 'Add Member',
-      icon: UserPlus,
-      description: 'Register new member',
-      color: 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('add-member');
-          toast.success('Navigating to Add Member form', {
-            description: 'Register a new gym member',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'member-receipt',
-      title: 'Member Receipt',
-      icon: Receipt,
-      description: 'Generate receipt',
-      color: 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('members', { tab: 'receipts' });
-          toast.success('Opening Member Receipts', {
-            description: 'View and generate member receipts',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'renew-upgrade',
-      title: 'Renew / Upgrade',
-      icon: RotateCcw,
-      description: 'Member renewals',
-      color: 'bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('members', { tab: 'renewals' });
-          toast.success('Opening Renewals & Upgrades', {
-            description: 'Manage membership renewals and upgrades',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'pos',
-      title: 'POS',
-      icon: ShoppingCart,
-      description: 'Point of Sale',
-      color: 'bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('point-of-sale');
-          toast.success('Opening Point of Sale', {
-            description: 'Process sales and transactions',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'schedule-class',
-      title: 'Schedule Class',
-      icon: Calendar,
-      description: 'Create class schedule',
-      color: 'bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('trainings-classes');
-          toast.success('Opening Class Scheduler', {
-            description: 'Create and manage class schedules',
-            duration: 2000,
-          });
-        }
-      }
-    }
+  // Subscription summary cards — mock values, navigates to filtered records
+  const subscriptionCards: SubscriptionCard[] = [
+    { id: 'sub-new',      title: 'Subscriptions\n(New)',      count: 24,  collected: 12450, accent: '#327F74', iconBg: 'bg-teal-50',   navigateTo: 'members',        navParams: { tab: 'all', filter: 'new' } },
+    { id: 'sub-renew',    title: 'Subscriptions\n(Renew)',    count: 18,  collected: 9200,  accent: '#2B7A78', iconBg: 'bg-cyan-50',   navigateTo: 'members',        navParams: { tab: 'renewals' } },
+    { id: 'sub-upgrade',  title: 'Subscriptions\n(Upgrades)', count: 7,   collected: 5800,  accent: '#4BA3A0', iconBg: 'bg-emerald-50',navigateTo: 'members',        navParams: { tab: 'renewals', mode: 'upgrade' } },
+    { id: 'sub-addons',   title: 'Subscriptions\n(Add-Ons)',  count: 31,  collected: 3750,  accent: '#1D6A65', iconBg: 'bg-green-50',  navigateTo: 'memberships',    navParams: { tab: 'add-ons' } },
+    { id: 'day-pass',     title: 'Day-Pass',                  count: 43,  collected: 6450,  accent: '#E63946', iconBg: 'bg-red-50',    navigateTo: 'point-of-sale',  navParams: { filter: 'day-pass' } },
   ];
 
   // Search members function
@@ -704,28 +631,36 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
         {/* Overview Tab Content */}
         <TabsContent value="overview" className="space-y-6 mt-0">
-          {/* Quick Action Tabs */}
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {quickActions.map((action) => (
-            <Button
-              key={action.id}
-              onClick={action.onClick}
-              className={cn(
-                "h-auto p-4 flex flex-col items-center space-y-2 text-white",
-                action.color
-              )}
-            >
-              <action.icon className="h-6 w-6" />
-              <div className="text-center">
-                <p className="font-medium text-sm">{action.title}</p>
-                <p className="text-xs opacity-90">{action.description}</p>
-              </div>
-            </Button>
-          ))}
-        </div>
-      </div>
+          {/* Subscription Summary Cards */}
+          <div className="bg-card border rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Today's Subscriptions & Passes</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {subscriptionCards.map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => {
+                    if (onNavigate) onNavigate(card.navigateTo, card.navParams);
+                  }}
+                  className="group text-left rounded-xl border bg-white p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                  style={{ '--ring-color': card.accent } as React.CSSProperties}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", card.iconBg)}>
+                      <CreditCard className="h-4 w-4" style={{ color: card.accent }} />
+                    </div>
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${card.accent}18`, color: card.accent }}>
+                      {card.count}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold leading-snug text-foreground whitespace-pre-line mb-2">{card.title}</p>
+                  <p className="text-[11px] text-muted-foreground">Collected</p>
+                  <p className="text-sm font-bold" style={{ color: card.accent }}>
+                    AED {card.collected.toLocaleString()}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
 
       {/* KPI Summary Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

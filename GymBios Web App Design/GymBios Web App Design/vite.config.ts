@@ -16,25 +16,8 @@ function figmaAssetResolver() {
   }
 }
 
-// Figma Make exports import packages with a pinned version, e.g.
-// "@radix-ui/react-progress@1.1.2" or "sonner@2.0.3". Strip the version so Vite
-// resolves the installed package instead.
-function versionedImportResolver() {
-  const versioned = /^((?:@[^/@]+\/)?[^/@]+)@\d[^/]*(\/.*)?$/
-  return {
-    name: 'versioned-import-resolver',
-    enforce: 'pre' as const,
-    async resolveId(id: string, importer: string | undefined) {
-      const m = id.match(versioned)
-      if (!m) return null
-      return this.resolve(m[1] + (m[2] ?? ''), importer, { skipSelf: true })
-    },
-  }
-}
-
 export default defineConfig({
   plugins: [
-    versionedImportResolver(),
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
     // Tailwind is not being actively used – do not remove them
