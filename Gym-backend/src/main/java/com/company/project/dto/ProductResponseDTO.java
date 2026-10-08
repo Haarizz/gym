@@ -36,6 +36,10 @@ public class ProductResponseDTO {
     private BigDecimal sellingPrice;
     private BigDecimal costPrice;
     private BigDecimal taxRate;
+    private Boolean useDefaultTax;
+    private Boolean allowDiscount;
+    private BigDecimal maxDiscountPercent;
+    private BigDecimal purchaseDiscountPercent;
     private String supplier;
     private Integer totalStock;
     private BigDecimal inventoryValue;
@@ -74,6 +78,10 @@ public class ProductResponseDTO {
         dto.setSellingPrice(p.getSellingPrice());
         dto.setCostPrice(p.getCostPrice());
         dto.setTaxRate(p.getTaxRate());
+        dto.setUseDefaultTax(!Boolean.FALSE.equals(p.getUseDefaultTax()));
+        dto.setAllowDiscount(!Boolean.FALSE.equals(p.getAllowDiscount()));
+        dto.setMaxDiscountPercent(p.getMaxDiscountPercent() != null ? p.getMaxDiscountPercent() : BigDecimal.ZERO);
+        dto.setPurchaseDiscountPercent(p.getPurchaseDiscountPercent() != null ? p.getPurchaseDiscountPercent() : BigDecimal.ZERO);
         dto.setSupplier(p.getSupplier());
         dto.setCreatedAt(p.getCreatedAt());
         dto.setUpdatedAt(p.getUpdatedAt());
@@ -193,6 +201,14 @@ public class ProductResponseDTO {
 
     public BigDecimal getTaxRate() { return taxRate; }
     public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
+    public Boolean getUseDefaultTax() { return useDefaultTax; }
+    public void setUseDefaultTax(Boolean v) { this.useDefaultTax = v; }
+    public Boolean getAllowDiscount() { return allowDiscount; }
+    public void setAllowDiscount(Boolean v) { this.allowDiscount = v; }
+    public BigDecimal getMaxDiscountPercent() { return maxDiscountPercent; }
+    public void setMaxDiscountPercent(BigDecimal v) { this.maxDiscountPercent = v; }
+    public BigDecimal getPurchaseDiscountPercent() { return purchaseDiscountPercent; }
+    public void setPurchaseDiscountPercent(BigDecimal v) { this.purchaseDiscountPercent = v; }
 
     public String getSupplier() { return supplier; }
     public void setSupplier(String supplier) { this.supplier = supplier; }

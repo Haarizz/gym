@@ -75,4 +75,34 @@ public class WalletService {
 
         return getWallet(memberId);
     }
+
+    /**
+     * Puts money back on a member's wallet — e.g. a POS return of goods that were paid from
+     * the wallet. As with debit, the ledger side is posted by the document itself (the
+     * refund's Wallet leg credits Reward Wallet Liability); this keeps balance and history.
+     */
+    public WalletResponseDTO credit(String memberId, BigDecimal amount, String sourceType, Long sourceId, String remarks) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Credit amount must be positive");
+        }
+        Member member = memberRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+
+        BigDecimal current = member.getWalletBalance() != null ? member.getWalletBalance() : BigDecimal.ZERO;
+        BigDecimal newBalance = current.add(amount);
+        member.setWalletBalance(newBalance);
+        memberRepository.save(member);
+
+        WalletTransaction tx = new WalletTransaction();
+        tx.setMemberId(memberId);
+        tx.setType("CREDIT");
+        tx.setAmount(amount);
+        tx.setBalanceAfter(newBalance);
+        tx.setSourceType(sourceType);
+        tx.setSourceId(sourceId);
+        tx.setRemarks(remarks);
+        walletTransactionRepository.save(tx);
+
+        return getWallet(memberId);
+    }
 }

@@ -91,6 +91,7 @@ export function SalesInvoicePage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | 'ALL'>('ALL');
   const [typeFilter, setTypeFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'' | 'MANUAL' | 'POS'>('');
   const [period, setPeriod] = useState<Period>('ALL');
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'invoiceDate', dir: 'desc' });
   const [page, setPage] = useState(1);
@@ -161,6 +162,7 @@ export function SalesInvoicePage() {
     const rows = invoices.filter(i => {
       if (statusFilter !== 'ALL' && displayStatus(i) !== statusFilter) return false;
       if (typeFilter && i.customerType !== typeFilter) return false;
+      if (sourceFilter && i.source !== sourceFilter) return false;
       if (range && (i.invoiceDate < range[0] || i.invoiceDate > range[1])) return false;
       if (!q) return true;
       return [i.invoiceNumber, i.customerName, i.customerPhone, i.reference, i.salesperson, ...i.items.map(x => x.productName)]
@@ -173,9 +175,9 @@ export function SalesInvoicePage() {
       return (sort.dir === 'asc' ? c : -c) || b.id - a.id;
     });
     return rows;
-  }, [invoices, search, statusFilter, typeFilter, period, sort]);
+  }, [invoices, search, statusFilter, typeFilter, sourceFilter, period, sort]);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, period]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, sourceFilter, period]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -385,6 +387,8 @@ export function SalesInvoicePage() {
                 <NativeSelect value={statusFilter} onChange={v => setStatusFilter(v as DisplayStatus | 'ALL')} options={STATUS_FILTERS} label="Status" />
                 <NativeSelect value={typeFilter} onChange={setTypeFilter} label="Customer type"
                   options={[{ value: '', label: 'All Customers' }, { value: 'MEMBER', label: 'Members' }, { value: 'WALK_IN', label: 'Walk-in' }]} />
+                <NativeSelect value={sourceFilter} onChange={v => setSourceFilter(v as '' | 'MANUAL' | 'POS')} label="Source"
+                  options={[{ value: '', label: 'All Sources' }, { value: 'MANUAL', label: 'Back office' }, { value: 'POS', label: 'POS' }]} />
               </div>
             </div>
 
@@ -417,7 +421,10 @@ export function SalesInvoicePage() {
                       <tr key={inv.id} className={cx(styles.row, inv.id === previewId && styles.rowSelected)} onClick={() => openPreview(inv)}>
                         <td className={cx(styles.center, styles.muted, styles.mono)}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{inv.invoiceNumber}</div>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {inv.invoiceNumber}
+                            {inv.source === 'POS' && <span className={cx(styles.pill, styles.pillBlue)} style={{ fontSize: 10, padding: '0 6px' }}>POS</span>}
+                          </div>
                           {inv.reference && <div className={cx(styles.tiny, styles.muted)}>Ref: {inv.reference}</div>}
                         </td>
                         <td>
@@ -485,7 +492,7 @@ export function SalesInvoicePage() {
                 return (
                   <button key={inv.id} type="button" className={styles.mobileCard} onClick={() => openPreview(inv)}>
                     <div className={styles.cardLine}>
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{inv.invoiceNumber}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{inv.invoiceNumber}{inv.source === 'POS' ? ' · POS' : ''}</span>
                       <span className={cx(styles.pill, st.cls)}>{st.label}</span>
                     </div>
                     <div className={cx(styles.tiny, styles.muted)} style={{ margin: '2px 0 8px' }}>{displayDate(inv.invoiceDate)}</div>

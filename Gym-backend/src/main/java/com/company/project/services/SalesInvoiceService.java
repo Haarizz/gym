@@ -72,6 +72,14 @@ public class SalesInvoiceService {
     private final FinancialEventService financialEventService;
     private final ReceiptVoucherService receiptVoucherService;
 
+    /** Optional (absent in unit tests): branch tax policy — Settings › Tax Configuration. */
+    private com.company.project.services.TaxPolicyService taxPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTaxPolicy(@org.springframework.context.annotation.Lazy com.company.project.services.TaxPolicyService taxPolicy) {
+        this.taxPolicy = taxPolicy;
+    }
+
     public SalesInvoiceService(SalesInvoiceRepository invoiceRepository,
                                SalesInvoiceItemRepository itemRepository,
                                ProductRepository productRepository,
@@ -199,6 +207,10 @@ public class SalesInvoiceService {
 
     public SalesInvoiceResponseDTO recordPayment(Long id, RecordBillPaymentRequestDTO req) {
         SalesInvoice invoice = findForUpdate(id);
+        if (invoice.isPos()) {
+            throw new BusinessRuleViolationException(invoice.getInvoiceNumber() + " is a POS sale. Collect its credit from "
+                    + "Point of Sale › Customers & credit so the POS sale and the till stay in step.");
+        }
         if (!"CONFIRMED".equals(invoice.getStatus())) {
             throw new BusinessRuleViolationException("Payments can only be recorded on confirmed invoices. " + invoice.getInvoiceNumber() + " is " + invoice.getStatus() + ".");
         }
@@ -213,6 +225,10 @@ public class SalesInvoiceService {
 
     public SalesInvoiceResponseDTO cancelInvoice(Long id) {
         SalesInvoice invoice = findForUpdate(id);
+        if (invoice.isPos()) {
+            throw new BusinessRuleViolationException(invoice.getInvoiceNumber() + " is a POS sale and can't be cancelled here. "
+                    + "Use a sales return on the POS terminal.");
+        }
         if ("CANCELLED".equals(invoice.getStatus())) {
             throw new BusinessRuleViolationException("Invoice is already cancelled.");
         }
@@ -244,8 +260,14 @@ public class SalesInvoiceService {
 
     @Transactional(readOnly = true)
     public SalesInvoicesPageResponseDTO getInvoices(int page, int size, String status, String search) {
+        return getInvoices(page, size, status, search, null);
+    }
+
+    /** @param source MANUAL, POS, or null/blank for both. */
+    @Transactional(readOnly = true)
+    public SalesInvoicesPageResponseDTO getInvoices(int page, int size, String status, String search, String source) {
         Pageable pageable = PageRequest.of(Math.max(page, 1) - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<SalesInvoice> result = invoiceRepository.findAll(buildSpec(status, search), pageable);
+        Page<SalesInvoice> result = invoiceRepository.findAll(buildSpec(status, search, source), pageable);
         List<SalesInvoiceResponseDTO> dtos = result.getContent().stream().map(this::toDto).collect(Collectors.toList());
         PaginationDTO pagination = new PaginationDTO(page, size, result.getTotalElements(), result.getTotalPages());
         return new SalesInvoicesPageResponseDTO(dtos, pagination);
@@ -325,6 +347,14 @@ public class SalesInvoiceService {
             if (disc.signum() < 0 || disc.compareTo(HUNDRED) > 0) {
                 throw new BusinessRuleViolationException("Line " + line + " (" + product.getName() + "): discount must be between 0 and 100%.");
             }
+            if (disc.signum() > 0 && Boolean.FALSE.equals(product.getAllowDiscount())) {
+                throw new BusinessRuleViolationException("Line " + line + " (" + product.getName() + "): discounts are not allowed on this product.");
+            }
+            BigDecimal productMax = nz(product.getMaxDiscountPercent());
+            if (productMax.signum() > 0 && disc.compareTo(productMax) > 0) {
+                throw new BusinessRuleViolationException("Line " + line + " (" + product.getName() + "): the maximum discount is "
+                        + productMax.stripTrailingZeros().toPlainString() + "%.");
+            }
             if (dto.getWarehouseId() != null && !warehouseRepository.existsById(dto.getWarehouseId())) {
                 throw new EntityNotFoundException("Warehouse not found with id: " + dto.getWarehouseId());
             }
@@ -338,8 +368,8 @@ public class SalesInvoiceService {
             item.setQuantity(dto.getQuantity());
             item.setUnitPrice(r2(price));
             item.setDiscountPercent(disc.setScale(2, RoundingMode.HALF_UP));
-            // VAT always follows the product's own configured rate — never the client.
-            item.setTaxPercent(nz(product.getTaxRate()).setScale(2, RoundingMode.HALF_UP));
+            // VAT follows the branch tax policy (or the product's own rate) — never the client.
+            item.setTaxPercent((taxPolicy != null ? taxPolicy.salesRate(product) : nz(product.getTaxRate())).setScale(2, RoundingMode.HALF_UP));
             item.setNotes(blankToNull(dto.getNotes()));
             items.add(item);
         }
@@ -610,9 +640,15 @@ public class SalesInvoiceService {
         return x != null ? x : blankToNull(b);
     }
 
-    private Specification<SalesInvoice> buildSpec(String status, String search) {
+    private Specification<SalesInvoice> buildSpec(String status, String search, String source) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            if (source != null && !source.isBlank()) {
+                String src = source.trim().toUpperCase(Locale.ROOT);
+                predicates.add(SalesInvoice.SOURCE_MANUAL.equals(src)
+                        ? cb.or(cb.isNull(root.get("source")), cb.equal(root.get("source"), src))
+                        : cb.equal(root.get("source"), src));
+            }
             if (status != null && !status.isBlank()) {
                 predicates.add(cb.equal(root.get("status"), status.trim().toUpperCase(Locale.ROOT)));
             }

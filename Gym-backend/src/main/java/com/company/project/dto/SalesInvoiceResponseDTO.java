@@ -46,6 +46,10 @@ public class SalesInvoiceResponseDTO {
     private String internalNotes;
     // Prints use this branch's company details (name, address, TRN, logo) in the header.
     private Long branchId;
+    /** MANUAL or POS. */
+    private String source;
+    private Long posTransactionId;
+    private BigDecimal returnedAmount;
     private String createdBy;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
@@ -89,6 +93,9 @@ public class SalesInvoiceResponseDTO {
         dto.setNotes(inv.getNotes());
         dto.setInternalNotes(inv.getInternalNotes());
         dto.setBranchId(inv.getBranchId());
+        dto.setSource(inv.getSource());
+        dto.setPosTransactionId(inv.getPosTransactionId());
+        dto.setReturnedAmount(inv.getReturnedAmount());
         dto.setCreatedBy(inv.getCreatedBy());
         dto.setCreatedAt(inv.getCreatedAt());
         dto.setUpdatedAt(inv.getUpdatedAt());
@@ -193,6 +200,12 @@ public class SalesInvoiceResponseDTO {
 
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+    public Long getPosTransactionId() { return posTransactionId; }
+    public void setPosTransactionId(Long posTransactionId) { this.posTransactionId = posTransactionId; }
+    public BigDecimal getReturnedAmount() { return returnedAmount; }
+    public void setReturnedAmount(BigDecimal returnedAmount) { this.returnedAmount = returnedAmount; }
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }

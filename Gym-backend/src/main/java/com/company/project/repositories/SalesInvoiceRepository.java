@@ -32,6 +32,9 @@ public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, Long
     @Query("SELECT i FROM SalesInvoice i WHERE i.id = :id")
     java.util.Optional<SalesInvoice> findByIdForUpdate(@Param("id") Long id);
 
+    /** The invoice mirroring a POS sale (source = POS). */
+    java.util.Optional<SalesInvoice> findByPosTransactionId(Long posTransactionId);
+
     /** A member's invoices in one status, oldest first — Member SOA uses the CONFIRMED ones. */
     List<SalesInvoice> findByMemberIdAndStatusOrderByInvoiceDateAscIdAsc(Long memberId, String status);
 }

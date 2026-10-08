@@ -45,9 +45,63 @@ public class SaleTransactionItem {
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "returned_quantity")
+    private Integer returnedQuantity = 0;
+
+    @Column(name = "tax_rate", precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
+    @Column(name = "list_price", precision = 10, scale = 2)
+    private BigDecimal listPrice;
+
+    @Column(name = "price_overridden")
+    private Boolean priceOverridden = false;
+
+    @Column(name = "bill_discount_share", precision = 10, scale = 2)
+    private BigDecimal billDiscountShare = BigDecimal.ZERO;
+
+    @Column(name = "taxable_amount", precision = 10, scale = 2)
+    private BigDecimal taxableAmount;
+
+    @Column(name = "cost_price", precision = 10, scale = 2)
+    private BigDecimal costPrice;
+
+    @Column(name = "category_name")
+    private String categoryName;
+
+    @Column(name = "barcode", length = 100)
+    private String barcode;
+
     public SaleTransactionItem() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
+
+    public Integer getReturnedQuantity() { return returnedQuantity; }
+    public void setReturnedQuantity(Integer returnedQuantity) { this.returnedQuantity = returnedQuantity; }
+
+    public BigDecimal getTaxRate() { return taxRate; }
+    public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
+
+    public BigDecimal getListPrice() { return listPrice; }
+    public void setListPrice(BigDecimal listPrice) { this.listPrice = listPrice; }
+
+    public Boolean getPriceOverridden() { return priceOverridden; }
+    public void setPriceOverridden(Boolean priceOverridden) { this.priceOverridden = priceOverridden; }
+
+    public BigDecimal getBillDiscountShare() { return billDiscountShare; }
+    public void setBillDiscountShare(BigDecimal billDiscountShare) { this.billDiscountShare = billDiscountShare; }
+
+    public BigDecimal getTaxableAmount() { return taxableAmount; }
+    public void setTaxableAmount(BigDecimal taxableAmount) { this.taxableAmount = taxableAmount; }
+
+    public BigDecimal getCostPrice() { return costPrice; }
+    public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
+
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+
+    public String getBarcode() { return barcode; }
+    public void setBarcode(String barcode) { this.barcode = barcode; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

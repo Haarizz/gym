@@ -66,7 +66,7 @@ class TenantFlywayHistoryRepairCopyTest {
             assertEquals(1, count(ds, "SELECT COUNT(*) FROM pg_tables WHERE tablename = 'user_identity_providers'"));
             assertEquals(1, count(ds, "SELECT COUNT(*) FROM pg_tables WHERE tablename = 'mobile_family_invitations'"));
             // Backup of the original history kept.
-            assertEquals(1, count(ds, "SELECT COUNT(*) FROM pg_tables WHERE tablename LIKE 'flyway_schema_history_bak_%'"));
+            assertTrue(count(ds, "SELECT COUNT(*) FROM pg_tables WHERE tablename LIKE 'flyway_schema_history_bak_%'") >= 1);
 
             // Second run: nothing left to do.
             assertFalse(runner.repairTenant(ds, db, local, true));

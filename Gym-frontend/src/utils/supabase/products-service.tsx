@@ -62,6 +62,14 @@ export interface Product {
   sellingPrice: number;
   costPrice: number;
   taxRate: number;
+  /** true: lines use the branch default tax (Settings › Tax Configuration); false: taxRate overrides it. */
+  useDefaultTax: boolean;
+  /** false: no discount may be given on this product. */
+  allowDiscount: boolean;
+  /** Sales discount pre-filled on POS / Sales Invoice lines — and the product's discount limit. */
+  maxDiscountPercent: number;
+  /** Discount pre-filled on Purchase Order / Supplier Bill lines. */
+  purchaseDiscountPercent: number;
   supplier?: string;
   totalStock: number;
   inventoryValue: number;
@@ -98,6 +106,10 @@ export interface ProductRequest {
   sellingPrice: number;
   costPrice: number;
   taxRate: number;
+  useDefaultTax?: boolean;
+  allowDiscount?: boolean;
+  maxDiscountPercent?: number;
+  purchaseDiscountPercent?: number;
   supplier?: string;
   openingStock: number;
   reorderLevel: number;
@@ -233,6 +245,10 @@ function mapProduct(r: any): Product {
     sellingPrice: Number(r.selling_price ?? r.sellingPrice ?? 0),
     costPrice: Number(r.cost_price ?? r.costPrice ?? 0),
     taxRate: Number(r.tax_rate ?? r.taxRate ?? 5),
+    useDefaultTax: (r.use_default_tax ?? r.useDefaultTax) !== false,
+    allowDiscount: (r.allow_discount ?? r.allowDiscount) !== false,
+    maxDiscountPercent: Number(r.max_discount_percent ?? r.maxDiscountPercent ?? 0) || 0,
+    purchaseDiscountPercent: Number(r.purchase_discount_percent ?? r.purchaseDiscountPercent ?? 0) || 0,
     supplier: r.supplier,
     totalStock: r.total_stock ?? r.totalStock ?? 0,
     inventoryValue: Number(r.inventory_value ?? r.inventoryValue ?? 0),
@@ -285,6 +301,10 @@ function toRequestBody(data: ProductRequest): Record<string, any> {
     selling_price: data.sellingPrice,
     cost_price: data.costPrice,
     tax_rate: data.taxRate,
+    use_default_tax: data.useDefaultTax,
+    allow_discount: data.allowDiscount,
+    max_discount_percent: data.maxDiscountPercent,
+    purchase_discount_percent: data.purchaseDiscountPercent,
     supplier: data.supplier,
     opening_stock: data.openingStock,
     reorder_level: data.reorderLevel,

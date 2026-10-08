@@ -356,8 +356,12 @@ public class FinancialEventService {
             return;
         }
 
+        // POS v2 records a leg per tender even for a single-method sale (so Online legs carry
+        // their receiving bank account and Credit legs post to Accounts Receivable); whenever
+        // legs are present they are authoritative, regardless of the headline payment method.
+        boolean hasLegs = sale.getPaymentBreakdown() != null && !sale.getPaymentBreakdown().isEmpty();
         List<JvLine> lines = new ArrayList<>(buildMoneyLines(
-                sale.getPaymentMethod(), sale.getPaymentBreakdown(), total, true,
+                hasLegs ? "MIXED" : sale.getPaymentMethod(), sale.getPaymentBreakdown(), total, true,
                 "POS sale — " + sale.getTransactionNumber()));
         lines.add(cr(ACC_SALES_REVENUE, "POS Sales Revenue", revenue, "Sales revenue"));
         if (tax.compareTo(BigDecimal.ZERO) > 0) {
@@ -417,6 +421,68 @@ public class FinancialEventService {
         JournalVoucher jv = createAndPost(
                 "POS Refund: " + sale.getTransactionNumber(), date, lines, "SALES");
         registerSource("SaleTransactionRefund", sale.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SALES — POS return (full or partial) against a SaleTransaction.
+     * DR  Sales Revenue                (returned amount − VAT)
+     * DR  Tax / GST Payable            (returned VAT)          — only if > 0
+     * CR  Cash/Bank/Receivable         (per refund leg)
+     * DR  Inventory Asset / CR COGS    (returned cost)         — only when the goods were restocked
+     */
+    public void onPosSaleReturned(PosSaleReturn ret) {
+        if (alreadyJournaled("PosSaleReturn", ret.getId())) return;
+
+        BigDecimal total   = safe(ret.getTotalAmount());
+        BigDecimal tax     = safe(ret.getTaxAmount());
+        BigDecimal revenue = total.subtract(tax);
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Skipped auto-journal for PosSaleReturn id={}: total {} is not positive", ret.getId(), total);
+            return;
+        }
+
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_SALES_REVENUE, "POS Sales Revenue", revenue,
+                "Return " + ret.getReturnNumber() + " — revenue reversal"));
+        if (tax.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", tax, "Return " + ret.getReturnNumber() + " — VAT reversal"));
+        }
+        boolean hasLegs = ret.getRefundBreakdown() != null && !ret.getRefundBreakdown().isEmpty();
+        lines.addAll(buildMoneyLines(hasLegs ? "MIXED" : ret.getRefundMethod(), ret.getRefundBreakdown(), total, false,
+                "Refund — " + ret.getReturnNumber()));
+
+        BigDecimal cogs = Boolean.TRUE.equals(ret.getRestock()) ? safe(ret.getTotalCogs()) : BigDecimal.ZERO;
+        if (cogs.compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_INVENTORY_ASSET, "Inventory Asset", cogs, "Return " + ret.getReturnNumber() + " — inventory restored"));
+            lines.add(cr(ACC_PURCHASE_COGS, "Cost of Goods Sold", cogs, "Return " + ret.getReturnNumber() + " — COGS reversal"));
+        }
+
+        LocalDate date = ret.getCreatedAt() != null ? ret.getCreatedAt().toLocalDate() : LocalDate.now();
+        JournalVoucher jv = createAndPost("POS Return: " + ret.getReturnNumber()
+                + " (sale " + ret.getTransactionNumber() + ")", date, lines, "SALES");
+        registerSource("PosSaleReturn", ret.getId(), "SALES", jv.getId());
+    }
+
+    /**
+     * SALES — customer settles POS credit (on-account) sales.
+     * DR  Cash/Bank                    (amount, per payment method / receiving bank account)
+     * CR  Accounts Receivable          (amount)
+     */
+    public void onPosCreditPaymentReceived(PosCreditPayment payment) {
+        if (alreadyJournaled("PosCreditPayment", payment.getId())) return;
+
+        BigDecimal amount = safe(payment.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        List<JvLine> lines = new ArrayList<>(buildMoneyLines(payment.getPaymentMethod(), null,
+                payment.getBankAccountCode(), payment.getBankAccountName(), amount, true,
+                "POS credit settlement " + payment.getPaymentNumber() + " — " + payment.getMemberName()));
+        lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", amount,
+                "POS credit settled — " + payment.getMemberName()));
+
+        LocalDate date = payment.getCreatedAt() != null ? payment.getCreatedAt().toLocalDate() : LocalDate.now();
+        JournalVoucher jv = createAndPost("POS Credit Settlement: " + payment.getPaymentNumber(), date, lines, "SALES");
+        registerSource("PosCreditPayment", payment.getId(), "SALES", jv.getId());
     }
 
     /**
@@ -1299,6 +1365,40 @@ public class FinancialEventService {
             case 4 -> "REVENUE";
             default -> "EXPENSE";
         };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  POS ADMINISTRATION — cash movements in a ledger-mapped category, corrections
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** One line of a POS adjustment journal. */
+    public record PosLine(String accountCode, String accountName, BigDecimal debit, BigDecimal credit, String description) {}
+
+    /**
+     * Posts a balanced POS adjustment once per (sourceType, sourceId) — a cash movement in a
+     * category that names a ledger account, or an applied POS correction. Returns the voucher
+     * number, or null when this source was already journaled.
+     */
+    public String postPosEntry(String sourceType, Long sourceId, String narration, LocalDate date, List<PosLine> lines) {
+        if (alreadyJournaled(sourceType, sourceId)) return null;
+        List<JvLine> jv = new ArrayList<>();
+        for (PosLine l : lines) {
+            if (safe(l.debit()).signum() == 0 && safe(l.credit()).signum() == 0) continue;
+            jv.add(new JvLine(l.accountCode(), l.accountName(), l.debit(), l.credit(), l.description()));
+        }
+        if (jv.isEmpty()) return null;
+        JournalVoucher voucher = createAndPost(narration, date != null ? date : LocalDate.now(), jv, "POS");
+        registerSource(sourceType, sourceId, "POS", voucher.getId());
+        return voucher.getVoucherNo();
+    }
+
+    /** Ledger account a POS payment leg settles to: its own account when set, else by method. */
+    public static String[] legAccount(PaymentSplitDTO leg) {
+        boolean own = leg.getBankAccountCode() != null && !leg.getBankAccountCode().isBlank();
+        String code = own ? leg.getBankAccountCode() : paymentMethodToAccount(leg.getMethod());
+        String name = own && leg.getBankAccountName() != null && !leg.getBankAccountName().isBlank()
+                ? leg.getBankAccountName() : cashAccountName(code);
+        return new String[]{code, name};
     }
 
     // ─────────────────────────────────────────────────────────────────────────

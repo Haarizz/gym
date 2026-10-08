@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -126,6 +127,127 @@ public class DashboardService {
         kpi.setAvailableStaff(staffRepository.countByStatus("active"));
         kpi.setClockedInStaff(staffAttendanceRepository.findClockedInStaffIds().size());
         return kpi;
+    }
+
+    /**
+     * Overview "Subscriptions & Passes" cards: how many New / Renewal / Upgrade /
+     * Add-on / Day-Pass sales were raised in the period and the money received on
+     * them (each receipt's own paidAmount — the same cash basis as Total Collection;
+     * a balance settled later lands on its own "Payment" receipt and isn't counted),
+     * plus how many of those sales still carry a balance and how much is owed.
+     *
+     * Upgrades are saved as "Renewal" receipts, so a renewal onto a different, pricier
+     * plan than that subscriber's previous New/Renewal receipt is counted as an upgrade
+     * instead — its money goes only to the Upgrades card, never to Renew.
+     */
+    public Map<String, Object> getSubscriptionSummary(String period) {
+        Period pr = resolvePeriod(period, LocalDate.now());
+        List<Receipt> sales = receiptRepository.findSalesOfTypesBetween(
+                List.of("New", "Renewal", "Add-on", "Daily Entry"), pr.start(), pr.end());
+
+        // Each renewing subscriber's New/Renewal receipts up to the period end, oldest first
+        List<Long> renewingMemberIds = sales.stream()
+                .filter(r -> "Renewal".equals(r.getTransactionType()) && r.getMemberDbId() != null)
+                .map(Receipt::getMemberDbId).distinct().collect(Collectors.toList());
+        Map<String, List<Receipt>> planHistory = new HashMap<>();
+        if (!renewingMemberIds.isEmpty()) {
+            for (Receipt r : receiptRepository.findMembershipReceiptsBefore(renewingMemberIds, pr.end())) {
+                planHistory.computeIfAbsent(subscriberKey(r), k -> new ArrayList<>()).add(r);
+            }
+        }
+
+        Map<String, Long> counts = new LinkedHashMap<>();
+        Map<String, BigDecimal> collected = new LinkedHashMap<>();
+        Map<String, Long> pendingCounts = new LinkedHashMap<>();
+        Map<String, BigDecimal> pendingAmounts = new LinkedHashMap<>();
+        for (String key : List.of("new", "renew", "upgrade", "addons", "dayPass")) {
+            counts.put(key, 0L);
+            collected.put(key, BigDecimal.ZERO);
+            pendingCounts.put(key, 0L);
+            pendingAmounts.put(key, BigDecimal.ZERO);
+        }
+        for (Receipt r : sales) {
+            String key = switch (r.getTransactionType()) {
+                case "New" -> "new";
+                case "Renewal" -> isUpgrade(r, planHistory.get(subscriberKey(r))) ? "upgrade" : "renew";
+                case "Add-on" -> "addons";
+                default -> "dayPass";
+            };
+            counts.merge(key, 1L, Long::sum);
+            if (r.getPaidAmount() != null) collected.merge(key, r.getPaidAmount(), BigDecimal::add);
+            BigDecimal due = outstandingOn(r);
+            if (due.signum() > 0) {
+                pendingCounts.merge(key, 1L, Long::sum);
+                pendingAmounts.merge(key, due, BigDecimal::add);
+            }
+        }
+
+        List<Map<String, Object>> cards = new ArrayList<>();
+        counts.forEach((key, count) -> {
+            Map<String, Object> card = new LinkedHashMap<>();
+            card.put("key", key);
+            card.put("count", count);
+            card.put("collected", collected.get(key).setScale(2, RoundingMode.HALF_UP));
+            card.put("pendingCount", pendingCounts.get(key));
+            card.put("pendingAmount", pendingAmounts.get(key).setScale(2, RoundingMode.HALF_UP));
+            cards.add(card);
+        });
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("period", pr.key());
+        result.put("from", pr.from().toString());
+        result.put("to", pr.to().toString());
+        result.put("cards", cards);
+        return result;
+    }
+
+    /**
+     * What's still owed on a sale today: the bill less everything paid toward it so far
+     * (later settlements roll into totalPaidToDate and flip the status to Paid) — same
+     * rule as ReceiptRepository.sumPendingInPeriod.
+     */
+    private static BigDecimal outstandingOn(Receipt r) {
+        String status = r.getStatus();
+        boolean open = "Pending".equals(status) || "Partial".equals(status) || "Overdue".equals(status);
+        if (!open || r.getAmount() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal paid = r.getTotalPaidToDate() != null ? r.getTotalPaidToDate()
+                : (r.getPaidAmount() != null ? r.getPaidAmount() : BigDecimal.ZERO);
+        return r.getAmount().subtract(paid).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Whose plan history a receipt belongs to. A family minor's charges are billed on
+     * the guardian's receipts (ReceiptService.createMinorChargeReceipt), so those are
+     * keyed by the minor to keep the two plan histories apart.
+     */
+    private static String subscriberKey(Receipt r) {
+        List<com.company.project.dto.MinorChargeDTO> minors = r.getMinorCharges();
+        if (minors != null && minors.size() == 1 && minors.get(0).getMemberDbId() != null
+                && r.getRemarks() != null && r.getRemarks().startsWith("Charge for family member")) {
+            return "minor:" + minors.get(0).getMemberDbId();
+        }
+        return "member:" + r.getMemberDbId();
+    }
+
+    /**
+     * True when this renewal moved the subscriber onto a different, pricier plan than
+     * their receipt just before it — the same Upgrade rule as the Members → Renewals &
+     * Upgrades history (a cheaper or same-price plan change stays a renewal here).
+     */
+    private static boolean isUpgrade(Receipt renewal, List<Receipt> history) {
+        if (history == null) return false;
+        Receipt previous = null;
+        for (Receipt r : history) {
+            if (r.getId().equals(renewal.getId())) break;
+            previous = r;
+        }
+        if (previous == null || previous.getPlanName() == null || renewal.getPlanName() == null) return false;
+        if (previous.getPlanName().trim().equalsIgnoreCase(renewal.getPlanName().trim())) return false;
+        BigDecimal before = previous.getAmount() != null ? previous.getAmount() : BigDecimal.ZERO;
+        BigDecimal after = renewal.getAmount() != null ? renewal.getAmount() : BigDecimal.ZERO;
+        return after.compareTo(before) > 0;
     }
 
     /**

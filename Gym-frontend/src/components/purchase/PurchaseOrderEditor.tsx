@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { CurrencyGlyph, CurrencyValue, useCurrency } from '../../utils/currency';
 import type { PurchaseOrder, PurchaseOrderRequest, Supplier } from '../../utils/supabase/purchase-service';
 import type { SupplierBill } from '../../utils/supabase/supplier-bill-service';
+import { getTaxDefaults, purchaseDiscountFor, purchaseTaxFor, type TaxDefaults } from '../../utils/supabase/tax-defaults-service';
 import type { Product } from '../../utils/supabase/products-service';
 import styles from './PurchaseInvoice.module.css';
 import { FastEntry, ProductSelector, Thumb } from './lineEntry';
@@ -80,7 +81,8 @@ const formFromOrder = (o: PurchaseOrder): Form => ({
   })),
 });
 
-const lineFromProduct = (p: Product): Line => ({
+// BillBull: the product's purchase discount and the branch purchase tax are pre-filled.
+const lineFromProduct = (p: Product, tax: TaxDefaults | null = null): Line => ({
   key: newKey(),
   productId: p.id,
   productName: p.name,
@@ -88,8 +90,8 @@ const lineFromProduct = (p: Product): Line => ({
   unitOfMeasure: p.defaultUnit ?? 'pcs',
   quantity: 1,
   unitPrice: p.costPrice ?? 0,
-  discountPercent: 0,
-  taxPercent: p.taxRate ?? 0,
+  discountPercent: purchaseDiscountFor(p),
+  taxPercent: purchaseTaxFor(p, tax),
   notes: '',
 });
 
@@ -169,6 +171,10 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
   // ── Derived ───────────────────────────────────────────────────────────────
   const supplier = suppliers.find(s => s.id === form.supplierId);
   const productById = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+  // Branch tax policy (Settings › Tax Configuration): not VAT registered → no tax on purchases.
+  const [taxDefaults, setTaxDefaults] = useState<TaxDefaults | null>(null);
+  useEffect(() => { getTaxDefaults().then(setTaxDefaults).catch(() => setTaxDefaults(null)); }, []);
+  const noTax = taxDefaults ? !taxDefaults.vatRegistered : false;
   const totals = useMemo(() => billTotals(form.lines, form.shippingCost), [form.lines, form.shippingCost]);
 
   // Quantity already on other open orders (not yet received) per product.
@@ -497,7 +503,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
                               onChange={e => updateLine(l.key, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                           </td>
                           <td>
-                            <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)} value={l.taxPercent === 0 ? '' : l.taxPercent} placeholder="0" disabled={readOnly}
+                            <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)} value={noTax ? '' : (l.taxPercent === 0 ? '' : l.taxPercent)} placeholder="0" disabled={readOnly || noTax}
                               onChange={e => updateLine(l.key, { taxPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                           </td>
                           <td className={styles.lineTotal}>
@@ -514,7 +520,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
                       <tr>
                         <td className={cx(styles.center, styles.muted)}>{form.lines.length + 1}</td>
                         <td colSpan={8}>
-                          <FastEntry inputRef={entryRef} products={products} onPick={p => addLines([lineFromProduct(p)])}
+                          <FastEntry inputRef={entryRef} products={products} onPick={p => addLines([lineFromProduct(p, taxDefaults)])}
                             onCustom={name => addLines([customLine(name)])} onBrowse={openCatalog} />
                         </td>
                       </tr>
@@ -655,7 +661,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
 
       <ProductSelector open={catalogOpen} onOpenChange={setCatalogOpen} products={products} target="Order"
         initialSearch={catalogSearch} onRefresh={onRefreshProducts}
-        onAdd={(p, e) => addLines([{ ...lineFromProduct(p), quantity: e.quantity, unitPrice: e.unitPrice, discountPercent: e.discountPercent }])} />
+        onAdd={(p, e) => addLines([{ ...lineFromProduct(p, taxDefaults), quantity: e.quantity, unitPrice: e.unitPrice, discountPercent: e.discountPercent || purchaseDiscountFor(p) }])} />
     </div>
   );
 });

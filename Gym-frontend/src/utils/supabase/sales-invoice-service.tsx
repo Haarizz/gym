@@ -62,6 +62,11 @@ export interface SalesInvoice {
   notes?: string;
   internalNotes?: string;
   branchId?: number;
+  /** MANUAL (back office) or POS (mirror of a Point of Sale sale — read-only here). */
+  source: 'MANUAL' | 'POS';
+  posTransactionId?: number;
+  /** Value returned through POS sales returns. */
+  returnedAmount: number;
   createdBy?: string;
   createdAt: string;
   updatedAt?: string;
@@ -175,6 +180,9 @@ function mapInvoice(r: any): SalesInvoice {
     notes: r.notes ?? undefined,
     internalNotes: r.internal_notes ?? r.internalNotes ?? undefined,
     branchId: r.branch_id ?? r.branchId ?? undefined,
+    source: (r.source ?? 'MANUAL') === 'POS' ? 'POS' : 'MANUAL',
+    posTransactionId: r.pos_transaction_id ?? r.posTransactionId ?? undefined,
+    returnedAmount: num(r.returned_amount ?? r.returnedAmount),
     createdBy: r.created_by ?? r.createdBy ?? undefined,
     createdAt: r.created_at ?? r.createdAt ?? '',
     updatedAt: r.updated_at ?? r.updatedAt ?? undefined,

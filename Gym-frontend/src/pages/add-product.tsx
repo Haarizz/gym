@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
+import { getTaxDefaults } from "../utils/supabase/tax-defaults-service";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Checkbox } from "../components/ui/checkbox";
@@ -177,6 +178,16 @@ export function AddProduct({ onNavigate }: AddProductProps) {
   const [defaultPrice, setDefaultPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [taxRate, setTaxRate] = useState("0");
+  // Tax follows the branch default (Settings › Tax Configuration) unless the product has its own rate.
+  const [useDefaultTax, setUseDefaultTax] = useState(true);
+  // Settings › Tax Configuration: a branch that is not VAT registered charges no tax on any product.
+  const [vatRegistered, setVatRegistered] = useState(true);
+  useEffect(() => { getTaxDefaults().then((d) => setVatRegistered(d.vatRegistered)).catch(() => undefined); }, []);
+  // BillBull product discounts: the sales discount is pre-filled on POS / Sales Invoice lines and is the
+  // product's limit; the purchase discount is pre-filled on Purchase Order / Supplier Bill lines.
+  const [allowDiscount, setAllowDiscount] = useState(true);
+  const [maxDiscount, setMaxDiscount] = useState("");
+  const [purchaseDiscount, setPurchaseDiscount] = useState("");
   const [productUnits, setProductUnits] = useState<ProductUnit[]>([]);
 
   // Recipe / Production Formula
@@ -348,6 +359,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         setDefaultPrice(product.sellingPrice ? String(product.sellingPrice) : "");
         setCostPrice(product.costPrice ? String(product.costPrice) : "");
         setTaxRate(product.taxRate ? String(product.taxRate) : "0");
+        setUseDefaultTax(product.useDefaultTax !== false);
+        setAllowDiscount(product.allowDiscount !== false);
+        setMaxDiscount(product.maxDiscountPercent ? String(product.maxDiscountPercent) : "");
+        setPurchaseDiscount(product.purchaseDiscountPercent ? String(product.purchaseDiscountPercent) : "");
         setIsManufactured(product.isManufactured ?? false);
         setHasVariants(product.hasVariants ?? false);
         setSupplier(product.supplier || "");
@@ -738,6 +753,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
     setDefaultPrice("");
     setCostPrice("");
     setTaxRate(defaultTaxRate);
+    setUseDefaultTax(true);
+    setAllowDiscount(true);
+    setMaxDiscount("");
+    setPurchaseDiscount("");
     setProductUnits([]);
     setIsManufactured(false);
     setRecipeIngredients([]);
@@ -818,6 +837,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
         sellingPrice: parseFloat(defaultPrice),
         costPrice: costPrice ? parseFloat(costPrice) : 0,
         taxRate: taxRate ? parseFloat(taxRate) : 0,
+        useDefaultTax,
+        allowDiscount,
+        maxDiscountPercent: allowDiscount && maxDiscount ? Math.min(100, Math.max(0, parseFloat(maxDiscount) || 0)) : 0,
+        purchaseDiscountPercent: purchaseDiscount ? Math.min(100, Math.max(0, parseFloat(purchaseDiscount) || 0)) : 0,
         supplier: supplier || undefined,
         openingStock: openingStock ? parseInt(openingStock, 10) : 0,
         reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) : 0,
@@ -1443,11 +1466,62 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                       id="tax-rate"
                       type="number"
                       step="0.01"
-                      value={taxRate}
+                      value={useDefaultTax ? "" : taxRate}
                       onChange={(e) => setTaxRate(e.target.value)}
+                      placeholder={useDefaultTax ? "Branch default" : "0"}
+                      disabled={useDefaultTax}
+                      className="input-focus"
+                    />
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                      <Checkbox checked={useDefaultTax} onCheckedChange={(v) => setUseDefaultTax(v === true)} />
+                      Use the branch tax (Settings › Tax Configuration)
+                    </label>
+                    {!vatRegistered && (
+                      <p className="text-xs text-amber-700">
+                        This branch is not VAT registered, so no tax is charged on sales or purchases. Turn on VAT registered in Settings › Tax Configuration to apply it.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="allow-discount">Discount allowed</Label>
+                    <div className="flex items-center gap-2" style={{ minHeight: 40 }}>
+                      <Switch id="allow-discount" checked={allowDiscount} onCheckedChange={setAllowDiscount} />
+                      <span className="text-sm text-gray-600">{allowDiscount ? "Yes" : "No discounts on this product"}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max-discount">Maximum Discount (%)</Label>
+                    <Input
+                      id="max-discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={allowDiscount ? maxDiscount : ""}
+                      onChange={(e) => setMaxDiscount(e.target.value)}
+                      placeholder="0"
+                      disabled={!allowDiscount}
+                      className="input-focus"
+                    />
+                    <p className="text-xs text-gray-500">Pre-filled on POS and Sales Invoice lines; the most that can be given without a supervisor.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase-discount">Purchase Discount (%)</Label>
+                    <Input
+                      id="purchase-discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={purchaseDiscount}
+                      onChange={(e) => setPurchaseDiscount(e.target.value)}
                       placeholder="0"
                       className="input-focus"
                     />
+                    <p className="text-xs text-gray-500">Pre-filled on Purchase Order and Supplier Bill lines.</p>
                   </div>
                 </div>
 

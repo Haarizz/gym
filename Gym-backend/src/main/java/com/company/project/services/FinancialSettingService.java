@@ -20,16 +20,18 @@ public class FinancialSettingService {
      * The categories the UI offers: GENERAL/ACCOUNTING/TAX/BANK are the CATEGORIES
      * constant in financial-settings.tsx; COMPANY is the Settings page's Company
      * Details card (company_name/address/email/phone/logo keys); APP_PREFERENCES
-     * holds the display-currency setting (currency.tsx). Settings are a generic
-     * key/value store with no per-key schema, so this is deliberately the only
-     * shape validated — see docs/gymbios-financial-roadmap.html — L1.
+     * holds the display-currency setting (currency.tsx); BRANCH_TAX is the
+     * Settings page's Tax Configuration tab (default VAT / sales / purchase tax
+     * rates). Settings are a generic key/value store with no per-key schema, so
+     * this is deliberately the only shape validated — see
+     * docs/gymbios-financial-roadmap.html — L1.
      */
-    private static final Set<String> VALID_CATEGORIES = Set.of("GENERAL", "ACCOUNTING", "TAX", "BANK", "COMPANY", "APP_PREFERENCES");
+    private static final Set<String> VALID_CATEGORIES = Set.of("GENERAL", "ACCOUNTING", "TAX", "BANK", "COMPANY", "APP_PREFERENCES", "BRANCH_TAX");
 
-    // Company identity and display currency plausibly differ per branch (different
-    // legal entities/countries); accounting/tax/bank policy stays one shared
-    // configuration for the whole business.
-    private static final Set<String> BRANCH_SCOPED_CATEGORIES = Set.of("COMPANY", "APP_PREFERENCES");
+    // Company identity, display currency and default tax rates plausibly differ per
+    // branch (different legal entities/countries); the remaining accounting/tax/bank
+    // policy stays one shared configuration for the whole business.
+    private static final Set<String> BRANCH_SCOPED_CATEGORIES = Set.of("COMPANY", "APP_PREFERENCES", "BRANCH_TAX");
 
     private final FinancialSettingRepository financialSettingRepository;
     private final BranchSettingsResolver branchSettingsResolver;

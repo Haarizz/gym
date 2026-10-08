@@ -49,6 +49,20 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, "BUSINESS_RULE_VIOLATION", ex.getMessage());
     }
 
+    /**
+     * @PreAuthorize denials. Without this the catch-all below turned them into a 500
+     * "Access Denied", indistinguishable from a server fault.
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to perform this action.");
+    }
+
+    @ExceptionHandler(SupervisorApprovalRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleSupervisorApprovalRequired(SupervisorApprovalRequiredException ex) {
+        return build(HttpStatus.FORBIDDEN, "SUPERVISOR_APPROVAL_REQUIRED", ex.getMessage());
+    }
+
     @ExceptionHandler(OtpException.class)
     public ResponseEntity<Map<String, Object>> handleOtpException(OtpException ex) {
         return build(ex.getStatus(), ex.getCode(), ex.getMessage());

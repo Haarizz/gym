@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   Search,
@@ -62,7 +63,11 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
 
   const [searchTerm, setSearchTerm] = useState("");
   useGlobalSearchPrefill(setSearchTerm);
-  const [selectedTransactionType, setSelectedTransactionType] = useState("all-transactions");
+  // Dashboard "Subscriptions & Passes" cards open this list pre-filtered by type
+  const location = useLocation();
+  const [selectedTransactionType, setSelectedTransactionType] = useState<string>(
+    (location.state as { receiptType?: string } | null)?.receiptType || "all-transactions"
+  );
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loadingReceipts, setLoadingReceipts] = useState(true);

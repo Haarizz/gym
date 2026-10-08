@@ -12,4 +12,6 @@ public interface SaleTransactionItemRepository extends JpaRepository<SaleTransac
     List<SaleTransactionItem> findByTransactionId(Long transactionId);
 
     void deleteByTransactionId(Long transactionId);
+
+    List<SaleTransactionItem> findByTransactionIdIn(java.util.Collection<Long> transactionIds);
 }

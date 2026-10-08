@@ -337,8 +337,12 @@ public class PromotionCampaignService {
     /**
      * Validate a promotion by its voucher code.
      * Checks: exists, status is active, not expired, usage limit not exceeded.
+     *
+     * "No such code" must not mark the caller's transaction rollback-only: DiscountCodeService
+     * catches it to fall back to referral coupons, and a poisoned transaction would then fail
+     * the whole checkout ("Transaction silently rolled back").
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = EntityNotFoundException.class)
     public PromotionCampaignResponseDTO validateByCode(String code) {
         PromotionCampaign promotion = promotionRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new EntityNotFoundException("Invalid promotion code"));

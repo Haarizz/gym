@@ -82,7 +82,7 @@ public class FinancialReportService {
      *
      * This will now automatically include:
      *   Membership payments (via ReceiptService)
-     *   POS sales (via SaleTransactionService)
+     *   POS sales (via PosCheckoutService)
      *   Approved expenses (via ExpenseService)
      *   Salary payments (via SalaryPaymentService)
      *   Any manually entered POSTED journal vouchers

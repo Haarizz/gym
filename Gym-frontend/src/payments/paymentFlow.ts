@@ -15,6 +15,15 @@ export const NEXT_METHOD_PRIORITY: PaymentType[] = [
   PAYMENT_TYPES.CASH,
   PAYMENT_TYPES.CARD,
   PAYMENT_TYPES.ONLINE,
+  PAYMENT_TYPES.WALLET,
+  PAYMENT_TYPES.CREDIT,
+];
+
+/** What a page offers when it doesn't say: the four standard tenders (Wallet is opt-in). */
+export const DEFAULT_OFFERED_TYPES: PaymentType[] = [
+  PAYMENT_TYPES.CASH,
+  PAYMENT_TYPES.CARD,
+  PAYMENT_TYPES.ONLINE,
   PAYMENT_TYPES.CREDIT,
 ];
 
@@ -26,7 +35,7 @@ export const NEXT_METHOD_PRIORITY: PaymentType[] = [
 export function suggestedNextMethod(
   currentType: PaymentType,
   remainingAfter: number,
-  offeredTypes: PaymentType[] = NEXT_METHOD_PRIORITY
+  offeredTypes: PaymentType[] = DEFAULT_OFFERED_TYPES
 ): PaymentType | null {
   if (remainingAfter <= AMOUNT_TOLERANCE) return null;
   const next = NEXT_METHOD_PRIORITY.find((type) => type !== currentType && offeredTypes.includes(type));
@@ -49,7 +58,7 @@ export interface ConfirmActionLabelArgs {
 export function confirmActionLabel({
   currentType,
   remainingAfter,
-  offeredTypes = NEXT_METHOD_PRIORITY,
+  offeredTypes = DEFAULT_OFFERED_TYPES,
   editing = false,
 }: ConfirmActionLabelArgs): string {
   const typeLabel = PAYMENT_TYPE_LABELS[currentType];

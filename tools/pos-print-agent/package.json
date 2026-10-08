@@ -1,0 +1,24 @@
+{
+  "name": "gymbios-pos-print-agent",
+  "private": true,
+  "version": "0.5.3",
+  "scripts": {
+    "start": "node server.js",
+    "start:tray": "node tray.js",
+    "build": "pkg . --targets node18-win-x64 --output dist/GymBiosPrintAgent.exe && node make-windowed.js",
+    "build:installer": "npm run build && iscc installer\\GymBiosPrintAgent.iss"
+  },
+  "bin": "tray.js",
+  "pkg": {
+    "assets": [
+      "node_modules/trayicon/rsrcs/**/*",
+      "assets/**/*"
+    ]
+  },
+  "dependencies": {
+    "trayicon": "^1.2.2"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

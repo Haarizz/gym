@@ -50,6 +50,20 @@ public class SupplierBillService {
     private final FinancialEventService financialEventService;
     private final PaymentVoucherService paymentVoucherService;
 
+    /** Optional (absent in unit tests): branch tax policy — Settings › Tax Configuration. */
+    private com.company.project.services.TaxPolicyService taxPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTaxPolicy(@org.springframework.context.annotation.Lazy com.company.project.services.TaxPolicyService taxPolicy) {
+        this.taxPolicy = taxPolicy;
+    }
+
+    /** Line tax: not VAT registered → 0; otherwise what was entered (the branch purchase tax when blank). */
+    private BigDecimal lineTax(BigDecimal entered) {
+        if (taxPolicy != null) return taxPolicy.purchaseRate(null, entered);
+        return entered != null ? entered : BigDecimal.ZERO;
+    }
+
     public SupplierBillService(SupplierBillRepository supplierBillRepository,
                                SupplierBillItemRepository supplierBillItemRepository,
                                SupplierRepository supplierRepository,
@@ -528,7 +542,7 @@ public class SupplierBillService {
         item.setUnitPrice(dto.getUnitPrice() != null ? dto.getUnitPrice() : BigDecimal.ZERO);
 
         BigDecimal discPct = dto.getDiscountPercent() != null ? dto.getDiscountPercent() : BigDecimal.ZERO;
-        BigDecimal taxPct = dto.getTaxPercent() != null ? dto.getTaxPercent() : BigDecimal.ZERO;
+        BigDecimal taxPct = lineTax(dto.getTaxPercent());
         item.setDiscountPercent(discPct);
         item.setTaxPercent(taxPct);
 
@@ -556,7 +570,7 @@ public class SupplierBillService {
             BigDecimal qty = BigDecimal.valueOf(dto.getQuantity() != null ? dto.getQuantity() : 1);
             BigDecimal price = dto.getUnitPrice() != null ? dto.getUnitPrice() : BigDecimal.ZERO;
             BigDecimal discPct = dto.getDiscountPercent() != null ? dto.getDiscountPercent() : BigDecimal.ZERO;
-            BigDecimal taxPct = dto.getTaxPercent() != null ? dto.getTaxPercent() : BigDecimal.ZERO;
+            BigDecimal taxPct = lineTax(dto.getTaxPercent());
 
             BigDecimal lineTotal = price.multiply(qty);
             BigDecimal disc = lineTotal.multiply(discPct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);

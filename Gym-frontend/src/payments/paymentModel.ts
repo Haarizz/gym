@@ -13,6 +13,8 @@ export const PAYMENT_TYPES = {
   CARD: "CARD",
   ONLINE: "ONLINE",
   CREDIT: "CREDIT",
+  /** Member reward-wallet balance. Opt-in: only offered where a page passes it in offeredTypes (the POS). */
+  WALLET: "WALLET",
 } as const;
 
 export type PaymentType = (typeof PAYMENT_TYPES)[keyof typeof PAYMENT_TYPES];
@@ -22,6 +24,7 @@ export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
   [PAYMENT_TYPES.CARD]: "Card",
   [PAYMENT_TYPES.ONLINE]: "Online",
   [PAYMENT_TYPES.CREDIT]: "Credit",
+  [PAYMENT_TYPES.WALLET]: "Wallet",
 };
 
 /** Half a minor currency unit — so 2-dp rounding never flips a comparison. */
