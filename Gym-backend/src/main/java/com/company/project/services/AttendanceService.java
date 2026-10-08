@@ -199,7 +199,19 @@ public class AttendanceService {
         record.setWalkInPhone(req.getPhone());
         record.setWalkInEmail(req.getEmail());
         record.setActivityType(req.getSessionType());
-        record.setWalkInPaymentStatus(StringUtils.hasText(req.getPaymentStatus()) ? req.getPaymentStatus() : "pending");
+        // What was actually received now — an explicit paidAmount (split / partial
+        // payment, rest on credit) wins over the older binary paid/pending flag.
+        java.math.BigDecimal charge = req.getAmount() != null ? req.getAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal paidNow;
+        if (req.getPaidAmount() != null) {
+            paidNow = req.getPaidAmount().max(java.math.BigDecimal.ZERO).min(charge);
+        } else {
+            paidNow = "paid".equalsIgnoreCase(req.getPaymentStatus()) ? charge : java.math.BigDecimal.ZERO;
+        }
+        String paymentStatus = req.getPaidAmount() == null && StringUtils.hasText(req.getPaymentStatus())
+                ? req.getPaymentStatus()
+                : (paidNow.signum() <= 0 ? "pending" : (paidNow.compareTo(charge) >= 0 ? "paid" : "partial"));
+        record.setWalkInPaymentStatus(paymentStatus);
         record.setWalkInAmount(req.getAmount());
         record.setWalkInPaymentMethod(req.getPaymentMethod());
         record.setNotes(req.getNotes());
@@ -210,13 +222,12 @@ public class AttendanceService {
         // Billing/Member Receipts pages) so it shows up in Billing exactly like a
         // member payment and posts to the ledger, instead of leaving it as an
         // Attendance row with no financial trace.
-        boolean hasCharge = req.getAmount() != null && req.getAmount().compareTo(java.math.BigDecimal.ZERO) > 0;
-        if (hasCharge) {
-            boolean paid = "paid".equalsIgnoreCase(record.getWalkInPaymentStatus());
+        if (charge.signum() > 0) {
             receiptService.createWalkInReceipt(
                     req.getName(), req.getPhone(), req.getSessionType(),
-                    req.getAmount(), paid ? req.getAmount() : java.math.BigDecimal.ZERO,
+                    charge, paidNow,
                     req.getPaymentMethod(), req.getPaymentBreakdown(),
+                    req.getBankAccountCode(), req.getBankAccountName(),
                     req.getNotes(), req.getProcessedByStaffId());
         }
 

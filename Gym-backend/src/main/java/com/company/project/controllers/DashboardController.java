@@ -28,6 +28,12 @@ public class DashboardController {
         return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getKPIs(period)));
     }
 
+    // Overview "Subscriptions & Passes" cards — same period values as /kpis
+    @GetMapping("/subscription-summary")
+    public ResponseEntity<GenericResponse<?>> getSubscriptionSummary(@RequestParam(defaultValue = "today") String period) {
+        return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getSubscriptionSummary(period)));
+    }
+
     @GetMapping("/revenue")
     public ResponseEntity<GenericResponse<?>> getRevenue(@RequestParam(defaultValue = "today") String period) {
         return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getRevenueData(period)));

@@ -38,6 +38,16 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     @Query("SELECT r FROM Receipt r WHERE r.paidAmount > 0 AND r.transactionDate >= :start AND r.transactionDate < :end ORDER BY r.transactionDate")
     List<Receipt> findPaidBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    // Sales of the given types raised in [start, end), paid or not — web dashboard
+    // "Subscriptions & Passes" cards. Rejected mobile purchases never became a sale.
+    @Query("SELECT r FROM Receipt r WHERE r.transactionType IN :types AND r.transactionDate >= :start AND r.transactionDate < :end AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') ORDER BY r.transactionDate")
+    List<Receipt> findSalesOfTypesBetween(@Param("types") List<String> types, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // These members' New/Renewal receipts before a moment, oldest first — tells a
+    // plan-change (upgrade) renewal apart from a like-for-like one
+    @Query("SELECT r FROM Receipt r WHERE r.memberDbId IN :memberDbIds AND r.transactionType IN ('New', 'Renewal') AND r.transactionDate < :before AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') ORDER BY r.transactionDate, r.id")
+    List<Receipt> findMembershipReceiptsBefore(@Param("memberDbIds") List<Long> memberDbIds, @Param("before") LocalDateTime before);
+
     // All receipts with real money received since a date (for monthly chart)
     @Query("SELECT r FROM Receipt r WHERE r.paidAmount > 0 AND r.transactionDate >= :start ORDER BY r.transactionDate")
     List<Receipt> findPaidSince(@Param("start") LocalDateTime start);

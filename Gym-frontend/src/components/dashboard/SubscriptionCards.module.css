@@ -1,0 +1,134 @@
+/* Dashboard Overview "Today's Subscriptions & Passes" — layout per the GymBios Web App
+   Design, colours from the old Quick Actions buttons. Each card sets its
+   --shade-500/600/700 gradient inline. */
+
+.panel {
+  background: var(--card);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  padding: 1.25rem;
+}
+
+.heading {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.error {
+  margin: -0.5rem 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--destructive);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: #ffffff;
+  background: linear-gradient(to bottom right, var(--shade-500), var(--shade-600));
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+
+.card:hover {
+  background: linear-gradient(to bottom right, var(--shade-600), var(--shade-700));
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--shade-600);
+  outline-offset: 2px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.count {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.25);
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.375;
+  white-space: pre-line;
+}
+
+.label {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.amount {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.skeleton {
+  display: block;
+  border-radius: 0.375rem;
+  background: rgb(255 255 255 / 0.3);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonCount {
+  width: 1.75rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+}
+
+.skeletonAmount {
+  width: 4.5rem;
+  height: 1.5rem;
+  margin-top: 0.125rem;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.5; }
+}

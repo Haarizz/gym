@@ -64,7 +64,13 @@ export interface WalkInCheckInRequest {
   // The day-pass amount actually charged — when payment_status is "paid" and
   // this is positive, the backend posts it to the ledger as service revenue.
   amount?: number;
+  // How much of amount was received now (split/partial payments; the rest is left
+  // on credit). Takes precedence over payment_status when sent.
+  paid_amount?: number;
   payment_method?: string;
+  // Bank account a single Online payment went to
+  bank_account_code?: string;
+  bank_account_name?: string;
   // How the payment was actually received — card type, cheque number/bank/date,
   // bank account, or online payment provider — same shape as a member's payment.
   payment_breakdown?: PaymentSplitLeg[];

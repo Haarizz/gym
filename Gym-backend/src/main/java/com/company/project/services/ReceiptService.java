@@ -637,6 +637,7 @@ public class ReceiptService {
     public Receipt createWalkInReceipt(String visitorName, String visitorPhone, String planName,
                                        BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
                                        List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                       String bankAccountCode, String bankAccountName,
                                        String remarks, Long processedByStaffId) {
         BigDecimal totalAmount = amount != null ? amount : BigDecimal.ZERO;
         BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(totalAmount) : BigDecimal.ZERO;
@@ -649,6 +650,8 @@ public class ReceiptService {
         r.setAmount(totalAmount);
         r.setPaymentMethod(normalizePaymentMethod(paymentMethod));
         r.setPaymentBreakdown(paymentBreakdown);
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
         r.setPaidAmount(paid);
         r.setTotalPaidToDate(paid);
         r.setBalanceAfter(totalAmount.subtract(paid));
