@@ -64,7 +64,18 @@ public class JournalVoucherService {
      * over the wire (see docs/gymbios-financial-roadmap.html — M1).
      */
     public List<JournalVoucherResponseDTO> getJournalVouchers(String search, String status) {
+        return getJournalVouchers(search, status, false);
+    }
+
+    /**
+     * Journal vouchers are entered manually (BillBull's MANUAL journal voucher). The entries the
+     * system posts by itself — POS sales, invoices, receipts, purchases, payments, reversals of
+     * those — still post to the ledger, but are left out of this list unless asked for; they
+     * are seen in the General Ledger and on their source document.
+     */
+    public List<JournalVoucherResponseDTO> getJournalVouchers(String search, String status, boolean includeSystem) {
         Specification<JournalVoucher> spec = buildSpec(search, status);
+        if (!includeSystem) spec = spec.and((root, query, cb) -> cb.isFalse(root.get("systemGenerated")));
         List<JournalVoucher> all = journalVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
         return all.stream()
                 .map(jv -> {
@@ -204,6 +215,22 @@ public class JournalVoucherService {
      * This is the ERP-standard way to correct a posted entry — the original
      * entry is never deleted or modified.
      */
+    /**
+     * Reversal requested from the Journal Vouchers screen: only manual vouchers. An automatic
+     * posting is corrected through its source document (return, credit note, cancellation), so
+     * the books never drift from the sale, invoice or payment that produced them.
+     */
+    public JournalVoucherResponseDTO reverseManualJournalVoucher(Long id, LocalDate reversalDate, String reason) {
+        JournalVoucher jv = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
+        if (jv.isSystemGenerated()) {
+            throw new BusinessRuleViolationException("Journal " + jv.getVoucherNo() + " was posted automatically"
+                    + (jv.getReference() != null ? " by " + jv.getReference() : "")
+                    + ". Correct it from its source document (return, credit note or cancellation) instead of reversing it here.");
+        }
+        return reverseJournalVoucher(id, reversalDate, reason);
+    }
+
     public JournalVoucherResponseDTO reverseJournalVoucher(Long id, LocalDate reversalDate, String reason) {
         JournalVoucher original = journalVoucherRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new EntityNotFoundException("Journal Voucher not found: " + id));
@@ -231,7 +258,9 @@ public class JournalVoucherService {
         reversal.setReference("REVERSAL");
         reversal.setTotalDebit(original.getTotalCredit());
         reversal.setTotalCredit(original.getTotalDebit());
-        reversal.setSystemGenerated(true);
+        // A reversal belongs with what it reverses: a manual voucher's reversal stays on the manual
+        // list; reversing an automatic posting (e.g. a cancelled receipt) stays automatic.
+        reversal.setSystemGenerated(original.isSystemGenerated());
         reversal.setCurrencyCode(original.getCurrencyCode() != null ? original.getCurrencyCode() : "AED");
         reversal.setReversesVoucherId(original.getId());
         reversal = journalVoucherRepository.save(reversal);

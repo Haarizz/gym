@@ -97,7 +97,14 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             Map.entry("V61__mobile_push_tokens_and_deliveries.sql", "V65__mobile_push_tokens_and_deliveries.sql"),
             Map.entry("V62__membership_freezes.sql", "V66__membership_freezes.sql"),
             Map.entry("V63__community_member_authors.sql", "V67__community_member_authors.sql"),
-            Map.entry("V64__membership_plan_offers.sql", "V68__membership_plan_offers.sql")
+            Map.entry("V64__membership_plan_offers.sql", "V68__membership_plan_offers.sql"),
+            // main took V69-V72 (reward audit check, member status, lead link, community
+            // participants) after tenants had run these two as V69/V70. Both files were
+            // edited after they ran (checksum drift); their schema effects — members.email
+            // nullable, receipt_vouchers.system_generated NOT NULL DEFAULT FALSE — were
+            // verified present on every tenant before recording the rename.
+            Map.entry("V69__members_email_nullable.sql", "V73__members_email_nullable.sql"),
+            Map.entry("V70__receipt_voucher_system_generated.sql", "V74__receipt_voucher_system_generated.sql")
     );
 
     /**
@@ -110,7 +117,11 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
      * V62's backfill only touches suppliers with no branch_id, so it's a no-op when
      * TenantSupplierBranchBackfillRunner already applied it.
      */
-    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47", "56", "60", "61", "62", "63");
+    static final Set<String> SAFE_OUT_OF_ORDER = Set.of("34", "35", "44", "45", "46", "47", "56", "60", "61", "62", "63",
+            // 69-72 land below the relabelled V73/V74: a guarded constraint drop, an
+            // idempotent status normalisation, ADD COLUMN/INDEX IF NOT EXISTS, and a
+            // fully guarded community-columns migration — all re-runnable.
+            "69", "70", "71", "72");
 
     /**
      * Migrations that may have been applied by hand, outside Flyway: a query

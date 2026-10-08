@@ -20,6 +20,8 @@ public class SalesInvoice extends BaseEntity implements BranchAware {
 
     public static final String CUSTOMER_WALK_IN = "WALK_IN";
     public static final String CUSTOMER_MEMBER = "MEMBER";
+    public static final String SOURCE_MANUAL = "MANUAL";
+    public static final String SOURCE_POS = "POS";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -134,6 +136,18 @@ public class SalesInvoice extends BaseEntity implements BranchAware {
     @Column(name = "branch_id")
     private Long branchId;
 
+    /** MANUAL (back-office invoice) or POS (mirror of a POS sale — read-only here). */
+    @Column(name = "source", nullable = false)
+    private String source = SOURCE_MANUAL;
+
+    /** The POS sale this invoice mirrors (source = POS). */
+    @Column(name = "pos_transaction_id")
+    private Long posTransactionId;
+
+    /** Value returned through POS sales returns (POS invoices only). */
+    @Column(name = "returned_amount", precision = 12, scale = 2)
+    private BigDecimal returnedAmount = BigDecimal.ZERO;
+
     public SalesInvoice() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
@@ -236,4 +250,11 @@ public class SalesInvoice extends BaseEntity implements BranchAware {
 
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public String getSource() { return source != null ? source : SOURCE_MANUAL; }
+    public void setSource(String source) { this.source = source; }
+    public boolean isPos() { return SOURCE_POS.equals(source); }
+    public Long getPosTransactionId() { return posTransactionId; }
+    public void setPosTransactionId(Long posTransactionId) { this.posTransactionId = posTransactionId; }
+    public BigDecimal getReturnedAmount() { return returnedAmount != null ? returnedAmount : BigDecimal.ZERO; }
+    public void setReturnedAmount(BigDecimal returnedAmount) { this.returnedAmount = returnedAmount; }
 }

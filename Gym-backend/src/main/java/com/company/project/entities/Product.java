@@ -71,6 +71,22 @@ public class Product extends BaseEntity implements BranchAware {
     @Column(name = "tax_rate", precision = 5, scale = 2)
     private BigDecimal taxRate = new BigDecimal("5.00");
 
+    /** true: lines follow the branch default tax (Settings › Tax Configuration); false: taxRate overrides it. */
+    @Column(name = "use_default_tax", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean useDefaultTax = true;
+
+    /** false: no discount may be given on this product. */
+    @Column(name = "allow_discount", nullable = false, columnDefinition = "boolean not null default true")
+    private Boolean allowDiscount = true;
+
+    /** Sales discount pre-filled on POS / Sales Invoice lines, and this product's discount limit. */
+    @Column(name = "max_discount_percent", precision = 5, scale = 2, nullable = false, columnDefinition = "numeric(5,2) not null default 0")
+    private BigDecimal maxDiscountPercent = BigDecimal.ZERO;
+
+    /** Discount pre-filled on Purchase Order / Supplier Bill lines. */
+    @Column(name = "purchase_discount_percent", precision = 5, scale = 2, nullable = false, columnDefinition = "numeric(5,2) not null default 0")
+    private BigDecimal purchaseDiscountPercent = BigDecimal.ZERO;
+
     @Column(name = "supplier")
     private String supplier;
 
@@ -131,6 +147,14 @@ public class Product extends BaseEntity implements BranchAware {
 
     public BigDecimal getTaxRate() { return taxRate; }
     public void setTaxRate(BigDecimal taxRate) { this.taxRate = taxRate; }
+    public Boolean getUseDefaultTax() { return useDefaultTax; }
+    public void setUseDefaultTax(Boolean v) { this.useDefaultTax = v; }
+    public Boolean getAllowDiscount() { return allowDiscount; }
+    public void setAllowDiscount(Boolean v) { this.allowDiscount = v; }
+    public BigDecimal getMaxDiscountPercent() { return maxDiscountPercent; }
+    public void setMaxDiscountPercent(BigDecimal v) { this.maxDiscountPercent = v; }
+    public BigDecimal getPurchaseDiscountPercent() { return purchaseDiscountPercent; }
+    public void setPurchaseDiscountPercent(BigDecimal v) { this.purchaseDiscountPercent = v; }
 
     public String getSupplier() { return supplier; }
     public void setSupplier(String supplier) { this.supplier = supplier; }

@@ -25,8 +25,10 @@ public class JournalVoucherController {
     @GetMapping
     public ResponseEntity<List<JournalVoucherResponseDTO>> getJournalVouchers(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(journalVoucherService.getJournalVouchers(search, status));
+            @RequestParam(required = false) String status,
+            /** true also lists the entries the system posted automatically (sales, invoices, payments…). */
+            @RequestParam(name = "includeSystem", defaultValue = "false") boolean includeSystem) {
+        return ResponseEntity.ok(journalVoucherService.getJournalVouchers(search, status, includeSystem));
     }
 
     @GetMapping("/{id}")
@@ -73,7 +75,7 @@ public class JournalVoucherController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate reversalDate,
             @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(
-                journalVoucherService.reverseJournalVoucher(id, reversalDate, reason));
+                journalVoucherService.reverseManualJournalVoucher(id, reversalDate, reason));
     }
 
     @DeleteMapping("/{id}")

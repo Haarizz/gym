@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface CashMovementRepository extends JpaRepository<CashMovement, Long> {
     List<CashMovement> findByPosSessionIdOrderByCreatedAtDesc(Long sessionId);
+
+    List<CashMovement> findByPosSessionIdInOrderByCreatedAtAsc(java.util.Collection<Long> sessionIds);
 }

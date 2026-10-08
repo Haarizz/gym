@@ -50,9 +50,12 @@ export async function getCompanyDetails(branchId?: number | null): Promise<Compa
   const pending = inflight.get(key);
   if (pending) return pending;
 
-  const request = financialSettingsService
-    .getSettings("COMPANY", branchId)
-    .then(settings => {
+  const request = Promise.all([
+    financialSettingsService.getSettings("COMPANY", branchId),
+    // A branch switched to "not VAT registered" (Settings › Tax Configuration) prints no TRN.
+    financialSettingsService.getSettings("BRANCH_TAX", branchId).catch(() => []),
+  ])
+    .then(([settings, taxSettings]) => {
       const details = { ...DEFAULT_COMPANY };
       settings.forEach(s => {
         if (!s.settingValue) return;
@@ -64,6 +67,8 @@ export async function getCompanyDetails(branchId?: number | null): Promise<Compa
         if (s.settingKey === "company_stamp") details.stamp = s.settingValue;
         if (s.settingKey === "company_trn") details.trn = s.settingValue;
       });
+      const registered = taxSettings.find(s => s.settingKey === "vat_registered")?.settingValue;
+      if (String(registered).toLowerCase() === "false") details.trn = "";
       cached.set(key, details);
       return details;
     })

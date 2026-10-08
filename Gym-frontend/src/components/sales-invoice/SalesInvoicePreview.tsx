@@ -190,7 +190,12 @@ function InvoiceRecord({
             </h2>
             <StatusPill inv={inv} />
             <span className={cx(styles.pill, ct.cls)}>{ct.label}</span>
-            <span className={cx(styles.pill, styles.pillGray)}>Direct Sale</span>
+            {inv.source === 'POS'
+              ? <span className={cx(styles.pill, styles.pillBlue)} title="Recorded from the Point of Sale — collect credit and make returns on the POS">POS Sale</span>
+              : <span className={cx(styles.pill, styles.pillGray)}>Direct Sale</span>}
+            {inv.source === 'POS' && inv.returnedAmount > 0 && (
+              <span className={cx(styles.pill, styles.pillAmber)}>Returned <CurrencyValue amount={inv.returnedAmount} options={fmt} /></span>
+            )}
             {inv.pricesIncludeTax && <span className={cx(styles.pill, styles.pillGray)}>VAT Incl.</span>}
           </div>
           <div className={styles.metaLine}>

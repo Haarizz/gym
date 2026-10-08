@@ -398,6 +398,10 @@ public class ProductService {
         copy.setSellingPrice(original.getSellingPrice());
         copy.setCostPrice(original.getCostPrice());
         copy.setTaxRate(original.getTaxRate());
+        copy.setUseDefaultTax(original.getUseDefaultTax());
+        copy.setAllowDiscount(original.getAllowDiscount());
+        copy.setMaxDiscountPercent(original.getMaxDiscountPercent());
+        copy.setPurchaseDiscountPercent(original.getPurchaseDiscountPercent());
         copy.setSupplier(original.getSupplier());
         copy = productRepository.save(copy);
 
@@ -450,7 +454,18 @@ public class ProductService {
         if (req.getSellingPrice() != null) product.setSellingPrice(req.getSellingPrice());
         if (req.getCostPrice() != null) product.setCostPrice(req.getCostPrice());
         if (req.getTaxRate() != null) product.setTaxRate(req.getTaxRate());
+        if (req.getUseDefaultTax() != null) product.setUseDefaultTax(req.getUseDefaultTax());
+        if (req.getAllowDiscount() != null) product.setAllowDiscount(req.getAllowDiscount());
+        if (req.getMaxDiscountPercent() != null) product.setMaxDiscountPercent(percent(req.getMaxDiscountPercent(), "Maximum discount"));
+        if (req.getPurchaseDiscountPercent() != null) product.setPurchaseDiscountPercent(percent(req.getPurchaseDiscountPercent(), "Purchase discount"));
         if (req.getSupplier() != null) product.setSupplier(req.getSupplier());
+    }
+
+    private static BigDecimal percent(BigDecimal v, String what) {
+        if (v.signum() < 0 || v.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException(what + " must be between 0 and 100%");
+        }
+        return v.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     /** Validates a user-entered SKU: required, trimmed, and unique across products. */

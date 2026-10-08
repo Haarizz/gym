@@ -46,6 +46,14 @@ public class PurchaseOrderService {
     private final ProductRepository productRepository;
     private final NotificationService notificationService;
 
+    /** Optional (absent in unit tests): branch tax policy — Settings › Tax Configuration. */
+    private com.company.project.services.TaxPolicyService taxPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTaxPolicy(@org.springframework.context.annotation.Lazy com.company.project.services.TaxPolicyService taxPolicy) {
+        this.taxPolicy = taxPolicy;
+    }
+
     public PurchaseOrderService(PurchaseOrderRepository purchaseOrderRepository,
                                 PurchaseOrderItemRepository purchaseOrderItemRepository,
                                 SupplierRepository supplierRepository,
@@ -313,7 +321,9 @@ public class PurchaseOrderService {
         item.setUnitPrice(req.getUnitPrice() != null ? req.getUnitPrice() : BigDecimal.ZERO);
 
         BigDecimal discPct = req.getDiscountPercent() != null ? req.getDiscountPercent() : BigDecimal.ZERO;
-        BigDecimal taxPct = req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO;
+        // Not VAT registered → no tax on purchases (Settings › Tax Configuration).
+        BigDecimal taxPct = taxPolicy != null ? taxPolicy.purchaseRate(null, req.getTaxPercent())
+                : req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO;
         item.setDiscountPercent(discPct);
         item.setTaxPercent(taxPct);
 

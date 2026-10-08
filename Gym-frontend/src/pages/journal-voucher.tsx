@@ -255,7 +255,9 @@ export function JournalVoucherPage() {
         <div>
           <h1 className="text-3xl font-bold">Journal Vouchers</h1>
           <p className="text-gray-600 mt-1">
-            Create and manage double-entry journal entries for financial adjustments
+            Manually entered double-entry journals for financial adjustments. Entries the system posts
+            automatically (POS sales, invoices, receipts, purchases, payments) are not listed here — they
+            appear in the General Ledger and on their source documents.
           </p>
         </div>
         <div className="flex items-center space-x-3">

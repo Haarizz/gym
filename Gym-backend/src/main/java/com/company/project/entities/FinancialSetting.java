@@ -14,7 +14,7 @@ public class FinancialSetting extends BaseEntity {
     private String settingKey;
 
     // Null for genuinely-global settings (GENERAL/ACCOUNTING/TAX/BANK categories).
-    // Set only for COMPANY-category and APP_PREFERENCES/currency_code rows, which
+    // Set only for COMPANY, BRANCH_TAX and APP_PREFERENCES/currency_code rows, which
     // are branch-scoped — see FinancialSettingService's BRANCH_SCOPED_CATEGORIES.
     // Deliberately NOT a BranchAware entity: that would force every category into
     // branch-scoping via the generic BranchSecurityListener, breaking the

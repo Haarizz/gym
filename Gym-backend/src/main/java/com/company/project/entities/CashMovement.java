@@ -24,9 +24,44 @@ public class CashMovement extends BaseEntity {
     @Column(name = "reason")
     private String reason;
 
+    @Column(name = "category", length = 100)
+    private String category;
+
+    @Column(name = "reference")
+    private String reference;
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    /** Managed category (V79); `category` keeps its name as recorded. */
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    /** Ledger account the movement was posted against, when its category names one. */
+    @Column(name = "posted_account_code", length = 30)
+    private String postedAccountCode;
+
+    @Column(name = "posted_account_name", length = 150)
+    private String postedAccountName;
+
     public CashMovement() {}
 
     // ── Getters & Setters ──────────────────────────────────────────────────
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public String getReference() { return reference; }
+    public void setReference(String reference) { this.reference = reference; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
+    public String getPostedAccountCode() { return postedAccountCode; }
+    public void setPostedAccountCode(String v) { this.postedAccountCode = v; }
+    public String getPostedAccountName() { return postedAccountName; }
+    public void setPostedAccountName(String v) { this.postedAccountName = v; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

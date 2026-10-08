@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Banknote, CreditCard, Landmark, Users, Pencil, X as XIcon } from "lucide-react";
+import { Banknote, CreditCard, Landmark, Users, Pencil, Wallet, X as XIcon } from "lucide-react";
 import { CurrencyValue } from "../utils/currency";
 import { Progress } from "../components/ui/progress";
 import type { AccountHead } from "../utils/supabase/account-heads-service";
@@ -9,9 +9,10 @@ import { CashModal, CashDraft } from "./modals/CashModal";
 import { CardModal, CardDraft } from "./modals/CardModal";
 import { OnlineModal, OnlineDraft } from "./modals/OnlineModal";
 import { CreditModal, CreditDraft, CreditCustomer, CreditParty } from "./modals/CreditModal";
+import { WalletModal, WalletDraft } from "./modals/WalletModal";
 import { resolveConfirm } from "./resolveConfirm";
 
-type Draft = CashDraft | CardDraft | OnlineDraft | CreditDraft;
+type Draft = CashDraft | CardDraft | OnlineDraft | CreditDraft | WalletDraft;
 type ConfirmPayload = Draft | Draft[];
 
 const METHOD_TILES: { type: PaymentType; label: string; hotkey: string; icon: React.ReactNode; accent: string }[] = [
@@ -19,6 +20,7 @@ const METHOD_TILES: { type: PaymentType; label: string; hotkey: string; icon: Re
   { type: PAYMENT_TYPES.CARD, label: "Card", hotkey: "d", icon: <CreditCard size={19} />, accent: "#2563EB" },
   { type: PAYMENT_TYPES.ONLINE, label: "Online", hotkey: "o", icon: <Landmark size={19} />, accent: "#0D9488" },
   { type: PAYMENT_TYPES.CREDIT, label: "Credit", hotkey: "r", icon: <Users size={19} />, accent: "#7C3AED" },
+  { type: PAYMENT_TYPES.WALLET, label: "Wallet", hotkey: "w", icon: <Wallet size={19} />, accent: "#CA8A04" },
 ];
 
 const ACCENT_BY_TYPE: Record<PaymentType, string> = {
@@ -26,6 +28,7 @@ const ACCENT_BY_TYPE: Record<PaymentType, string> = {
   [PAYMENT_TYPES.CARD]: "#2563EB",
   [PAYMENT_TYPES.ONLINE]: "#0D9488",
   [PAYMENT_TYPES.CREDIT]: "#7C3AED",
+  [PAYMENT_TYPES.WALLET]: "#CA8A04",
 };
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -149,6 +152,8 @@ export interface PaymentAllocationPanelProps {
   offeredTypes?: PaymentType[];
   /** Fixed owner of any Credit line (e.g. the bill's supplier) — see CreditParty. */
   creditParty?: CreditParty;
+  /** Spendable wallet balance when WALLET is offered (null = no member / unknown). */
+  walletBalance?: number | null;
 }
 
 export function PaymentAllocationPanel({
@@ -160,6 +165,7 @@ export function PaymentAllocationPanel({
   onSearchCustomers,
   offeredTypes = [PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT],
   creditParty,
+  walletBalance = null,
 }: PaymentAllocationPanelProps) {
   const creditLabel = creditParty ? `Left on credit (${creditParty.accountLabel})` : "Transferred to Accounts Receivable";
   const [openModal, setOpenModal] = useState<PaymentType | null>(null);
@@ -168,7 +174,10 @@ export function PaymentAllocationPanel({
   const { paymentLines, remaining, allocated, change, methodsUsed, summary, fullyAllocated, overAllocated, errors, addLine, updateLine, removeLine, targetFor } =
     manager;
 
-  const availableTiles = METHOD_TILES.filter((t) => offeredTypes.includes(t.type));
+  const walletUsed = manager.totalByType(PAYMENT_TYPES.WALLET);
+  // Wallet needs a member with a balance; it never appears unless the page offers it.
+  const availableTiles = METHOD_TILES.filter((t) => offeredTypes.includes(t.type)
+    && (t.type !== PAYMENT_TYPES.WALLET || (walletBalance ?? 0) > 0));
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -241,7 +250,7 @@ export function PaymentAllocationPanel({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
         <div style={{ fontSize: 13.5, fontWeight: 600, color: "#6b7280", marginBottom: 10 }}>Add Payment</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(4, availableTiles.length)}, 1fr)`, gap: 10 }}>
           {availableTiles.map((tile) => (
             <button
               key={tile.type}
@@ -283,6 +292,9 @@ export function PaymentAllocationPanel({
                 {tile.icon}
               </div>
               <span style={{ fontSize: 12.5, fontWeight: 600 }}>{tile.label}</span>
+              {tile.type === PAYMENT_TYPES.WALLET && walletBalance != null && (
+                <span style={{ fontSize: 11, color: "#92400e" }}>Balance <CurrencyValue amount={walletBalance} /></span>
+              )}
             </button>
           ))}
         </div>
@@ -424,6 +436,17 @@ export function PaymentAllocationPanel({
           editingLine={editingLine?.paymentType === PAYMENT_TYPES.ONLINE ? editingLine : null}
           bankAccounts={bankAccounts}
           bankAccountsLoading={bankAccountsLoading}
+          offeredTypes={offeredTypes}
+        />
+      )}
+      {openModal === PAYMENT_TYPES.WALLET && (
+        <WalletModal
+          open
+          onClose={closeModal}
+          onConfirm={handleConfirm}
+          target={targetFor(editingLine)}
+          editingLine={editingLine?.paymentType === PAYMENT_TYPES.WALLET ? editingLine : null}
+          balance={Math.max(0, (walletBalance ?? 0) - walletUsed + (editingLine?.paymentType === PAYMENT_TYPES.WALLET ? editingLine.amount : 0))}
           offeredTypes={offeredTypes}
         />
       )}

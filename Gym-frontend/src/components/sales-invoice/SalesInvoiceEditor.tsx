@@ -9,6 +9,7 @@ import { CurrencyGlyph, CurrencyValue, useCurrency } from '../../utils/currency'
 import { membersService, type Member } from '../../utils/supabase/members-service';
 import type { SalesCustomerType, SalesInvoice, SalesInvoiceRequest } from '../../utils/supabase/sales-invoice-service';
 import type { Product, Warehouse } from '../../utils/supabase/products-service';
+import { getTaxDefaults, salesDiscountFor, salesTaxFor, type TaxDefaults } from '../../utils/supabase/tax-defaults-service';
 import styles from '../purchase/PurchaseInvoice.module.css';
 import { FastEntry, ProductSelector, Thumb } from '../purchase/lineEntry';
 import { PAYMENT_TERMS, addDays, displayDate, money, round2, todayIso } from '../purchase/purchaseInvoiceUtils';
@@ -164,6 +165,9 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
   const pendingFocus = useRef<string | null>(null);
 
   useEffect(() => { setForm(initial); setBaseline(JSON.stringify(initial)); }, [initial]);
+  // Branch tax policy (Settings › Tax Configuration) — the server applies the same rule on save.
+  const [taxDefaults, setTaxDefaults] = useState<TaxDefaults | null>(null);
+  useEffect(() => { getTaxDefaults().then(setTaxDefaults).catch(() => setTaxDefaults(null)); }, []);
 
   useEffect(() => {
     if (!pendingFocus.current) return;
@@ -192,7 +196,8 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
     return best;
   };
 
-  const lineFromProduct = (p: Product, qty = 1, price = p.sellingPrice ?? 0, disc = 0): Line => ({
+  // BillBull: the product's discount is pre-filled on the line, and is the most it can carry.
+  const lineFromProduct = (p: Product, qty = 1, price = p.sellingPrice ?? 0, disc = salesDiscountFor(p)): Line => ({
     key: newKey(),
     productId: p.id,
     productName: p.name,
@@ -201,10 +206,24 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
     warehouseId: bestWarehouse(p),
     quantity: qty,
     unitPrice: price,
-    discountPercent: disc,
-    taxPercent: p.taxRate ?? 0,
+    discountPercent: disc || salesDiscountFor(p),
+    taxPercent: salesTaxFor(p, taxDefaults),
     notes: '',
   });
+
+  /** The discount a line may carry: none when the product doesn't allow discounts, else up to its maximum. */
+  const discountCap = (productId: number | null | undefined) => {
+    const p = productId != null ? productById.get(productId) : undefined;
+    if (!p) return 100;
+    if (p.allowDiscount === false) return 0;
+    return p.maxDiscountPercent > 0 ? p.maxDiscountPercent : 100;
+  };
+  const setLineDiscount = (key: string, productId: number | null | undefined, raw: string) => {
+    const cap = discountCap(productId);
+    const v = Math.min(100, Math.max(0, Number(raw) || 0));
+    if (v > cap) toast.error(cap === 0 ? 'Discounts are not allowed on this product.' : `The maximum discount for this product is ${cap}%.`);
+    updateLine(key, { discountPercent: Math.min(v, cap) });
+  };
 
   const addLine = (line: Line) => {
     setForm(f => {
@@ -706,11 +725,12 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); entryRef.current?.focus(); } }} />
                           </td>
                           <td>
-                            <input type="number" min={0} max={100} step="0.01" className={cx(styles.cellInput, styles.right)}
-                              value={l.discountPercent === 0 ? '' : l.discountPercent} placeholder="0" disabled={readOnly}
-                              onChange={e => updateLine(l.key, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
+                            <input type="number" min={0} max={discountCap(l.productId)} step="0.01" className={cx(styles.cellInput, styles.right)}
+                              value={l.discountPercent === 0 ? '' : l.discountPercent} placeholder="0" disabled={readOnly || discountCap(l.productId) === 0}
+                              title={discountCap(l.productId) === 0 ? 'No discount on this product' : discountCap(l.productId) < 100 ? `Max ${discountCap(l.productId)}%` : undefined}
+                              onChange={e => setLineDiscount(l.key, l.productId, e.target.value)} />
                           </td>
-                          <td className={cx(styles.right, styles.muted)} title="From the product's VAT rate">{l.taxPercent ? `${l.taxPercent}%` : '—'}</td>
+                          <td className={cx(styles.right, styles.muted)} title={taxDefaults && !taxDefaults.vatRegistered ? "Not VAT registered — no tax" : "Branch sales tax, or the product's own rate"}>{l.taxPercent ? `${l.taxPercent}%` : '—'}</td>
                           <td className={styles.lineTotal}>
                             {money(a?.total ?? 0)}
                             {(a?.discount ?? 0) > 0 && <div className={cx(styles.tiny, styles.danger)} style={{ fontWeight: 500 }}>− {money(a.discount)}</div>}

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Settings, CheckCircle2, XCircle, Search, Building2, Users } from 'lucide-react';
+import { Plus, Edit2, CheckCircle2, XCircle, Search, Building2, Users } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -13,7 +12,6 @@ import { branchApi, BranchDTO } from '../utils/supabase/branch-service';
 import { useBranch } from '../utils/branch-context';
 
 export function BranchManagement() {
-  const navigate = useNavigate();
   const [branches, setBranches] = useState<BranchDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -189,14 +187,6 @@ export function BranchManagement() {
                         aria-label="Edit branch"
                       >
                         <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate(`/branch-management/${branch.id}/settings`)}
-                        aria-label="Branch settings"
-                      >
-                        <Settings className="h-4 w-4" />
                       </Button>
                       <Switch
                         checked={branch.status === 'ACTIVE'}

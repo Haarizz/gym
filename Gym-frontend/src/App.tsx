@@ -62,7 +62,6 @@ import { CatalogResolver } from "./pages/catalog/resolver";
 import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
-import { BranchSettings } from "./pages/branch-settings";
 import { GymManagement } from "./pages/gym-management";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
@@ -1275,7 +1274,6 @@ export default function App() {
       <Route path="/assets" element={<Assets />} />
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
-      <Route path="/branch-management/:branchId/settings" element={<BranchSettings />} />
       <Route path="/gym-management" element={<GymManagement />} />
       <Route path="/pending-approval" element={<PendingApproval />} />
       <Route path="/platform-leads" element={<PlatformLeads />} />

@@ -62,6 +62,10 @@ export const customerTypeMeta = (inv: Pick<SalesInvoice, 'customerType'>) =>
 
 /** What the user may do to an invoice in its current state (mirrors backend rules). */
 export function invoiceActions(inv: SalesInvoice) {
+  // POS sales are mirrored here read-only: credit is collected and returns are made on the POS.
+  if (inv.source === 'POS') {
+    return { edit: false, confirm: false, delete: false, cancel: false, recordPayment: false, print: inv.items.length > 0 };
+  }
   const isDraft = inv.status === 'DRAFT';
   const isConfirmed = inv.status === 'CONFIRMED';
   return {

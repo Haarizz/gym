@@ -20,15 +20,16 @@ public class SalesInvoiceController {
     }
 
     /**
-     * GET /api/sales-invoices?page=1&size=20&status=&search=
+     * GET /api/sales-invoices?page=1&size=20&status=&search=&source=  (source: MANUAL | POS)
      */
     @GetMapping
     public ResponseEntity<SalesInvoicesPageResponseDTO> getInvoices(
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(salesInvoiceService.getInvoices(page, size, status, search));
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String source) {
+        return ResponseEntity.ok(salesInvoiceService.getInvoices(page, size, status, search, source));
     }
 
     /**
