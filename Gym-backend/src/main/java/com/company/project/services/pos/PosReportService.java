@@ -119,8 +119,12 @@ public class PosReportService {
         List<ChecklistItem> checklist = new ArrayList<>();
         checklist.add(new ChecklistItem("SESSIONS_CLOSED", "All sessions closed", open == 0,
                 open == 0 ? d.sessions.size() + " session(s) closed" : open + " session(s) still open"));
-        checklist.add(new ChecklistItem("NOT_ALREADY_CLOSED", "Day not already closed", close == null,
-                close == null ? "Ready to close" : "Closed by " + close.getClosedBy() + " (" + close.getCloseNumber() + ")"));
+        // Once the day is closed that's the finished state, not a failed check — show it
+        // as done rather than a red "Day not already closed" next to the Closed badge.
+        checklist.add(close == null
+                ? new ChecklistItem("NOT_ALREADY_CLOSED", "Day not yet closed", true, "Ready to close")
+                : new ChecklistItem("DAY_CLOSED", "Day closed", true,
+                        "Closed by " + close.getClosedBy() + " (" + close.getCloseNumber() + ")"));
         checklist.add(new ChecklistItem("HELD_SALES", "No parked sales", held == 0,
                 held == 0 ? "No held carts" : held + " held cart(s) will stay parked (warning only)"));
         checklist.add(new ChecklistItem("CASH_VARIANCE", "Cash variance reviewed", varianceTotal.signum() == 0,
