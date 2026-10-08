@@ -58,6 +58,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { RenewalTransactionHistory } from "../components/members/RenewalTransactionHistory";
+import { DueForRenewalList } from "../components/members/DueForRenewalList";
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
 import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
@@ -2061,6 +2062,18 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               )}
             </CardContent>
           </Card>
+
+          {/* Members who need renewing, most overdue first — pick one to start */}
+          {!selectedMemberForRenewal && (
+            <DueForRenewalList
+              refreshKey={renewalHistoryKey}
+              onSelect={(memberDbId) => {
+                membersService.getMemberById(String(memberDbId))
+                  .then((member) => { if (member) selectMemberForRenewal(member); })
+                  .catch(() => toast.error("Couldn't load that member"));
+              }}
+            />
+          )}
 
           {/* Step 2: Choose New Plan */}
           {selectedMemberForRenewal && (

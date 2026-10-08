@@ -46,11 +46,6 @@ import {
 } from 'recharts';
 import { 
   Search,
-  UserPlus,
-  Receipt,
-  RotateCcw,
-  ShoppingCart,
-  Calendar,
   DollarSign,
   Users,
   UserCheck,
@@ -96,16 +91,7 @@ import {
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, isYesterday } from 'date-fns';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { RevenueDashboard } from '../components/dashboard/RevenueDashboard';
-
-// Types
-interface QuickAction {
-  id: string;
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
-  color: string;
-  onClick: () => void;
-}
+import { SubscriptionCards } from '../components/dashboard/SubscriptionCards';
 
 // Interface for navigation with params
 interface NavigationHandler {
@@ -431,90 +417,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     toast.success('Dashboard exported');
   }, [kpiData, revenueData, membershipDistribution, attendanceByType, salesPipeline, dateFilter, periodLabel, currencyCode]);
 
-  // Quick Actions with GymBios gradient theme
-  const quickActions: QuickAction[] = [
-    {
-      id: 'add-member',
-      title: 'Add Member',
-      icon: UserPlus,
-      description: 'Register new member',
-      color: 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('add-member');
-          toast.success('Navigating to Add Member form', {
-            description: 'Register a new gym member',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'member-receipt',
-      title: 'Member Receipt',
-      icon: Receipt,
-      description: 'Generate receipt',
-      color: 'bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('members', { tab: 'receipts' });
-          toast.success('Opening Member Receipts', {
-            description: 'View and generate member receipts',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'renew-upgrade',
-      title: 'Renew / Upgrade',
-      icon: RotateCcw,
-      description: 'Member renewals',
-      color: 'bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('members', { tab: 'renewals' });
-          toast.success('Opening Renewals & Upgrades', {
-            description: 'Manage membership renewals and upgrades',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'pos',
-      title: 'POS',
-      icon: ShoppingCart,
-      description: 'Point of Sale',
-      color: 'bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('point-of-sale');
-          toast.success('Opening Point of Sale', {
-            description: 'Process sales and transactions',
-            duration: 2000,
-          });
-        }
-      }
-    },
-    {
-      id: 'schedule-class',
-      title: 'Schedule Class',
-      icon: Calendar,
-      description: 'Create class schedule',
-      color: 'bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300',
-      onClick: () => {
-        if (onNavigate) {
-          onNavigate('trainings-classes');
-          toast.success('Opening Class Scheduler', {
-            description: 'Create and manage class schedules',
-            duration: 2000,
-          });
-        }
-      }
-    }
-  ];
-
   // Search members function
   const searchMembers = useCallback(async (term: string) => {
     if (!term.trim()) {
@@ -814,28 +716,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
         {/* Overview Tab Content */}
         <TabsContent value="overview" className="space-y-6 mt-0">
-      {/* Quick Action Tabs */}
-      <div className={cn(dashboardSurfaceShell, "p-6")}>
-        <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {quickActions.map((action) => (
-            <Button
-              key={action.id}
-              onClick={action.onClick}
-              className={cn(
-                "h-auto p-4 flex flex-col items-center space-y-2 text-white",
-                action.color
-              )}
-            >
-              <action.icon className="h-6 w-6" />
-              <div className="text-center">
-                <p className="font-medium text-sm">{action.title}</p>
-                <p className="text-xs opacity-90">{action.description}</p>
-              </div>
-            </Button>
-          ))}
-        </div>
-      </div>
+      {/* Subscription & pass sales for the selected period */}
+      <SubscriptionCards
+        period={dateFilter}
+        periodLabel={periodLabel}
+        refreshKey={revenueRefreshKey}
+        onNavigate={onNavigate}
+      />
 
       {/* KPI Summary Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

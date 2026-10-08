@@ -53,6 +53,11 @@ export const dashboardService = {
     return apiCall(`/dashboard/kpis?period=${period}`);
   },
 
+  // New / Renewal / Upgrade / Add-on / Day-Pass sales and collection for the period
+  async getSubscriptionSummary(period: string = 'today') {
+    return apiCall(`/dashboard/subscription-summary?period=${period}`) as Promise<ApiResponse<SubscriptionSummary>>;
+  },
+
   // Get revenue data for specific period
   async getRevenueData(period: string = 'today') {
     return apiCall(`/dashboard/revenue?period=${period}`);
@@ -213,7 +218,23 @@ export interface PendingTaskData {
   subject: string;
 }
 
-export type RevenueGranularity = 'hourly' | 'daily' | 'weekly' | 'monthly';
+export type SubscriptionCardKey = 'new' | 'renew' | 'upgrade' | 'addons' | 'dayPass';
+
+export interface SubscriptionSummary {
+  period: string;
+  from: string;
+  to: string;
+  cards: {
+    key: SubscriptionCardKey;
+    count: number;
+    collected: number;
+    /** Sales in the period that still carry a balance, and how much is owed on them */
+    pendingCount: number;
+    pendingAmount: number;
+  }[];
+}
+
+export type RevenueGranularity ='hourly' | 'daily' | 'weekly' | 'monthly';
 
 export interface RevenueBreakdownRow {
   name: string;

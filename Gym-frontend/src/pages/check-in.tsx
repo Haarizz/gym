@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -22,7 +23,6 @@ import {
   AlertCircle,
   UserPlus,
   Upload,
-  CreditCard,
   X,
   CalendarClock,
   RefreshCw,
@@ -36,7 +36,11 @@ import { staffAttendanceService } from '../utils/supabase/staff-attendance-servi
 import { attendanceService } from '../utils/supabase/attendance-service';
 import { plansService, type Plan } from '../utils/supabase/plans-service';
 import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
-import type { PaymentSplitLeg } from '../utils/supabase/billing-service';
+import { usePaymentManager } from '../payments/usePaymentManager';
+import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
+import { buildPaymentPayload } from '../payments/paymentPayload';
+import { PAYMENT_TYPES } from '../payments/paymentModel';
+import type { CreditCustomer } from '../payments/modals/CreditModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,19 +54,6 @@ interface PersonEntry {
   status: string;
   photoUrl?: string;
 }
-
-// ── Payment methods (mirrors add-member.tsx's canonical set, minus POS) ──────
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: 'Cash',
-  card: 'Card',
-  check: 'Cheque',
-  'bank-transfer': 'Bank Transfer',
-  online: 'Online Payment',
-  credit: 'Credit',
-};
-const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Maestro', 'Diners Club', 'Other'];
-const ONLINE_PAYMENT_TYPE_OPTIONS = ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Samsung Pay', 'Apple Pay', 'Amazon Pay', 'UPI', 'Other'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -112,7 +103,11 @@ export function CheckIn() {
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm]       = useState('');
-  const [activeTab, setActiveTab]         = useState('registered');
+  // The dashboard's Day-Pass card opens this straight on the Walk-In / Daily tab
+  const location = useLocation();
+  const [activeTab, setActiveTab]         = useState(
+    (location.state as { tab?: string } | null)?.tab === 'daily' ? 'daily' : 'registered'
+  );
   const [selectedPerson, setSelectedPerson] = useState<PersonEntry | null>(null);
   const [activeOnlyFilter, setActiveOnlyFilter] = useState(false);
 
@@ -122,24 +117,12 @@ export function CheckIn() {
   const [visitorPhoto, setVisitorPhoto]   = useState<string | null>(null);
   const [walkInPlans, setWalkInPlans]     = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan]   = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [paymentDone, setPaymentDone]     = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
+  const [grantingAccess, setGrantingAccess] = useState(false);
   const [dailyCheckIns, setDailyCheckIns] = useState<any[]>([]);
   const [walkInsLoaded, setWalkInsLoaded] = useState(false);
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
   const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
   const [processedByStaffId, setProcessedByStaffId] = useState('');
-
-  // Payment-method-specific detail fields — matches Add Member's capture for
-  // Card/Cheque/Bank Transfer/Online Payment so a walk-in's payment record has
-  // the same detail as a member's.
-  const [paymentDetails, setPaymentDetails] = useState({
-    cardType: '', chequeNumber: '', chequeDate: '', bankName: '',
-    bankAccountId: '', onlinePaymentType: '', providerName: '',
-  });
-  const updatePaymentDetail = (field: string, value: string) =>
-    setPaymentDetails(prev => ({ ...prev, [field]: value }));
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -257,6 +240,10 @@ export function CheckIn() {
     : todayAttendance;
 
   const selectedPlanDetails = walkInPlans.find(p => p.id.toString() === selectedPlan);
+  const walkInCharge = Number(selectedPlanDetails?.price ?? 0);
+  // Same payment flow as Renewals / Add-ons: split across methods, rest on credit
+  const walkInPaymentManager = usePaymentManager({ invoiceTotal: walkInCharge });
+  const walkInCredit = walkInPaymentManager.totalByType(PAYMENT_TYPES.CREDIT);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -366,60 +353,69 @@ export function CheckIn() {
     }
   };
 
-  const handleCollectPayment = () => {
-    if (!visitorName || !visitorMobile || !selectedPlan || !paymentMethod) {
+  // Mirrors the renewal flow's payload: how much is received now, the real
+  // method(s) it moved through, and any remainder left on credit. "Credit" is
+  // never sent as a real method — it's only the absence of one.
+  const handleGrantAccess = async () => {
+    if (!visitorName || !visitorMobile || !selectedPlan) {
       toast.error('Please fill in all required fields');
       return;
     }
-    setProcessingPayment(true);
-    setTimeout(() => {
-      setPaymentDone(true);
-      setProcessingPayment(false);
-      const label = PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod;
-      toast.success(paymentMethod === 'credit'
-        ? `${currencyCode} ${selectedPlanDetails?.price} marked as Credit (unpaid)`
-        : `Payment of ${currencyCode} ${selectedPlanDetails?.price} collected via ${label}`);
-    }, 1200);
-  };
-
-  // Mirrors add-member.tsx's buildFamilyMemberLeg — builds the single
-  // PaymentSplitDTO-shaped leg (snake_case) describing how this walk-in's
-  // payment was actually received.
-  const buildWalkInPaymentLeg = (amount: number): PaymentSplitLeg => {
-    const leg: PaymentSplitLeg = { method: PAYMENT_METHOD_LABELS[paymentMethod] || paymentMethod, amount };
-    if (paymentMethod === 'card') {
-      leg.card_type = paymentDetails.cardType;
-    } else if (paymentMethod === 'check') {
-      leg.cheque_number = paymentDetails.chequeNumber;
-      if (paymentDetails.bankName) leg.bank_name = paymentDetails.bankName;
-      if (paymentDetails.chequeDate) leg.cheque_date = paymentDetails.chequeDate;
-    } else if (paymentMethod === 'bank-transfer') {
-      const acct = bankAccounts.find(a => String(a.id) === paymentDetails.bankAccountId);
-      leg.bank_account_code = acct?.code;
-      leg.bank_account_name = acct?.name;
-    } else if (paymentMethod === 'online') {
-      leg.online_payment_type = paymentDetails.onlinePaymentType;
-      if (paymentDetails.onlinePaymentType === 'Other') leg.provider_name = paymentDetails.providerName;
+    if (walkInCharge > 0 && !walkInPaymentManager.settleable) {
+      toast.error('Payment Incomplete', {
+        description: 'Allocate the full amount (or leave the remainder on Credit) before granting access.',
+      });
+      return;
     }
-    return leg;
-  };
-
-  const handleGrantAccess = async () => {
-    if (!paymentDone) { toast.error('Complete payment first'); return; }
     try {
-      const isCredit = paymentMethod === 'credit';
-      const amount = selectedPlanDetails?.price ?? 0;
-      const methodLabel = PAYMENT_METHOD_LABELS[paymentMethod] || 'Cash';
+      setGrantingAccess(true);
+      const lines = walkInPaymentManager.paymentLines;
+      const payload = buildPaymentPayload(lines, walkInCharge);
+      const paidAmount = walkInCharge > 0 ? payload.paidAmount : 0;
+      const nonCreditLines = lines.filter(l => l.paymentType !== PAYMENT_TYPES.CREDIT);
+      const methodLabelByType: Record<string, string> = {
+        [PAYMENT_TYPES.CASH]: 'Cash',
+        [PAYMENT_TYPES.CARD]: 'Card',
+        [PAYMENT_TYPES.ONLINE]: 'Online Payment',
+      };
+      const lineMethod = (l: typeof lines[number]) =>
+        l.paymentType === PAYMENT_TYPES.CARD && l.paymentSubtype ? l.paymentSubtype : methodLabelByType[l.paymentType];
+
+      let paymentMethod = 'Credit';
+      let paymentBreakdown: WalkInCheckInRequest['payment_breakdown'];
+      let bankAccountCode: string | undefined;
+      let bankAccountName: string | undefined;
+      if (nonCreditLines.length === 1) {
+        const line = nonCreditLines[0];
+        paymentMethod = lineMethod(line);
+        if (line.paymentType === PAYMENT_TYPES.ONLINE && line.bankAccountId) {
+          const account = bankAccounts.find(a => String(a.id) === line.bankAccountId);
+          bankAccountCode = account?.code;
+          bankAccountName = account?.name;
+        }
+      } else if (nonCreditLines.length > 1) {
+        paymentMethod = 'Mixed';
+        paymentBreakdown = nonCreditLines.map(line => ({
+          method: lineMethod(line),
+          amount: line.amount,
+          ...(line.reference ? { reference: line.reference } : {}),
+          ...(line.bankAccountName ? { bank_account_name: line.bankAccountName } : {}),
+        }));
+      }
+      const paymentSummary = walkInCharge > 0 ? (walkInPaymentManager.summary || paymentMethod) : 'Free';
+
       const req: WalkInCheckInRequest = {
         name: visitorName,
         phone: visitorMobile,
         session_type: selectedPlanDetails?.name || 'gym',
-        payment_status: isCredit ? 'pending' : 'paid',
-        amount,
-        payment_method: methodLabel,
-        payment_breakdown: isCredit ? undefined : [buildWalkInPaymentLeg(amount)],
+        amount: walkInCharge,
+        paid_amount: paidAmount,
+        payment_method: paymentMethod,
+        payment_breakdown: paymentBreakdown,
+        bank_account_code: bankAccountCode,
+        bank_account_name: bankAccountName,
         device_id: 'WEB',
-        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${methodLabel}, Amount: ${currencyCode} ${amount}`,
+        notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentSummary}, Amount: ${currencyCode} ${walkInCharge}`,
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
       };
       const resp = await checkInService.walkInCheckIn(req);
@@ -435,24 +431,27 @@ export function CheckIn() {
         type: 'daily',
         mobile: visitorMobile,
         plan: selectedPlanDetails,
-        paymentMethod,
+        paymentMethod: paymentSummary,
         amount: selectedPlanDetails?.price,
       };
       setDailyCheckIns(prev => [visitor, ...prev.filter(p => p.id !== resp.attendance_id)]);
       toast.success(`Access granted to ${visitorName}`, {
-        description: `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
+        description: walkInCredit > 0
+          ? `${selectedPlanDetails?.name} — ${currencyCode} ${walkInCredit} left on credit`
+          : `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
       });
       resetDailyForm();
     } catch (err: any) {
       toast.error(err.message || 'Walk-in check-in failed');
+    } finally {
+      setGrantingAccess(false);
     }
   };
 
   const resetDailyForm = () => {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
-    setSelectedPlan(''); setPaymentMethod(''); setPaymentDone(false);
-    setProcessingPayment(false); setProcessedByStaffId('');
-    setPaymentDetails({ cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '', onlinePaymentType: '', providerName: '' });
+    setSelectedPlan(''); setProcessedByStaffId('');
+    walkInPaymentManager.clearLines();
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
       setIsCameraActive(false);
@@ -801,125 +800,59 @@ export function CheckIn() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-primary">Payment Method <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={paymentMethod}
-                        onValueChange={(v) => {
-                          setPaymentMethod(v);
-                          setPaymentDetails({ cardType: '', chequeNumber: '', chequeDate: '', bankName: '', bankAccountId: '', onlinePaymentType: '', providerName: '' });
-                        }}
-                      >
-                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select method" /></SelectTrigger>
+                      <Label className="text-primary">Processed By (Staff)</Label>
+                      <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
+                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="card">Card</SelectItem>
-                          <SelectItem value="check">Cheque</SelectItem>
-                          <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
-                          <SelectItem value="online">Online Payment</SelectItem>
-                          <SelectItem value="credit">Credit</SelectItem>
+                          {staffOptions.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">Credits this sale toward that staff member's revenue target.</p>
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-primary">Processed By (Staff)</Label>
-                    <Select value={processedByStaffId || undefined} onValueChange={setProcessedByStaffId}>
-                      <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select staff member (optional)" /></SelectTrigger>
-                      <SelectContent>
-                        {staffOptions.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Credits this sale toward that staff member's revenue target.</p>
-                  </div>
-
-                  {/* Method-specific detail fields — mirrors add-member.tsx's renderPaymentMethodDetails */}
-                  {paymentMethod === 'card' && (
-                    <div>
-                      <Label className="text-sm text-gray-600 mb-1 block">Card Type</Label>
-                      <Select value={paymentDetails.cardType || undefined} onValueChange={(v) => updatePaymentDetail('cardType', v)}>
-                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select card type" /></SelectTrigger>
-                        <SelectContent>
-                          {CARD_TYPE_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {paymentMethod === 'check' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <Label className="text-sm text-gray-600 mb-1 block">Cheque Number</Label>
-                        <Input value={paymentDetails.chequeNumber} onChange={(e) => updatePaymentDetail('chequeNumber', e.target.value)} className="border-primary/20" />
-                      </div>
-                      <div>
-                        <Label className="text-sm text-gray-600 mb-1 block">Bank Name</Label>
-                        <Input value={paymentDetails.bankName} onChange={(e) => updatePaymentDetail('bankName', e.target.value)} className="border-primary/20" />
-                      </div>
-                      <div>
-                        <Label className="text-sm text-gray-600 mb-1 block">Cheque Date</Label>
-                        <Input type="date" value={paymentDetails.chequeDate} onChange={(e) => updatePaymentDetail('chequeDate', e.target.value)} className="border-primary/20" />
-                      </div>
-                    </div>
-                  )}
-                  {paymentMethod === 'bank-transfer' && (
-                    <div>
-                      <Label className="text-sm text-gray-600 mb-1 block">Bank Account</Label>
-                      <Select value={paymentDetails.bankAccountId || undefined} onValueChange={(v) => updatePaymentDetail('bankAccountId', v)}>
-                        <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select bank account" /></SelectTrigger>
-                        <SelectContent>
-                          {bankAccounts.length === 0 ? (
-                            <div className="px-2 py-1.5 text-sm text-gray-500">No bank accounts found in Chart of Accounts</div>
-                          ) : (
-                            bankAccounts.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>)
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {paymentMethod === 'online' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-sm text-gray-600 mb-1 block">Online Payment Type</Label>
-                        <Select value={paymentDetails.onlinePaymentType || undefined} onValueChange={(v) => updatePaymentDetail('onlinePaymentType', v)}>
-                          <SelectTrigger className="border-primary/20"><SelectValue placeholder="Select type" /></SelectTrigger>
-                          <SelectContent>
-                            {ONLINE_PAYMENT_TYPE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {paymentDetails.onlinePaymentType === 'Other' && (
-                        <div>
-                          <Label className="text-sm text-gray-600 mb-1 block">Provider Name</Label>
-                          <Input value={paymentDetails.providerName} onChange={(e) => updatePaymentDetail('providerName', e.target.value)} className="border-primary/20" />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {paymentMethod === 'credit' && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                      Access will be granted with the charge left unpaid — no amount is collected now.
-                    </p>
-                  )}
 
                   {selectedPlan && (
                     <div className="p-4 bg-gradient-light border border-primary/20 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Total Charge</p>
-                        <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {selectedPlanDetails?.price}</p>
+                        <p className="text-2xl font-bold text-primary"><CurrencyGlyph /> {walkInCharge}</p>
                         <p className="text-xs text-muted-foreground mt-1">Valid for {selectedPlanDetails?.duration}</p>
                       </div>
-                      {paymentDone ? (
+                      {walkInCharge <= 0 ? (
+                        <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
+                          <CheckCircle className="h-4 w-4 mr-1" /> Free
+                        </Badge>
+                      ) : !walkInPaymentManager.settleable ? (
+                        <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
+                          <AlertCircle className="h-4 w-4 mr-1" /> Awaiting Payment
+                        </Badge>
+                      ) : walkInCredit <= 0 ? (
                         <Badge className="bg-green-100 text-green-800 border-0 px-3 py-1">
                           <CheckCircle className="h-4 w-4 mr-1" /> Paid
                         </Badge>
-                      ) : (
+                      ) : walkInCredit >= walkInCharge ? (
                         <Badge className="bg-yellow-100 text-yellow-800 border-0 px-3 py-1">
-                          <AlertCircle className="h-4 w-4 mr-1" /> Pending
+                          <AlertCircle className="h-4 w-4 mr-1" /> On Credit
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-orange-100 text-orange-800 border-0 px-3 py-1">
+                          <AlertCircle className="h-4 w-4 mr-1" /> Partly on Credit
                         </Badge>
                       )}
                     </div>
+                  )}
+
+                  {/* Payment — same allocation flow as Renewals / Add-ons */}
+                  {selectedPlan && walkInCharge > 0 && (
+                    <PaymentAllocationPanel
+                      manager={walkInPaymentManager}
+                      invoiceTotal={walkInCharge}
+                      bankAccounts={bankAccounts}
+                      customers={visitorName ? [{ code: visitorMobile || visitorName, name: visitorName } as CreditCustomer] : []}
+                      offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT]}
+                    />
                   )}
                 </div>
 
@@ -930,17 +863,15 @@ export function CheckIn() {
                     <X className="mr-2 h-4 w-4" /> Cancel
                   </Button>
                   <Button
-                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
-                    onClick={handleCollectPayment}
-                    disabled={!visitorName || !visitorMobile || !selectedPlan || !paymentMethod || paymentDone || processingPayment}
+                    className="flex-1 btn-primary"
+                    onClick={handleGrantAccess}
+                    disabled={!visitorName || !visitorMobile || !selectedPlan || grantingAccess
+                      || (walkInCharge > 0 && !walkInPaymentManager.settleable)}
                   >
-                    {processingPayment
-                      ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Processing...</>
-                      : <><CreditCard className="mr-2 h-4 w-4" /> Collect Payment</>
+                    {grantingAccess
+                      ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Granting...</>
+                      : <><CheckCircle className="mr-2 h-4 w-4" /> Grant Access</>
                     }
-                  </Button>
-                  <Button className="flex-1 btn-primary" onClick={handleGrantAccess} disabled={!paymentDone}>
-                    <CheckCircle className="mr-2 h-4 w-4" /> Grant Access
                   </Button>
                 </div>
               </CardContent>
