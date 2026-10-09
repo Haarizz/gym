@@ -1,30 +1,32 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiCommunityRepository } from '../infrastructure/ApiCommunityRepository';
-import { communityKeys } from './useCommunity';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { communityKeys, useCommunityMode } from './useCommunity';
 import type {
+  CommunityReportReason,
   CreateCommunityPostRequest,
   CreateCommunityCommentRequest,
 } from '../domain/community.types';
-import { CommunityService } from '../application/CommunityService';
 
-const repository = new ApiCommunityRepository();
-const communityService = new CommunityService(repository);
+/** Posts changed: every feed, plus the aggregates derived from them. */
+function invalidatePosts(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
+  queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
+  queryClient.invalidateQueries({ queryKey: communityKeys.trendingTopics() });
+  queryClient.invalidateQueries({ queryKey: communityKeys.leaderboard() });
+}
 
 export function useCreateCommunityPost() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
-    mutationFn: (request: CreateCommunityPostRequest) =>
-      communityService.createPost(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
-    },
+    mutationFn: (request: CreateCommunityPostRequest) => service.createPost(request),
+    onSuccess: () => invalidatePosts(queryClient),
   });
 }
 
 export function useAddCommunityComment() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
     mutationFn: ({
@@ -33,12 +35,10 @@ export function useAddCommunityComment() {
     }: {
       postId: number;
       request: CreateCommunityCommentRequest;
-    }) => communityService.addComment(postId, request),
+    }) => service.addComment(postId, request),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: communityKeys.comments(variables.postId),
-      });
-      // Invalidate feeds to update comment counts
+      queryClient.invalidateQueries({ queryKey: communityKeys.comments(variables.postId) });
+      // Comment counts live on the feed items.
       queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
       queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
     },
@@ -47,11 +47,11 @@ export function useAddCommunityComment() {
 
 export function useToggleCommunityLike() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
-    mutationFn: (postId: number) => communityService.toggleLike(postId),
+    mutationFn: ({ postId, liked }: { postId: number; liked: boolean }) => service.toggleLike(postId, liked),
     onSuccess: () => {
-      // Invalidate feeds to update like counts
       queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
       queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
     },
@@ -60,20 +60,17 @@ export function useToggleCommunityLike() {
 
 export function useDeleteCommunityPost() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
-    mutationFn: (postId: number) => communityService.deletePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.trendingTopics() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.leaderboard() });
-    },
+    mutationFn: (postId: number) => service.deletePost(postId),
+    onSuccess: () => invalidatePosts(queryClient),
   });
 }
 
 export function useDeleteCommunityComment() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
     mutationFn: ({
@@ -82,11 +79,9 @@ export function useDeleteCommunityComment() {
     }: {
       postId: number;
       commentId: number;
-    }) => communityService.deleteComment(postId, commentId),
+    }) => service.deleteComment(postId, commentId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: communityKeys.comments(variables.postId),
-      });
+      queryClient.invalidateQueries({ queryKey: communityKeys.comments(variables.postId) });
       queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
       queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
     },
@@ -95,28 +90,74 @@ export function useDeleteCommunityComment() {
 
 export function useArchiveCommunityPost() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
-    mutationFn: (postId: number) => communityService.archivePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.trendingTopics() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.leaderboard() });
-    },
+    mutationFn: (postId: number) => service.archivePost(postId),
+    onSuccess: () => invalidatePosts(queryClient),
   });
 }
 
 export function useUnarchiveCommunityPost() {
   const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
 
   return useMutation({
-    mutationFn: (postId: number) => communityService.unarchivePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: communityKeys.feeds() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.stats() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.trendingTopics() });
-      queryClient.invalidateQueries({ queryKey: communityKeys.leaderboard() });
+    mutationFn: (postId: number) => service.unarchivePost(postId),
+    onSuccess: () => invalidatePosts(queryClient),
+  });
+}
+
+// ── Global Community only (offered only when the server says the viewer may) ──
+
+export function useReportCommunityPost() {
+  const { service } = useCommunityMode();
+
+  return useMutation({
+    mutationFn: ({ postId, reason, details }: { postId: number; reason: CommunityReportReason; details?: string }) =>
+      service.reportPost(postId, reason, details),
+  });
+}
+
+export function useReportCommunityComment() {
+  const { service } = useCommunityMode();
+
+  return useMutation({
+    mutationFn: ({ commentId, reason, details }: { commentId: number; reason: CommunityReportReason; details?: string }) =>
+      service.reportComment(commentId, reason, details),
+  });
+}
+
+export function useModerateCommunityPost() {
+  const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
+
+  return useMutation({
+    mutationFn: ({ postId, action, reason }: { postId: number; action: 'hide' | 'restore'; reason?: string }) =>
+      action === 'hide' ? service.hidePost(postId, reason) : service.restorePost(postId, reason),
+    onSuccess: () => invalidatePosts(queryClient),
+  });
+}
+
+export function useModerateCommunityComment() {
+  const queryClient = useQueryClient();
+  const { service } = useCommunityMode();
+
+  return useMutation({
+    mutationFn: ({
+      commentId,
+      action,
+      scope,
+      reason,
+    }: {
+      postId: number;
+      commentId: number;
+      action: 'hide' | 'restore';
+      scope?: string;
+      reason?: string;
+    }) => (action === 'hide' ? service.hideComment(commentId, scope, reason) : service.restoreComment(commentId, scope, reason)),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: communityKeys.comments(variables.postId) });
     },
   });
 }

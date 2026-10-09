@@ -1,5 +1,6 @@
 package com.company.project.controllers;
 
+import com.company.project.community.global.LegacyCommunityCompatAdapter;
 import com.company.project.dto.*;
 import com.company.project.services.CommunityService;
 import org.springframework.http.ResponseEntity;
@@ -9,29 +10,40 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The legacy tenant-scoped Community API. Until the global Community cutover
+ * (authority = GLOBAL) every call is served by CommunityService from the legacy
+ * tables, exactly as before. From the cutover on, the same endpoints are served
+ * by LegacyCommunityCompatAdapter from the global store — the only
+ * authoritative store — with identical response shapes and status mapping
+ * (see docs/community/phase5-adapter-contract.md). The switch is the authority
+ * flag itself; it can't go back.
+ */
 @RestController
 @RequestMapping("/api/community")
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final LegacyCommunityCompatAdapter compat;
 
-    public CommunityController(CommunityService communityService) {
+    public CommunityController(CommunityService communityService, LegacyCommunityCompatAdapter compat) {
         this.communityService = communityService;
+        this.compat = compat;
     }
 
     @GetMapping("/stats")
     public ResponseEntity<CommunityEngagementStatsDTO> getEngagementStats() {
-        return ResponseEntity.ok(communityService.getEngagementStats());
+        return ResponseEntity.ok(compat.isActive() ? compat.getEngagementStats() : communityService.getEngagementStats());
     }
 
     @GetMapping("/stats/trending-topics")
     public ResponseEntity<java.util.List<TrendingTopicDTO>> getTrendingTopics() {
-        return ResponseEntity.ok(communityService.getTrendingTopics());
+        return ResponseEntity.ok(compat.isActive() ? compat.getTrendingTopics() : communityService.getTrendingTopics());
     }
 
     @GetMapping("/stats/leaderboard")
     public ResponseEntity<java.util.List<LeaderboardEntryDTO>> getLeaderboard() {
-        return ResponseEntity.ok(communityService.getLeaderboard());
+        return ResponseEntity.ok(compat.isActive() ? compat.getLeaderboard() : communityService.getLeaderboard());
     }
 
     @GetMapping("/posts")
@@ -43,7 +55,9 @@ public class CommunityController {
             @RequestParam(defaultValue = "20") int limit
     ) {
         try {
-            return ResponseEntity.ok(communityService.getFeed(q, type, page, limit, archived));
+            return ResponseEntity.ok(compat.isActive()
+                    ? compat.getFeed(q, type, page, limit, archived)
+                    : communityService.getFeed(q, type, page, limit, archived));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).build();
         }
@@ -53,7 +67,7 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> createPost(@RequestBody CreateCommunityPostRequestDTO request) {
         try {
-            return ResponseEntity.ok(communityService.createPost(request));
+            return ResponseEntity.ok(compat.isActive() ? compat.createPost(request) : communityService.createPost(request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
@@ -64,7 +78,7 @@ public class CommunityController {
     @GetMapping("/posts/{postId}/comments")
     public ResponseEntity<List<CommunityPostCommentResponseDTO>> getComments(@PathVariable Long postId) {
         try {
-            return ResponseEntity.ok(communityService.getComments(postId));
+            return ResponseEntity.ok(compat.isActive() ? compat.getComments(postId) : communityService.getComments(postId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -77,7 +91,7 @@ public class CommunityController {
             @RequestBody CreateCommunityCommentRequestDTO request
     ) {
         try {
-            return ResponseEntity.ok(communityService.addComment(postId, request));
+            return ResponseEntity.ok(compat.isActive() ? compat.addComment(postId, request) : communityService.addComment(postId, request));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
@@ -89,7 +103,7 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> toggleLike(@PathVariable Long postId) {
         try {
-            return ResponseEntity.ok(communityService.toggleLike(postId));
+            return ResponseEntity.ok(compat.isActive() ? compat.toggleLike(postId) : communityService.toggleLike(postId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
@@ -101,7 +115,11 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> deletePost(@PathVariable Long postId) {
         try {
-            communityService.deletePost(postId);
+            if (compat.isActive()) {
+                compat.deletePost(postId);
+            } else {
+                communityService.deletePost(postId);
+            }
             return ResponseEntity.ok(Map.of("success", true));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -121,7 +139,11 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> deleteComment(@PathVariable Long postId, @PathVariable Long commentId) {
         try {
-            communityService.deleteComment(postId, commentId);
+            if (compat.isActive()) {
+                compat.deleteComment(postId, commentId);
+            } else {
+                communityService.deleteComment(postId, commentId);
+            }
             return ResponseEntity.ok(Map.of("success", true));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -141,7 +163,7 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> archivePost(@PathVariable Long postId) {
         try {
-            return ResponseEntity.ok(communityService.archivePost(postId));
+            return ResponseEntity.ok(compat.isActive() ? compat.setArchived(postId, true) : communityService.archivePost(postId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
@@ -153,7 +175,7 @@ public class CommunityController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> unarchivePost(@PathVariable Long postId) {
         try {
-            return ResponseEntity.ok(communityService.unarchivePost(postId));
+            return ResponseEntity.ok(compat.isActive() ? compat.setArchived(postId, false) : communityService.unarchivePost(postId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {

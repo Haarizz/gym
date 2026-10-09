@@ -77,12 +77,19 @@ public class TenantContextFilter extends OncePerRequestFilter {
     // the code itself, so whatever X-Tenant-ID the app sends must not gate it.
     private static final RequestMatcher STRICTLY_GLOBAL_REFERRAL_PATH = uriEquals("/api/mobile/referrals/claim");
 
+    // The global Community spans every gym and picks the gym it needs itself (the
+    // posting gym is membership-checked per request against that gym's own
+    // database), so it must neither be routed to nor membership-gated by the
+    // caller's currently selected X-Tenant-ID.
+    private static final RequestMatcher GLOBAL_COMMUNITY_PATH = uriStartsWith("/api/mobile/community/");
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
-            STRICTLY_GLOBAL_REFERRAL_PATH
+            STRICTLY_GLOBAL_REFERRAL_PATH,
+            GLOBAL_COMMUNITY_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -92,6 +99,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
             STRICTLY_GLOBAL_REFERRAL_PATH,
+            GLOBAL_COMMUNITY_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );

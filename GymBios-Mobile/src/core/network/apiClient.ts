@@ -21,6 +21,9 @@ export const apiClient = axios.create({
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    // Lets the backend see which app builds still call deprecated APIs (e.g. the
+    // legacy /community endpoints) before retiring them behind a minimum version.
+    'X-App-Version': env.appVersion,
   },
 });
 

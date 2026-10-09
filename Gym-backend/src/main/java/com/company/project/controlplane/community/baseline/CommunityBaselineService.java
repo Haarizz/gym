@@ -91,13 +91,18 @@ public class CommunityBaselineService {
         this.snapshotReader = snapshotReader;
     }
 
-    /** One legacy store plus the bookkeeping the analysis accumulates for it. */
-    private static final class Source {
+    /**
+     * One legacy store plus everything the analysis concluded about it. Shared
+     * with the backfill and reconciliation so they act on exactly the same
+     * facts the baseline reports.
+     */
+    public static final class Source {
         final String name;
         final SourceKind kind;
         final String tenantSlug;
         final SourceReport report = new SourceReport();
         Snapshot snapshot;
+        DataSource dataSource;
         final Set<Long> quarantinedPosts = new TreeSet<>();
         final Set<Long> quarantinedComments = new TreeSet<>();
         final Set<Long> quarantinedLikes = new TreeSet<>();
@@ -106,6 +111,10 @@ public class CommunityBaselineService {
         final Set<Long> supersededLikes = new TreeSet<>();
         /** post id -> tenant slug the post is attributed to (null = undetermined). */
         final Map<Long, String> postTenant = new HashMap<>();
+        /** "table:id" -> every QUARANTINED anomaly code raised for that record (record-level and by reference). */
+        final Map<String, Set<String>> quarantineCodes = new HashMap<>();
+        /** "table:id" -> author classification of that record. */
+        final Map<String, LegacyAuthorClassifier.Classification> authorOf = new HashMap<>();
 
         Source(String name, SourceKind kind, String tenantSlug) {
             this.name = name;
@@ -124,9 +133,42 @@ public class CommunityBaselineService {
                 default -> quarantinedLikes;
             };
         }
+
+        void quarantine(String table, long id, String code) {
+            quarantined(table).add(id);
+            quarantineCodes.computeIfAbsent(table + ":" + id, k -> new TreeSet<>()).add(code);
+        }
+
+        public String name() { return name; }
+        public SourceKind kind() { return kind; }
+        public String tenantSlug() { return tenantSlug; }
+        public boolean isUsable() { return usable(); }
+        public Snapshot snapshot() { return snapshot; }
+        public DataSource dataSource() { return dataSource; }
+        public String attributedTenant(long postId) { return postTenant.get(postId); }
+        public boolean isSuperseded(String table, long id) {
+            return switch (table) {
+                case POSTS -> supersededPosts.contains(id);
+                case COMMENTS -> supersededComments.contains(id);
+                default -> supersededLikes.contains(id);
+            };
+        }
+        public Set<String> quarantineCodes(String table, long id) {
+            return quarantineCodes.getOrDefault(table + ":" + id, Set.of());
+        }
+        public LegacyAuthorClassifier.Classification authorOf(String table, long id) {
+            return authorOf.get(table + ":" + id);
+        }
     }
 
+    /** Everything the baseline concluded: the report plus per-source, per-record facts. */
+    public record Analysis(CommunityBaselineReport report, List<Source> sources, Map<String, Tenant> tenantsBySlug) {}
+
     public CommunityBaselineReport run() {
+        return analyze().report();
+    }
+
+    public Analysis analyze() {
         CommunityBaselineReport report = new CommunityBaselineReport();
         report.reportVersion = REPORT_VERSION;
         report.generatedAt = Instant.now().toString();
@@ -193,7 +235,7 @@ public class CommunityBaselineService {
 
         log.info("Community baseline complete: sources={}, anomalies={}, quarantinedRecords={}, digest={}",
                 report.sources.size(), report.anomalies.size(), report.identity.quarantinedRecords, report.digest);
-        return report;
+        return new Analysis(report, sources, tenantsBySlug);
     }
 
     // ── Reading ──────────────────────────────────────────────────────────────
@@ -206,6 +248,7 @@ public class CommunityBaselineService {
         try {
             Snapshot snap = snapshotReader.read(dataSource);
             source.snapshot = snap;
+            source.dataSource = dataSource;
             sr.reachable = true;
             sr.database = snap.database;
             sr.hasCommunityTables = snap.hasCommunityTables;
@@ -279,7 +322,7 @@ public class CommunityBaselineService {
         for (Map.Entry<String, long[]> e : recordsPerGym.entrySet()) {
             if (!tenantsBySlug.containsKey(e.getKey())) {
                 Set<Long> affected = postsAttributedTo(source, e.getKey());
-                quarantineByReference(source, affected);
+                quarantineByReference(source, affected, "PRIMARY_GYM_NOT_REGISTERED_AS_TENANT");
                 addAnomaly(report, source, "PRIMARY_GYM_NOT_REGISTERED_AS_TENANT", Classification.QUARANTINED, "gyms", null,
                         "Primary gym '" + e.getKey() + "' has no control-plane tenants row; affects "
                                 + describeAffected(source, affected),
@@ -295,7 +338,7 @@ public class CommunityBaselineService {
 
         if (source.tenantSlug.chars().anyMatch(Character::isWhitespace)) {
             if (hasData) {
-                quarantineByReference(source, allPosts);
+                quarantineByReference(source, allPosts, "TENANT_SLUG_WHITESPACE");
             }
             addAnomaly(report, source, "TENANT_SLUG_WHITESPACE",
                     hasData ? Classification.QUARANTINED : Classification.RESOLVED, "tenants", tenant.getId(),
@@ -305,7 +348,7 @@ public class CommunityBaselineService {
         }
         if (!"ACTIVE".equals(tenant.getStatus())) {
             if (hasData) {
-                quarantineByReference(source, allPosts);
+                quarantineByReference(source, allPosts, "TENANT_NOT_ACTIVE");
             }
             addAnomaly(report, source, "TENANT_NOT_ACTIVE",
                     hasData ? Classification.QUARANTINED : Classification.RESOLVED, "tenants", tenant.getId(),
@@ -315,7 +358,7 @@ public class CommunityBaselineService {
         }
         if (snap.gyms.size() != 1) {
             if (hasData) {
-                quarantineByReference(source, allPosts);
+                quarantineByReference(source, allPosts, "TENANT_GYM_COUNT_UNEXPECTED");
             }
             addAnomaly(report, source, "TENANT_GYM_COUNT_UNEXPECTED",
                     hasData ? Classification.QUARANTINED : Classification.RESOLVED, "gyms", null,
@@ -542,6 +585,7 @@ public class CommunityBaselineService {
                 snap.membersByUserId.getOrDefault(userId, 0),
                 snap.membersByGlobalUserId.getOrDefault(userId, 0));
         LegacyAuthorClassifier.Classification result = LegacyAuthorClassifier.classify(evidence);
+        source.authorOf.put(table + ":" + recordId, result);
 
         String authorKey = cacheKey + "|" + Objects.toString(attributedSlug, "");
         AuthorEntry entry = authors.computeIfAbsent(authorKey, k -> {
@@ -759,15 +803,21 @@ public class CommunityBaselineService {
     private void addAnomaly(CommunityBaselineReport report, Source source, String code, Classification classification,
                             String table, Long recordId, String detail, String resolution) {
         report.anomalies.add(new Anomaly(code, classification, source.name, table, recordId, detail, resolution));
+        if (classification == Classification.QUARANTINED && recordId != null
+                && (POSTS.equals(table) || COMMENTS.equals(table) || LIKES.equals(table))) {
+            source.quarantine(table, recordId, code);
+        }
     }
 
-    private void quarantineByReference(Source source, Set<Long> posts) {
-        source.quarantinedPosts.addAll(posts);
+    private void quarantineByReference(Source source, Set<Long> posts, String code) {
+        for (Long id : posts) {
+            source.quarantine(POSTS, id, code);
+        }
         for (CommentRow c : source.snapshot.comments.values()) {
-            if (c.postId() != null && posts.contains(c.postId())) source.quarantinedComments.add(c.id());
+            if (c.postId() != null && posts.contains(c.postId())) source.quarantine(COMMENTS, c.id(), code);
         }
         for (LikeRow l : source.snapshot.likes.values()) {
-            if (l.postId() != null && posts.contains(l.postId())) source.quarantinedLikes.add(l.id());
+            if (l.postId() != null && posts.contains(l.postId())) source.quarantine(LIKES, l.id(), code);
         }
     }
 
