@@ -18,6 +18,8 @@ public final class PermissionCatalog {
 
     public static final List<String> ACTIONS_FULL = List.of("VIEW", "CREATE", "EDIT", "DELETE", "EXPORT");
     public static final List<String> ACTIONS_FULL_APPROVE = List.of("VIEW", "CREATE", "EDIT", "DELETE", "EXPORT", "APPROVE");
+    /** COMMUNITY adds MODERATE: hide/restore content written by the gym's own members (global Community). */
+    public static final List<String> ACTIONS_FULL_MODERATE = List.of("VIEW", "CREATE", "EDIT", "DELETE", "EXPORT", "MODERATE");
     public static final List<String> ACTIONS_VIEW_ONLY = List.of("VIEW");
     public static final List<String> ACTIONS_VIEW_EXPORT = List.of("VIEW", "EXPORT");
     public static final List<String> ACTIONS_VIEW_EDIT = List.of("VIEW", "EDIT");
@@ -26,7 +28,7 @@ public final class PermissionCatalog {
     public static final Map<String, List<String>> MODULES = new LinkedHashMap<>();
     static {
         MODULES.put("DASHBOARD", ACTIONS_VIEW_ONLY);
-        MODULES.put("COMMUNITY", ACTIONS_FULL);
+        MODULES.put("COMMUNITY", ACTIONS_FULL_MODERATE);
         MODULES.put("MEMBERS", ACTIONS_FULL_APPROVE);
         MODULES.put("BILLING", ACTIONS_FULL);
         MODULES.put("MEMBERSHIP_PLANS", ACTIONS_FULL);

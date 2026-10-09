@@ -358,6 +358,12 @@ public class DataInitializer implements CommandLineRunner {
         grantPermissionIfMissing("ADMIN", "MEMBERS_APPROVE");
         grantPermissionIfMissing("MANAGER", "MEMBERS_APPROVE");
         grantPermissionIfMissing("RECEPTIONIST", "MEMBERS_APPROVE");
+
+        // COMMUNITY_MODERATE (global Community: hide/restore content written by this
+        // gym's own members) is new on the COMMUNITY module — backfilled here for the
+        // same first-seeding-only reason as MEMBERS_APPROVE above (C7: ADMIN + MANAGER).
+        grantPermissionIfMissing("ADMIN", "COMMUNITY_MODERATE");
+        grantPermissionIfMissing("MANAGER", "COMMUNITY_MODERATE");
     }
 
     private void seedDefaultRolePermissions(String roleName, List<String> permissionKeys) {

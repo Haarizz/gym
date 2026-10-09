@@ -51,14 +51,20 @@ public final class LegacyAuthorClassifier {
             int membersByGlobalUserId
     ) {}
 
-    public record Classification(Outcome outcome, AuthorKind kind, String tenantSlug, String reason) {
+    /** Stable tag for the one AMBIGUOUS case a D3 policy may resolve (reason text is for humans only). */
+    public static final String RULE_PRIMARY_MEMBER_LOGIN = "PRIMARY_MEMBER_LOGIN";
+
+    /**
+     * @param rule stable machine tag for cases a rollout policy can resolve, else null
+     */
+    public record Classification(Outcome outcome, AuthorKind kind, String tenantSlug, String reason, String rule) {
 
         static Classification resolved(AuthorKind kind, String tenantSlug, String reason) {
-            return new Classification(Outcome.RESOLVED, kind, tenantSlug, reason);
+            return new Classification(Outcome.RESOLVED, kind, tenantSlug, reason, null);
         }
 
         static Classification of(Outcome outcome, String reason) {
-            return new Classification(outcome, null, null, reason);
+            return new Classification(outcome, null, null, reason, null);
         }
     }
 
@@ -127,9 +133,10 @@ public final class LegacyAuthorClassifier {
             // AuthService issues isGlobal=true for ROLE_MEMBER without a directory
             // entry under tenant routing, so authentication would treat this account
             // as GLOBAL while the data says it is a gym-created member login.
-            return Classification.of(Outcome.AMBIGUOUS,
+            return new Classification(Outcome.AMBIGUOUS, null, null,
                     "Gym-created member login in the primary database: data links it via members.user_id, "
-                            + "but authentication treats ROLE_MEMBER without a directory entry as a global account");
+                            + "but authentication treats ROLE_MEMBER without a directory entry as a global account",
+                    RULE_PRIMARY_MEMBER_LOGIN);
         }
         if (memberRole) {
             return Classification.of(Outcome.AMBIGUOUS,

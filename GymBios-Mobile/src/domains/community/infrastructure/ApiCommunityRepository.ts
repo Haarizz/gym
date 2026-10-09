@@ -58,9 +58,10 @@ export class ApiCommunityRepository implements CommunityRepository {
     q?: string,
     type?: string,
     archived?: boolean,
-    page: number = 1,
+    pageParam: number | string = 1,
     limit: number = 20,
   ): Promise<CommunityPostsPageResponse> {
+    const page = typeof pageParam === 'number' ? pageParam : Number(pageParam) || 1;
     const response = await apiClient.get<any>(
       '/community/posts',
       {
@@ -75,14 +76,16 @@ export class ApiCommunityRepository implements CommunityRepository {
     );
     
     const posts = response.data.posts.map(this.mapCommunityPost);
+    const pagination = {
+      page: response.data.pagination.page,
+      limit: response.data.pagination.limit,
+      totalElements: response.data.pagination.total,
+      totalPages: response.data.pagination.total_pages,
+    };
     return {
       posts,
-      pagination: {
-        page: response.data.pagination.page,
-        limit: response.data.pagination.limit,
-        totalElements: response.data.pagination.total,
-        totalPages: response.data.pagination.total_pages,
-      },
+      pagination,
+      nextPageParam: pagination.page < pagination.totalPages ? pagination.page + 1 : null,
       canPost: response.data.can_post === true,
       canInteract: response.data.can_interact === true,
     };
