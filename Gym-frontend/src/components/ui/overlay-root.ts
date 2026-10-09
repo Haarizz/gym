@@ -23,8 +23,17 @@ export function getBodyZoom(): number {
 
 export function getOverlayRoot(): HTMLElement | undefined {
   if (typeof document === "undefined") return undefined;
-  if (overlayRoot?.isConnected) return overlayRoot;
   const zoom = getBodyZoom();
+  if (overlayRoot?.isConnected) {
+    // The body zoom is 1 on phones outside the POS (src/styles/responsive.css) and
+    // 0.9 elsewhere, so it can change on rotation/resize or when entering the POS —
+    // keep the counter-zoom in step with it.
+    if (overlayRoot.style.getPropertyValue("--overlay-zoom") !== String(zoom)) {
+      overlayRoot.style.zoom = String(1 / zoom);
+      overlayRoot.style.setProperty("--overlay-zoom", String(zoom));
+    }
+    return overlayRoot;
+  }
   overlayRoot = document.createElement("div");
   overlayRoot.setAttribute("data-slot", "overlay-root");
   overlayRoot.style.zoom = String(1 / zoom);

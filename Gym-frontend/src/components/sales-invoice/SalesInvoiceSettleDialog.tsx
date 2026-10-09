@@ -112,7 +112,7 @@ export function SalesInvoiceSettleDialog({ request, bankAccounts, stockCheckEnab
       <DialogContent
         style={{
           display: 'flex', flexDirection: 'column', gap: 0, padding: 0, overflow: 'hidden',
-          width: '100%', maxWidth: 'min(30rem, calc(100% - 2rem))', maxHeight: 'calc(100dvh / 0.9 - 2rem)',
+          width: '100%', maxWidth: 'min(30rem, calc(100% - 2rem))', maxHeight: 'calc(100dvh / var(--gb-zoom, 0.9) - 2rem)',
         }}
       >
         <DialogHeader style={{ flexShrink: 0, padding: '20px 48px 12px 20px', textAlign: 'left' }}>

@@ -3,6 +3,7 @@ import React, {
   useMemo,
   useCallback,
   useEffect,
+  useLayoutEffect,
 } from "react";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
@@ -131,6 +132,9 @@ import { usePermissions, hasPermission } from "./utils/permissions";
 import { membersService } from "./utils/supabase/members-service";
 
 import ErrorBoundary from "./components/shared/error-boundary";
+import { ResponsiveEnhancer } from "./components/shared/ResponsiveEnhancer";
+import { applyResponsiveScope, isPosPath } from "./utils/responsive-scope";
+import { openGlobalSearch } from "./components/global-search/GlobalSearch";
 import {
   LayoutDashboard,
   Users,
@@ -818,6 +822,14 @@ export default function App() {
 
   // Use location.pathname to figure out active section for styling mostly
   const currentPath = location.pathname;
+  // The POS keeps the original shell breakpoints and none of the responsive layer
+  // (see utils/responsive-scope.ts).
+  const isPosRoute = isPosPath(currentPath);
+  useLayoutEffect(() => {
+    applyResponsiveScope(currentPath);
+  }, [currentPath]);
+  // Off-canvas navigation drawer (phones/tablets) — closed after picking a page.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
 
   // Global state for branches
@@ -1330,7 +1342,7 @@ export default function App() {
   // Show loading screen while checking authentication
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center bg-gray-50" style={{ minHeight: 'calc(100vh / 0.9)' }}>
+      <div className="flex items-center justify-center bg-gray-50 gb-shell">
         <div className="text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="bg-primary rounded-xl p-3">
@@ -1364,8 +1376,12 @@ export default function App() {
 
   // Show main app if authenticated
   return (
-    <SidebarProvider>
-      <div className="flex w-full" style={{ minHeight: 'calc(100vh / 0.9)' }}>
+    <SidebarProvider
+      mobileBreakpoint={isPosRoute ? 768 : 1024}
+      openMobile={mobileNavOpen}
+      onOpenMobileChange={setMobileNavOpen}
+    >
+      <div className="flex w-full gb-shell">
         <Sidebar className="hidden md:flex bg-gradient-primary">
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center justify-between mb-4">
@@ -1432,6 +1448,7 @@ export default function App() {
                         handleNavClick(item.path || item.id);
                       } else {
                         handleNavClick(item.path || item.id);
+                        setMobileNavOpen(false);
                       }
                     }}
                     isActive={activeSectionPathId === item.id}
@@ -1475,9 +1492,10 @@ export default function App() {
                           {item.subItems.map((subItem) => (
                             <SidebarMenuButton
                               key={subItem.id}
-                              onClick={() =>
-                                handleNavClick(subItem.path || subItem.id)
-                              }
+                              onClick={() => {
+                                handleNavClick(subItem.path || subItem.id);
+                                setMobileNavOpen(false);
+                              }}
                               isActive={
                                 activeSectionPathId === subItem.id
                               }
@@ -1537,19 +1555,33 @@ export default function App() {
           </SidebarFooter>
         </Sidebar>
 
-        <main className="flex-1 overflow-auto min-w-0">
-          <header className="border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 sticky top-0 z-40 shadow-sm md:hidden">
+        <main className="flex-1 overflow-auto min-w-0 gb-main">
+          <header className={`gb-app-header border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 sticky top-0 z-40 shadow-sm ${isPosRoute ? 'md:hidden' : 'lg:hidden'}`}>
             <div className="flex h-16 items-center px-4">
               <SidebarTrigger className="mr-4" />
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 min-w-0">
                 <div className="bg-gradient-primary text-white rounded-xl p-2 shadow-md">
                   <Dumbbell className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="font-bold" style={{ color: '#2B7A78' }}>GymBios</h2>
+                  {!isPosRoute && !isGymbiosAdmin && activeBranchName && (
+                    <p className="gb-app-header-branch">{activeBranchName}</p>
+                  )}
                 </div>
               </div>
               <div className="flex-1" />
+              {!isPosRoute && !isGymbiosAdmin && !isMemberRole && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="gb-app-header-search"
+                  onClick={openGlobalSearch}
+                  aria-label="Search"
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+              )}
               {!isGymbiosAdmin && <NotificationBell className="mr-2" />}
               <div className="relative">
                 <Avatar className="h-8 w-8 border-2 border-primary/20">
@@ -1571,7 +1603,7 @@ export default function App() {
           </header>
 
           <div className="flex-1">
-            <ErrorBoundary>
+            <ErrorBoundary resetKey={currentPath}>
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 {routeAllowed ? (
                   <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
@@ -1607,6 +1639,7 @@ export default function App() {
       {!isGymbiosAdmin && !isMemberRole && (
         <GlobalSearch pages={globalSearchPages} branchId={activeBranchId} branchName={activeBranchName} />
       )}
+      <ResponsiveEnhancer enabled={!isPosRoute} />
       <Toaster />
     </SidebarProvider>
   );

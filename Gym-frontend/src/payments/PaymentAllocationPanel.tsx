@@ -154,6 +154,12 @@ export interface PaymentAllocationPanelProps {
   creditParty?: CreditParty;
   /** Spendable wallet balance when WALLET is offered (null = no member / unknown). */
   walletBalance?: number | null;
+  /**
+   * Flag cash tendered above the amount due (it becomes change) with an amber
+   * warning, so a mistyped amount stands out. Off by default — the POS and other
+   * screens keep their behaviour. Membership renewals turn it on (BG_84).
+   */
+  warnCashOverTender?: boolean;
 }
 
 export function PaymentAllocationPanel({
@@ -166,6 +172,7 @@ export function PaymentAllocationPanel({
   offeredTypes = [PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT],
   creditParty,
   walletBalance = null,
+  warnCashOverTender = false,
 }: PaymentAllocationPanelProps) {
   const creditLabel = creditParty ? `Left on credit (${creditParty.accountLabel})` : "Transferred to Accounts Receivable";
   const [openModal, setOpenModal] = useState<PaymentType | null>(null);
@@ -366,6 +373,15 @@ export function PaymentAllocationPanel({
               </span>
             </div>
           )}
+          {warnCashOverTender && change > 0 && (
+            <div
+              role="alert"
+              style={{ fontSize: 13, color: "#92400e", backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "8px 12px" }}
+            >
+              Cash received is more than the <CurrencyValue amount={invoiceTotal} /> due — check the amount. You'll be asked
+              to confirm the <CurrencyValue amount={change} /> change before the payment is saved.
+            </div>
+          )}
         </div>
 
         <div
@@ -415,6 +431,7 @@ export function PaymentAllocationPanel({
           target={targetFor(editingLine)}
           editingLine={editingLine?.paymentType === PAYMENT_TYPES.CASH ? editingLine : null}
           offeredTypes={offeredTypes}
+          warnOverTender={warnCashOverTender}
         />
       )}
       {openModal === PAYMENT_TYPES.CARD && (

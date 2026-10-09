@@ -29,7 +29,8 @@ import {
   CheckCircle,
   Info,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { toast } from "sonner";
 import { facilitiesService, FacilityApi, FacilityRequest } from '../utils/supabase/facilities-service';
@@ -343,6 +344,7 @@ export function Facilities({ onNavigate, embedded, summaryContainer }: Facilitie
             </div>
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
               <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search facilities by name or ID..."
                   value={searchTerm}

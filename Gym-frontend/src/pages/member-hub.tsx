@@ -589,7 +589,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       {/* Top Navigation Bar */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-50">
+      <div className="bg-white shadow-sm border-b sticky top-0 z-50 gb-sticky-below-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}

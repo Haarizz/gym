@@ -1,0 +1,743 @@
+/*
+ * GymBios responsive layer — phones, tablets and desktops.
+ *
+ * index.css is a frozen, precompiled Tailwind snapshot (no build step, and only a
+ * handful of responsive variants exist in it), so responsive behaviour is added here
+ * as plain CSS on top of the existing utilities and component data-slots.
+ *
+ * Scope: every rule below is prefixed with html:not([data-gb-pos]). The Point of Sale
+ * sets <html data-gb-pos> while it is showing (src/utils/responsive-scope.ts), which
+ * switches this whole file off, so the POS keeps its original layout byte-for-byte.
+ *
+ * Breakpoints (viewport px; media queries ignore the body zoom):
+ *   phone       < 768   (small phones < 375)
+ *   tablet      768–1023 — navigation becomes a drawer
+ *   desktop     >= 1024
+ *
+ * This file is unlayered, so it outranks every Tailwind utility (those all live in
+ * @layer). Rules therefore target the exact default utility (e.g. .p-6, .px-6) rather
+ * than a whole component, so a page that chose its own spacing keeps it.
+ */
+
+/* ── Body zoom ─────────────────────────────────────────────────────────────────
+ * The app renders at zoom 0.9 (index.css). On phones that leaves body text at ~12.6px
+ * and inputs small enough for iOS Safari to zoom into on focus, so phones run at 1.
+ * --gb-zoom mirrors the active zoom for the few places that size against the viewport
+ * (they divide by it, since vh/vw are scaled by an ancestor's zoom).
+ */
+:root {
+  --gb-zoom: 0.9;
+}
+
+/* App shell min-height (was an inline calc(100vh / 0.9); the POS keeps exactly that). */
+.gb-shell {
+  min-height: calc(100vh / 0.9);
+}
+
+html:not([data-gb-pos]) .gb-shell {
+  min-height: calc(100vh / var(--gb-zoom));
+  min-height: calc(100dvh / var(--gb-zoom));
+}
+
+@media screen and (max-width: 767px) {
+  html:not([data-gb-pos]) {
+    --gb-zoom: 1;
+  }
+
+  html:not([data-gb-pos]) body {
+    zoom: 1;
+  }
+}
+
+/* Gradient text: .bg-gradient-primary uses the `background` shorthand, which resets
+   background-clip, so bg-clip-text never took effect and the text showed as a solid
+   teal block (login page, renew/upgrade). */
+html:not([data-gb-pos]) .bg-clip-text[class*="bg-gradient-"] {
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-gb-pos]) *,
+  html:not([data-gb-pos]) *::before,
+  html:not([data-gb-pos]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── App shell: header, drawer, main ───────────────────────────────────────── */
+html:not([data-gb-pos]) .gb-app-header-branch {
+  max-width: 46vw;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.1;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+html:not([data-gb-pos]) .gb-app-header h2 {
+  line-height: 1.25;
+}
+
+@media screen and (max-width: 1023px) {
+  /* Height of the sticky app header (h-16 plus the notch inset). */
+  html:not([data-gb-pos]) {
+    --gb-header-h: calc(4rem + env(safe-area-inset-top));
+  }
+
+  /* Page-level sticky bars pin just below the app header instead of under it. */
+  html:not([data-gb-pos]) .gb-sticky-below-header {
+    top: var(--gb-header-h);
+  }
+
+  html:not([data-gb-pos]) .gb-sticky-below-header.z-50 {
+    z-index: 39;
+  }
+
+  /* Floating action buttons clear the home indicator / rounded corners. */
+  html:not([data-gb-pos]) .fixed.bottom-6 { bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+  html:not([data-gb-pos]) .fixed.bottom-8 { bottom: calc(2rem + env(safe-area-inset-bottom)); }
+  html:not([data-gb-pos]) .fixed.right-6 { right: calc(1.5rem + env(safe-area-inset-right)); }
+  html:not([data-gb-pos]) .fixed.right-8 { right: calc(2rem + env(safe-area-inset-right)); }
+
+  /* main used overflow:auto, which made it the sticky header's scroll container (so
+     the header never stuck) and let wide content scroll the whole page sideways. */
+  html:not([data-gb-pos]) .gb-main {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  html:not([data-gb-pos]) .gb-app-header {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  html:not([data-gb-pos]) .gb-app-header > div {
+    gap: 0.25rem;
+    padding-left: 0.5rem;
+    padding-right: 0.75rem;
+  }
+
+  html:not([data-gb-pos]) .gb-app-header [data-slot="sidebar-trigger"],
+  html:not([data-gb-pos]) .gb-app-header .gb-app-header-search,
+  html:not([data-gb-pos]) .gb-app-header [data-slot="button"] {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-right: 0;
+  }
+
+  html:not([data-gb-pos]) .gb-app-header [data-slot="sidebar-trigger"] {
+    margin-right: 0.25rem;
+  }
+
+  html:not([data-gb-pos]) .gb-app-header [data-slot="sidebar-trigger"] svg,
+  html:not([data-gb-pos]) .gb-app-header .gb-app-header-search svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* Page content clears the notch / rounded corners in landscape. */
+  html:not([data-gb-pos]) .gb-main > :not(.gb-app-header) {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Navigation drawer */
+  html:not([data-gb-pos]) [data-slot="sidebar"][data-mobile="true"] {
+    max-width: 86vw;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  html:not([data-gb-pos]) [data-mobile="true"] [data-sidebar="content"] {
+    overscroll-behavior: contain;
+  }
+
+  html:not([data-gb-pos]) [data-mobile="true"] [data-sidebar="menu-button"] {
+    min-height: 2.75rem;
+  }
+
+  html:not([data-gb-pos]) [data-mobile="true"] [data-sidebar="menu-button"].text-sm {
+    min-height: 2.5rem;
+  }
+
+  html:not([data-gb-pos]) [data-mobile="true"] [data-slot="select-trigger"] {
+    min-height: 2.75rem;
+  }
+}
+
+/* ── Overlays: popovers, menus, selects ────────────────────────────────────── */
+html:not([data-gb-pos]) [data-slot="popover-content"],
+html:not([data-gb-pos]) [data-slot="dropdown-menu-content"],
+html:not([data-gb-pos]) [data-slot="select-content"] {
+  max-width: calc(100vw / var(--gb-zoom) - 1rem);
+}
+
+html:not([data-gb-pos]) [data-slot="select-item"],
+html:not([data-gb-pos]) [data-slot="dropdown-menu-item"] {
+  overflow-wrap: anywhere;
+}
+
+/* ── Dialogs: never taller than the viewport ───────────────────────────────── */
+html:not([data-gb-pos]) [data-slot="dialog-content"].p-6 {
+  max-height: calc(100vh / var(--gb-zoom) - 2rem);
+  max-height: calc(100dvh / var(--gb-zoom) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+html:not([data-gb-pos]) [data-slot="alert-dialog-content"] {
+  max-height: calc(100dvh / var(--gb-zoom) - 2rem);
+  overflow-y: auto;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Touch devices (phones, and tablets with a coarse pointer): comfortable targets.
+ * ════════════════════════════════════════════════════════════════════════════ */
+@media screen and (max-width: 767px), screen and (max-width: 1023px) and (pointer: coarse) {
+  html:not([data-gb-pos]) button:not(.absolute):not(.rdp button).h-9,
+  html:not([data-gb-pos]) button:not(.absolute):not(.rdp button).h-10 {
+    min-height: 2.75rem;
+  }
+
+  html:not([data-gb-pos]) button:not(.absolute):not(.rdp button).h-8 {
+    min-height: 2.5rem;
+  }
+
+  html:not([data-gb-pos]) button:not(.absolute):not(.rdp button):is(.size-9, .size-8, .size-7, .h-9.w-9, .h-8.w-8, .h-7.w-7) {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  html:not([data-gb-pos]) [data-slot="input"]:not(.absolute),
+  html:not([data-gb-pos]) [data-slot="select-trigger"] {
+    min-height: 2.75rem;
+  }
+
+  html:not([data-gb-pos]) td [data-slot="input"],
+  html:not([data-gb-pos]) td [data-slot="select-trigger"] {
+    min-height: 2.5rem;
+  }
+
+  /* Bigger hit area without changing how the control looks. */
+  html:not([data-gb-pos]) [data-slot="checkbox"],
+  html:not([data-gb-pos]) [data-slot="switch"] {
+    position: relative;
+  }
+
+  html:not([data-gb-pos]) [data-slot="checkbox"]::after,
+  html:not([data-gb-pos]) [data-slot="switch"]::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+
+  html:not([data-gb-pos]) [data-slot="select-item"],
+  html:not([data-gb-pos]) [data-slot="dropdown-menu-item"],
+  html:not([data-gb-pos]) [data-slot="dropdown-menu-checkbox-item"],
+  html:not([data-gb-pos]) [data-slot="command-item"],
+  html:not([data-gb-pos]) [cmdk-item] {
+    min-height: 2.75rem;
+  }
+
+  html:not([data-gb-pos]) [data-slot="dialog-content"] > button.absolute.top-4.right-4,
+  html:not([data-gb-pos]) [data-slot="sheet-content"] > button.absolute.top-4.right-4 {
+    top: 0.5rem;
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+  }
+
+  html:not([data-gb-pos]) [data-slot="dialog-content"] > button.absolute.top-4.right-4 svg,
+  html:not([data-gb-pos]) [data-slot="sheet-content"] > button.absolute.top-4.right-4 svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Phones and tablets (< 1024px)
+ * ════════════════════════════════════════════════════════════════════════════ */
+@media screen and (max-width: 1023px) {
+  /* Tabs: a swipeable strip instead of squeezed / overflowing / stacked triggers. */
+  html:not([data-gb-pos]) [data-slot="tabs-list"] {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    grid-template-columns: none;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 2.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html:not([data-gb-pos]) [data-slot="tabs-list"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  html:not([data-gb-pos]) [data-slot="tabs-list"] > [data-slot="tabs-trigger"] {
+    flex: 1 0 auto;
+    width: auto;
+    min-height: 2.25rem;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+    scroll-snap-align: start;
+  }
+
+  /* Grid/flex children may shrink below their content instead of pushing it wider. */
+  html:not([data-gb-pos]) .grid > :not([class*="min-w-"]),
+  html:not([data-gb-pos]) .flex-1:not([class*="min-w-"]) {
+    min-width: 0;
+  }
+
+  /* A declared min-width still yields on screens narrower than it. */
+  html:not([data-gb-pos]) [class*="min-w-["]:not(table) {
+    max-width: 100%;
+  }
+
+  /* Wide fixed-width boxes (w-[600px], w-96 …) never exceed their container. */
+  html:not([data-gb-pos]) :is([class*=" w-["], [class^="w-["], .w-64, .w-72, .w-80, .w-96):not(table):not(svg) {
+    max-width: 100%;
+  }
+
+  html:not([data-gb-pos]) [data-slot="table-container"] {
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html:not([data-gb-pos]) .recharts-responsive-container,
+  html:not([data-gb-pos]) .recharts-wrapper {
+    max-width: 100%;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Phones (< 768px)
+ * ════════════════════════════════════════════════════════════════════════════ */
+@media screen and (max-width: 767px) {
+  /* ── Spacing: tighter but comfortable. ── */
+  html:not([data-gb-pos]) .p-6 { padding: 1rem; }
+  html:not([data-gb-pos]) .p-8 { padding: 1.25rem; }
+  html:not([data-gb-pos]) .px-6 { padding-left: 1rem; padding-right: 1rem; }
+  html:not([data-gb-pos]) .px-8 { padding-left: 1.25rem; padding-right: 1.25rem; }
+  html:not([data-gb-pos]) .py-6 { padding-top: 1rem; padding-bottom: 1rem; }
+  html:not([data-gb-pos]) .py-8 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+  html:not([data-gb-pos]) .pt-6 { padding-top: 1rem; }
+  html:not([data-gb-pos]) .pb-6 { padding-bottom: 1rem; }
+  html:not([data-gb-pos]) .gap-6 { gap: 1rem; }
+  html:not([data-gb-pos]) .gap-8 { gap: 1.25rem; }
+
+  /* index.css's older safety net adds margin-top on top of Tailwind v4's
+     margin-block-end, doubling the gaps; replace it with a single 1rem gap. */
+  html:not([data-gb-pos]) :is(.space-y-6, .space-y-8) > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0;
+  }
+
+  html:not([data-gb-pos]) .space-y-6 > :not(:last-child) { margin-block-end: 1rem; }
+  html:not([data-gb-pos]) .space-y-8 > :not(:last-child) { margin-block-end: 1.25rem; }
+
+  html:not([data-gb-pos]) :is(.space-x-6, .space-x-8) > :not([hidden]) ~ :not([hidden]) {
+    margin-left: 0;
+  }
+
+  /* Long unbroken strings (emails, IDs, URLs) wrap instead of running off the line.
+     break-word, not anywhere: anywhere also shrinks min-content, which lets flex rows
+     squeeze short tokens like "+0.0%" apart. */
+  html:not([data-gb-pos]) .gb-main,
+  html:not([data-gb-pos]) [data-slot="dialog-content"],
+  html:not([data-gb-pos]) [data-slot="sheet-content"] {
+    overflow-wrap: break-word;
+  }
+
+  html:not([data-gb-pos]) .gb-fullscreen {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ── Typography: no oversized headings. ── */
+  html:not([data-gb-pos]) .text-3xl { font-size: 1.5rem; line-height: 2rem; }
+  html:not([data-gb-pos]) .text-4xl { font-size: 1.75rem; line-height: 2.25rem; }
+  html:not([data-gb-pos]) :is(.text-5xl, .text-6xl) { font-size: 2.25rem; line-height: 2.5rem; }
+
+  /* ── Forms: 16px text so iOS Safari doesn't zoom into a field on focus. ── */
+  html:not([data-gb-pos]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  html:not([data-gb-pos]) textarea,
+  html:not([data-gb-pos]) select {
+    font-size: 16px;
+  }
+
+  /* ── Rows that would overflow: let them wrap. ──
+     Page headers (title block + actions) and toolbars of buttons/selects. Plain text
+     rows are left alone — with wrap they'd drop text under its icon instead of
+     letting it wrap in place. */
+  html:not([data-gb-pos]) .flex.justify-between:not(.flex-col):not(.flex-nowrap):not([data-slot]),
+  html:not([data-gb-pos]) .flex:not(.flex-col):not(.flex-nowrap):not([data-slot]):has(> button ~ button),
+  html:not([data-gb-pos]) .flex:not(.flex-col):not(.flex-nowrap):not([data-slot]):has(> .relative > [data-slot="input"]):has(> button),
+  html:not([data-gb-pos]) .flex:not(.flex-col):not(.flex-nowrap):not([data-slot]):has(> [data-slot="badge"]),
+  html:not([data-gb-pos]) .flex:not(.flex-col):not(.flex-nowrap):not([data-slot]):has(> [data-slot="select-trigger"], > [data-slot="popover-trigger"], > [data-slot="dropdown-menu-trigger"]) {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  html:not([data-gb-pos]) .flex.justify-between:not(.flex-col):not(.flex-nowrap):not([data-slot]) {
+    row-gap: 0.75rem;
+  }
+
+  /* Fixed-width selects in toolbars share the row and wrap; in stacked filter
+     columns they take the full width. */
+  html:not([data-gb-pos]) .flex:not(.flex-col) > [data-slot="select-trigger"]:is([class*="w-["], .w-32, .w-36, .w-40, .w-44, .w-48, .w-52, .w-56, .w-60, .w-64) {
+    flex: 1 1 9rem;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* A search field in a wrapping filter bar takes its own row; filters share the next. */
+  html:not([data-gb-pos]) .flex:not(.flex-col):is(.flex-wrap, :has(> [data-slot="select-trigger"]), :has(> button)) > :is(.flex-1, .relative):has([data-slot="input"]) {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* A fixed-width search box (w-64 …) fills the row it was given. */
+  html:not([data-gb-pos]) .relative > [data-slot="input"]:is(.w-48, .w-56, .w-64, .w-72, .w-80, .w-96) {
+    width: 100%;
+  }
+
+  html:not([data-gb-pos]) .flex-col > [data-slot="select-trigger"],
+  html:not([data-gb-pos]) .flex-col:not(.items-center):not(.items-start):not(.items-end) > button,
+  html:not([data-gb-pos]) .flex-col > .relative:has(> [data-slot="input"]) {
+    width: 100%;
+  }
+
+  /* ── Grids ──
+     index.css's safety net collapses every grid-cols-2…6 to one column at ≤640px.
+     Instead: grids holding form fields stack (one field per row); other fixed grids
+     drop to two columns so short items (stats, chips, buttons) don't each take a
+     full row. Spanning items take the whole row. */
+  html:not([data-gb-pos]) :is(.grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html:not([data-gb-pos]) :is(.grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6):has(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea, select, [data-slot="select-trigger"], [role="combobox"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html:not([data-gb-pos]) :is(.col-span-2, .col-span-3, .col-span-4, .col-span-5, .col-span-6, .col-span-8) {
+    grid-column: 1 / -1;
+  }
+
+  /* KPI / stat cards sit two per row. Three patterns are recognised: the shadcn stat
+     card (title + icon in a flex-row CardHeader), a single CardContent holding a value
+     block beside an icon, a single CardContent of label + value (+ one line), and a
+     title-only CardHeader over a CardContent that leads with the value. */
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"]:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) :is(.text-2xl, .text-3xl) {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-content"].p-6:only-child {
+    padding: 0.875rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] {
+    gap: 0.5rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-header"] {
+    padding: 0.875rem 0.875rem 0;
+    gap: 0.5rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-content"] {
+    padding: 0 0.875rem 0.875rem;
+  }
+
+  /* ── Cards ── */
+  html:not([data-gb-pos]) [data-slot="card"].gap-6 { gap: 1rem; }
+  html:not([data-gb-pos]) [data-slot="card-header"].px-6,
+  html:not([data-gb-pos]) [data-slot="card-content"].px-6,
+  html:not([data-gb-pos]) [data-slot="card-footer"].px-6 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  html:not([data-gb-pos]) [data-slot="card-header"].pt-6 { padding-top: 1rem; }
+  html:not([data-gb-pos]) [data-slot="card-content"]:last-child { padding-bottom: 1rem; }
+  html:not([data-gb-pos]) [data-slot="card-content"].p-0:last-child { padding-bottom: 0; }
+  html:not([data-gb-pos]) [data-slot="card-footer"].pb-6 { padding-bottom: 1rem; }
+
+  /* ── Dialogs become bottom sheets ── */
+  html:not([data-gb-pos]) [data-slot="dialog-content"] {
+    --tw-enter-scale: 1;
+    --tw-exit-scale: 1;
+    --tw-enter-translate-y: 100%;
+    --tw-exit-translate-y: 100%;
+    --tw-duration: 0.24s;
+    --tw-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    translate: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100vh - 1rem) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 0.5rem) !important;
+    border-bottom-width: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  html:not([data-gb-pos]) [data-slot="dialog-content"].p-6 {
+    padding: 1.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  html:not([data-gb-pos]) [data-slot="dialog-content"].p-6 [data-slot="dialog-header"] {
+    padding-right: 2.25rem;
+    text-align: left;
+  }
+
+  /* Footer actions stay reachable at the bottom of long forms. */
+  html:not([data-gb-pos]) [data-slot="dialog-content"].p-6 [data-slot="dialog-footer"] {
+    position: sticky;
+    bottom: calc(-1rem - env(safe-area-inset-bottom));
+    z-index: 2;
+    margin: 0 -1rem calc(-1rem - env(safe-area-inset-bottom));
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  html:not([data-gb-pos]) [data-slot="alert-dialog-content"] {
+    padding: 1.25rem;
+  }
+
+  /* Side sheets opened by pages (not the nav drawer) use the full width. */
+  html:not([data-gb-pos]) [data-slot="sheet-content"]:not([data-mobile]):is([data-side="right"], [data-side="left"]) {
+    width: 100%;
+    max-width: 100%;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ── Tables (annotated by components/shared/ResponsiveEnhancer.tsx) ── */
+  html:not([data-gb-pos]) table[data-gb-table="scroll"][data-gb-self-scroll] {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html:not([data-gb-pos]) [data-slot="table-container"]:has(> table[data-gb-table="cards"]) {
+    overflow: visible;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > thead {
+    display: none;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > tfoot {
+    margin-top: 0.625rem;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--card);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > tfoot > tr {
+    background: var(--muted);
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > :is(td, th) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem 0.75rem;
+    min-width: 0;
+    max-width: none;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > [data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    margin-right: auto;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+  }
+
+  /* Inline rows inside a cell (name + badges, icon + text) wrap rather than squeeze. */
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > :is(td, th) .flex:not(.flex-col) {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > :is(td, th):empty {
+    display: none;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > [data-gb-cell="primary"] {
+    justify-content: flex-start;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.125rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > [data-gb-cell="actions"] {
+    padding-top: 0.375rem;
+    margin-top: 0.125rem;
+    border-top: 1px dashed var(--border);
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > [data-gb-cell="full"] {
+    justify-content: center;
+    text-align: center;
+  }
+
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > :is(tbody, tfoot) > tr > :is(td, th):not([data-label]):not([data-gb-cell]) {
+    justify-content: flex-start;
+  }
+
+  /* A full-row message (empty state / expanded detail) shouldn't look like a card. */
+  html:not([data-gb-pos]) table[data-gb-table="cards"] > tbody > tr:has(> [data-gb-cell="full"]:only-child) {
+    padding: 0.5rem;
+  }
+
+  /* ── Toasts clear the home indicator. ── */
+  html:not([data-gb-pos]) [data-sonner-toaster] {
+    --mobile-offset-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Tablets (768–1023px): KPI cards three (four for 4 or 8 cards) across instead of
+ * two tall rows.
+ * ════════════════════════════════════════════════════════════════════════════ */
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  /* Compact header-style stat cards fit four across. */
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))):is(:has(> :nth-child(4):last-child), :has(> :nth-child(8):last-child)) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))):has(> :nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Value-beside-icon cards need more width: four of them sit two by two. */
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))):has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)):has(> :nth-child(4):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] {
+    gap: 0.75rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-header"].px-6 {
+    padding: 1.125rem 1.125rem 0;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-content"].px-6 {
+    padding: 0 1.125rem 1.125rem;
+  }
+
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) > [data-slot="card"] > [data-slot="card-content"].p-6:only-child {
+    padding: 1.125rem;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ * Tablets and small laptops (768–1279px): dense form/filter grids (md:grid-cols-4+)
+ * would squeeze each field to ~140px; let them fit as many 12rem+ columns as there
+ * is room for. Grids with spanning children are page layouts and are left alone.
+ * ════════════════════════════════════════════════════════════════════════════ */
+@media screen and (min-width: 768px) and (max-width: 1279px) {
+  html:not([data-gb-pos]) .grid:is(.md\:grid-cols-4, .md\:grid-cols-5, .md\:grid-cols-6, .lg\:grid-cols-5, .lg\:grid-cols-6):not(:has(> [class*="col-span"])):has(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea, select, [data-slot="select-trigger"]) {
+    grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  }
+}
+
+/* Small laptops (1024–1279px): in 2/3 + 1/3 page layouts the side column (calendars,
+   quick stats) would drop below its content width next to the desktop sidebar. */
+@media screen and (min-width: 1024px) and (max-width: 1279px) {
+  html:not([data-gb-pos]) .grid.lg\:grid-cols-3:has(> .lg\:col-span-2) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(19.5rem, 1fr);
+  }
+}
+
+/* Small phones (< 375px): KPI cards return to one per row before they get cramped. */
+@media screen and (max-width: 359px) {
+  html:not([data-gb-pos]) :is(.grid, [class*="kpiGrid"]):is(:has(> [data-slot="card"] > [data-slot="card-header"].space-y-0), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > .flex.justify-between:only-child :is(.text-xl, .text-2xl, .text-3xl)), :has(> [data-slot="card"] > [data-slot="card-content"]:only-child > :first-child + :is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+2)), :has(> [data-slot="card"] > [data-slot="card-header"].pb-2 + [data-slot="card-content"]:last-child > :first-child:is(.text-xl, .text-2xl, .text-3xl):nth-last-child(-n+3))) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

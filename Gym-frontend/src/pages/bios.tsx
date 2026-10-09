@@ -65,6 +65,18 @@ import { biosService, type BiosSettings, type BiosActivityLogEntry, type BiosBra
 import { staffService, type StaffTarget } from '../utils/supabase/staff-service';
 import { useBranch } from '../utils/branch-context';
 import { useCurrency, CurrencyValue, CurrencyGlyph } from '../utils/currency';
+import { KPIReportDialog } from '../components/bios/kpi-report-dialog';
+import { ExecutiveDashboardDialog } from '../components/bios/executive-dashboard-dialog';
+import { BusinessIntelligenceDialog } from '../components/bios/business-intelligence-dialog';
+import { PerformanceMetricsDialog } from '../components/bios/performance-metrics-dialog';
+import { PredictiveAnalyticsDialog } from '../components/bios/predictive-analytics-dialog';
+import { RevenueAnalyticsDialog } from '../components/bios/revenue-analytics-dialog';
+import { MemberAnalyticsDialog } from '../components/bios/member-analytics-dialog';
+import { OperationalReportsDialog } from '../components/bios/operational-reports-dialog';
+import { BenchmarkingDialog } from '../components/bios/benchmarking-dialog';
+import { BIEngineWrapper } from '../components/bios/bi-engine-wrapper';
+import { type BiosLiveData, downloadCsv, formatSignedPercent } from '../components/bios/bios-live';
+import '../styles/bios.css';
 
 type RevenueChartPoint = {
   month: string;
@@ -77,6 +89,7 @@ type MemberChartPoint = {
   members: number;
   retention: number;
   churn: number;
+  newMembers?: number;
 };
 
 type RevenueSourcePoint = {
@@ -225,9 +238,6 @@ const calculateGrowthRate = (current: number, previous: number): number | null =
   return Number((((current - previous) / previous) * 100).toFixed(1));
 };
 
-const formatSignedPercent = (value: number | null) =>
-  value === null ? 'New' : `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
-
 const getMetricState = (
   current: number,
   target: number
@@ -288,63 +298,7 @@ const formatSegmentLabel = (value: string) =>
     .trim()
     .replace(/\b\w/g, (match) => match.toUpperCase())} Segment`;
 
-const downloadBlob = (filename: string, blob: Blob) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
-
-const toCsvCell = (value: unknown) => {
-  const s = value == null ? '' : String(value);
-  return `"${s.replaceAll('"', '""')}"`;
-};
-
-const exportAsCsv = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
-  const csv = [
-    header.map(toCsvCell).join(','),
-    ...rows.map((r) => r.map(toCsvCell).join(',')),
-  ].join('\n');
-  downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-};
-
-const DetailRows = ({ rows }: { rows: Array<{ label: string; value: React.ReactNode }> }) => (
-  <div className="divide-y">
-    {rows.map((row, index) => (
-      <div key={index} className="flex justify-between items-center text-sm py-2">
-        <span className="text-gray-600">{row.label}</span>
-        <span className="font-medium text-gray-900">{row.value}</span>
-      </div>
-    ))}
-  </div>
-);
-
-const DetailTable = ({ columns, rows }: { columns: string[]; rows: Array<Array<React.ReactNode>> }) => (
-  <div className="overflow-x-auto">
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b">
-          {columns.map((column, index) => (
-            <th key={index} className="text-left py-2 pr-4 text-gray-500 font-medium">{column}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, rowIndex) => (
-          <tr key={rowIndex} className="border-b last:border-0">
-            {row.map((cell, cellIndex) => (
-              <td key={cellIndex} className="py-2 pr-4">{cell}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+type BiosDialog = 'kpi' | 'executive' | 'bi' | 'performance' | 'predictive' | 'revenue' | 'members' | 'reports' | 'benchmarking';
 
 export function BiOS() {
   const { formatCurrency, currencyCode } = useCurrency();
@@ -377,6 +331,22 @@ export function BiOS() {
 
   const [trendMonths, setTrendMonths] = useState(6);
   const [detailsDialog, setDetailsDialog] = useState<{ title: string; description?: string; content: React.ReactNode } | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Which analysis dialog is open, and the tab it should open on.
+  const [openDialog, setOpenDialog] = useState<BiosDialog | null>(null);
+  const [dialogTab, setDialogTab] = useState<string | undefined>(undefined);
+  const openBiosDialog = (dialog: BiosDialog, tab?: string) => {
+    setDialogTab(tab);
+    setOpenDialog(dialog);
+  };
+  const dialogState = (dialog: BiosDialog) => ({
+    open: openDialog === dialog,
+    onOpenChange: (open: boolean) => { if (!open) setOpenDialog(null); }
+  });
+
+  // Per membership type: total / active / expired — feeds the Member Analytics segments.
+  const [membershipTypeStats, setMembershipTypeStats] = useState<Record<string, { total: number; active: number; expired: number }>>({});
 
   // Real "Recent Reports" / "Recent Exports" activity log — replaces the
   // previously hardcoded sample rows.
@@ -415,6 +385,15 @@ export function BiOS() {
         accumulator[membershipType] = (accumulator[membershipType] || 0) + 1;
         return accumulator;
       }, {});
+
+      setMembershipTypeStats(memberList.reduce<Record<string, { total: number; active: number; expired: number }>>((accumulator, member) => {
+        const type = member.membership_type || 'Unknown';
+        const stats = accumulator[type] || (accumulator[type] = { total: 0, active: 0, expired: 0 });
+        stats.total += 1;
+        if (member.membership_status === 'active') stats.active += 1;
+        if (member.membership_status === 'expired') stats.expired += 1;
+        return accumulator;
+      }, {}));
 
       const recentJoins = memberList.filter((member) => {
         const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
@@ -476,8 +455,11 @@ export function BiOS() {
       setRevenueChartData(liveRevenueChart);
 
       const liveMemberChart = rollingMonths.map(({ label, end }) => {
+        const monthKey = getMonthKey(end);
+        let newMembers = 0;
         const membersInPeriod = memberList.filter((member) => {
           const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
+          if (joinedAt && getMonthKey(joinedAt) === monthKey) newMembers += 1;
           return joinedAt ? joinedAt <= end : false;
         });
 
@@ -490,7 +472,8 @@ export function BiOS() {
           month: label,
           members: membersInPeriod.length,
           retention,
-          churn: Number((100 - retention).toFixed(1))
+          churn: Number((100 - retention).toFixed(1)),
+          newMembers
         };
       });
 
@@ -546,7 +529,7 @@ export function BiOS() {
   const loadActivityLogs = useCallback(() => {
     biosService.getRecentActivity('REPORT', 20)
       .then((entries) => {
-        setRecentReportsLog(entries.slice(0, 4));
+        setRecentReportsLog(entries);
         const monthStart = new Date();
         monthStart.setDate(1);
         monthStart.setHours(0, 0, 0, 0);
@@ -555,7 +538,7 @@ export function BiOS() {
       .catch(() => {});
     biosService.getRecentActivity('EXPORT', 20)
       .then((entries) => {
-        setRecentExportsLog(entries.slice(0, 4));
+        setRecentExportsLog(entries);
         const weekStart = new Date();
         weekStart.setDate(weekStart.getDate() - 7);
         setExportsThisWeek(entries.filter((e) => e.created_at && new Date(e.created_at) >= weekStart).length);
@@ -922,7 +905,7 @@ export function BiOS() {
       ...livePerformanceMetrics.map((metric) => [`${metric.metric} (current)`, metric.current] as [string, number]),
       ...liveBenchmarks.map((benchmark) => [`${benchmark.metric} vs your target`, `${benchmark.value} vs ${benchmark.industry}`] as [string, string]),
     ];
-    exportAsCsv(`bios-report_${dateLabel}.csv`, header, rows);
+    downloadCsv(`bios-report_${dateLabel}.csv`, header, rows);
     const title = `Business Summary — ${getCurrentPeriod()}`;
     biosService.logActivity('REPORT', title, 'CSV', rows.length)
       .then(loadActivityLogs)
@@ -939,213 +922,79 @@ export function BiOS() {
       ...memberChartData.map((point) => ['Monthly Members', point.month, point.members] as [string, string, number]),
       ...displayMemberSegments.map((segment) => ['Member Segment', segment.segment, segment.count] as [string, string, number]),
     ];
-    exportAsCsv(`bios-data-export_${dateLabel}.csv`, header, rows);
+    downloadCsv(`bios-data-export_${dateLabel}.csv`, header, rows);
     biosService.logActivity('EXPORT', 'Full Data Export', 'CSV', rows.length)
       .then(loadActivityLogs)
       .catch(() => {});
     toast.success('Data export started');
   };
 
-  const showExecutiveDetails = () => {
-    setDetailsDialog({
-      title: 'Executive Dashboard',
-      description: `Business health summary for ${getCurrentPeriod()}`,
-      content: (
-        <div className="space-y-4">
-          <DetailRows
-            rows={[
-              { label: 'Revenue Growth', value: formatSignedPercent(revenueGrowthRate) },
-              { label: 'Member Growth', value: formatSignedPercent(memberGrowthRate) },
-              { label: 'Profit Margin', value: `${hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%` },
-              { label: 'Overall Health Score', value: `${overallHealthScore}% (${overallHealthLabel})` }
-            ]}
-          />
-          <DetailTable
-            columns={['Month', 'Revenue', 'Target']}
-            rows={displayedRevenueChartData.map((point) => [point.month, formatCurrency(point.revenue), formatCurrency(point.target)])}
-          />
-          {topStaffTargets.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-2">Top Staff by Revenue This Month</h4>
-              <DetailTable
-                columns={['Staff', 'Revenue Achieved', 'Target', 'Progress']}
-                rows={topStaffTargets.map((t) => [
-                  t.staff_name || 'Unknown',
-                  formatCurrency(t.revenue_achieved || 0),
-                  formatCurrency(t.revenue_target || 0),
-                  `${t.percentage || 0}%`
-                ])}
-              />
-            </div>
-          )}
-        </div>
-      )
-    });
+  // Everything the analysis dialogs and the BI Engine tab read — live where a
+  // source exists; see components/bios/bios-live.tsx.
+  const live: BiosLiveData = {
+    hasLiveData: hasGymData,
+    gymData,
+    currencyCode,
+    totalRevenue,
+    totalExpenses: gymData?.totalExpenses ?? 0,
+    netIncome: gymData?.netIncome ?? 0,
+    profitMargin: hasGymData ? gymData.profitMargin : 23.8,
+    activeMembers,
+    totalMembers,
+    retentionRate,
+    retentionDelta,
+    revenueGrowthRate,
+    memberGrowthRate,
+    overallHealthScore,
+    overallHealthLabel,
+    performanceScore,
+    revenuePerMember,
+    todayCheckIns,
+    avgSessionMinutes,
+    peakHours: sortedPeakHours,
+    monthlyRevenueTarget: monthlyRevenueTargetValue,
+    monthlyTrend: gymData?.monthlyTrend ?? [],
+    revenueSources: revenueSourceData,
+    expensesByCategory: gymData?.expensesByCategory ?? {},
+    membershipTypes: gymData?.membershipTypes ?? {},
+    membershipTypeStats,
+    memberTrend: memberChartData.map((point) => ({ ...point, newMembers: point.newMembers ?? 0 })),
+    recentJoins: gymData?.recentJoins ?? 0,
+    expiredMembers: gymData?.expiredMembers ?? 0,
+    overdueMembers: gymData?.overdueMembers ?? 0,
+    suspendedMembers: gymData?.suspendedMembers ?? 0,
+    topStaff: topStaffTargets,
+    branchComparison,
+    onExportReport: handleGenerateReport,
+    onExportData: handleExportData,
+    onConfigure: () => {
+      setOpenDialog(null);
+      setSettingsOpen(true);
+    }
   };
 
-  const showBiDetails = () => {
-    setDetailsDialog({
-      title: 'Business Intelligence',
-      description: hasGymData ? 'Live insights from connected data sources' : 'Sample insights — connect data to see live figures',
-      content: (
-        <div className="space-y-4">
-          <DetailRows
-            rows={[
-              { label: 'Data Sources', value: `${dataSourceCount} Active` },
-              { label: 'Peak Hour', value: hasGymData ? topPeakHour : 'N/A' },
-              { label: 'Check-ins Today', value: todayCheckIns },
-              { label: 'Net Income', value: hasGymData ? formatCurrency(gymData.netIncome) : '-' },
-              { label: 'Profit Margin', value: `${hasGymData ? gymData.profitMargin.toFixed(1) : '23.8'}%` }
-            ]}
-          />
-          {hasGymData && sortedPeakHours.length > 0 && (
-            <DetailTable
-              columns={['Hour', 'Check-ins']}
-              rows={sortedPeakHours.map(([hour, count]) => [hour, count])}
-            />
-          )}
-        </div>
-      )
-    });
+  // Shapes the design's dialogs expect.
+  const dialogTopKPIs = {
+    totalRevenue,
+    activeMembers,
+    retentionRate,
+    monthlyGrowth: revenueGrowthRate ?? 0
   };
-
-  const showPerformanceDetails = () => {
-    setDetailsDialog({
-      title: 'Performance Metrics',
-      description: `Overall performance score: ${performanceScore}%`,
-      content: (
-        <DetailTable
-          columns={['Metric', 'Current', 'Target', 'Change']}
-          rows={livePerformanceMetrics.map((metric) => [
-            metric.metric,
-            metric.current,
-            metric.target,
-            <span className={metric.trend === 'up' ? 'text-green-600' : metric.trend === 'down' ? 'text-red-600' : 'text-gray-600'}>
-              {formatSignedPercent(metric.change)}
-            </span>
-          ])}
-        />
-      )
-    });
-  };
-
-  const showPredictionsAllDetails = () => {
-    setDetailsDialog({
-      title: 'AI Predictions',
-      description: `Confidence average: ${confidenceAverage}%`,
-      content: (
-        <DetailTable
-          columns={['Insight', 'Prediction', 'Confidence', 'Timeframe', 'Priority']}
-          rows={aiPredictions.map((insight) => [
-            insight.insight,
-            insight.prediction,
-            `${insight.confidence}%`,
-            insight.timeframe,
-            insight.priority
-          ])}
-        />
-      )
-    });
-  };
-
-  const showRevenueBreakdownDetails = () => {
-    setDetailsDialog({
-      title: 'Revenue Breakdown',
-      description: `Total revenue: ${formatCurrency(totalRevenue)}`,
-      content: (
-        <DetailTable
-          columns={['Source', 'Amount', 'Share']}
-          rows={revenueSourceData.map((source) => [source.source, formatCurrency(source.amount), `${source.percentage}%`])}
-        />
-      )
-    });
-  };
-
-  const showRevenueTrendsDetails = () => {
-    setDetailsDialog({
-      title: 'Revenue vs Target Trends',
-      description: `Growth rate: ${formatSignedPercent(revenueGrowthRate)}`,
-      content: (
-        <DetailTable
-          columns={['Month', 'Revenue', 'Target']}
-          rows={displayedRevenueChartData.map((point) => [point.month, formatCurrency(point.revenue), formatCurrency(point.target)])}
-        />
-      )
-    });
-  };
-
-  const showMemberSegmentDetails = () => {
-    const fullSegments = hasGymData
-      ? Object.entries(gymData.membershipTypes)
-          .sort((first, second) => second[1] - first[1])
-          .map(([type, count]) => ({
-            segment: formatSegmentLabel(type),
-            count,
-            percentage: gymData.totalMembers > 0 ? Math.round((count / gymData.totalMembers) * 100) : 0
-          }))
-      : memberAnalytics.map((segment) => ({
-          segment: segment.segment,
-          count: segment.count,
-          percentage: Math.round((segment.count / topKPIs.activeMembers) * 100)
-        }));
-
-    setDetailsDialog({
-      title: 'Member Segments',
-      description: `${totalMembers.toLocaleString()} total members`,
-      content: (
-        <DetailTable
-          columns={['Segment', 'Members', 'Share']}
-          rows={fullSegments.map((segment) => [segment.segment, segment.count, `${segment.percentage}%`])}
-        />
-      )
-    });
-  };
-
-  const showMemberRetentionDetails = () => {
-    setDetailsDialog({
-      title: 'Member Growth & Retention',
-      description: `Retention rate: ${retentionRate}% (${formatSignedPercent(retentionDelta)} vs last month)`,
-      content: (
-        <DetailTable
-          columns={['Month', 'Members', 'Retention', 'Churn']}
-          rows={memberChartData.map((point) => [point.month, point.members, `${point.retention}%`, `${point.churn}%`])}
-        />
-      )
-    });
-  };
-
-  const showReportsAllDetails = () => {
-    setDetailsDialog({
-      title: 'Operational Reports',
-      description: recentReportsLog.length > 0 ? 'Recently generated reports' : 'No reports generated yet',
-      content: recentReportsLog.length > 0 ? (
-        <DetailTable
-          columns={['Report', 'Format', 'Generated By', 'Generated At']}
-          rows={recentReportsLog.map((report) => [report.title, report.format, report.generated_by || 'Unknown', formatRelativeTime(report.created_at)])}
-        />
-      ) : (
-        <p className="text-sm text-gray-500">Click "Generate" to create your first report.</p>
-      )
-    });
-  };
-
-  const showBenchmarkDetails = () => {
-    setDetailsDialog({
-      title: 'Your Benchmarks',
-      description: `${benchmarkBadgeText} — compared against the targets you set in BiOS Configuration, not external industry data`,
-      content: (
-        <DetailTable
-          columns={['Metric', 'Your Value', 'Your Target', 'Performance']}
-          rows={liveBenchmarks.map((benchmark) => [
-            benchmark.metric,
-            benchmark.metric.includes('Revenue') ? formatCurrency(benchmark.value) : `${benchmark.value}%`,
-            benchmark.metric.includes('Revenue') ? formatCurrency(benchmark.industry) : `${benchmark.industry}%`,
-            <span className={getPerformanceColor(benchmark.performance)}>{benchmark.performance}</span>
-          ])}
-        />
-      )
-    });
-  };
+  const dialogMemberSegments = hasGymData
+    ? Object.entries(gymData.membershipTypes)
+        .sort((first, second) => second[1] - first[1])
+        .map(([type, count]) => ({ segment: formatSegmentLabel(type), count, engagement: null, ltv: null }))
+    : memberAnalytics;
+  const dialogRecentReports = recentReportsLog.slice(0, 4).map((entry) => ({
+    report: entry.title,
+    type: entry.format,
+    generated: formatRelativeTime(entry.created_at),
+    downloads: 0,
+    status: 'Available'
+  }));
+  const activityLog = [...recentReportsLog, ...recentExportsLog].sort(
+    (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+  );
 
   const showFilterOptions = () => {
     setDetailsDialog({
@@ -1171,7 +1020,7 @@ export function BiOS() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div data-bios-ui="" className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1196,6 +1045,21 @@ export function BiOS() {
         </div>
       </div>
 
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 bg-white shadow-sm">
+          <TabsTrigger value="overview" className="data-[state=active]:bg-[#2B7A78] data-[state=active]:text-white">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            BiOS Overview
+          </TabsTrigger>
+          <TabsTrigger value="bi-engine" className="data-[state=active]:bg-[#2B7A78] data-[state=active]:text-white">
+            <Brain className="h-4 w-4 mr-2" />
+            BI Engine Dashboard
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
       {/* Executive Summary — a short rule-based narrative from real numbers (no
           external AI API required; works the same with or without VITE_CLAUDE_API_KEY). */}
       {hasGymData && (
@@ -1308,7 +1172,7 @@ export function BiOS() {
                 <Monitor className="h-5 w-5 text-blue-600" />
                 <CardTitle>Executive Dashboard</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showExecutiveDetails}>View Details</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('executive')}>View Details</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1332,7 +1196,7 @@ export function BiOS() {
               <Progress value={clamp(hasGymData ? gymData.profitMargin : 23.8, 0, 100)} className="h-2" />
               <p className="text-xs text-gray-500">Overall business health: {overallHealthLabel}</p>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={handleGenerateReport}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('kpi')}>
                   <BarChart3 className="h-4 w-4 mr-1" />
                   KPI Report
                 </Button>
@@ -1353,7 +1217,7 @@ export function BiOS() {
                 <Brain className="h-5 w-5 text-purple-600" />
                 <CardTitle>Business Intelligence</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showBiDetails}>Analyze</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('bi')}>Analyze</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1385,7 +1249,7 @@ export function BiOS() {
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showBiDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('bi')}>
                   <Eye className="h-4 w-4 mr-1" />
                   View Insights
                 </Button>
@@ -1406,7 +1270,7 @@ export function BiOS() {
                 <Gauge className="h-5 w-5 text-green-600" />
                 <CardTitle>Performance Metrics</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showPerformanceDetails}>Monitor</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('performance')}>Monitor</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1428,11 +1292,11 @@ export function BiOS() {
                 <Progress value={performanceScore} className="h-2" />
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showPerformanceDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('performance', 'live')}>
                   <Activity className="h-4 w-4 mr-1" />
                   Live View
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('performance', 'schedule')}>
                   <Calendar className="h-4 w-4 mr-1" />
                   Schedule
                 </Button>
@@ -1449,8 +1313,8 @@ export function BiOS() {
                 <TrendingUpDown className="h-5 w-5 text-orange-600" />
                 <CardTitle>Predictive Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={handlePredict} disabled={predictionsLoading || !gymData}>
-                {predictionsLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Predict'}
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('predictive')}>
+                Predict
               </Button>
             </div>
           </CardHeader>
@@ -1474,11 +1338,11 @@ export function BiOS() {
               </div>
               <Progress value={confidenceAverage} className="h-2" />
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={() => setSettingsOpen(true)}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('predictive', 'alerts')}>
                   <Zap className="h-4 w-4 mr-1" />
                   Auto-Alert
                 </Button>
-                <Button variant="ghost" size="sm" onClick={showPredictionsAllDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('predictive')}>
                   <Eye className="h-4 w-4 mr-1" />
                   View All
                 </Button>
@@ -1495,7 +1359,7 @@ export function BiOS() {
                 <DollarSign className="h-5 w-5 text-green-600" />
                 <CardTitle>Revenue Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showRevenueBreakdownDetails}>Analyze</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('revenue')}>Analyze</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1526,11 +1390,11 @@ export function BiOS() {
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showRevenueBreakdownDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('revenue')}>
                   <PieChartIcon className="h-4 w-4 mr-1" />
                   Breakdown
                 </Button>
-                <Button variant="ghost" size="sm" onClick={showRevenueTrendsDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('revenue', 'trends')}>
                   <TrendingUp className="h-4 w-4 mr-1" />
                   Trends
                 </Button>
@@ -1547,7 +1411,7 @@ export function BiOS() {
                 <Users className="h-5 w-5 text-blue-600" />
                 <CardTitle>Member Analytics</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showMemberSegmentDetails}>Segment</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('members')}>Segment</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1569,11 +1433,11 @@ export function BiOS() {
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showMemberSegmentDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('members')}>
                   <UsersIcon className="h-4 w-4 mr-1" />
                   Segments
                 </Button>
-                <Button variant="ghost" size="sm" onClick={showMemberRetentionDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('members', 'retention')}>
                   <Target className="h-4 w-4 mr-1" />
                   Retention
                 </Button>
@@ -1590,7 +1454,7 @@ export function BiOS() {
                 <Activity className="h-5 w-5 text-cyan-600" />
                 <CardTitle>Operational Reports</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={handleGenerateReport}>Generate</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('reports', 'generate')}>Generate</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1614,7 +1478,7 @@ export function BiOS() {
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showReportsAllDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('reports')}>
                   <FileText className="h-4 w-4 mr-1" />
                   View All
                 </Button>
@@ -1635,7 +1499,7 @@ export function BiOS() {
                 <Target className="h-5 w-5 text-red-600" />
                 <CardTitle>Benchmarking</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={showBenchmarkDetails}>Compare</Button>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('benchmarking')}>Compare</Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1668,7 +1532,7 @@ export function BiOS() {
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={showBenchmarkDetails}>
+                <Button variant="ghost" size="sm" onClick={() => openBiosDialog('benchmarking')}>
                   <BarChart3 className="h-4 w-4 mr-1" />
                   Full Report
                 </Button>
@@ -1740,7 +1604,7 @@ export function BiOS() {
                 </CardTitle>
                 <CardDescription>Monthly performance against targets</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={showRevenueTrendsDetails}>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('revenue', 'trends')}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </Button>
@@ -1772,7 +1636,7 @@ export function BiOS() {
                 </CardTitle>
                 <CardDescription>Member metrics over the last {trendMonths} months</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={showMemberRetentionDetails}>
+              <Button variant="outline" size="sm" onClick={() => openBiosDialog('members', 'retention')}>
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </Button>
@@ -1869,9 +1733,118 @@ export function BiOS() {
         </CardContent>
       </Card>
 
+        </TabsContent>
+
+        {/* BI Engine Dashboard Tab */}
+        <TabsContent value="bi-engine" className="space-y-6">
+          <BIEngineWrapper
+            formatCurrency={formatCurrency}
+            getCurrentPeriod={getCurrentPeriod}
+            live={live}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <KPIReportDialog
+        {...dialogState('kpi')}
+        topKPIs={dialogTopKPIs}
+        performanceMetrics={livePerformanceMetrics}
+        revenueBySource={revenueSourceData}
+        revenueData={displayedRevenueChartData}
+        membershipData={memberChartData}
+        memberAnalytics={dialogMemberSegments}
+        benchmarkData={liveBenchmarks}
+        recentReports={dialogRecentReports}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+      />
+
+      <ExecutiveDashboardDialog
+        {...dialogState('executive')}
+        topKPIs={dialogTopKPIs}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+      />
+
+      <BusinessIntelligenceDialog
+        {...dialogState('bi')}
+        defaultTab={dialogTab}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+        insights={aiPredictions}
+        onRefreshInsights={handlePredict}
+        refreshing={predictionsLoading}
+      />
+
+      <PerformanceMetricsDialog
+        {...dialogState('performance')}
+        defaultTab={dialogTab}
+        performanceMetrics={livePerformanceMetrics}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+        onRefresh={() => loadRealData(trendMonths)}
+      />
+
+      <PredictiveAnalyticsDialog
+        {...dialogState('predictive')}
+        defaultTab={dialogTab}
+        predictiveInsights={aiPredictions}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+        onRefresh={handlePredict}
+        refreshing={predictionsLoading}
+      />
+
+      <RevenueAnalyticsDialog
+        {...dialogState('revenue')}
+        defaultTab={dialogTab}
+        revenueBySource={revenueSourceData}
+        revenueData={displayedRevenueChartData}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+      />
+
+      <MemberAnalyticsDialog
+        {...dialogState('members')}
+        defaultTab={dialogTab}
+        memberAnalytics={dialogMemberSegments}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+      />
+
+      <OperationalReportsDialog
+        {...dialogState('reports')}
+        defaultTab={dialogTab}
+        recentReports={dialogRecentReports}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+        activityLog={activityLog}
+        reportsThisMonth={reportsThisMonth}
+        exportsThisWeek={exportsThisWeek}
+        formatRelativeTime={formatRelativeTime}
+        onRefreshLog={loadActivityLogs}
+      />
+
+      <BenchmarkingDialog
+        {...dialogState('benchmarking')}
+        defaultTab={dialogTab}
+        benchmarkData={liveBenchmarks}
+        formatCurrency={formatCurrency}
+        getCurrentPeriod={getCurrentPeriod}
+        live={live}
+      />
+
       {/* BiOS Configuration Dialog — backs Set Targets / Schedule Report / Set Alerts / Configure */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent data-bios-ui="" className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Settings className="h-5 w-5 text-purple-600" />
@@ -2079,9 +2052,9 @@ export function BiOS() {
         </DialogContent>
       </Dialog>
 
-      {/* Generic detail viewer — backs the View Details / Analyze / Monitor / Compare / etc. buttons */}
+      {/* Generic detail viewer — backs the header Filter button */}
       <Dialog open={detailsDialog !== null} onOpenChange={(open) => { if (!open) setDetailsDialog(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent data-bios-ui="" className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{detailsDialog?.title}</DialogTitle>
             {detailsDialog?.description && <DialogDescription>{detailsDialog.description}</DialogDescription>}

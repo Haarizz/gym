@@ -96,7 +96,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-background z-50 overflow-y-auto gb-fullscreen">
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

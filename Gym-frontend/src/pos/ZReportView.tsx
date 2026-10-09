@@ -46,7 +46,7 @@ export function ZReportView() {
       heading: "Sessions",
       columns: ["Session", "Cashier", "Terminal", "Opened", "Closed", "Float", "Expected", "Counted", "Variance"],
       numeric: [5, 6, 7, 8],
-      rows: r.sessions.map((x) => [x.sessionNumber, x.staffName || x.openedBy || "", x.terminalName || "", fmtTime(x.openedAt), x.closedAt ? fmtTime(x.closedAt) : "OPEN",
+      rows: r.sessions.map((x) => [x.sessionNumber, x.staffName || x.openedBy || "", x.terminalName || "", fmtDateTime(x.openedAt), x.closedAt ? fmtDateTime(x.closedAt) : "OPEN",
         num(x.openingCash), num(x.expectedCash), num(x.closingCash), num(x.cashVariance)]),
     },
     {
@@ -223,8 +223,8 @@ export function ZReportView() {
                     <td className={s.strong}>{x.sessionNumber}</td>
                     <td>{x.staffName || x.openedBy}</td>
                     <td>{x.terminalName || "—"}</td>
-                    <td>{fmtTime(x.openedAt)}</td>
-                    <td>{x.closedAt ? fmtTime(x.closedAt) : <Pill tone="amber">Open</Pill>}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(x.openedAt)}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{x.closedAt ? fmtDateTime(x.closedAt) : <Pill tone="amber">Open</Pill>}</td>
                     <td className={s.num}><Money value={x.totalSales} /></td>
                     <td className={s.num}>{x.expectedCash != null ? <Money value={x.expectedCash} /> : "—"}</td>
                     <td className={s.num}>{x.closingCash != null ? <Money value={x.closingCash} /> : "—"}</td>

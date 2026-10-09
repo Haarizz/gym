@@ -725,7 +725,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       />
 
       {/* KPI Summary Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 4-up only from xl: at 1024–1279px the sidebar leaves each card too narrow. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <Card className={cn(dashboardCardShell, "bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/30")}>
           <CardContent className="p-6">
             {isLoading ? (

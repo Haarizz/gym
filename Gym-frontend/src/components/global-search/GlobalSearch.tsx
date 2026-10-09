@@ -64,6 +64,13 @@ function isEditable(el: EventTarget | null): boolean {
   return false;
 }
 
+const OPEN_EVENT = "gymbios:open-global-search";
+
+/** Opens global search without a keyboard — used by the search button in the mobile header. */
+export function openGlobalSearch() {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
 export function GlobalSearch({ pages, branchId, branchName }: GlobalSearchProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -86,8 +93,13 @@ export function GlobalSearch({ pages, branchId, branchName }: GlobalSearchProps)
         setOpen(true);
       }
     };
+    const onOpen = () => setOpen(true);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(OPEN_EVENT, onOpen);
+    };
   }, []);
 
   const trimmed = query.trim();
@@ -186,6 +198,8 @@ export function GlobalSearch({ pages, branchId, branchName }: GlobalSearchProps)
                 maxLength={100}
               />
               {loading && <Loader2 className={`${styles.inputIcon} animate-spin`} />}
+              {/* Full-screen on phones, where there's no overlay to tap and no Esc key. */}
+              <DialogPrimitive.Close className={styles.cancelBtn}>Cancel</DialogPrimitive.Close>
             </div>
 
             <Command.List className={styles.list}>

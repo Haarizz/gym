@@ -22,7 +22,8 @@
 
 .header {
   position: sticky;
-  top: 0;
+  /* Below the app's mobile/tablet header when there is one (src/styles/responsive.css). */
+  top: var(--gb-header-h, 0px);
   z-index: 30;
   margin: 0 -24px;
   padding: 24px 24px 16px;
@@ -1332,6 +1333,11 @@
   .browseBtn { display: inline-flex; }
 }
 
+@media (max-width: 767px) {
+  /* Wrapped title + actions are too tall to pin on a phone. */
+  .header { position: static; }
+}
+
 @media (max-width: 768px) {
   .page { padding: 0 16px 16px; }
   .header { margin: 0 -16px; padding: 16px; }
@@ -1347,7 +1353,11 @@
   .searchBox { width: 100%; }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 767px) {
+  .kpiGrid { gap: 12px; }
+}
+
+@media (max-width: 359px) {
   .kpiGrid { grid-template-columns: minmax(0, 1fr); }
 }
 

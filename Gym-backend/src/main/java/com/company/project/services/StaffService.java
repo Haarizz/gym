@@ -365,9 +365,31 @@ public class StaffService {
                 || (req.getAppPassword() != null && !req.getAppPassword().isBlank());
         if (touchesLogin) {
             saved = syncAppLogin(saved, req);
+        } else {
+            syncAccountRole(saved);
         }
 
         return StaffResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * The edit form's Role "also controls app access", but an HR-only save never reached
+     * syncAppLogin, so the login kept whatever role it was created with (often the STAFF
+     * fallback) and a role's permissions never applied to that person (BG_87). Re-points
+     * the account at the security role matching the staff role — unless that text names
+     * no role, so free-text designations never downgrade an account to STAFF.
+     */
+    private void syncAccountRole(Staff staff) {
+        if (staff.getUserId() == null || staff.getRole() == null || staff.getRole().isBlank()) return;
+        Role securityRole = roleRepository.findByRoleNameIgnoreCase(staff.getRole().trim()).orElse(null);
+        if (securityRole == null || securityRole.getRoleName().equalsIgnoreCase(RoleService.ADMIN_ROLE_NAME)) return;
+        User user = userRepository.findById(staff.getUserId()).orElse(null);
+        if (user == null) return;
+
+        List<UserRole> current = userRoleRepository.findByUserId(user.getId());
+        if (current.size() == 1 && current.get(0).getRole().getId().equals(securityRole.getId())) return;
+        current.forEach(userRoleRepository::delete);
+        userRoleRepository.save(new UserRole(null, user, securityRole));
     }
 
     public void deleteStaff(Long id) {

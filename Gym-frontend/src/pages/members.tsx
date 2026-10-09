@@ -755,7 +755,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     if (!(member as any).is_family_head) return fee;
     const plan = apiPlans.find(p => p.name === member.membership_plan);
     if (!plan || plan.familyBillingMode !== 'family_head') return fee;
-    const autoCalc = plan.autoCalculateTotal !== false && plan.pricePerMember != null;
+    // Same rule as MemberService.pricesPerMember(): a blank or 0 price per member means flat pricing.
+    const autoCalc = plan.autoCalculateTotal !== false && Number(plan.pricePerMember) > 0;
     if (!autoCalc) return fee; // flat combined price — no per-member figure to show
     return memberPriceForIndex(plan, 0);
   };
@@ -979,6 +980,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   const renewalPaymentManager = usePaymentManager({ invoiceTotal: calculateTotalAmount() });
 
+  // BG_84: cash above the amount due is treated as change — but a mistyped amount
+  // (₹500 for a ₹100 plan) must not go through silently, so it needs a confirmation.
+  const [confirmChangeOpen, setConfirmChangeOpen] = useState(false);
+  const changeConfirmedRef = React.useRef(false);
+
   const handleProcessRenewalUpgrade = async () => {
     if (!selectedMemberForRenewal || !selectedNewPlan) {
       toast.error('Missing Information', {
@@ -1002,6 +1008,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       });
       return;
     }
+
+    if (renewalPaymentManager.change > 0 && !changeConfirmedRef.current) {
+      setConfirmChangeOpen(true);
+      return;
+    }
+    changeConfirmedRef.current = false;
 
     // Compute new end date from plan duration
     const computeEndDate = (durationValue: string, durationType: string): string => {
@@ -2314,6 +2326,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     name: selectedMemberForRenewal.name,
                   } as CreditCustomer] : []}
                   offeredTypes={[PAYMENT_TYPES.CASH, PAYMENT_TYPES.CARD, PAYMENT_TYPES.ONLINE, PAYMENT_TYPES.CREDIT]}
+                  warnCashOverTender
                 />
               </CardContent>
             </Card>
@@ -2436,6 +2449,35 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               </CardContent>
             </Card>
           )}
+
+          {/* BG_84: confirm cash tendered above the amount due before saving */}
+          <Dialog open={confirmChangeOpen} onOpenChange={setConfirmChangeOpen}>
+            <DialogContent className="sm:max-w-[460px]">
+              <DialogHeader>
+                <DialogTitle>Cash is more than the amount due</DialogTitle>
+                <DialogDescription>
+                  Cash received is <strong><CurrencyGlyph /> {renewalPaymentManager.totalByType(PAYMENT_TYPES.CASH).toLocaleString()}</strong> but
+                  only <strong><CurrencyGlyph /> {calculateTotalAmount().toLocaleString()}</strong> is due. Only the amount due is recorded —
+                  return <strong><CurrencyGlyph /> {renewalPaymentManager.change.toLocaleString()}</strong> to the member as change.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmChangeOpen(false)}>
+                  Correct the amount
+                </Button>
+                <Button
+                  className="bg-gradient-primary text-white"
+                  onClick={() => {
+                    changeConfirmedRef.current = true;
+                    setConfirmChangeOpen(false);
+                    handleProcessRenewalUpgrade();
+                  }}
+                >
+                  Confirm and return change
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Success Modal */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>

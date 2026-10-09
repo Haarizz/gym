@@ -117,7 +117,7 @@ public class MobileFamilyPricingService {
         isMinorFlags.forEach(m -> memberPlanNames.add(plan.getName()));
 
         if (familyHeadBilling) {
-            boolean autoCalc = !Boolean.FALSE.equals(plan.getAutoCalculateTotal()) && plan.getPricePerMember() != null;
+            boolean autoCalc = memberService.pricesPerMember(plan);
             BigDecimal total;
             if (autoCalc) {
                 total = memberService.memberPriceForIndex(plan, 0);

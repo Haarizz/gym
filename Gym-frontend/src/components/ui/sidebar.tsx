@@ -57,6 +57,9 @@ function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  mobileBreakpoint,
+  openMobile: openMobileProp,
+  onOpenMobileChange,
   className,
   style,
   children,
@@ -65,9 +68,26 @@ function SidebarProvider({
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Viewport width (px) below which the sidebar becomes an off-canvas drawer. */
+  mobileBreakpoint?: number;
+  /** Controlled state of the off-canvas drawer, so the app can close it after navigating. */
+  openMobile?: boolean;
+  onOpenMobileChange?: (open: boolean) => void;
 }) {
-  const isMobile = useIsMobile();
-  const [openMobile, setOpenMobile] = React.useState(false);
+  const isMobile = useIsMobile(mobileBreakpoint);
+  const [_openMobile, _setOpenMobile] = React.useState(false);
+  const openMobile = openMobileProp ?? _openMobile;
+  const setOpenMobile = React.useCallback(
+    (value: boolean | ((value: boolean) => boolean)) => {
+      const next = typeof value === "function" ? value(openMobile) : value;
+      if (onOpenMobileChange) {
+        onOpenMobileChange(next);
+      } else {
+        _setOpenMobile(next);
+      }
+    },
+    [onOpenMobileChange, openMobile],
+  );
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.

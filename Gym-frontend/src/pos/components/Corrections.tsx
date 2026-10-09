@@ -132,11 +132,19 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
     : [];
   const picked = options.find((c) => String(c.id) === categoryId);
 
-  let ready = reason.trim().length >= 5;
-  if (target.kind === "SALE" && saleMode === "PAYMENT_MODE") ready = ready && Math.abs(split - total) < 0.005 && (!(parseFloat(online) > 0) || Boolean(bankId));
-  if (target.kind === "SALE" && saleMode === "CUSTOMER") ready = ready && member !== null;
-  if (target.kind === "CASH_MOVEMENT") ready = ready && Boolean(picked);
-  if (target.kind === "SESSION") ready = ready && newCount >= 0;
+  // Why the submit button is disabled, shown beside it — a silently greyed-out button
+  // left cashiers guessing (BG: a 4-character reason blocked a valid payment split).
+  const reasonLength = reason.trim().length;
+  let blocker: string | null = null;
+  if (target.kind === "SALE" && saleMode === "PAYMENT_MODE") {
+    if (Math.abs(split - total) >= 0.005) blocker = `The corrected split must add up to ${num(total)}.`;
+    else if (parseFloat(online) > 0 && !bankId) blocker = "Select the bank account that received the online payment.";
+  }
+  if (target.kind === "SALE" && saleMode === "CUSTOMER" && member === null) blocker = "Pick the corrected customer.";
+  if (target.kind === "CASH_MOVEMENT" && !picked) blocker = "Pick the corrected category.";
+  if (target.kind === "SESSION" && newCount < 0) blocker = "The corrected count cannot be negative.";
+  if (!blocker && reasonLength < 5) blocker = reasonLength === 0 ? "Enter a reason for the correction." : `The reason needs at least 5 characters (${reasonLength}/5).`;
+  const ready = blocker === null;
 
   const send = async () => {
     let body: CorrectionRequest;
@@ -278,11 +286,13 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
         <div className={s.field}>
           <Label>Reason *</Label>
           <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What went wrong and how you know (e.g. card slip found)" />
+          <span className={s.fieldHint}>At least 5 characters.</span>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input type="checkbox" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /> Send for approval now
         </label>
         <DialogFooter>
+          {blocker && <span className={`${s.small} ${s.muted}`} style={{ alignSelf: "center", marginRight: "auto" }}>{blocker}</span>}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button className={primaryBtn} disabled={!ready || busy} onClick={send}>{busy ? "Sending…" : submitNow ? "Request approval" : "Save draft"}</Button>
         </DialogFooter>

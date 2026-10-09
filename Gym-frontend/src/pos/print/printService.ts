@@ -202,7 +202,7 @@ export async function testPrinter(printer: PosPrinter): Promise<PrintOutcome> {
 // ── A4 tax invoice ──────────────────────────────────────────────────────────
 
 export function saleA4Document(sale: Sale, company: CompanyDetails, currencyCode: CurrencyCode, isReprint = false,
-  images: Map<number, string> = new Map()): PrintDocument {
+  catalog: Map<number, CatalogInfo> = new Map()): PrintDocument {
   const date = new Date(sale.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   return {
     docType: "sales-invoice",
@@ -227,8 +227,10 @@ export function saleA4Document(sale: Sale, company: CompanyDetails, currencyCode
       name: i.productName,
       code: i.productSku ?? undefined,
       sku: i.productSku ?? undefined,
+      brand: catalog.get(i.productId)?.brand,
       barcode: i.barcode ?? undefined,
-      image: images.get(i.productId),
+      image: catalog.get(i.productId)?.image,
+      description: catalog.get(i.productId)?.description,
       qty: i.quantity,
       price: i.unitPrice,
       discountPercent: i.discountPercent,
@@ -252,18 +254,25 @@ export function saleA4Document(sale: Sale, company: CompanyDetails, currencyCode
   };
 }
 
-/** First photo of each product on the sale (a sale line stores no image), for the A4 photo column. */
-async function productImages(sale: Sale): Promise<Map<number, string>> {
+type CatalogInfo = { image?: string; description?: string; brand?: string };
+
+/** Photo, description and brand of each product on the sale — a sale line stores none of them. */
+async function productCatalog(sale: Sale): Promise<Map<number, CatalogInfo>> {
   const ids = [...new Set(sale.items.map((i) => i.productId).filter((id): id is number => id != null))];
   const found = await Promise.all(ids.map((id) => productsService.getProductById(id)
-    .then((p) => [id, resolveBackendImageUrl(p.imageUrls?.[0])] as const)
-    .catch(() => [id, undefined] as const)));
-  return new Map(found.filter((e): e is readonly [number, string] => Boolean(e[1])));
+    .then((p): [number, CatalogInfo] => [id, {
+      image: resolveBackendImageUrl(p.imageUrls?.[0]) || undefined,
+      description: p.description || undefined,
+      brand: p.brand || undefined,
+    }])
+    .catch(() => null)));
+  return new Map(found.filter((e): e is [number, CatalogInfo] => e != null));
 }
 
 export async function printSaleA4(sale: Sale, company: CompanyDetails, currencyCode: CurrencyCode, isReprint = false): Promise<PrintOutcome> {
   const settings = await loadDefaultSettings("sales-invoice");
-  const images = settings.colProductImage ? await productImages(sale) : new Map<number, string>();
-  await printHtml(printDocumentHtml(settings, saleA4Document(sale, company, currencyCode, isReprint, images)), settings.paperSize);
+  const needsCatalog = settings.colProductImage || settings.colDescription || (settings.colItemCode && settings.colBrand);
+  const catalog = needsCatalog ? await productCatalog(sale) : new Map<number, CatalogInfo>();
+  await printHtml(printDocumentHtml(settings, saleA4Document(sale, company, currencyCode, isReprint, catalog)), settings.paperSize);
   return { mode: "a4", printerName: null };
 }

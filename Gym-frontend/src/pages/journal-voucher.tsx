@@ -710,7 +710,7 @@ export function JournalVoucherPage() {
                           <SelectContent>
                             <SelectItem value="__none__">—</SelectItem>
                             {costCenters.map((c) => (
-                              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                              <SelectItem key={c.id} value={c.code}>{c.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

@@ -288,3 +288,14 @@
     padding-right: 8px;
   }
 }
+
+/* Small phones: the primary action gets its own full-width row. */
+@media (max-width: 374px) {
+  .footerActions {
+    flex-wrap: wrap;
+  }
+
+  .footerActions > :last-child {
+    flex-basis: 100%;
+  }
+}

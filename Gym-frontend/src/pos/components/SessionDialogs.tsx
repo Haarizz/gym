@@ -12,7 +12,7 @@ import { posApi } from "../api";
 import { usePos } from "../PosContext";
 import { useApproval } from "./Approval";
 import { DenominationCounter, Money, Pill } from "./Shared";
-import { denominationTotal, emptyDenominations, fmtTime, r2, type Denominations } from "../pricing";
+import { denominationTotal, emptyDenominations, fmtDateTime, fmtTime, r2, type Denominations } from "../pricing";
 import { cashMovementDoc } from "../print/receiptModel";
 import type { CashCategory, CashMovement, PosSession } from "../types";
 import s from "../pos.module.css";
@@ -360,7 +360,7 @@ export function LiveSessionsDialog({ open, onOpenChange, onForceClose, onTakenOv
                   </td>
                   <td>{x.staffName || x.openedBy}{x.takenOverFrom ? <div className={`${s.small} ${s.muted}`}>from {x.takenOverFrom}</div> : null}</td>
                   <td>{x.terminalName ? <span className="flex items-center gap-1"><Monitor size={13} />{x.terminalName}</span> : "—"}</td>
-                  <td>{fmtTime(x.openedAt)}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(x.openedAt)}</td>
                   <td className={s.num}><Money value={x.openingCash} /></td>
                   <td className={s.num}>{x.transactionCount}</td>
                   <td className={s.num}><Money value={x.totalSales} /></td>
