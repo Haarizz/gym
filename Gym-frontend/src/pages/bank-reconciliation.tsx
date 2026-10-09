@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import {
   bankReconciliationService,
@@ -244,7 +244,10 @@ export function BankReconciliation() {
       setSelectedAccountName(ALL_ACCOUNTS);
       return;
     }
-    const rec = visibleReconciliations[0] ?? null;
+    const preferred = preferredRecIdRef.current != null
+      ? visibleReconciliations.find(r => r.id === preferredRecIdRef.current)
+      : undefined;
+    const rec = preferred ?? visibleReconciliations[0] ?? null;
     setCurrentReconciliation(rec);
     setAllTransactions(rec ? mapLinesToTransactions(rec) : []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -519,11 +522,13 @@ export function BankReconciliation() {
 
   const openCreate = () => {
     setForm({ ...emptyForm, bankAccountName: selectedAccountName !== ALL_ACCOUNTS ? selectedAccountName : "" });
+    setLineErrorsShown(false);
     setShowCreateDialog(true);
   };
 
   const openEdit = (rec: ApiReconciliation) => {
     setEditingId(rec.id);
+    setLineErrorsShown(false);
     setForm({
       bankAccountName: rec.bankAccountName,
       statementDate: rec.statementDate.split("T")[0],
@@ -541,6 +546,34 @@ export function BankReconciliation() {
     });
     setShowEditDialog(true);
   };
+
+  // BG_88: a statement line needs a date, a description and an amount — a blank line used
+  // to save silently as "-0.00 Debit" with no description. Indexes of invalid lines are
+  // highlighted once the user has tried to submit.
+  const [lineErrorsShown, setLineErrorsShown] = useState(false);
+  const lineProblem = (l: LineForm): string | null => {
+    if (!l.transactionDate) return "a date";
+    if (!l.description.trim()) return "a description";
+    const amount = parseFloat(l.amount);
+    if (!(amount > 0)) return "an amount greater than 0";
+    return null;
+  };
+  const validateLines = (f: ReconciliationForm): boolean => {
+    const bad = f.lines.map((l, i) => ({ i, problem: lineProblem(l) })).filter(x => x.problem);
+    if (bad.length === 0) return true;
+    setLineErrorsShown(true);
+    const first = bad[0];
+    toast.error(`Statement line ${first.i + 1} needs ${first.problem}`, {
+      description: bad.length > 1
+        ? `${bad.length} lines are incomplete — fill them in or remove them with ✕.`
+        : "Fill it in, or remove the line with ✕.",
+    });
+    return false;
+  };
+
+  // Which reconciliation to show after the list reloads (the one just created/edited or
+  // picked) — otherwise the reload falls back to the first one on file (BG_88).
+  const preferredRecIdRef = useRef<number | null>(null);
 
   const toRequest = (f: ReconciliationForm): BankReconciliationCreateRequest => ({
     bankAccountName: f.bankAccountName,
@@ -563,15 +596,18 @@ export function BankReconciliation() {
   const handleCreate = async () => {
     if (!form.bankAccountName.trim()) { toast.error("Bank account name is required"); return; }
     if (!form.statementDate) { toast.error("Statement date is required"); return; }
+    if (!validateLines(form)) return;
     setSavingForm(true);
     try {
       const created = await bankReconciliationService.create(toRequest(form));
       toast.success("Reconciliation created");
       setShowCreateDialog(false);
+      preferredRecIdRef.current = created.id;
       setCurrentReconciliation(created);
       setAllTransactions(mapLinesToTransactions(created));
-      setSelectedAccountName(created.bankAccountName);
+      // Reload first so the new account is known before filtering to it.
       await loadReconciliations();
+      setSelectedAccountName(created.bankAccountName);
     } catch (err: any) {
       toast.error(err.message || "Failed to create reconciliation");
     } finally {
@@ -581,15 +617,17 @@ export function BankReconciliation() {
 
   const handleEdit = async () => {
     if (!editingId) return;
+    if (!validateLines(form)) return;
     setSavingForm(true);
     try {
       const updated = await bankReconciliationService.update(editingId, toRequest(form));
       toast.success("Reconciliation updated");
       setShowEditDialog(false);
+      preferredRecIdRef.current = updated.id;
       setCurrentReconciliation(updated);
       setAllTransactions(mapLinesToTransactions(updated));
-      setSelectedAccountName(updated.bankAccountName);
       await loadReconciliations();
+      setSelectedAccountName(updated.bankAccountName);
     } catch (err: any) {
       toast.error(err.message || "Failed to update reconciliation");
     } finally {
@@ -710,13 +748,13 @@ export function BankReconciliation() {
                 {form.lines.map((line, idx) => (
                   <tr key={idx} className="border-t border-gray-100">
                     <td className="p-1">
-                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" />
+                      <Input type="date" value={line.transactionDate} onChange={e => updateLine(idx, "transactionDate", e.target.value)} aria-invalid={lineErrorsShown && !line.transactionDate} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" />
                     </td>
                     <td className="p-1">
-                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" placeholder="Description" />
+                      <Input value={line.description} onChange={e => updateLine(idx, "description", e.target.value)} aria-invalid={lineErrorsShown && !line.description.trim()} className="h-8 text-sm border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" placeholder="Description" />
                     </td>
                     <td className="p-1">
-                      <Input type="number" step="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} className="h-8 text-sm text-right border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" />
+                      <Input type="number" step="0.01" min="0.01" value={line.amount} onChange={e => updateLine(idx, "amount", e.target.value)} aria-invalid={lineErrorsShown && !(parseFloat(line.amount) > 0)} className="h-8 text-sm text-right border-gray-200 focus:ring-1 focus:ring-gymbios-primary/20 w-full" placeholder="0.00" />
                     </td>
                     <td className="p-1">
                       <Select value={line.type} onValueChange={v => updateLine(idx, "type", v)}>
@@ -912,6 +950,7 @@ export function BankReconciliation() {
                     onValueChange={v => {
                       const rec = visibleReconciliations.find(r => r.id === parseInt(v));
                       if (rec) {
+                        preferredRecIdRef.current = rec.id;
                         setCurrentReconciliation(rec);
                         setAllTransactions(mapLinesToTransactions(rec));
                       }

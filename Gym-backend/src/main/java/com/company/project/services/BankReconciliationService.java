@@ -132,7 +132,30 @@ public class BankReconciliationService {
         dto.setDifference(closing.subtract(systemBalance));
     }
 
+    /**
+     * A bank statement line must carry a date, a description and a positive amount
+     * (its direction is the DEBIT/CREDIT type) — a blank line used to be stored as a
+     * 0.00 debit with no description (BG_88). Checked before anything is written.
+     */
+    private void validateLines(List<BankStatementLineDTO> lines) {
+        if (lines == null) return;
+        for (int i = 0; i < lines.size(); i++) {
+            BankStatementLineDTO l = lines.get(i);
+            String which = "Statement line " + (i + 1);
+            if (l.getTransactionDate() == null) {
+                throw new IllegalArgumentException(which + " needs a date.");
+            }
+            if (l.getDescription() == null || l.getDescription().isBlank()) {
+                throw new IllegalArgumentException(which + " needs a description.");
+            }
+            if (l.getAmount() == null || l.getAmount().signum() <= 0) {
+                throw new IllegalArgumentException(which + " needs an amount greater than 0.");
+            }
+        }
+    }
+
     public BankReconciliationResponseDTO create(BankReconciliationRequestDTO req) {
+        validateLines(req.getLines());
         BankReconciliation r = new BankReconciliation();
         mapFromRequest(r, req);
         r.setStatus("OPEN");
@@ -147,6 +170,7 @@ public class BankReconciliationService {
         if ("COMPLETED".equals(r.getStatus())) {
             throw new IllegalStateException("Completed reconciliations cannot be modified");
         }
+        validateLines(req.getLines());
         mapFromRequest(r, req);
         r = reconciliationRepository.save(r);
         reconcileLines(id, req.getLines());

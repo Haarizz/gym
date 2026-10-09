@@ -2,6 +2,11 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
+  /**
+   * When this changes (e.g. the route path), a caught error is cleared so the next
+   * page renders normally instead of inheriting the previous page's error screen.
+   */
+  resetKey?: string;
 }
 
 interface State {
@@ -16,6 +21,12 @@ class ErrorBoundary extends Component<Props, State> {
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  public componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, error: undefined });
+    }
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {

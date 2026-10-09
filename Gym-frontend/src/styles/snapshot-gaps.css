@@ -1,0 +1,68 @@
+/*
+ * Utilities the pages use that the frozen Tailwind snapshot (index.css) never
+ * generated, so they rendered as no-ops — e.g. the member pages' brand-teal buttons
+ * (bg-[#327F74] text-white) showed white text on no background.
+ *
+ * Declared inside Tailwind's own utilities layer, after the snapshot, so they cascade
+ * exactly like generated utilities (a hover:/variant class still wins over them).
+ * None of these classes are used by the POS.
+ */
+
+@layer utilities {
+  .text-\[\#327F74\] { color: #327F74; }
+  .bg-\[\#327F74\] { background-color: #327F74; }
+  .border-\[\#327F74\] { border-color: #327F74; }
+  .ring-\[\#2B7A78\] { --tw-ring-color: #2B7A78; }
+  .ring-\[\#2B7A78\]\/20 { --tw-ring-color: rgb(43 122 120 / 0.2); }
+
+  .from-\[\#327F74\] {
+    --tw-gradient-from: #327F74;
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+
+  .to-\[\#2a6a61\] {
+    --tw-gradient-to: #2a6a61;
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+
+  @media (hover: hover) {
+    .hover\:border-\[\#327F74\]:hover { border-color: #327F74; }
+    .hover\:bg-\[\#327F74\]:hover { background-color: #327F74; }
+    .hover\:bg-\[\#236664\]:hover { background-color: #236664; }
+  }
+
+  /* BiOS analysis dialogs + BI Engine (components/bios, pages/bios.tsx) */
+  .text-pink-600 { color: oklch(.592 .249 .584); }
+  .text-pink-900 { color: oklch(.408 .153 2.432); }
+  .border-pink-200 { border-color: oklch(.899 .061 343.231); }
+  .border-l-cyan-500 { border-left-color: var(--color-cyan-500); }
+  .border-l-purple-500 { border-left-color: var(--color-purple-500); }
+  .my-6 { margin-block: calc(var(--spacing) * 6); }
+  .rotate-90 { rotate: 90deg; }
+  .max-h-\[85vh\] { max-height: 85vh; }
+  .data-\[state\=active\]\:bg-\[\#E63946\][data-state="active"] { background-color: #E63946; }
+
+  .from-pink-50 {
+    --tw-gradient-from: var(--color-pink-50);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+
+  .to-\[\#2B7A78\]\/10 {
+    --tw-gradient-to: rgb(43 122 120 / 0.1);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+
+  @media (width >= 40rem) {
+    .sm\:max-w-6xl { max-width: var(--container-6xl); }
+    .sm\:max-w-7xl { max-width: var(--container-7xl); }
+  }
+
+  @media (width >= 64rem) {
+    .lg\:grid-cols-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  }
+
+  @media (hover: hover) {
+    .hover\:bg-\[\#236663\]:hover { background-color: #236663; }
+    .hover\:bg-\[\#d32f3f\]:hover { background-color: #d32f3f; }
+  }
+}

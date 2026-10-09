@@ -233,6 +233,10 @@ public class ReceiptService {
         dto.setBilledToHead(member.isEffectivelyBilledToHead());
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        // Receipt rows carry their real time: transactionDate is a UTC wall-clock (JVM is
+        // pinned to UTC), so label it with "Z" like JacksonConfig does — a bare
+        // "yyyy-MM-dd" reached browsers as UTC midnight (5:30 AM in IST).
+        DateTimeFormatter stampFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
         // Products sold to this member on Sales Invoices are always their own, even when
         // their membership fees are billed to a family head.
         List<com.company.project.dto.StatementLineDTO> salesRows = salesInvoiceRows(memberDbId, dateFmt);
@@ -298,7 +302,7 @@ public class ReceiptService {
 
             com.company.project.dto.StatementLineDTO invoiceRow = new com.company.project.dto.StatementLineDTO();
             invoiceRow.setId(b.getId());
-            invoiceRow.setDate(txnDate != null ? txnDate.format(dateFmt) : null);
+            invoiceRow.setDate(txnDate != null ? txnDate.format(stampFmt) : null);
             invoiceRow.setReceiptNo(b.getReceiptNo());
             invoiceRow.setInvoiceNo(b.getInvoiceNo());
             invoiceRow.setType("Invoice");
@@ -322,7 +326,7 @@ public class ReceiptService {
                     BigDecimal take = legAmount.min(remaining);
                     if (take.compareTo(BigDecimal.ZERO) <= 0) continue;
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, b.getId(), b.getReceiptNo(), leg.getMethod(), take, b.getStatus());
+                            buildPaymentRow(txnDate, stampFmt, b.getId(), b.getReceiptNo(), leg.getMethod(), take, b.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, take));
                     allRows.add(payRow);
                     remaining = remaining.subtract(take);
@@ -330,7 +334,7 @@ public class ReceiptService {
             }
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 com.company.project.dto.StatementLineDTO payRow =
-                        buildPaymentRow(txnDate, dateFmt, b.getId(), b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus());
+                        buildPaymentRow(txnDate, stampFmt, b.getId(), b.getReceiptNo(), b.getPaymentMethod(), remaining, b.getStatus());
                 payRow.setMinorCharges(scaleMinorCharges(billMinorCharges, remaining));
                 allRows.add(payRow);
             }
@@ -352,7 +356,7 @@ public class ReceiptService {
                     BigDecimal legAmount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
                     if (legAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, s.getId(), s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus());
+                            buildPaymentRow(txnDate, stampFmt, s.getId(), s.getReceiptNo(), leg.getMethod(), legAmount, s.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, legAmount));
                     allRows.add(payRow);
                 }
@@ -360,7 +364,7 @@ public class ReceiptService {
                 BigDecimal amount = s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO;
                 if (amount.compareTo(BigDecimal.ZERO) > 0) {
                     com.company.project.dto.StatementLineDTO payRow =
-                            buildPaymentRow(txnDate, dateFmt, s.getId(), s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus());
+                            buildPaymentRow(txnDate, stampFmt, s.getId(), s.getReceiptNo(), s.getPaymentMethod(), amount, s.getStatus());
                     payRow.setMinorCharges(scaleMinorCharges(linkedMinorCharges, amount));
                     allRows.add(payRow);
                 }
@@ -377,7 +381,7 @@ public class ReceiptService {
 
         BigDecimal openingBalance = BigDecimal.ZERO;
         for (com.company.project.dto.StatementLineDTO row : allRows) {
-            if (from != null && row.getDate() != null && LocalDateTime.parse(row.getDate() + "T00:00:00").isBefore(from)) {
+            if (from != null && row.getDate() != null && parseStatementDate(row.getDate()).isBefore(from)) {
                 openingBalance = openingBalance.add(row.getDebit()).subtract(row.getCredit());
             }
         }
@@ -388,7 +392,7 @@ public class ReceiptService {
         List<com.company.project.dto.StatementLineDTO> lines = new ArrayList<>();
 
         for (com.company.project.dto.StatementLineDTO row : allRows) {
-            LocalDateTime rowDate = row.getDate() != null ? LocalDateTime.parse(row.getDate() + "T00:00:00") : null;
+            LocalDateTime rowDate = row.getDate() != null ? parseStatementDate(row.getDate()) : null;
             if (from != null && rowDate != null && rowDate.isBefore(from)) continue;
             if (to != null && rowDate != null && rowDate.isAfter(to)) continue;
 
@@ -405,6 +409,12 @@ public class ReceiptService {
         dto.setClosingBalance(running);
         dto.setLines(lines);
         return dto;
+    }
+
+    /** Statement dates are either a full UTC stamp (receipt rows) or a bare date (sales rows). */
+    private static LocalDateTime parseStatementDate(String date) {
+        if (date.length() == 10) return java.time.LocalDate.parse(date).atStartOfDay();
+        return LocalDateTime.parse(date.endsWith("Z") ? date.substring(0, date.length() - 1) : date);
     }
 
     private com.company.project.dto.StatementLineDTO buildPaymentRow(
@@ -598,10 +608,12 @@ public class ReceiptService {
         // member.outstandingBalance is already finalized by the caller (MemberService)
         // before this method runs, so it reflects the true balance after this bill.
         r.setBalanceAfter(member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO);
-        if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            r.setStatus("Pending");
-        } else if (paidAmount.compareTo(totalAmount) >= 0) {
+        // Fully-paid is checked first so a zero-amount bill (100% discount) is "Paid",
+        // not "Pending" just because nothing was received.
+        if (paidAmount.compareTo(totalAmount) >= 0) {
             r.setStatus("Paid");
+        } else if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            r.setStatus("Pending");
         } else {
             r.setStatus("Partial");
         }
@@ -655,7 +667,7 @@ public class ReceiptService {
         r.setPaidAmount(paid);
         r.setTotalPaidToDate(paid);
         r.setBalanceAfter(totalAmount.subtract(paid));
-        r.setStatus(paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : (paid.compareTo(totalAmount) >= 0 ? "Paid" : "Partial"));
+        r.setStatus(paid.compareTo(totalAmount) >= 0 ? "Paid" : (paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : "Partial"));
         r.setPlanName(planName);
         r.setValidFrom(LocalDateTime.now());
         r.setMembershipType("Walk-In");
@@ -718,7 +730,7 @@ public class ReceiptService {
         r.setPaidAmount(paid);
         r.setTotalPaidToDate(paid);
         r.setBalanceAfter(guardian.getOutstandingBalance() != null ? guardian.getOutstandingBalance() : BigDecimal.ZERO);
-        r.setStatus(paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : (fullyPaid ? "Paid" : "Partial"));
+        r.setStatus(fullyPaid ? "Paid" : (paid.compareTo(BigDecimal.ZERO) <= 0 ? "Pending" : "Partial"));
         r.setBankAccountCode(bankAccountCode);
         r.setBankAccountName(bankAccountName);
         r.setDueDate(fullyPaid ? null : guardian.getNextPaymentDate());

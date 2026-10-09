@@ -20,9 +20,11 @@ export interface CashModalProps {
   target: number;
   editingLine?: PaymentLine | null;
   offeredTypes: PaymentType[];
+  /** Show an amber "more than the amount due" warning when the cash becomes change (BG_84). */
+  warnOverTender?: boolean;
 }
 
-export function CashModal({ open, onClose, onConfirm, target, editingLine, offeredTypes }: CashModalProps) {
+export function CashModal({ open, onClose, onConfirm, target, editingLine, offeredTypes, warnOverTender = false }: CashModalProps) {
   const [amount, setAmount] = useState(() => String(editingLine?.amount ?? target));
 
   const numericAmount = toAmount(amount);
@@ -94,6 +96,16 @@ export function CashModal({ open, onClose, onConfirm, target, editingLine, offer
               <span style={{ fontSize: 13.5, fontWeight: 700 }}>
                 <CurrencyValue amount={changeToReturn} />
               </span>
+            </div>
+          )}
+          {warnOverTender && changeToReturn > 0 && (
+            <div
+              role="alert"
+              style={{ marginTop: 8, fontSize: 13, color: "#92400e", backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "8px 12px" }}
+            >
+              <CurrencyValue amount={numericAmount} /> is more than the <CurrencyValue amount={target} /> due.
+              Only <CurrencyValue amount={applied} /> is applied — return <CurrencyValue amount={changeToReturn} /> as change,
+              or correct the amount.
             </div>
           )}
         </div>

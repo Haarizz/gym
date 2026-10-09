@@ -351,7 +351,7 @@ public class FamilyPlanChangeService {
             headOwnFee = planPrice;
             headLineFee = planPrice;
         } else if (familyHeadBilling) {
-            boolean autoCalc = !Boolean.FALSE.equals(plan.getAutoCalculateTotal()) && plan.getPricePerMember() != null;
+            boolean autoCalc = memberService.pricesPerMember(plan);
             headLineFee = autoCalc ? memberService.memberPriceForIndex(plan, 0) : planPrice;
             BigDecimal total = headLineFee;
             for (int i = 0; i < family.size(); i++) {
@@ -503,7 +503,9 @@ public class FamilyPlanChangeService {
         fm.setMembershipFee(fee);
         fm.setOutstandingBalance(outstanding);
         fm.setPaymentStatus(outstanding.signum() <= 0 ? "paid" : paid.signum() > 0 ? "partial" : "pending");
-        fm.setPaymentMethod(paid.signum() > 0 ? methodOf(legs, req.getPaymentMethod()) : "Credit");
+        // Nothing owed (zero fee) keeps the chosen method rather than reading as Credit.
+        fm.setPaymentMethod(paid.signum() > 0 || outstanding.signum() <= 0
+                ? methodOf(legs, req.getPaymentMethod()) : "Credit");
         fm.setPaymentBreakdown(legs.size() > 1 ? legs : null);
         if (paid.signum() > 0) {
             fm.setBankAccountCode(req.getBankAccountCode());

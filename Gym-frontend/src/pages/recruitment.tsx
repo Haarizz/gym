@@ -511,9 +511,9 @@ export function Recruitment() {
         </div>
 
         {/* Search and Filters + View Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 flex-1">
-            <div className="relative flex-1 max-w-md">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 flex-1">
+            <div className="relative flex-1 max-w-md min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search candidates, job titles, or departments..."
@@ -558,7 +558,7 @@ export function Recruitment() {
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center bg-white border rounded-lg ml-4">
+          <div className="flex items-center bg-white border rounded-lg">
             <Button
               variant={currentView === 'dashboard' ? 'default' : 'ghost'}
               size="sm"

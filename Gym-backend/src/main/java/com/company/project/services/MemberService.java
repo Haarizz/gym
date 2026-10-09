@@ -423,8 +423,7 @@ public class MemberService {
 
         if (familyHeadBillingMode) {
             int totalMembers = 1 + minorFamilyMembers.size();
-            boolean autoCalc = !Boolean.FALSE.equals(resolvedPlan.getAutoCalculateTotal())
-                    && resolvedPlan.getPricePerMember() != null;
+            boolean autoCalc = pricesPerMember(resolvedPlan);
             BigDecimal combinedHeadFee;
             if (autoCalc) {
                 combinedHeadFee = BigDecimal.ZERO;
@@ -756,6 +755,17 @@ public class MemberService {
      * (falling back to pricePerMember) for every member beyond that cap. index is
      * 0-based across the whole family, head included (head is always index 0).
      */
+    /**
+     * Whether a family_head plan's invoice is priced per member (memberPriceForIndex)
+     * rather than by the plan's own flat price: auto-calculate is on AND a real
+     * price-per-member is set. A blank or 0 price-per-member means "not priced per
+     * member" — otherwise a Couple/Family plan priced at e.g. 100 would bill 0 (BG_83).
+     */
+    public boolean pricesPerMember(MembershipPlan plan) {
+        return !Boolean.FALSE.equals(plan.getAutoCalculateTotal())
+                && plan.getPricePerMember() != null && plan.getPricePerMember().signum() > 0;
+    }
+
     public BigDecimal memberPriceForIndex(MembershipPlan plan, int index) {
         BigDecimal base = plan.getPricePerMember() != null ? plan.getPricePerMember() : BigDecimal.ZERO;
         Integer max = plan.getMaxFamilyMembers();
@@ -1025,8 +1035,10 @@ public class MemberService {
         }
         // "Credit" is only ever the stored method label when nothing was actually
         // received yet — any real money always carries its real method, consistent
-        // with the Add Member credit flow (see gymbios-credit-payment-fix).
+        // with the Add Member credit flow (see gymbios-credit-payment-fix). A fully
+        // discounted (zero-fee) renewal owes nothing, so it keeps the chosen method too.
         member.setPaymentMethodUsed(amountReceived.compareTo(BigDecimal.ZERO) > 0
+                || outstanding.compareTo(BigDecimal.ZERO) <= 0
                 ? request.getPaymentMethod() : "Credit");
 
         Member saved = memberRepository.save(member);
@@ -1218,9 +1230,15 @@ public class MemberService {
 
         List<Member> dependents = memberRepository.findByFamilyHeadId(head.getMemberId());
         int totalMembers = 1 + dependents.size();
+        // Same pricing as signup: per member when configured, else the plan's flat price.
+        boolean perMember = pricesPerMember(plan);
         BigDecimal totalFee = BigDecimal.ZERO;
-        for (int i = 0; i < totalMembers; i++) {
-            totalFee = totalFee.add(memberPriceForIndex(plan, i));
+        if (perMember) {
+            for (int i = 0; i < totalMembers; i++) {
+                totalFee = totalFee.add(memberPriceForIndex(plan, i));
+            }
+        } else {
+            totalFee = PlanOfferPricing.effectivePrice(plan);
         }
         head.setMembershipFee(totalFee);
 
@@ -1252,7 +1270,8 @@ public class MemberService {
         for (int i = 0; i < dependents.size(); i++) {
             Member dep = dependents.get(i);
             memberCharges.add(new com.company.project.dto.MinorChargeDTO(
-                    dep.getMemberId(), dep.getId(), dep.getName(), memberPriceForIndex(plan, i + 1), renewalPaid));
+                    dep.getMemberId(), dep.getId(), dep.getName(),
+                    perMember ? memberPriceForIndex(plan, i + 1) : BigDecimal.ZERO, renewalPaid));
         }
 
         com.company.project.entities.Receipt receipt = receiptService.createReceiptForMember(
@@ -1413,7 +1432,7 @@ public class MemberService {
             // invoice, shown on their own record) — nothing is billed at this point;
             // the real amount is recalculated fresh at the next renewFamily() call.
             BigDecimal informationalFee = familyHeadBillingMode
-                    ? memberPriceForIndex(headPlan, existingDependents.size() + 1)
+                    ? (pricesPerMember(headPlan) ? memberPriceForIndex(headPlan, existingDependents.size() + 1) : BigDecimal.ZERO)
                     : fm.getMinorFee();
             createBilledToHeadRecord(fm, head, informationalFee);
         } else {

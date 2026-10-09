@@ -53,7 +53,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, parseISO } from "date-fns";
 import {
   LineChart,
   Line,
@@ -100,9 +100,16 @@ interface MemberHistoryAnalyticsProps {
 
 const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
 
+// A bare "yyyy-MM-dd" carries no time. new Date() would read it as UTC midnight
+// (5:30 AM in IST, or the previous day west of UTC), so it is parsed as a local
+// calendar date instead and shown without a time.
+function isDateOnly(value?: string | null): boolean {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 function safeDate(value?: string | null): Date | null {
   if (!value) return null;
-  const d = new Date(value);
+  const d = isDateOnly(value) ? parseISO(value) : new Date(value);
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -149,7 +156,8 @@ function mergeTransactionLines(lines: StatementLine[]): StatementLine[] {
 
 function fmtDateTime(value?: string | null): string {
   const d = safeDate(value);
-  return d ? format(d, 'dd MMM yyyy, h:mm a') : '—';
+  if (!d) return '—';
+  return format(d, isDateOnly(value) ? 'dd MMM yyyy' : 'dd MMM yyyy, h:mm a');
 }
 
 function initialsOf(name?: string | null): string {
@@ -159,6 +167,7 @@ function initialsOf(name?: string | null): string {
 
 interface TimelineItem {
   date: Date;
+  dateOnly: boolean;
   event: string;
   detail: string;
   type: 'membership' | 'payment' | 'addon' | 'referral';
@@ -360,11 +369,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   statementLines.forEach(l => {
     const d = safeDate(l.date);
     if (!d) return;
+    const dateOnly = isDateOnly(l.date);
     if (l.type === 'Invoice') {
-      timelineItems.push({ date: d, event: 'Invoice', detail: l.description, type: 'membership' });
+      timelineItems.push({ date: d, dateOnly, event: 'Invoice', detail: l.description, type: 'membership' });
     } else if (l.credit > 0) {
       timelineItems.push({
-        date: d, event: 'Payment',
+        date: d, dateOnly, event: 'Payment',
         detail: `${currencyCode} ${l.credit.toLocaleString()} via ${l.payment_method || 'unknown method'}`,
         type: 'payment',
       });
@@ -372,11 +382,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   });
   addons.forEach(a => {
     const d = safeDate(a.purchase_date);
-    if (d) timelineItems.push({ date: d, event: 'Add-on Purchase', detail: a.addon_name, type: 'addon' });
+    if (d) timelineItems.push({ date: d, dateOnly: isDateOnly(a.purchase_date), event: 'Add-on Purchase', detail: a.addon_name, type: 'addon' });
   });
   referrals.forEach(r => {
     const d = safeDate(r.date || r.createdAt);
-    if (d) timelineItems.push({ date: d, event: 'Referral', detail: `Referred ${r.refereeName}`, type: 'referral' });
+    if (d) timelineItems.push({ date: d, dateOnly: isDateOnly(r.date || r.createdAt), event: 'Referral', detail: `Referred ${r.refereeName}`, type: 'referral' });
   });
   timelineItems.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -1074,7 +1084,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <div className="flex-1 border-l-2 border-gray-200 pl-4 pb-6">
                             <div className="flex items-center justify-between mb-1">
                               <h4 className="font-semibold text-gray-900">{activity.event}</h4>
-                              <span className="text-sm text-gray-500">{format(activity.date, 'dd MMM yyyy, h:mm a')}</span>
+                              <span className="text-sm text-gray-500">{format(activity.date, activity.dateOnly ? 'dd MMM yyyy' : 'dd MMM yyyy, h:mm a')}</span>
                             </div>
                             <p className="text-sm text-gray-600">{activity.detail}</p>
                           </div>

@@ -5,7 +5,13 @@ import { CurrencyProvider } from "./utils/currency";
 import { BranchProvider } from "./utils/branch-context";
 import { PrivacyPolicyPage, TermsOfServicePage, SupportPage } from "./pages/legal-pages";
 import { PublicLeadFormPage } from "./pages/public-lead-form";
+import { applyResponsiveScope } from "./utils/responsive-scope";
 import "./styles/index.css";
+import "./styles/snapshot-gaps.css";
+import "./styles/responsive.css";
+
+// Set before the first paint so a POS deep link never flashes the responsive layout.
+applyResponsiveScope(window.location.pathname);
 
 // Legal/support pages linked from the login footer, opened in a new tab — must
 // render standalone with zero app/auth context (App() assumes CurrencyProvider/

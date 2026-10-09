@@ -304,6 +304,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     (formData.membershipType === 'family' || formData.membershipType === 'couple')
     && getSelectedPrimaryPlan()?.familyBillingMode === 'family_head';
 
+  // Mirrors MemberService.pricesPerMember(): per-member pricing needs auto-calculate on
+  // AND a price per member above 0 — otherwise the plan's own price is the invoice (BG_83).
+  const pricesPerMember = (plan?: MembershipPlanData | null): boolean =>
+    !!plan && plan.autoCalculateTotal !== false && Number(plan.pricePerMember) > 0;
+
   // Mirrors MemberService.memberPriceForIndex() on the backend: price_per_member
   // for members within max_family_members, additional_member_price (falling back
   // to price_per_member) for every member beyond that cap.
@@ -1092,7 +1097,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     // member × current headcount) — not the plan's flat listed price. This is
     // what actually gets billed/collected via the primary member's payment
     // section below; family members carry no payment of their own.
-    if (isFamilyHeadBillingMode() && plan.autoCalculateTotal !== false && plan.pricePerMember != null) {
+    if (isFamilyHeadBillingMode() && pricesPerMember(plan)) {
       const totalMembers = familyMembers.length + 1;
       return {
         name: plan.name,
@@ -1644,7 +1649,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Page Header */}
-      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 border-b bg-white/90 backdrop-blur-sm shadow-sm">
+      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 border-b bg-white/90 backdrop-blur-sm shadow-sm gb-sticky-below-header">
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="outline" size="sm" onClick={() => onNavigate?.('members')} className="gap-2 shrink-0">
             <FaArrowLeft size={14} />
@@ -2287,8 +2292,14 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                             {formData.membershipType === 'couple' ? 'Couple Head Billing' : 'Family Head Billing'} — one combined invoice
                           </span>
                           <span className="text-sm font-bold text-primary">
-                            {currencyCode} {(Number(getSelectedPrimaryPlan()?.pricePerMember) || 0)} × {familyMembers.length + 1} ={' '}
-                            {currencyCode} {getSelectedPrimaryPlan() ? computeFamilyHeadTotal(getSelectedPrimaryPlan()!, familyMembers.length + 1).toFixed(2) : '0.00'}
+                            {pricesPerMember(getSelectedPrimaryPlan()) ? (
+                              <>
+                                {currencyCode} {Number(getSelectedPrimaryPlan()?.pricePerMember)} × {familyMembers.length + 1} ={' '}
+                                {currencyCode} {computeFamilyHeadTotal(getSelectedPrimaryPlan()!, familyMembers.length + 1).toFixed(2)}
+                              </>
+                            ) : (
+                              <>{currencyCode} {Number(getMembershipDetails().price || 0).toFixed(2)}</>
+                            )}
                           </span>
                         </div>
                         <p className="text-xs text-primary/70">

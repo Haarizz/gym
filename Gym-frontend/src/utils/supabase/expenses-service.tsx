@@ -109,6 +109,18 @@ function toExpenseBody(req: ExpenseCreateRequest) {
   };
 }
 
+/** Backend errors come back as a JSON body ({ message, error, status, timestamp }), not plain text. */
+async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    return body?.message || fallback;
+  } catch {
+    return text;
+  }
+}
+
 class ExpensesService {
   async getExpenses(filters: {
     search?: string;
@@ -152,7 +164,7 @@ class ExpensesService {
       method: "POST",
       body: JSON.stringify(toExpenseBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to create expense");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to create expense"));
     return mapExpense(await res.json());
   }
 
@@ -161,7 +173,7 @@ class ExpensesService {
       method: "PUT",
       body: JSON.stringify(toExpenseBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to update expense");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to update expense"));
     return mapExpense(await res.json());
   }
 
@@ -170,7 +182,7 @@ class ExpensesService {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error("Failed to update expense status");
+    if (!res.ok) throw new Error(await extractErrorMessage(res, "Failed to update expense status"));
     return mapExpense(await res.json());
   }
 

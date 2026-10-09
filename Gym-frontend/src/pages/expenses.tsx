@@ -139,12 +139,12 @@ export function Expenses() {
 
   const locations = ["Downtown", "Mall Branch", "Marina Branch", "All Locations"];
   const categories = ["Utilities", "Rent", "Equipment", "Operational", "Marketing", "Salaries", "Maintenance", "Other"];
-  const costCenters = Array.from(new Set([
-    "General / Head Office",
-    ...(realCostCenters.length > 0
-      ? realCostCenters.map(c => c.name)
-      : ["Gym Equipment", "Electric", "Facility", "Digital Marketing", "Cleaning", "Water & Sewer", "Internet & Telecom", "Security", "Maintenance", "Administration"])
-  ]));
+  // The backend validates expense.costCenter against cost_centers.code, so the form must
+  // submit the code (not the display name). Rows saved before that rule may hold a name.
+  const costCenterLabel = (value: string) =>
+    realCostCenters.find((c) => c.code === value)?.name ?? value;
+  const toCostCenterCode = (value: string) =>
+    realCostCenters.find((c) => c.code === value || c.name === value)?.code ?? value;
   const taxRates = ["0", "5", "10"];
   const statuses = ["pending", "paid", "approved", "rejected", "draft"];
 
@@ -306,7 +306,7 @@ export function Expenses() {
       date: expense.date,
       vendorName: expense.vendorName,
       category: expense.category,
-      costCenter: expense.costCenter,
+      costCenter: toCostCenterCode(expense.costCenter),
       location: expense.location,
       amount: expense.amount,
       taxRate: expense.taxRate,
@@ -432,10 +432,14 @@ export function Expenses() {
 
       <div className="space-y-2">
         <Label>Cost Center</Label>
-        <Select value={form.costCenter} onValueChange={(v) => setForm({ ...form, costCenter: v })}>
+        <Select
+          value={form.costCenter || "__none__"}
+          onValueChange={(v) => setForm({ ...form, costCenter: v === "__none__" ? "" : v })}
+        >
           <SelectTrigger><SelectValue placeholder="Select cost center" /></SelectTrigger>
           <SelectContent>
-            {costCenters.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <SelectItem value="__none__">None</SelectItem>
+            {realCostCenters.map((c) => <SelectItem key={c.id} value={c.code}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -734,7 +738,7 @@ export function Expenses() {
                         {expense.category}
                       </Badge>
                     </TableCell>
-                    <TableCell>{expense.costCenter}</TableCell>
+                    <TableCell>{costCenterLabel(expense.costCenter)}</TableCell>
                     <TableCell>{expense.location}</TableCell>
                     <TableCell className="text-right"><CurrencyGlyph /> {expense.amount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{expense.taxRate}%</TableCell>

@@ -151,8 +151,9 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     loadData();
   }, []);
 
-  // Get unique departments
-  const departments = Array.from(new Set(employees.map(e => e.department)));
+  // Get unique departments — skip staff with no department: an empty value can't be a
+  // Select option (Radix throws), which crashed the whole page (BG_85).
+  const departments = Array.from(new Set(employees.map(e => e.department?.trim()).filter((d): d is string => !!d)));
 
   // Filtered employees
   const filteredEmployees = useMemo(() => {
@@ -613,7 +614,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{employee.department}</div>
+                          <div className="font-medium">{employee.department || "—"}</div>
                           <div className="text-sm text-muted-foreground">{employee.designation}</div>
                         </div>
                       </TableCell>
@@ -737,7 +738,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                           <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
                         </div>
                       </TableCell>
-                      <TableCell>{employee.department}</TableCell>
+                      <TableCell>{employee.department || "—"}</TableCell>
                       <TableCell>
                         <span className="font-bold" style={{ color: '#2B7A78' }}>
                           <CurrencyGlyph /> {employee.netSalary.toLocaleString()}

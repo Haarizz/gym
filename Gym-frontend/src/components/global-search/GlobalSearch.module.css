@@ -59,6 +59,19 @@
   font-size: 15px;
 }
 
+.cancelBtn {
+  display: none;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .input::placeholder {
   color: var(--muted-foreground);
 }
@@ -229,6 +242,22 @@
     height: 100dvh;
     border-radius: 0;
     border: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 16px keeps iOS Safari from zooming into the field on focus. */
+  .input {
+    font-size: 16px;
+  }
+
+  .cancelBtn {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .item {
+    min-height: 44px;
   }
 
   .shortcuts {

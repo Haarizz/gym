@@ -317,7 +317,7 @@ export function BusinessOnboardingFullscreen({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="fixed inset-0 z-50 bg-white overflow-hidden"
-          style={{ height: "calc(100svh / 0.9)" }}
+          style={{ height: "calc(100svh / var(--gb-zoom, 0.9))" }}
         >
           <style>{`
             .onboarding-scroll {
@@ -394,7 +394,7 @@ export function BusinessOnboardingFullscreen({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
             className="flex"
-            style={{ height: "calc(100svh / 0.9)" }}
+            style={{ height: "calc(100svh / var(--gb-zoom, 0.9))" }}
           >
             {/* LEFT SIDEBAR - Stepper */}
             <div className="w-80 ob-sidebar border-r border-slate-200 flex flex-col">
