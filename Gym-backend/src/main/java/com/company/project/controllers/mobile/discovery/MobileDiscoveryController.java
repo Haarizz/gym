@@ -384,6 +384,10 @@ public class MobileDiscoveryController {
             // code's discount and spends it.
             BigDecimal offerPrice = plan.getEffectivePrice() != null ? plan.getEffectivePrice() : BigDecimal.ZERO;
             memberRequest.setMembershipFee(offerPrice);
+            if (plan.getPrice() != null && plan.getPrice().compareTo(offerPrice) > 0) {
+                memberRequest.setOfferDiscount(plan.getPrice().subtract(offerPrice));
+                memberRequest.setOfferLabel(com.company.project.services.PlanOfferPricing.receiptLabel(plan.getOfferLabel()));
+            }
             BigDecimal couponDiscount = BigDecimal.ZERO;
             if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
                 BigDecimal gross = offerPrice;

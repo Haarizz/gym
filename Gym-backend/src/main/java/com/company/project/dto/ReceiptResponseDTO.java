@@ -32,6 +32,8 @@ public class ReceiptResponseDTO {
     private String validTill;
     private String processedBy;
     private String remarks;
+    private java.math.BigDecimal discountAmount;
+    private String discountLabel;
     private String membershipType;
     private java.math.BigDecimal paidAmount;
     private java.math.BigDecimal dueAmount;
@@ -68,6 +70,8 @@ public class ReceiptResponseDTO {
         dto.validTill       = r.getValidTill() != null ? r.getValidTill().format(ISO) + "Z" : null;
         dto.processedBy     = r.getProcessedBy();
         dto.remarks         = r.getRemarks();
+        dto.discountAmount  = r.getDiscountAmount();
+        dto.discountLabel   = r.getDiscountLabel();
         dto.membershipType  = r.getMembershipType();
         java.math.BigDecimal totalAmt = r.getAmount() != null ? r.getAmount() : java.math.BigDecimal.ZERO;
         dto.paidAmount      = r.getPaidAmount() != null ? r.getPaidAmount() : java.math.BigDecimal.ZERO;
@@ -110,6 +114,8 @@ public class ReceiptResponseDTO {
     public String getValidTill() { return validTill; }
     public String getProcessedBy() { return processedBy; }
     public String getRemarks() { return remarks; }
+    public java.math.BigDecimal getDiscountAmount() { return discountAmount; }
+    public String getDiscountLabel() { return discountLabel; }
     public String getMembershipType() { return membershipType; }
     public java.math.BigDecimal getPaidAmount() { return paidAmount; }
     public java.math.BigDecimal getDueAmount() { return dueAmount; }

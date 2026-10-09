@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { BrandColors } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useMembershipApprovalStatus } from '../hooks/useMembershipApprovalStatus';
+import { PaymentRejectedScreen } from './PaymentRejectedScreen';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
 
 /**
@@ -10,8 +11,10 @@ import { PendingApprovalScreen } from './PendingApprovalScreen';
  * membership, ...). While a Cash/Credit/Mixed purchase is awaiting reception
  * approval, TenantContextFilter 403s every one of those endpoints, so the
  * wrapped screen must not even mount — otherwise its queries fire and the user
- * gets a stack of "403" toasts behind the pending screen. Children only mount
- * once /api/members/me has confirmed access isn't pending.
+ * gets a stack of "403" toasts behind the pending screen. A rejected purchase
+ * leaves access locked the same way, so it gets its own screen showing staff's
+ * reason. Children only mount once /api/members/me has confirmed access isn't
+ * locked.
  */
 export function MemberApprovalGate({ children }: { children: ReactNode }) {
   const approval = useMembershipApprovalStatus();
@@ -29,6 +32,18 @@ export function MemberApprovalGate({ children }: { children: ReactNode }) {
       <PendingApprovalScreen
         membershipPlan={approval.data.membershipPlan}
         gymName={approval.data.gymName}
+        onRefresh={() => approval.refetch()}
+        isRefreshing={approval.isRefetching}
+      />
+    );
+  }
+
+  if (approval.data?.isRejectedLocked) {
+    return (
+      <PaymentRejectedScreen
+        membershipPlan={approval.data.membershipPlan}
+        gymName={approval.data.gymName}
+        rejectionReason={approval.data.rejectionReason}
         onRefresh={() => approval.refetch()}
         isRefreshing={approval.isRefetching}
       />

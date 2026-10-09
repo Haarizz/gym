@@ -18,6 +18,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long deleteBySessionId(Long sessionId);
     // Bookings on a session that were paid with a Reward Pass (to give passes back before deleting).
     List<Booking> findBySessionIdAndRewardIdIsNotNull(Long sessionId);
+    // Bookings still holding a seat on a session (to cancel and refund them with the session).
+    List<Booking> findBySessionIdAndStatusNot(Long sessionId, String status);
+    // Whether a member already holds a seat on a session (so they can't book — and pay — twice).
+    boolean existsBySessionIdAndMember_IdAndStatusNot(Long sessionId, Long memberId, String status);
+    // Bookings whose Cash/Credit/Mixed payment is awaiting staff approval — web Approvals page.
+    @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH b.member " +
+           "WHERE b.status = 'pending_approval' ORDER BY s.date ASC, s.startTime ASC")
+    List<Booking> findPendingPaymentApprovals();
 
     // (sessionName, sessionType, sessionDate, sessionStartTime, price) for paid, priced bookings
     // (PT and classes) whose session falls in [start, end] — web Revenue Dashboard

@@ -47,6 +47,7 @@ export function MembershipPaymentsTab() {
                 : 'N/A';
 
               const displayAmount = item.paidAmount ?? item.amount ?? 0;
+              const discount = Number(item.discountAmount) || 0;
 
               return (
                 <Pressable key={item.id} style={styles.paymentRow} onPress={() => setSelectedReceiptId(item.id)}>
@@ -55,6 +56,14 @@ export function MembershipPaymentsTab() {
                     <Text style={styles.metaText}>
                       {formattedDate} • {item.paymentMethod || item.transactionType}
                     </Text>
+                    {discount > 0 && (
+                      <View style={styles.discountTag}>
+                        <Feather name="tag" size={11} color={BrandColors.teal} />
+                        <Text style={styles.discountTagText} numberOfLines={1}>
+                          {item.discountLabel || 'Discount'} · -<CurrencyValue amount={discount} />
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View style={[
                     styles.statusBadge, 
@@ -127,6 +136,23 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderBottomWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  discountTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    backgroundColor: `${BrandColors.teal}15`,
+  },
+  discountTagText: {
+    fontSize: TypographyScale.small,
+    color: BrandColors.teal,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   amountText: {
     fontSize: 15,

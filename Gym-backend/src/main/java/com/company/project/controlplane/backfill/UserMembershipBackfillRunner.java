@@ -10,33 +10,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * One-time, manually-triggered backfill of user_memberships for members rows
- * linked to a GymBios app account (members.global_user_id) before that index
- * existed. New links are indexed as they happen (MemberService.linkGlobalUser,
- * family invitation claims), and a member opening their own gym's community
- * indexes themselves — this just makes every existing member count for other
- * gyms' Community right away. Disabled by default; run once with:
- *   --user-membership.backfill.enabled=true
- * Idempotent: skips any (global user, tenant) already indexed, so it is safe to
- * re-run. Read-only against tenant databases.
+ * Backfill of user_memberships for members rows linked to a GymBios app account
+ * (members.global_user_id) that the index doesn't know about — links made before
+ * the index existed, or any recordLink that failed (it is best-effort). New links
+ * are indexed as they happen (MemberService.linkGlobalUser, family invitation
+ * claims); this catches the rest, so other gyms' Community and the app's gym
+ * recovery after a reinstall (GET /api/mobile/profile/memberships) see them.
+ *
+ * Runs in the background on every startup, once the app is ready, so a plain
+ * restart is all a deploy needs. Idempotent: skips any (global user, tenant)
+ * already indexed. Read-only against tenant databases. Turn off with
+ *   --user-membership.backfill.enabled=false
  *
  * With tenant routing on, it walks every Tenant with a real TenantConnection.
  * With routing off there is one database, indexed under the default slug —
  * the same slug GlobalMembershipService resolves for requests in that mode.
  */
 @Component
-@ConditionalOnProperty(name = "user-membership.backfill.enabled", havingValue = "true")
-public class UserMembershipBackfillRunner implements CommandLineRunner {
+@ConditionalOnProperty(name = "user-membership.backfill.enabled", havingValue = "true", matchIfMissing = true)
+public class UserMembershipBackfillRunner {
 
     private static final Logger log = LoggerFactory.getLogger(UserMembershipBackfillRunner.class);
 
@@ -65,8 +71,9 @@ public class UserMembershipBackfillRunner implements CommandLineRunner {
         this.primaryDataSource = primaryDataSource;
     }
 
-    @Override
-    public void run(String... args) {
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void run() {
         int indexed = 0;
         if (!tenantRoutingEnabled) {
             indexed += backfill(defaultTenantSlug, primaryDataSource);
@@ -87,6 +94,15 @@ public class UserMembershipBackfillRunner implements CommandLineRunner {
 
     private int backfill(String tenantSlug, DataSource dataSource) {
         int indexed = 0;
+        Set<Long> alreadyIndexed;
+        try {
+            alreadyIndexed = userMembershipRepository.findByTenantSlug(tenantSlug).stream()
+                    .map(UserMembershipEntry::getGlobalUserId)
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("UserMembershipBackfillRunner: could not read index for tenant '{}' — {}", tenantSlug, e.getMessage());
+            return 0;
+        }
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -94,7 +110,7 @@ public class UserMembershipBackfillRunner implements CommandLineRunner {
             while (rs.next()) {
                 long memberId = rs.getLong("id");
                 long globalUserId = rs.getLong("global_user_id");
-                if (userMembershipRepository.findByGlobalUserIdAndTenantSlug(globalUserId, tenantSlug).isPresent()) {
+                if (!alreadyIndexed.add(globalUserId)) {
                     continue;
                 }
                 try {

@@ -75,6 +75,15 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Column(columnDefinition = "TEXT")
     private String remarks;
 
+    // Price reduction already taken off `amount` (plan offer, promo/coupon code, Reward
+    // Pass, staff discount) and what it was, e.g. "Offer: Diwali + Code NEWMEMBER2026" —
+    // so a discounted (or free) bill reads as one, not as a plain lower price.
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "discount_label")
+    private String discountLabel;
+
     // "Individual" | "Family" | "Corporate"
     @Column(name = "membership_type")
     private String membershipType;
@@ -205,6 +214,12 @@ public class Receipt extends BaseEntity implements BranchAware {
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getDiscountLabel() { return discountLabel; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
 
     public String getMembershipType() { return membershipType; }
     public void setMembershipType(String membershipType) { this.membershipType = membershipType; }

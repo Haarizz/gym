@@ -113,7 +113,9 @@ export const MaxContentWidth = 800;
 export const Glass = {
   fill: 'rgba(255,255,255,0.45)',
   fillStrong: 'rgba(255,255,255,0.68)',
-  border: 'rgba(255,255,255,0.65)',
+  // Transparent on purpose: a light outline reads as a white ring around
+  // every glass panel/button on top of coloured backgrounds.
+  border: 'transparent',
   highlight: 'rgba(255,255,255,0.5)',
   shadowColor: 'rgba(30,42,58,0.16)',
 } as const;

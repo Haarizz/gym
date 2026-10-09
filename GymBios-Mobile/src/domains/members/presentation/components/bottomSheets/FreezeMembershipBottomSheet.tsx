@@ -23,12 +23,6 @@ interface FreezeMembershipBottomSheetProps {
 
 const FROZEN_COLOR = '#0284c7';
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 export function FreezeMembershipBottomSheet({
   visible,
   member,
@@ -55,9 +49,10 @@ export function FreezeMembershipBottomSheet({
     }
   }
 
+  // The end date is the last day frozen, so 1 → 3 Oct is 3 days.
   const freezeDays =
     startDate && endDate
-      ? Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000)
+      ? Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1
       : null;
 
   const handleFreeze = useCallback(async () => {
@@ -65,8 +60,8 @@ export function FreezeMembershipBottomSheet({
       setError('Select the date the freeze ends.');
       return;
     }
-    if (startDate && endDate <= startDate) {
-      setError('The freeze must end after it starts.');
+    if (startDate && endDate < startDate) {
+      setError('The freeze can\'t end before it starts.');
       return;
     }
     try {
@@ -142,7 +137,7 @@ export function FreezeMembershipBottomSheet({
                 setEndDate(d);
                 setError(undefined);
               }}
-              minimumDate={addDays(startDate ?? startOfToday(), 1)}
+              minimumDate={startDate ?? startOfToday()}
               error={error}
               required
             />

@@ -14,9 +14,9 @@ import java.math.BigDecimal;
 import java.util.stream.Collectors;
 
 /**
- * Reward wallet balance + spend. Wallet *credits* happen only through
- * RewardRedemptionService (a reward being redeemed); this service handles the
- * *debit* side — a member spending their balance during checkout. The ledger
+ * Reward wallet balance + spend. Wallet credits come from RewardRedemptionService
+ * (a reward being redeemed) and from booking refunds (credit() below); debits are
+ * a member spending their balance during checkout. The ledger
  * entry for a debit is posted by the receipt itself (its "Wallet" payment leg
  * now maps to the Reward Wallet Liability account — see FinancialEventService),
  * so this service only maintains the balance/history, never the ledger.
@@ -77,9 +77,10 @@ public class WalletService {
     }
 
     /**
-     * Puts money back on a member's wallet — e.g. a POS return of goods that were paid from
-     * the wallet. As with debit, the ledger side is posted by the document itself (the
-     * refund's Wallet leg credits Reward Wallet Liability); this keeps balance and history.
+     * Puts money back on a member's wallet — e.g. a POS return of goods paid from the wallet,
+     * or a cancelled booking refunded to the wallet. The ledger side is posted by the caller
+     * (the POS refund's Wallet leg, or FinancialEventService.onBookingRefundedToWallet);
+     * this keeps balance and history.
      */
     public WalletResponseDTO credit(String memberId, BigDecimal amount, String sourceType, Long sourceId, String remarks) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {

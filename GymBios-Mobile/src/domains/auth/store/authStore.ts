@@ -88,6 +88,14 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     const stored = await secureStorage.getItem(activeTenantKey(userId));
     if (stored) {
       get().setActiveTenant(stored);
+    } else if (get().appRole === 'member') {
+      // Nothing on this device (fresh install, new phone, cleared data) — ask the
+      // server which gym this account belongs to instead of starting gym-less.
+      const { fetchLinkedGymTenant } = await import('@/domains/auth/application/fetchLinkedGymTenant');
+      const tenant = await fetchLinkedGymTenant();
+      if (tenant) {
+        get().setActiveTenant(tenant);
+      }
     }
 
     // Every login/sign-up path awaits this, so a Family/Couple membership bought

@@ -68,6 +68,15 @@ export function AppAccessSection({
         </DetailGrid>
       ) : null}
 
+      {state !== 'none' && isGlobalAccount ? (
+        <View style={[styles.note, { backgroundColor: theme.backgroundSelected }]}>
+          <Feather name="info" size={14} color={theme.textSecondary} />
+          <Typography variant="caption" color="textSecondary" style={styles.noteText}>
+            This member manages their own GymBios password, so it can't be reset by the gym.
+          </Typography>
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         {state === 'none' ? (
           <ActionButton
@@ -146,6 +155,17 @@ function ActionButton({ icon, label, onPress, primary, color, disabled }: Action
 const styles = StyleSheet.create({
   hint: {
     marginBottom: Spacing.md,
+  },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    marginTop: Spacing.three,
+    padding: Spacing.two,
+    borderRadius: Radius.sm,
+  },
+  noteText: {
+    flex: 1,
   },
   actions: {
     flexDirection: 'row',

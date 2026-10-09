@@ -8,7 +8,8 @@ const DEFAULT_TRAINER_DASHBOARD: TrainerDashboardData = {
   trainerInfo: {
     name: 'Rahul Mehta',
     specialization: 'Strength & Conditioning',
-    rating: 4.9,
+    rating: null,
+    ratingCount: 0,
   },
   todaysStats: {
     sessionsScheduled: 0,

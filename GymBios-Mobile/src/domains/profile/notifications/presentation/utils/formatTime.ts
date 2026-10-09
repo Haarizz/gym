@@ -32,3 +32,21 @@ export function formatRelativeTime(dateString?: string): string {
     day: 'numeric',
   });
 }
+
+/** Compact stamp for tight rows: "Now", "5m", "3h", "Yesterday", "4d", "Oct 12". */
+export function formatShortTime(dateString?: string): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMin < 1) return 'Now';
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}

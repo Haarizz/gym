@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { getGreeting } from '@/shared/utils/greeting';
 import type { TrainerInfo } from '../../domain/TrainerDashboardData';
 
 interface TrainerWelcomeCardProps {
@@ -10,6 +11,8 @@ interface TrainerWelcomeCardProps {
 
 export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
   const firstName = trainerInfo.name.split(' ')[0] || trainerInfo.name;
+  const greeting = getGreeting();
+  const hasRating = trainerInfo.rating != null && trainerInfo.ratingCount > 0;
 
   return (
     <LinearGradient
@@ -18,12 +21,20 @@ export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.greeting}>Good morning, {firstName}! 👋</Text>
+      <Text style={styles.greeting}>{greeting}, {firstName}! 👋</Text>
       <Text style={styles.specialization}>{trainerInfo.specialization}</Text>
       <View style={styles.ratingRow}>
         <Feather name="star" size={14} color="#FFFFFF" />
-        <Text style={styles.ratingValue}>{trainerInfo.rating}</Text>
-        <Text style={styles.ratingLabel}>Rating</Text>
+        {hasRating ? (
+          <>
+            <Text style={styles.ratingValue}>{trainerInfo.rating!.toFixed(1)}</Text>
+            <Text style={styles.ratingLabel}>
+              Rating · {trainerInfo.ratingCount} {trainerInfo.ratingCount === 1 ? 'review' : 'reviews'}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.ratingLabel}>No ratings yet</Text>
+        )}
       </View>
     </LinearGradient>
   );

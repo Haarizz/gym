@@ -2,6 +2,7 @@ package com.company.project.services;
 
 import com.company.project.dto.TrainingSessionRequestDTO;
 import com.company.project.dto.TrainingSessionResponseDTO;
+import com.company.project.entities.Booking;
 import com.company.project.entities.Staff;
 import com.company.project.entities.TrainingSession;
 import com.company.project.repositories.BookingRepository;
@@ -24,15 +25,18 @@ public class TrainingSessionService {
     private final BookingRepository bookingRepository;
     private final StaffRepository staffRepository;
     private final RewardRedemptionService rewardRedemptionService;
+    private final BookingPaymentService bookingPaymentService;
 
     public TrainingSessionService(TrainingSessionRepository sessionRepository,
                                   BookingRepository bookingRepository,
                                   StaffRepository staffRepository,
-                                  RewardRedemptionService rewardRedemptionService) {
+                                  RewardRedemptionService rewardRedemptionService,
+                                  BookingPaymentService bookingPaymentService) {
         this.sessionRepository = sessionRepository;
         this.bookingRepository = bookingRepository;
         this.staffRepository = staffRepository;
         this.rewardRedemptionService = rewardRedemptionService;
+        this.bookingPaymentService = bookingPaymentService;
     }
 
     // @Transactional is what makes BranchFilterAspect enable the branch filter;
@@ -117,8 +121,15 @@ public class TrainingSessionService {
             }
         }
 
+        boolean cancelling = "cancelled".equalsIgnoreCase(request.getStatus())
+                && !"cancelled".equalsIgnoreCase(session.getStatus());
+
         applyRequest(session, request);
         sessionRepository.save(session);
+
+        if (cancelling) {
+            cancelActiveBookings(id);
+        }
 
         int booked = Math.toIntExact(bookingRepository.countBySessionIdAndStatusNot(id, "cancelled"));
         return toResponse(session, booked);
@@ -126,11 +137,23 @@ public class TrainingSessionService {
 
     @Transactional
     public void deleteSession(Long id) {
-        // Deleting the session deletes its bookings — give back any Reward Pass they were paid with.
+        // Deleting the session deletes its bookings — refund the live ones in full first.
+        cancelActiveBookings(id);
+        // A pass kept by a member's late cancellation is given back too: the session is gone.
         bookingRepository.findBySessionIdAndRewardIdIsNotNull(id)
                 .forEach(b -> rewardRedemptionService.restorePass(b.getRewardId()));
         bookingRepository.deleteBySessionId(id);
         sessionRepository.deleteById(id);
+    }
+
+    /** The gym called the session off: every booking on it is cancelled and refunded in full. */
+    private void cancelActiveBookings(Long sessionId) {
+        for (Booking booking : bookingRepository.findBySessionIdAndStatusNot(sessionId, "cancelled")) {
+            bookingPaymentService.settleCancellation(booking,
+                    BookingPaymentService.CANCELLED_BY_STAFF, BookingPaymentService.REFUND_METHOD_WALLET);
+            booking.setStatus("cancelled");
+            bookingRepository.save(booking);
+        }
     }
 
     private void validateRequest(TrainingSessionRequestDTO request) {

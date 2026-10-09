@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(242,244,247,0.86)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.6)',
+    borderTopColor: 'transparent',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,

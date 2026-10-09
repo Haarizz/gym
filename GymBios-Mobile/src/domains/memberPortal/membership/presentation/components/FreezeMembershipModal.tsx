@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { CurrencyValue } from '@/core/providers';
+import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 
 const MAX_2DP = { maximumFractionDigits: 2 };
 import type { FreezeInfo } from '../../domain/models';
@@ -45,6 +45,10 @@ export function FreezeMembershipModal({
   const [customDays, setCustomDays] = useState('');
   const [selectedReason, setSelectedReason] = useState(FREEZE_REASONS[0]);
 
+  const handleClose = () => {
+    if (!isLoading) onClose();
+  };
+
   const handleFreeze = () => {
     onConfirm(selectedDays, selectedReason);
   };
@@ -58,196 +62,155 @@ export function FreezeMembershipModal({
     ? ` · ${freeze.remaining_occurrences ?? 0} of ${freeze.max_occurrences} freezes left`
     : '';
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Freeze Subscription</Text>
-              <Text style={styles.subtitle}>
-                {daysAvailable} of {freeze.max_days} freeze days left{occurrencesText}
-              </Text>
-            </View>
-            <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton} disabled={isLoading}>
-              <Feather name="x" size={20} color={BrandColors.textPrimary} />
-            </Pressable>
+  const footer = (
+    <View style={styles.footer}>
+      {isValidDuration && rate > 0 && (
+        chargedDays > 0 ? (
+          <View style={styles.chargeBox}>
+            <Feather name="info" size={16} color={BrandColors.trainerAmber} />
+            <Text style={styles.chargeText}>
+              {chargedDays} extra {chargedDays === 1 ? 'day' : 'days'} × <CurrencyValue amount={rate} options={MAX_2DP} /> ={' '}
+              <CurrencyValue style={styles.chargeAmount} amount={charge} options={MAX_2DP} />
+              {' '}will be added to your outstanding balance when the freeze ends. Unfreeze early and you only pay for the days actually frozen.
+            </Text>
           </View>
-
-          <View style={styles.body}>
-            <View style={styles.policyBox}>
-              {rate > 0 && (
-                <Text style={styles.policyText}>
-                  {freeze.free_days_remaining > 0 ? (
-                    <>{freeze.free_days_remaining} free freeze days left, then <CurrencyValue amount={rate} options={MAX_2DP} /> per extra day.</>
-                  ) : (
-                    <>No free freeze days left — each day costs <CurrencyValue amount={rate} options={MAX_2DP} />.</>
-                  )}
-                </Text>
-              )}
-              <Text style={styles.policyText}>
-                {freeze.auto_unfreeze
-                  ? 'Your subscription resumes automatically at the end of the freeze, and its end date moves forward by the days frozen.'
-                  : 'Unfreeze from this screen when you\'re back — your subscription end date moves forward by the days frozen.'}
-              </Text>
-            </View>
-
-            <Text style={styles.sectionLabel}>Select Duration</Text>
-            <View style={styles.daysRow}>
-              {FREEZE_OPTIONS.map((days) => {
-                const isSelected = selectedDays === days && customDays === '';
-                const isDisabled = days > daysAvailable;
-                return (
-                  <Pressable
-                    key={days}
-                    style={[
-                      styles.dayCard, 
-                      isSelected && styles.dayCardSelected,
-                      isDisabled && { opacity: 0.4 }
-                    ]}
-                    onPress={() => {
-                      if (!isDisabled) {
-                        setSelectedDays(days);
-                        setCustomDays('');
-                      }
-                    }}
-                    disabled={isDisabled || isLoading}
-                  >
-                    <Text style={[styles.dayNum, isSelected && styles.textSelected]}>{days}</Text>
-                    <Text style={[styles.dayText, isSelected && styles.textSelected]}>Days</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.customDaysContainer}>
-              <Text style={styles.customDaysLabel}>Or enter custom days:</Text>
-              <TextInput
-                style={styles.customDaysInput}
-                keyboardType="numeric"
-                value={customDays}
-                onChangeText={(text) => {
-                  setCustomDays(text);
-                  const parsed = parseInt(text, 10);
-                  if (!isNaN(parsed)) {
-                    setSelectedDays(parsed);
-                  } else {
-                    setSelectedDays(0);
-                  }
-                }}
-                placeholder="e.g. 5"
-                placeholderTextColor="#94A3B8"
-                maxLength={3}
-                editable={!isLoading}
-              />
-            </View>
-
-            <Text style={[styles.sectionLabel, { marginTop: Spacing.four }]}>Reason</Text>
-            <View style={styles.reasonsList}>
-              {FREEZE_REASONS.map((reason) => {
-                const isSelected = selectedReason === reason;
-                return (
-                  <Pressable
-                    key={reason}
-                    style={[styles.reasonOption, isSelected && styles.reasonOptionSelected]}
-                    onPress={() => setSelectedReason(reason)}
-                    disabled={isLoading}
-                  >
-                    <Feather
-                      name={isSelected ? 'check-circle' : 'circle'}
-                      size={18}
-                      color={isSelected ? BrandColors.trainerAmber : '#94A3B8'}
-                    />
-                    <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
-                      {reason}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.footer}>
-            {isValidDuration && rate > 0 && (
-              chargedDays > 0 ? (
-                <View style={styles.chargeBox}>
-                  <Feather name="info" size={16} color={BrandColors.trainerAmber} />
-                  <Text style={styles.chargeText}>
-                    {chargedDays} extra {chargedDays === 1 ? 'day' : 'days'} × <CurrencyValue amount={rate} options={MAX_2DP} /> ={' '}
-                    <CurrencyValue style={styles.chargeAmount} amount={charge} options={MAX_2DP} />
-                    {' '}will be added to your outstanding balance.
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.noChargeText}>No charge — within your free freeze days.</Text>
-              )
+        ) : (
+          <Text style={styles.noChargeText}>No charge — within your free freeze days.</Text>
+        )
+      )}
+      <Pressable
+        style={[styles.confirmButton, (isLoading || !isValidDuration) && { opacity: 0.7 }]}
+        onPress={handleFreeze}
+        disabled={isLoading || !isValidDuration}
+      >
+        {isLoading ? (
+          <Text style={styles.confirmButtonText}>Freezing...</Text>
+        ) : (
+          <Text style={styles.confirmButtonText}>
+            {isValidDuration ? (
+              <>
+                Freeze for {selectedDays} Days
+                {charge > 0 ? <> · <CurrencyValue amount={charge} options={MAX_2DP} /></> : null}
+              </>
+            ) : (
+              `Choose 1–${daysAvailable} days`
             )}
-            <Pressable 
-              style={[styles.confirmButton, (isLoading || !isValidDuration) && { opacity: 0.7 }]} 
-              onPress={handleFreeze}
-              disabled={isLoading || !isValidDuration}
-            >
-              {isLoading ? (
-                <Text style={styles.confirmButtonText}>Freezing...</Text>
-              ) : (
-                <Text style={styles.confirmButtonText}>
-                  {isValidDuration ? (
-                    <>
-                      Freeze for {selectedDays} Days
-                      {charge > 0 ? <> · <CurrencyValue amount={charge} options={MAX_2DP} /></> : null}
-                    </>
-                  ) : (
-                    `Choose 1–${daysAvailable} days`
-                  )}
-                </Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
+          </Text>
+        )}
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.7 }]}
+        onPress={handleClose}
+        disabled={isLoading}
+      >
+        <Text style={styles.cancelButtonText}>Cancel</Text>
+      </Pressable>
+    </View>
+  );
+
+  return (
+    <AppBottomSheet
+      visible={visible}
+      title="Freeze Subscription"
+      subtitle={`${daysAvailable} of ${freeze.max_days} freeze days left${occurrencesText}`}
+      onClose={handleClose}
+      footer={footer}
+    >
+      <View style={styles.policyBox}>
+        {rate > 0 && (
+          <Text style={styles.policyText}>
+            {freeze.free_days_remaining > 0 ? (
+              <>{freeze.free_days_remaining} free freeze days left, then <CurrencyValue amount={rate} options={MAX_2DP} /> per extra day.</>
+            ) : (
+              <>No free freeze days left — each day costs <CurrencyValue amount={rate} options={MAX_2DP} />.</>
+            )}
+          </Text>
+        )}
+        <Text style={styles.policyText}>
+          {freeze.auto_unfreeze
+            ? 'Your subscription resumes automatically at the end of the freeze, and its end date moves forward by the days frozen.'
+            : 'Unfreeze from this screen when you\'re back — your subscription end date moves forward by the days frozen.'}
+        </Text>
       </View>
-    </Modal>
+
+      <Text style={styles.sectionLabel}>Select Duration</Text>
+      <View style={styles.daysRow}>
+        {FREEZE_OPTIONS.map((days) => {
+          const isSelected = selectedDays === days && customDays === '';
+          const isDisabled = days > daysAvailable;
+          return (
+            <Pressable
+              key={days}
+              style={[
+                styles.dayCard, 
+                isSelected && styles.dayCardSelected,
+                isDisabled && { opacity: 0.4 }
+              ]}
+              onPress={() => {
+                if (!isDisabled) {
+                  setSelectedDays(days);
+                  setCustomDays('');
+                }
+              }}
+              disabled={isDisabled || isLoading}
+            >
+              <Text style={[styles.dayNum, isSelected && styles.textSelected]}>{days}</Text>
+              <Text style={[styles.dayText, isSelected && styles.textSelected]}>Days</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={styles.customDaysContainer}>
+        <Text style={styles.customDaysLabel}>Or enter custom days:</Text>
+        <TextInput
+          style={styles.customDaysInput}
+          keyboardType="numeric"
+          value={customDays}
+          onChangeText={(text) => {
+            setCustomDays(text);
+            const parsed = parseInt(text, 10);
+            if (!isNaN(parsed)) {
+              setSelectedDays(parsed);
+            } else {
+              setSelectedDays(0);
+            }
+          }}
+          placeholder="e.g. 5"
+          placeholderTextColor="#94A3B8"
+          maxLength={3}
+          editable={!isLoading}
+        />
+      </View>
+
+      <Text style={[styles.sectionLabel, { marginTop: Spacing.four }]}>Reason</Text>
+      <View style={styles.reasonsList}>
+        {FREEZE_REASONS.map((reason) => {
+          const isSelected = selectedReason === reason;
+          return (
+            <Pressable
+              key={reason}
+              style={[styles.reasonOption, isSelected && styles.reasonOptionSelected]}
+              onPress={() => setSelectedReason(reason)}
+              disabled={isLoading}
+            >
+              <Feather
+                name={isSelected ? 'check-circle' : 'circle'}
+                size={18}
+                color={isSelected ? BrandColors.trainerAmber : '#94A3B8'}
+              />
+              <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
+                {reason}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: BrandColors.surface,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    paddingTop: Spacing.four,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.three,
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  title: {
-    fontSize: TypographyScale.title,
-    fontWeight: '800',
-    color: BrandColors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: BrandColors.textSecondary,
-    marginTop: 2,
-  },
-  closeButton: {
-    padding: 6,
-    borderRadius: Radius.full,
-    backgroundColor: BrandColors.screenBackground,
-  },
-  body: {
-    padding: Spacing.four,
-  },
   sectionLabel: {
     fontSize: 15,
     fontWeight: '700',
@@ -352,9 +315,6 @@ const styles = StyleSheet.create({
     color: '#2451A6',
   },
   footer: {
-    padding: Spacing.four,
-    borderTopWidth: 1,
-    borderColor: '#E2E8F0',
     gap: Spacing.three,
   },
   chargeBox: {
@@ -391,5 +351,17 @@ const styles = StyleSheet.create({
     fontSize: TypographyScale.subtitle,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  cancelButton: {
+    paddingVertical: Spacing.three,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cancelButtonText: {
+    fontSize: TypographyScale.body,
+    fontWeight: '700',
+    color: BrandColors.textSecondary,
   },
 });

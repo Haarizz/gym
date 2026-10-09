@@ -26,12 +26,21 @@ export function buildReceiptInvoiceHtml(receipt: MobileReceiptDetail, accentColo
   const displayStatus = isPaid ? "Paid" : receipt.status;
   const statusClass = isPaid ? "" : ' style="background:#fef3c7;color:#92400e;"';
 
+  const discount = Number(receipt.discountAmount) || 0;
   const items = [{
     description: receipt.planName || receipt.transactionType || 'Gym Services',
     subtitle: `Transaction Type: ${receipt.transactionType || '-'}`,
     type: receipt.transactionType || '-',
-    amount: totalAmt,
+    amount: totalAmt + discount,
   }];
+  if (discount > 0) {
+    items.push({
+      description: receipt.discountLabel || 'Discount',
+      subtitle: '',
+      type: 'Discount',
+      amount: -discount,
+    });
+  }
 
   const rows = items.map(item => `
         <tr>

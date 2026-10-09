@@ -57,10 +57,13 @@ public class MobileMemberBookingsController {
         return ResponseEntity.ok(bookingsService.createBooking(principal, request));
     }
 
+    /** Body (optional): { "refund_method": "WALLET" } — WALLET is the only one available for now. */
     @PostMapping("/{bookingId}/cancel")
     public ResponseEntity<MemberBookingDTO> cancelBooking(
             @AuthenticationPrincipal UserDetailsImpl principal,
-            @PathVariable Long bookingId) {
-        return ResponseEntity.ok(bookingsService.cancelBooking(principal, bookingId));
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) CancelMemberBookingRequestDTO request) {
+        String refundMethod = request != null ? request.getRefundMethod() : null;
+        return ResponseEntity.ok(bookingsService.cancelBooking(principal, bookingId, refundMethod));
     }
 }

@@ -30,12 +30,51 @@ public class Booking extends BaseEntity implements BranchAware {
     @Column(name = "guest_phone")
     private String guestPhone;
 
-    // confirmed | checked-in | no-show | cancelled
+    // confirmed | pending_approval | checked-in | no-show | cancelled
     @Column(nullable = false)
     private String status = "confirmed";
 
+    // What the member was charged — grossPrice less discountAmount.
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
+
+    // The session's price at booking time, before any code or Reward Pass.
+    @Column(name = "gross_price", precision = 10, scale = 2)
+    private BigDecimal grossPrice;
+
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    private BigDecimal discountAmount;
+
+    // e.g. "Code SUMMER10" or "Reward Pass RP-123".
+    @Column(name = "discount_label")
+    private String discountLabel;
+
+    // The part of price paid from the member's wallet.
+    @Column(name = "wallet_amount", precision = 10, scale = 2)
+    private BigDecimal walletAmount;
+
+    // The receipt that recorded the payment, if the booking was paid for.
+    @Column(name = "receipt_id")
+    private Long receiptId;
+
+    // null = nothing to refund | REFUNDED | NOT_REFUNDABLE (cancelled inside the refund window)
+    // | VOIDED (cancelled or rejected before staff approved the payment)
+    @Column(name = "refund_status", length = 32)
+    private String refundStatus;
+
+    // WALLET for now; DIRECT once a payment gateway can send money back.
+    @Column(name = "refund_method", length = 32)
+    private String refundMethod;
+
+    @Column(name = "refunded_amount", precision = 10, scale = 2)
+    private BigDecimal refundedAmount;
+
+    @Column(name = "refunded_at")
+    private java.time.LocalDateTime refundedAt;
+
+    // MEMBER | STAFF — staff cancellations always refund in full.
+    @Column(name = "cancelled_by", length = 16)
+    private String cancelledBy;
 
     @Column(name = "qr_code")
     private String qrCode;
@@ -88,6 +127,36 @@ public class Booking extends BaseEntity implements BranchAware {
 
     public Long getRewardId() { return rewardId; }
     public void setRewardId(Long rewardId) { this.rewardId = rewardId; }
+
+    public BigDecimal getGrossPrice() { return grossPrice; }
+    public void setGrossPrice(BigDecimal grossPrice) { this.grossPrice = grossPrice; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getDiscountLabel() { return discountLabel; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
+
+    public BigDecimal getWalletAmount() { return walletAmount; }
+    public void setWalletAmount(BigDecimal walletAmount) { this.walletAmount = walletAmount; }
+
+    public Long getReceiptId() { return receiptId; }
+    public void setReceiptId(Long receiptId) { this.receiptId = receiptId; }
+
+    public String getRefundStatus() { return refundStatus; }
+    public void setRefundStatus(String refundStatus) { this.refundStatus = refundStatus; }
+
+    public String getRefundMethod() { return refundMethod; }
+    public void setRefundMethod(String refundMethod) { this.refundMethod = refundMethod; }
+
+    public BigDecimal getRefundedAmount() { return refundedAmount; }
+    public void setRefundedAmount(BigDecimal refundedAmount) { this.refundedAmount = refundedAmount; }
+
+    public java.time.LocalDateTime getRefundedAt() { return refundedAt; }
+    public void setRefundedAt(java.time.LocalDateTime refundedAt) { this.refundedAt = refundedAt; }
+
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
 
     @Column(name = "branch_id")
     private Long branchId;

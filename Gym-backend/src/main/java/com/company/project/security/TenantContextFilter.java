@@ -98,6 +98,15 @@ public class TenantContextFilter extends OncePerRequestFilter {
 
     private static final RequestMatcher OWN_STATUS_CHECK_PATH = uriEquals("/api/members/me");
 
+    // Reachable while a purchase awaits approval: the status check itself, plus push-token
+    // registration so the device can receive the "payment approved" push (see
+    // MemberPaymentApprovalNotifier) — a member who bought by cash is pending from their
+    // very first app session, so blocking this would mean they never get that push.
+    private static final RequestMatcher PENDING_APPROVAL_ALLOWED_PATH = new OrRequestMatcher(
+            OWN_STATUS_CHECK_PATH,
+            uriStartsWith("/api/mobile/member/push-tokens")
+    );
+
     private static final RequestMatcher LEGACY_EXEMPT_PATH = new OrRequestMatcher(
             GLOBAL_EXEMPT_PATH,
             uriEquals("/api/branches/my-branches"),
@@ -170,7 +179,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             // can't be bypassed by calling an API other than /purchase.
                             // /api/members/me stays reachable (see isOwnStatusCheckPath)
                             // so the app can keep checking whether it's been resolved.
-                            if (!OWN_STATUS_CHECK_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+                            if (!PENDING_APPROVAL_ALLOWED_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
                                 TenantContextHolder.clear();
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                                         "Access Denied: Membership payment is awaiting approval");

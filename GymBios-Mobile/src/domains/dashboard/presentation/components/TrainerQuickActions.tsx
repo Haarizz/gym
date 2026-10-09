@@ -1,7 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { GlassSurface } from '@/shared/components';
+import { BrandColors } from '@/core/theme';
+import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
 
 interface TrainerQuickActionsProps {
   onMessageMember?: () => void;
@@ -38,86 +37,12 @@ export function TrainerQuickActions({
     else router.push('/(trainer)/ledger' as any);
   };
 
-  return (
-    <GlassSurface radius={Radius.lg} style={styles.container}>
-      <Text style={styles.title}>Quick Actions</Text>
-      <View style={styles.grid}>
-        <Pressable
-          style={[styles.actionBtn, { borderColor: BrandColors.trainerAmber }]}
-          onPress={handleMessage}
-          accessibilityRole="button"
-          accessibilityLabel="Message Member"
-        >
-          <Text style={[styles.actionBtnText, { color: BrandColors.trainerAmber }]}>
-            Message Member
-          </Text>
-        </Pressable>
+  const actions: QuickAction[] = [
+    { label: 'Message Member', icon: 'message-circle', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleMessage },
+    { label: 'Create Workout', icon: 'activity', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCreateWorkout },
+    { label: 'Track Progress', icon: 'trending-up', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleTrackProgress },
+    { label: 'View Ledger', icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
+  ];
 
-        <Pressable
-          style={[styles.actionBtn, { borderColor: BrandColors.teal }]}
-          onPress={handleCreateWorkout}
-          accessibilityRole="button"
-          accessibilityLabel="Create Workout"
-        >
-          <Text style={[styles.actionBtnText, { color: BrandColors.teal }]}>
-            Create Workout
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.actionBtn, { borderColor: BrandColors.memberGold }]}
-          onPress={handleTrackProgress}
-          accessibilityRole="button"
-          accessibilityLabel="Track Progress"
-        >
-          <Text style={[styles.actionBtnText, { color: BrandColors.memberGold }]}>
-            Track Progress
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[styles.actionBtn, { borderColor: '#A855F7' }]}
-          onPress={handleViewLedger}
-          accessibilityRole="button"
-          accessibilityLabel="View Ledger"
-        >
-          <Text style={[styles.actionBtnText, { color: '#A855F7' }]}>
-            View Ledger
-          </Text>
-        </Pressable>
-      </View>
-    </GlassSurface>
-  );
+  return <QuickActionsGrid actions={actions} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.four,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: Spacing.three,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  actionBtn: {
-    width: '48.5%',
-    borderWidth: 2,
-    borderRadius: Radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-});

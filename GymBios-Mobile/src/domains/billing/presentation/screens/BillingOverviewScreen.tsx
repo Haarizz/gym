@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'transparent',
   },
   createReceiptText: {
     color: '#ffffff',

@@ -22,6 +22,10 @@ public class FacilityService {
         this.facilityRepository = facilityRepository;
     }
 
+    // @Transactional is what makes BranchFilterAspect enable the branch filter;
+    // without it findAll()/findByStatus() load every branch's facilities and
+    // BranchSecurityListener rejects the first foreign-branch row on @PostLoad.
+    @Transactional(readOnly = true)
     public List<FacilityResponseDTO> getFacilities(String status, String search) {
         List<Facility> facilities;
 

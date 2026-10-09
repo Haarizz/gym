@@ -8,6 +8,9 @@ export interface PastBookingData {
   time: string;
   trainer: string;
   attended: boolean;
+  cancelled?: boolean;
+  /** e.g. "Refunded to wallet" / "Not refunded" for a cancelled paid booking. */
+  refundNote?: string | null;
 }
 
 interface PastBookingItemProps {
@@ -36,6 +39,14 @@ export function PastBookingItem({ booking }: PastBookingItemProps) {
       {booking.attended && (
         <View style={styles.attendedBadge}>
           <Text style={styles.attendedText}>✓ Attended</Text>
+        </View>
+      )}
+      {!booking.attended && booking.cancelled && (
+        <View style={styles.cancelledGroup}>
+          <View style={styles.cancelledBadge}>
+            <Text style={styles.cancelledText}>Cancelled</Text>
+          </View>
+          {booking.refundNote ? <Text style={styles.refundNote}>{booking.refundNote}</Text> : null}
         </View>
       )}
     </View>
@@ -84,5 +95,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#15803D',
+  },
+  cancelledGroup: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  cancelledBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  cancelledText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.textSecondary,
+  },
+  refundNote: {
+    fontSize: 11,
+    color: BrandColors.textSecondary,
   },
 });

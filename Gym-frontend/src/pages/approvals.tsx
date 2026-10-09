@@ -3,9 +3,11 @@
 // Mixed payment — these require staff to verify the cash was received (or the
 // credit terms are acceptable) before the member gets app access. See
 // MobileDiscoveryController.purchaseMembership on the backend for how a member
-// lands in this state.
+// lands in this state. Class/PT bookings paid the same way in the app wait here
+// too (BookingPaymentService) — the seat is held until reception decides.
 import React, { useCallback, useEffect, useState } from 'react';
 import { membersService, type Member } from '../utils/supabase/members-service';
+import { bookingService, type BookingApi } from '../utils/supabase/booking-service';
 import { useCurrency } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -37,12 +39,17 @@ import {
   RefreshCw,
   Clock,
   Wallet,
+  CalendarCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PAGE_SIZE = 20;
 
 type ActionType = 'approve' | 'reject';
+
+type ActionTarget =
+  | { kind: 'member'; type: ActionType; member: Member }
+  | { kind: 'booking'; type: ActionType; booking: BookingApi };
 
 function formatDateTime(value?: string | null): string {
   if (!value) return '—';
@@ -61,7 +68,10 @@ export function Approvals() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  const [actionDialog, setActionDialog] = useState<{ type: ActionType; member: Member } | null>(null);
+  const [bookingApprovals, setBookingApprovals] = useState<BookingApi[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
+  const [actionDialog, setActionDialog] = useState<ActionTarget | null>(null);
   const [reason, setReason] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -79,33 +89,72 @@ export function Approvals() {
     }
   }, [currentPage]);
 
+  const loadBookings = useCallback(async () => {
+    setLoadingBookings(true);
+    try {
+      setBookingApprovals(await bookingService.getPendingPaymentApprovals());
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load booking payments');
+    } finally {
+      setLoadingBookings(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
 
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
+
+  const refreshAll = () => {
+    loadMembers();
+    loadBookings();
+  };
+
   const openAction = (type: ActionType, member: Member) => {
-    setActionDialog({ type, member });
+    setActionDialog({ kind: 'member', type, member });
+    setReason('');
+  };
+
+  const openBookingAction = (type: ActionType, booking: BookingApi) => {
+    setActionDialog({ kind: 'booking', type, booking });
     setReason('');
   };
 
   const confirmAction = async () => {
     if (!actionDialog) return;
-    const { type, member } = actionDialog;
+    const { type } = actionDialog;
     if (type === 'reject' && !reason.trim()) {
       toast.error('A rejection reason is required');
       return;
     }
     setProcessing(true);
     try {
-      if (type === 'approve') {
-        await membersService.approveMemberPayment(member.id);
-        toast.success(`${member.name}'s payment approved — app access unlocked`);
+      if (actionDialog.kind === 'member') {
+        const { member } = actionDialog;
+        if (type === 'approve') {
+          await membersService.approveMemberPayment(member.id);
+          toast.success(`${member.name}'s payment approved — app access unlocked`);
+        } else {
+          await membersService.rejectMemberPayment(member.id, reason.trim());
+          toast.success(`${member.name}'s payment rejected`);
+        }
+        setActionDialog(null);
+        await loadMembers();
       } else {
-        await membersService.rejectMemberPayment(member.id, reason.trim());
-        toast.success(`${member.name}'s payment rejected`);
+        const { booking } = actionDialog;
+        if (type === 'approve') {
+          await bookingService.approvePayment(booking.id);
+          toast.success(`${booking.memberName}'s booking confirmed`);
+        } else {
+          await bookingService.rejectPayment(booking.id, reason.trim());
+          toast.success(`${booking.memberName}'s booking payment rejected — the seat was released`);
+        }
+        setActionDialog(null);
+        await loadBookings();
       }
-      setActionDialog(null);
-      await loadMembers();
       // Lets the sidebar clear its pending-approvals dot right away.
       window.dispatchEvent(new Event('approvals_updated'));
     } catch (err: any) {
@@ -114,6 +163,15 @@ export function Approvals() {
       setProcessing(false);
     }
   };
+
+  const dialogName = actionDialog
+    ? actionDialog.kind === 'member' ? actionDialog.member.name : actionDialog.booking.memberName
+    : '';
+  const dialogMethod = actionDialog
+    ? (actionDialog.kind === 'member'
+        ? actionDialog.member.payment_method_used
+        : actionDialog.booking.paymentMethod)?.toLowerCase() || 'payment'
+    : 'payment';
 
   const cardShell = 'border-primary/10 shadow-md hover:shadow-lg transition-shadow';
 
@@ -124,10 +182,10 @@ export function Approvals() {
         <div>
           <h1 className="text-3xl font-bold">Approvals</h1>
           <p className="text-muted-foreground mt-2">
-            Review mobile purchases paid by Cash, Credit, or Mixed payment before the member gets app access
+            Review mobile purchases and session bookings paid by Cash, Credit, or Mixed payment
           </p>
         </div>
-        <Button variant="outline" onClick={loadMembers}>
+        <Button variant="outline" onClick={refreshAll}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
@@ -147,7 +205,21 @@ export function Approvals() {
             <p className="text-xs text-muted-foreground">Members waiting on reception</p>
           </CardContent>
         </Card>
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Booking Payments</CardTitle>
+            <div className="bg-amber-50 p-2 rounded-lg">
+              <CalendarCheck className="h-4 w-4 text-amber-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{bookingApprovals.length}</div>
+            <p className="text-xs text-muted-foreground">Seats held until the payment is confirmed</p>
+          </CardContent>
+        </Card>
       </div>
+
+      <h2 className="text-lg font-semibold">Memberships</h2>
 
       {/* Table */}
       <Card className={cardShell}>
@@ -254,6 +326,97 @@ export function Approvals() {
         </div>
       )}
 
+      {/* Booking payments */}
+      <h2 className="text-lg font-semibold pt-2">Booking Payments</h2>
+      <Card className={cardShell}>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Member</TableHead>
+                <TableHead>Session</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead>Booked</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingBookings && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Loading booking payments...
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loadingBookings && bookingApprovals.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <CalendarCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    No booking payments are waiting on approval.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loadingBookings && bookingApprovals.map((booking) => {
+                const price = booking.price ?? 0;
+                const received = booking.paidAmount ?? 0;
+                return (
+                  <TableRow key={booking.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell>
+                      <div className="font-medium">{booking.memberName || '—'}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{booking.sessionName || '—'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {booking.date} {booking.startTime ? `· ${booking.startTime.slice(0, 5)}` : ''}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 gap-1">
+                        <Wallet className="h-3 w-3" />
+                        {booking.paymentMethod || '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(price)}
+                      {booking.discountLabel && (
+                        <div className="text-xs text-muted-foreground">{booking.discountLabel}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className={received < price ? 'text-red-600 font-medium' : ''}>
+                      {formatCurrency(received)}
+                      {booking.walletAmount ? (
+                        <div className="text-xs text-muted-foreground">incl. {formatCurrency(booking.walletAmount)} wallet</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{formatDateTime(booking.createdAt)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-700 border-green-200 hover:bg-green-50"
+                        onClick={() => openBookingAction('approve', booking)}
+                      >
+                        <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-700 border-red-200 hover:bg-red-50"
+                        onClick={() => openBookingAction('reject', booking)}
+                      >
+                        <XCircle className="mr-1.5 h-4 w-4" /> Reject
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Approve / Reject confirmation dialog */}
       <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) setActionDialog(null); }}>
         <DialogContent className="max-w-md">
@@ -262,9 +425,13 @@ export function Approvals() {
             <DialogDescription>
               {actionDialog && (
                 <>
-                  {actionDialog.type === 'approve'
-                    ? <>Confirm that <strong>{actionDialog.member.name}</strong>'s {actionDialog.member.payment_method_used?.toLowerCase() || 'payment'} was received. This unlocks their app access.</>
-                    : <>Reject <strong>{actionDialog.member.name}</strong>'s payment. Their membership will be marked inactive and app access stays locked.</>}
+                  {actionDialog.kind === 'member'
+                    ? (actionDialog.type === 'approve'
+                        ? <>Confirm that <strong>{dialogName}</strong>'s {dialogMethod} was received. This unlocks their app access.</>
+                        : <>Reject <strong>{dialogName}</strong>'s payment. Their membership will be marked inactive and app access stays locked.</>)
+                    : (actionDialog.type === 'approve'
+                        ? <>Confirm that <strong>{dialogName}</strong>'s {dialogMethod} for <strong>{actionDialog.booking.sessionName}</strong> was received. Their seat is confirmed.</>
+                        : <>Reject <strong>{dialogName}</strong>'s payment for <strong>{actionDialog.booking.sessionName}</strong>. The booking is cancelled, the seat released, and any wallet amount or Reward Pass returned.</>)}
                 </>
               )}
             </DialogDescription>

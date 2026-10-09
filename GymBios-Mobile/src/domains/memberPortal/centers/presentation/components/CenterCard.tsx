@@ -1,9 +1,10 @@
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { CurrencyValue } from '@/core/providers';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
+import { GlassSurface } from '@/shared/components';
 import type { CenterSummary } from '@/domains/discovery';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 
@@ -14,12 +15,12 @@ const PAYMENT_ICON: Record<string, keyof typeof Feather.glyphMap> = {
 };
 
 const CATEGORY_STYLE: Record<string, { bg: string; text: string }> = {
-  Gym: { bg: 'rgba(50, 127, 116, 0.6)', text: '#FFFFFF' },
-  'Fitness Center': { bg: 'rgba(234, 88, 12, 0.75)', text: '#FFFFFF' },
-  'Wellness Center': { bg: 'rgba(126, 34, 206, 0.75)', text: '#FFFFFF' },
-  Studio: { bg: 'rgba(219, 39, 119, 0.75)', text: '#FFFFFF' },
+  Gym: { bg: '#E6F2F0', text: BrandColors.tealDark },
+  'Fitness Center': { bg: '#FFEDD5', text: '#C2410C' },
+  'Wellness Center': { bg: '#F3E8FF', text: '#7E22CE' },
+  Studio: { bg: '#FCE7F3', text: '#BE185D' },
 };
-const DEFAULT_CATEGORY_STYLE = { bg: 'rgba(0,0,0,0.6)', text: '#FFFFFF' };
+const DEFAULT_CATEGORY_STYLE = { bg: '#F1F5F9', text: BrandColors.textPrimary };
 
 const GENDER_STYLE: Record<string, { bg: string; text: string }> = {
   'Ladies Only': { bg: '#FCE7F3', text: '#BE185D' },
@@ -38,232 +39,217 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
   const showGenderBadge = !!center.accessType && center.accessType !== 'Mixed';
   const showRating = center.reviewCount > 0 && center.avgRating != null;
 
-  const Banner = (coverUrl ? ImageBackground : View) as any;
-  const bannerProps = coverUrl ? { source: { uri: coverUrl }, imageStyle: styles.bannerImage } : {};
   const categoryStyle = center.centerType ? (CATEGORY_STYLE[center.centerType] || DEFAULT_CATEGORY_STYLE) : null;
   const genderStyle = center.accessType ? GENDER_STYLE[center.accessType] : undefined;
+  const paymentMethods = center.acceptedPaymentMethods ?? [];
 
   return (
-    <View style={styles.pressable}>
-      <View style={styles.card}>
-        {/* Banner / Header Box */}
-        <Banner style={[styles.banner, !coverUrl && { backgroundColor: BrandColors.tealDark }]} {...(bannerProps as any)}>
-          {!!coverUrl && (
-            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
+    <GlassSurface strong radius={20} style={styles.card}>
+      <View style={styles.cardTop}>
+        {/* Thumbnail */}
+        <View style={styles.thumb}>
+          {coverUrl ? (
+            <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <Feather name="activity" size={28} color="rgba(255,255,255,0.85)" />
           )}
-          <View style={styles.bannerHeader}>
-            {categoryStyle ? (
-              <View style={[styles.categoryBadge, { backgroundColor: categoryStyle.bg }]}>
-                <Feather name="activity" size={11} color={categoryStyle.text} />
-                <Text style={[styles.categoryText, { color: categoryStyle.text }]}>{center.centerType}</Text>
-              </View>
-            ) : <View />}
-            {distanceKm != null && (
-              <View style={styles.distanceBadge}>
-                <Feather name="navigation" size={11} color="#FFFFFF" />
-                <Text style={styles.distanceText}>{distanceKm.toFixed(1)} km</Text>
-              </View>
-            )}
-          </View>
-
-          {showGenderBadge && (
-            <View style={styles.bannerBottom}>
-              <View style={[styles.genderBadge, genderStyle && { backgroundColor: genderStyle.bg }]}>
-                <Text style={[styles.genderText, genderStyle && { color: genderStyle.text }]}>
-                  {center.accessType}
-                </Text>
-              </View>
+          {distanceKm != null && (
+            <View style={styles.distanceBadge}>
+              <Feather name="navigation" size={9} color="#FFFFFF" />
+              <Text style={styles.distanceText}>{distanceKm.toFixed(1)} km</Text>
             </View>
           )}
-        </Banner>
+        </View>
 
-        {/* Body info */}
-        <View style={styles.body}>
-          <View style={styles.bodyHeaderRow}>
-            <Text style={styles.centerName} numberOfLines={1}>
-              {center.centerName}
-            </Text>
-            {showRating && (
-              <View style={styles.ratingRow}>
-                <Feather name="star" size={13} color={BrandColors.memberGold} />
-                <Text style={styles.ratingText}>{center.avgRating!.toFixed(1)}</Text>
-                <Text style={styles.reviewsText}>({center.reviewCount})</Text>
-              </View>
-            )}
-          </View>
+        {/* Info */}
+        <View style={styles.info}>
+          {(categoryStyle || showGenderBadge) && (
+            <View style={styles.tagsRow}>
+              {categoryStyle && (
+                <View style={[styles.tag, { backgroundColor: categoryStyle.bg }]}>
+                  <Text style={[styles.tagText, { color: categoryStyle.text }]} numberOfLines={1}>
+                    {center.centerType}
+                  </Text>
+                </View>
+              )}
+              {showGenderBadge && (
+                <View style={[styles.tag, { backgroundColor: genderStyle?.bg ?? '#F1F5F9' }]}>
+                  <Text style={[styles.tagText, { color: genderStyle?.text ?? BrandColors.tealDark }]} numberOfLines={1}>
+                    {center.accessType}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
-          {center.address && (
+          <Text style={styles.centerName} numberOfLines={2}>
+            {center.centerName}
+          </Text>
+
+          {!!center.address && (
             <View style={styles.locationRow}>
-              <Feather name="map-pin" size={13} color={BrandColors.teal} />
+              <Feather name="map-pin" size={12} color={BrandColors.tealDark} />
               <Text style={styles.addressText} numberOfLines={1}>
                 {center.address}
               </Text>
             </View>
           )}
 
-          {/* Price + payment icons */}
-          <View style={styles.footer}>
-            <View>
-              <Text style={styles.startingFromLabel}>Starting from</Text>
-              <View style={styles.priceRow}>
-                {center.startingPrice != null ? (
-                  <Text style={styles.startingPrice}><CurrencyValue amount={center.startingPrice} /></Text>
-                ) : (
-                  <Text style={styles.startingPrice}>View Subscriptions</Text>
-                )}
-                {center.startingPrice != null && <Text style={styles.perMonthText}> /month</Text>}
-              </View>
+          {showRating && (
+            <View style={styles.ratingRow}>
+              <Feather name="star" size={12} color={BrandColors.memberGold} />
+              <Text style={styles.ratingText}>{center.avgRating!.toFixed(1)}</Text>
+              <Text style={styles.reviewsText}>({center.reviewCount})</Text>
             </View>
+          )}
+        </View>
+      </View>
 
-            {center.acceptedPaymentMethods?.length > 0 && (
-              <View style={styles.paymentIconsRow}>
-                {/* BNPL gets its own chip below — keep it out of the icon chips so it can't
-                    take a slot from Cash/Card or render twice. */}
-                {center.acceptedPaymentMethods.filter((m) => m !== 'BNPL' && PAYMENT_ICON[m]).slice(0, 2).map((method) => {
-                  const iconName = PAYMENT_ICON[method];
-                  return (
-                    <View key={method} style={styles.paymentIconChip}>
-                      <FeatherIcon name={iconName} size={12} color={BrandColors.textSecondary} />
-                      <Text style={styles.paymentIconText}>{method}</Text>
-                    </View>
-                  );
-                })}
-                {center.acceptedPaymentMethods.includes('BNPL') && (
-                  <View style={styles.bnplChip}>
-                    <Text style={styles.bnplText}>BNPL</Text>
-                  </View>
-                )}
+      {/* Price + payment methods */}
+      <View style={styles.footer}>
+        <View style={styles.priceBlock}>
+          <Text style={styles.startingFromLabel}>Starting from</Text>
+          {center.startingPrice != null ? (
+            <View style={styles.priceRow}>
+              <Text style={styles.startingPrice}><CurrencyValue amount={center.startingPrice} /></Text>
+              <Text style={styles.perMonthText}> /month</Text>
+            </View>
+          ) : (
+            <Text style={styles.startingPrice}>View Subscriptions</Text>
+          )}
+        </View>
+
+        {paymentMethods.length > 0 && (
+          <View style={styles.paymentIconsRow}>
+            {/* BNPL gets its own chip below — keep it out of the icon chips so it can't
+                take a slot from Cash/Card or render twice. */}
+            {paymentMethods.filter((m) => m !== 'BNPL' && PAYMENT_ICON[m]).slice(0, 2).map((method) => (
+              <View key={method} style={styles.paymentIconChip}>
+                <FeatherIcon name={PAYMENT_ICON[method]} size={11} color={BrandColors.textSecondary} />
+                <Text style={styles.paymentIconText}>{method}</Text>
+              </View>
+            ))}
+            {paymentMethods.includes('BNPL') && (
+              <View style={styles.bnplChip}>
+                <Text style={styles.bnplText}>BNPL</Text>
               </View>
             )}
           </View>
-
-          {/* CTAs */}
-          <View style={styles.ctaRow}>
-            <Pressable
-              style={({ pressed }) => [styles.viewDetailsButton, pressed && styles.pressed]}
-              onPress={() => onViewDetails(center)}
-              accessibilityRole="button"
-              accessibilityLabel={`View details for ${center.centerName}`}
-            >
-              <Text style={styles.viewDetailsText}>View Details</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
-              onPress={() => onBuyMembership(center)}
-              accessibilityRole="button"
-              accessibilityLabel={`Subscribe at ${center.centerName}`}
-            >
-              <LinearGradient
-                colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.buyButton}
-              >
-                <Text style={styles.buyButtonText}>Subscribe</Text>
-              </LinearGradient>
-            </Pressable>
-          </View>
-        </View>
+        )}
       </View>
-    </View>
+
+      {/* CTAs */}
+      <View style={styles.ctaRow}>
+        <Pressable
+          style={({ pressed }) => [styles.viewDetailsButton, pressed && styles.pressed]}
+          onPress={() => onViewDetails(center)}
+          accessibilityRole="button"
+          accessibilityLabel={`View details for ${center.centerName}`}
+        >
+          <Text style={styles.viewDetailsText}>View Details</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
+          onPress={() => onBuyMembership(center)}
+          accessibilityRole="button"
+          accessibilityLabel={`Subscribe at ${center.centerName}`}
+        >
+          <LinearGradient
+            colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.buyButton}
+          >
+            <Text style={styles.buyButtonText}>Subscribe</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </GlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
-  pressable: {
-    marginBottom: Spacing.four,
-  },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    overflow: 'hidden',
+    padding: 10,
+    gap: 10,
+    marginBottom: Spacing.md,
   },
   pressed: {
     opacity: 0.85,
   },
-  banner: {
-    height: 160,
-    justifyContent: 'space-between',
-    padding: Spacing.three,
-  },
-  bannerImage: {
-    resizeMode: 'cover',
-  },
-  bannerHeader: {
+  cardTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    gap: Spacing.md,
   },
-  categoryBadge: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
-    flexDirection: 'row',
+  thumb: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: BrandColors.tealDark,
     alignItems: 'center',
-    gap: 4,
-  },
-  categoryText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: BrandColors.teal,
+    justifyContent: 'center',
   },
   distanceBadge: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: Radius.full,
   },
   distanceText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
-  bannerBottom: {
+  info: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+    paddingTop: 2,
+  },
+  tagsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 4,
   },
-  genderBadge: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: 4,
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  genderText: {
+  tagText: {
     fontSize: 10,
     fontWeight: '700',
-    color: BrandColors.tealDark,
-  },
-  body: {
-    padding: Spacing.four,
-  },
-  bodyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.two,
   },
   centerName: {
-    flex: 1,
     fontSize: 16,
-    fontWeight: '800',
+    lineHeight: 20,
+    fontWeight: '700',
     color: BrandColors.textPrimary,
-    marginRight: Spacing.two,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addressText: {
+    flex: 1,
+    fontSize: 13,
+    color: BrandColors.textSecondary,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   ratingText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: BrandColors.textPrimary,
   },
@@ -271,43 +257,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: BrandColors.textSecondary,
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: Spacing.three,
-  },
-  addressText: {
-    flex: 1,
-    fontSize: 12,
-    color: BrandColors.textSecondary,
-  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.two,
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingHorizontal: 2,
     borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: Spacing.three,
+    borderColor: 'rgba(30,42,58,0.08)',
+  },
+  priceBlock: {
+    flexShrink: 1,
   },
   startingFromLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: BrandColors.textSecondary,
-    fontWeight: '500',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   startingPrice: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
     color: BrandColors.textPrimary,
   },
   perMonthText: {
-    fontSize: 11,
+    fontSize: 12,
     color: BrandColors.textSecondary,
   },
   paymentIconsRow: {
@@ -318,13 +295,13 @@ const styles = StyleSheet.create({
   paymentIconChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#F9FAFB',
+    gap: 3,
+    backgroundColor: Glass.fill,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Glass.border,
     borderRadius: Radius.sm,
     paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   paymentIconText: {
     fontSize: 10,
@@ -337,7 +314,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245, 158, 11, 0.2)',
     borderRadius: Radius.sm,
     paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   bnplText: {
     fontSize: 10,
@@ -350,17 +327,18 @@ const styles = StyleSheet.create({
   },
   viewDetailsButton: {
     flex: 1,
-    paddingVertical: 10,
+    height: 42,
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: BrandColors.teal,
+    backgroundColor: Glass.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   viewDetailsText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    color: BrandColors.teal,
+    color: BrandColors.tealDark,
   },
   buyButtonWrapper: {
     flex: 1,
@@ -368,14 +346,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   buyButton: {
-    paddingVertical: 10,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buyButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },
 });
-

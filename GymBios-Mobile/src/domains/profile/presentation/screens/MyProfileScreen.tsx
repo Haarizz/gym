@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     backgroundColor: 'rgba(255,255,255,0.7)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: 'transparent',
   },
   editPillIcon: {
     marginRight: 4,

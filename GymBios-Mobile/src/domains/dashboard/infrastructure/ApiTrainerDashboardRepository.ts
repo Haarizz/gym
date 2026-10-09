@@ -15,7 +15,8 @@ interface BackendTrainerDashboardData {
   trainer_info: {
     name: string;
     specialization: string;
-    rating: number;
+    rating: number | null;
+    rating_count: number;
   };
   todays_stats: {
     sessions_scheduled: number;
@@ -41,7 +42,8 @@ export class ApiTrainerDashboardRepository {
       trainerInfo: {
         name: data.trainer_info?.name || 'Trainer',
         specialization: data.trainer_info?.specialization || 'General',
-        rating: data.trainer_info?.rating || 4.9,
+        rating: data.trainer_info?.rating ?? null,
+        ratingCount: data.trainer_info?.rating_count ?? 0,
       },
       todaysStats: {
         sessionsScheduled: data.todays_stats?.sessions_scheduled || 0,

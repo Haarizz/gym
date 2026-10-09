@@ -13,6 +13,7 @@ import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.MembershipFreezeService;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -123,7 +124,8 @@ public class MobileMemberDashboardService {
                 isActive,
                 member.getMembershipStartDate(),
                 member.getMembershipEndDate(),
-                member.getExpiryDate(),
+                // While frozen, the expiry the member will have once the freeze ends.
+                MembershipFreezeService.projectedExpiry(member, LocalDateTime.now()),
                 daysRemaining,
                 member.getPaymentStatus(),
                 member.getOutstandingBalance()

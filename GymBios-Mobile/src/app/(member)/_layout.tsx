@@ -6,8 +6,11 @@ import {
 
 import { BranchProvider } from '@/shared/providers/BranchProvider';
 import { MemberPushNotifications } from '@/domains/notifications';
+import { usePaymentApprovalToast } from '@/domains/discovery/hooks/usePaymentApprovalToast';
 
 export default function MemberLayout() {
+  usePaymentApprovalToast();
+
   return (
     <BranchProvider>
       <MemberPushNotifications />

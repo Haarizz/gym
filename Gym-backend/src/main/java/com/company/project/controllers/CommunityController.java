@@ -45,7 +45,7 @@ public class CommunityController {
         try {
             return ResponseEntity.ok(communityService.getFeed(q, type, page, limit, archived));
         } catch (SecurityException e) {
-            return ResponseEntity.status(401).build();
+            return ResponseEntity.status(403).build();
         }
     }
 
@@ -57,7 +57,7 @@ public class CommunityController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
-            return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -81,7 +81,7 @@ public class CommunityController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
-            return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -93,7 +93,7 @@ public class CommunityController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (SecurityException e) {
-            return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
         }
     }
 

@@ -1,12 +1,15 @@
 package com.company.project.entities;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.Filter;
 
-@Filter(name = "branchFilter", condition = "branch_id = :branchId")
+// Deliberately not BranchAware: the community is shared across every branch (and,
+// product-wise, every gym), so posts must not be hidden by the branch filter, and
+// liking/commenting — which bumps the counters below — must not be rejected by
+// BranchSecurityListener for a post from another branch or in "All Branches" mode.
+// branch_id is still recorded for reference.
 @Entity
 @Table(name = "community_posts")
-public class CommunityPost extends BaseEntity implements BranchAware {
+public class CommunityPost extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,6 +25,12 @@ public class CommunityPost extends BaseEntity implements BranchAware {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_member_id")
     private Member authorMember;
+
+    // Same column, read as a plain id. Authors can be members of another branch, and
+    // loading that Member trips BranchSecurityListener's read isolation — so community
+    // reads use this id (plus a batched name lookup) and never touch authorMember.
+    @Column(name = "author_member_id", insertable = false, updatable = false)
+    private Long authorMemberId;
 
     @Column(nullable = false, length = 140)
     private String topic;
@@ -63,7 +72,12 @@ public class CommunityPost extends BaseEntity implements BranchAware {
     public void setAuthorUser(User authorUser) { this.authorUser = authorUser; }
 
     public Member getAuthorMember() { return authorMember; }
-    public void setAuthorMember(Member authorMember) { this.authorMember = authorMember; }
+    public void setAuthorMember(Member authorMember) {
+        this.authorMember = authorMember;
+        this.authorMemberId = authorMember != null ? authorMember.getId() : null;
+    }
+
+    public Long getAuthorMemberId() { return authorMemberId; }
 
     public String getTopic() { return topic; }
     public void setTopic(String topic) { this.topic = topic; }

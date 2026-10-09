@@ -44,6 +44,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
     }
 
+    @ExceptionHandler(SessionFullException.class)
+    public ResponseEntity<Map<String, Object>> handleSessionFull(SessionFullException ex) {
+        return build(HttpStatus.CONFLICT, "SESSION_FULL", ex.getMessage());
+    }
+
     @ExceptionHandler(BusinessRuleViolationException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRule(BusinessRuleViolationException ex) {
         return build(HttpStatus.CONFLICT, "BUSINESS_RULE_VIOLATION", ex.getMessage());

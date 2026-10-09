@@ -80,6 +80,10 @@ export interface MembershipPayment {
   paidAmount: number;
   paymentMethod: string;
   status: string;
+  /** Taken off this bill's amount (offer / code / Reward Pass / staff discount). */
+  discountAmount?: number | null;
+  /** What the discount was, e.g. "Offer: Diwali + Code NEWMEMBER2026". */
+  discountLabel?: string | null;
 }
 
 export interface MobileReceiptDetail {
@@ -101,6 +105,8 @@ export interface MobileReceiptDetail {
   memberPhone?: string;
   membershipType?: string;
   remarks?: string;
+  discountAmount?: number | null;
+  discountLabel?: string | null;
 }
 
 export interface AddOn {

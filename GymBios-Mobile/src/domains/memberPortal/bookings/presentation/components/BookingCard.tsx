@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { CurrencyValue } from '@/core/providers';
 import { GlassSurface } from '@/shared/components';
-import { ConfirmationModal } from '@/shared/components/ConfirmationModal/ConfirmationModal';
+import { formatRefundDeadline } from '../../domain/refundPolicy';
 
 export interface BookingItemData {
   id: string | number;
@@ -13,32 +13,42 @@ export interface BookingItemData {
   duration?: string;
   trainer: string;
   location: string;
-  spotsLeft: number;
+  /** null = unlimited seats. */
+  spotsLeft: number | null;
+  /** Lower-case backend status: confirmed | pending_approval | ... */
   status: string;
+  /** What was charged (after discounts); 0 for free sessions. */
+  price: number;
+  /** Amount paid — refunded in full if cancelled in time. 0 while awaiting approval. */
+  paidAmount: number;
+  /** A Credit/part payment: only part of the price has been paid. */
+  partlyPaid: boolean;
+  paymentStatus: string | null;
+  discountLabel: string | null;
+  walletAmount: number | null;
+  paidWithPass: boolean;
+  refundDeadline: string | null;
+  refundableIfCancelledNow: boolean;
 }
 
 interface BookingCardProps {
   booking: BookingItemData;
-  onCancel: (id: string | number) => void;
+  onCancel: (booking: BookingItemData) => void;
   onViewDetails: (booking: BookingItemData) => void;
 }
 
-export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardProps) {
-  const [isCancelConfirmVisible, setIsCancelConfirmVisible] = useState(false);
+const STATUS_LABELS: Record<string, string> = {
+  pending_approval: 'AWAITING APPROVAL',
+};
 
+export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardProps) {
   const formattedDate = new Date(booking.date).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
-
-  const handleCancelPress = () => {
-    setIsCancelConfirmVisible(true);
-  };
-
-  const confirmCancel = () => {
-    setIsCancelConfirmVisible(false);
-    onCancel(booking.id);
-  };
+  const awaitingApproval = booking.status === 'pending_approval';
+  const deadline = formatRefundDeadline(booking.refundDeadline);
+  const isPaid = booking.price > 0 || booking.paidWithPass;
 
   return (
     <GlassSurface radius={Radius.lg} style={styles.card}>
@@ -47,8 +57,10 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
           <Text style={styles.className}>{booking.class}</Text>
           <Text style={styles.trainerName}>with {booking.trainer}</Text>
         </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{booking.status.toUpperCase()}</Text>
+        <View style={[styles.statusBadge, awaitingApproval && styles.statusBadgePending]}>
+          <Text style={[styles.statusText, awaitingApproval && styles.statusTextPending]}>
+            {STATUS_LABELS[booking.status] ?? booking.status.toUpperCase()}
+          </Text>
         </View>
       </View>
 
@@ -79,18 +91,41 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
           <Feather name="map-pin" size={13} color={BrandColors.textSecondary} />
           <Text style={styles.locationText}>{booking.location}</Text>
         </View>
-        <View style={styles.spotsGroup}>
-          <Feather name="users" size={13} color={BrandColors.textSecondary} />
-          <Text
-            style={[
-              styles.spotsText,
-              booking.spotsLeft === 0 && styles.spotsTextFull,
-            ]}
-          >
-            {booking.spotsLeft > 0 ? `${booking.spotsLeft} spots left` : 'Full'}
-          </Text>
-        </View>
+        {booking.spotsLeft != null && (
+          <View style={styles.spotsGroup}>
+            <Feather name="users" size={13} color={BrandColors.textSecondary} />
+            <Text
+              style={[
+                styles.spotsText,
+                booking.spotsLeft === 0 && styles.spotsTextFull,
+              ]}
+            >
+              {booking.spotsLeft > 0 ? `${booking.spotsLeft} spots left` : 'Full'}
+            </Text>
+          </View>
+        )}
       </View>
+
+      {isPaid && (
+        <View style={styles.paymentRow}>
+          <Text style={styles.paymentText}>
+            {booking.paidWithPass && booking.price === 0 ? (
+              'Paid with Reward Pass'
+            ) : awaitingApproval ? (
+              <>Payment of <CurrencyValue amount={booking.price} /> awaiting gym approval</>
+            ) : booking.partlyPaid ? (
+              <>Part-paid · <CurrencyValue amount={booking.price} /> total</>
+            ) : (
+              <>Paid <CurrencyValue amount={booking.price} /></>
+            )}
+          </Text>
+          {!awaitingApproval && deadline && (
+            <Text style={[styles.refundText, !booking.refundableIfCancelledNow && styles.refundTextClosed]}>
+              {booking.refundableIfCancelledNow ? `Refundable until ${deadline}` : 'No longer refundable'}
+            </Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.actionRow}>
         <Pressable
@@ -102,23 +137,11 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
 
         <Pressable
           style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
-          onPress={handleCancelPress}
+          onPress={() => onCancel(booking)}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </Pressable>
       </View>
-
-      <ConfirmationModal
-        visible={isCancelConfirmVisible}
-        title="Cancel Booking"
-        message={`Are you sure you want to cancel your booking for ${booking.class}?`}
-        confirmText="Yes, Cancel"
-        cancelText="Keep Booking"
-        variant="danger"
-        icon="x-circle"
-        onConfirm={confirmCancel}
-        onClose={() => setIsCancelConfirmVisible(false)}
-      />
     </GlassSurface>
   );
 }
@@ -160,6 +183,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#15803D',
     letterSpacing: 0.4,
+  },
+  statusBadgePending: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  statusTextPending: {
+    color: '#B45309',
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+    borderTopWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  paymentText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: BrandColors.textPrimary,
+  },
+  refundText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.teal,
+  },
+  refundTextClosed: {
+    color: BrandColors.textSecondary,
   },
   metaRow: {
     flexDirection: 'row',

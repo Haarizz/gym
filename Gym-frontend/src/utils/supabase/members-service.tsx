@@ -274,6 +274,32 @@ class MembersService {
     return response.json();
   }
 
+  // Mobile purchases staff already approved or rejected — Approvals > History tab.
+  async getApprovalHistory(
+    filters: { status?: 'APPROVED' | 'REJECTED'; search?: string } = {},
+    pagination: PaginationParams = {}
+  ): Promise<MembersResponse> {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.search) params.append('search', filters.search);
+    if (pagination.page)  params.append('page',  String(pagination.page));
+    if (pagination.limit) params.append('limit', String(pagination.limit));
+
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/approval-history?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch approval history: ${response.status}`));
+    return response.json();
+  }
+
+  async getApprovalHistorySummary(): Promise<{ approved: number; rejected: number }> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/approval-history/summary`
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch approval summary: ${response.status}`));
+    return response.json();
+  }
+
   async approveMemberPayment(id: string): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/approve-payment`,
@@ -309,6 +335,10 @@ class MembersService {
     // membership_fee is then the fee BEFORE that discount — the backend applies it.
     reward_pass_id?: number;
     coupon_code?: string;
+    // A discount already taken off membership_fee (plan offer / staff discount) —
+    // only recorded on the receipt, worded by offer_label.
+    offer_discount?: number;
+    offer_label?: string;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/renew`,

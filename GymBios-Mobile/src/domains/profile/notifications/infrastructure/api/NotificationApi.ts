@@ -1,5 +1,7 @@
 import { apiClient } from '@/core/network/apiClient';
+import { camelizeKeys } from '@/shared/utils/caseKeys';
 import type {
+  NotificationItem,
   NotificationPage,
   UnreadCountResponse,
 } from '../../domain/notification.types';
@@ -9,10 +11,17 @@ export class NotificationApi {
    * GET /api/notifications?page=0&size=20[&module=...]
    */
   async getNotifications(page = 0, size = 20, module?: string): Promise<NotificationPage> {
-    const response = await apiClient.get<NotificationPage>('/notifications', {
+    const response = await apiClient.get('/notifications', {
       params: { page, size, module },
     });
-    return response.data;
+    // Backend is snake_case (is_read, created_at, action_url, reference_id).
+    const result = camelizeKeys<NotificationPage>(response.data);
+    // Older backends serialize the flag as "read" (Jackson strips the "is" from isRead()).
+    result.content = (result.content ?? []).map((n) => {
+      const { read, ...rest } = n as NotificationItem & { read?: boolean };
+      return { ...rest, isRead: Boolean(n.isRead ?? read) };
+    });
+    return result;
   }
 
   /**

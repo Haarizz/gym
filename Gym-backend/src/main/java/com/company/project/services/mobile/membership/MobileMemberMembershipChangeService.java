@@ -190,6 +190,8 @@ public class MobileMemberMembershipChangeService {
         RenewalRequestDTO renewalRequest = new RenewalRequestDTO();
         renewalRequest.setPlanName(plan.getName());
         renewalRequest.setMembershipFee(finalAmount);
+        renewalRequest.setOfferDiscount(PlanOfferPricing.discount(plan));
+        renewalRequest.setOfferLabel(PlanOfferPricing.receiptLabel(plan.getOfferLabel()));
         renewalRequest.setAmountReceived(finalAmount);
         renewalRequest.setPaymentMethod(request.getPaymentMethodUsed());
         renewalRequest.setPaymentBreakdown(request.getPaymentBreakdown());

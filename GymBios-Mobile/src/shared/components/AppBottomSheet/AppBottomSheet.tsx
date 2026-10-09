@@ -19,6 +19,7 @@ export function AppBottomSheet({
   subtitle,
   onClose,
   children,
+  footer,
 }: AppBottomSheetProps) {
   const translateY = useRef(new Animated.Value(600)).current;
   // Controls whether <Modal> is mounted at all — lags behind `visible` on close.
@@ -85,6 +86,8 @@ export function AppBottomSheet({
             >
               {children}
             </ScrollView>
+
+            {!!footer && <View style={styles.footer}>{footer}</View>}
           </SafeAreaView>
         </Animated.View>
       </View>

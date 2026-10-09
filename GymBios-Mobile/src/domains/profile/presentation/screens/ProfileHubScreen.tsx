@@ -8,14 +8,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
-import * as ImagePicker from 'expo-image-picker';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { ConfirmationModal } from '@/shared/components/ConfirmationModal';
 import { GlassBlob } from '@/shared/components';
+import { usePhotoPicker } from '@/shared/components/AvatarPicker';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import { useAuthStore, useRestoreSession } from '@/domains/auth';
+import { useCurrency } from '@/core/providers';
+import { useMyWallet } from '@/domains/memberPortal/wallet/useMyWallet';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileSummary } from '../../hooks/useProfileSummary';
@@ -24,12 +27,15 @@ import { ProfileHubHeader } from '../components/ProfileHubHeader';
 import { ProfileSummaryCard } from '../components/ProfileSummaryCard';
 import { ProfileNavigationRow } from '../components/ProfileNavigationRow';
 
+const SHEET_DISMISS_DELAY_MS = 400;
+
 interface ProfileHubScreenProps {
   onClose: () => void;
   onNavigateToProfile: () => void;
   onNavigateToReferrals: () => void;
   onNavigateToPerformance: () => void;
   onNavigateToTransactions: () => void;
+  onNavigateToWallet: () => void;
   onNavigateToSettings: () => void;
   onLogout?: () => void;
 }
@@ -40,6 +46,7 @@ export function ProfileHubScreen({
   onNavigateToReferrals,
   onNavigateToPerformance,
   onNavigateToTransactions,
+  onNavigateToWallet,
   onNavigateToSettings,
   onLogout,
 }: ProfileHubScreenProps) {
@@ -50,53 +57,34 @@ export function ProfileHubScreen({
   const appRole = useAuthStore((s) => s.appRole);
   // Staff and trainers get My Performance; Referrals is for members and admins.
   const isEmployee = appRole === 'staff' || appRole === 'trainer';
+  // Only members have a wallet (booking refunds, reward credit).
+  const isMember = appRole === 'member';
+  const { data: wallet } = useMyWallet(isMember);
+  const { formatCurrency } = useCurrency();
 
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  const handleTakePhoto = useCallback(async () => {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        return;
-      }
+  const { takePhoto, chooseFromGallery } = usePhotoPicker();
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        await updatePhoto(result.assets[0].uri);
-      }
-    } catch {
-      // Ignored
-    }
-  }, [updatePhoto]);
-
-  const handleChooseGallery = useCallback(async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        await updatePhoto(result.assets[0].uri);
-      }
-    } catch {
-      // Ignored
-    }
-  }, [updatePhoto]);
+  // Close the sheet first and launch the picker only once its Modal has gone:
+  // iOS won't present the camera/gallery over a modal that is still dismissing,
+  // which made these options silently do nothing on device.
+  const closeSheetThen = useCallback(
+    (pick: () => Promise<string | undefined>) => {
+      setPhotoSheetVisible(false);
+      setTimeout(async () => {
+        const uri = await pick();
+        if (!uri) return;
+        try {
+          await updatePhoto(uri);
+        } catch {
+          toast.error('Failed to update photo. Please try again.');
+        }
+      }, SHEET_DISMISS_DELAY_MS);
+    },
+    [updatePhoto],
+  );
 
   const handleConfirmLogout = useCallback(() => {
     if (onLogout) {
@@ -157,6 +145,17 @@ export function ProfileHubScreen({
                 iconBgColor="#dbeafe"
                 iconColor="#2563eb"
                 onPress={onNavigateToPerformance}
+              />
+            )}
+
+            {isMember && (
+              <ProfileNavigationRow
+                icon="briefcase"
+                title="Wallet"
+                subtitle={`${formatCurrency(wallet?.balance ?? 0)} available · refunds & credit`}
+                iconBgColor="#dcfce7"
+                iconColor="#16a34a"
+                onPress={onNavigateToWallet}
               />
             )}
 
@@ -232,10 +231,7 @@ export function ProfileHubScreen({
               styles.sheetOption,
               pressed && styles.sheetOptionPressed,
             ]}
-            onPress={() => {
-              setPhotoSheetVisible(false);
-              handleTakePhoto();
-            }}
+            onPress={() => closeSheetThen(takePhoto)}
           >
             <Feather name="camera" size={20} color={BrandColors.teal} style={styles.sheetOptionIcon} />
             <Typography variant="body">Take Photo</Typography>
@@ -246,10 +242,7 @@ export function ProfileHubScreen({
               styles.sheetOption,
               pressed && styles.sheetOptionPressed,
             ]}
-            onPress={() => {
-              setPhotoSheetVisible(false);
-              handleChooseGallery();
-            }}
+            onPress={() => closeSheetThen(chooseFromGallery)}
           >
             <Feather name="image" size={20} color={BrandColors.teal} style={styles.sheetOptionIcon} />
             <Typography variant="body">Choose from Gallery</Typography>

@@ -59,10 +59,16 @@ apiClient.interceptors.response.use(
     const message =
       textBody ?? body?.message ?? body?.error ?? error.message ?? 'An unexpected error occurred';
 
-    if (!error.config?.skipGlobalErrorToast) {
+    // Suppress toasts for pure network failures (no response received — device
+    // is offline, timed out, or the server is unreachable). The NetworkGuard
+    // already shows a full-screen offline wall in that case.
+    const isNetworkError = !error.response;
+
+    if (!isNetworkError && !error.config?.skipGlobalErrorToast) {
       toast.error(message);
     }
 
     return Promise.reject(new ApiError(message, status, body));
   },
 );
+

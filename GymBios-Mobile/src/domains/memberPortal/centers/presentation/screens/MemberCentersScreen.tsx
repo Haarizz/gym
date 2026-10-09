@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
-import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandColors, Glass, Radius, Spacing, TypographyScale, heroTint } from '@/core/theme';
+import { GlassBlob, GlassSurface } from '@/shared/components';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { CenterCard } from '../components/CenterCard';
 import { CenterFiltersModal, DEFAULT_CENTER_FILTERS, type CenterFilters } from '../components/CenterFiltersModal';
@@ -27,6 +29,7 @@ export function MemberCentersScreen({
   initialDeepLink?: { tenantSlug: string; branchId: string };
 } = {}) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<CenterFilters>(DEFAULT_CENTER_FILTERS);
   const [sortBy, setSortBy] = useState('Distance');
@@ -179,40 +182,47 @@ export function MemberCentersScreen({
 
   return (
     <View style={styles.container}>
-      {/* Hero search bar */}
-      <LinearGradient colors={[BrandColors.teal, BrandColors.tealDark]} style={styles.hero}>
-        <Text style={styles.heroTitle}>Find Wellness Centers</Text>
-        <Text style={styles.heroSubtitle}>Discover gyms, studios & wellness hubs near you</Text>
+      {/* Colour wash behind the glass panels, same recipe as the member dashboard */}
+      <View style={styles.blobLayer} pointerEvents="none">
+        <GlassBlob color={BrandColors.memberGold} size={340} opacity={0.42} top={-90} right={-60} />
+        <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={140} left={-110} />
+      </View>
 
-        <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#9CA3AF" />
+      {/* Search + actions */}
+      <View style={styles.controls}>
+        <GlassSurface strong radius={Radius.lg} style={styles.searchBar}>
+          <Feather name="search" size={18} color={BrandColors.textSecondary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by name, area, or type..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#7A8684"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <Pressable hitSlop={8} onPress={() => setSearchQuery('')}>
-              <Feather name="x" size={16} color="#9CA3AF" />
+              <Feather name="x" size={16} color="#7A8684" />
             </Pressable>
           )}
-        </View>
+        </GlassSurface>
 
-        <View style={styles.heroActionsRow}>
+        <View style={styles.actionsRow}>
           <Pressable
-            style={[styles.locationButton, isLocationOn && styles.locationButtonActive]}
+            style={({ pressed }) => [
+              styles.locationButton,
+              isLocationOn && styles.locationButtonActive,
+              pressed && styles.pressed,
+            ]}
             onPress={handleUseMyLocation}
             accessibilityRole="button"
             accessibilityState={{ selected: isLocationOn, busy: isLocating }}
           >
             {isLocating ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={isLocationOn ? BrandColors.teal : '#FFFFFF'} />
             ) : (
               <Feather
                 name="navigation"
-                size={14}
+                size={15}
                 color={isLocationOn ? BrandColors.teal : '#FFFFFF'}
               />
             )}
@@ -225,11 +235,15 @@ export function MemberCentersScreen({
             {isLocationOn && <Feather name="x" size={14} color={BrandColors.teal} />}
           </Pressable>
 
-          <Pressable 
-            style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]} 
+          <Pressable
+            style={({ pressed }) => [
+              styles.filterButton,
+              activeFilterCount > 0 && styles.filterButtonActive,
+              pressed && styles.pressed,
+            ]}
             onPress={() => setIsFiltersOpen(true)}
           >
-            <Feather name="sliders" size={14} color="#FFFFFF" />
+            <Feather name="sliders" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : BrandColors.tealDark} />
             <Text style={[styles.filterButtonText, activeFilterCount > 0 && styles.filterButtonTextActive]}>
               Filters
             </Text>
@@ -240,7 +254,7 @@ export function MemberCentersScreen({
             )}
           </Pressable>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Active filter chips */}
       {activeFilterCount > 0 && (
@@ -288,7 +302,10 @@ export function MemberCentersScreen({
       {/* Centers List */}
       <ScrollView
         style={styles.scrollList}
-        contentContainerStyle={styles.scrollListContent}
+        contentContainerStyle={[
+          styles.scrollListContent,
+          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 24 },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -300,9 +317,11 @@ export function MemberCentersScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.resultCountRow}>
+          <Text style={styles.resultCountTitle} numberOfLines={1}>
+            {locationLabel ? `Centers near ${locationLabel}` : 'Wellness centers near you'}
+          </Text>
           <Text style={styles.resultCountText}>
-            <Text style={styles.resultCountNumber}>{filteredCenters.length}</Text> centers
-            {locationLabel ? ` near ${locationLabel}` : ' available'}
+            {filteredCenters.length} available
           </Text>
         </View>
 
@@ -350,64 +369,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BrandColors.screenBackground,
   },
-  hero: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.four + 2,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
+  blobLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 420,
+    overflow: 'hidden',
   },
-  heroTitle: {
-    fontSize: TypographyScale.subtitle,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  heroSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: Spacing.four,
+  controls: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.md + 2,
+    paddingBottom: Spacing.two,
+    gap: 10,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: BrandColors.surface,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    borderRadius: Radius.md,
-    gap: Spacing.two,
-    marginBottom: Spacing.three,
+    height: 48,
+    paddingHorizontal: 14,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: TypographyScale.body,
+    fontSize: 15,
     color: BrandColors.textPrimary,
     paddingVertical: 0,
   },
-  heroActionsRow: {
+  actionsRow: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
+  pressed: {
+    opacity: 0.85,
+  },
   locationButton: {
     flex: 1,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.md,
+    borderRadius: 14,
+    backgroundColor: heroTint(BrandColors.teal, 0.9),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: Glass.border,
   },
   locationButtonActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+    backgroundColor: Glass.fillStrong,
+    borderColor: heroTint(BrandColors.teal, 0.5),
   },
   locationButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: TypographyScale.body,
+    fontWeight: '700',
     color: '#FFFFFF',
     flexShrink: 1,
   },
@@ -415,33 +430,34 @@ const styles = StyleSheet.create({
     color: BrandColors.teal,
   },
   filterButton: {
+    minWidth: 108,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.md,
+    borderRadius: 14,
+    backgroundColor: Glass.fillStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: Glass.border,
   },
   filterButtonActive: {
-    backgroundColor: BrandColors.memberGold,
-    borderColor: BrandColors.memberGold,
+    backgroundColor: heroTint(BrandColors.trainerAmber, 0.9),
   },
   filterButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: TypographyScale.body,
+    fontWeight: '700',
+    color: BrandColors.tealDark,
   },
   filterButtonTextActive: {
     color: '#FFFFFF',
   },
   filterCountBadge: {
     backgroundColor: '#FFFFFF',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -451,13 +467,10 @@ const styles = StyleSheet.create({
     color: BrandColors.trainerAmber,
   },
   activeFiltersBar: {
-    backgroundColor: BrandColors.surface,
-    borderBottomWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: Spacing.two + 2,
+    paddingBottom: Spacing.two,
   },
   activeFiltersScroll: {
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.three,
     alignItems: 'center',
     gap: Spacing.two,
   },
@@ -506,20 +519,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollListContent: {
-    padding: Spacing.four,
-    paddingBottom: Spacing.six + 50,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
   },
   resultCountRow: {
-    marginBottom: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginBottom: Spacing.md,
+  },
+  resultCountTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: BrandColors.textPrimary,
   },
   resultCountText: {
-    fontSize: TypographyScale.small,
-    fontWeight: '600',
+    fontSize: 13,
     color: BrandColors.textSecondary,
-  },
-  resultCountNumber: {
-    fontWeight: '800',
-    color: BrandColors.textPrimary,
   },
   emptyState: {
     alignItems: 'center',

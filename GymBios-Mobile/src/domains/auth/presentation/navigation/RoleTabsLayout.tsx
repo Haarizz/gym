@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useReducedMotion } from 'react-native-reanimated';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -18,6 +19,7 @@ import {
   useUnreadNotificationCount,
 } from '@/domains/profile';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
+import { getGreeting } from '@/shared/utils/greeting';
 import {
   isCommunityRoute,
   isFullScreenRoute,
@@ -25,7 +27,8 @@ import {
   MODULE_ROUTES,
 } from './layoutRoutes';
 import { TabIcon } from './tabConfigs';
-import { RoleTabBarStyles, TAB_BAR_HEIGHT, renderTabBarBackground, renderTabBarIcon } from './RoleTabBar';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
+import { RoleTabBar, TAB_BAR_HEIGHT, TAB_SCENE_TRANSITION_SPEC, forTabSlide } from './RoleTabBar';
 
 export type { TabIcon };
 export * from './layoutRoutes';
@@ -45,16 +48,20 @@ interface RoleTabsLayoutProps {
 }
 
 
+// Header glass tint: the role colours at slightly-below-full opacity so the
+// pill reads as tinted glass rather than a flat painted bar.
+function glassTint(color: string, alpha: number): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? heroTint(color, alpha) : color;
+}
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-
-  if (hour < 5) return 'Welcome Back';
-  if (hour < 12) return 'Good Morning';
-  if (hour < 18) return 'Good Afternoon';
-  if (hour < 22) return 'Good Evening';
-
-  return 'Welcome Back';
+// Light role colours (member gold) need dark header content; darker ones
+// (teal, amber/orange) read better in white.
+function isLightColor(color: string): boolean {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return true;
+  const r = parseInt(color.substring(1, 3), 16);
+  const g = parseInt(color.substring(3, 5), 16);
+  const b = parseInt(color.substring(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.7;
 }
 
 export function RoleTabsLayout({
@@ -74,6 +81,7 @@ export function RoleTabsLayout({
   const { profile, initials } = useProfile();
   const { count: unreadCount } = useUnreadNotificationCount();
   const { selectedBranchId, availableBranches, setSelectedBranchId } = useBranchContext();
+  const reduceMotion = useReducedMotion();
 
   const roleGroup = segments[0] || '(admin)';
 
@@ -85,10 +93,65 @@ export function RoleTabsLayout({
     ? (headerColors.length === 1 ? [headerColors[0], headerColors[0]] : headerColors)
     : [headerColor || BrandColors.teal, headerColor || BrandColors.teal]) as unknown as readonly [string, string, ...string[]];
 
+  const headerTint = resolvedColors.map((c, i) =>
+    glassTint(c, i === 0 ? 0.92 : 0.82),
+  ) as unknown as readonly [string, string, ...string[]];
+  const headerOnLight = isLightColor(resolvedColors[0]);
+  const headerFg = headerOnLight ? BrandColors.textPrimary : '#FFFFFF';
+  const headerFgMuted = headerOnLight ? 'rgba(30,42,58,0.65)' : 'rgba(255,255,255,0.8)';
+
   const greeting = getGreeting();
 
   const isAdmin = roleGroup === '(admin)';
   const tabBarBottom = (insets.bottom > 0 ? insets.bottom : 24) + 6;
+
+  // Only admins have an "All branches" scope. Everyone else sees the name of
+  // the branch they actually belong to — and nothing at all until they have
+  // one (e.g. a fresh member with no gym membership yet).
+  const selectedBranchName = selectedBranchId === 'ALL'
+    ? undefined
+    : availableBranches.find(b => b.id === selectedBranchId)?.branch_name;
+  const branchLabel = isAdmin
+    ? selectedBranchName || 'All branches'
+    : selectedBranchName;
+
+  const isTabBarHidden = isFullScreen || isCommunityScreen;
+
+  // Stable renderer and options so header-only updates (unread count, branch)
+  // don't re-render the tab bar or rebuild every screen's options.
+  const renderTabBar = useCallback(
+    ({ state, navigation }: BottomTabBarProps) => (
+      <RoleTabBar
+        state={state}
+        navigation={navigation}
+        tabs={tabs}
+        activeColor={activeColor}
+        hidden={isTabBarHidden}
+        bottom={tabBarBottom}
+      />
+    ),
+    [tabs, activeColor, isTabBarHidden, tabBarBottom],
+  );
+
+  const screenOptions = useMemo(
+    () => ({
+      headerShown: false,
+
+      sceneStyle: {
+        backgroundColor: BrandColors.screenBackground,
+      },
+
+      // Screens slide in from the side of the tab being moved to.
+      ...(reduceMotion
+        ? { animation: 'none' as const }
+        : {
+            animation: 'shift' as const,
+            sceneStyleInterpolator: forTabSlide,
+            transitionSpec: TAB_SCENE_TRANSITION_SPEC,
+          }),
+    }),
+    [reduceMotion],
+  );
 
   return (
     <SafeAreaView
@@ -96,100 +159,79 @@ export function RoleTabsLayout({
       style={styles.safeArea}>
       <View style={styles.container}>
         {!isFullScreen && showRoleHeader && (
-          <GlassSurface tint={resolvedColors} radius={0} style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Pressable
-                hitSlop={12}
-                style={styles.avatarButton}
-                onPress={() => {
-                  router.push(`/${roleGroup}/profile` as any);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Open profile hub"
-              >
-                <Avatar
-                  size={36}
-                  initials={initials}
-                  imageUrl={profile?.photoUrl}
-                  backgroundColor="rgba(255,255,255,0.55)"
-                  textColor={BrandColors.textPrimary}
-                />
-              </Pressable>
-
-              <View style={styles.headerTextContainer}>
-                <Text style={styles.greeting}>{greeting}</Text>
+          <View style={styles.headerWrap}>
+            <GlassSurface tint={headerTint} radius={HEADER_RADIUS} style={styles.header}>
+              <View style={styles.headerLeft}>
                 <Pressable
-                  onPress={() => isAdmin && setIsBranchSelectorOpen(true)}
-                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                  hitSlop={12}
+                  style={styles.avatarButton}
+                  onPress={() => {
+                    router.push(`/${roleGroup}/profile` as any);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open profile hub"
                 >
-                  <Text style={styles.titleText}>
-                    {profile?.name || title} · {selectedBranchId === 'ALL' ? 'All branches' : availableBranches.find(b => b.id === selectedBranchId)?.branch_name || 'All branches'}
-                  </Text>
-                  {isAdmin && <Feather name="chevron-down" size={16} color={BrandColors.textPrimary} style={{ marginLeft: 4 }} />}
+                  <Avatar
+                    size={40}
+                    initials={initials}
+                    imageUrl={profile?.photoUrl}
+                    backgroundColor="rgba(255,255,255,0.55)"
+                    textColor={BrandColors.textPrimary}
+                  />
                 </Pressable>
-              </View>
-            </View>
 
-            <Pressable
-              hitSlop={12}
-              style={styles.notificationButton}
-              onPress={() => setIsNotificationsOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Notifications, ${unreadCount} unread`}
-            >
-              <Feather name="bell" size={20} color={BrandColors.textPrimary} />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  {unreadCount > 1 && unreadCount <= 99 ? (
-                    <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
-                  ) : unreadCount > 99 ? (
-                    <Text style={styles.notificationBadgeText}>99+</Text>
-                  ) : null}
+                <View style={styles.headerTextContainer}>
+                  <Text style={[styles.greeting, { color: headerFgMuted }]} numberOfLines={1}>
+                    {greeting}
+                  </Text>
+                  <Pressable
+                    onPress={() => isAdmin && setIsBranchSelectorOpen(true)}
+                    disabled={!isAdmin}
+                    style={styles.titleRow}
+                  >
+                    <Text style={[styles.titleText, { color: headerFg }]} numberOfLines={1}>
+                      {profile?.name || title}
+                    </Text>
+                    {isAdmin && <Feather name="chevron-down" size={16} color={headerFg} style={{ marginLeft: 2 }} />}
+                  </Pressable>
+                  {!!branchLabel && (
+                    <Text style={[styles.branchText, { color: headerFgMuted }]} numberOfLines={1}>
+                      {branchLabel}
+                    </Text>
+                  )}
                 </View>
-              )}
-            </Pressable>
-          </GlassSurface>
+              </View>
+
+              <Pressable
+                hitSlop={8}
+                style={({ pressed }) => [styles.notificationButton, pressed && styles.headerButtonPressed]}
+                onPress={() => setIsNotificationsOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Notifications, ${unreadCount} unread`}
+              >
+                <Feather name="bell" size={19} color={headerFg} />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    {unreadCount > 1 && unreadCount <= 99 ? (
+                      <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+                    ) : unreadCount > 99 ? (
+                      <Text style={styles.notificationBadgeText}>99+</Text>
+                    ) : null}
+                  </View>
+                )}
+              </Pressable>
+            </GlassSurface>
+          </View>
         )}
 
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-
-            tabBarHideOnKeyboard: true,
-
-            sceneStyle: {
-              backgroundColor: BrandColors.screenBackground,
-            },
-
-            tabBarActiveTintColor: activeColor,
-            tabBarInactiveTintColor: '#94A3B8',
-
-            tabBarShowLabel: false,
-            tabBarIconStyle: { marginBottom: 0 },
-
-            tabBarStyle: [
-              RoleTabBarStyles.tabBar,
-              {
-                bottom: tabBarBottom,
-              },
-              (isFullScreen || isCommunityScreen) && {
-                display: 'none',
-              },
-            ],
-
-            tabBarItemStyle: RoleTabBarStyles.tabItem,
-
-            tabBarBackground: renderTabBarBackground(),
-          }}>
+        <Tabs tabBar={renderTabBar} screenOptions={screenOptions}>
           {tabs.map((tab) => (
             <Tabs.Screen
               key={tab.name}
               name={tab.name}
               options={{
                 title: tab.title,
-                tabBarLabel: tab.title,
                 href: (tab.name === 'index' ? `/${roleGroup}` : `/${roleGroup}/${tab.name}`) as any,
-                tabBarIcon: renderTabBarIcon(tab.icon, activeColor, tab.title),
               }}
             />
           ))}
@@ -280,6 +322,8 @@ const TAB_BAR_BOTTOM_PADDING = 12;
 
 // The modules FAB is anchored to the tab bar: centred on it, then lifted so
 // it floats slightly proud of the pill's top edge.
+const HEADER_RADIUS = 24;
+
 const MODULES_FAB_SIZE = 56;
 const MODULES_FAB_LIFT = 14;
 const MODULES_FAB_OFFSET = TAB_BAR_HEIGHT / 2 - MODULES_FAB_SIZE / 2 + MODULES_FAB_LIFT;
@@ -287,9 +331,8 @@ const MODULES_FAB_OFFSET = TAB_BAR_HEIGHT / 2 - MODULES_FAB_SIZE / 2 + MODULES_F
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // Always screen background — the header GlassSurface provides the role
-    // colour. This makes the rounded bottom-corner gaps invisible since they
-    // blend with the screen content below.
+    // Always screen background — the floating header pill provides the role
+    // colour, and the space around it blends with the screen content below.
     backgroundColor: BrandColors.screenBackground,
   },
 
@@ -298,29 +341,40 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.screenBackground,
   },
 
+  // Floating pill, inset from the screen edges like the bottom tab bar, so the
+  // header no longer reads as a bar pasted over a strip of background.
+  // zIndex keeps its shadow above the scene rendered after it.
+  headerWrap: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 4,
+    zIndex: 10,
+  },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 10,
   },
 
   headerLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    marginRight: 10,
   },
 
   avatarButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.55)',
-    marginRight: 10,
   },
 
   avatarText: {
@@ -330,29 +384,54 @@ const styles = StyleSheet.create({
   },
 
   headerTextContainer: {
+    flex: 1,
     justifyContent: 'center',
   },
 
   greeting: {
     fontSize: 12,
-    color: 'rgba(30,42,58,0.65)',
+    fontWeight: '500',
+  },
+
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   titleText: {
-    color: BrandColors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 
+  branchText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+
+  // Frosted circle for the bell, the same white-glass fill used inside other
+  // glass panels.
   notificationButton: {
     position: 'relative',
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+
+  headerButtonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
   },
 
   notificationBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 4,
+    right: 4,
     minWidth: 16,
     height: 16,
     borderRadius: 8,

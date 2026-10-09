@@ -8,6 +8,7 @@ export interface MemberInfo {
   isActive: boolean;
   status?: string;
   isFrozen: boolean;
+  totalVisits: number;
 }
 
 export interface MemberTodayScheduleItem {

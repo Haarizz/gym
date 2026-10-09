@@ -37,6 +37,11 @@ class BookingRewardPassTest {
     @Mock private NotificationService notificationService;
     @Mock private QrCodeService qrCodeService;
     @Mock private RewardRedemptionService rewardRedemptionService;
+    @Mock private DiscountCodeService discountCodeService;
+    @Mock private WalletService walletService;
+    @Mock private ReceiptService receiptService;
+    @Mock private com.company.project.repositories.ReceiptRepository receiptRepository;
+    @Mock private FinancialEventService financialEventService;
 
     private BookingService service;
     private TrainingSession session;
@@ -44,14 +49,17 @@ class BookingRewardPassTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        BookingPaymentService payments = new BookingPaymentService(rewardRedemptionService, discountCodeService,
+                walletService, receiptService, receiptRepository, memberRepository, financialEventService,
+                notificationService);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
-                notificationService, qrCodeService, rewardRedemptionService);
+                notificationService, qrCodeService, rewardRedemptionService, payments);
 
         session = new TrainingSession();
         session.setId(1L);
         session.setType("pt");
         session.setPrice(new BigDecimal("150"));
-        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(session));
 
         Member member = new Member();
         member.setId(10L);
@@ -117,9 +125,19 @@ class BookingRewardPassTest {
         BookingStatusUpdateDTO update = new BookingStatusUpdateDTO();
         update.setStatus("cancelled");
         service.updateStatus(55L, update);
-        service.updateStatus(55L, update);
+        // A second cancel is refused, so the pass can't be given back twice.
+        assertThrows(BusinessRuleViolationException.class, () -> service.updateStatus(55L, update));
 
         verify(rewardRedemptionService).restorePass(7L);
         assertNull(booking.getRewardId());
+    }
+
+    @Test
+    void fullSessionIsRefusedWithSessionFull() {
+        session.setCapacity(1);
+        when(bookingRepository.countBySessionIdAndStatusNot(1L, "cancelled")).thenReturn(1L);
+        assertThrows(com.company.project.exceptions.SessionFullException.class,
+                () -> service.createBooking(request(10L, null)));
+        verify(bookingRepository, never()).save(any());
     }
 }

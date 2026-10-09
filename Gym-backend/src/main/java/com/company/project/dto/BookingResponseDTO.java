@@ -89,4 +89,52 @@ public class BookingResponseDTO {
 
     public Long getRewardId() { return rewardId; }
     public void setRewardId(Long rewardId) { this.rewardId = rewardId; }
+
+    // Payment details for a paid booking (see Booking).
+    private BigDecimal grossPrice;
+    private BigDecimal discountAmount;
+    private String discountLabel;
+    private BigDecimal walletAmount;
+    private Long receiptId;
+    private String refundStatus;
+    private String refundMethod;
+    private BigDecimal refundedAmount;
+    private String cancelledBy;
+
+    public BigDecimal getGrossPrice() { return grossPrice; }
+    public void setGrossPrice(BigDecimal grossPrice) { this.grossPrice = grossPrice; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getDiscountLabel() { return discountLabel; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
+
+    public BigDecimal getWalletAmount() { return walletAmount; }
+    public void setWalletAmount(BigDecimal walletAmount) { this.walletAmount = walletAmount; }
+
+    public Long getReceiptId() { return receiptId; }
+    public void setReceiptId(Long receiptId) { this.receiptId = receiptId; }
+
+    public String getRefundStatus() { return refundStatus; }
+    public void setRefundStatus(String refundStatus) { this.refundStatus = refundStatus; }
+
+    public String getRefundMethod() { return refundMethod; }
+    public void setRefundMethod(String refundMethod) { this.refundMethod = refundMethod; }
+
+    public BigDecimal getRefundedAmount() { return refundedAmount; }
+    public void setRefundedAmount(BigDecimal refundedAmount) { this.refundedAmount = refundedAmount; }
+
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+
+    // The receipt's payment method (Cash / Credit / Mixed ...) — filled for the approvals list.
+    private String paymentMethod;
+    private BigDecimal paidAmount;
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
 }

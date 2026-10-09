@@ -59,6 +59,7 @@ export function CommunityFeed({
   return (
     <FlatList
       data={posts}
+      style={styles.feed}
       keyExtractor={(item) => String(item.id)}
       renderItem={({ item }) => (
         <CommunityPostCard post={item} onCommentsPress={onCommentsPress} />
@@ -97,6 +98,9 @@ export function CommunityFeed({
 }
 
 const styles = StyleSheet.create({
+  feed: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',

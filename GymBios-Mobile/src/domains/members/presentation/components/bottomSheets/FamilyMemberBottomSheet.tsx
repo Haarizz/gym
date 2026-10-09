@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { format } from 'date-fns';
 
 import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
+import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
+import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateOfBirthRules';
 import type { AddFamilyMemberRequest } from '../../../application/family/MemberFamilyRepository';
 
 interface FamilyMemberBottomSheetProps {
@@ -23,7 +26,7 @@ export function FamilyMemberBottomSheet({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [gender, setGender] = useState('');
   const [familyRole, setFamilyRole] = useState('ADULT');
   const [membershipType, setMembershipType] = useState('');
@@ -36,7 +39,7 @@ export function FamilyMemberBottomSheet({
       name,
       email,
       phone,
-      dateOfBirth: dateOfBirth || undefined,
+      dateOfBirth: dateOfBirth ? format(dateOfBirth, 'yyyy-MM-dd') : undefined,
       gender: gender || undefined,
       familyRole,
       membershipType,
@@ -77,7 +80,15 @@ export function FamilyMemberBottomSheet({
         <Input label="Full Name" value={name} onChangeText={setName} placeholder="Enter full name" />
         <Input label="Email" value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" autoCapitalize="none" />
         <Input label="Phone" value={phone} onChangeText={setPhone} placeholder="Enter phone" keyboardType="phone-pad" />
-        <Input label="Date of Birth" value={dateOfBirth} onChangeText={setDateOfBirth} placeholder="YYYY-MM-DD" />
+        <DatePicker
+          label="Date of Birth"
+          placeholder="Select date of birth"
+          value={dateOfBirth}
+          onChange={setDateOfBirth}
+          initialView="year"
+          minimumDate={getMinBirthDate()}
+          maximumDate={getMaxBirthDate()}
+        />
         <Input label="Gender" value={gender} onChangeText={setGender} placeholder="e.g. Male, Female" />
         <Input label="Family Role" value={familyRole} onChangeText={setFamilyRole} placeholder="ADULT or MINOR" />
         <Input label="Membership Type" value={membershipType} onChangeText={setMembershipType} placeholder="e.g. FAMILY" />

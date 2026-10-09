@@ -6,6 +6,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import { GENDERS } from '@/domains/members/constants';
+import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateOfBirthRules';
 
 import { FormCard, RequiredLabel } from './FormCard';
 import { MemberPhotoCard } from './MemberPhotoCard';
@@ -69,7 +70,9 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
           placeholder="Select date of birth"
           value={data.dateOfBirth}
           onChange={(d) => updateField('dateOfBirth', d)}
-          maximumDate={new Date()}
+          initialView="year"
+          minimumDate={getMinBirthDate()}
+          maximumDate={getMaxBirthDate()}
           error={errors?.dateOfBirth}
         />
 

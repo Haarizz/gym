@@ -2240,7 +2240,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <Card className="overflow-hidden border-blue-200 bg-blue-50">
                 <CardContent className="p-4 text-sm text-blue-900">
                   <p>This membership is currently frozen{member.freeze_reason ? `: ${member.freeze_reason}` : '.'}</p>
-                  {member.freeze_end_date && <p className="mt-1">Scheduled to end: {fmtDate(member.freeze_end_date)}</p>}
+                  {member.freeze_end_date && <p className="mt-1">Last frozen day: {fmtDate(new Date(new Date(member.freeze_end_date).getTime() - 1).toISOString())}</p>}
                 </CardContent>
               </Card>
             </div>

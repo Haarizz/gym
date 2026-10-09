@@ -1,7 +1,9 @@
 export interface TrainerInfo {
   name: string;
   specialization: string;
-  rating: number;
+  /** Average member rating (1–5); null until the trainer has been rated. */
+  rating: number | null;
+  ratingCount: number;
 }
 
 export interface TrainerTodayStats {

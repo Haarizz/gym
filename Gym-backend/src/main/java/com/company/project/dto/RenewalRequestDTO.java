@@ -7,6 +7,12 @@ import java.util.List;
  * Request body for renewing or upgrading a member's membership.
  */
 public class RenewalRequestDTO {
+    // A discount already netted out of membershipFee before it was sent — the plan's
+    // running offer or a staff discount — recorded on the receipt only, with offerLabel
+    // as its wording ("Offer: Diwali", "Staff discount"). Separate from any code/pass.
+    private BigDecimal offerDiscount;
+    private String offerLabel;
+
 
     private String planName;
     private String membershipEndDate;   // ISO string "YYYY-MM-DDTHH:mm:ssZ"
@@ -87,4 +93,10 @@ public class RenewalRequestDTO {
 
     public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
     public void setMinorCharges(List<MinorChargeDTO> minorCharges) { this.minorCharges = minorCharges; }
+
+    public BigDecimal getOfferDiscount() { return offerDiscount; }
+    public void setOfferDiscount(BigDecimal offerDiscount) { this.offerDiscount = offerDiscount; }
+
+    public String getOfferLabel() { return offerLabel; }
+    public void setOfferLabel(String offerLabel) { this.offerLabel = offerLabel; }
 }

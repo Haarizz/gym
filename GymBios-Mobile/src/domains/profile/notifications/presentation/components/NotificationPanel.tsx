@@ -1,17 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Animated,
-  Dimensions,
+  Easing,
   Modal,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useSegments, type Href } from 'expo-router';
-import { BrandColors } from '@/core/theme';
 import type { NotificationItem } from '../../domain/notification.types';
-import { resolveNotificationRoute } from '../../domain/notificationRoutes';
+import { isInformationalNotification, resolveNotificationRoute } from '../../domain/notificationRoutes';
 import { toast } from '@/shared/components/Toasts';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
@@ -20,6 +22,14 @@ import { NotificationHeader } from './NotificationHeader';
 import { NotificationFilterPills } from './NotificationFilterPills';
 import { NotificationList } from './NotificationList';
 import { NotificationFooter } from './NotificationFooter';
+import { NotificationGlass as G } from './notificationGlass';
+
+const glassAvailable = isLiquidGlassAvailable();
+/** Sheet sits inset from the screen edges so it reads as a floating glass card. */
+const SHEET_RIGHT = 10;
+const SHEET_RADIUS = 32;
+/** Room under the list for the floating footer pill. */
+const FOOTER_CLEARANCE = 96;
 
 interface NotificationPanelProps {
   visible: boolean;
@@ -37,11 +47,15 @@ interface NotificationPanelProps {
 export function NotificationPanel({ visible, onClose, module, title, onItemPress }: NotificationPanelProps) {
   const router = useRouter();
   const segments = useSegments();
-  const screenWidth = Dimensions.get('window').width;
-  const panelWidth = Math.min(screenWidth * 0.9, 420);
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const panelWidth = Math.min(screenWidth - 44, 420);
+  // Fully off-screen, including the right gutter and shadow.
+  const hiddenOffset = panelWidth + SHEET_RIGHT + 24;
 
-  const translateX = useRef(new Animated.Value(panelWidth)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const translateX = useState(() => new Animated.Value(hiddenOffset))[0];
+  const scale = useState(() => new Animated.Value(0.98))[0];
+  const backdropOpacity = useState(() => new Animated.Value(0))[0];
   const [isMounted, setIsMounted] = useState(visible);
 
   const {
@@ -67,28 +81,44 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
       refetch();
       refetchUnreadCount();
 
+      // Spring in with a touch of overshoot, like the reference's cubic-bezier(.2,.9,.25,1.05).
       Animated.parallel([
-        Animated.timing(translateX, {
+        Animated.spring(translateX, {
           toValue: 0,
-          duration: 280,
           useNativeDriver: true,
+          damping: 22,
+          stiffness: 190,
+          mass: 0.9,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 18,
+          stiffness: 160,
         }),
         Animated.timing(backdropOpacity, {
-          toValue: 0.5,
-          duration: 280,
+          toValue: 1,
+          duration: 320,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start();
     } else {
       Animated.parallel([
         Animated.timing(translateX, {
-          toValue: panelWidth,
-          duration: 240,
+          toValue: hiddenOffset,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 0.98,
+          duration: 260,
           useNativeDriver: true,
         }),
         Animated.timing(backdropOpacity, {
           toValue: 0,
-          duration: 240,
+          duration: 260,
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
@@ -97,7 +127,7 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
         }
       });
     }
-  }, [visible, panelWidth, translateX, backdropOpacity, refetch, refetchUnreadCount]);
+  }, [visible, hiddenOffset, translateX, scale, backdropOpacity, refetch, refetchUnreadCount]);
 
   const handleRefresh = async () => {
     await Promise.all([refetch(), refetchUnreadCount()]);
@@ -112,6 +142,9 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
       onItemPress(item);
       return;
     }
+
+    // Purely informational — tapping only marks it read.
+    if (isInformationalNotification(item)) return;
 
     // Close first either way: the toast host sits under this Modal and would be hidden.
     onClose();
@@ -130,6 +163,53 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
   if (!isMounted) {
     return null;
   }
+
+  const renderContent = () => (
+    <>
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']}
+        style={styles.sheen}
+      />
+
+      <NotificationHeader
+        title={title}
+        unreadCount={unreadCount}
+        isRefreshing={isFetching && !isFetchingNextPage}
+        onClose={onClose}
+        onRefresh={handleRefresh}
+      />
+
+      <NotificationFilterPills
+        activeFilter={filter}
+        onSelectFilter={setFilter}
+        unreadCount={unreadCount}
+        totalCount={totalElements}
+      />
+
+      <View style={styles.listContainer}>
+        <NotificationList
+          sections={groupedNotifications}
+          filter={filter}
+          isLoading={isLoading}
+          isFetching={isFetching}
+          isFetchingNextPage={isFetchingNextPage}
+          hasNextPage={hasNextPage}
+          onRefresh={handleRefresh}
+          onLoadMore={fetchNextPage}
+          onItemPress={handleItemPress}
+          bottomInset={FOOTER_CLEARANCE}
+        />
+      </View>
+
+      <NotificationFooter
+        totalCount={totalElements}
+        hasUnread={unreadCount > 0}
+        isMarkingAllRead={isMarkingAllRead}
+        onMarkAllRead={handleMarkAllRead}
+      />
+    </>
+  );
 
   return (
     <Modal
@@ -155,53 +235,30 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
           />
         </Animated.View>
 
-        {/* Slide-over panel */}
+        {/* Floating glass sheet */}
         <Animated.View
           style={[
-            styles.panel,
-            { width: panelWidth, transform: [{ translateX }] },
+            styles.sheetShadow,
+            {
+              width: panelWidth,
+              top: insets.top + 8,
+              bottom: Math.max(insets.bottom, 12),
+              opacity: translateX.interpolate({
+                inputRange: [0, hiddenOffset],
+                outputRange: [1, 0.6],
+              }),
+              transform: [{ translateX }, { scale }],
+            },
           ]}
         >
-          <SafeAreaView edges={['top']} style={styles.safeAreaContainer}>
-            {/* 1. Fixed Header */}
-            <NotificationHeader
-              title={title}
-              unreadCount={unreadCount}
-              isRefreshing={isFetching && !isFetchingNextPage}
-              onClose={onClose}
-              onRefresh={handleRefresh}
-            />
-
-            {/* 2. Fixed Filter Controls */}
-            <NotificationFilterPills
-              activeFilter={filter}
-              onSelectFilter={setFilter}
-              unreadCount={unreadCount}
-            />
-
-            {/* 3. Flexible Scrollable Notification List */}
-            <View style={styles.listContainer}>
-              <NotificationList
-                sections={groupedNotifications}
-                filter={filter}
-                isLoading={isLoading}
-                isFetching={isFetching}
-                isFetchingNextPage={isFetchingNextPage}
-                hasNextPage={hasNextPage}
-                onRefresh={handleRefresh}
-                onLoadMore={fetchNextPage}
-                onItemPress={handleItemPress}
-              />
-            </View>
-
-            {/* 4. Fixed Bottom Footer */}
-            <NotificationFooter
-              totalCount={totalElements}
-              hasUnread={unreadCount > 0}
-              isMarkingAllRead={isMarkingAllRead}
-              onMarkAllRead={handleMarkAllRead}
-            />
-          </SafeAreaView>
+          {glassAvailable ? (
+            <GlassView glassEffectStyle="regular" colorScheme="light" style={styles.sheet}>
+              <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glassFill]} />
+              {renderContent()}
+            </GlassView>
+          ) : (
+            <View style={[styles.sheet, styles.sheetFallback]}>{renderContent()}</View>
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -211,28 +268,42 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
 const styles = StyleSheet.create({
   overlayContainer: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#000000',
+    backgroundColor: G.scrim,
   },
-  panel: {
-    height: '100%',
-    backgroundColor: BrandColors.screenBackground,
-    shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    shadowOffset: { width: -4, height: 0 },
+  sheetShadow: {
+    position: 'absolute',
+    right: SHEET_RIGHT,
+    borderRadius: SHEET_RADIUS,
+    shadowColor: G.shadow,
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 24 },
     elevation: 24,
   },
-  safeAreaContainer: {
+  sheet: {
     flex: 1,
-    backgroundColor: BrandColors.surface,
+    borderRadius: SHEET_RADIUS,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: G.border,
+  },
+  glassFill: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  sheetFallback: {
+    backgroundColor: G.sheetFallback,
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
   },
   listContainer: {
     flex: 1,
-    backgroundColor: BrandColors.screenBackground,
   },
 });

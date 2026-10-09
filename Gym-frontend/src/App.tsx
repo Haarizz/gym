@@ -123,6 +123,7 @@ import { PayrollReports } from "./pages/payroll-reports";
 import { PayrollAnalytics } from "./pages/payroll-analytics";
 import { RolesPermissions } from "./pages/roles-permissions";
 import { Approvals } from "./pages/approvals";
+import { ApprovalHistory } from "./pages/approval-history";
 import { PendingApproval } from "./pages/pending-approval";
 import { PlatformLeads } from "./pages/platform-leads";
 import { PlatformFollowUp } from "./pages/platform-follow-up";
@@ -183,6 +184,7 @@ import {
   FileText,
   Briefcase,
   Clock,
+  History as HistoryIcon,
   CalendarClock,
   ShieldCheck,
   Globe,
@@ -216,6 +218,15 @@ const menuItems = [
     id: "approvals",
     path: "/approvals",
     permission: "MEMBERS_APPROVE",
+    subItems: [
+      {
+        title: "History",
+        icon: HistoryIcon,
+        id: "approval-history",
+        path: "/approval-history",
+        permission: "MEMBERS_APPROVE",
+      },
+    ],
   },
   {
     title: "Community",
@@ -1167,6 +1178,7 @@ export default function App() {
       <Route path="/dashboard" element={<Dashboard onNavigate={handleNavClick} />} />
       <Route path="/notifications" element={<Notifications />} />
       <Route path="/approvals" element={<Approvals />} />
+      <Route path="/approval-history" element={<ApprovalHistory />} />
       <Route path="/community" element={<Community />} />
       <Route path="/members" element={<Members onNavigate={handleNavClick} initialTab={navigationParams.tab} />} />
       <Route path="/members/add" element={<AddMember onNavigate={handleNavClick} />} />

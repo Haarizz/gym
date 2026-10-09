@@ -101,7 +101,7 @@ public class MobileMemberBookingsServiceTest {
         BookingResponseDTO bookingResponseDTO = new BookingResponseDTO();
         bookingResponseDTO.setId("500");
         
-        when(bookingService.createBooking(any())).thenReturn(bookingResponseDTO);
+        when(bookingService.createBooking(any(), eq(true))).thenReturn(bookingResponseDTO);
         when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
         when(bookingRepository.countBySessionIdAndStatusNot(100L, "cancelled")).thenReturn(10L);
 
@@ -113,7 +113,7 @@ public class MobileMemberBookingsServiceTest {
         assertNotNull(result);
         assertEquals(500L, result.getId());
         assertEquals("CONFIRMED", result.getStatus());
-        verify(bookingService).createBooking(any());
+        verify(bookingService).createBooking(any(), eq(true));
     }
 
     @Test
@@ -130,9 +130,9 @@ public class MobileMemberBookingsServiceTest {
         when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking))
                 .thenReturn(Optional.of(cancelledBooking));
 
-        MemberBookingDTO result = mobileMemberBookingsService.cancelBooking(principal, 500L);
+        MemberBookingDTO result = mobileMemberBookingsService.cancelBooking(principal, 500L, "WALLET");
         
-        verify(bookingService).updateStatus(eq(500L), any());
+        verify(bookingService).updateStatus(eq(500L), any(), eq("MEMBER"), eq("WALLET"));
         assertEquals("CANCELLED", result.getStatus());
     }
 }

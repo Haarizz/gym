@@ -1,7 +1,8 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BrandColors, Spacing } from '@/core/theme';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { NotificationGlass as G } from './notificationGlass';
 
 interface NotificationFooterProps {
   totalCount: number;
@@ -10,89 +11,113 @@ interface NotificationFooterProps {
   onMarkAllRead: () => void;
 }
 
+const glassAvailable = isLiquidGlassAvailable();
+
+/** Floating glass pill pinned to the bottom of the panel; the list scrolls underneath it. */
 export function NotificationFooter({
   totalCount,
   hasUnread,
   isMarkingAllRead = false,
   onMarkAllRead,
 }: NotificationFooterProps) {
+  const disabled = !hasUnread || isMarkingAllRead;
+  const Container = glassAvailable ? GlassView : View;
+
   return (
-    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <View style={styles.container}>
-        <Text style={styles.totalText}>
-          {totalCount} {totalCount === 1 ? 'total' : 'total'}
-        </Text>
+    <View style={styles.wrap} pointerEvents="box-none">
+      <Container
+        {...(glassAvailable ? { glassEffectStyle: 'regular' as const, colorScheme: 'light' as const } : {})}
+        style={[styles.pill, !glassAvailable && styles.pillFallback]}
+      >
+        <Text style={styles.totalText}>{totalCount} total</Text>
 
         <Pressable
           style={({ pressed }) => [
-            styles.markAllButton,
-            (!hasUnread || isMarkingAllRead) && styles.disabledButton,
-            pressed && hasUnread && styles.pressedButton,
+            styles.markButton,
+            !hasUnread && styles.markButtonDisabled,
+            pressed && !disabled && styles.markButtonPressed,
           ]}
           onPress={onMarkAllRead}
-          disabled={!hasUnread || isMarkingAllRead}
+          disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel="Mark all as read"
         >
           {isMarkingAllRead ? (
-            <ActivityIndicator size="small" color={BrandColors.teal} />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text
-              style={[
-                styles.markAllText,
-                !hasUnread && styles.disabledMarkAllText,
-              ]}
-            >
-              Mark all as read
-            </Text>
+            <>
+              <Feather name="check-circle" size={15} color={hasUnread ? '#FFFFFF' : G.ink3} />
+              <Text style={[styles.markText, !hasUnread && styles.markTextDisabled]}>Mark all as read</Text>
+            </>
           )}
         </Pressable>
-      </View>
-    </SafeAreaView>
+      </Container>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: BrandColors.surface,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: -2 },
+  wrap: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 999,
+    shadowColor: G.shadow,
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: Platform.OS === 'android' ? 8 : 0,
   },
-  container: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    minHeight: 52,
+    gap: 12,
+    paddingVertical: 8,
+    paddingLeft: 18,
+    paddingRight: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  pillFallback: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   totalText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: BrandColors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2E3B37',
   },
-  markAllButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+  markButton: {
+    height: 44,
+    minWidth: 150,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: G.teal,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  pressedButton: {
-    backgroundColor: '#F1F5F9',
+  markButtonPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.97 }],
   },
-  disabledButton: {
-    opacity: 0.6,
+  markButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'transparent',
   },
-  markAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: BrandColors.teal,
+  markText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  disabledMarkAllText: {
-    color: '#94A3B8',
+  markTextDisabled: {
+    color: G.ink3,
   },
 });

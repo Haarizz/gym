@@ -133,4 +133,28 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     // Mobile Cash/Credit/Mixed purchases awaiting reception approval (Approvals tab)
     Page<Member> findByApprovalStatusOrderByJoinDateDesc(String approvalStatus, Pageable pageable);
+
+    // Decided (APPROVED/REJECTED) mobile purchases, newest decision first — Approval History tab
+    @Query("SELECT m FROM Member m WHERE m.approvalStatus IN :statuses "
+            + "AND (:search = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(m.email) LIKE LOWER(CONCAT('%', :search, '%')) OR m.phone LIKE CONCAT('%', :search, '%')) "
+            + "ORDER BY m.approvedAt DESC")
+    Page<Member> findApprovalHistory(@Param("statuses") java.util.Collection<String> statuses,
+                                     @Param("search") String search, Pageable pageable);
+
+    long countByApprovalStatus(String approvalStatus);
+
+    /**
+     * Display names for community authors, across every branch. Native on purpose:
+     * it returns plain rows, so neither the Hibernate branchFilter nor
+     * BranchSecurityListener's read check applies — the community is shared across
+     * branches, and only id + name leave this query.
+     */
+    @Query(value = "SELECT m.id AS id, m.name AS name FROM members m WHERE m.id IN (:ids)", nativeQuery = true)
+    List<MemberNameView> findNamesByIdIn(@Param("ids") java.util.Collection<Long> ids);
+
+    interface MemberNameView {
+        Long getId();
+        String getName();
+    }
 }

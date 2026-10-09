@@ -13,6 +13,7 @@ import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.BookingPaymentService;
 import com.company.project.services.BookingService;
 import com.company.project.services.TrainingSessionService;
 import org.springframework.stereotype.Service;
@@ -132,7 +133,9 @@ public class MobileMemberBookingsService {
         List<Booking> memberBookings = new java.util.ArrayList<>(bookingRepository.findPastBookings(member.getId(), targetDate.plusDays(1), LocalTime.MIDNIGHT));
         memberBookings.addAll(bookingRepository.findUpcomingBookings(member.getId(), targetDate.minusDays(1), LocalTime.MAX));
         
+        // A cancelled booking doesn't count — the member can book that session again.
         Map<Long, String> sessionStatusMap = memberBookings.stream()
+                .filter(b -> !"cancelled".equalsIgnoreCase(b.getStatus()))
                 .filter(b -> b.getSession() != null && b.getSession().getDate() != null && b.getSession().getDate().equals(targetDate))
                 .collect(Collectors.toMap(
                         b -> b.getSession().getId(), 
@@ -140,16 +143,25 @@ public class MobileMemberBookingsService {
                         (s1, s2) -> s1
                 ));
 
+        LocalDateTime now = LocalDateTime.now();
         List<AvailableClassDTO> availableClasses = new ArrayList<>();
         for (com.company.project.dto.TrainingSessionResponseDTO session : sessions) {
             // Apply booking business logic: exclude cancelled sessions
             if ("cancelled".equalsIgnoreCase(session.getStatus())) {
                 continue;
             }
+            // ...and ones that have already started (they can't be booked any more).
+            if (session.getDate() != null && session.getStartTime() != null
+                    && !LocalDateTime.of(session.getDate(), session.getStartTime()).isAfter(now)) {
+                continue;
+            }
 
-            int capacity = session.getCapacity() != null ? session.getCapacity() : 0;
-            int bookedCount = session.getBooked();
-            int availableSpots = Math.max(0, capacity - bookedCount);
+            // No capacity set = unlimited seats (null spots), as BookingService treats it.
+            Integer capacity = session.getCapacity();
+            Integer availableSpots = capacity == null ? null : Math.max(0, capacity - session.getBooked());
+            LocalDateTime refundDeadline = session.getDate() != null && session.getStartTime() != null
+                    ? LocalDateTime.of(session.getDate(), session.getStartTime()).minus(BookingPaymentService.REFUND_CUTOFF)
+                    : null;
 
             AvailableClassDTO dto = new AvailableClassDTO();
             dto.setClassId(Long.valueOf(session.getId()));
@@ -164,6 +176,9 @@ public class MobileMemberBookingsService {
             dto.setCapacity(capacity);
             dto.setAvailableSpots(availableSpots);
             dto.setMemberBookingState(sessionStatusMap.get(Long.valueOf(session.getId())));
+            dto.setPrice(session.getPrice());
+            dto.setRefundDeadline(refundDeadline != null ? refundDeadline.toString() : null);
+            dto.setRefundableIfBookedNow(refundDeadline == null || now.isBefore(refundDeadline));
 
             availableClasses.add(dto);
         }
@@ -190,10 +205,18 @@ public class MobileMemberBookingsService {
         BookingRequestDTO webRequest = new BookingRequestDTO();
         webRequest.setSessionId(request.getClassId());
         webRequest.setMemberId(member.getId());
-        webRequest.setStatus("confirmed"); // Default to confirmed as per existing backend logic
+        webRequest.setStatus("confirmed"); // pending_approval instead for a Cash/Credit/Mixed payment
         webRequest.setRewardPassId(request.getRewardPassId());
+        webRequest.setCouponCode(request.getCouponCode());
+        webRequest.setWalletAmount(request.getWalletAmount());
+        webRequest.setExpectedAmount(request.getExpectedAmount());
+        webRequest.setPaymentMethodUsed(request.getPaymentMethodUsed());
+        webRequest.setPaymentBreakdown(request.getPaymentBreakdown());
+        webRequest.setBankAccountCode(request.getBankAccountCode());
+        webRequest.setBankAccountName(request.getBankAccountName());
+        webRequest.setPaymentDueDate(request.getPaymentDueDate());
 
-        BookingResponseDTO response = bookingService.createBooking(webRequest);
+        BookingResponseDTO response = bookingService.createBooking(webRequest, true);
         
         // Fetch the created booking
         Booking booking = bookingRepository.findByIdAndMemberId(Long.valueOf(response.getId()), member.getId())
@@ -202,8 +225,12 @@ public class MobileMemberBookingsService {
         return mapToMemberBookingDTO(booking, false);
     }
 
+    /**
+     * The member cancels their own booking. Refunded to their wallet when cancelled at
+     * least BookingPaymentService.REFUND_CUTOFF before the session; not refunded after.
+     */
     @Transactional
-    public MemberBookingDTO cancelBooking(UserDetailsImpl principal, Long bookingId) {
+    public MemberBookingDTO cancelBooking(UserDetailsImpl principal, Long bookingId, String refundMethod) {
         Member member = requireAuthenticatedMember(principal);
         Booking booking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
@@ -216,7 +243,7 @@ public class MobileMemberBookingsService {
         updateRequest.setStatus("cancelled");
         
         // Use existing BookingService which handles notifications and state transitions
-        bookingService.updateStatus(bookingId, updateRequest);
+        bookingService.updateStatus(bookingId, updateRequest, BookingPaymentService.CANCELLED_BY_MEMBER, refundMethod);
         
         Booking updatedBooking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
                 .orElseThrow(() -> new RuntimeException("Could not retrieve updated booking"));
@@ -268,9 +295,27 @@ public class MobileMemberBookingsService {
             dto.setLocation(session.getLocation());
             dto.setCapacity(session.getCapacity());
             
+            dto.setType(session.getType());
+
             int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
-            dto.setAvailableSpots(Math.max(0, (session.getCapacity() != null ? session.getCapacity() : 0) - bookedCount));
+            dto.setAvailableSpots(session.getCapacity() == null ? null : Math.max(0, session.getCapacity() - bookedCount));
+
+            LocalDateTime refundDeadline = BookingPaymentService.refundDeadline(session);
+            dto.setRefundDeadline(refundDeadline != null ? refundDeadline.toString() : null);
+            dto.setRefundableIfCancelledNow(BookingPaymentService.isWithinRefundWindow(session, LocalDateTime.now()));
         }
+
+        dto.setPrice(booking.getPrice());
+        dto.setGrossPrice(booking.getGrossPrice());
+        dto.setDiscountAmount(booking.getDiscountAmount());
+        dto.setDiscountLabel(booking.getDiscountLabel());
+        dto.setWalletAmount(booking.getWalletAmount());
+        dto.setPaymentStatus(booking.getPaymentStatus());
+        dto.setReceiptId(booking.getReceiptId());
+        dto.setRefundStatus(booking.getRefundStatus());
+        dto.setRefundMethod(booking.getRefundMethod());
+        dto.setRefundedAmount(booking.getRefundedAmount());
+        dto.setCancelledBy(booking.getCancelledBy());
 
         if (isAttended) {
             dto.setStatus("ATTENDED");

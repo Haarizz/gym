@@ -46,7 +46,6 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
   return function useLogin(role: AppRole) {
     const router = useRouter();
     const setSession = useAuthStore((state) => state.setSession);
-    const [errorMessage, setErrorMessage] = useState<string>();
 
     const mutation = useMutation({
       mutationFn: (values: LoginFormValues) =>
@@ -57,12 +56,11 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
         }),
       onSuccess: async (result) => {
         if (!result.success) {
-          setErrorMessage(result.error);
+          toast.error(result.error);
           analytics.track({ name: 'auth_login_failed', properties: { role } });
           return;
         }
 
-        setErrorMessage(undefined);
         setSession(result.value);
 
         // A global member's JWT carries no tenant claim (they may join gyms after
@@ -98,7 +96,6 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
     return {
       login: mutation.mutate,
       isLoading: mutation.isPending,
-      errorMessage,
     };
   };
 }
@@ -106,19 +103,17 @@ export function createUseLogin(authOrchestrator: AuthOrchestrator) {
 export function createUseRegister(authOrchestrator: AuthOrchestrator) {
   return function useRegister() {
     const router = useRouter();
-    const [errorMessage, setErrorMessage] = useState<string>();
 
     const mutation = useMutation({
       mutationFn: (values: RegisterUserDto) =>
         authOrchestrator.register(values),
       onSuccess: (result) => {
         if (!result.success) {
-          setErrorMessage(result.error);
+          toast.error(result.error);
           analytics.track({ name: 'auth_register_failed' });
           return;
         }
 
-        setErrorMessage(undefined);
         analytics.track({ name: 'auth_register_initiated' });
 
         // TEMPORARY: until real email delivery is wired in, the backend
@@ -149,7 +144,6 @@ export function createUseRegister(authOrchestrator: AuthOrchestrator) {
     return {
       register: mutation.mutate,
       isLoading: mutation.isPending,
-      errorMessage,
     };
   };
 }
