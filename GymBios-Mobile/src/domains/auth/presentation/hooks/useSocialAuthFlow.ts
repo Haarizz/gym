@@ -108,7 +108,6 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
   return function useGoogleSignIn() {
     const router = useRouter();
     const setSession = useAuthStore((state) => state.setSession);
-    const [errorMessage, setErrorMessage] = useState<string>();
 
     const mutation = useMutation({
       mutationFn: async (): Promise<SocialAuthOutcome> => {
@@ -136,7 +135,6 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
         return result.value;
       },
       onSuccess: async (outcome) => {
-        setErrorMessage(undefined);
         await handleSocialOutcome(outcome, 'GOOGLE', { router, setSession });
       },
       onError: (error: unknown) => {
@@ -148,14 +146,13 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
           name: 'auth_social_signin_failed',
           properties: { provider: 'GOOGLE' },
         });
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to continue with Google. Please try again.');
+        toast.error(error instanceof Error ? error.message : 'Unable to continue with Google. Please try again.');
       },
     });
 
     return {
       signInWithGoogle: () => mutation.mutate(),
       isLoading: mutation.isPending,
-      errorMessage,
       isAvailable: isGoogleAvailable,
     };
   };
@@ -179,7 +176,6 @@ export function createUseAppleSignIn(authOrchestrator: AuthOrchestrator) {
   return function useAppleSignIn() {
     const router = useRouter();
     const setSession = useAuthStore((state) => state.setSession);
-    const [errorMessage, setErrorMessage] = useState<string>();
 
     const mutation = useMutation({
       mutationFn: async (): Promise<SocialAuthOutcome> => {
@@ -209,7 +205,6 @@ export function createUseAppleSignIn(authOrchestrator: AuthOrchestrator) {
         return result.value;
       },
       onSuccess: async (outcome) => {
-        setErrorMessage(undefined);
         await handleSocialOutcome(outcome, 'APPLE', { router, setSession });
       },
       onError: (error: unknown) => {
@@ -218,14 +213,13 @@ export function createUseAppleSignIn(authOrchestrator: AuthOrchestrator) {
           name: 'auth_social_signin_failed',
           properties: { provider: 'APPLE' },
         });
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to continue with Apple. Please try again.');
+        toast.error(error instanceof Error ? error.message : 'Unable to continue with Apple. Please try again.');
       },
     });
 
     return {
       signInWithApple: () => mutation.mutate(),
       isLoading: mutation.isPending,
-      errorMessage,
       // Sign in with Apple is iOS-only, both by platform capability and App
       // Store review guidelines when a Google button is also present.
       isAvailable: Platform.OS === 'ios',

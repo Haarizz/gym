@@ -17,6 +17,7 @@ import com.company.project.enums.PassContext;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.services.NotificationService;
+import com.company.project.services.mobile.push.MemberPaymentApprovalNotifier;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.entities.Role;
@@ -79,6 +80,7 @@ public class MemberService {
     private final DiscountCodeService discountCodeService;
     private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
     private final GlobalMembershipService globalMembershipService;
+    private final MemberPaymentApprovalNotifier paymentApprovalNotifier;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -100,7 +102,8 @@ public class MemberService {
                          @Lazy RewardRedemptionService rewardRedemptionService,
                          @Lazy DiscountCodeService discountCodeService,
                          com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository,
-                         GlobalMembershipService globalMembershipService) {
+                         GlobalMembershipService globalMembershipService,
+                         MemberPaymentApprovalNotifier paymentApprovalNotifier) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -119,6 +122,7 @@ public class MemberService {
         this.discountCodeService       = discountCodeService;
         this.salesInvoiceRepository    = salesInvoiceRepository;
         this.globalMembershipService   = globalMembershipService;
+        this.paymentApprovalNotifier   = paymentApprovalNotifier;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -196,6 +200,41 @@ public class MemberService {
     }
 
     /**
+     * Mobile purchases staff already approved or rejected, newest decision first.
+     * Unlike getPendingApprovals this keeps the branchFilter on: decided members
+     * carry their branch, so loading another branch's row would trip
+     * BranchSecurityListener's read check. "All Branches" mode still shows every branch.
+     */
+    @Transactional(readOnly = true)
+    public MembersPageResponseDTO getApprovalHistory(String status, String search, int page, int limit) {
+        Pageable pageable = PageRequest.of(page - 1, limit);
+        List<String> statuses = status != null && !status.isBlank()
+                ? List.of(status.trim().toUpperCase())
+                : List.of("APPROVED", "REJECTED");
+        String term = search != null ? search.trim() : "";
+        Page<Member> memberPage = memberRepository.findApprovalHistory(statuses, term, pageable);
+
+        List<MemberResponseDTO> dtos = memberPage.getContent().stream()
+                .map(MemberResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+
+        PaginationDTO pagination = new PaginationDTO(
+                page, limit,
+                memberPage.getTotalElements(),
+                memberPage.getTotalPages()
+        );
+
+        return new MembersPageResponseDTO(dtos, pagination);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getApprovalHistorySummary() {
+        return java.util.Map.of(
+                "approved", memberRepository.countByApprovalStatus("APPROVED"),
+                "rejected", memberRepository.countByApprovalStatus("REJECTED"));
+    }
+
+    /**
      * Reception/admin approves a mobile Cash/Credit/Mixed purchase: unlocks the
      * member's app access and posts the deferred receipt to the General Ledger.
      *
@@ -228,6 +267,7 @@ public class MemberService {
             member.setMembershipStatus("active");
         }
         Member saved = memberRepository.save(member);
+        paymentApprovalNotifier.notifyApproved(saved);
 
         // A mobile Family/Couple purchase locks every family member created with it
         // behind the head's approval (see registerFamilyAdult/createBilledToHeadRecord)
@@ -244,7 +284,7 @@ public class MemberService {
             if ("pending_approval".equals(dep.getMembershipStatus())) {
                 dep.setMembershipStatus("active");
             }
-            memberRepository.save(dep);
+            paymentApprovalNotifier.notifyApproved(memberRepository.save(dep));
         }
 
         return MemberResponseDTO.fromEntity(saved);
@@ -276,6 +316,7 @@ public class MemberService {
         member.setRejectionReason(reason);
         member.setMembershipStatus("inactive");
         Member saved = memberRepository.save(member);
+        paymentApprovalNotifier.notifyRejected(saved);
 
         for (Member dep : pendingDependentsOf(saved)) {
             com.company.project.entities.Receipt depReceipt = receiptService.findPendingReceiptForMember(dep.getId());
@@ -287,7 +328,7 @@ public class MemberService {
             dep.setApprovedAt(LocalDateTime.now());
             dep.setRejectionReason(reason);
             dep.setMembershipStatus("inactive");
-            memberRepository.save(dep);
+            paymentApprovalNotifier.notifyRejected(memberRepository.save(dep));
         }
 
         return MemberResponseDTO.fromEntity(saved);
@@ -563,6 +604,11 @@ public class MemberService {
                 saved, "New", saved.getPaymentStatus(), combinedBreakdown.isEmpty() ? null : combinedBreakdown,
                 request.getBankAccountCode(), request.getBankAccountName(), combinedFee, minorCharges,
                 request.getProcessedByStaffId());
+        BigDecimal codeDiscount = orZero(request.getDiscountApplied());
+        String codeLabel = hasSignupCoupon ? "Code " + request.getCouponCode().trim().toUpperCase()
+                : (codeDiscount.signum() > 0 ? "Discount" : null);
+        receipt = receiptService.recordDiscount(receipt, orZero(request.getOfferDiscount()).add(codeDiscount),
+                discountLabel(request.getOfferDiscount(), request.getOfferLabel(), codeLabel));
 
         // A mobile self-service purchase paid by Cash/Credit/Mixed is awaiting
         // reception approval (see MobileDiscoveryController) — mirror the member's
@@ -988,7 +1034,7 @@ public class MemberService {
         // Reward Pass / shareable coupon: membershipFee arrived as the fee before it, so
         // take the discount off here — before outstanding/amountReceived are derived —
         // and spend the pass/coupon in this same transaction.
-        String rewardNote = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode());
+        RenewalReward reward = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode());
 
         // Compute new expiry from plan duration, extending from current expiry (or today)
         if (member.getMembershipPlan() != null) {
@@ -1036,9 +1082,8 @@ public class MemberService {
         // "Credit" is only ever the stored method label when nothing was actually
         // received yet — any real money always carries its real method, consistent
         // with the Add Member credit flow (see gymbios-credit-payment-fix). A fully
-        // discounted (zero-fee) renewal owes nothing, so it keeps the chosen method too.
-        member.setPaymentMethodUsed(amountReceived.compareTo(BigDecimal.ZERO) > 0
-                || outstanding.compareTo(BigDecimal.ZERO) <= 0
+        // discounted renewal owes nothing, so it isn't on Credit either.
+        member.setPaymentMethodUsed(amountReceived.compareTo(BigDecimal.ZERO) > 0 || outstanding.signum() == 0
                 ? request.getPaymentMethod() : "Credit");
 
         Member saved = memberRepository.save(member);
@@ -1052,7 +1097,10 @@ public class MemberService {
                 itemized || billedToHeadFees.signum() > 0 ? fee : null,
                 itemized ? request.getMinorCharges() : null,
                 request.getProcessedByStaffId());
-        if (rewardNote != null) receipt.setRemarks(rewardNote);
+        if (reward != null) receipt.setRemarks(reward.note());
+        receipt = receiptService.recordDiscount(receipt,
+                orZero(request.getOfferDiscount()).add(reward != null ? reward.discount() : BigDecimal.ZERO),
+                discountLabel(request.getOfferDiscount(), request.getOfferLabel(), reward != null ? reward.label() : null));
 
         // Post to General Ledger for whatever amount was actually received — a partial/
         // credit renewal must still post the real amount through the real method; it
@@ -1077,12 +1125,17 @@ public class MemberService {
         return MemberResponseDTO.fromEntity(saved);
     }
 
+    /** A Reward Pass / coupon taken off a renewal: what it was (for the receipt) and how much. */
+    private record RenewalReward(String label, BigDecimal discount) {
+        String note() { return label + " applied (-" + discount + ")"; }
+    }
+
     /**
      * Applies a Reward Pass or a shareable coupon to a renewal: member.membershipFee holds
-     * the fee before the discount and is replaced with the net fee. Returns a note for the
-     * receipt, or null when neither was sent.
+     * the fee before the discount and is replaced with the net fee. Returns null when
+     * neither was sent.
      */
-    private String applyRenewalReward(Member member, Long rewardPassId, String couponCode) {
+    private RenewalReward applyRenewalReward(Member member, Long rewardPassId, String couponCode) {
         boolean hasCoupon = couponCode != null && !couponCode.isBlank();
         if (rewardPassId == null && !hasCoupon) return null;
         if (rewardPassId != null && hasCoupon) {
@@ -1090,19 +1143,37 @@ public class MemberService {
         }
         BigDecimal gross = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
         BigDecimal discount;
-        String note;
+        String label;
         if (rewardPassId != null) {
             discount = rewardRedemptionService.passDiscount(rewardPassId, gross);
             ReferralReward pass = rewardRedemptionService.consumePass(
                     rewardPassId, member.getMemberId(), PassContext.MEMBERSHIP, member.getId());
-            note = "Reward Pass " + pass.getRewardCode() + " applied (-" + discount + ")";
+            label = "Reward Pass " + pass.getRewardCode();
         } else {
             discount = rewardRedemptionService.redeemCouponAtCheckout(couponCode, gross, member.getId(), member.getName());
-            note = "Coupon " + couponCode.trim().toUpperCase() + " applied (-" + discount + ")";
+            label = "Coupon " + couponCode.trim().toUpperCase();
         }
         member.setMembershipFee(gross.subtract(discount));
         member.setDiscountApplied(discount);
-        return note;
+        return new RenewalReward(label, discount);
+    }
+
+    /**
+     * The receipt's discount label: the offer/staff discount netted out before the fee
+     * was sent (offerLabel as the caller worded it), then any code/pass on top,
+     * e.g. "Offer: Diwali + Code NEWMEMBER2026".
+     */
+    private static String discountLabel(BigDecimal offerDiscount, String offerLabel, String codeLabel) {
+        String offer = null;
+        if (offerDiscount != null && offerDiscount.signum() > 0) {
+            offer = offerLabel != null && !offerLabel.isBlank() ? offerLabel.trim() : "Discount";
+        }
+        if (offer == null) return codeLabel;
+        return codeLabel == null ? offer : offer + " + " + codeLabel;
+    }
+
+    private static BigDecimal orZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     /**

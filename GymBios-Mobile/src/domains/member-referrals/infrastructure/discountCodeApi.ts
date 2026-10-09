@@ -25,10 +25,13 @@ function map(d: DiscountCodeResponseDTO): DiscountCode {
 }
 
 export const discountCodeApi = {
-  /** A promotion or referral coupon code, checked in the signed-in member's own gym. */
-  validate: async (code: string): Promise<DiscountCode> => {
+  /**
+   * A promotion or referral coupon code, checked in the signed-in member's own gym. With
+   * `amount`, the server also prices the code on it (promotion caps/minimums included).
+   */
+  validate: async (code: string, amount?: number): Promise<DiscountCode> => {
     const response = await apiClient.get<DiscountCodeResponseDTO>('/discount-codes/validate', {
-      params: { code },
+      params: { code, amount },
       skipGlobalErrorToast: true, // the picker shows the reason inline
     });
     return map(response.data);

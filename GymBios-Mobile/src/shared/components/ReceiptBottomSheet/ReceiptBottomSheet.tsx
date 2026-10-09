@@ -78,6 +78,7 @@ export function ReceiptBottomSheet({
     }
 
     const isPaid = receipt.status.toLowerCase() === 'paid';
+    const discount = Number(receipt.discountAmount) || 0;
     const statusColor = isPaid ? '#16a34a' : '#d97706';
 
     return (
@@ -140,6 +141,22 @@ export function ReceiptBottomSheet({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Summary</Text>
             <View style={styles.totalsContainer}>
+              {discount > 0 && (
+                <>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Price</Text>
+                    <CurrencyValue style={styles.totalValue} amount={Number(receipt.amount) + discount} decimals={2} />
+                  </View>
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { color: accentColor, flexShrink: 1 }]}>
+                      {receipt.discountLabel || 'Discount'}
+                    </Text>
+                    <Text style={[styles.totalValue, { color: accentColor }]}>
+                      -<CurrencyValue amount={discount} decimals={2} />
+                    </Text>
+                  </View>
+                </>
+              )}
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total Amount</Text>
                 <CurrencyValue style={styles.totalValue} amount={receipt.amount} decimals={2} />

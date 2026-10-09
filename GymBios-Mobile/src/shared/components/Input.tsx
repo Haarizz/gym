@@ -17,6 +17,8 @@ export interface InputProps extends TextInputProps {
   /** String or inline node (e.g. a <CurrencyGlyph />) rendered in the label text. */
   label?: React.ReactNode;
   error?: string;
+  /** Highlight the field as invalid but don't render the error text below it (e.g. when errors are surfaced via toast). */
+  hideErrorText?: boolean;
   /** 'default' uses the standard themed style; 'auth' is a white card-style input for login screens; 'glass' is the same shape with a translucent frosted fill for glass-panel screens */
   variant?: 'default' | 'auth' | 'glass';
   containerStyle?: any;
@@ -26,6 +28,7 @@ export interface InputProps extends TextInputProps {
 export function Input({
   label,
   error,
+  hideErrorText,
   style,
   variant = 'default',
   onFocus,
@@ -120,7 +123,7 @@ export function Input({
         )}
       </View>
 
-      {error ? (
+      {error && !hideErrorText ? (
         <Typography
           variant="caption"
           color="error"

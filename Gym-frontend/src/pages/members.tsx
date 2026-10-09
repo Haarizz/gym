@@ -1117,6 +1117,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           membership_end_date: newEndDate,
           membership_fee: calculateFeeBeforeReward(),
           ...selectionRequestFields(renewalReward),
+          ...(parseFloat(discountAmount) > 0
+            ? { offer_discount: parseFloat(discountAmount), offer_label: 'Staff discount' }
+            : {}),
           payment_status: amountReceived >= totalAmount ? 'paid' : (amountReceived > 0 ? 'partial' : 'pending'),
           membership_type: selectedNewPlan.planType,
           membership_status: 'active',

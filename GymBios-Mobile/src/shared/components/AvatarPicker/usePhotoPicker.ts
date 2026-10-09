@@ -11,7 +11,7 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
 };
 
 /**
- * Camera / gallery launchers for a square profile photo. Each resolves to the
+ * Camera / gallery launchers for a square photo. Each resolves to the
  * picked local URI, or undefined if the user cancelled or permission was denied
  * (a toast explains the latter).
  *
@@ -25,7 +25,7 @@ export function usePhotoPicker() {
       if (!permission.granted) {
         toast.warning(
           permission.canAskAgain
-            ? 'Camera access is needed to take a profile photo.'
+            ? 'Camera access is needed to take a photo.'
             : 'Camera access is turned off. Enable it in Settings to take a photo.',
           { title: 'Permission Required' },
         );

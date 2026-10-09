@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Typography } from '@/shared/components';
+import { Button } from '@/shared/components';
 
 interface SocialAuthButtonsProps {
   onGoogleSignIn: () => void;
@@ -9,7 +9,6 @@ interface SocialAuthButtonsProps {
   onAppleSignIn: () => void;
   isAppleLoading: boolean;
   isAppleAvailable: boolean;
-  errorMessage?: string;
 }
 
 /** Shared "Continue with Google/Apple" row — used by both SignInForm and SignUpForm, below their existing divider. */
@@ -20,7 +19,6 @@ export function SocialAuthButtons({
   onAppleSignIn,
   isAppleLoading,
   isAppleAvailable,
-  errorMessage,
 }: SocialAuthButtonsProps) {
   return (
     <View style={styles.container}>
@@ -44,7 +42,6 @@ export function SocialAuthButtons({
           style={styles.button}
         />
       ) : null}
-      {errorMessage ? <Typography style={styles.errorText}>{errorMessage}</Typography> : null}
     </View>
   );
 }
@@ -56,11 +53,5 @@ const styles = StyleSheet.create({
   },
   button: {
     borderColor: '#D8DEDA',
-  },
-  errorText: {
-    color: '#D93B3B',
-    fontSize: 13,
-    marginTop: 4,
-    textAlign: 'center',
   },
 });

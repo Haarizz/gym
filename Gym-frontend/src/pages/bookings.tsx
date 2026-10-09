@@ -72,7 +72,7 @@ interface Booking {
 
 
 export function Bookings({ onNavigate }: BookingsProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -331,6 +331,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
       case 'checked-in': return 'bg-green-100 text-green-800';
       case 'no-show': return 'bg-red-100 text-red-800';
       case 'cancelled': return 'bg-gray-100 text-gray-800';
+      case 'pending_approval': return 'bg-amber-100 text-amber-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -359,9 +360,14 @@ export function Bookings({ onNavigate }: BookingsProps) {
 
   const handleStatusUpdate = async (bookingId: string, newStatus: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled') => {
     try {
-      await bookingService.updateStatus(bookingId, newStatus);
+      const updated = await bookingService.updateStatus(bookingId, newStatus);
       await fetchBookings(members);
-      toast.success(`Booking status updated to ${newStatus}`);
+      // A staff cancellation refunds the member's app payment in full, to their wallet.
+      if (newStatus === 'cancelled' && updated.refundStatus === 'REFUNDED' && updated.refundedAmount) {
+        toast.success(`Booking cancelled — ${formatCurrency(updated.refundedAmount)} refunded to the member's wallet`);
+      } else {
+        toast.success(`Booking status updated to ${newStatus}`);
+      }
     } catch (error: any) {
       toast.error(error?.message || "Failed to update booking");
     }
@@ -1592,7 +1598,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
               Delete Booking
             </DialogTitle>
             <DialogDescription className="text-center">
-              This action cannot be undone. The booking will be permanently removed.
+              This action cannot be undone. The booking will be permanently removed, and anything
+              the member paid in the app is refunded to their wallet.
             </DialogDescription>
           </DialogHeader>
 

@@ -8,6 +8,7 @@ import com.company.project.entities.Member;
 import com.company.project.entities.TrainingSession;
 import com.company.project.enums.PassContext;
 import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.exceptions.SessionFullException;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.TrainingSessionRepository;
@@ -32,19 +33,22 @@ public class BookingService {
     private final NotificationService notificationService;
     private final QrCodeService qrCodeService;
     private final RewardRedemptionService rewardRedemptionService;
+    private final BookingPaymentService bookingPaymentService;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
                           MemberRepository memberRepository,
                           NotificationService notificationService,
                           QrCodeService qrCodeService,
-                          RewardRedemptionService rewardRedemptionService) {
+                          RewardRedemptionService rewardRedemptionService,
+                          BookingPaymentService bookingPaymentService) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
         this.qrCodeService = qrCodeService;
         this.rewardRedemptionService = rewardRedemptionService;
+        this.bookingPaymentService = bookingPaymentService;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -102,22 +106,35 @@ public class BookingService {
         return response;
     }
 
+    /** Staff booking from the web (no payment taken here — staff record it separately). */
     @Transactional
     public BookingResponseDTO createBooking(BookingRequestDTO request) {
+        return createBooking(request, false);
+    }
+
+    /**
+     * memberSelfService: a member booking for themselves in the app, who pays for a
+     * priced session now (see BookingPaymentService.charge).
+     */
+    @Transactional
+    public BookingResponseDTO createBooking(BookingRequestDTO request, boolean memberSelfService) {
         if (request.getSessionId() == null) {
             throw new RuntimeException("Session is required");
         }
 
-        TrainingSession session = sessionRepository.findById(request.getSessionId())
+        // Locked until this transaction ends, so concurrent bookings can't oversell the last seat.
+        TrainingSession session = sessionRepository.findByIdForUpdate(request.getSessionId())
                 .orElseThrow(() -> new RuntimeException("Session not found"));
 
         if ("cancelled".equalsIgnoreCase(session.getStatus())) {
-            throw new RuntimeException("Session is cancelled");
+            throw new BusinessRuleViolationException("This session has been cancelled");
         }
 
+        // Bookings awaiting payment approval hold their seat too (anything not cancelled).
         int booked = Math.toIntExact(bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled"));
         if (session.getCapacity() != null && booked >= session.getCapacity()) {
-            throw new RuntimeException("Session is full");
+            throw new SessionFullException("This session is full — all " + session.getCapacity()
+                    + " spots have been booked.");
         }
 
         Member member = null;
@@ -133,9 +150,23 @@ public class BookingService {
             }
         }
 
+        if (memberSelfService && member == null) {
+            throw new BusinessRuleViolationException("Member is required");
+        }
+        if (memberSelfService && session.getDate() != null && session.getStartTime() != null
+                && !LocalDateTime.of(session.getDate(), session.getStartTime()).isAfter(LocalDateTime.now())) {
+            throw new BusinessRuleViolationException("This session has already started");
+        }
+        if (member != null && bookingRepository.existsBySessionIdAndMember_IdAndStatusNot(
+                session.getId(), member.getId(), "cancelled")) {
+            throw new BusinessRuleViolationException(memberSelfService
+                    ? "You have already booked this session"
+                    : "This member already has a booking for this session");
+        }
+
         // A Free PT / Class Reward Pass must fit this booking before anything is saved.
         PassContext passContext = null;
-        if (request.getRewardPassId() != null) {
+        if (request.getRewardPassId() != null && !memberSelfService) {
             if (member == null) {
                 throw new BusinessRuleViolationException("Reward Passes can only be used for member bookings");
             }
@@ -159,7 +190,10 @@ public class BookingService {
         // Save first to obtain the booking ID, then generate the HMAC-signed QR
         bookingRepository.save(booking);
 
-        if (passContext != null) {
+        if (memberSelfService) {
+            // Prices the booking and takes payment (code/pass, wallet, receipt, approval).
+            bookingPaymentService.charge(booking, member, session, request);
+        } else if (passContext != null) {
             // Spent in this same transaction — if anything below fails, the pass is untouched.
             rewardRedemptionService.consumePass(request.getRewardPassId(), member.getMemberId(), passContext, booking.getId());
             booking.setRewardId(request.getRewardPassId());
@@ -183,10 +217,13 @@ public class BookingService {
             Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
             if (targetId != null) {
                 try {
+                    boolean awaitingApproval = BookingPaymentService.STATUS_PENDING_APPROVAL.equals(booking.getStatus());
                     notificationService.notifyUser(
                             targetId,
-                            "Booking Confirmed",
-                            "Your booking for " + sessionName + " is confirmed.",
+                            awaitingApproval ? "Booking Received" : "Booking Confirmed",
+                            awaitingApproval
+                                    ? "Your seat for " + sessionName + " is held while the gym confirms your payment."
+                                    : "Your booking for " + sessionName + " is confirmed.",
                             "SUCCESS", "MEDIUM", "BOOKINGS",
                             booking.getId(), "/book-session",
                             "BOOKING_CREATED_" + booking.getId()
@@ -200,18 +237,38 @@ public class BookingService {
         return toResponse(booking);
     }
 
+    /** Staff status change from the web — a staff cancellation always refunds in full. */
     @Transactional
     public BookingResponseDTO updateStatus(Long id, BookingStatusUpdateDTO request) {
+        return updateStatus(id, request, BookingPaymentService.CANCELLED_BY_STAFF, BookingPaymentService.REFUND_METHOD_WALLET);
+    }
+
+    /**
+     * cancelledBy/refundMethod only matter when the new status is "cancelled": a member
+     * cancelling inside the refund window gets nothing back (BookingPaymentService).
+     */
+    @Transactional
+    public BookingResponseDTO updateStatus(Long id, BookingStatusUpdateDTO request, String cancelledBy, String refundMethod) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
+        boolean cancelling = "cancelled".equalsIgnoreCase(request.getStatus())
+                && !"cancelled".equalsIgnoreCase(booking.getStatus());
+        if ("cancelled".equalsIgnoreCase(request.getStatus()) && !cancelling) {
+            throw new BusinessRuleViolationException("This booking is already cancelled");
+        }
+        if (BookingPaymentService.STATUS_PENDING_APPROVAL.equalsIgnoreCase(booking.getStatus())
+                && StringUtils.hasText(request.getStatus()) && !cancelling) {
+            throw new BusinessRuleViolationException("Approve or reject this booking's payment first");
+        }
+        if (cancelling) {
+            // Before the status flips — it decides between voiding and refunding.
+            bookingPaymentService.settleCancellation(booking, cancelledBy, refundMethod);
+        }
         if (StringUtils.hasText(request.getStatus())) {
             booking.setStatus(request.getStatus());
         }
         if (request.getPaymentStatus() != null) {
             booking.setPaymentStatus(request.getPaymentStatus());
-        }
-        if ("cancelled".equalsIgnoreCase(request.getStatus())) {
-            releaseRewardPass(booking);
         }
         bookingRepository.save(booking);
 
@@ -250,8 +307,48 @@ public class BookingService {
 
     @Transactional
     public void deleteBooking(Long id) {
-        bookingRepository.findById(id).ifPresent(this::releaseRewardPass);
+        bookingRepository.findById(id).ifPresent(booking -> {
+            // Deleting a live booking is a staff cancellation: refund it in full first.
+            if (!"cancelled".equalsIgnoreCase(booking.getStatus())) {
+                bookingPaymentService.settleCancellation(booking,
+                        BookingPaymentService.CANCELLED_BY_STAFF, BookingPaymentService.REFUND_METHOD_WALLET);
+            }
+            releaseRewardPass(booking);
+        });
         bookingRepository.deleteById(id);
+    }
+
+    /** Bookings whose Cash/Credit/Mixed payment awaits staff approval — web Approvals page. */
+    @Transactional(readOnly = true)
+    public List<BookingResponseDTO> getPendingPaymentApprovals() {
+        return bookingRepository.findPendingPaymentApprovals().stream()
+                .map(booking -> {
+                    BookingResponseDTO dto = toResponse(booking);
+                    com.company.project.entities.Receipt receipt = bookingPaymentService.receiptFor(booking);
+                    if (receipt != null) {
+                        // Cash / Credit / Mixed — "Mixed" also when part came from the wallet.
+                        dto.setPaymentMethod(receipt.getPaymentMethod());
+                        dto.setPaidAmount(receipt.getPaidAmount());
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public BookingResponseDTO approvePayment(Long id, String approvedBy) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException("Booking not found"));
+        bookingPaymentService.approve(booking, approvedBy);
+        return toResponse(bookingRepository.save(booking));
+    }
+
+    @Transactional
+    public BookingResponseDTO rejectPayment(Long id, String rejectedBy, String reason) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException("Booking not found"));
+        bookingPaymentService.reject(booking, rejectedBy, reason);
+        return toResponse(bookingRepository.save(booking));
     }
 
     /** Gives back the Reward Pass a booking was paid with (cancel/delete), at most once. */
@@ -284,6 +381,15 @@ public class BookingService {
         dto.setGuestPhone(booking.getGuestPhone());
         dto.setCreatedAt(booking.getCreatedAt());
         dto.setPaymentStatus(booking.getPaymentStatus());
+        dto.setGrossPrice(booking.getGrossPrice());
+        dto.setDiscountAmount(booking.getDiscountAmount());
+        dto.setDiscountLabel(booking.getDiscountLabel());
+        dto.setWalletAmount(booking.getWalletAmount());
+        dto.setReceiptId(booking.getReceiptId());
+        dto.setRefundStatus(booking.getRefundStatus());
+        dto.setRefundMethod(booking.getRefundMethod());
+        dto.setRefundedAmount(booking.getRefundedAmount());
+        dto.setCancelledBy(booking.getCancelledBy());
         return dto;
     }
 }

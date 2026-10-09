@@ -36,10 +36,12 @@ import java.util.List;
  *  - chargePerExtraDay     billed for each frozen day beyond the free days
  *  - autoUnfreeze          end the freeze automatically on its end date
  *
- * The charge for extra days is raised as an unpaid "Freeze Charge" bill and added
- * to the member's outstanding balance (their family head's, if they're billed to
- * the head), so it's settled through the normal Web/Mobile payment flows and
- * shows up in Billing → Member Dues as "Extra Freeze Days".
+ * A freeze is charged when it ends, not when it starts: the days actually frozen
+ * use up the free days first, and only the days beyond them are billed. That
+ * charge is raised as an unpaid "Freeze Charge" bill and added to the member's
+ * outstanding balance (their family head's, if they're billed to the head), so
+ * it's settled through the normal Web/Mobile payment flows and shows up in
+ * Billing → Member Dues as "Extra Freeze Days".
  *
  * Only freezes the member requests in the app are checked against the policy and
  * charged. Staff freezes from the Web are recorded (so they use up the member's
@@ -170,8 +172,8 @@ public class MembershipFreezeService {
             m.put("id", f.getId());
             m.put("planName", f.getPlanName());
             m.put("freezeStart", f.getFreezeStart() != null ? f.getFreezeStart().toLocalDate().toString() : null);
-            m.put("plannedEnd", f.getPlannedEnd() != null ? f.getPlannedEnd().toLocalDate().toString() : null);
-            m.put("endedAt", f.getEndedAt() != null ? f.getEndedAt().toLocalDate().toString() : null);
+            m.put("plannedEnd", lastFrozenDay(f.getFreezeStart(), f.getPlannedEnd()));
+            m.put("endedAt", lastFrozenDay(f.getFreezeStart(), f.getEndedAt()));
             m.put("days", daysUsed(f));
             m.put("freeDays", f.getFreeDaysApplied());
             m.put("chargedDays", f.getChargedDays());
@@ -223,18 +225,14 @@ public class MembershipFreezeService {
         coreRequest.setReason(reason);
         memberService.freezeMember(member.getId(), coreRequest);
 
+        // Nothing is billed yet — the charge is settled on unfreeze from the days
+        // actually frozen (see settleFreeze). These are the planned figures.
         int chargedDays = allowance.chargeableDays(days);
         BigDecimal charge = allowance.chargeFor(days);
 
         MembershipFreeze record = newRecord(member, start, end, days, reason, MembershipFreeze.SOURCE_MOBILE);
         record.setFreeDaysApplied(days - chargedDays);
-        record.setChargedDays(chargedDays);
         record.setChargePerDay(allowance.chargePerExtraDay());
-        record.setChargeAmount(charge);
-        if (charge.signum() > 0) {
-            record.setChargeReceiptId(raiseFreezeCharge(member, chargedDays, allowance.chargePerExtraDay(),
-                    charge, start, end).getId());
-        }
         freezeRepository.save(record);
 
         return new FreezeResult(start, end, days, record.getFreeDaysApplied(), chargedDays, charge);
@@ -244,9 +242,15 @@ public class MembershipFreezeService {
     public MemberResponseDTO freezeByStaff(Long memberId, FreezeRequestDTO request) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        // Re-freezing without an unfreeze in between replaces the freeze in progress —
+        // ended properly first, so the days already frozen still move the expiry.
+        if ("frozen".equalsIgnoreCase(member.getMembershipStatus())) {
+            unfreeze(memberId);
+        } else {
+            closeOpenFreeze(memberId, LocalDateTime.now());
+        }
         FreezeAllowance allowance = getAllowance(member, findPlan(member));
-        // Re-freezing without an unfreeze in between replaces the freeze in progress.
-        closeOpenFreeze(memberId, LocalDateTime.now());
+        request.setFreezeUntil(staffEndDateToFreezeEnd(request.getFreezeUntil()));
 
         MemberResponseDTO result = memberService.freezeMember(memberId, request);
 
@@ -291,9 +295,8 @@ public class MembershipFreezeService {
     }
 
     /**
-     * Ends the member's freeze as of frozenUntil. If it ended before its extra
-     * (charged) days were used, the unpaid part of its Freeze Charge bill is
-     * reduced to match — a member is only billed for extra days actually frozen.
+     * Ends the member's freeze as of frozenUntil and settles it: free days cover
+     * the days actually frozen first, and only the days beyond them are billed.
      */
     public MemberResponseDTO unfreeze(Long memberId, LocalDateTime frozenUntil) {
         MemberResponseDTO result = memberService.unfreezeMember(memberId, frozenUntil);
@@ -303,10 +306,47 @@ public class MembershipFreezeService {
 
     private void closeOpenFreeze(Long memberId, LocalDateTime endedAt) {
         freezeRepository.findFirstByMemberDbIdAndEndedAtIsNullOrderByFreezeStartDesc(memberId).ifPresent(f -> {
+            // Free days left to this freeze: what's left in the period, plus what
+            // the allowance is currently holding for this (still open) freeze.
+            Member member = memberRepository.findById(memberId).orElse(null);
+            int freeDaysAvailable = member == null ? f.getFreeDaysApplied()
+                    : getAllowance(member, findPlan(member)).freeDaysRemaining()
+                      + Math.min(f.getFreeDaysApplied(), f.getRequestedDays());
+
             f.setEndedAt(endedAt.isBefore(f.getFreezeStart()) ? f.getFreezeStart() : endedAt);
-            reduceChargeForUnusedDays(f);
+            if (f.getChargeReceiptId() != null) {
+                // Billed upfront before charging moved to unfreeze — trim that bill instead.
+                reduceChargeForUnusedDays(f);
+            } else {
+                settleFreeze(f, member, freeDaysAvailable);
+            }
             freezeRepository.save(f);
         });
+    }
+
+    /**
+     * Applies free days to the days actually frozen and, for a freeze the member
+     * requested in the app, bills the rest as a Freeze Charge. Staff freezes only
+     * record the free days used — they're never billed.
+     */
+    private void settleFreeze(MembershipFreeze f, Member member, int freeDaysAvailable) {
+        int days = daysUsed(f);
+        int freeDays = Math.min(days, Math.max(0, freeDaysAvailable));
+        f.setFreeDaysApplied(freeDays);
+
+        BigDecimal rate = f.getChargePerDay();
+        if (!MembershipFreeze.SOURCE_MOBILE.equals(f.getSource()) || member == null
+                || rate == null || rate.signum() <= 0) {
+            return;
+        }
+        int chargedDays = days - freeDays;
+        BigDecimal charge = rate.multiply(BigDecimal.valueOf(chargedDays)).setScale(2, RoundingMode.HALF_UP);
+        f.setChargedDays(chargedDays);
+        f.setChargeAmount(charge);
+        if (charge.signum() > 0) {
+            f.setChargeReceiptId(raiseFreezeCharge(member, chargedDays, rate, charge,
+                    f.getFreezeStart(), f.getEndedAt()).getId());
+        }
     }
 
     private void reduceChargeForUnusedDays(MembershipFreeze f) {
@@ -367,7 +407,44 @@ public class MembershipFreezeService {
         return true;
     }
 
+    // ── Expiry ────────────────────────────────────────────────────────────────
+
+    /**
+     * The expiry date a frozen member will have once their freeze ends: the stored
+     * expiry only moves forward on unfreeze (MemberService.unfreezeMember), so while
+     * frozen it's pushed out here by the freeze's length — to its planned end, or
+     * to now if it's run past that. Any other member's expiry is returned as is.
+     */
+    public static LocalDateTime projectedExpiry(Member member, LocalDateTime now) {
+        LocalDateTime expiry = member.getExpiryDate();
+        if (expiry == null || !"frozen".equalsIgnoreCase(member.getMembershipStatus())
+                || member.getFreezeStartDate() == null) {
+            return expiry;
+        }
+        LocalDateTime frozenUntil = member.getFreezeEndDate() != null && member.getFreezeEndDate().isAfter(now)
+                ? member.getFreezeEndDate() : now;
+        long days = ChronoUnit.DAYS.between(member.getFreezeStartDate(), frozenUntil);
+        return days > 0 ? expiry.plusDays(days) : expiry;
+    }
+
+    /**
+     * Staff pick a freeze's last frozen day (1 → 3 Oct is 3 days), but a freeze is
+     * stored as ending the moment the member is back — the start of the next day.
+     */
+    static String staffEndDateToFreezeEnd(String lastFrozenDay) {
+        if (lastFrozenDay == null || lastFrozenDay.length() < 10) return lastFrozenDay;
+        return java.time.LocalDate.parse(lastFrozenDay.substring(0, 10)).plusDays(1).atStartOfDay()
+                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** The last day a freeze ending at `end` covers — the day before, if it ends at midnight. */
+    private static String lastFrozenDay(LocalDateTime start, LocalDateTime end) {
+        if (end == null) return null;
+        java.time.LocalDate day = end.minusNanos(1).toLocalDate();
+        return (start != null && day.isBefore(start.toLocalDate()) ? start.toLocalDate() : day).toString();
+    }
 
     public MembershipPlan findPlan(Member member) {
         return member.getMembershipPlan() != null

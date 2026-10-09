@@ -208,6 +208,8 @@ public class FinancialEventService {
                 deferredNet = split[0];
                 lines.add(cr(ACC_DEFERRED_REVENUE, "Deferred Revenue", split[0],
                         "Membership payment held as deferred revenue"));
+            } else if (ReceiptService.TXN_CLASS_BOOKING.equals(receipt.getTransactionType())) {
+                lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0], "Class booking revenue"));
             } else {
                 lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", split[0], "Revenue recognition"));
             }
@@ -1078,6 +1080,34 @@ public class FinancialEventService {
                 "Credit Note: " + note.getVoucherNo() + " — " + note.getMemberName(),
                 note.getDate(), lines, "BILLING");
         registerSource("CreditNote", note.getId(), "BILLING", jv.getId());
+    }
+
+    /**
+     * BOOKINGS — a cancelled class booking's payment refunded to the member's wallet.
+     * Reverses the revenue onMemberPaymentReceived booked for it; the money stays
+     * with the gym as wallet credit the member can spend later.
+     * DR  Service / Add-on Revenue     (amount, net of VAT)
+     * DR  Tax / GST Payable            (VAT portion)
+     * CR  Reward Wallet Liability      (amount)
+     */
+    public void onBookingRefundedToWallet(Long bookingId, String memberName, BigDecimal amount) {
+        if (alreadyJournaled("BookingRefund", bookingId)) return;
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        BigDecimal[] split = splitVatInclusive(amount);
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0],
+                "Booking refund — " + memberName));
+        if (split[1].compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", split[1], "Booking refund — VAT reversal"));
+        }
+        lines.add(cr(ACC_REWARD_LIABILITY, "Reward Wallet Liability", amount,
+                "Booking #" + bookingId + " refunded to wallet"));
+
+        JournalVoucher jv = createAndPost(
+                "Booking Refund: #" + bookingId + " — " + memberName,
+                LocalDate.now(), lines, "BILLING");
+        registerSource("BookingRefund", bookingId, "BILLING", jv.getId());
     }
 
     // ─────────────────────────────────────────────────────────────────────────

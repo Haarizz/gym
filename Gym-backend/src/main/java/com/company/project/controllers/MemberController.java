@@ -61,6 +61,29 @@ public class MemberController {
     }
 
     /**
+     * GET /api/members/approval-history?status=APPROVED|REJECTED&search=&page=1&limit=20
+     * Mobile Cash/Credit/Mixed purchases staff already approved or rejected — backs
+     * the Approvals > History sidebar tab. Omit status for both.
+     */
+    @GetMapping("/approval-history")
+    public ResponseEntity<MembersPageResponseDTO> getApprovalHistory(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(memberService.getApprovalHistory(status, search, page, limit));
+    }
+
+    /**
+     * GET /api/members/approval-history/summary
+     * { "approved": n, "rejected": n } across all branches.
+     */
+    @GetMapping("/approval-history/summary")
+    public ResponseEntity<java.util.Map<String, Long>> getApprovalHistorySummary() {
+        return ResponseEntity.ok(memberService.getApprovalHistorySummary());
+    }
+
+    /**
      * POST /api/members/{id}/approve-payment
      * Body (optional): { "remarks": "..." }
      * Approves a mobile Cash/Credit/Mixed purchase awaiting reception approval —

@@ -23,6 +23,7 @@ import type { PaymentResult } from '@/shared/payment/types';
 
 import { useCenterDetails, useCenterPlans, type CenterPlan } from '@/domains/discovery';
 import { useAuthStore } from '@/domains/auth/store/authStore';
+import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateOfBirthRules';
 import { usePurchaseFamilyPlan } from '../../hooks/usePurchaseFamilyPlan';
 import { useFamilyQuote } from '../../hooks/useFamilyQuote';
 import type { FamilyPurchaseRequest } from '../../infrastructure/familyApi';
@@ -389,7 +390,9 @@ export function FamilyPurchaseScreen() {
                         label="Date of birth (optional)"
                         value={value ?? null}
                         onChange={onChange}
-                        maximumDate={new Date()}
+                        initialView="year"
+                        minimumDate={getMinBirthDate()}
+                        maximumDate={getMaxBirthDate()}
                       />
                     )}
                   />

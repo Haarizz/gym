@@ -18,9 +18,19 @@ import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Button, Typography } from '@/shared/components';
 import { useCreateCommunityPost } from '../../hooks/useCommunityActions';
+import { useCommunityMode } from '../../hooks/useCommunity';
 import type { CropRatio } from '../hooks/useCommunityPostComposer';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+
+/** Why a member can't post at their selected gym (codes from the server). */
+const POSTING_BLOCKED: Record<string, string> = {
+  NOT_A_MEMBER: 'Only members of your selected gym can post. Switch to one of your gyms to post.',
+  APP_ACCESS_PENDING: 'You can post once your membership is approved.',
+  GYM_CONTEXT_REQUIRED: 'Select one of your gyms to post.',
+  MEMBERSHIP_UNDETERMINED: 'Your membership couldn\'t be confirmed.',
+  PLATFORM_CANNOT_POST: 'Platform accounts can\'t post in the Community.',
+};
 
 const POST_TYPES = [
   { value: 'achievement', label: '🏆 Achievement' },
@@ -82,6 +92,12 @@ export function CommunityPostComposer({
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
   const createPost = useCreateCommunityPost();
+  const { mode, config } = useCommunityMode();
+  const isGlobal = mode === 'global' && config != null;
+  const postingBlocked = isGlobal && !config.canPost;
+  const blockedMessage = config?.readOnly
+    ? 'The Community is read-only right now.'
+    : POSTING_BLOCKED[config?.postingBlockedReason ?? ''] ?? 'Posting isn\'t available right now.';
 
   const handlePickImage = useCallback(async () => {
     try {
@@ -109,6 +125,28 @@ export function CommunityPostComposer({
           return;
         }
         const mimeType = asset.mimeType ?? 'image/jpeg';
+        // The global Community enforces upload limits server-side; check first so
+        // the member gets a clear message instead of a failed post.
+        if (isGlobal) {
+          const limits = config.limits;
+          const bytes = asset.fileSize ?? Math.floor((asset.base64.length * 3) / 4);
+          if (limits.imageTypes.length > 0 && !limits.imageTypes.includes(mimeType)) {
+            toast.warning('Please choose a JPEG or PNG photo.', { title: 'Unsupported image' });
+            return;
+          }
+          if (bytes > limits.imageBytes) {
+            toast.warning(`Please choose a photo under ${(limits.imageBytes / (1024 * 1024)).toFixed(1)} MB.`, {
+              title: 'Image too large',
+            });
+            return;
+          }
+          if (asset.width > limits.imageDimension || asset.height > limits.imageDimension) {
+            toast.warning(`Please choose a photo no larger than ${limits.imageDimension}×${limits.imageDimension}.`, {
+              title: 'Image too large',
+            });
+            return;
+          }
+        }
         const dataUrl = `data:${mimeType};base64,${asset.base64}`;
         setImage({ dataUrl, uri: asset.uri });
         setCropPosition(50);
@@ -119,7 +157,7 @@ export function CommunityPostComposer({
         title: 'Error'
       });
     }
-  }, [setImage, setCropPosition, setCropZoom]);
+  }, [setImage, setCropPosition, setCropZoom, isGlobal, config]);
 
   const handleRemoveImage = useCallback(() => {
     setImage(null);
@@ -163,7 +201,7 @@ export function CommunityPostComposer({
   }, [topic, content, type, image, cropRatio, cropPosition, cropZoom, createPost, onSuccess]);
 
   const isSubmitting = createPost.isPending;
-  const canSubmit = topic.trim().length > 0 && content.trim().length > 0 && !isSubmitting;
+  const canSubmit = topic.trim().length > 0 && content.trim().length > 0 && !isSubmitting && !postingBlocked;
 
   return (
     <KeyboardAvoidingView
@@ -433,7 +471,11 @@ export function CommunityPostComposer({
           style={{ borderRadius: 16 }}
         />
         <Typography variant="caption" style={styles.helperText}>
-          Visible to everyone in your branch
+          {!isGlobal
+            ? 'Visible to everyone in your branch'
+            : postingBlocked
+              ? blockedMessage
+              : `Posting as a member of ${config.postingGymName ?? 'your gym'} · visible to everyone in the GymBios Community`}
         </Typography>
       </View>
     </KeyboardAvoidingView>

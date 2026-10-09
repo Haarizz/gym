@@ -71,6 +71,8 @@ export const membershipApi = {
       paidAmount: item.paid_amount,
       paymentMethod: item.payment_method,
       status: item.status,
+      discountAmount: item.discount_amount,
+      discountLabel: item.discount_label,
     }));
   },
 
@@ -95,6 +97,8 @@ export const membershipApi = {
       memberPhone: response.data.member_phone,
       membershipType: response.data.membership_type,
       remarks: response.data.remarks,
+      discountAmount: response.data.discount_amount,
+      discountLabel: response.data.discount_label,
     };
   },
   

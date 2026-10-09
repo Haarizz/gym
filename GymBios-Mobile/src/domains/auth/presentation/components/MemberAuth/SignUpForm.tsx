@@ -1,38 +1,38 @@
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { FieldErrors } from 'react-hook-form';
 
 import { Button, Input, Typography } from '@/shared/components';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import { signupSchema, type SignupValues } from './schemas';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { SocialAuthButtons } from './SocialAuthButtons';
+
+const SIGNUP_FIELD_ORDER: (keyof SignupValues)[] = ['fullName', 'username', 'email', 'password'];
 
 interface SignUpFormProps {
   onSwitchToSignin: () => void;
   onRegister: (values: SignupValues) => void;
   isLoading?: boolean;
-  errorMessage?: string | null;
   onGoogleSignIn?: () => void;
   isGoogleLoading?: boolean;
   isGoogleAvailable?: boolean;
   onAppleSignIn?: () => void;
   isAppleLoading?: boolean;
   isAppleAvailable?: boolean;
-  socialErrorMessage?: string;
 }
 
 export function SignUpForm({
   onSwitchToSignin,
   onRegister,
   isLoading,
-  errorMessage,
   onGoogleSignIn,
   isGoogleLoading,
   isGoogleAvailable,
   onAppleSignIn,
   isAppleLoading,
   isAppleAvailable,
-  socialErrorMessage,
 }: SignUpFormProps) {
   const {
     control,
@@ -53,6 +53,11 @@ export function SignUpForm({
 
   const onSignup = (values: SignupValues) => {
     onRegister(values);
+  };
+
+  const onInvalid = (formErrors: FieldErrors<SignupValues>) => {
+    const firstField = SIGNUP_FIELD_ORDER.find((field) => formErrors[field]?.message);
+    if (firstField) toast.error(formErrors[firstField]!.message as string);
   };
 
   return (
@@ -76,6 +81,7 @@ export function SignUpForm({
               onChangeText={onChange}
               value={value}
               error={errors.fullName?.message}
+              hideErrorText
             />
           )}
         />
@@ -95,6 +101,7 @@ export function SignUpForm({
               onChangeText={onChange}
               value={value}
               error={errors.username?.message}
+              hideErrorText
             />
           )}
         />
@@ -115,6 +122,7 @@ export function SignUpForm({
               onChangeText={onChange}
               value={value}
               error={errors.email?.message}
+              hideErrorText
             />
           )}
         />
@@ -135,14 +143,13 @@ export function SignUpForm({
                 onChangeText={onChange}
                 value={value}
                 error={errors.password?.message}
+                hideErrorText
               />
               <PasswordStrengthMeter password={signupPassword} />
             </View>
           )}
         />
       </View>
-
-      {errorMessage && <Typography style={styles.errorText}>{errorMessage}</Typography>}
 
       <Typography style={styles.terms}>
         By creating an account, you agree to GymBios's <Typography style={styles.termsLink}>Terms</Typography> and{' '}
@@ -152,7 +159,7 @@ export function SignUpForm({
       <Button
         label="Create account"
         size="lg"
-        onPress={handleSubmit(onSignup)}
+        onPress={handleSubmit(onSignup, onInvalid)}
         loading={isLoading}
         style={styles.btnPrimary}
       />
@@ -172,7 +179,6 @@ export function SignUpForm({
             onAppleSignIn={onAppleSignIn}
             isAppleLoading={!!isAppleLoading}
             isAppleAvailable={!!isAppleAvailable}
-            errorMessage={socialErrorMessage}
           />
         </>
       ) : null}
@@ -201,12 +207,6 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: 16,
-  },
-  errorText: {
-    color: '#D93B3B',
-    fontSize: 13,
-    marginTop: 12,
-    textAlign: 'center',
   },
   passwordField: {
     marginBottom: 8,

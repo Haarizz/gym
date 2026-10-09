@@ -94,7 +94,9 @@ public class MobileMemberMembershipService {
         membershipInfo.setId(member.getId());
         membershipInfo.setStatus(member.getMembershipStatus());
         membershipInfo.setStartDate(member.getMembershipStartDate());
-        membershipInfo.setExpiryDate(member.getExpiryDate());
+        // While frozen, the expiry the member will have once the freeze ends.
+        LocalDateTime expiryDate = MembershipFreezeService.projectedExpiry(member, LocalDateTime.now());
+        membershipInfo.setExpiryDate(expiryDate);
         membershipInfo.setBranchId(member.getBranchId());
         
         // Determine plan details
@@ -113,17 +115,17 @@ public class MobileMemberMembershipService {
         }
         
         // Calculate days
-        if (member.getMembershipStartDate() != null && member.getExpiryDate() != null) {
+        if (member.getMembershipStartDate() != null && expiryDate != null) {
             int totalDays = (int) ChronoUnit.DAYS.between(
                     member.getMembershipStartDate().toLocalDate(), 
-                    member.getExpiryDate().toLocalDate());
+                    expiryDate.toLocalDate());
             membershipInfo.setTotalDays(Math.max(0, totalDays));
         }
 
-        if (member.getExpiryDate() != null) {
+        if (expiryDate != null) {
             int remainingDays = (int) ChronoUnit.DAYS.between(
                     LocalDate.now(), 
-                    member.getExpiryDate().toLocalDate());
+                    expiryDate.toLocalDate());
             membershipInfo.setRemainingDays(Math.max(0, remainingDays));
         }
 

@@ -7,14 +7,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type {
   NotificationFilter,
   NotificationGroup,
   NotificationItem as NotificationItemType,
 } from '../../domain/notification.types';
 import { NotificationItemRow } from './NotificationItem';
+import { NotificationGlass as G } from './notificationGlass';
 
 interface NotificationListProps {
   sections: NotificationGroup[];
@@ -26,6 +27,8 @@ interface NotificationListProps {
   onRefresh: () => void;
   onLoadMore: () => void;
   onItemPress: (item: NotificationItemType) => void;
+  /** Space reserved under the last card so it can scroll clear of the floating footer. */
+  bottomInset?: number;
 }
 
 export function NotificationList({
@@ -38,11 +41,12 @@ export function NotificationList({
   onRefresh,
   onLoadMore,
   onItemPress,
+  bottomInset = 24,
 }: NotificationListProps) {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={BrandColors.teal} />
+        <ActivityIndicator size="large" color={G.teal} />
         <Text style={styles.loadingText}>Loading notifications...</Text>
       </View>
     );
@@ -52,49 +56,53 @@ export function NotificationList({
 
   if (isEmpty) {
     return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconCircle}>
-          <Feather
-            name={filter === 'UNREAD' ? 'check-circle' : 'bell-off'}
-            size={32}
-            color={BrandColors.teal}
-          />
+      <Animated.View entering={FadeIn.duration(300)} style={styles.emptyContainer}>
+        <View style={styles.emptyBubble}>
+          <Feather name={filter === 'UNREAD' ? 'check' : 'bell-off'} size={28} color={G.teal} />
         </View>
         <Text style={styles.emptyTitle}>
-          {filter === 'UNREAD' ? "You're all caught up!" : 'No notifications'}
+          {filter === 'UNREAD' ? "You're all caught up" : 'No notifications yet'}
         </Text>
         <Text style={styles.emptySubtitle}>
-          {filter === 'UNREAD'
-            ? 'There are no unread notifications.'
-            : 'New updates and alerts will appear here.'}
+          New updates about payments, classes and check-ins will show up here.
         </Text>
-      </View>
+      </Animated.View>
     );
   }
+
+  // Stagger index runs across sections so the second group continues the cascade.
+  const sectionOffsets = sections.reduce<number[]>((acc, s, i) => {
+    acc.push(i === 0 ? 0 : acc[i - 1] + sections[i - 1].data.length);
+    return acc;
+  }, []);
 
   return (
     <SectionList
       sections={sections}
       keyExtractor={(item) => String(item.id)}
-      renderItem={({ item }) => (
-        <NotificationItemRow notification={item} onPress={onItemPress} />
+      renderItem={({ item, index, section }) => (
+        <NotificationItemRow
+          notification={item}
+          onPress={onItemPress}
+          index={sectionOffsets[sections.indexOf(section)] + index}
+        />
       )}
       renderSectionHeader={({ section: { title, count } }) => (
-        <View style={styles.sectionHeaderContainer}>
-          <Text style={styles.sectionHeaderText}>
-            {title} ({count})
-          </Text>
-          <View style={styles.sectionDivider} />
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionLabel}>{title}</Text>
+          <Text style={styles.sectionCount}>{count}</Text>
         </View>
       )}
-      contentContainerStyle={styles.listContent}
+      ItemSeparatorComponent={ItemGap}
+      SectionSeparatorComponent={SectionGap}
+      contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={isFetching && !isFetchingNextPage && !isLoading}
           onRefresh={onRefresh}
-          colors={[BrandColors.teal]}
-          tintColor={BrandColors.teal}
+          colors={[G.teal]}
+          tintColor={G.teal}
         />
       }
       onEndReached={() => {
@@ -106,7 +114,7 @@ export function NotificationList({
       ListFooterComponent={
         isFetchingNextPage ? (
           <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color={BrandColors.teal} />
+            <ActivityIndicator size="small" color={G.teal} />
           </View>
         ) : null
       }
@@ -115,26 +123,37 @@ export function NotificationList({
   );
 }
 
+function ItemGap() {
+  return <View style={{ height: 8 }} />;
+}
+
+function SectionGap() {
+  return <View style={{ height: 8 }} />;
+}
+
 const styles = StyleSheet.create({
   listContent: {
-    paddingBottom: 24,
+    paddingHorizontal: 12,
+    paddingTop: 4,
   },
-  sectionHeaderContainer: {
-    backgroundColor: BrandColors.screenBackground,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 6,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingTop: 10,
   },
-  sectionHeaderText: {
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: '#3B4844',
+  },
+  sectionCount: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 0.5,
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#CBD5E1',
-    marginTop: 6,
+    color: G.ink3,
   },
   centerContainer: {
     flex: 1,
@@ -145,36 +164,42 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: BrandColors.textSecondary,
+    fontWeight: '600',
+    color: G.ink2,
   },
   emptyContainer: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
+    gap: 10,
+    paddingTop: 64,
+    paddingHorizontal: 24,
   },
-  emptyIconCircle: {
+  emptyBubble: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E6F4F1',
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    shadowColor: G.shadow,
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: BrandColors.textPrimary,
-    marginBottom: 6,
+    fontSize: 17,
+    fontWeight: '800',
+    color: G.ink,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 13,
-    color: BrandColors.textSecondary,
+    lineHeight: 19,
+    fontWeight: '500',
+    color: G.ink2,
     textAlign: 'center',
-    maxWidth: 240,
-    lineHeight: 18,
+    maxWidth: 250,
   },
   footerLoader: {
     paddingVertical: 16,

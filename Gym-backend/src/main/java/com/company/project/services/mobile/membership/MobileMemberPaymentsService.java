@@ -61,6 +61,8 @@ public class MobileMemberPaymentsService {
         dto.setPaidAmount(receipt.getPaidAmount());
         dto.setPaymentMethod(receipt.getPaymentMethod());
         dto.setStatus(receipt.getStatus());
+        dto.setDiscountAmount(receipt.getDiscountAmount());
+        dto.setDiscountLabel(receipt.getDiscountLabel());
         return dto;
     }
 }

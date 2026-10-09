@@ -70,6 +70,13 @@ export const styles = StyleSheet.create({
   body: {
     flexShrink: 1, 
   },
+  footer: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+  },
   contentContainer: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,

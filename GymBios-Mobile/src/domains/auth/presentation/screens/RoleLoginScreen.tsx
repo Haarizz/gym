@@ -32,7 +32,7 @@ interface RoleLoginScreenProps {
 export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
   const router = useRouter();
   const config = ROLE_LOGIN_CONFIG[role];
-  const { login, isLoading, errorMessage } = useLogin(role);
+  const { login, isLoading } = useLogin(role);
 
   return (
     <View style={styles.root}>
@@ -73,7 +73,6 @@ export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
               config={config}
               onSubmit={login}
               loading={isLoading}
-              errorMessage={errorMessage}
             />
           </ScrollView>
         </KeyboardAvoidingView>

@@ -6,6 +6,17 @@ import type { NotificationItem } from './notification.types';
  * so each web path is mapped explicitly to the mobile route that exists for
  * the current role. Returns null when there is no mobile equivalent.
  */
+/** Backend MemberPaymentApprovalNotifier's module: informational, tapping it does nothing. */
+export const PAYMENT_APPROVED_NOTIFICATION_MODULE = 'MEMBERSHIP_APPROVAL';
+
+/**
+ * Nothing to open: payment approvals, plus any notification without an actionUrl
+ * (older payment-approved rows were stored under the GENERAL module).
+ */
+export function isInformationalNotification(item: NotificationItem): boolean {
+  return item.module === PAYMENT_APPROVED_NOTIFICATION_MODULE || !item.actionUrl;
+}
+
 type RouteResolver = (roleGroup: string, item: NotificationItem) => string | null;
 
 const hasId = (id: unknown): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0;

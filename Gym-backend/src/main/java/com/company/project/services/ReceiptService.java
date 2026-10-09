@@ -306,7 +306,10 @@ public class ReceiptService {
             invoiceRow.setReceiptNo(b.getReceiptNo());
             invoiceRow.setInvoiceNo(b.getInvoiceNo());
             invoiceRow.setType("Invoice");
-            invoiceRow.setDescription(b.getPlanName() != null ? b.getPlanName() : b.getTransactionType());
+            String billName = b.getPlanName() != null ? b.getPlanName() : b.getTransactionType();
+            invoiceRow.setDescription(b.getDiscountAmount() != null && b.getDiscountAmount().signum() > 0
+                    ? billName + " · " + b.getDiscountLabel() + " (-" + b.getDiscountAmount() + ")"
+                    : billName);
             invoiceRow.setDebit(billAmount);
             invoiceRow.setCredit(BigDecimal.ZERO);
             invoiceRow.setStatus(b.getStatus());
@@ -479,6 +482,81 @@ public class ReceiptService {
         return Character.toUpperCase(trimmed.charAt(0)) + trimmed.substring(1).toLowerCase();
     }
 
+    /** transactionType of a receipt for a paid class / PT / facility booking. */
+    public static final String TXN_CLASS_BOOKING = "Class Booking";
+
+    /**
+     * The bill for a paid booking (mobile member self-booking). amount is what the
+     * member owes after any code/Reward Pass; paidAmount what they paid now (wallet
+     * included) — less than amount only for a Credit or partial payment, whose
+     * remainder the caller adds to the member's outstanding balance. Not posted to
+     * the ledger here: BookingPaymentService posts it right away, or once staff
+     * approve a Cash/Credit/Mixed payment.
+     */
+    public Receipt createBookingReceipt(Member member, String description, LocalDateTime sessionStart,
+                                        BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
+                                        List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                        String bankAccountCode, String bankAccountName,
+                                        LocalDateTime dueDate) {
+        BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
+        BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(total) : BigDecimal.ZERO;
+
+        Receipt r = new Receipt();
+        r.setTransactionDate(LocalDateTime.now());
+        r.setMemberDbId(member.getId());
+        r.setMemberId(member.getMemberId());
+        r.setMemberName(member.getName());
+        r.setMemberPhone(member.getPhone());
+        r.setTransactionType(TXN_CLASS_BOOKING);
+        r.setAmount(total);
+        r.setPaymentMethod(normalizePaymentMethod(paymentMethod));
+        r.setPaymentBreakdown(paymentBreakdown);
+        r.setPaidAmount(paid);
+        r.setTotalPaidToDate(paid);
+        BigDecimal memberOutstanding = member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO;
+        r.setBalanceAfter(memberOutstanding);
+        if (paid.compareTo(total) >= 0) {
+            r.setStatus("Paid");
+        } else if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+            r.setStatus("Pending");
+        } else {
+            r.setStatus("Partial");
+        }
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
+        r.setDueDate(paid.compareTo(total) < 0 && dueDate != null ? dueDate : sessionStart);
+        r.setPlanName(description);
+        // Same-day validity keeps it out of deferred revenue — a booking is earned on the day.
+        r.setValidFrom(sessionStart);
+        r.setValidTill(sessionStart);
+        r.setMembershipType("Booking");
+        r.setProcessedBy("Mobile App");
+
+        Receipt saved = receiptRepository.save(r);
+        saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
+        return receiptRepository.save(saved);
+    }
+
+    /** Posts a booking receipt's received amount to the General Ledger and Receipt Vouchers. */
+    public void postBookingReceipt(Receipt receipt) {
+        if (receipt.getPaidAmount() == null || receipt.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) return;
+        financialEventService.onMemberPaymentReceived(receipt);
+        receiptVoucherService.createVoucherFromModule(
+                "Class Booking – " + receipt.getMemberName(),
+                "Booking",
+                receipt.getMemberName(),
+                receipt.getMemberDbId(),
+                receipt.getPaidAmount(),
+                receipt.getPaymentMethod(),
+                receipt.getReceiptNo(),
+                null,
+                receipt.getPlanName(),
+                receipt.getPaymentBreakdown(),
+                receipt.getBranchId()
+        );
+    }
+
     /**
      * Called from MemberService after creating or renewing a member.
      */
@@ -538,6 +616,17 @@ public class ReceiptService {
             );
         }
         return saved;
+    }
+
+    /**
+     * Records the discount already taken off a bill's amount and what it was, so payment
+     * history shows a discounted (or free) bill as such. No-op when there was none.
+     */
+    public Receipt recordDiscount(Receipt receipt, BigDecimal discount, String label) {
+        if (receipt == null || discount == null || discount.signum() <= 0) return receipt;
+        receipt.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
+        receipt.setDiscountLabel(label != null && !label.isBlank() ? label : "Discount");
+        return receiptRepository.save(receipt);
     }
 
     public Receipt rejectReceipt(Receipt receipt, String rejectedBy, String reason) {
@@ -608,8 +697,8 @@ public class ReceiptService {
         // member.outstandingBalance is already finalized by the caller (MemberService)
         // before this method runs, so it reflects the true balance after this bill.
         r.setBalanceAfter(member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO);
-        // Fully-paid is checked first so a zero-amount bill (100% discount) is "Paid",
-        // not "Pending" just because nothing was received.
+        // Fully covered comes first: a 0 invoice (e.g. a 100% promotion/coupon) has
+        // nothing left to collect, so it is Paid even though paidAmount is 0.
         if (paidAmount.compareTo(totalAmount) >= 0) {
             r.setStatus("Paid");
         } else if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {

@@ -8,5 +8,6 @@ import java.util.Optional;
 
 public interface UserMembershipRepository extends JpaRepository<UserMembershipEntry, Long> {
     List<UserMembershipEntry> findByGlobalUserId(Long globalUserId);
+    List<UserMembershipEntry> findByTenantSlug(String tenantSlug);
     Optional<UserMembershipEntry> findByGlobalUserIdAndTenantSlug(Long globalUserId, String tenantSlug);
 }

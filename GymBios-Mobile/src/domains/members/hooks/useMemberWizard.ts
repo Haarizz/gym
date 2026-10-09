@@ -13,6 +13,7 @@ import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 import { leadKeys } from '@/domains/leads/hooks/leadKeys';
 import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance';
+import { validateDateOfBirth } from '@/domains/profile/domain/dateOfBirthRules';
 
 /** Contact details carried over when a converted lead is registered as a member. */
 export interface MemberPrefill {
@@ -114,6 +115,9 @@ function validatePersonal(data: MemberWizardData): StepErrors {
 
   const email = data.email.trim();
   if (email && !EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
+
+  const dobError = data.dateOfBirth ? validateDateOfBirth(format(data.dateOfBirth, 'yyyy-MM-dd')) : null;
+  if (dobError) errors.dateOfBirth = dobError;
 
   if (data.photoStatus === 'uploading') errors.photoUrl = 'Wait for the photo to finish uploading';
   return errors;

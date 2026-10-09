@@ -9,6 +9,12 @@ import java.util.List;
  * parsed in MemberService to avoid Jackson date-parsing configuration issues.
  */
 public class MemberRequestDTO {
+    // A discount already netted out of membershipFee before it was sent — the plan's
+    // running offer or a staff discount — recorded on the receipt only, with offerLabel
+    // as its wording ("Offer: Diwali", "Staff discount"). Separate from any code/pass.
+    private java.math.BigDecimal offerDiscount;
+    private String offerLabel;
+
 
     private String name;
     private String email;
@@ -245,4 +251,10 @@ public class MemberRequestDTO {
 
     public String getApprovalStatus() { return approvalStatus; }
     public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public java.math.BigDecimal getOfferDiscount() { return offerDiscount; }
+    public void setOfferDiscount(java.math.BigDecimal offerDiscount) { this.offerDiscount = offerDiscount; }
+
+    public String getOfferLabel() { return offerLabel; }
+    public void setOfferLabel(String offerLabel) { this.offerLabel = offerLabel; }
 }

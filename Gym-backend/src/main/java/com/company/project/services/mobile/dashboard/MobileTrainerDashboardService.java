@@ -7,6 +7,7 @@ import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.ReceiptRepository;
 import com.company.project.repositories.StaffRepository;
 import com.company.project.repositories.StaffTargetRepository;
+import com.company.project.repositories.WorkoutFeedbackRepository;
 import com.company.project.security.UserDetailsImpl;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -34,6 +35,7 @@ public class MobileTrainerDashboardService {
     private final ReceiptRepository receiptRepository;
     private final StaffTargetRepository staffTargetRepository;
     private final BookingRepository bookingRepository;
+    private final WorkoutFeedbackRepository workoutFeedbackRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -42,11 +44,13 @@ public class MobileTrainerDashboardService {
             StaffRepository staffRepository,
             ReceiptRepository receiptRepository,
             StaffTargetRepository staffTargetRepository,
-            BookingRepository bookingRepository) {
+            BookingRepository bookingRepository,
+            WorkoutFeedbackRepository workoutFeedbackRepository) {
         this.staffRepository = staffRepository;
         this.receiptRepository = receiptRepository;
         this.staffTargetRepository = staffTargetRepository;
         this.bookingRepository = bookingRepository;
+        this.workoutFeedbackRepository = workoutFeedbackRepository;
     }
 
     public TrainerDashboardResponseDTO getTrainerDashboard(UserDetailsImpl principal) {
@@ -63,11 +67,18 @@ public class MobileTrainerDashboardService {
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
 
-        // 1. Trainer Info
+        // 1. Trainer Info — rating is the average of member workout feedback on this trainer's sessions
+        Double rating = null;
+        long ratingCount = 0;
+        for (Object[] row : workoutFeedbackRepository.averageRatingByTrainerIds(List.of(staff.getId()))) {
+            rating = Math.round(((Number) row[1]).doubleValue() * 10) / 10.0;
+            ratingCount = ((Number) row[2]).longValue();
+        }
         TrainerInfoDTO trainerInfo = new TrainerInfoDTO(
                 staff.getName() != null ? staff.getName() : principal.getUsername(),
                 staff.getDepartment() != null ? staff.getDepartment() : staff.getRole(),
-                4.9 // Default rating since there's no rating field in Staff entity
+                rating,
+                ratingCount
         );
 
         // 2. Fetch Today's Sessions using EntityManager

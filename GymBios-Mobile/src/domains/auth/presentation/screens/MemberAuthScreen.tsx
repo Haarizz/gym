@@ -22,21 +22,18 @@ interface MemberAuthScreenProps {
 
 export function MemberAuthScreen({ useLogin, useRegister, useGoogleSignIn, useAppleSignIn }: MemberAuthScreenProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
-  const { login, isLoading: isLoginLoading, errorMessage: loginError } = useLogin('member');
-  const { register, isLoading: isRegisterLoading, errorMessage: registerError } = useRegister();
+  const { login, isLoading: isLoginLoading } = useLogin('member');
+  const { register, isLoading: isRegisterLoading } = useRegister();
   const {
     signInWithGoogle,
     isLoading: isGoogleLoading,
-    errorMessage: googleError,
     isAvailable: isGoogleAvailable,
   } = useGoogleSignIn();
   const {
     signInWithApple,
     isLoading: isAppleLoading,
-    errorMessage: appleError,
     isAvailable: isAppleAvailable,
   } = useAppleSignIn();
-  const socialErrorMessage = googleError ?? appleError;
 
   return (
     <View style={styles.root}>
@@ -67,7 +64,6 @@ export function MemberAuthScreen({ useLogin, useRegister, useGoogleSignIn, useAp
             {activeTab === 'signin' ? (
               <SignInForm
                 isLoading={isLoginLoading}
-                errorMessage={loginError}
                 onLogin={(values) => login({ username: values.username, password: values.password })}
                 onSwitchToSignup={() => setActiveTab('signup')}
                 onGoogleSignIn={signInWithGoogle}
@@ -76,12 +72,10 @@ export function MemberAuthScreen({ useLogin, useRegister, useGoogleSignIn, useAp
                 onAppleSignIn={signInWithApple}
                 isAppleLoading={isAppleLoading}
                 isAppleAvailable={isAppleAvailable}
-                socialErrorMessage={socialErrorMessage}
               />
             ) : (
               <SignUpForm
                 isLoading={isRegisterLoading}
-                errorMessage={registerError}
                 onRegister={register}
                 onSwitchToSignin={() => setActiveTab('signin')}
                 onGoogleSignIn={signInWithGoogle}
@@ -90,7 +84,6 @@ export function MemberAuthScreen({ useLogin, useRegister, useGoogleSignIn, useAp
                 onAppleSignIn={signInWithApple}
                 isAppleLoading={isAppleLoading}
                 isAppleAvailable={isAppleAvailable}
-                socialErrorMessage={socialErrorMessage}
               />
             )}
 
@@ -137,7 +130,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(242,244,247,0.86)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.6)',
+    borderTopColor: 'transparent',
     borderBottomWidth: 0,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,

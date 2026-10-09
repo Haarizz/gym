@@ -10,9 +10,20 @@ export interface BookingApi {
   date?: string | null;
   startTime?: string | null;
   type?: 'class' | 'pt' | 'facility' | null;
-  status?: 'confirmed' | 'checked-in' | 'no-show' | 'cancelled' | null;
-  paymentStatus?: 'paid' | 'pay_later' | null;
+  status?: 'confirmed' | 'pending_approval' | 'checked-in' | 'no-show' | 'cancelled' | null;
+  paymentStatus?: 'paid' | 'partial' | 'pending' | 'pay_later' | null;
   price?: number | null;
+  // Mobile self-booking payment (see BookingPaymentService on the backend).
+  grossPrice?: number | null;
+  discountLabel?: string | null;
+  walletAmount?: number | null;
+  // REFUNDED | NOT_REFUNDABLE | VOIDED — set when a paid booking is cancelled.
+  refundStatus?: string | null;
+  refundedAmount?: number | null;
+  cancelledBy?: 'MEMBER' | 'STAFF' | null;
+  // Only on the approvals list: how the member paid, and how much was received.
+  paymentMethod?: string | null;
+  paidAmount?: number | null;
   qrCode?: string | null;
   guest?: boolean | null;
   memberId?: string | null;
@@ -55,7 +66,20 @@ class BookingService {
       guestPhone: raw.guestPhone ?? raw.guest_phone ?? null,
       createdAt: raw.createdAt ?? raw.created_at ?? null,
       paymentStatus: raw.paymentStatus ?? raw.payment_status ?? null,
+      grossPrice: raw.grossPrice ?? raw.gross_price ?? null,
+      discountLabel: raw.discountLabel ?? raw.discount_label ?? null,
+      walletAmount: raw.walletAmount ?? raw.wallet_amount ?? null,
+      refundStatus: raw.refundStatus ?? raw.refund_status ?? null,
+      refundedAmount: raw.refundedAmount ?? raw.refunded_amount ?? null,
+      cancelledBy: raw.cancelledBy ?? raw.cancelled_by ?? null,
+      paymentMethod: raw.paymentMethod ?? raw.payment_method ?? null,
+      paidAmount: raw.paidAmount ?? raw.paid_amount ?? null,
     };
+  }
+
+  private async errorMessage(response: Response, fallback: string): Promise<string> {
+    const err = await response.json().catch(() => ({}));
+    return (err as any)?.message || fallback;
   }
 
   async getBookings(params: {
@@ -107,7 +131,7 @@ class BookingService {
       `${backendBaseUrl}/bookings/${id}/status`,
       { method: "PATCH", body: JSON.stringify({ status }) }
     );
-    if (!response.ok) throw new Error(`Failed to update booking: ${response.status}`);
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to update booking: ${response.status}`));
     return this.normalizeBooking(await response.json());
   }
 
@@ -125,7 +149,35 @@ class BookingService {
       `${backendBaseUrl}/bookings/${id}`,
       { method: "DELETE" }
     );
-    if (!response.ok) throw new Error(`Failed to delete booking: ${response.status}`);
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to delete booking: ${response.status}`));
+  }
+
+  /** Bookings paid by Cash/Credit/Mixed in the app, awaiting reception approval. */
+  async getPendingPaymentApprovals(): Promise<BookingApi[]> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/bookings/pending-approvals`);
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to fetch booking approvals: ${response.status}`));
+    const data = await response.json();
+    return (Array.isArray(data) ? data : []).map((raw: any) => this.normalizeBooking(raw));
+  }
+
+  /** Confirms the seat and posts the payment to the ledger. */
+  async approvePayment(id: string): Promise<BookingApi> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/bookings/${id}/approve-payment`,
+      { method: "POST", body: JSON.stringify({}) }
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to approve payment: ${response.status}`));
+    return this.normalizeBooking(await response.json());
+  }
+
+  /** Cancels the booking, frees the seat and returns any wallet amount / Reward Pass. */
+  async rejectPayment(id: string, reason: string): Promise<BookingApi> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/bookings/${id}/reject-payment`,
+      { method: "POST", body: JSON.stringify({ reason }) }
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to reject payment: ${response.status}`));
+    return this.normalizeBooking(await response.json());
   }
 }
 

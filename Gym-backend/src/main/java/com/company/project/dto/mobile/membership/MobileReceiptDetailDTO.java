@@ -34,6 +34,8 @@ public class MobileReceiptDetailDTO {
     private String memberPhone;
     private String membershipType;
     private String remarks;
+    private BigDecimal discountAmount;
+    private String discountLabel;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -64,6 +66,8 @@ public class MobileReceiptDetailDTO {
         dto.memberPhone     = r.getMemberPhone();
         dto.membershipType  = r.getMembershipType();
         dto.remarks         = r.getRemarks();
+        dto.discountAmount  = r.getDiscountAmount();
+        dto.discountLabel   = r.getDiscountLabel();
         return dto;
     }
 
@@ -87,4 +91,6 @@ public class MobileReceiptDetailDTO {
     public String getMemberPhone() { return memberPhone; }
     public String getMembershipType() { return membershipType; }
     public String getRemarks() { return remarks; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public String getDiscountLabel() { return discountLabel; }
 }

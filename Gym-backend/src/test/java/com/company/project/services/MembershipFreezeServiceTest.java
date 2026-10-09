@@ -93,22 +93,62 @@ class MembershipFreezeServiceTest {
         assertEquals(4, a.freeDaysRemaining());
     }
 
-    @Test
-    void freezeBeyondFreeDaysRaisesChargeOnOutstandingBalance() {
-        pastFreeze(6, 6); // 4 free days left
+    /** A mobile freeze in progress, started daysAgo, as freezeByMember records it. */
+    private MembershipFreeze openMobileFreeze(int daysAgo, int requestedDays, int plannedFreeDays) {
+        MembershipFreeze f = new MembershipFreeze();
+        f.setMemberDbId(7L);
+        f.setSource(MembershipFreeze.SOURCE_MOBILE);
+        f.setFreezeStart(LocalDateTime.now().minusDays(daysAgo));
+        f.setRequestedDays(requestedDays);
+        f.setFreeDaysApplied(plannedFreeDays);
+        f.setChargePerDay(new BigDecimal("5.00"));
+        history.add(f);
+        when(freezeRepository.findFirstByMemberDbIdAndEndedAtIsNullOrderByFreezeStartDesc(7L))
+                .thenReturn(Optional.of(f));
+        return f;
+    }
+
+    private void stubBillCreation() {
         when(receiptService.createReceipt(any())).thenAnswer(inv -> {
             Receipt r = inv.getArgument(0);
             r.setId(99L);
             when(receiptRepository.findById(99L)).thenReturn(Optional.of(r));
             return ReceiptResponseDTO.fromEntity(r);
         });
+    }
+
+    @Test
+    void freezeBeyondFreeDaysQuotesChargeButBillsNothingUpfront() {
+        pastFreeze(6, 6); // 4 free days left
 
         MembershipFreezeService.FreezeResult result = service.freezeByMember(member, 15, "Travel");
 
         assertEquals(4, result.freeDaysApplied());
         assertEquals(11, result.chargedDays());
         assertEquals(new BigDecimal("55.00"), result.chargeAmount());
-        assertEquals(new BigDecimal("55.00"), member.getOutstandingBalance());
+        assertEquals(0, member.getOutstandingBalance().signum());
+        verify(receiptService, never()).createReceipt(any());
+
+        ArgumentCaptor<MembershipFreeze> record = ArgumentCaptor.forClass(MembershipFreeze.class);
+        verify(freezeRepository).save(record.capture());
+        assertNull(record.getValue().getChargeReceiptId());
+        assertEquals(new BigDecimal("5.00"), record.getValue().getChargePerDay());
+        verify(memberService).freezeMember(eq(7L), any());
+    }
+
+    @Test
+    void unfreezeAfterFullFreezeBillsOnlyDaysBeyondFreeDays() {
+        // 12-day freeze, 10 free: ran its full length.
+        MembershipFreeze open = openMobileFreeze(12, 12, 10);
+        stubBillCreation();
+
+        service.unfreeze(7L, open.getFreezeStart().plusDays(12));
+
+        assertEquals(10, open.getFreeDaysApplied());
+        assertEquals(2, open.getChargedDays());
+        assertEquals(new BigDecimal("10.00"), open.getChargeAmount());
+        assertEquals(99L, open.getChargeReceiptId());
+        assertEquals(new BigDecimal("10.00"), member.getOutstandingBalance());
         assertEquals("pending", member.getPaymentStatus());
 
         ArgumentCaptor<Receipt> bill = ArgumentCaptor.forClass(Receipt.class);
@@ -116,11 +156,43 @@ class MembershipFreezeServiceTest {
         assertEquals("Freeze Charge", bill.getValue().getTransactionType());
         assertEquals("Extra freeze days", bill.getValue().getPlanName());
         assertEquals("Pending", bill.getValue().getStatus());
+    }
 
-        ArgumentCaptor<MembershipFreeze> record = ArgumentCaptor.forClass(MembershipFreeze.class);
-        verify(freezeRepository).save(record.capture());
-        assertEquals(99L, record.getValue().getChargeReceiptId());
-        verify(memberService).freezeMember(eq(7L), any());
+    @Test
+    void freeDaysUsedByAnEndedFreezeAreNotOfferedAgain() {
+        MembershipFreeze open = openMobileFreeze(12, 12, 10);
+        stubBillCreation();
+        service.unfreeze(7L, open.getFreezeStart().plusDays(12));
+
+        MembershipFreezeService.FreezeAllowance a = service.getAllowance(member, service.findPlan(member));
+
+        assertEquals(0, a.freeDaysRemaining());
+        assertEquals(5, a.chargeableDays(5));
+    }
+
+    @Test
+    void earlyUnfreezeBillsOnlyDaysActuallyFrozen() {
+        // 12-day freeze, 10 free, ended after 4 days: all 4 free, nothing billed, 6 free days left.
+        MembershipFreeze open = openMobileFreeze(4, 12, 10);
+
+        service.unfreeze(7L, open.getFreezeStart().plusDays(4));
+
+        assertEquals(4, open.getFreeDaysApplied());
+        assertEquals(0, open.getChargedDays());
+        verify(receiptService, never()).createReceipt(any());
+        assertEquals(6, service.getAllowance(member, service.findPlan(member)).freeDaysRemaining());
+    }
+
+    @Test
+    void staffFreezeIsNeverBilledOnUnfreeze() {
+        MembershipFreeze open = openMobileFreeze(12, 12, 10);
+        open.setSource(MembershipFreeze.SOURCE_STAFF);
+
+        service.unfreeze(7L, open.getFreezeStart().plusDays(12));
+
+        assertEquals(10, open.getFreeDaysApplied());
+        assertEquals(0, open.getChargedDays());
+        verify(receiptService, never()).createReceipt(any());
     }
 
     @Test
@@ -197,6 +269,60 @@ class MembershipFreezeServiceTest {
         var order = inOrder(memberService);
         order.verify(memberService).unfreezeMember(eq(7L), any(LocalDateTime.class));
         order.verify(memberService).renewMember(7L, request);
+        assertNotNull(open.getEndedAt());
+    }
+
+    @Test
+    void frozenMemberSeesExpiryPushedOutByTheFreeze() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 2, 12, 0);
+        member.setMembershipStatus("frozen");
+        member.setExpiryDate(LocalDateTime.of(2026, 10, 10, 0, 0));
+        member.setFreezeStartDate(LocalDateTime.of(2026, 10, 1, 0, 0));
+        member.setFreezeEndDate(LocalDateTime.of(2026, 10, 4, 0, 0)); // frozen 1–3 Oct
+
+        assertEquals(LocalDateTime.of(2026, 10, 13, 0, 0), MembershipFreezeService.projectedExpiry(member, now));
+
+        // Still frozen past the planned end (no auto-unfreeze): extends up to now.
+        assertEquals(LocalDateTime.of(2026, 10, 15, 0, 0),
+                MembershipFreezeService.projectedExpiry(member, LocalDateTime.of(2026, 10, 6, 9, 0)));
+
+        member.setMembershipStatus("active");
+        assertEquals(LocalDateTime.of(2026, 10, 10, 0, 0), MembershipFreezeService.projectedExpiry(member, now));
+    }
+
+    @Test
+    void staffEndDateIsTheLastFrozenDay() {
+        assertEquals("2026-10-04T00:00:00", MembershipFreezeService.staffEndDateToFreezeEnd("2026-10-03"));
+        assertEquals("2026-10-04T00:00:00", MembershipFreezeService.staffEndDateToFreezeEnd("2026-10-03T00:00:00Z"));
+    }
+
+    @Test
+    void staffFreezeStoresTheDayAfterTheLastFrozenDayAsTheEnd() {
+        com.company.project.dto.FreezeRequestDTO request = new com.company.project.dto.FreezeRequestDTO();
+        request.setFreezeStartDate("2026-10-01T00:00:00Z");
+        request.setFreezeUntil("2026-10-03T00:00:00Z");
+
+        service.freezeByStaff(7L, request);
+
+        ArgumentCaptor<com.company.project.dto.FreezeRequestDTO> sent =
+                ArgumentCaptor.forClass(com.company.project.dto.FreezeRequestDTO.class);
+        verify(memberService).freezeMember(eq(7L), sent.capture());
+        assertEquals("2026-10-04T00:00:00", sent.getValue().getFreezeUntil());
+    }
+
+    @Test
+    void staffRefreezingAFrozenMemberEndsTheOldFreezeFirst() {
+        member.setMembershipStatus("frozen");
+        MembershipFreeze open = openMobileFreeze(3, 3, 3);
+        open.setSource(MembershipFreeze.SOURCE_STAFF);
+        com.company.project.dto.FreezeRequestDTO request = new com.company.project.dto.FreezeRequestDTO();
+        request.setFreezeUntil("2026-12-20");
+
+        service.freezeByStaff(7L, request);
+
+        var order = inOrder(memberService);
+        order.verify(memberService).unfreezeMember(eq(7L), any(LocalDateTime.class));
+        order.verify(memberService).freezeMember(eq(7L), any());
         assertNotNull(open.getEndedAt());
     }
 

@@ -44,6 +44,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
     }
 
+    @ExceptionHandler(SessionFullException.class)
+    public ResponseEntity<Map<String, Object>> handleSessionFull(SessionFullException ex) {
+        return build(HttpStatus.CONFLICT, "SESSION_FULL", ex.getMessage());
+    }
+
     @ExceptionHandler(BusinessRuleViolationException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRule(BusinessRuleViolationException ex) {
         return build(HttpStatus.CONFLICT, "BUSINESS_RULE_VIOLATION", ex.getMessage());
@@ -71,6 +76,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CommunityMembershipRequiredException.class)
     public ResponseEntity<Map<String, Object>> handleCommunityMembershipRequired(CommunityMembershipRequiredException ex) {
         return build(HttpStatus.FORBIDDEN, "COMMUNITY_MEMBERSHIP_REQUIRED", ex.getMessage());
+    }
+
+    @ExceptionHandler(com.company.project.community.global.CommunityException.class)
+    public ResponseEntity<Map<String, Object>> handleCommunity(com.company.project.community.global.CommunityException ex) {
+        return build(ex.getStatus(), ex.getCode(), ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

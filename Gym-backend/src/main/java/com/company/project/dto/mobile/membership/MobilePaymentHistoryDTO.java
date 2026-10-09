@@ -13,6 +13,8 @@ public class MobilePaymentHistoryDTO {
     private BigDecimal paidAmount;
     private String paymentMethod;
     private String status; // "Paid", "Pending", "Partial"
+    private BigDecimal discountAmount;
+    private String discountLabel;
 
     public MobilePaymentHistoryDTO() {}
 
@@ -39,4 +41,10 @@ public class MobilePaymentHistoryDTO {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getDiscountLabel() { return discountLabel; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
 }

@@ -11,6 +11,7 @@ import { MemberReferralsScreen } from '../../../member-referrals/presentation/sc
 import { MyPerformanceScreen } from './MyPerformanceScreen';
 import { TransactionsScreen } from './TransactionsScreen';
 import { SettingsScreen } from './SettingsScreen';
+import { WalletScreen } from '@/domains/memberPortal/wallet/WalletScreen';
 
 const SLIDE_DURATION = 320;
 
@@ -20,9 +21,10 @@ export type ProfileView =
   | 'referrals'
   | 'my-performance'
   | 'transactions'
+  | 'wallet'
   | 'settings';
 
-const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'settings'];
+const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'settings'];
 
 export function ProfileScreen() {
   const router = useRouter();
@@ -42,9 +44,10 @@ export function ProfileScreen() {
     if (view && (VALID_VIEWS as string[]).includes(view)) {
       if (view === 'my-performance' && !isEmployee) return;
       if (view === 'referrals' && isEmployee) return;
+      if (view === 'wallet' && appRole !== 'member') return;
       setActiveView(view as ProfileView);
     }
-  }, [view, isEmployee]);
+  }, [view, isEmployee, appRole]);
 
   // The Tabs navigator keeps this screen mounted across blur/focus rather
   // than remounting it, so SlideIn's own mount-triggered entrance wouldn't
@@ -88,6 +91,9 @@ export function ProfileScreen() {
     case 'transactions':
       content = <TransactionsScreen onBack={() => setActiveView('hub')} />;
       break;
+    case 'wallet':
+      content = <WalletScreen onBack={() => setActiveView('hub')} />;
+      break;
     case 'settings':
       content = <SettingsScreen onBack={() => setActiveView('hub')} />;
       break;
@@ -100,6 +106,7 @@ export function ProfileScreen() {
           onNavigateToReferrals={() => setActiveView('referrals')}
           onNavigateToPerformance={() => setActiveView('my-performance')}
           onNavigateToTransactions={() => setActiveView('transactions')}
+          onNavigateToWallet={() => setActiveView('wallet')}
           onNavigateToSettings={() => setActiveView('settings')}
           onLogout={handleLogout}
         />

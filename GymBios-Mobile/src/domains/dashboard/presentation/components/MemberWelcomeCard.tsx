@@ -8,12 +8,20 @@ interface MemberWelcomeCardProps {
 }
 
 export function MemberWelcomeCard({ memberInfo }: MemberWelcomeCardProps) {
-  const firstName = memberInfo.name ? memberInfo.name.split(' ')[0] : 'Member';
+  const firstName = memberInfo.name?.trim().split(/\s+/)[0] || 'Member';
+  // No check-ins yet means this is the member's first time here.
+  const isNewMember = memberInfo.totalVisits === 0;
 
   return (
     <GlassSurface radius={18} style={styles.card}>
-      <Text style={styles.title}>Welcome back, {firstName}! 👋</Text>
-      <Text style={styles.subtitle}>Ready to crush your goals today?</Text>
+      <Text style={styles.title}>
+        {isNewMember ? `Welcome, ${firstName}! 👋` : `Welcome back, ${firstName}! 👋`}
+      </Text>
+      <Text style={styles.subtitle}>
+        {isNewMember
+          ? "Great to have you here — let's kick off your fitness journey."
+          : 'Ready to crush your goals today?'}
+      </Text>
     </GlassSurface>
   );
 }

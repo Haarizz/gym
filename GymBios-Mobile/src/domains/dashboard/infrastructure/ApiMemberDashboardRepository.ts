@@ -214,6 +214,7 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
       isActive: membership?.active ?? false,
       status: membership?.status,
       isFrozen: membership?.isFrozen ?? membership?.is_frozen ?? (membership?.status?.toLowerCase() === 'frozen'),
+      totalVisits: rawStats?.totalVisits ?? rawStats?.total_visits ?? 0,
     };
 
     if (!memberInfo.daysRemaining && memberInfo.validUntil) {

@@ -33,7 +33,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, addDays } from "date-fns";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 
 interface FreezeUnfreezeProps {
@@ -51,6 +51,9 @@ const cardBorder: React.CSSProperties = { borderColor: 'rgba(43, 122, 120, 0.2)'
 
 const initials = (name: string) => (name || '').split(' ').filter(Boolean).map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 const fmt = (d?: string | Date | null) => (d ? format(new Date(d), 'dd MMM yyyy') : '—');
+// A stored freeze end is the moment the member is back (midnight after a staff-picked
+// last day), so the last day actually frozen is the moment before it.
+const lastFrozenDay = (end: string) => new Date(new Date(end).getTime() - 1);
 
 export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   // Freeze form (left)
@@ -180,8 +183,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       return;
     }
 
-    if (freezeStartDate >= freezeEndDate) {
-      toast.error('End date must be after start date');
+    if (freezeStartDate > freezeEndDate) {
+      toast.error('End date cannot be before start date');
       return;
     }
     setIsSubmitting(true);
@@ -259,10 +262,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
       }));
   };
 
-  // Total planned freeze duration (start → end, inclusive)
+  // Total planned freeze duration (start → the moment the freeze ends)
   const plannedFreezeDays = (m: Member): number => {
     if (!m.freeze_start_date || !m.freeze_end_date) return 0;
-    return Math.max(0, differenceInDays(new Date(m.freeze_end_date), new Date(m.freeze_start_date)) + 1);
+    return Math.max(0, differenceInDays(new Date(m.freeze_end_date), new Date(m.freeze_start_date)));
   };
 
   const filteredMembers = useMemo(() => {
@@ -291,7 +294,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     const rows = frozenMembers.map((m) => [
       m.name, m.member_id, m.phone, m.membership_plan,
       m.freeze_start_date ? format(new Date(m.freeze_start_date), 'yyyy-MM-dd') : '',
-      m.freeze_end_date ? format(new Date(m.freeze_end_date), 'yyyy-MM-dd') : '',
+      m.freeze_end_date ? format(lastFrozenDay(m.freeze_end_date), 'yyyy-MM-dd') : '',
       plannedFreezeDays(m), m.membership_status,
       autoUnfreezeFor(m) ? 'Yes' : 'No', m.freeze_reason || '',
     ]);
@@ -496,7 +499,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             selected={freezeStartDate}
                             onSelect={(d) => {
                               setFreezeStartDate(d);
-                              if (d && freezeEndDate && freezeEndDate <= d) setFreezeEndDate(undefined);
+                              if (d && freezeEndDate && freezeEndDate < d) setFreezeEndDate(undefined);
                             }}
                             disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                           />
@@ -518,7 +521,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             mode="single"
                             selected={freezeEndDate}
                             onSelect={setFreezeEndDate}
-                            disabled={(date) => !freezeStartDate || date <= freezeStartDate}
+                            disabled={(date) => !freezeStartDate || date < freezeStartDate}
                           />
                         </PopoverContent>
                       </Popover>
@@ -566,7 +569,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                     <div>
                       <Label className="text-sm font-medium">Auto Unfreeze on End Date</Label>
                       <p className="text-xs text-gray-600 mt-1">
-                        Automatically activate membership on {freezeEndDate ? format(freezeEndDate, 'dd MMM yyyy') : 'end date'}
+                        Automatically activate membership on {freezeEndDate ? format(addDays(freezeEndDate, 1), 'dd MMM yyyy') : 'the day after the end date'}
                       </p>
                     </div>
                     <Switch checked={autoUnfreeze} onCheckedChange={setAutoUnfreeze} />
@@ -675,7 +678,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             <TableCell className="font-mono text-sm">{member.member_id || member.id}</TableCell>
                             <TableCell>{member.membership_plan || '—'}</TableCell>
                             <TableCell>{fmt(member.freeze_start_date)}</TableCell>
-                            <TableCell>{fmt(member.freeze_end_date)}</TableCell>
+                            <TableCell>{member.freeze_end_date ? fmt(lastFrozenDay(member.freeze_end_date)) : '—'}</TableCell>
                             <TableCell>
                               <Badge className="bg-blue-100 text-blue-700">{plannedFreezeDays(member)} days</Badge>
                             </TableCell>

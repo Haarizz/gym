@@ -197,7 +197,12 @@ export function PromotionsScreen({
             keyExtractor={(item) => String(item.id)}
             renderItem={renderPromotionItem}
             numColumns={numColumns}
-            ListHeaderComponent={renderHeader}
+            // Pass an element, not the function: renderHeader changes identity on
+            // every keystroke, and FlatList treats a function as a component type —
+            // a new type remounts the header, destroying the focused TextInput and
+            // dismissing the keyboard after one character.
+            ListHeaderComponent={renderHeader()}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
             refreshControl={
               <RefreshControl

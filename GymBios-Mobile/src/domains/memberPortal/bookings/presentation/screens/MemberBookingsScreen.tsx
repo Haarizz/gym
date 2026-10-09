@@ -11,58 +11,105 @@ import {
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { GlassBlob, GlassSurface } from '@/shared/components';
 import { BookingStatsHeader } from '../components/BookingStatsHeader';
 import { BookingCard, type BookingItemData } from '../components/BookingCard';
 import { PastBookingItem, type PastBookingData } from '../components/PastBookingItem';
 import { BookClassModal } from '../components/BookClassModal';
+import { CancelBookingSheet } from '../components/CancelBookingSheet';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet/AppBottomSheet';
-import { 
-  useUpcomingBookings, 
-  usePastBookings, 
-  useBookingStats, 
-  useCancelBooking 
+import {
+  useUpcomingBookings,
+  usePastBookings,
+  useBookingStats,
+  useCancelBooking
 } from '../../hooks/useMemberBookings';
+import type { MemberBookingData, RefundMethod } from '../../domain/MemberBookingData';
+import { formatRefundDeadline } from '../../domain/refundPolicy';
+
+const isAttendedStatus = (status: string) => {
+  const s = (status || '').toUpperCase();
+  return s === 'CHECKED-IN' || s === 'ATTENDED';
+};
+
+function toBookingItem(b: MemberBookingData): BookingItemData {
+  const price = b.price ?? 0;
+  return {
+    id: String(b.id),
+    class: b.className ?? 'Unknown Class',
+    date: b.date,
+    time: b.startTime ?? '',
+    duration: `${b.durationMinutes ?? 0} min`,
+    trainer: b.trainerName ?? '',
+    location: b.location ?? '',
+    spotsLeft: b.availableSpots,
+    status: (b.status || '').toLowerCase(),
+    price,
+    paidAmount: b.paymentStatus === 'paid' ? price : 0,
+    partlyPaid: b.paymentStatus === 'partial',
+    paymentStatus: b.paymentStatus,
+    discountLabel: b.discountLabel,
+    walletAmount: b.walletAmount,
+    paidWithPass: !!b.discountLabel?.startsWith('Reward Pass'),
+    refundDeadline: b.refundDeadline,
+    refundableIfCancelledNow: b.refundableIfCancelledNow,
+  };
+}
+
+const REFUND_NOTES: Record<string, string> = {
+  REFUNDED: 'Refunded to wallet',
+  NOT_REFUNDABLE: 'Not refunded',
+  VOIDED: 'Nothing charged',
+};
 
 export function MemberBookingsScreen() {
-  const { 
-    data: upcomingBookings, 
-    isLoading: isLoadingUpcoming, 
-    refetch: refetchUpcoming, 
-    isRefetching: isRefetchingUpcoming 
+  const { formatCurrency } = useCurrency();
+  const {
+    data: upcomingBookings,
+    isLoading: isLoadingUpcoming,
+    refetch: refetchUpcoming,
+    isRefetching: isRefetchingUpcoming
   } = useUpcomingBookings();
-  
-  const { 
-    data: pastBookings, 
-    isLoading: isLoadingPast, 
-    refetch: refetchPast, 
-    isRefetching: isRefetchingPast 
+
+  const {
+    data: pastBookings,
+    isLoading: isLoadingPast,
+    refetch: refetchPast,
+    isRefetching: isRefetchingPast
   } = usePastBookings();
-  
-  const { 
-    data: stats, 
-    isLoading: isLoadingStats, 
-    refetch: refetchStats, 
-    isRefetching: isRefetchingStats 
+
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    refetch: refetchStats,
+    isRefetching: isRefetchingStats
   } = useBookingStats();
 
   const cancelMutation = useCancelBooking();
 
   const [isBookModalVisible, setIsBookModalVisible] = useState(false);
   const [selectedBookingForDetails, setSelectedBookingForDetails] = useState<BookingItemData | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<BookingItemData | null>(null);
 
-  const handleCancelBooking = (id: string | number) => {
-    cancelMutation.mutate(Number(id), {
-      onSuccess: () => toast.success('Your reservation has been cancelled.'),
-      onError: () => toast.error('Failed to cancel the booking.'),
+  const handleConfirmCancel = (booking: BookingItemData, refundMethod: RefundMethod) => {
+    cancelMutation.mutate({ bookingId: Number(booking.id), refundMethod }, {
+      onSuccess: (result) => {
+        setBookingToCancel(null);
+        if (result.refundStatus === 'REFUNDED' && result.refundedAmount) {
+          toast.success(`${formatCurrency(result.refundedAmount)} has been refunded to your wallet.`, {
+            title: 'Booking Cancelled',
+          });
+        } else if (result.refundStatus === 'NOT_REFUNDABLE') {
+          toast.success('Your spot has been released. No refund was given.', { title: 'Booking Cancelled' });
+        } else {
+          toast.success('Your reservation has been cancelled.');
+        }
+      },
+      // The API client already shows the server's reason.
+      onError: () => setBookingToCancel(null),
     });
   };
-
-  const handleViewDetails = (booking: BookingItemData) => {
-    setSelectedBookingForDetails(booking);
-  };
-
-
 
   const onRefresh = () => {
     refetchUpcoming();
@@ -84,45 +131,25 @@ export function MemberBookingsScreen() {
   const allUpcomingRaw = upcomingBookings || [];
   const allPastRaw = pastBookings || [];
 
-  const actualUpcomingRaw = allUpcomingRaw.filter(b => {
-    const status = ((b as any).status || '').toUpperCase();
-    return status !== 'CHECKED-IN' && status !== 'ATTENDED';
-  });
-
-  const checkedInFromUpcoming = allUpcomingRaw.filter(b => {
-    const status = ((b as any).status || '').toUpperCase();
-    return status === 'CHECKED-IN' || status === 'ATTENDED';
-  });
-
+  const actualUpcomingRaw = allUpcomingRaw.filter((b) => !isAttendedStatus(b.status));
+  const checkedInFromUpcoming = allUpcomingRaw.filter((b) => isAttendedStatus(b.status));
   const actualPastRaw = [...allPastRaw, ...checkedInFromUpcoming];
 
-  const mappedUpcoming: BookingItemData[] = actualUpcomingRaw.map(b => {
-    const bData: any = b;
-    return {
-      id: String(bData.id),
-      class: bData.class_name ?? bData.className ?? 'Unknown Class',
-      date: bData.date,
-      time: bData.start_time ?? bData.startTime ?? '',
-      duration: `${bData.duration_minutes ?? bData.durationMinutes ?? 0} min`,
-      trainer: bData.trainer_name ?? bData.trainerName ?? '',
-      location: bData.location ?? '',
-      spotsLeft: bData.available_spots ?? bData.availableSpots ?? 0,
-      status: (bData.status || '').toLowerCase() as any,
-    };
-  });
+  const mappedUpcoming: BookingItemData[] = actualUpcomingRaw.map(toBookingItem);
 
-  const mappedPast: PastBookingData[] = actualPastRaw.map(b => {
-    const bData: any = b;
-    const status = (bData.status || '').toUpperCase();
-    return {
-      id: String(bData.id),
-      class: bData.class_name ?? bData.className ?? 'Unknown Class',
-      date: bData.date,
-      time: bData.start_time ?? bData.startTime ?? '',
-      trainer: bData.trainer_name ?? bData.trainerName ?? '',
-      attended: status === 'ATTENDED' || status === 'CHECKED-IN',
-    };
-  });
+  const mappedPast: PastBookingData[] = actualPastRaw.map((b) => ({
+    id: String(b.id),
+    class: b.className ?? 'Unknown Class',
+    date: b.date,
+    time: b.startTime ?? '',
+    trainer: b.trainerName ?? '',
+    attended: isAttendedStatus(b.status),
+    cancelled: (b.status || '').toUpperCase() === 'CANCELLED',
+    refundNote: b.refundStatus ? REFUND_NOTES[b.refundStatus] : null,
+  }));
+
+  const details = selectedBookingForDetails;
+  const detailsDeadline = formatRefundDeadline(details?.refundDeadline);
 
   return (
     <View style={styles.root}>
@@ -169,8 +196,8 @@ export function MemberBookingsScreen() {
               <BookingCard
                 key={booking.id}
                 booking={booking}
-                onCancel={handleCancelBooking}
-                onViewDetails={handleViewDetails}
+                onCancel={setBookingToCancel}
+                onViewDetails={setSelectedBookingForDetails}
               />
             ))}
           </View>
@@ -204,37 +231,76 @@ export function MemberBookingsScreen() {
         onClose={() => setIsBookModalVisible(false)}
       />
 
+      <CancelBookingSheet
+        key={bookingToCancel?.id ?? 'none'}
+        booking={bookingToCancel}
+        loading={cancelMutation.isPending}
+        onClose={() => setBookingToCancel(null)}
+        onConfirm={handleConfirmCancel}
+      />
+
       <AppBottomSheet
-        visible={!!selectedBookingForDetails}
-        title={selectedBookingForDetails?.class || 'Class Details'}
-        subtitle={selectedBookingForDetails?.trainer ? `with ${selectedBookingForDetails.trainer}` : ''}
+        visible={!!details}
+        title={details?.class || 'Class Details'}
+        subtitle={details?.trainer ? `with ${details.trainer}` : ''}
         onClose={() => setSelectedBookingForDetails(null)}
       >
-        {selectedBookingForDetails && (
-          <View style={{ gap: Spacing.four, paddingBottom: Spacing.four }}>
+        {details && (
+          <View style={styles.detailsBody}>
             <View>
-              <Text style={{ fontSize: 13, color: BrandColors.textSecondary, marginBottom: 2 }}>Date & Time</Text>
-              <Text style={{ fontSize: 15, color: BrandColors.textPrimary, fontWeight: '600' }}>
-                {selectedBookingForDetails.date} at {selectedBookingForDetails.time}
+              <Text style={styles.detailLabel}>Date & Time</Text>
+              <Text style={styles.detailValue}>
+                {details.date} at {details.time}
               </Text>
-              <Text style={{ fontSize: 13, color: BrandColors.textSecondary, marginTop: 2 }}>
-                Duration: {selectedBookingForDetails.duration}
-              </Text>
+              <Text style={styles.detailMeta}>Duration: {details.duration}</Text>
             </View>
 
             <View>
-              <Text style={{ fontSize: 13, color: BrandColors.textSecondary, marginBottom: 2 }}>Location</Text>
-              <Text style={{ fontSize: 15, color: BrandColors.textPrimary, fontWeight: '600' }}>
-                {selectedBookingForDetails.location}
-              </Text>
+              <Text style={styles.detailLabel}>Location</Text>
+              <Text style={styles.detailValue}>{details.location}</Text>
             </View>
 
             <View>
-              <Text style={{ fontSize: 13, color: BrandColors.textSecondary, marginBottom: 2 }}>Status</Text>
-              <Text style={{ fontSize: 15, color: BrandColors.textPrimary, fontWeight: '600', textTransform: 'capitalize' }}>
-                {selectedBookingForDetails.status}
+              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={[styles.detailValue, styles.capitalize]}>
+                {details.status === 'pending_approval' ? 'Awaiting payment approval' : details.status}
               </Text>
             </View>
+
+            {(details.price > 0 || details.paidWithPass) && (
+              <View>
+                <Text style={styles.detailLabel}>Payment</Text>
+                {details.paidWithPass && details.price === 0 ? (
+                  <Text style={styles.detailValue}>Paid with Reward Pass</Text>
+                ) : (
+                  <Text style={styles.detailValue}>
+                    <CurrencyValue amount={details.price} />
+                    {details.status === 'pending_approval'
+                      ? ' · awaiting approval'
+                      : details.partlyPaid ? ' · part-paid' : ' · paid'}
+                  </Text>
+                )}
+                {details.discountLabel && !details.paidWithPass ? (
+                  <Text style={styles.detailMeta}>Discount: {details.discountLabel}</Text>
+                ) : null}
+                {details.walletAmount ? (
+                  <Text style={styles.detailMeta}>
+                    <CurrencyValue amount={details.walletAmount} /> from wallet
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            {(details.price > 0 || details.paidWithPass) && detailsDeadline && details.status !== 'pending_approval' && (
+              <View>
+                <Text style={styles.detailLabel}>Cancellation</Text>
+                <Text style={styles.detailValue}>
+                  {details.refundableIfCancelledNow
+                    ? `Full refund if cancelled before ${detailsDeadline}`
+                    : 'No refund — the session starts in less than 2 hours'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </AppBottomSheet>
@@ -304,5 +370,27 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: TypographyScale.body,
     color: BrandColors.textSecondary,
+  },
+  detailsBody: {
+    gap: Spacing.four,
+    paddingBottom: Spacing.four,
+  },
+  detailLabel: {
+    fontSize: 13,
+    color: BrandColors.textSecondary,
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 15,
+    color: BrandColors.textPrimary,
+    fontWeight: '600',
+  },
+  detailMeta: {
+    fontSize: 13,
+    color: BrandColors.textSecondary,
+    marginTop: 2,
+  },
+  capitalize: {
+    textTransform: 'capitalize',
   },
 });

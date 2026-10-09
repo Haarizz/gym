@@ -8,6 +8,8 @@ import type {
   CreateCommunityPostRequest,
   CreateCommunityCommentRequest,
   ToggleCommunityLikeResponse,
+  CommunityClientConfig,
+  CommunityReportReason,
 } from '../domain/community.types';
 
 export interface CommunityRepository {
@@ -19,7 +21,7 @@ export interface CommunityRepository {
     q?: string,
     type?: string,
     archived?: boolean,
-    page?: number,
+    pageParam?: number | string,
     limit?: number,
   ): Promise<CommunityPostsPageResponse>;
 
@@ -35,5 +37,15 @@ export interface CommunityRepository {
   ): Promise<CommunityComment>;
   deleteComment(postId: number, commentId: number): Promise<void>;
 
-  toggleLike(postId: number): Promise<ToggleCommunityLikeResponse>;
+  /** currentlyLiked lets idempotent APIs choose like vs unlike; the legacy toggle ignores it. */
+  toggleLike(postId: number, currentlyLiked?: boolean): Promise<ToggleCommunityLikeResponse>;
+
+  // Global Community only (the legacy API has no equivalent).
+  getConfig?(): Promise<CommunityClientConfig>;
+  reportPost?(postId: number, reason: CommunityReportReason, details?: string): Promise<void>;
+  reportComment?(commentId: number, reason: CommunityReportReason, details?: string): Promise<void>;
+  hidePost?(postId: number, reason?: string): Promise<CommunityPost>;
+  restorePost?(postId: number, reason?: string): Promise<CommunityPost>;
+  hideComment?(commentId: number, scope?: string, reason?: string): Promise<void>;
+  restoreComment?(commentId: number, scope?: string, reason?: string): Promise<void>;
 }

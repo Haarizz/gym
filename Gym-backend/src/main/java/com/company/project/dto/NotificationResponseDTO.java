@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.time.LocalDateTime;
@@ -66,7 +67,10 @@ public class NotificationResponseDTO {
     public int getCount() { return count; }
     public void setCount(int count) { this.count = count; }
 
+    // Jackson would otherwise derive "read" from isRead(); clients expect is_read -> isRead.
+    @JsonProperty("is_read")
     public boolean isRead() { return isRead; }
+    @JsonProperty("is_read")
     public void setRead(boolean isRead) { this.isRead = isRead; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }

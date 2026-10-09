@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useProfile } from '@/domains/profile';
 import type { MemberDashboardData } from '../domain/MemberDashboardData';
@@ -16,6 +17,7 @@ export const DEFAULT_MEMBER_DASHBOARD: MemberDashboardData = {
     validUntil: '',
     isActive: false,
     isFrozen: false,
+    totalVisits: 0,
   },
   todaysSchedule: [],
   quickStats: [
@@ -42,11 +44,6 @@ export function useMemberDashboard() {
       const data = await memberDashboardRepository.getMemberDashboard();
       return {
         ...data,
-        memberInfo: {
-          ...data.memberInfo,
-          name: profile?.name || data.memberInfo?.name || DEFAULT_MEMBER_DASHBOARD.memberInfo.name,
-          gymName: profile?.branch || data.memberInfo?.gymName || DEFAULT_MEMBER_DASHBOARD.memberInfo.gymName,
-        },
         todaysSchedule: Array.isArray(data.todaysSchedule) ? data.todaysSchedule : [],
         quickStats: Array.isArray(data.quickStats) ? data.quickStats : DEFAULT_MEMBER_DASHBOARD.quickStats,
       };
@@ -55,15 +52,23 @@ export function useMemberDashboard() {
     staleTime: 1000 * 60 * 2,
   });
 
+  // Profile overrides are applied outside queryFn: on first load the profile
+  // may not have resolved yet, and baking the fallback (the username, for
+  // members without a gym) into the cached response would stick until refetch.
+  const data = useMemo<MemberDashboardData>(() => {
+    const base = query.data ?? DEFAULT_MEMBER_DASHBOARD;
+    return {
+      ...base,
+      memberInfo: {
+        ...base.memberInfo,
+        name: profile?.name || base.memberInfo?.name || DEFAULT_MEMBER_DASHBOARD.memberInfo.name,
+        gymName: profile?.branch || base.memberInfo?.gymName || DEFAULT_MEMBER_DASHBOARD.memberInfo.gymName,
+      },
+    };
+  }, [query.data, profile?.name, profile?.branch]);
+
   return {
     ...query,
-    data: query.data ?? {
-      ...DEFAULT_MEMBER_DASHBOARD,
-      memberInfo: {
-        ...DEFAULT_MEMBER_DASHBOARD.memberInfo,
-        name: profile?.name || DEFAULT_MEMBER_DASHBOARD.memberInfo.name,
-        gymName: profile?.branch || DEFAULT_MEMBER_DASHBOARD.memberInfo.gymName,
-      },
-    },
+    data,
   };
 }

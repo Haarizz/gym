@@ -54,4 +54,20 @@ public class AvailableClassDTO {
 
     public String getMemberBookingState() { return memberBookingState; }
     public void setMemberBookingState(String memberBookingState) { this.memberBookingState = memberBookingState; }
+
+    // The session's price (null or 0 = free).
+    private java.math.BigDecimal price;
+    // Gym-local wall-clock time (ISO, no zone) after which a member's cancellation is not refunded.
+    private String refundDeadline;
+    // Whether a booking made now could still be cancelled with a refund (false inside the window).
+    private boolean refundableIfBookedNow;
+
+    public java.math.BigDecimal getPrice() { return price; }
+    public void setPrice(java.math.BigDecimal price) { this.price = price; }
+
+    public String getRefundDeadline() { return refundDeadline; }
+    public void setRefundDeadline(String refundDeadline) { this.refundDeadline = refundDeadline; }
+
+    public boolean isRefundableIfBookedNow() { return refundableIfBookedNow; }
+    public void setRefundableIfBookedNow(boolean refundableIfBookedNow) { this.refundableIfBookedNow = refundableIfBookedNow; }
 }

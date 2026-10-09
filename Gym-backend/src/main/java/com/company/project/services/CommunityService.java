@@ -8,6 +8,7 @@ import com.company.project.repositories.CommunityPostLikeRepository;
 import com.company.project.repositories.CommunityPostRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.UserRepository;
+import com.company.project.security.BranchContextHolder;
 import com.company.project.security.TenantContextHolder;
 import com.company.project.security.UserDetailsImpl;
 import org.springframework.data.domain.Page;
@@ -24,7 +25,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -91,12 +94,12 @@ public class CommunityService {
     private record Viewer(Long userId, Long memberId, Long globalUserId) {
         static final Viewer ANONYMOUS = new Viewer(null, null, null);
 
-        boolean isAuthorOf(User authorUser, Member authorMember, Long authorGlobalUserId) {
+        boolean isAuthorOf(User authorUser, Long authorMemberId, Long authorGlobalUserId) {
             if (userId != null) {
                 return authorUser != null && userId.equals(authorUser.getId());
             }
             if (memberId != null) {
-                return authorMember != null && memberId.equals(authorMember.getId());
+                return memberId.equals(authorMemberId);
             }
             if (globalUserId != null) {
                 return globalUserId.equals(authorGlobalUserId);
@@ -130,6 +133,13 @@ public class CommunityService {
                 return user.getUsername();
             }
             return member != null ? member.getName() : guestName;
+        }
+
+        /** The acting member's name keyed by id, for responses about what they just wrote. */
+        Map<Long, String> memberName() {
+            return member != null
+                    ? Collections.singletonMap(member.getId(), member.getName())
+                    : Collections.emptyMap();
         }
 
         /** Distinct across all three ID spaces, for notification dedup keys. */
@@ -210,8 +220,10 @@ public class CommunityService {
             likedByMeSet = Collections.emptySet();
         }
 
+        Map<Long, String> memberNames = memberNames(
+                result.getContent().stream().map(CommunityPost::getAuthorMemberId).toList());
         List<CommunityPostResponseDTO> posts = result.getContent().stream()
-                .map(post -> toPostResponse(post, likedByMeSet.contains(post.getId()), viewer))
+                .map(post -> toPostResponse(post, likedByMeSet.contains(post.getId()), viewer, memberNames))
                 .collect(Collectors.toList());
 
         PaginationDTO pagination = new PaginationDTO(
@@ -249,6 +261,7 @@ public class CommunityService {
         post.setTopic(topic);
         post.setContent(content);
         post.setType(type);
+        post.setBranchId(BranchContextHolder.getActiveBranchId());
 
         if (request.getImageDataUrl() != null && !request.getImageDataUrl().trim().isEmpty()) {
             post.setImageDataUrl(request.getImageDataUrl().trim());
@@ -258,7 +271,7 @@ public class CommunityService {
         }
 
         CommunityPost saved = communityPostRepository.save(post);
-        return toPostResponse(saved, false, author.viewer());
+        return toPostResponse(saved, false, author.viewer(), author.memberName());
     }
 
     /**
@@ -380,13 +393,12 @@ public class CommunityService {
                     entry.setUsername(author.getUsername());
                     return entry;
                 });
-            } else if (p.getAuthorMember() != null && p.getAuthorMember().getId() != null) {
-                Member author = p.getAuthorMember();
-                key = "m" + author.getId();
+            } else if (p.getAuthorMemberId() != null) {
+                Long authorMemberId = p.getAuthorMemberId();
+                key = "m" + authorMemberId;
                 authors.computeIfAbsent(key, k -> {
                     LeaderboardEntryDTO entry = new LeaderboardEntryDTO();
-                    entry.setMemberId(author.getId());
-                    entry.setUsername(author.getName());
+                    entry.setMemberId(authorMemberId);
                     return entry;
                 });
             } else {
@@ -397,6 +409,12 @@ public class CommunityService {
             counts[1] += p.getLikeCount();
             counts[2] += p.getCommentCount();
         }
+
+        Map<Long, String> memberNames = memberNames(
+                authors.values().stream().map(LeaderboardEntryDTO::getMemberId).toList());
+        authors.values().stream()
+                .filter(author -> author.getMemberId() != null)
+                .forEach(author -> author.setUsername(memberNames.get(author.getMemberId())));
 
         return agg.entrySet().stream()
                 .map(e -> {
@@ -418,7 +436,11 @@ public class CommunityService {
     public List<CommunityPostCommentResponseDTO> getComments(Long postId) {
         List<CommunityPostComment> comments = communityPostCommentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         Viewer viewer = getCurrentViewer();
-        return comments.stream().map(comment -> toCommentResponse(comment, viewer)).collect(Collectors.toList());
+        Map<Long, String> memberNames = memberNames(
+                comments.stream().map(CommunityPostComment::getAuthorMemberId).toList());
+        return comments.stream()
+                .map(comment -> toCommentResponse(comment, viewer, memberNames))
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -451,7 +473,7 @@ public class CommunityService {
                 author.displayName() + " commented: \"" + snippet(content) + "\"",
                 null);
 
-        return toCommentResponse(saved, author.viewer());
+        return toCommentResponse(saved, author.viewer(), author.memberName());
     }
 
     @Transactional
@@ -526,7 +548,7 @@ public class CommunityService {
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null);
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMemberId(), null);
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this post");
         }
@@ -552,7 +574,7 @@ public class CommunityService {
         }
 
         boolean isOwner = actor.viewer().isAuthorOf(
-                comment.getAuthorUser(), comment.getAuthorMember(), comment.getAuthorGlobalUserId());
+                comment.getAuthorUser(), comment.getAuthorMemberId(), comment.getAuthorGlobalUserId());
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to delete this comment");
         }
@@ -714,7 +736,8 @@ public class CommunityService {
         return memberRepository.findByGlobalUserId(globalUserId);
     }
 
-    private CommunityPostResponseDTO toPostResponse(CommunityPost post, boolean likedByMe, Viewer viewer) {
+    private CommunityPostResponseDTO toPostResponse(CommunityPost post, boolean likedByMe, Viewer viewer,
+                                                    Map<Long, String> memberNames) {
 
         CommunityPostImageDTO image = null;
         if (post.getImageDataUrl() != null && !post.getImageDataUrl().isEmpty()) {
@@ -740,13 +763,12 @@ public class CommunityService {
             dto.setAuthorUserId(author.getId());
             dto.setAuthorUsername(author.getUsername());
             dto.setAuthorRoles(rolesOf(author));
-        } else if (post.getAuthorMember() != null) {
-            Member author = post.getAuthorMember();
-            dto.setAuthorMemberId(author.getId());
-            dto.setAuthorUsername(author.getName());
+        } else if (post.getAuthorMemberId() != null) {
+            dto.setAuthorMemberId(post.getAuthorMemberId());
+            dto.setAuthorUsername(memberNames.getOrDefault(post.getAuthorMemberId(), "Unknown"));
             dto.setAuthorRoles(List.of("MEMBER"));
         }
-        dto.setOwnedByMe(viewer.isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null));
+        dto.setOwnedByMe(viewer.isAuthorOf(post.getAuthorUser(), post.getAuthorMemberId(), null));
         dto.setCreatedAt(post.getCreatedAt());
         dto.setArchived(post.isArchived());
         return dto;
@@ -767,17 +789,19 @@ public class CommunityService {
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found"));
 
-        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMember(), null);
+        boolean isOwner = actor.viewer().isAuthorOf(post.getAuthorUser(), post.getAuthorMemberId(), null);
         if (!isOwner && !isAdmin(actor)) {
             throw new SecurityException("Not allowed to update this post");
         }
 
         post.setArchived(archived);
         CommunityPost saved = communityPostRepository.save(post);
-        return toPostResponse(saved, false, actor.viewer());
+        return toPostResponse(saved, false, actor.viewer(),
+                memberNames(Collections.singletonList(saved.getAuthorMemberId())));
     }
 
-    private CommunityPostCommentResponseDTO toCommentResponse(CommunityPostComment comment, Viewer viewer) {
+    private CommunityPostCommentResponseDTO toCommentResponse(CommunityPostComment comment, Viewer viewer,
+                                                              Map<Long, String> memberNames) {
         CommunityPostCommentResponseDTO dto = new CommunityPostCommentResponseDTO();
         dto.setId(comment.getId());
         dto.setPostId(comment.getPost().getId());
@@ -787,10 +811,9 @@ public class CommunityService {
             dto.setAuthorUserId(author.getId());
             dto.setAuthorUsername(author.getUsername());
             dto.setAuthorRoles(rolesOf(author));
-        } else if (comment.getAuthorMember() != null) {
-            Member author = comment.getAuthorMember();
-            dto.setAuthorMemberId(author.getId());
-            dto.setAuthorUsername(author.getName());
+        } else if (comment.getAuthorMemberId() != null) {
+            dto.setAuthorMemberId(comment.getAuthorMemberId());
+            dto.setAuthorUsername(memberNames.getOrDefault(comment.getAuthorMemberId(), "Unknown"));
             dto.setAuthorRoles(List.of("MEMBER"));
         } else if (comment.getAuthorGlobalUserId() != null) {
             // A member of another gym; their name was captured when they commented.
@@ -798,9 +821,27 @@ public class CommunityService {
             dto.setAuthorRoles(List.of("MEMBER"));
         }
         dto.setOwnedByMe(viewer.isAuthorOf(
-                comment.getAuthorUser(), comment.getAuthorMember(), comment.getAuthorGlobalUserId()));
+                comment.getAuthorUser(), comment.getAuthorMemberId(), comment.getAuthorGlobalUserId()));
         dto.setCreatedAt(comment.getCreatedAt());
         return dto;
+    }
+
+    /**
+     * Display names for member authors, by members.id, in one query. Authors may be
+     * members of another branch, so this deliberately avoids loading Member entities
+     * (see MemberRepository.findNamesByIdIn); nulls in memberIds are ignored.
+     */
+    private Map<Long, String> memberNames(Collection<Long> memberIds) {
+        Set<Long> ids = new HashSet<>(memberIds);
+        ids.remove(null);
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, String> names = new HashMap<>();
+        for (MemberRepository.MemberNameView row : memberRepository.findNamesByIdIn(ids)) {
+            names.put(row.getId(), row.getName());
+        }
+        return names;
     }
 
     private static List<String> rolesOf(User user) {

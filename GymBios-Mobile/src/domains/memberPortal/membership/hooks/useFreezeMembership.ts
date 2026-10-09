@@ -21,7 +21,7 @@ export function useFreezeMembership() {
       const frozen = `Subscription frozen for ${result.days} days${until ? ` (until ${until})` : ''}.`;
       toast.success(
         result.chargeAmount > 0
-          ? `${frozen} ${formatAmount(result.chargeAmount)} for ${result.chargedDays} extra freeze days was added to your outstanding balance.`
+          ? `${frozen} Up to ${formatAmount(result.chargeAmount)} for ${result.chargedDays} extra freeze days will be added to your outstanding balance when the freeze ends.`
           : frozen,
         { title: 'Subscription Frozen' },
       );

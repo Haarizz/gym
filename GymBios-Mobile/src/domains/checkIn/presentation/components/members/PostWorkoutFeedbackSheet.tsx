@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MemberFeedbackPayload } from '../../../domain/MemberFeedback';
 
 interface PostWorkoutFeedbackSheetProps {
@@ -79,6 +80,7 @@ export function PostWorkoutFeedbackSheet({
   onSubmit,
   onClose,
 }: PostWorkoutFeedbackSheetProps) {
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [showToast, setShowToast] = useState(false);
 
@@ -173,7 +175,8 @@ export function PostWorkoutFeedbackSheet({
       onRequestClose={() => {}}
     >
       <View style={styles.scrim}>
-        <View style={styles.sheetContainer}>
+        {/* Keep the footer clear of the Android virtual nav bar / iOS home indicator. */}
+        <View style={[styles.sheetContainer, { paddingBottom: Math.max(24, insets.bottom + 12) }]}>
           {/* Toast Notification */}
           {showToast && (
             <View style={styles.toast}>

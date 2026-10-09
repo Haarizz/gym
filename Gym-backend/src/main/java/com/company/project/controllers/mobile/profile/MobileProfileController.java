@@ -1,15 +1,19 @@
 package com.company.project.controllers.mobile.profile;
 
 import com.company.project.dto.StaffResponseDTO;
+import com.company.project.dto.mobile.profile.MobileLinkedGymDTO;
 import com.company.project.dto.mobile.profile.MobileProfileDTO;
 import com.company.project.dto.mobile.profile.MobileStaffContactUpdateDTO;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.GlobalMembershipService;
 import com.company.project.services.StaffService;
 import com.company.project.services.mobile.profile.MemberPhotoSyncService;
 import com.company.project.services.mobile.profile.MobileProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/mobile/profile")
@@ -18,12 +22,15 @@ public class MobileProfileController {
     private final MobileProfileService mobileProfileService;
     private final StaffService staffService;
     private final MemberPhotoSyncService memberPhotoSyncService;
+    private final GlobalMembershipService globalMembershipService;
 
     public MobileProfileController(MobileProfileService mobileProfileService, StaffService staffService,
-                                   MemberPhotoSyncService memberPhotoSyncService) {
+                                   MemberPhotoSyncService memberPhotoSyncService,
+                                   GlobalMembershipService globalMembershipService) {
         this.mobileProfileService = mobileProfileService;
         this.staffService = staffService;
         this.memberPhotoSyncService = memberPhotoSyncService;
+        this.globalMembershipService = globalMembershipService;
     }
 
     @GetMapping("/me")
@@ -40,6 +47,23 @@ public class MobileProfileController {
             memberPhotoSyncService.syncToGym(principal.getId(), tenantSlug, profile.getPhotoUrl(), true);
         }
         return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * The gyms this app account is a member of, active first. A global member's JWT
+     * carries no tenant, so the app only knows its gym from a locally stored value —
+     * this lets it recover that after a reinstall or on a new device. Gym-local
+     * accounts get their tenant from the JWT and have no such list.
+     */
+    @GetMapping("/memberships")
+    public ResponseEntity<List<MobileLinkedGymDTO>> getMyMemberships(@AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        if (!principal.isGlobal()) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(globalMembershipService.findLinkedGyms(principal.getId()));
     }
 
     @PutMapping("/me")

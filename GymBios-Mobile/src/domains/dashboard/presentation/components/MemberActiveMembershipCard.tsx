@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     padding: Spacing.four + 2,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
+    borderColor: 'transparent',
     shadowColor: 'rgba(229,165,33,0.45)',
     shadowOpacity: 1,
     shadowRadius: 16,

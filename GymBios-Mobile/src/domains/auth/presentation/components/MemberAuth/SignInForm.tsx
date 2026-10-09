@@ -1,14 +1,17 @@
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { FieldErrors } from 'react-hook-form';
 
 import { Button, Input, Typography } from '@/shared/components';
+import { toast } from '@/shared/components/Toasts/toastStore';
 import { loginSchema, type LoginValues } from './schemas';
 import { SocialAuthButtons } from './SocialAuthButtons';
 
+const LOGIN_FIELD_ORDER: (keyof LoginValues)[] = ['username', 'password'];
+
 interface SignInFormProps {
   isLoading: boolean;
-  errorMessage?: string;
   onLogin: (values: LoginValues) => void;
   onSwitchToSignup: () => void;
   onGoogleSignIn?: () => void;
@@ -17,12 +20,10 @@ interface SignInFormProps {
   onAppleSignIn?: () => void;
   isAppleLoading?: boolean;
   isAppleAvailable?: boolean;
-  socialErrorMessage?: string;
 }
 
 export function SignInForm({
   isLoading,
-  errorMessage,
   onLogin,
   onSwitchToSignup,
   onGoogleSignIn,
@@ -31,7 +32,6 @@ export function SignInForm({
   onAppleSignIn,
   isAppleLoading,
   isAppleAvailable,
-  socialErrorMessage,
 }: SignInFormProps) {
   const {
     control,
@@ -44,6 +44,11 @@ export function SignInForm({
       password: '',
     },
   });
+
+  const onInvalid = (formErrors: FieldErrors<LoginValues>) => {
+    const firstField = LOGIN_FIELD_ORDER.find((field) => formErrors[field]?.message);
+    if (firstField) toast.error(formErrors[firstField]!.message as string);
+  };
 
   const onForgotPassword = () => {
     Alert.alert('Coming Soon', 'Forgot password flow will be available soon.');
@@ -70,6 +75,7 @@ export function SignInForm({
               onChangeText={onChange}
               value={value}
               error={errors.username?.message}
+              hideErrorText
             />
           )}
         />
@@ -89,6 +95,7 @@ export function SignInForm({
               onChangeText={onChange}
               value={value}
               error={errors.password?.message}
+              hideErrorText
             />
           )}
         />
@@ -104,13 +111,7 @@ export function SignInForm({
         </Pressable>
       </View>
 
-      {errorMessage ? (
-        <View style={styles.errorBanner}>
-          <Typography style={styles.errorBannerText}>{errorMessage}</Typography>
-        </View>
-      ) : null}
-
-      <Button label="Sign in" size="lg" loading={isLoading} onPress={handleSubmit(onLogin)} style={styles.btnPrimary} />
+      <Button label="Sign in" size="lg" loading={isLoading} onPress={handleSubmit(onLogin, onInvalid)} style={styles.btnPrimary} />
 
       {onGoogleSignIn && onAppleSignIn && (isGoogleAvailable || isAppleAvailable) ? (
         <>
@@ -127,7 +128,6 @@ export function SignInForm({
             onAppleSignIn={onAppleSignIn}
             isAppleLoading={!!isAppleLoading}
             isAppleAvailable={!!isAppleAvailable}
-            errorMessage={socialErrorMessage}
           />
         </>
       ) : null}
@@ -219,19 +219,5 @@ const styles = StyleSheet.create({
   switchLink: {
     fontWeight: '700',
     color: '#0E6653',
-  },
-  errorBanner: {
-    backgroundColor: '#fff1f2',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#fecdd3',
-  },
-  errorBannerText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#d4183d',
   },
 });

@@ -77,12 +77,19 @@ public class TenantContextFilter extends OncePerRequestFilter {
     // the code itself, so whatever X-Tenant-ID the app sends must not gate it.
     private static final RequestMatcher STRICTLY_GLOBAL_REFERRAL_PATH = uriEquals("/api/mobile/referrals/claim");
 
+    // The global Community spans every gym and picks the gym it needs itself (the
+    // posting gym is membership-checked per request against that gym's own
+    // database), so it must neither be routed to nor membership-gated by the
+    // caller's currently selected X-Tenant-ID.
+    private static final RequestMatcher GLOBAL_COMMUNITY_PATH = uriStartsWith("/api/mobile/community/");
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
-            STRICTLY_GLOBAL_REFERRAL_PATH
+            STRICTLY_GLOBAL_REFERRAL_PATH,
+            GLOBAL_COMMUNITY_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -92,11 +99,21 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
             STRICTLY_GLOBAL_REFERRAL_PATH,
+            GLOBAL_COMMUNITY_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );
 
     private static final RequestMatcher OWN_STATUS_CHECK_PATH = uriEquals("/api/members/me");
+
+    // Reachable while a purchase awaits approval: the status check itself, plus push-token
+    // registration so the device can receive the "payment approved" push (see
+    // MemberPaymentApprovalNotifier) — a member who bought by cash is pending from their
+    // very first app session, so blocking this would mean they never get that push.
+    private static final RequestMatcher PENDING_APPROVAL_ALLOWED_PATH = new OrRequestMatcher(
+            OWN_STATUS_CHECK_PATH,
+            uriStartsWith("/api/mobile/member/push-tokens")
+    );
 
     private static final RequestMatcher LEGACY_EXEMPT_PATH = new OrRequestMatcher(
             GLOBAL_EXEMPT_PATH,
@@ -170,7 +187,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
                             // can't be bypassed by calling an API other than /purchase.
                             // /api/members/me stays reachable (see isOwnStatusCheckPath)
                             // so the app can keep checking whether it's been resolved.
-                            if (!OWN_STATUS_CHECK_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+                            if (!PENDING_APPROVAL_ALLOWED_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
                                 TenantContextHolder.clear();
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                                         "Access Denied: Membership payment is awaiting approval");

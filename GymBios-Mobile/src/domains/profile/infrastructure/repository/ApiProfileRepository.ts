@@ -82,7 +82,9 @@ export class ApiProfileRepository implements ProfileRepository {
     // employment details.
     const staff = roleDisplay !== 'MEMBER' ? await this.getStaffProfile().catch(() => null) : null;
 
-    const name = staff?.name || localProfile.name || primaryName;
+    // Members have no staff_name on /auth/me, so primaryName would be their
+    // username — the full name from /mobile/profile/me comes first.
+    const name = staff?.name || remoteProfile?.fullName || localProfile.name || primaryName;
     const email = staff?.email || remoteProfile?.email || localProfile.email || currentUser?.email || `${username}@gymbios.local`;
     const phone = staff?.phone || remoteProfile?.phone || localProfile.phone || '';
     const address = staff?.address || remoteProfile?.address || localProfile.address || '';

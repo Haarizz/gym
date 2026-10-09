@@ -25,4 +25,9 @@ export interface AppBottomSheetProps {
    * Content rendered inside the scrollable body.
    */
   children: ReactNode;
+
+  /**
+   * Optional content pinned below the scrollable body (e.g. action buttons).
+   */
+  footer?: ReactNode;
 }

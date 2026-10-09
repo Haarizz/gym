@@ -3,6 +3,7 @@ package com.company.project.services;
 import com.company.project.config.TenantDataSourceRegistry;
 import com.company.project.controlplane.entities.UserMembershipEntry;
 import com.company.project.controlplane.repositories.UserMembershipRepository;
+import com.company.project.dto.mobile.profile.MobileLinkedGymDTO;
 import com.company.project.entities.Member;
 import com.company.project.security.TenantContextHolder;
 import org.slf4j.Logger;
@@ -18,6 +19,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -113,6 +117,27 @@ public class GlobalMembershipService {
             log.warn("Could not read membership index for global user {}: {}", globalUserId, e.getMessage());
         }
         return false;
+    }
+
+    /**
+     * Every gym this account is linked to, active memberships first, so the app can
+     * pick its gym again when it has none stored locally (fresh install, new device).
+     */
+    public List<MobileLinkedGymDTO> findLinkedGyms(Long globalUserId) {
+        if (globalUserId == null) {
+            return List.of();
+        }
+        List<MobileLinkedGymDTO> gyms = new ArrayList<>();
+        try {
+            for (UserMembershipEntry entry : userMembershipRepository.findByGlobalUserId(globalUserId)) {
+                gyms.add(new MobileLinkedGymDTO(entry.getTenantSlug(),
+                        hasActiveMembershipIn(entry.getTenantSlug(), globalUserId)));
+            }
+        } catch (Exception e) {
+            log.warn("Could not read membership index for global user {}: {}", globalUserId, e.getMessage());
+        }
+        gyms.sort(Comparator.comparing(MobileLinkedGymDTO::active).reversed());
+        return gyms;
     }
 
     /**

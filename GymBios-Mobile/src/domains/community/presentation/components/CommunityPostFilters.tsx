@@ -26,7 +26,9 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
-      style={{ flexGrow: 0 }}
+      // ScrollView defaults to flexShrink: 1, so without this the feed list below
+      // squeezes the pill row (clipping the labels) as its content grows.
+      style={{ flexGrow: 0, flexShrink: 0 }}
     >
       {POST_TYPES.map((pt) => {
         const isSelected = selectedType === pt.value;
@@ -70,7 +72,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 4,
   },
 
   pill: {

@@ -19,10 +19,9 @@ interface LoginFormProps {
   config: RoleLoginConfig;
   onSubmit: (values: LoginFormValues) => void;
   loading?: boolean;
-  errorMessage?: string;
 }
 
-export function LoginForm({ config, onSubmit, loading = false, errorMessage }: LoginFormProps) {
+export function LoginForm({ config, onSubmit, loading = false }: LoginFormProps) {
   const {
     control,
     handleSubmit,
@@ -105,13 +104,6 @@ export function LoginForm({ config, onSubmit, loading = false, errorMessage }: L
         />
       </View>
 
-      {/* API error */}
-      {errorMessage ? (
-        <View style={styles.errorBanner}>
-          <Typography style={styles.errorBannerText}>{errorMessage}</Typography>
-        </View>
-      ) : null}
-
       {/* CTA */}
       <Button
         label="Sign In"
@@ -164,20 +156,6 @@ const styles = StyleSheet.create({
   fields: {
     gap: 18,
     marginBottom: 24,
-  },
-  errorBanner: {
-    backgroundColor: '#fff1f2',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#fecdd3',
-  },
-  errorBannerText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#d4183d',
   },
   button: {
     marginBottom: 20,

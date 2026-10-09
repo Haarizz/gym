@@ -1,5 +1,6 @@
 import { AvatarPicker } from '@/shared/components/AvatarPicker';
 import { DatePicker } from '@/shared/components/DatePicker';
+import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateOfBirthRules';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
@@ -75,7 +76,9 @@ export function PersonalInfoFormSection({
           placeholder="Select date of birth"
           value={dateOfBirth}
           onChange={onChangeDateOfBirth}
-          maximumDate={new Date()}
+          initialView="year"
+          minimumDate={getMinBirthDate()}
+          maximumDate={getMaxBirthDate()}
           error={errors?.dateOfBirth}
         />
         <Input

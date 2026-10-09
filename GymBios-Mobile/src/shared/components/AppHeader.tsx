@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // Subtle glass border
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'transparent',
     shadowColor: BrandColors.teal,
     shadowOpacity: 0.35,
     shadowRadius: 8,

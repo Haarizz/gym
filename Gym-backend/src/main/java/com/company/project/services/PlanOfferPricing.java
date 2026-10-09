@@ -52,6 +52,11 @@ public final class PlanOfferPricing {
         return discount(plan, LocalDate.now());
     }
 
+    /** How a running offer reads on a receipt: "Offer: <label>", or just "Offer". */
+    public static String receiptLabel(String offerLabel) {
+        return offerLabel != null && !offerLabel.isBlank() ? "Offer: " + offerLabel.trim() : "Offer";
+    }
+
     private static BigDecimal regularPrice(MembershipPlan plan) {
         return plan.getPrice() != null ? plan.getPrice().max(BigDecimal.ZERO) : BigDecimal.ZERO;
     }

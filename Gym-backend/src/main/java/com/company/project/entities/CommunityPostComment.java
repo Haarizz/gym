@@ -27,6 +27,12 @@ public class CommunityPostComment extends BaseEntity {
     @JoinColumn(name = "author_member_id")
     private Member authorMember;
 
+    // Same column, read as a plain id. Authors can be members of another branch, and
+    // loading that Member trips BranchSecurityListener's read isolation — so community
+    // reads use this id (plus a batched name lookup) and never touch authorMember.
+    @Column(name = "author_member_id", insertable = false, updatable = false)
+    private Long authorMemberId;
+
     @Column(name = "author_global_user_id")
     private Long authorGlobalUserId;
 
@@ -48,7 +54,12 @@ public class CommunityPostComment extends BaseEntity {
     public void setAuthorUser(User authorUser) { this.authorUser = authorUser; }
 
     public Member getAuthorMember() { return authorMember; }
-    public void setAuthorMember(Member authorMember) { this.authorMember = authorMember; }
+    public void setAuthorMember(Member authorMember) {
+        this.authorMember = authorMember;
+        this.authorMemberId = authorMember != null ? authorMember.getId() : null;
+    }
+
+    public Long getAuthorMemberId() { return authorMemberId; }
 
     public Long getAuthorGlobalUserId() { return authorGlobalUserId; }
     public void setAuthorGlobalUserId(Long authorGlobalUserId) { this.authorGlobalUserId = authorGlobalUserId; }

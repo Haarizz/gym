@@ -48,16 +48,18 @@ class MemberRenewalRewardTest {
     private MemberService service;
     private Member member;
 
+    private ReceiptService receiptService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         // Every createReceiptForMember overload hands back a fresh (unpaid) receipt.
-        ReceiptService receiptService = Mockito.mock(ReceiptService.class, inv ->
+        receiptService = Mockito.mock(ReceiptService.class, inv ->
                 inv.getMethod().getReturnType() == Receipt.class ? new Receipt() : null);
         service = new MemberService(memberRepository, planRepository, receiptService, userRepository,
                 roleRepository, userRoleRepository, passwordEncoder, notificationService,
                 automationExecutorService, receiptVoucherService, financialEventService, branchService,
-                userBranchRepository, userDirectoryRepository, rewardRedemptionService, null, null, null);
+                userBranchRepository, userDirectoryRepository, rewardRedemptionService, null, null, null, null);
 
         member = new Member();
         member.setId(10L);
@@ -93,6 +95,23 @@ class MemberRenewalRewardTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(member.getOutstandingBalance()));
         assertEquals("paid", member.getPaymentStatus());
         verify(rewardRedemptionService).consumePass(7L, "MBR-10", PassContext.MEMBERSHIP, 10L);
+    }
+
+    @Test
+    void fullyDiscountedRenewalIsPaidNotCredit() {
+        RenewalRequestDTO req = renewal();
+        req.setCouponCode("free100");
+        when(rewardRedemptionService.redeemCouponAtCheckout(eq("free100"), eq(new BigDecimal("300")), eq(10L), eq("Sam")))
+                .thenReturn(new BigDecimal("300.00"));
+
+        service.renewMember(10L, req);
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(member.getMembershipFee()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(member.getOutstandingBalance()));
+        assertEquals("paid", member.getPaymentStatus());
+        assertEquals("Card", member.getPaymentMethodUsed());
+        // The receipt shows it as a discounted bill, not just a 0 amount.
+        verify(receiptService).recordDiscount(any(Receipt.class), eq(new BigDecimal("300.00")), eq("Coupon FREE100"));
     }
 
     @Test

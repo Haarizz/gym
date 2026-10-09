@@ -159,6 +159,7 @@ const buildRenewalPlans = (raw: RawPlan[], currentPlanName: string) => {
       price,
       discount,
       finalPrice,
+      offerLabel: p.offer_label ?? p.offerLabel ?? null,
       savings: discount,
       newExpiryDate: newExpiry.toISOString().slice(0, 10),
       features: p.description ? [p.description] : ["Gym access included"],
@@ -367,6 +368,9 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
         membership_end_date: newEnd.toISOString(),
         // Fee before any Reward Pass / coupon — the backend takes that discount off.
         membership_fee: selectedPlan.finalPrice,
+        ...(selectedPlan.discount > 0
+          ? { offer_discount: selectedPlan.discount, offer_label: selectedPlan.offerLabel ? `Offer: ${selectedPlan.offerLabel}` : 'Offer' }
+          : {}),
         payment_status: "pending",
         membership_type: membershipData?.currentPlan.type ?? "Individual",
         membership_status: "active",

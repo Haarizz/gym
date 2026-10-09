@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 
 import { QueryProvider } from './QueryProvider';
 import { CurrencyProvider } from './CurrencyProvider';
+import { NetworkGuard } from '@/shared/components/NetworkGuard';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -16,7 +17,9 @@ export function AppProviders({ children }: AppProvidersProps) {
     <QueryProvider>
       <CurrencyProvider>
         <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          {children}
+          <NetworkGuard>
+            {children}
+          </NetworkGuard>
         </NavigationThemeProvider>
       </CurrencyProvider>
     </QueryProvider>

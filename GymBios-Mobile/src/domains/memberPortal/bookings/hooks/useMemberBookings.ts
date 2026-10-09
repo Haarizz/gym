@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { memberBookingsRepository } from '../infrastructure/ApiMemberBookingsRepository';
-import { CreateMemberBookingRequest } from '../domain/MemberBookingData';
+import { CreateMemberBookingRequest, RefundMethod } from '../domain/MemberBookingData';
+import { walletKeys } from '../../wallet/useMyWallet';
 
 export const queryKeys = {
   all: ['memberBookings'] as const,
@@ -42,11 +43,16 @@ export function useCancelBooking() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (bookingId: number) => memberBookingsRepository.cancelBooking(bookingId),
+    mutationFn: ({ bookingId, refundMethod }: { bookingId: number; refundMethod?: RefundMethod }) =>
+      memberBookingsRepository.cancelBooking(bookingId, refundMethod),
     onSuccess: () => {
       // Invalidate relevant queries so the UI updates
       queryClient.invalidateQueries({ queryKey: queryKeys.upcoming() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.past() });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats() });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.all, 'availableClasses'] });
+      // A refund lands in the wallet.
+      queryClient.invalidateQueries({ queryKey: walletKeys.mine });
     },
   });
 }
@@ -65,6 +71,8 @@ export function useCreateMemberBooking() {
       // Since we don't know the date of the class directly from request easily here,
       // we invalidate all availableClasses queries or could parse it if provided.
       queryClient.invalidateQueries({ queryKey: [...queryKeys.all, 'availableClasses'] });
+      // Part of the price may have come out of the wallet.
+      queryClient.invalidateQueries({ queryKey: walletKeys.mine });
     },
   });
 }

@@ -5,7 +5,7 @@ import { useDisplayCurrencySync } from '@/core/providers/CurrencyProvider';
 import { useAuthStore } from '@/domains/auth/store';
 import { ApiMemberDirectoryRepository } from '@/domains/members/infrastructure/directory/ApiMemberDirectoryRepository';
 import { useQuery } from '@tanstack/react-query';
-import { useMembershipApprovalStatus } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
+import { isMemberAccessLocked, useMembershipApprovalStatus } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
 
 export type BranchId = number | 'ALL';
 
@@ -33,12 +33,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   });
 
   // /api/branches/my-branches is 403'd by TenantContextFilter while a member's
-  // Cash/Credit/Mixed purchase awaits reception approval — hold it until
-  // /api/members/me confirms access isn't pending (see MemberApprovalGate).
+  // Cash/Credit/Mixed purchase awaits reception approval (or was rejected) — hold
+  // it until /api/members/me confirms access isn't locked (see MemberApprovalGate).
   const approval = useMembershipApprovalStatus({ enabled: appRole === 'member' });
-  const isApprovalPending = approval.data?.approvalStatus === 'PENDING';
+  const isApprovalLocked = isMemberAccessLocked(approval.data);
   const { data: branches, isLoading: isBranchesLoading } = useMyBranches({
-    enabled: appRole !== 'member' || (!approval.isLoading && !isApprovalPending),
+    enabled: appRole !== 'member' || (!approval.isLoading && !isApprovalLocked),
   });
 
   // 1. Determine the best available branch ID based on loaded data
