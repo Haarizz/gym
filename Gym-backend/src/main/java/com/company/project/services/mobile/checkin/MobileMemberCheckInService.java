@@ -10,6 +10,7 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.CheckInPolicyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,17 +21,25 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class MobileMemberCheckInService {
 
     private final MemberRepository memberRepository;
     private final AttendanceRepository attendanceRepository;
+    private final CheckInPolicyService checkInPolicyService;
+
+    // Per-member lock so a double-tap can't pass the active-session / daily-cap
+    // checks twice before either insert commits (same approach as CheckInService).
+    private final ConcurrentHashMap<Long, Object> checkInLocks = new ConcurrentHashMap<>();
 
     public MobileMemberCheckInService(MemberRepository memberRepository,
-                                      AttendanceRepository attendanceRepository) {
+                                      AttendanceRepository attendanceRepository,
+                                      CheckInPolicyService checkInPolicyService) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
+        this.checkInPolicyService = checkInPolicyService;
     }
 
     private Member getAuthenticatedMember(UserDetailsImpl principal) {
@@ -74,11 +83,21 @@ public class MobileMemberCheckInService {
                         .orElse(null)
                 : null;
 
-        if (activeAttendance != null) {
-            return new MemberCheckInStatusResponseDTO(true, activeAttendance.getId(), activeAttendance.getCheckInTime());
-        }
+        MemberCheckInStatusResponseDTO dto = activeAttendance != null
+                ? new MemberCheckInStatusResponseDTO(true, activeAttendance.getId(), activeAttendance.getCheckInTime())
+                : new MemberCheckInStatusResponseDTO(false, null, null);
 
-        return new MemberCheckInStatusResponseDTO(false, null, null);
+        CheckInPolicyService.Allowance allowance = checkInPolicyService.evaluate(member);
+        dto.setLimitUnit(allowance.limitUnit());
+        dto.setLimitValue(allowance.limitValue());
+        dto.setUsed(allowance.used());
+        dto.setLimitPeriod(allowance.limitPeriod());
+        dto.setCheckInsToday(allowance.checkInsToday());
+        dto.setMaxCheckInsPerDay(allowance.maxCheckInsPerDay());
+        dto.setNextCheckInAllowedAt(allowance.nextCheckInAllowedAt());
+        dto.setCanCheckIn(allowance.canCheckIn());
+        dto.setBlockedReason(allowance.blockedReason());
+        return dto;
     }
 
     @Transactional
@@ -90,19 +109,24 @@ public class MobileMemberCheckInService {
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay   = LocalDate.now().atTime(LocalTime.MAX);
 
-        if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDay, endOfDay)) {
-            throw new BusinessRuleViolationException(member.getName() + " is already checked in. Please check out first.");
-        }
-
         Attendance attendance = new Attendance();
-        attendance.setMember(member);
-        attendance.setCheckInTime(LocalDateTime.now());
-        attendance.setCheckInMethod("app");
-        attendance.setDeviceId("MOBILE");
-        attendance.setResolvedBy("member_id");
-        attendance.setStatus("active");
-        attendance.setType("member");
-        attendanceRepository.saveAndFlush(attendance);
+        Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
+        synchronized (lock) {
+            if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDay, endOfDay)) {
+                throw new BusinessRuleViolationException(member.getName() + " is already checked in. Please check out first.");
+            }
+            // Plan quota, daily cap and cooldown between visits
+            checkInPolicyService.enforce(member);
+
+            attendance.setMember(member);
+            attendance.setCheckInTime(LocalDateTime.now());
+            attendance.setCheckInMethod("app");
+            attendance.setDeviceId("MOBILE");
+            attendance.setResolvedBy("member_id");
+            attendance.setStatus("active");
+            attendance.setType("member");
+            attendanceRepository.saveAndFlush(attendance);
+        }
 
         member.setTotalVisits(member.getTotalVisits() == null ? 1 : member.getTotalVisits() + 1);
         memberRepository.save(member);

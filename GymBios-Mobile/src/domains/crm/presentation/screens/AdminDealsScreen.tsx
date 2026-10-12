@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import type { MemberInfo } from '../../domain/MemberDashboardData';

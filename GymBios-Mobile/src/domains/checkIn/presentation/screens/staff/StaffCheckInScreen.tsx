@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';

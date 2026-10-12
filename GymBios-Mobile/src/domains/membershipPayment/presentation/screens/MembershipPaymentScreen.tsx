@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { TextInput, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import { BrandColors, Spacing, Radius } from '@/core/theme';
 
 interface FeedbackTextFieldProps {

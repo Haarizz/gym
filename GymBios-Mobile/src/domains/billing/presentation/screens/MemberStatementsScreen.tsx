@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';

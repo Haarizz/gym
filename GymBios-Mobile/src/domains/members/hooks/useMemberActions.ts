@@ -141,6 +141,11 @@ export function useMemberActions() {
     [invalidateMemberData],
   );
 
+  const getFreezeAllowance = useCallback(
+    (id: number) => freezeService.getFreezeAllowance(id),
+    [],
+  );
+
   const unfreezeMember = useCallback(
     async (id: number): Promise<Member> => {
       const result = await freezeService.unfreezeMember(id);
@@ -186,6 +191,7 @@ export function useMemberActions() {
 
     freezeMember,
     unfreezeMember,
+    getFreezeAllowance,
 
     setCredentials,
     toggleAccess,

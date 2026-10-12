@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, FlatList, Text, Pressable, TextInput, ScrollView } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable, ScrollView } from 'react-native';
+import { Text, TextInput } from '@/shared/components/AppText';
 import { useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';

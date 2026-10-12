@@ -4,11 +4,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Text, TextInput } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';

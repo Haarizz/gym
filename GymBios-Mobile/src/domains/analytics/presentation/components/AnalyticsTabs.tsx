@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export type AnalyticsTab = 'overview' | 'revenue' | 'operations';

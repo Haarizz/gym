@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';

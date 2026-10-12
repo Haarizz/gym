@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
 
 import { Typography } from '@/shared/components/Typography';

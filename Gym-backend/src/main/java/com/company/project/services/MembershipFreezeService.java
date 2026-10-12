@@ -43,9 +43,10 @@ import java.util.List;
  * it's settled through the normal Web/Mobile payment flows and shows up in
  * Billing → Member Dues as "Extra Freeze Days".
  *
- * Only freezes the member requests in the app are checked against the policy and
- * charged. Staff freezes from the Web are recorded (so they use up the member's
- * allowance) but never blocked or billed — staff decide those case by case.
+ * Staff freezes (Web and the staff app) follow the same policy, with two
+ * exceptions decided case by case: a manager (ADMIN/MANAGER role) may go past
+ * the plan's limits, and any staff member may waive the extra-day charge. Both
+ * are recorded on the freeze.
  */
 @Service
 @Transactional
@@ -75,6 +76,18 @@ public class MembershipFreezeService {
         this.receiptRepository = receiptRepository;
         this.receiptService = receiptService;
         this.memberService = memberService;
+    }
+
+    /** Who is applying a staff freeze, and whether they may go past the plan's limits. */
+    public record StaffActor(String name, boolean canOverrideLimits) {
+        private static final java.util.Set<String> OVERRIDE_ROLES = java.util.Set.of("ROLE_ADMIN", "ROLE_MANAGER");
+
+        public static StaffActor of(com.company.project.security.UserDetailsImpl principal) {
+            if (principal == null) return new StaffActor(null, false);
+            boolean canOverride = principal.getAuthorities().stream()
+                    .anyMatch(a -> OVERRIDE_ROLES.contains(a.getAuthority()));
+            return new StaffActor(principal.getUsername(), canOverride);
+        }
     }
 
     // ── Allowance ─────────────────────────────────────────────────────────────
@@ -140,7 +153,7 @@ public class MembershipFreezeService {
      * camelCase Map keys (the global SNAKE_CASE strategy doesn't touch Map keys).
      */
     @Transactional(readOnly = true)
-    public java.util.Map<String, Object> getAllowanceView(Long memberId) {
+    public java.util.Map<String, Object> getAllowanceView(Long memberId, StaffActor actor) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
         FreezeAllowance a = getAllowance(member, findPlan(member));
@@ -158,6 +171,7 @@ public class MembershipFreezeService {
         m.put("autoUnfreeze", a.autoUnfreeze());
         m.put("canFreeze", a.canFreeze());
         m.put("unavailableMessage", a.unavailableReason() == null ? null : unavailableMessage(a.unavailableReason(), a));
+        m.put("canOverrideLimits", actor != null && actor.canOverrideLimits());
         return m;
     }
 
@@ -180,6 +194,9 @@ public class MembershipFreezeService {
             m.put("chargeAmount", f.getChargeAmount() != null ? f.getChargeAmount() : BigDecimal.ZERO);
             m.put("reason", f.getReason());
             m.put("source", f.getSource());
+            m.put("limitsOverridden", f.isLimitsOverridden());
+            m.put("chargeWaived", f.isChargeWaived());
+            m.put("recordedBy", f.getRecordedBy());
             m.put("status", f.getEndedAt() == null ? "Active" : "Completed");
             rows.add(m);
         }
@@ -238,10 +255,17 @@ public class MembershipFreezeService {
         return new FreezeResult(start, end, days, record.getFreeDaysApplied(), chargedDays, charge);
     }
 
-    /** A freeze applied by staff on the Web: recorded against the allowance, never blocked or charged. */
-    public MemberResponseDTO freezeByStaff(Long memberId, FreezeRequestDTO request) {
+    /**
+     * A freeze applied by staff (Web or the staff app). Checked against the plan's
+     * policy like a member's own freeze, unless a manager overrides the limits; its
+     * extra days are billed when it ends, unless the charge is waived.
+     */
+    public MemberResponseDTO freezeByStaff(Long memberId, FreezeRequestDTO request, StaffActor actor) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        if (request.isOverrideLimits() && (actor == null || !actor.canOverrideLimits())) {
+            throw new BusinessRuleViolationException("Only a manager can override the plan's freeze limits.");
+        }
         // Re-freezing without an unfreeze in between replaces the freeze in progress —
         // ended properly first, so the days already frozen still move the expiry.
         if ("frozen".equalsIgnoreCase(member.getMembershipStatus())) {
@@ -252,6 +276,15 @@ public class MembershipFreezeService {
         FreezeAllowance allowance = getAllowance(member, findPlan(member));
         request.setFreezeUntil(staffEndDateToFreezeEnd(request.getFreezeUntil()));
 
+        int requestedDays = staffFreezeDays(request);
+        boolean overLimits = !allowance.canFreeze() || requestedDays > allowance.remainingDays();
+        if (overLimits && !request.isOverrideLimits()) {
+            String why = allowance.canFreeze()
+                    ? "Only " + allowance.remainingDays() + " freeze days are left on this plan."
+                    : unavailableMessage(allowance.unavailableReason(), allowance);
+            throw new BusinessRuleViolationException(why + " A manager can override the plan's limits.");
+        }
+
         MemberResponseDTO result = memberService.freezeMember(memberId, request);
 
         LocalDateTime start = member.getFreezeStartDate();
@@ -259,8 +292,23 @@ public class MembershipFreezeService {
         int days = end != null ? (int) Math.max(0, ChronoUnit.DAYS.between(start, end)) : 0;
         MembershipFreeze record = newRecord(member, start, end, days, request.getReason(), MembershipFreeze.SOURCE_STAFF);
         record.setFreeDaysApplied(Math.min(days, allowance.freeDaysRemaining()));
+        // A waived freeze bills nothing when it ends (see settleFreeze).
+        record.setChargePerDay(request.isWaiveCharge() ? BigDecimal.ZERO : allowance.chargePerExtraDay());
+        record.setChargeWaived(request.isWaiveCharge() && allowance.chargeableDays(days) > 0);
+        record.setLimitsOverridden(overLimits);
+        record.setRecordedBy(actor != null ? actor.name() : null);
         freezeRepository.save(record);
         return result;
+    }
+
+    /** Days a staff freeze request covers: its start (today if unset) up to its stored end. */
+    private static int staffFreezeDays(FreezeRequestDTO request) {
+        if (request.getFreezeUntil() == null) return 0;
+        java.time.LocalDate start = request.getFreezeStartDate() != null && request.getFreezeStartDate().length() >= 10
+                ? java.time.LocalDate.parse(request.getFreezeStartDate().substring(0, 10))
+                : java.time.LocalDate.now();
+        java.time.LocalDate end = java.time.LocalDate.parse(request.getFreezeUntil().substring(0, 10));
+        return (int) Math.max(0, ChronoUnit.DAYS.between(start, end));
     }
 
     // ── Unfreeze ──────────────────────────────────────────────────────────────
@@ -325,9 +373,9 @@ public class MembershipFreezeService {
     }
 
     /**
-     * Applies free days to the days actually frozen and, for a freeze the member
-     * requested in the app, bills the rest as a Freeze Charge. Staff freezes only
-     * record the free days used — they're never billed.
+     * Applies free days to the days actually frozen and bills the rest as a Freeze
+     * Charge. A freeze with no per-day rate — the plan doesn't charge, staff waived
+     * it, or a staff freeze from before staff freezes were billed — bills nothing.
      */
     private void settleFreeze(MembershipFreeze f, Member member, int freeDaysAvailable) {
         int days = daysUsed(f);
@@ -335,8 +383,7 @@ public class MembershipFreezeService {
         f.setFreeDaysApplied(freeDays);
 
         BigDecimal rate = f.getChargePerDay();
-        if (!MembershipFreeze.SOURCE_MOBILE.equals(f.getSource()) || member == null
-                || rate == null || rate.signum() <= 0) {
+        if (member == null || rate == null || rate.signum() <= 0) {
             return;
         }
         int chargedDays = days - freeDays;
@@ -344,8 +391,11 @@ public class MembershipFreezeService {
         f.setChargedDays(chargedDays);
         f.setChargeAmount(charge);
         if (charge.signum() > 0) {
+            String processedBy = MembershipFreeze.SOURCE_MOBILE.equals(f.getSource())
+                    ? "Member (GymBios Mobile)"
+                    : f.getRecordedBy() != null ? f.getRecordedBy() : "Staff";
             f.setChargeReceiptId(raiseFreezeCharge(member, chargedDays, rate, charge,
-                    f.getFreezeStart(), f.getEndedAt()).getId());
+                    f.getFreezeStart(), f.getEndedAt(), processedBy).getId());
         }
     }
 
@@ -484,7 +534,7 @@ public class MembershipFreezeService {
      * of whoever pays for this member — themselves, or their family head.
      */
     private Receipt raiseFreezeCharge(Member member, int chargedDays, BigDecimal rate, BigDecimal amount,
-                                      LocalDateTime start, LocalDateTime end) {
+                                      LocalDateTime start, LocalDateTime end, String processedBy) {
         Member account = member;
         if (member.isEffectivelyBilledToHead() && member.getFamilyHeadId() != null) {
             account = memberRepository.findByMemberId(member.getFamilyHeadId()).orElse(member);
@@ -516,7 +566,7 @@ public class MembershipFreezeService {
         r.setValidFrom(start);
         r.setValidTill(end);
         r.setMembershipType(account.getMembershipType());
-        r.setProcessedBy("Member (GymBios Mobile)");
+        r.setProcessedBy(processedBy);
         r.setBranchId(account.getBranchId());
         String remarks = FREEZE_CHARGE_DESCRIPTION + ": " + chargedDays + " day" + (chargedDays == 1 ? "" : "s")
                 + " × " + rate.setScale(2, RoundingMode.HALF_UP).toPlainString()

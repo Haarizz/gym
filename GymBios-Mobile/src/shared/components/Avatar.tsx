@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors } from '../../core/theme';
 import type { ViewStyle, StyleProp } from 'react-native';
 

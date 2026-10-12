@@ -1,4 +1,5 @@
 import type {
+  FreezeAllowance,
   FreezeRequest,
   MemberFreezeRepository,
 } from '../../application/freeze/MemberFreezeRepository';
@@ -61,6 +62,16 @@ export class ApiMemberFreezeRepository implements MemberFreezeRepository {
     );
 
     return this.toDomain(response.data);
+  }
+
+  async getFreezeAllowance(id: number): Promise<FreezeAllowance> {
+    const response = await apiClient.get<FreezeAllowance>(`/members/${id}/freeze-allowance`);
+    const a = response.data;
+    return {
+      ...a,
+      chargePerExtraDay: Number(a.chargePerExtraDay ?? 0),
+      canOverrideLimits: a.canOverrideLimits ?? false,
+    };
   }
 
   async unfreezeMember(id: number): Promise<Member> {

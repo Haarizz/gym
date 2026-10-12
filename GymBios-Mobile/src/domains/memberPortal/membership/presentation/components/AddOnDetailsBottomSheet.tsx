@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing, TypographyScale } from '@/core/theme';

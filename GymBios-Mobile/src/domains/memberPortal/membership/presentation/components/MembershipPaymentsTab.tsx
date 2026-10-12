@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, Pressable } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';

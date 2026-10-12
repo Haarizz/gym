@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { getCurrencyDefinition, useCurrencyStore } from '@/core/providers';
 import { CURRENCY_FONT_FAMILY } from '@/core/providers/currencyDefinitions';

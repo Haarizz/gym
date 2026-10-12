@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';

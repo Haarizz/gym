@@ -12,6 +12,7 @@ export interface StaffWizardData {
   address: string;
   photoUrl: string;
   photoUri?: string;
+  photoStatus: 'idle' | 'uploading' | 'error';
   role: string;
   department: string;
   branch: string;
@@ -23,47 +24,88 @@ export interface StaffWizardData {
   schedule: WeeklySchedule;
   username: string;
   password: string;
+  confirmPassword: string;
   appAccessEnabled: boolean;
 }
+
+export type WizardMode = 'create' | 'edit';
+
+/** Field-level validation messages, keyed by the wizard field they belong to. */
+export type StaffStepErrors = Partial<Record<keyof StaffWizardData, string>>;
 
 export interface WizardStep {
   id: string;
   title: string;
-  validate: (data: StaffWizardData) => boolean;
+  validate: (data: StaffWizardData, mode: WizardMode) => StaffStepErrors;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[0-9\s\-()]{7,20}$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+function validatePersonal(data: StaffWizardData): StaffStepErrors {
+  const errors: StaffStepErrors = {};
+  if (data.name.trim().length < 2) errors.name = 'Enter the staff member\'s full name';
+
+  const email = data.email.trim();
+  if (!email) errors.email = 'Email is required';
+  else if (!EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
+
+  const phone = data.phone.trim();
+  if (!phone) errors.phone = 'Phone number is required';
+  else if (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, '').length < 7) {
+    errors.phone = 'Enter a valid phone number';
+  }
+
+  if (data.photoStatus === 'uploading') errors.photoUrl = 'Wait for the photo to finish uploading';
+  return errors;
+}
+
+function validateEmployment(data: StaffWizardData): StaffStepErrors {
+  const errors: StaffStepErrors = {};
+  if (!data.role.trim()) errors.role = 'Choose a role';
+  if (!data.department.trim()) errors.department = 'Choose a department';
+  if (!data.branch.trim()) errors.branch = 'Choose a branch';
+  return errors;
+}
+
+function validateCompensation(data: StaffWizardData): StaffStepErrors {
+  const errors: StaffStepErrors = {};
+  const salary = data.salary.trim();
+  if (salary && !(Number(salary) >= 0)) errors.salary = 'Enter a valid amount';
+  const target = data.monthlyTarget.trim();
+  if (target && !(Number(target) >= 0)) errors.monthlyTarget = 'Enter a valid amount';
+  return errors;
+}
+
+function validateAccess(data: StaffWizardData, mode: WizardMode): StaffStepErrors {
+  const errors: StaffStepErrors = {};
+  if (!data.appAccessEnabled) return errors;
+
+  const username = data.username.trim();
+  if (!username) errors.username = 'Username is required';
+  else if (/\s/.test(username)) errors.username = 'Username can\'t contain spaces';
+  else if (username.length < 3) errors.username = 'Username must be at least 3 characters';
+
+  // An existing login keeps its password when this is left blank on edit.
+  const passwordOptional = mode === 'edit';
+  if (!data.password) {
+    if (!passwordOptional) errors.password = 'Password is required';
+  } else if (data.password.length < MIN_PASSWORD_LENGTH) {
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+  }
+  if ((data.password || data.confirmPassword) && data.password !== data.confirmPassword) {
+    errors.confirmPassword = 'Passwords don\'t match';
+  }
+  return errors;
 }
 
 const STEPS: WizardStep[] = [
-  {
-    id: 'personal',
-    title: 'Personal Information',
-    validate: (data) =>
-      data.name.trim().length > 0 &&
-      data.email.trim().length > 0 &&
-      data.phone.trim().length > 0,
-  },
-  {
-    id: 'employment',
-    title: 'Employment',
-    validate: (data) =>
-      data.role.trim().length > 0 &&
-      data.department.trim().length > 0 &&
-      data.branch.trim().length > 0,
-  },
-  {
-    id: 'compensation',
-    title: 'Compensation',
-    validate: () => true,
-  },
-  {
-    id: 'schedule',
-    title: 'Schedule & Certifications',
-    validate: () => true,
-  },
-  {
-    id: 'access',
-    title: 'App Access & Review',
-    validate: () => true,
-  },
+  { id: 'personal', title: 'Personal Information', validate: validatePersonal },
+  { id: 'employment', title: 'Employment', validate: validateEmployment },
+  { id: 'compensation', title: 'Compensation', validate: validateCompensation },
+  { id: 'schedule', title: 'Schedule & Certifications', validate: () => ({}) },
+  { id: 'access', title: 'App Access & Review', validate: validateAccess },
 ];
 
 function mapStaffToWizardData(staff?: Staff): StaffWizardData {
@@ -74,6 +116,7 @@ function mapStaffToWizardData(staff?: Staff): StaffWizardData {
     address: staff?.address ?? '',
     photoUrl: resolveImageUrl(staff?.photoUrl) ?? '',
     photoUri: undefined,
+    photoStatus: 'idle',
     role: staff?.role ?? '',
     department: staff?.department ?? '',
     branch: staff?.branch ?? '',
@@ -85,16 +128,17 @@ function mapStaffToWizardData(staff?: Staff): StaffWizardData {
     schedule: staff?.schedule ?? {},
     username: staff?.appUsername ?? '',
     password: '',
+    confirmPassword: '',
     appAccessEnabled: staff?.appAccessEnabled ?? false,
   };
 }
 
 function buildCreateRequest(data: StaffWizardData): CreateStaffRequest {
   return {
-    name: data.name,
-    email: data.email,
-    phone: data.phone,
-    address: data.address,
+    name: data.name.trim(),
+    email: data.email.trim(),
+    phone: data.phone.trim(),
+    address: data.address.trim(),
     photoUrl: data.photoUrl || undefined,
     role: data.role,
     department: data.department,
@@ -105,8 +149,9 @@ function buildCreateRequest(data: StaffWizardData): CreateStaffRequest {
     monthlyTarget: Number(data.monthlyTarget) || 0,
     certifications: data.certifications,
     schedule: data.schedule,
-    appUsername: data.appAccessEnabled ? data.username : undefined,
-    appPassword: data.appAccessEnabled ? data.password : undefined,
+    appUsername: data.appAccessEnabled ? data.username.trim() : undefined,
+    // Blank on edit means "keep the current password".
+    appPassword: data.appAccessEnabled && data.password ? data.password : undefined,
   };
 }
 
@@ -127,6 +172,10 @@ interface UseStaffWizardReturn {
   totalSteps: number;
   currentStep: WizardStep;
   data: StaffWizardData;
+  /** Validation messages for the current step. */
+  stepErrors: StaffStepErrors;
+  /** Validates any step (1-based) against the current data. */
+  validateStep: (step: number) => StaffStepErrors;
   canGoNext: boolean;
   canGoPrevious: boolean;
   loading: boolean;
@@ -161,9 +210,16 @@ export function useStaffWizard({
   const currentStep = STEPS[step - 1];
   const totalSteps = STEPS.length;
 
-  const canGoNext = useMemo(
-    () => currentStep.validate(data),
-    [currentStep, data],
+  const stepErrors = useMemo(
+    () => currentStep.validate(data, mode),
+    [currentStep, data, mode],
+  );
+
+  const canGoNext = Object.keys(stepErrors).length === 0;
+
+  const validateStep = useCallback(
+    (target: number) => STEPS[target - 1]?.validate(data, mode) ?? {},
+    [data, mode],
   );
 
   const canGoPrevious = useMemo(() => step > 1, [step]);
@@ -244,6 +300,8 @@ export function useStaffWizard({
     totalSteps,
     currentStep,
     data,
+    stepErrors,
+    validateStep,
     canGoNext,
     canGoPrevious,
     loading: submitting,

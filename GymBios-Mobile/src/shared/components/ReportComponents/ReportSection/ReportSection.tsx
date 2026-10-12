@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { styles } from './ReportSection.styles';
 import type { ReportSectionProps } from './ReportSection.types';

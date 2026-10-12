@@ -3,9 +3,9 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassBlob, GlassSurface } from '@/shared/components';
 import { TrainerProfileCard, type TrainerProfileData } from '../components/TrainerProfileCard';

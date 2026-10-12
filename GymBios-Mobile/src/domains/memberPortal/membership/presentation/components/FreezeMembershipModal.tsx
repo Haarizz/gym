@@ -2,10 +2,9 @@ import { useState } from 'react';
 import {
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { CurrencyValue } from '@/core/providers';

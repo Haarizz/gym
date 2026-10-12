@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
@@ -74,6 +75,16 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay
     );
+
+    // ── Check-in policy (CheckInPolicyService) ───────────────────────────────
+
+    @Query("SELECT a FROM Attendance a WHERE a.member.id = :memberId AND a.checkInTime >= :since")
+    List<Attendance> findMemberAttendanceSince(
+            @Param("memberId") Long memberId,
+            @Param("since") LocalDateTime since
+    );
+
+    Optional<Attendance> findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(Long memberId);
 
     // ── Auto-close (midnight cron) ────────────────────────────────────────────
 

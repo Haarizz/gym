@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export interface PastBookingData {

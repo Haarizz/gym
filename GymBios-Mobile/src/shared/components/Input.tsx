@@ -3,10 +3,10 @@ import { useState } from 'react';
 import {
   Pressable,
   StyleSheet,
-  TextInput,
   type TextInputProps,
   View,
 } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';

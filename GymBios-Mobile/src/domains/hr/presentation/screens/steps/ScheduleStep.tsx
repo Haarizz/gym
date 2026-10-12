@@ -1,30 +1,33 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Pressable, StyleSheet, View, ScrollView } from 'react-native';
+import { format, parseISO } from 'date-fns';
+import { Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
-import { Button } from '@/shared/components/Button';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
-import { FormSection } from '@/shared/components/FormSection';
 import { Typography } from '@/shared/components/Typography';
 import { DatePicker } from '@/shared/components/DatePicker';
+import { FormCard } from '@/domains/members/presentation/components/form/FormCard';
 import type { StaffCertification } from '@/domains/hr/domain/Staff';
-import type { StaffWizardData } from '../../hooks/useStaffWizard';
+import type { StaffStepProps } from './stepTypes';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
+// `value` is what gets stored on the schedule, so it must not change.
+const SLOTS = [
+  { value: 'Morning (6am–12pm)', label: 'Morning', hint: '6am–12pm' },
+  { value: 'Afternoon (12pm–5pm)', label: 'Afternoon', hint: '12pm–5pm' },
+  { value: 'Evening (5pm–10pm)', label: 'Evening', hint: '5pm–10pm' },
+];
 
-interface ScheduleStepProps {
-  data: StaffWizardData;
-  updateField: <K extends keyof StaffWizardData>(
-    field: K,
-    value: StaffWizardData[K],
-  ) => void;
+interface ScheduleStepProps extends StaffStepProps {
   addCertification: () => void;
   removeCertification: (index: number) => void;
   onChangeCert: (index: number, field: keyof StaffCertification, value: string) => void;
 }
+
+const toDate = (value: string) => (value ? parseISO(value) : undefined);
+const toDateString = (d: Date | null) => (d ? format(d, 'yyyy-MM-dd') : '');
 
 export function ScheduleStep({
   data,
@@ -34,16 +37,13 @@ export function ScheduleStep({
   onChangeCert,
 }: ScheduleStepProps) {
   const theme = useTheme();
+  const workingDays = DAYS.filter((day) => (data.schedule[day] ?? []).length > 0).length;
 
   const toggleSlot = (day: string, slot: string) => {
     const current = data.schedule[day] ?? [];
-    const active = current.includes(slot);
-    let updated;
-    if (active) {
-      updated = current.filter((s) => s !== slot);
-    } else {
-      updated = [...current, slot];
-    }
+    const updated = current.includes(slot)
+      ? current.filter((s) => s !== slot)
+      : [...current, slot];
     const newSchedule = { ...data.schedule };
     if (updated.length === 0) {
       delete newSchedule[day];
@@ -70,236 +70,246 @@ export function ScheduleStep({
 
   return (
     <View style={styles.container}>
-      <FormSection title="Weekly Schedule">
-        <Typography variant="bodySmall" style={{ color: theme.textSecondary, marginBottom: Spacing.two }}>
-          Select the working days and time slots for this employee
-        </Typography>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={[styles.gridContainer, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-            {/* Header */}
-            <View style={[styles.gridRow, { backgroundColor: theme.backgroundElement }]}>
-              <View style={[styles.gridCellDay, { borderBottomWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
-                <Typography variant="bodySmallBold" style={{ color: theme.textSecondary }}>Day</Typography>
-              </View>
-              {SLOTS.map((slot) => (
-                <View key={slot} style={[styles.gridCellSlot, { borderBottomWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
-                  <Typography variant="bodySmallBold" style={{ color: theme.textSecondary, textAlign: 'center' }}>
-                    {slot}
-                  </Typography>
-                </View>
-              ))}
-            </View>
-            
-            {/* Days */}
-            {DAYS.map((day, di) => {
-              const activeSlots = data.schedule[day] ?? [];
-              return (
-                <View key={day} style={[styles.gridRow, { backgroundColor: di % 2 === 0 ? theme.backgroundElement : theme.background }]}>
-                  <View style={[styles.gridCellDay, { borderRightWidth: 1, borderBottomWidth: di === DAYS.length - 1 ? 0 : 1, borderColor: theme.border }]}>
-                    <Typography variant="bodySmallBold">{day}</Typography>
-                  </View>
-                  {SLOTS.map((slot) => {
-                    const active = activeSlots.includes(slot);
-                    return (
-                      <View key={slot} style={[styles.gridCellSlot, { borderRightWidth: 1, borderBottomWidth: di === DAYS.length - 1 ? 0 : 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Pressable
-                          onPress={() => toggleSlot(day, slot)}
-                          style={[
-                            styles.checkbox,
-                            {
-                              borderColor: active ? theme.primary : theme.border,
-                              backgroundColor: active ? theme.primary : 'transparent',
-                            }
-                          ]}
-                        >
-                          {active && <Feather name="check" size={14} color="#fff" />}
-                        </Pressable>
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
-        <View style={styles.legendContainer}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendBox, { backgroundColor: theme.primary }]} />
-            <Typography variant="caption" style={{ color: theme.textSecondary }}>Selected</Typography>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendBox, { borderColor: theme.border, borderWidth: 2 }]} />
-            <Typography variant="caption" style={{ color: theme.textSecondary }}>Not working</Typography>
-          </View>
-        </View>
-      </FormSection>
-
-      <FormSection title="Certifications">
-        {data.certifications.length === 0 && (
-          <Typography variant="bodySmall" style={{ color: theme.textSecondary, textAlign: 'center', paddingVertical: Spacing.four }}>
-            No certifications on file.
-          </Typography>
-        )}
-        {data.certifications.map((cert, index) => (
-          <View
-            key={index}
-            style={[styles.certCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border, borderWidth: 1 }]}
-          >
-            <View style={styles.certHeader}>
-              <View style={styles.certHeaderLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: theme.primary + '1a' }]}>
-                  <Feather name="award" size={16} color={theme.primary} />
-                </View>
-                <Typography variant="bodySmallBold">
-                  Certification {index + 1}
-                </Typography>
-              </View>
-              <Pressable
-                hitSlop={8}
-                onPress={() => removeCertification(index)}
-                style={styles.removeButton}
+      <FormCard
+        icon="calendar"
+        title="Weekly schedule"
+        description={
+          workingDays
+            ? `${workingDays} working day${workingDays > 1 ? 's' : ''} · tap a shift to toggle`
+            : 'Tap the shifts this person usually works'
+        }
+      >
+        {DAYS.map((day) => {
+          const activeSlots = data.schedule[day] ?? [];
+          return (
+            <View key={day} style={styles.dayRow}>
+              <Typography
+                variant="bodySmallBold"
+                style={[styles.dayLabel, { color: activeSlots.length ? theme.text : theme.textSecondary }]}
               >
-                <Feather name="x" size={16} color={theme.error} />
+                {day.slice(0, 3)}
+              </Typography>
+              <View style={styles.slots}>
+                {SLOTS.map((slot) => {
+                  const selected = activeSlots.includes(slot.value);
+                  return (
+                    <Pressable
+                      key={slot.value}
+                      onPress={() => toggleSlot(day, slot.value)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={`${day} ${slot.label} ${slot.hint}`}
+                      style={({ pressed }) => [
+                        styles.slot,
+                        {
+                          borderColor: selected ? theme.primary : theme.border,
+                          backgroundColor: selected ? 'rgba(50,127,116,0.10)' : theme.backgroundElement,
+                        },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Typography
+                        variant="caption"
+                        numberOfLines={1}
+                        style={[styles.slotLabel, { color: selected ? theme.primary : theme.textSecondary }]}
+                      >
+                        {slot.label}
+                      </Typography>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+        <Typography variant="caption" color="textSecondary">
+          Morning 6am–12pm · Afternoon 12pm–5pm · Evening 5pm–10pm
+        </Typography>
+      </FormCard>
+
+      <FormCard
+        icon="award"
+        title="Certifications"
+        description={
+          data.certifications.length
+            ? `${data.certifications.length} on file`
+            : 'Optional · e.g. CPT, first aid, nutrition'
+        }
+      >
+        {data.certifications.map((cert, index) => (
+          <View key={index} style={[styles.certCard, { borderColor: theme.border }]}>
+            <View style={styles.certHeader}>
+              <Typography variant="bodySmallBold" style={styles.certTitle} numberOfLines={1}>
+                {cert.certName.trim() || `Certification ${index + 1}`}
+              </Typography>
+              <Pressable
+                hitSlop={10}
+                onPress={() => removeCertification(index)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove certification ${index + 1}`}
+                style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}
+              >
+                <Feather name="trash-2" size={15} color={theme.error} />
               </Pressable>
             </View>
-            <View style={styles.certGrid}>
-              <View style={styles.certField}>
-                <Input
-                  label="Certification Name"
-                  value={cert.certName}
-                  onChangeText={(value) => onChangeCert(index, 'certName', value)}
-                  placeholder="e.g. CPT"
-                />
-              </View>
-              <View style={styles.certField}>
-                <Input
-                  label="Issuer"
-                  value={cert.issuer}
-                  onChangeText={(value) => onChangeCert(index, 'issuer', value)}
-                  placeholder="e.g. ACE"
-                />
-              </View>
-              <View style={styles.certField}>
-                <DatePicker
-                  label="Issue Date"
-                  value={cert.issueDate ? new Date(cert.issueDate) : undefined}
-                  onChange={(d) => d && onChangeCert(index, 'issueDate', d.toISOString().split('T')[0])}
-                  placeholder="Select Date"
-                />
-              </View>
-              <View style={styles.certField}>
-                <DatePicker
-                  label="Expiry Date"
-                  value={cert.expiryDate ? new Date(cert.expiryDate) : undefined}
-                  onChange={(d) => d && onChangeCert(index, 'expiryDate', d.toISOString().split('T')[0])}
-                  placeholder="Select Date"
-                />
-              </View>
-            </View>
-            
-            <View style={{ marginTop: Spacing.three }}>
-              <Typography variant="bodySmallBold" style={{ marginBottom: Spacing.one }}>Document</Typography>
-              <Button
-                variant="outline"
-                label={cert.documentUrl ? "Replace Document" : "Upload Document"}
-                onPress={() => handlePickDocument(index)}
+
+            <Input
+              label="Name"
+              value={cert.certName}
+              onChangeText={(value) => onChangeCert(index, 'certName', value)}
+              placeholder="e.g. Certified Personal Trainer"
+            />
+            <Input
+              label="Issuer"
+              value={cert.issuer}
+              onChangeText={(value) => onChangeCert(index, 'issuer', value)}
+              placeholder="e.g. ACE"
+            />
+            <View style={styles.dateRow}>
+              <DatePicker
+                label="Issued"
+                placeholder="Select"
+                value={toDate(cert.issueDate)}
+                onChange={(d) => onChangeCert(index, 'issueDate', toDateString(d))}
+                style={styles.dateField}
               />
-              {cert.documentUrl ? (
-                 <Typography variant="caption" style={{ color: theme.textSecondary, marginTop: Spacing.one }} numberOfLines={1}>
-                   {cert.documentUrl.split('/').pop()}
-                 </Typography>
-              ) : null}
+              <DatePicker
+                label="Expires"
+                placeholder="Select"
+                value={toDate(cert.expiryDate)}
+                minimumDate={toDate(cert.issueDate)}
+                onChange={(d) => onChangeCert(index, 'expiryDate', toDateString(d))}
+                style={styles.dateField}
+              />
             </View>
+
+            <Pressable
+              onPress={() => handlePickDocument(index)}
+              accessibilityRole="button"
+              accessibilityLabel={cert.documentUrl ? 'Replace document' : 'Upload document'}
+              style={({ pressed }) => [
+                styles.docButton,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Feather
+                name={cert.documentUrl ? 'file-text' : 'upload'}
+                size={16}
+                color={BrandColors.teal}
+              />
+              <Typography variant="bodySmall" style={styles.docText} numberOfLines={1}>
+                {cert.documentUrl ? cert.documentUrl.split('/').pop() : 'Upload document'}
+              </Typography>
+              {cert.documentUrl ? (
+                <Typography variant="caption" style={[styles.docAction, { color: theme.primary }]}>
+                  Replace
+                </Typography>
+              ) : null}
+            </Pressable>
           </View>
         ))}
-        <Button
-          label="+ Add Certification"
-          variant="secondary"
+
+        <Pressable
           onPress={addCertification}
-        />
-      </FormSection>
+          accessibilityRole="button"
+          accessibilityLabel="Add certification"
+          style={({ pressed }) => [
+            styles.addButton,
+            { borderColor: theme.primary },
+            pressed && styles.pressed,
+          ]}
+        >
+          <Feather name="plus" size={16} color={theme.primary} />
+          <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
+            Add certification
+          </Typography>
+        </Pressable>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
-  gridContainer: {
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  dayLabel: {
+    width: 36,
+  },
+  slots: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  slot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
     borderRadius: Radius.md,
     borderWidth: 1,
-    overflow: 'hidden',
-    minWidth: 460,
   },
-  gridRow: {
-    flexDirection: 'row',
+  slotLabel: {
+    fontWeight: '700',
   },
-  gridCellDay: {
-    width: 120,
-    padding: Spacing.three,
-    justifyContent: 'center',
-  },
-  gridCellSlot: {
-    flex: 1,
-    minWidth: 100,
-    padding: Spacing.three,
-    justifyContent: 'center',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: Radius.sm,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.four,
-    marginTop: Spacing.two,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  legendBox: {
-    width: 16,
-    height: 16,
-    borderRadius: Radius.sm,
+  pressed: {
+    opacity: 0.7,
   },
   certCard: {
     borderRadius: Radius.md,
-    padding: Spacing.three,
-    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.md,
+    gap: Spacing.md,
   },
   certHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.two,
-  },
-  certHeaderLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  iconWrapper: {
-    padding: Spacing.one + Spacing.half,
-    borderRadius: Radius.sm,
+  certTitle: {
+    flex: 1,
   },
   removeButton: {
-    padding: Spacing.half,
+    padding: Spacing.one,
   },
-  certGrid: {
+  dateRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.three,
+    gap: Spacing.md,
   },
-  certField: {
-    width: '47%',
+  dateField: {
+    flex: 1,
+  },
+  docButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  docText: {
+    flex: 1,
+  },
+  docAction: {
+    fontWeight: '700',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    minHeight: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
   },
 });

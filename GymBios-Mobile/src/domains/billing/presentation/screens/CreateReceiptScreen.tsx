@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Modal, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Modal, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 

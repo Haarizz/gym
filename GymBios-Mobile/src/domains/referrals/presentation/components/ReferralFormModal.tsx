@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';

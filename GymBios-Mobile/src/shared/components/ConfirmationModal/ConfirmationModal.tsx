@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors } from '@/core/theme';

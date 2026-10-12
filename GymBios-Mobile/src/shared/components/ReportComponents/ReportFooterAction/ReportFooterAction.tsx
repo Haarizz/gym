@@ -1,8 +1,8 @@
 import React from 'react';
 import {
   Pressable,
-  Text,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { styles } from './ReportFooterAction.styles';
 import { ReportFooterActionProps } from './ReportFooterAction.types';

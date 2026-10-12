@@ -3,10 +3,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
   Alert,
 } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';

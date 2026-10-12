@@ -1,4 +1,5 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { PerformanceTipDTO } from '../../domain/TrainerPerformanceData';

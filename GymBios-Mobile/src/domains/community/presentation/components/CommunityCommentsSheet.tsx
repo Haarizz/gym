@@ -5,9 +5,9 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { formatDistanceToNow } from 'date-fns';
 

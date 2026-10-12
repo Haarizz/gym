@@ -1,20 +1,13 @@
+import { format, parseISO } from 'date-fns';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/domains/members/presentation/components/form/FormCard';
 import { useRoles } from '@/domains/roles/hooks/useRoles';
 import { useAllBranches } from '@/domains/branch';
-import type { StaffWizardData } from '../../hooks/useStaffWizard';
-
-interface EmploymentStepProps {
-  data: StaffWizardData;
-  updateField: <K extends keyof StaffWizardData>(
-    field: K,
-    value: StaffWizardData[K],
-  ) => void;
-}
+import type { StaffStepProps } from './stepTypes';
 
 const DEPARTMENTS = [
   { label: 'Sales', value: 'Sales' },
@@ -23,51 +16,64 @@ const DEPARTMENTS = [
   { label: 'HR', value: 'HR' },
 ];
 
-export function EmploymentStep({ data, updateField }: EmploymentStepProps) {
+export function EmploymentStep({ data, updateField, errors }: StaffStepProps) {
   const { roles } = useRoles();
   const { data: branchData } = useAllBranches();
 
   const roleOptions = roles.map((r) => ({ label: r.roleName, value: r.roleName }));
-  const branchOptions = branchData ? branchData.map((b) => ({ label: b.branch_name, value: b.branch_name })) : [];
+  const branchOptions = branchData
+    ? branchData.map((b) => ({ label: b.branch_name, value: b.branch_name }))
+    : [];
 
   return (
     <View style={styles.container}>
-      <FormSection title="Employment">
+      <FormCard icon="briefcase" title="Position" description="Role controls what this person can access">
         <Dropdown
-          label="Role *"
+          label="Role"
+          required
           value={data.role}
           options={roleOptions}
           onChange={(v) => updateField('role', v)}
-          placeholder="Select Role"
+          placeholder="Select role"
+          error={errors?.role}
         />
         <Dropdown
-          label="Department *"
+          label="Department"
+          required
           value={data.department}
           options={DEPARTMENTS}
           onChange={(v) => updateField('department', v)}
-          placeholder="Select Department"
+          placeholder="Select department"
+          error={errors?.department}
         />
+      </FormCard>
+
+      <FormCard icon="map-pin" title="Workplace">
         <Dropdown
-          label="Branch *"
+          label="Branch"
+          required
           value={data.branch}
           options={branchOptions}
           onChange={(v) => updateField('branch', v)}
-          placeholder="Select Branch"
+          placeholder="Select branch"
+          error={errors?.branch}
         />
         <DatePicker
-          label="Join Date"
-          value={data.joinDate ? new Date(data.joinDate) : undefined}
-          onChange={(d) => d && updateField('joinDate', d.toISOString().split('T')[0])}
-          placeholder="YYYY-MM-DD"
+          label="Join date"
+          placeholder="Select join date"
+          // Parsed/formatted as local dates so the stored day doesn't shift with the timezone.
+          value={data.joinDate ? parseISO(data.joinDate) : undefined}
+          onChange={(d) => updateField('joinDate', d ? format(d, 'yyyy-MM-dd') : '')}
+          error={errors?.joinDate}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
 });

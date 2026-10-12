@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { EmptyState } from '@/shared/components/EmptyState';

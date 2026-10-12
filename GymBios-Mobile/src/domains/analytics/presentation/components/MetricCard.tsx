@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { Radius, Spacing, BrandColors, TypographyScale } from '@/core/theme';

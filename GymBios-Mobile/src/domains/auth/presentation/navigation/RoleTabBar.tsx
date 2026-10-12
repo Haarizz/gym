@@ -22,7 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { BrandColors, Glass } from '@/core/theme';
+import { BrandColors, Fonts, Glass } from '@/core/theme';
 import { TabIcon } from './tabConfigs';
 
 // Picks a legible icon colour for the near-solid active-tab fill — light
@@ -205,6 +205,7 @@ export const RoleTabBarStyles = StyleSheet.create({
   tabLabel: {
     position: 'absolute',
     bottom: -8,
+    fontFamily: Fonts.sans,
     fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',

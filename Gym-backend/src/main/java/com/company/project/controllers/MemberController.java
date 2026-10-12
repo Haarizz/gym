@@ -284,16 +284,19 @@ public class MemberController {
     @PostMapping("/{id}/freeze")
     public ResponseEntity<MemberResponseDTO> freezeMember(
             @PathVariable Long id,
-            @RequestBody com.company.project.dto.FreezeRequestDTO request) {
-        return ResponseEntity.ok(freezeService.freezeByStaff(id, request));
+            @RequestBody com.company.project.dto.FreezeRequestDTO request,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(freezeService.freezeByStaff(id, request, MembershipFreezeService.StaffActor.of(principal)));
     }
 
     /**
      * GET /api/members/{id}/freeze-allowance — freeze days/occurrences left in the current plan period
      */
     @GetMapping("/{id}/freeze-allowance")
-    public ResponseEntity<java.util.Map<String, Object>> freezeAllowance(@PathVariable Long id) {
-        return ResponseEntity.ok(freezeService.getAllowanceView(id));
+    public ResponseEntity<java.util.Map<String, Object>> freezeAllowance(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(freezeService.getAllowanceView(id, MembershipFreezeService.StaffActor.of(principal)));
     }
 
     /**

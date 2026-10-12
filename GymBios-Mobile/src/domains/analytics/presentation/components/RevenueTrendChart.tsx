@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { CurrencyValue, formatAmount } from '@/core/providers';
 import Svg, { Path, Line, Circle, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';

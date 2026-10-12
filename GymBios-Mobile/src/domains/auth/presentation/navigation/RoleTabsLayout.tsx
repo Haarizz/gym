@@ -5,9 +5,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Glass, heroTint } from '@/core/theme';

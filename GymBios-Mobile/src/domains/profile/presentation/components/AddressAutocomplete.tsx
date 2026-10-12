@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
 import { Typography } from '@/shared/components';

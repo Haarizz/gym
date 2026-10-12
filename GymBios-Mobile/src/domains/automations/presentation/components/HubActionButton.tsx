@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewStyle, type StyleProp } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewStyle, type StyleProp } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 

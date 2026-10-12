@@ -2,78 +2,74 @@ import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
-import { FormSection } from '@/shared/components/FormSection';
-import type { StaffWizardData } from '../../hooks/useStaffWizard';
-import { StaffAvatarPicker } from '../../components/wizard/StaffAvatarPicker';
-import { uploadPhoto } from '@/shared/utils/uploadPhoto';
-import { toast } from '@/shared/components/Toasts/toastStore';
+import { FormCard, RequiredLabel } from '@/domains/members/presentation/components/form/FormCard';
+import { MemberPhotoCard } from '@/domains/members/presentation/components/form/MemberPhotoCard';
+import type { StaffStepProps } from './stepTypes';
 
-interface PersonalStepProps {
-  data: StaffWizardData;
-  updateField: <K extends keyof StaffWizardData>(
-    field: K,
-    value: StaffWizardData[K],
-  ) => void;
-}
-
-export function PersonalStep({ data, updateField }: PersonalStepProps) {
+export function PersonalStep({ data, updateField, errors }: StaffStepProps) {
   return (
     <View style={styles.container}>
-      <StaffAvatarPicker
-        photoUri={data.photoUri}
-        photoUrl={data.photoUrl}
-        name={data.name}
-        onChangePhoto={async (uri) => {
-          updateField('photoUri', uri);
-          if (!uri) {
-            updateField('photoUrl', '');
-            return;
-          }
-          try {
-            const url = await uploadPhoto(uri);
-            updateField('photoUrl', url);
-          } catch {
-            toast.error('Failed to upload photo. Please try again.');
-            updateField('photoUrl', '');
-          }
-        }}
+      <MemberPhotoCard
+        data={data}
+        updateField={updateField}
+        errors={errors}
+        hint="Optional · shown on the staff profile and schedules"
       />
-      <FormSection title="Personal Information">
+
+      <FormCard icon="user" title="Basic details">
         <Input
-          label="Full Name *"
+          label={<RequiredLabel>Full name</RequiredLabel>}
           value={data.name}
           onChangeText={(v) => updateField('name', v)}
-          placeholder="Enter full name"
+          placeholder="e.g. Omar Khalid"
+          autoCapitalize="words"
+          textContentType="name"
+          error={errors?.name}
         />
+      </FormCard>
+
+      <FormCard icon="phone" title="Contact" description="Used for payroll, alerts and login recovery">
         <Input
-          label="Email *"
+          label={<RequiredLabel>Email</RequiredLabel>}
           value={data.email}
           onChangeText={(v) => updateField('email', v)}
-          placeholder="Enter email address"
+          placeholder="name@example.com"
           keyboardType="email-address"
+          textContentType="emailAddress"
           autoCapitalize="none"
+          autoCorrect={false}
+          error={errors?.email}
         />
         <Input
-          label="Phone *"
+          label={<RequiredLabel>Phone</RequiredLabel>}
           value={data.phone}
           onChangeText={(v) => updateField('phone', v)}
-          placeholder="Enter phone number"
+          placeholder="e.g. +971 50 123 4567"
           keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          error={errors?.phone}
         />
         <Input
           label="Address"
           value={data.address}
           onChangeText={(v) => updateField('address', v)}
-          placeholder="Enter address"
+          placeholder="Street, area, city"
+          multiline
+          style={styles.multiline}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
+  },
+  multiline: {
+    minHeight: 72,
+    paddingTop: Spacing.md,
+    textAlignVertical: 'top',
   },
 });
