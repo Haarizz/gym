@@ -184,15 +184,85 @@ class MembershipFreezeServiceTest {
     }
 
     @Test
-    void staffFreezeIsNeverBilledOnUnfreeze() {
+    void staffFreezeIsBilledOnUnfreezeLikeAMemberFreeze() {
         MembershipFreeze open = openMobileFreeze(12, 12, 10);
         open.setSource(MembershipFreeze.SOURCE_STAFF);
+        open.setRecordedBy("frontdesk");
+        stubBillCreation();
+
+        service.unfreeze(7L, open.getFreezeStart().plusDays(12));
+
+        assertEquals(10, open.getFreeDaysApplied());
+        assertEquals(2, open.getChargedDays());
+        ArgumentCaptor<Receipt> bill = ArgumentCaptor.forClass(Receipt.class);
+        verify(receiptService).createReceipt(bill.capture());
+        assertEquals("frontdesk", bill.getValue().getProcessedBy());
+    }
+
+    @Test
+    void waivedStaffFreezeIsNotBilledOnUnfreeze() {
+        MembershipFreeze open = openMobileFreeze(12, 12, 10);
+        open.setSource(MembershipFreeze.SOURCE_STAFF);
+        open.setChargePerDay(BigDecimal.ZERO);
+        open.setChargeWaived(true);
 
         service.unfreeze(7L, open.getFreezeStart().plusDays(12));
 
         assertEquals(10, open.getFreeDaysApplied());
         assertEquals(0, open.getChargedDays());
         verify(receiptService, never()).createReceipt(any());
+    }
+
+    private com.company.project.dto.FreezeRequestDTO staffRequest(int days) {
+        com.company.project.dto.FreezeRequestDTO request = new com.company.project.dto.FreezeRequestDTO();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        request.setFreezeStartDate(today.toString());
+        request.setFreezeUntil(today.plusDays(days - 1).toString()); // last frozen day
+        return request;
+    }
+
+    private static final MembershipFreezeService.StaffActor STAFF = new MembershipFreezeService.StaffActor("frontdesk", false);
+    private static final MembershipFreezeService.StaffActor MANAGER = new MembershipFreezeService.StaffActor("manager", true);
+
+    @Test
+    void staffFreezeOverThePlanLimitsIsBlocked() {
+        pastFreeze(25, 10); // 5 days left
+
+        BusinessRuleViolationException e = assertThrows(BusinessRuleViolationException.class,
+                () -> service.freezeByStaff(7L, staffRequest(6), STAFF));
+        assertTrue(e.getMessage().contains("A manager can override"));
+        verify(memberService, never()).freezeMember(anyLong(), any());
+    }
+
+    @Test
+    void onlyAManagerCanOverrideThePlanLimits() {
+        pastFreeze(25, 10);
+        com.company.project.dto.FreezeRequestDTO request = staffRequest(6);
+        request.setOverrideLimits(true);
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.freezeByStaff(7L, request, STAFF));
+
+        service.freezeByStaff(7L, request, MANAGER);
+
+        ArgumentCaptor<MembershipFreeze> record = ArgumentCaptor.forClass(MembershipFreeze.class);
+        verify(freezeRepository).save(record.capture());
+        assertTrue(record.getValue().isLimitsOverridden());
+        assertEquals("manager", record.getValue().getRecordedBy());
+    }
+
+    @Test
+    void staffFreezeRecordsTheRateUnlessTheChargeIsWaived() {
+        service.freezeByStaff(7L, staffRequest(12), STAFF);
+        com.company.project.dto.FreezeRequestDTO waived = staffRequest(12);
+        waived.setWaiveCharge(true);
+        service.freezeByStaff(7L, waived, STAFF);
+
+        ArgumentCaptor<MembershipFreeze> records = ArgumentCaptor.forClass(MembershipFreeze.class);
+        verify(freezeRepository, times(2)).save(records.capture());
+        assertEquals(new BigDecimal("5.00"), records.getAllValues().get(0).getChargePerDay());
+        assertFalse(records.getAllValues().get(0).isChargeWaived());
+        assertEquals(0, records.getAllValues().get(1).getChargePerDay().signum());
+        assertFalse(records.getAllValues().get(1).isLimitsOverridden());
     }
 
     @Test
@@ -302,7 +372,7 @@ class MembershipFreezeServiceTest {
         request.setFreezeStartDate("2026-10-01T00:00:00Z");
         request.setFreezeUntil("2026-10-03T00:00:00Z");
 
-        service.freezeByStaff(7L, request);
+        service.freezeByStaff(7L, request, STAFF);
 
         ArgumentCaptor<com.company.project.dto.FreezeRequestDTO> sent =
                 ArgumentCaptor.forClass(com.company.project.dto.FreezeRequestDTO.class);
@@ -315,10 +385,9 @@ class MembershipFreezeServiceTest {
         member.setMembershipStatus("frozen");
         MembershipFreeze open = openMobileFreeze(3, 3, 3);
         open.setSource(MembershipFreeze.SOURCE_STAFF);
-        com.company.project.dto.FreezeRequestDTO request = new com.company.project.dto.FreezeRequestDTO();
-        request.setFreezeUntil("2026-12-20");
+        com.company.project.dto.FreezeRequestDTO request = staffRequest(5);
 
-        service.freezeByStaff(7L, request);
+        service.freezeByStaff(7L, request, STAFF);
 
         var order = inOrder(memberService);
         order.verify(memberService).unfreezeMember(eq(7L), any(LocalDateTime.class));

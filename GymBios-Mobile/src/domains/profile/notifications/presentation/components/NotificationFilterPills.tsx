@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import type { NotificationFilter } from '../../domain/notification.types';
 import { NotificationGlass as G } from './notificationGlass';
 

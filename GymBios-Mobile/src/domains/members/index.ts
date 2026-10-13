@@ -34,6 +34,7 @@ export { MemberFamilyService } from './application/family/MemberFamilyService';
 export type {
   MemberFreezeRepository,
   FreezeRequest,
+  FreezeAllowance,
 } from './application/freeze/MemberFreezeRepository';
 export { MemberFreezeService } from './application/freeze/MemberFreezeService';
 

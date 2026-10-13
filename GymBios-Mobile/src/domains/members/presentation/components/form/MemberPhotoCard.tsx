@@ -8,7 +8,21 @@ import { Avatar } from '@/shared/components/Avatar';
 import { usePhotoPicker } from '@/shared/components/AvatarPicker';
 import { Typography } from '@/shared/components/Typography';
 import { uploadPhoto } from '@/shared/utils/uploadPhoto';
-import type { MemberStepProps } from './stepTypes';
+
+type PhotoField = 'photoUri' | 'photoUrl' | 'photoStatus';
+
+interface PhotoCardProps {
+  data: {
+    name: string;
+    photoUri?: string;
+    photoUrl: string;
+    photoStatus: 'idle' | 'uploading' | 'error';
+  };
+  updateField: (field: PhotoField, value: any) => void;
+  errors?: { photoUrl?: string };
+  /** Helper text shown before a photo is picked. */
+  hint?: string;
+}
 
 function initialsOf(name: string): string {
   const letters = name
@@ -22,11 +36,16 @@ function initialsOf(name: string): string {
 }
 
 /**
- * Profile photo picker for the member form. Camera / gallery are plain buttons
+ * Profile photo picker for the member and staff forms. Camera / gallery are plain buttons
  * (no intermediate sheet), and the picked image is uploaded straight away so the
  * stored URL is ready by the time the form is submitted.
  */
-export function MemberPhotoCard({ data, updateField, errors }: MemberStepProps) {
+export function MemberPhotoCard({
+  data,
+  updateField,
+  errors,
+  hint = 'Optional · helps staff recognise the member at check-in',
+}: PhotoCardProps) {
   const theme = useTheme();
   const { takePhoto, chooseFromGallery } = usePhotoPicker();
   // Guards against a slow earlier upload overwriting a newer pick.
@@ -76,7 +95,7 @@ export function MemberPhotoCard({ data, updateField, errors }: MemberStepProps) 
       ? 'Upload failed — tap Retry or pick another photo'
       : currentImage
         ? 'Looks good. You can change it any time.'
-        : 'Optional · helps staff recognise the member at check-in';
+        : hint;
 
   return (
     <View style={[styles.card, { borderColor: theme.border }]}>

@@ -5,10 +5,10 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useQueryClient } from '@tanstack/react-query';
 import { BrandColors, Colors, Radius, Spacing, TypographyScale } from '@/core/theme';

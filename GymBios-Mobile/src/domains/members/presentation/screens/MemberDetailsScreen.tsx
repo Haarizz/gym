@@ -58,6 +58,7 @@ export function MemberDetailsScreen({
     renewMinor,
     freezeMember,
     unfreezeMember,
+    getFreezeAllowance,
     setCredentials,
     toggleAccess,
   } = useMemberActions();
@@ -278,6 +279,7 @@ export function MemberDetailsScreen({
         onClose={() => setFreezeVisible(false)}
         onFreeze={handleFreeze}
         onUnfreeze={handleUnfreeze}
+        loadAllowance={getFreezeAllowance}
       />
 
       <FamilyMemberBottomSheet

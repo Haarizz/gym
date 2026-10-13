@@ -5,10 +5,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';

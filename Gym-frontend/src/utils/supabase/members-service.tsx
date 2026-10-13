@@ -348,7 +348,17 @@ class MembersService {
     return response.json();
   }
 
-  async freezeMember(id: string, data: { freezeUntil: string; freezeStartDate?: string; reason?: string }): Promise<Member> {
+  /**
+   * freezeUntil is the last day frozen. overrideLimits (managers only) lets the freeze
+   * go past the plan's limits; waiveCharge skips billing the days beyond the free ones.
+   */
+  async freezeMember(id: string, data: {
+    freezeUntil: string;
+    freezeStartDate?: string;
+    reason?: string;
+    overrideLimits?: boolean;
+    waiveCharge?: boolean;
+  }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/freeze`,
       { method: 'POST', body: JSON.stringify(data) }
@@ -507,6 +517,8 @@ export interface FreezeAllowance {
   autoUnfreeze: boolean;
   canFreeze: boolean;
   unavailableMessage: string | null;
+  /** Whether the signed-in staff member may go past the plan's limits (ADMIN/MANAGER). */
+  canOverrideLimits?: boolean;
 }
 
 export interface FreezeHistoryEntry {
@@ -521,6 +533,9 @@ export interface FreezeHistoryEntry {
   chargeAmount: number;
   reason?: string | null;
   source?: string | null;
+  limitsOverridden?: boolean;
+  chargeWaived?: boolean;
+  recordedBy?: string | null;
   status: "Active" | "Completed";
 }
 

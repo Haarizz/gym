@@ -20,7 +20,10 @@ export const memberCheckInApi = {
   },
 
   async checkIn(): Promise<MemberCheckInResponse> {
-    const response = await apiClient.post<MemberCheckInResponse>('/mobile/member/check-in', {});
+    // MemberCheckInCard shows its own toast for refusals (limits, cooldown).
+    const response = await apiClient.post<MemberCheckInResponse>('/mobile/member/check-in', {}, {
+      skipGlobalErrorToast: true,
+    });
     const data = response.data;
     return {
       ...data,

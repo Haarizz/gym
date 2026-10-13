@@ -64,15 +64,21 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 export type ColorScheme = keyof typeof Colors;
 
+/**
+ * App text font. Embedded natively by the expo-font config plugin (app.json) with every
+ * weight registered under this one family, so `fontWeight` keeps selecting the right file.
+ */
+export const APP_FONT_FAMILY = 'Plus Jakarta Sans';
+
 export const Fonts = Platform.select({
   ios: {
-    sans: 'system-ui',
+    sans: APP_FONT_FAMILY,
     serif: 'ui-serif',
     rounded: 'ui-rounded',
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: APP_FONT_FAMILY,
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',

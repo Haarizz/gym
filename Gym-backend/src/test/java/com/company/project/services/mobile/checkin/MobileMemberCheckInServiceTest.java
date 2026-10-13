@@ -10,6 +10,7 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.CheckInPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class MobileMemberCheckInServiceTest {
 
     @Mock
     private AttendanceRepository attendanceRepository;
+
+    @Mock
+    private CheckInPolicyService checkInPolicyService;
 
     @InjectMocks
     private MobileMemberCheckInService checkInService;
@@ -66,6 +70,9 @@ class MobileMemberCheckInServiceTest {
         testMember.setMembershipEndDate(LocalDateTime.now().plusMonths(10));
         testMember.setExpiryDate(LocalDateTime.now().plusMonths(10));
         testMember.setTotalVisits(10);
+
+        lenient().when(checkInPolicyService.evaluate(any(Member.class))).thenReturn(
+                new CheckInPolicyService.Allowance(null, null, null, null, 0, 3, null, null));
     }
 
     @Test
@@ -293,5 +300,19 @@ class MobileMemberCheckInServiceTest {
         // Verification query was scoped strictly to Sarah's member ID (50L), never Bob's (99L)
         verify(attendanceRepository, times(1)).findByMember_IdOrderByCheckInTimeDesc(50L);
         verify(attendanceRepository, never()).findByMember_IdOrderByCheckInTimeDesc(99L);
+    }
+
+    @Test
+    @DisplayName("Should not create attendance when the check-in policy rejects the member")
+    void testPolicyRejectionBlocksCheckIn() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        when(attendanceRepository.existsActiveSessionForMember(eq(50L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+        doThrow(new BusinessRuleViolationException("Daily limit reached"))
+                .when(checkInPolicyService).enforce(testMember);
+
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.checkIn(testPrincipal));
+        verify(attendanceRepository, never()).saveAndFlush(any(Attendance.class));
+        verify(memberRepository, never()).save(any(Member.class));
     }
 }

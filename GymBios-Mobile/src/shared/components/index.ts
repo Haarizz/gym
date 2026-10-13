@@ -1,3 +1,4 @@
+export { Text, TextInput } from './AppText';
 export { Typography, type TypographyProps, type TypographyVariant } from './Typography';
 export { Button, type ButtonProps } from './Button';
 export { Input, type InputProps } from './Input';

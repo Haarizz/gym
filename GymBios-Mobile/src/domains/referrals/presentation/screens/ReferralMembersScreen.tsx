@@ -3,11 +3,11 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  TextInput,
   Pressable,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';

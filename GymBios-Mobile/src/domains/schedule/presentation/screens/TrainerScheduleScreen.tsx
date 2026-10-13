@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Loader, ConfirmationModal } from '@/shared/components';

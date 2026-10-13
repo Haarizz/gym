@@ -92,6 +92,7 @@ import { referralService } from '../utils/supabase/referral-service';
 import type { ReferralResponse } from '../utils/supabase/referral-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
 
 interface MemberHistoryAnalyticsProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
@@ -233,6 +234,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
   const [freezeReason, setFreezeReason] = useState('');
   const [savingFreeze, setSavingFreeze] = useState(false);
+  const [waiveFreezeCharge, setWaiveFreezeCharge] = useState(false);
+  const [overrideFreezeLimits, setOverrideFreezeLimits] = useState(false);
+  // Reloaded each time the freeze dialog opens — the allowance changes with every freeze.
+  const { allowance: freezeAllowance } = useFreezeAllowance(isFreezeDialogOpen ? memberId : null);
 
   // ── Load everything for this member ─────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -485,12 +490,20 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     try {
       const freezeUntil = format(freezeEndDate, 'yyyy-MM-dd') + 'T00:00:00Z';
       const freezeStart = freezeStartDate ? format(freezeStartDate, 'yyyy-MM-dd') + 'T00:00:00Z' : undefined;
-      await membersService.freezeMember(String(memberId), { freezeUntil, freezeStartDate: freezeStart, reason: freezeReason || undefined });
+      await membersService.freezeMember(String(memberId), {
+        freezeUntil,
+        freezeStartDate: freezeStart,
+        reason: freezeReason || undefined,
+        overrideLimits: overrideFreezeLimits || undefined,
+        waiveCharge: waiveFreezeCharge || undefined,
+      });
       toast.success('Membership frozen successfully');
       setIsFreezeDialogOpen(false);
       setFreezeStartDate(undefined);
       setFreezeEndDate(undefined);
       setFreezeReason('');
+      setWaiveFreezeCharge(false);
+      setOverrideFreezeLimits(false);
       loadAll();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to freeze membership');
@@ -642,6 +655,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   }
 
   const isFrozen = member.membership_status === 'frozen';
+  const canSubmitFreeze = canSubmitStaffFreeze(
+    freezeAllowance, staffFreezeDays(freezeStartDate ?? new Date(), freezeEndDate), overrideFreezeLimits);
   const isActive = member.membership_status === 'active';
   // The membership_status column is only ever set explicitly (create/freeze/
   // deactivate) — nothing flips it to "expired" when the expiry date passes,
@@ -2300,6 +2315,16 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 </div>
               </div>
 
+              <StaffFreezeOptions
+                allowance={freezeAllowance}
+                startDate={freezeStartDate ?? new Date()}
+                endDate={freezeEndDate}
+                waiveCharge={waiveFreezeCharge}
+                onWaiveChargeChange={setWaiveFreezeCharge}
+                overrideLimits={overrideFreezeLimits}
+                onOverrideLimitsChange={setOverrideFreezeLimits}
+              />
+
               <div className="space-y-2">
                 <Label>Reason (Optional)</Label>
                 <Textarea
@@ -2328,7 +2353,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             ) : (
               <Button
                 className="bg-[#E63946] hover:bg-[#d12935] text-white"
-                disabled={!freezeEndDate || savingFreeze}
+                disabled={!freezeEndDate || !canSubmitFreeze || savingFreeze}
                 onClick={handleFreeze}
               >
                 {savingFreeze ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}

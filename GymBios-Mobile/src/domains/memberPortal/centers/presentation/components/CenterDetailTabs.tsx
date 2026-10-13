@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing } from '@/core/theme';
 
 export type CenterDetailTab = 'overview' | 'plans' | 'trainers' | 'info';

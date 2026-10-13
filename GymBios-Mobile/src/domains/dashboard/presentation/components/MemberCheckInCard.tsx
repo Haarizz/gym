@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,7 +14,7 @@ import {
 } from '@/domains/checkIn';
 import { useMemberDashboard, dashboardKeys } from '@/domains/dashboard';
 import { PostWorkoutFeedbackSheet } from '@/domains/checkIn/presentation/components/members/PostWorkoutFeedbackSheet';
-import type { MemberFeedbackPayload } from '@/domains/checkIn/domain/MemberFeedback';
+import type { MemberCheckInStatus, MemberFeedbackPayload } from '@/domains/checkIn/domain/MemberFeedback';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -29,7 +30,7 @@ const DISABLED_BG  = BrandColors.screenBackground;
 export function MemberCheckInCard() {
   const queryClient = useQueryClient();
   const { data: dashboardData } = useMemberDashboard();
-  const { data: statusData } = useMemberCheckInStatus();
+  const { data: statusData, refetch: refetchStatus } = useMemberCheckInStatus();
 
   const checkInMutation = useMemberCheckIn();
   const checkOutMutation = useMemberCheckOut();
@@ -60,11 +61,30 @@ export function MemberCheckInCard() {
 
   const isActiveMembership = dashboardData?.memberInfo?.isActive ?? false;
 
+  // Plan quota / daily cap / cooldown — only relevant while not checked in.
+  const blockedReason = !isCheckedIn && statusData?.canCheckIn === false ? statusData.blockedReason : null;
+  const isBlocked = !!blockedReason;
+  const usageLabel = formatUsage(statusData);
+
+  // Re-check status when the cooldown ends so the card unlocks on its own.
+  const nextAllowedAt = statusData?.nextCheckInAllowedAt;
+  useEffect(() => {
+    if (!nextAllowedAt) return;
+    const ms = new Date(nextAllowedAt).getTime() - Date.now();
+    if (!Number.isFinite(ms) || ms <= 0) return;
+    const timer = setTimeout(() => refetchStatus(), Math.min(ms + 1000, 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [nextAllowedAt, refetchStatus]);
+
   const isActionPending =
     checkInMutation.isPending || checkOutMutation.isPending;
 
   const handleAction = () => {
     if (isActionPending) return;
+    if (isBlocked) {
+      toast.info(blockedReason!, { title: 'Check-In Unavailable' });
+      return;
+    }
 
     if (!isCheckedIn) {
       checkInMutation.mutate(undefined, {
@@ -79,10 +99,8 @@ export function MemberCheckInCard() {
           const msg =
             err?.response?.data?.message || err?.message || 'Check-in could not be completed.';
 
-          if (
-            status === 409 ||
-            (typeof msg === 'string' && msg.toLowerCase().includes('already checked in'))
-          ) {
+          // 409 is also used for limit/cooldown refusals, so match on the message.
+          if (typeof msg === 'string' && msg.toLowerCase().includes('already checked in')) {
             setOverrideCheckedIn(true);
             queryClient.invalidateQueries({ queryKey: checkInKeys.all });
             queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
@@ -90,6 +108,7 @@ export function MemberCheckInCard() {
               title: 'Already Checked In',
             });
           } else {
+            if (status === 409) queryClient.invalidateQueries({ queryKey: checkInKeys.all });
             toast.info(msg, { title: 'Check-In Notice' });
           }
         },
@@ -161,12 +180,18 @@ export function MemberCheckInCard() {
         disabled={isActionPending || !isActiveMembership}
         style={({ pressed }) => [
           styles.container,
-          !isActiveMembership && styles.containerDisabled,
+          (!isActiveMembership || isBlocked) && styles.containerDisabled,
           pressed && styles.pressed,
         ]}
         accessibilityRole="button"
         accessibilityLabel={
-          !isActiveMembership ? 'Subscription Required' : isCheckedIn ? 'Check Out of Gym' : 'Check In Now'
+          !isActiveMembership
+            ? 'Subscription Required'
+            : isCheckedIn
+              ? 'Check Out of Gym'
+              : isBlocked
+                ? `Check-In Unavailable. ${blockedReason}`
+                : 'Check In Now'
         }
       >
         {!isActiveMembership ? (
@@ -180,6 +205,21 @@ export function MemberCheckInCard() {
               <Text style={[styles.subtitle, styles.textDisabled]}>Requires an active gym subscription</Text>
             </View>
             <Feather name="chevron-right" size={20} color={BrandColors.textSecondary} />
+          </View>
+        ) : isBlocked ? (
+          // Limit reached or cooling down between visits — plain surface
+          <View style={styles.content}>
+            <View style={[styles.iconBox, styles.iconBoxDisabled]}>
+              <Feather
+                name={statusData?.nextCheckInAllowedAt ? 'clock' : 'slash'}
+                size={22}
+                color={BrandColors.textSecondary}
+              />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={[styles.title, styles.textDisabled]}>Check-In Unavailable</Text>
+              <Text style={[styles.subtitle, styles.textDisabled]}>{blockedReason}</Text>
+            </View>
           </View>
         ) : (
           // Active state — green/amber gradient glass
@@ -211,7 +251,9 @@ export function MemberCheckInCard() {
                 <Text style={styles.subtitle}>
                   {isCheckedIn
                     ? 'Workout in progress · Tap when finished'
-                    : 'Gate access ready'}
+                    : usageLabel
+                      ? `Gate access ready · ${usageLabel}`
+                      : 'Gate access ready'}
                 </Text>
               </View>
               <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.8)" />
@@ -231,6 +273,19 @@ export function MemberCheckInCard() {
       )}
     </>
   );
+}
+
+/** e.g. "18 of 60 sessions left" — null for unlimited plans. */
+function formatUsage(status?: MemberCheckInStatus): string | null {
+  if (!status?.limitValue || !status.limitUnit) return null;
+  const left = Math.max(0, status.limitValue - (status.used ?? 0));
+  const unit = status.limitUnit.toLowerCase();
+  const period =
+    status.limitPeriod === 'Week' ? ' this week'
+      : status.limitPeriod === 'Month' ? ' this month'
+        : status.limitPeriod === 'Year' ? ' this year'
+          : '';
+  return `${left} of ${status.limitValue} ${unit} left${period}`;
 }
 
 const styles = StyleSheet.create({

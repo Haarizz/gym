@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { ScrollView, View, StyleSheet, Pressable, Text } from 'react-native';
+import { ScrollView, View, StyleSheet, Pressable } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

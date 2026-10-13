@@ -17,6 +17,8 @@ public class FreezeRequestDTO {
     private String freezeUntil;   // ISO date string "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ssZ"
     private String freezeStartDate; // Same formats; optional — defaults to now when omitted
     private String reason;
+    private boolean overrideLimits; // a manager going past the plan's freeze limits
+    private boolean waiveCharge;    // don't bill the days beyond the free allowance
 
     public String getFreezeUntil() { return freezeUntil; }
     public void setFreezeUntil(String freezeUntil) { this.freezeUntil = freezeUntil; }
@@ -26,4 +28,10 @@ public class FreezeRequestDTO {
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+
+    public boolean isOverrideLimits() { return overrideLimits; }
+    public void setOverrideLimits(boolean overrideLimits) { this.overrideLimits = overrideLimits; }
+
+    public boolean isWaiveCharge() { return waiveCharge; }
+    public void setWaiveCharge(boolean waiveCharge) { this.waiveCharge = waiveCharge; }
 }

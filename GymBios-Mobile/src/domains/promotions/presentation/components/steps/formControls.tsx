@@ -1,7 +1,8 @@
 import Feather from '@expo/vector-icons/Feather';
 import { parseISO, format, isValid } from 'date-fns';
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { PromotionFormData } from '../../hooks/usePromotionWizard';

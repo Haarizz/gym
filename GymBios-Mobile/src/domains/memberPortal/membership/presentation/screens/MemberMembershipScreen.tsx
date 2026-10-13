@@ -4,10 +4,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';

@@ -56,6 +56,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type RewardDiscountSelection } from '../components/shared/RewardDiscountPicker';
+import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
+import { parseISO } from 'date-fns';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -250,7 +252,9 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
   const [freezeForm, setFreezeForm] = useState({
     startDate: '',
     endDate: '',
-    reason: ''
+    reason: '',
+    waiveCharge: false,
+    overrideLimits: false,
   });
 
   // Real data state
@@ -260,6 +264,12 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
   const [dataError, setDataError] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [rewardSel, setRewardSel] = useState<RewardDiscountSelection>(null);
+  // Reloaded each time the freeze sheet opens — the allowance changes with every freeze.
+  const { allowance: freezeAllowance } = useFreezeAllowance(showFreezeSheet ? memberId : null);
+  const freezeStart = freezeForm.startDate ? parseISO(freezeForm.startDate) : new Date();
+  const freezeEnd = freezeForm.endDate ? parseISO(freezeForm.endDate) : undefined;
+  const canSubmitFreeze = canSubmitStaffFreeze(
+    freezeAllowance, staffFreezeDays(freezeStart, freezeEnd), freezeForm.overrideLimits);
 
   const loadData = useCallback(async () => {
     const token = sessionStorage.getItem("token");
@@ -422,14 +432,20 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
       const res = await fetch(`${API_BASE}/members/${memberId}/freeze`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ freezeUntil: freezeForm.endDate, reason: freezeForm.reason || "Member request" }),
+        body: JSON.stringify({
+          freezeStartDate: freezeForm.startDate || undefined,
+          freezeUntil: freezeForm.endDate,
+          reason: freezeForm.reason || "Member request",
+          overrideLimits: freezeForm.overrideLimits || undefined,
+          waiveCharge: freezeForm.waiveCharge || undefined,
+        }),
       });
       if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as any)?.message ?? "Freeze failed"); }
       setShowFreezeSheet(false);
       setSuccessType('freeze');
       setShowSuccessDialog(true);
       toast.success('Membership Frozen!', { description: `Frozen until ${freezeForm.endDate}`, duration: 3000 });
-      setFreezeForm({ startDate: '', endDate: '', reason: '' });
+      setFreezeForm({ startDate: '', endDate: '', reason: '', waiveCharge: false, overrideLimits: false });
       loadData();
     } catch (e: any) {
       toast.error('Freeze Failed', { description: e.message });
@@ -1274,23 +1290,26 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
           </SheetHeader>
 
           <div className="space-y-6 mt-6">
-            {/* Freeze Policy */}
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div className="text-sm space-y-1">
-                    <p className="font-semibold text-blue-900">Freeze Policy</p>
-                    <ul className="list-disc list-inside text-blue-700 space-y-1">
-                      <li>Minimum freeze period: 7 days</li>
-                      <li>Maximum freeze period: 60 days</li>
-                      <li>Maximum freeze count per year: 2 times</li>
-                      <li>Freeze requires admin approval</li>
-                    </ul>
+            {/* Freeze Policy — this member's plan allowance */}
+            {freezeAllowance && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div className="text-sm space-y-1">
+                      <p className="font-semibold text-blue-900">Freeze Policy</p>
+                      <ul className="list-disc list-inside text-blue-700 space-y-1">
+                        <li>{freezeAllowance.remainingDays} of {freezeAllowance.maxDays} freeze days left</li>
+                        {freezeAllowance.maxOccurrences != null && (
+                          <li>{freezeAllowance.remainingOccurrences ?? 0} of {freezeAllowance.maxOccurrences} freezes left</li>
+                        )}
+                        <li>{freezeAllowance.freeDaysRemaining} free days left{Number(freezeAllowance.chargePerExtraDay) > 0 ? `, then ${freezeAllowance.chargePerExtraDay} per extra day` : ''}</li>
+                      </ul>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Freeze Form */}
             <div className="space-y-4">
@@ -1328,11 +1347,22 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               </div>
             </div>
 
+            <StaffFreezeOptions
+              allowance={freezeAllowance}
+              startDate={freezeStart}
+              endDate={freezeEnd}
+              waiveCharge={freezeForm.waiveCharge}
+              onWaiveChargeChange={(waiveCharge) => setFreezeForm({ ...freezeForm, waiveCharge })}
+              overrideLimits={freezeForm.overrideLimits}
+              onOverrideLimitsChange={(overrideLimits) => setFreezeForm({ ...freezeForm, overrideLimits })}
+            />
+
             {/* Submit Button */}
             <Button
               className="w-full h-12"
               style={{ backgroundColor: '#327F74' }}
               onClick={handleRequestFreeze}
+              disabled={!freezeForm.endDate || !canSubmitFreeze}
             >
               <Snowflake className="h-5 w-5 mr-2" />
               Submit Freeze Request

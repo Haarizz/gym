@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
 import { CurrencyGlyph } from '@/core/providers';

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
 import type { PerformanceTargets } from '../../domain/StaffPerformanceData';

@@ -4,9 +4,9 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
 import type {

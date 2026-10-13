@@ -6,9 +6,9 @@ import {
   PanResponder,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { toastStore, ToastItem, ToastVariant } from './toastStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

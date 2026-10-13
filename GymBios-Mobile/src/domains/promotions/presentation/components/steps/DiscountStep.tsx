@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 
 import { useCurrency } from '@/core/providers';
 import { Dropdown } from '@/shared/components/Dropdown';

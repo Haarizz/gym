@@ -1,4 +1,5 @@
-import { Alert, Modal, Pressable, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 

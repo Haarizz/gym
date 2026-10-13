@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo } from 'react';
-import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import { type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { useFonts } from 'expo-font';
 import { useQuery } from '@tanstack/react-query';
 

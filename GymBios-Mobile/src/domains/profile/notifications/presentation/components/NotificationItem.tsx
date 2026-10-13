@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
 import type { NotificationItem as NotificationItemType } from '../../domain/notification.types';

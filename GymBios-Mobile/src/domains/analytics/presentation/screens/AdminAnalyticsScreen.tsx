@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CurrencyValue } from '@/core/providers';
-import { View, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator, Text } from 'react-native';
+import { View, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { Stack } from 'expo-router';
 import { useAdminAnalytics } from '../../hooks/useAdminAnalytics';
 import { AnalyticsTabs, AnalyticsTab } from '../components/AnalyticsTabs';

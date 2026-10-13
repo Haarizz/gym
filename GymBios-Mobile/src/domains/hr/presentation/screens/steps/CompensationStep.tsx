@@ -2,43 +2,40 @@ import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
-import { FormSection } from '@/shared/components/FormSection';
-import type { StaffWizardData } from '../../hooks/useStaffWizard';
+import { FormCard } from '@/domains/members/presentation/components/form/FormCard';
+import type { StaffStepProps } from './stepTypes';
 
-interface CompensationStepProps {
-  data: StaffWizardData;
-  updateField: <K extends keyof StaffWizardData>(
-    field: K,
-    value: StaffWizardData[K],
-  ) => void;
-}
-
-export function CompensationStep({ data, updateField }: CompensationStepProps) {
+export function CompensationStep({ data, updateField, errors }: StaffStepProps) {
   return (
     <View style={styles.container}>
-      <FormSection title="Compensation">
+      <FormCard icon="dollar-sign" title="Pay" description="Monthly base salary before commissions">
         <Input
-          label="Base Salary"
+          label="Base salary"
           value={data.salary}
           onChangeText={(v) => updateField('salary', v)}
           placeholder="0"
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
+          error={errors?.salary}
         />
+      </FormCard>
+
+      <FormCard icon="target" title="Targets" description="Sales target used in performance reports">
         <Input
-          label="Monthly Target"
+          label="Monthly target"
           value={data.monthlyTarget}
           onChangeText={(v) => updateField('monthlyTarget', v)}
           placeholder="0"
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
+          error={errors?.monthlyTarget}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
 });

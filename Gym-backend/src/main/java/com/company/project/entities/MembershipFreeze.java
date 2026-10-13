@@ -67,6 +67,18 @@ public class MembershipFreeze {
     @Column(nullable = false, length = 20)
     private String source;
 
+    /** A manager let this staff freeze go past the plan's freeze limits. */
+    @Column(name = "limits_overridden", nullable = false)
+    private boolean limitsOverridden;
+
+    /** Staff waived the charge for days beyond the free allowance. */
+    @Column(name = "charge_waived", nullable = false)
+    private boolean chargeWaived;
+
+    /** Who applied a staff freeze. */
+    @Column(name = "recorded_by")
+    private String recordedBy;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -111,6 +123,15 @@ public class MembershipFreeze {
 
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
+
+    public boolean isLimitsOverridden() { return limitsOverridden; }
+    public void setLimitsOverridden(boolean limitsOverridden) { this.limitsOverridden = limitsOverridden; }
+
+    public boolean isChargeWaived() { return chargeWaived; }
+    public void setChargeWaived(boolean chargeWaived) { this.chargeWaived = chargeWaived; }
+
+    public String getRecordedBy() { return recordedBy; }
+    public void setRecordedBy(String recordedBy) { this.recordedBy = recordedBy; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

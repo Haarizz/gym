@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { membersService, Member, type FreezeAllowance, type FreezeHistoryEntry } from '../utils/supabase/members-service';
+import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays } from '../components/members/StaffFreezeOptions';
 import { CurrencyGlyph } from '../utils/currency';
 import { plansService } from '../utils/supabase/plans-service';
 import { authService } from '../utils/supabase/auth-service';
@@ -9,7 +10,6 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
@@ -33,7 +33,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import { format, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 
 interface FreezeUnfreezeProps {
@@ -64,7 +64,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   const [allowanceLoading, setAllowanceLoading] = useState(false);
   const [freezeStartDate, setFreezeStartDate] = useState<Date | undefined>(undefined);
   const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
-  const [autoUnfreeze, setAutoUnfreeze] = useState(true);
+  const [waiveCharge, setWaiveCharge] = useState(false);
+  const [overrideLimits, setOverrideLimits] = useState(false);
   const [freezeNotes, setFreezeNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,11 +132,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     try {
       const a = await membersService.getFreezeAllowance(member.id);
       setAllowance(a);
-      setAutoUnfreeze(a.autoUnfreeze);
     } catch {
       setAllowance(null);
-      const planAuto = member.membership_plan ? planAutoUnfreeze[member.membership_plan] : undefined;
-      if (planAuto !== undefined) setAutoUnfreeze(planAuto);
     } finally {
       setAllowanceLoading(false);
     }
@@ -148,14 +146,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     setFreezeStartDate(undefined);
     setFreezeEndDate(undefined);
     setFreezeNotes('');
+    setWaiveCharge(false);
+    setOverrideLimits(false);
   };
 
-  // Freeze length and how much of it the plan's free days cover
-  const totalDays = freezeStartDate && freezeEndDate ? differenceInDays(freezeEndDate, freezeStartDate) + 1 : 0;
-  const freeDaysAvailable = allowance ? allowance.freeDaysRemaining : 0;
-  const extraDays = Math.max(0, totalDays - freeDaysAvailable);
-  const extraDayRate = allowance ? Number(allowance.chargePerExtraDay || 0) : 0;
-  const exceedsRemaining = allowance ? totalDays > allowance.remainingDays : false;
+  const totalDays = staffFreezeDays(freezeStartDate, freezeEndDate);
+  const canSubmit = canSubmitStaffFreeze(allowance, totalDays, overrideLimits);
 
   const handleFreezeMembership = async () => {
     if (!selectedMember || !freezeStartDate || !freezeEndDate) {
@@ -195,6 +191,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
         freezeUntil,
         freezeStartDate: freezeStart,
         reason: freezeNotes || undefined,
+        overrideLimits: overrideLimits || undefined,
+        waiveCharge: waiveCharge || undefined,
       });
       toast.success(`Membership frozen for ${selectedMember.name}`, {
         description: `${totalDays} days from ${format(freezeStartDate, 'dd MMM yyyy')} to ${format(freezeEndDate, 'dd MMM yyyy')}`,
@@ -528,52 +526,15 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                     </div>
                   </div>
 
-                  {/* Freeze Summary */}
-                  {freezeStartDate && freezeEndDate && (
-                    <Card className="bg-white" style={{ borderColor: 'rgba(43, 122, 120, 0.3)' }}>
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-600">Total Days</p>
-                          <p className="font-bold text-gray-900">{totalDays} days</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-600">Free Days Available</p>
-                          <p className="font-semibold text-green-600">{freeDaysAvailable} days</p>
-                        </div>
-                        {extraDays > 0 && (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-gray-600">Extra Days</p>
-                              <p className="font-semibold text-orange-600">{extraDays} days</p>
-                            </div>
-                            {extraDayRate > 0 && (
-                              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                                <p className="text-sm font-medium text-gray-900">Charge for Extra Days</p>
-                                <div className="text-right">
-                                  <p className="font-bold" style={{ color: '#E63946' }}><CurrencyGlyph /> {(extraDays * extraDayRate).toLocaleString()}</p>
-                                  <p className="text-xs text-gray-500">Not billed for staff freezes</p>
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {exceedsRemaining && (
-                          <p className="text-xs text-amber-700">Longer than the {allowance?.remainingDays} days left on this plan's freeze allowance.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Auto Unfreeze */}
-                  <div className="flex items-center justify-between p-4 rounded-lg" style={{ border: '1px solid rgba(43, 122, 120, 0.2)' }}>
-                    <div>
-                      <Label className="text-sm font-medium">Auto Unfreeze on End Date</Label>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Automatically activate membership on {freezeEndDate ? format(addDays(freezeEndDate, 1), 'dd MMM yyyy') : 'the day after the end date'}
-                      </p>
-                    </div>
-                    <Switch checked={autoUnfreeze} onCheckedChange={setAutoUnfreeze} />
-                  </div>
+                  <StaffFreezeOptions
+                    allowance={allowance}
+                    startDate={freezeStartDate}
+                    endDate={freezeEndDate}
+                    waiveCharge={waiveCharge}
+                    onWaiveChargeChange={setWaiveCharge}
+                    overrideLimits={overrideLimits}
+                    onOverrideLimitsChange={setOverrideLimits}
+                  />
 
                   {/* Notes */}
                   <div className="space-y-2">
@@ -591,7 +552,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                     onClick={handleFreezeMembership}
                     className="w-full text-white"
                     style={{ background: '#E63946' }}
-                    disabled={!freezeStartDate || !freezeEndDate || isSubmitting}
+                    disabled={!freezeStartDate || !freezeEndDate || !canSubmit || isSubmitting}
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
                     Freeze Membership
@@ -837,8 +798,13 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <TableCell>
                           {Number(record.chargeAmount) > 0 ? (
                             <span className="font-medium" style={{ color: '#E63946' }}><CurrencyGlyph /> {Number(record.chargeAmount).toLocaleString()}</span>
+                          ) : record.chargeWaived ? (
+                            <span className="text-gray-600">Waived</span>
                           ) : (
                             <span className="text-gray-600">Free</span>
+                          )}
+                          {record.limitsOverridden && (
+                            <p className="text-xs text-amber-700">Over plan limits{record.recordedBy ? ` · by ${record.recordedBy}` : ''}</p>
                           )}
                         </TableCell>
                         <TableCell>

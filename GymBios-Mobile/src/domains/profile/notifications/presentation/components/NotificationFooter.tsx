@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { NotificationGlass as G } from './notificationGlass';

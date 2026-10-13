@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text } from '@/shared/components/AppText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Typography } from '@/shared/components/Typography';
 import { Surface } from '@/shared/components/Surface';

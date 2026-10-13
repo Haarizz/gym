@@ -5,6 +5,20 @@ export interface MemberCheckInStatus {
   attendance_id?: number | null;
   checkInTime?: string | null;
   check_in_time?: string | null;
+  /** Plan quota unit — "Sessions" | "Days" | "Hours"; null when the plan is unlimited. */
+  limitUnit?: string | null;
+  /** Allowed amount per period; null when unlimited. */
+  limitValue?: number | null;
+  used?: number | null;
+  /** "Payment" | "Week" | "Month" | "Year"; null when unlimited. */
+  limitPeriod?: string | null;
+  checkInsToday?: number;
+  maxCheckInsPerDay?: number;
+  /** End of the cooldown after the last check-out, if still cooling down. */
+  nextCheckInAllowedAt?: string | null;
+  canCheckIn?: boolean;
+  /** Why a check-in would be refused right now (quota, daily cap or cooldown). */
+  blockedReason?: string | null;
 }
 
 export interface MemberCheckInResponse {

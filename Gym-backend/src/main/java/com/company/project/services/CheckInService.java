@@ -25,6 +25,7 @@ public class CheckInService {
     private final BookingRepository bookingRepository;
     private final AttendanceRepository attendanceRepository;
     private final QrCodeService qrCodeService;
+    private final CheckInPolicyService checkInPolicyService;
 
     // Per-member lock so two near-simultaneous check-ins for the same member
     // (e.g. gate scanner + reception scanning the same QR within milliseconds)
@@ -36,11 +37,13 @@ public class CheckInService {
     public CheckInService(MemberRepository memberRepository,
                           BookingRepository bookingRepository,
                           AttendanceRepository attendanceRepository,
-                          QrCodeService qrCodeService) {
+                          QrCodeService qrCodeService,
+                          CheckInPolicyService checkInPolicyService) {
         this.memberRepository    = memberRepository;
         this.bookingRepository   = bookingRepository;
         this.attendanceRepository = attendanceRepository;
         this.qrCodeService       = qrCodeService;
+        this.checkInPolicyService = checkInPolicyService;
     }
 
     // ── POST /api/checkin ─────────────────────────────────────────────────────
@@ -62,6 +65,8 @@ public class CheckInService {
             if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDayNow, endOfDayNow)) {
                 throw new RuntimeException(member.getName() + " is already checked in. Please check out first.");
             }
+            // Plan quota, daily cap and cooldown between visits
+            checkInPolicyService.enforce(member);
 
             // Record attendance
             attendance.setMember(member);
