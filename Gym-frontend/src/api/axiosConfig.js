@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isTokenExpired, expireSessionAndReload, SESSION_EXPIRED_MESSAGE } from '../utils/session-expiry';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -8,6 +9,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
+    // BG_98: an expired JWT gets a bare 403 from the backend (not the 401 handled
+    // below), so catch it here before the request is sent.
+    if (isTokenExpired(token)) {
+      expireSessionAndReload();
+      return Promise.reject(new Error(SESSION_EXPIRED_MESSAGE));
+    }
     const activeBranchId = sessionStorage.getItem('activeBranchId');
 
     if (token) {

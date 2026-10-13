@@ -1,0 +1,111 @@
+/* Members KPI row. A module because the precompiled Tailwind snapshot lacks
+   several of the needed utilities (e.g. xl:grid-cols-5). */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  --tone: var(--primary);
+  --tone-bg: #2b7a781a;
+  --ring: #6366f1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  background: var(--card, #fff);
+  border: 1px solid color-mix(in srgb, var(--primary) 10%, transparent);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.card:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.card.active {
+  box-shadow: 0 0 0 2px var(--ring), 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.primary { --tone: var(--primary); --tone-bg: #2b7a781a; --ring: #6366f1; }
+.green { --tone: #16a34a; --tone-bg: #f0fdf4; --ring: #16a34a; }
+.blue { --tone: #2563eb; --tone-bg: #eff6ff; --ring: #2563eb; }
+.red { --tone: #dc2626; --tone-bg: #fef2f2; --ring: #dc2626; }
+.cyan { --tone: #0891b2; --tone-bg: #ecfeff; --ring: #0891b2; }
+.amber { --tone: #d97706; --tone-bg: #fffbeb; --ring: #d97706; }
+.purple { --tone: #9333ea; --tone-bg: #faf5ff; --ring: #9333ea; }
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.chip {
+  display: inline-flex;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  color: var(--tone);
+  background: var(--tone-bg);
+}
+
+.value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 2rem;
+  color: var(--tone);
+  overflow-wrap: anywhere;
+}
+
+.loading {
+  color: var(--muted-foreground);
+}
+
+.sub {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+/* Filter notice shown inside a list filtered by a card */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  font-size: 0.8125rem;
+}
+
+.clear {
+  padding: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}

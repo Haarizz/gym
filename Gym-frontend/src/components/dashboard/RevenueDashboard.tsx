@@ -57,11 +57,14 @@ import {
 import {
   dashboardService,
   type RevenueBreakdownRow,
+  type RevenueCompareMode,
   type RevenueGranularity,
   type RevenueStreamKey,
   type RevenueSummary
 } from "../../utils/supabase/dashboard-service";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
+import { RevenueComparisonTab, RevenueInsightTiles, RevenueReportsTab, formatRange } from "./RevenueReports";
+import reportStyles from "./RevenueReports.module.css";
 
 type FilterType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
 
@@ -147,6 +150,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
   const [draftRange, setDraftRange] = useState<{ from?: Date; to?: Date } | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('total-collection');
+  const [compareMode, setCompareMode] = useState<RevenueCompareMode>('previous');
 
   const [data, setData] = useState<RevenueSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +164,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    dashboardService.getRevenueSummary(fromKey, toKey, granularity)
+    dashboardService.getRevenueSummary(fromKey, toKey, granularity, compareMode)
       .then((res) => {
         if (cancelled) return;
         if (res?.success && res.data) {
@@ -176,7 +180,9 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [fromKey, toKey, granularity, refreshKey, reloadKey]);
+  }, [fromKey, toKey, granularity, compareMode, refreshKey, reloadKey]);
+
+  const compareText = compareMode === 'last-year' ? 'vs last year' : 'vs previous period';
 
   const handleDateFilterChange = (type: Exclude<FilterType, 'custom'>) => {
     const preset = presetRange(type);
@@ -217,7 +223,8 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
     tone,
     subtitle,
     cash,
-    card
+    card,
+    previousValue
   }: {
     title: string;
     value: number;
@@ -229,6 +236,8 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
     subtitle?: string;
     cash?: number;
     card?: number;
+    /** The comparison period's figure, shown under the trend */
+    previousValue?: number;
   }) => {
     const toneClasses = {
       emerald: { chip: 'bg-emerald-50', icon: 'text-emerald-600', value: 'text-emerald-700' },
@@ -279,8 +288,13 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                   <span className={cn("text-sm font-medium", trendColor)}>
                     {trend >= 0 ? '+' : ''}{trend.toFixed(1)}%
                   </span>
-                  <span className="text-sm text-muted-foreground ml-1">vs previous period</span>
+                  <span className="text-sm text-muted-foreground ml-1">{compareText}</span>
                 </div>
+              )}
+              {previousValue !== undefined && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {compareMode === 'last-year' ? 'Last year' : 'Previous'}: {isCurrency ? <Money value={previousValue} /> : previousValue.toLocaleString()}
+                </p>
               )}
               {subtitle && (
                 <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
@@ -521,11 +535,16 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
         { name: 'Online / Other', value: toNumber(total.other), color: COLORS.other },
       ].filter((d) => d.value > 0)
     : [];
-  const trendData = (data?.trend ?? []).map((p) => ({
+  // The comparison period has the same bucket size, so its points line up by index
+  const comparisonTrend = data?.comparison?.trend ?? [];
+  const trendData = (data?.trend ?? []).map((p, idx) => ({
     label: p.label,
     revenue: toNumber(p.revenue),
     expenses: p.expenses === null || p.expenses === undefined ? undefined : toNumber(p.expenses),
+    previous: comparisonTrend[idx] ? toNumber(comparisonTrend[idx].revenue) : undefined,
   }));
+  const showComparisonLine = comparisonTrend.some((p) => toNumber(p.revenue) > 0);
+  const comparisonName = data?.comparison?.label ?? 'Previous period';
   const showExpenseLine = data?.granularity !== 'hourly' && toNumber(data?.expenses?.total) > 0;
   const expenseRows = data?.expenses?.breakdown ?? [];
 
@@ -596,6 +615,21 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
               />
             </PopoverContent>
           </Popover>
+
+          <div className={reportStyles.compareSwitch} role="group" aria-label="Compare with">
+            <span>Compare with</span>
+            <button type="button" aria-pressed={compareMode === 'previous'} onClick={() => setCompareMode('previous')}>
+              Previous period
+            </button>
+            <button type="button" aria-pressed={compareMode === 'last-year'} onClick={() => setCompareMode('last-year')}>
+              Same period last year
+            </button>
+          </div>
+          {data && (
+            <span className={reportStyles.compareRange}>
+              Comparing with {formatRange(data.previousFrom, data.previousTo)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -624,7 +658,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
           tone="emerald"
           cash={total ? toNumber(total.cash) : undefined}
           card={total ? toNumber(total.card) : undefined}
-          subtitle={total ? `${toNumber(total.count)} transactions` : undefined}
+          previousValue={data?.comparison ? toNumber(data.comparison.totalCollection.total) : undefined}
         />
         <KPICard
           title="Total Expenses"
@@ -634,6 +668,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
           icon={Receipt}
           tone="red"
           subtitle={data ? `${toNumber(data.expenses.count)} approved / paid expenses` : undefined}
+          previousValue={data?.comparison ? toNumber(data.comparison.expenses.total) : undefined}
         />
         <KPICard
           title="Net Revenue"
@@ -642,6 +677,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
           icon={TrendingUp}
           tone="teal"
           subtitle="Collection minus expenses"
+          previousValue={data?.comparison ? toNumber(data.comparison.netRevenue.total) : undefined}
         />
         <KPICard
           title="Active Members"
@@ -653,10 +689,15 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
         />
       </div>
 
+      {/* Second KPI row: averages, members, margin, discounts, receivables */}
+      {data?.insights && data?.comparison && <RevenueInsightTiles data={data} />}
+
       {/* Revenue Breakdown Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="w-full flex flex-wrap h-auto p-1 gap-1">
           <TabsTrigger value="total-collection" className="text-xs">Total Collection</TabsTrigger>
+          <TabsTrigger value="comparison" className="text-xs">Comparison</TabsTrigger>
+          <TabsTrigger value="reports" className="text-xs">Detailed Reports</TabsTrigger>
           <TabsTrigger value="membership" className="text-xs">Membership</TabsTrigger>
           <TabsTrigger value="personal-training" className="text-xs">PT & Services</TabsTrigger>
           <TabsTrigger value="merchandise" className="text-xs">Merchandise</TabsTrigger>
@@ -716,7 +757,9 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                 <Card className={cardShell}>
                   <CardHeader>
                     <CardTitle>{TREND_TITLES[data?.granularity ?? 'daily']}</CardTitle>
-                    <CardDescription>Revenue performance over time ({currencyCode})</CardDescription>
+                    <CardDescription>
+                      Revenue performance over time ({currencyCode}){showComparisonLine ? `, with ${comparisonName.toLowerCase()} dotted` : ''}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -725,7 +768,18 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                         <XAxis dataKey="label" minTickGap={16} />
                         <YAxis />
                         <Tooltip content={<CustomTooltip />} />
-                        {showExpenseLine && <Legend />}
+                        {(showExpenseLine || showComparisonLine) && <Legend />}
+                        {showComparisonLine && (
+                          <Line
+                            type="monotone"
+                            dataKey="previous"
+                            name={comparisonName}
+                            stroke="#94A3B8"
+                            strokeWidth={2}
+                            strokeDasharray="2 4"
+                            dot={false}
+                          />
+                        )}
                         <Line
                           type="monotone"
                           dataKey="revenue"
@@ -750,6 +804,20 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                   </CardContent>
                 </Card>
               </AnimatedGrid>
+            </TabsContent>
+
+            {/* Period-vs-period comparison */}
+            <TabsContent value="comparison" className="space-y-4">
+              {data?.insights && data?.comparison
+                ? <RevenueComparisonTab data={data} />
+                : <EmptyState title="Comparison" message="Comparison data isn't available from the server yet." />}
+            </TabsContent>
+
+            {/* Detailed reports: top plans/products/members, staff, day & hour patterns */}
+            <TabsContent value="reports" className="space-y-4">
+              {data?.insights && data?.comparison
+                ? <RevenueReportsTab data={data} currencyCode={currencyCode} />
+                : <EmptyState title="Detailed reports" message="Detailed reports aren't available from the server yet." />}
             </TabsContent>
 
             {/* Membership Revenue Tab */}

@@ -698,16 +698,20 @@ public class PosCorrectionService {
         }
     }
 
-    /** Maker-checker: a supervisor, and not the one who raised it. */
+    /**
+     * Maker-checker: a supervisor, and not the one who raised it — except the gym owner
+     * (ADMIN), who has no one above them to approve their own corrections.
+     */
     private void checker(PosCorrection c) {
         if (!support.isSupervisor()) throw new SupervisorApprovalRequiredException("Only a supervisor can decide on a correction.");
-        if (support.currentUsername().equals(c.getRequestedBy())) {
+        if (support.currentUsername().equals(c.getRequestedBy()) && !support.isAdmin()) {
             throw new BusinessRuleViolationException("You raised this request — another supervisor has to approve or reject it.");
         }
     }
 
     private boolean canDecide(PosCorrection c) {
-        return PENDING.equals(c.getStatus()) && support.isSupervisor() && !support.currentUsername().equals(c.getRequestedBy());
+        return PENDING.equals(c.getStatus()) && support.isSupervisor()
+                && (support.isAdmin() || !support.currentUsername().equals(c.getRequestedBy()));
     }
 
     private void audit(String action, PosCorrection c, String details, String approvedBy) {

@@ -3,17 +3,22 @@ package com.company.project.services;
 import com.company.project.dto.BiosActivityLogRequestDTO;
 import com.company.project.dto.BiosActivityLogResponseDTO;
 import com.company.project.dto.BiosBranchComparisonDTO;
+import com.company.project.dto.BiosOverviewDTO;
 import com.company.project.dto.BiosSettingsDTO;
 import com.company.project.entities.Branch;
 import com.company.project.entities.BiosActivityLog;
+import com.company.project.entities.BiosMonthlySnapshot;
 import com.company.project.entities.BiosSettings;
-import com.company.project.entities.Member;
-import com.company.project.entities.Receipt;
 import com.company.project.repositories.BiosActivityLogRepository;
+import com.company.project.repositories.BiosMonthlySnapshotRepository;
 import com.company.project.repositories.BiosSettingsRepository;
 import com.company.project.repositories.BranchRepository;
+import com.company.project.repositories.JournalVoucherLineRepository;
 import com.company.project.repositories.MemberRepository;
-import com.company.project.repositories.ReceiptRepository;
+import com.company.project.security.BranchContextHolder;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.hibernate.Session;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +28,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,20 +46,29 @@ public class BiosService {
     private final BiosActivityLogRepository biosActivityLogRepository;
     private final BranchRepository branchRepository;
     private final MemberRepository memberRepository;
-    private final ReceiptRepository receiptRepository;
+    private final JournalVoucherLineRepository journalVoucherLineRepository;
+    private final BiosMonthlySnapshotRepository biosMonthlySnapshotRepository;
+    private final FinancialAnalyticsService financialAnalyticsService;
     private final BranchSettingsResolver branchSettingsResolver;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public BiosService(BiosSettingsRepository biosSettingsRepository,
                         BiosActivityLogRepository biosActivityLogRepository,
                         BranchRepository branchRepository,
                         MemberRepository memberRepository,
-                        ReceiptRepository receiptRepository,
+                        JournalVoucherLineRepository journalVoucherLineRepository,
+                        BiosMonthlySnapshotRepository biosMonthlySnapshotRepository,
+                        FinancialAnalyticsService financialAnalyticsService,
                         BranchSettingsResolver branchSettingsResolver) {
         this.biosSettingsRepository = biosSettingsRepository;
         this.biosActivityLogRepository = biosActivityLogRepository;
         this.branchRepository = branchRepository;
         this.memberRepository = memberRepository;
-        this.receiptRepository = receiptRepository;
+        this.journalVoucherLineRepository = journalVoucherLineRepository;
+        this.biosMonthlySnapshotRepository = biosMonthlySnapshotRepository;
+        this.financialAnalyticsService = financialAnalyticsService;
         this.branchSettingsResolver = branchSettingsResolver;
     }
 
@@ -178,14 +195,107 @@ public class BiosService {
                 .stream().map(BiosActivityLogResponseDTO::fromEntity).collect(Collectors.toList());
     }
 
+    // ── Overview (member KPIs + member trend) ─────────────────────────────────
+
+    /**
+     * Member KPIs and a month-by-month member trend ending with the current
+     * month, scoped by the request's branch filter. Past months come from the
+     * month-end snapshots where every branch in scope has one, and are estimated
+     * from membership periods and receipts otherwise.
+     */
+    @Transactional(readOnly = true)
+    public BiosOverviewDTO getOverview(int months) {
+        int monthCount = Math.max(1, Math.min(months, 24));
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        YearMonth currentMonth = YearMonth.from(today);
+        YearMonth firstMonth = currentMonth.minusMonths(monthCount - 1L);
+
+        BiosOverviewDTO overview = new BiosOverviewDTO();
+        overview.setAsOf(today);
+
+        long total = 0, active = 0, expired = 0, suspended = 0, overdue = 0;
+        List<BiosOverviewDTO.MembershipTypeRow> types = new ArrayList<>();
+        for (Object[] row : memberRepository.biosStatusBreakdownByMembershipType(startOfToday)) {
+            String type = row[0] != null && !row[0].toString().isBlank() ? row[0].toString() : "Unknown";
+            types.add(new BiosOverviewDTO.MembershipTypeRow(type, toLong(row[1]), toLong(row[2]), toLong(row[3])));
+            total += toLong(row[1]);
+            active += toLong(row[2]);
+            expired += toLong(row[3]);
+            suspended += toLong(row[4]);
+            overdue += toLong(row[5]);
+        }
+        types.sort((a, b) -> Long.compare(b.total(), a.total()));
+        overview.setTotalMembers(total);
+        overview.setActiveMembers(active);
+        overview.setExpiredMembers(expired);
+        overview.setSuspendedMembers(suspended);
+        overview.setOverdueMembers(overdue);
+        overview.setMembershipTypes(types);
+
+        Map<YearMonth, Long> joinsByMonth = new HashMap<>();
+        for (Object[] row : memberRepository.countJoinsByMonthSince(firstMonth.atDay(1).atStartOfDay())) {
+            if (row[0] != null && row[1] != null) {
+                joinsByMonth.put(YearMonth.of(((Number) row[0]).intValue(), ((Number) row[1]).intValue()), toLong(row[2]));
+            }
+        }
+        overview.setRecentJoins(joinsByMonth.getOrDefault(currentMonth, 0L));
+
+        // A past month counts as recorded only if every branch in scope has a snapshot for it.
+        int branchesInScope = BranchContextHolder.getActiveBranchId() != null
+                ? 1 : branchRepository.findByStatus("ACTIVE").size();
+        Map<YearMonth, List<BiosMonthlySnapshot>> snapshotsByMonth = biosMonthlySnapshotRepository
+                .findByMonthBetween(firstMonth.atDay(1), currentMonth.minusMonths(1).atDay(1)).stream()
+                .collect(Collectors.groupingBy(s -> YearMonth.from(s.getMonth())));
+
+        List<BiosOverviewDTO.MemberTrendPoint> trend = new ArrayList<>();
+        long membersOnBooks = memberRepository.countJoinedBefore(firstMonth.atDay(1).atStartOfDay());
+        for (YearMonth month = firstMonth; !month.isAfter(currentMonth); month = month.plusMonths(1)) {
+            long joined = joinsByMonth.getOrDefault(month, 0L);
+            membersOnBooks += joined;
+            List<BiosMonthlySnapshot> snapshots = snapshotsByMonth.getOrDefault(month, List.of());
+
+            long monthMembers;
+            long monthActive;
+            long monthNew;
+            String source;
+            if (month.equals(currentMonth)) {
+                monthMembers = total;
+                monthActive = active;
+                monthNew = joined;
+                source = "live";
+            } else if (branchesInScope > 0 && snapshots.size() >= branchesInScope) {
+                monthMembers = snapshots.stream().mapToLong(BiosMonthlySnapshot::getTotalMembers).sum();
+                monthActive = snapshots.stream().mapToLong(BiosMonthlySnapshot::getActiveMembers).sum();
+                monthNew = snapshots.stream().mapToLong(BiosMonthlySnapshot::getNewMembers).sum();
+                source = "snapshot";
+            } else {
+                monthMembers = membersOnBooks;
+                monthActive = Math.min(monthMembers,
+                        memberRepository.countEstimatedActiveAt(month.plusMonths(1).atDay(1).atStartOfDay()));
+                monthNew = joined;
+                source = "estimated";
+            }
+            double retention = retentionPercent(monthActive, monthMembers);
+            double churn = monthMembers > 0
+                    ? BigDecimal.valueOf(100).subtract(BigDecimal.valueOf(retention)).setScale(1, RoundingMode.HALF_UP).doubleValue()
+                    : 0.0;
+            trend.add(new BiosOverviewDTO.MemberTrendPoint(month.toString(), monthMembers, monthActive, monthNew,
+                    retention, churn, source));
+        }
+        overview.setMemberTrend(trend);
+        return overview;
+    }
+
     // ── Branch comparison ──────────────────────────────────────────────────────
 
     /**
      * Per-branch member/revenue snapshot for the current month. Only returns a
      * meaningful cross-branch view when called with no active-branch header set
      * (admin "All Branches" mode) — the Hibernate branch filter is disabled in
-     * that case (see BranchContextFilter), so memberRepository/receiptRepository
-     * here see rows from every branch rather than just one.
+     * that case (see BranchContextFilter), so the grouped queries here see rows
+     * from every branch rather than just one. Revenue is posted journal revenue,
+     * the same figure the Finance dashboard and the BiOS revenue chart show.
      */
     @Transactional(readOnly = true)
     public List<BiosBranchComparisonDTO> getBranchComparison() {
@@ -194,47 +304,127 @@ public class BiosService {
             return List.of();
         }
 
-        List<Member> allMembers = memberRepository.findAll();
-        Map<Long, List<Member>> membersByBranch = allMembers.stream()
-                .filter(m -> m.getBranchId() != null)
-                .collect(Collectors.groupingBy(Member::getBranchId));
+        Map<Long, long[]> membersByBranch = new HashMap<>();
+        for (Object[] row : memberRepository.countTotalAndActiveByBranch(LocalDate.now().atStartOfDay())) {
+            if (row[0] != null) {
+                membersByBranch.put((Long) row[0], new long[] { toLong(row[1]), toLong(row[2]) });
+            }
+        }
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
-        LocalDateTime monthEnd = monthStart.plusMonths(1);
-
-        List<Receipt> paidThisMonth = receiptRepository.findAll().stream()
-                .filter(r -> "Paid".equals(r.getStatus()))
-                .filter(r -> {
-                    LocalDateTime when = r.getTransactionDate() != null ? r.getTransactionDate() : r.getCreatedAt();
-                    return when != null && !when.isBefore(monthStart) && when.isBefore(monthEnd);
-                })
-                .collect(Collectors.toList());
-        Map<Long, BigDecimal> revenueByBranch = paidThisMonth.stream()
-                .filter(r -> r.getBranchId() != null)
-                .collect(Collectors.groupingBy(
-                        Receipt::getBranchId,
-                        Collectors.reducing(BigDecimal.ZERO,
-                                r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO),
-                                BigDecimal::add)
-                ));
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        Map<Long, BigDecimal> revenueByBranch = postedRevenueByBranch(monthStart, monthStart.plusMonths(1));
 
         return branches.stream().map(branch -> {
-            List<Member> branchMembers = membersByBranch.getOrDefault(branch.getId(), List.of());
-            long total = branchMembers.size();
-            long active = branchMembers.stream().filter(m -> "active".equalsIgnoreCase(m.getMembershipStatus())).count();
-            double retention = total > 0
-                    ? BigDecimal.valueOf(active).divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100)).setScale(1, RoundingMode.HALF_UP).doubleValue()
-                    : 0.0;
-            BigDecimal revenue = revenueByBranch.getOrDefault(branch.getId(), BigDecimal.ZERO);
-
+            long[] counts = membersByBranch.getOrDefault(branch.getId(), new long[] { 0, 0 });
             return new BiosBranchComparisonDTO(
                     String.valueOf(branch.getId()),
                     branch.getBranchName(),
                     branch.getBranchCode(),
-                    total, active, retention, revenue
+                    counts[0], counts[1], retentionPercent(counts[1], counts[0]),
+                    revenueByBranch.getOrDefault(branch.getId(), BigDecimal.ZERO)
             );
         }).collect(Collectors.toList());
+    }
+
+    // ── Scheduled reports / alerts (see BiosScheduler) ─────────────────────────
+
+    /** One branch's numbers for a BiOS email, already scoped to that branch. */
+    public record BranchSnapshot(String branchName, long totalMembers, long activeMembers,
+                                 double retentionPercent, BigDecimal revenue) {}
+
+    /**
+     * Every branch in the current tenant database with a BiOS report or alert
+     * switched on. Called with no active branch, so the branch filter is off and
+     * every branch's settings row is visible.
+     */
+    @Transactional(readOnly = true)
+    public List<BiosSettings> findBranchesWithSchedulesOrAlerts() {
+        return biosSettingsRepository.findAll().stream()
+                .filter(s -> s.getBranchId() != null)
+                .filter(s -> Boolean.TRUE.equals(s.getScheduleEnabled())
+                        || Boolean.TRUE.equals(s.getAlertEnabled())
+                        || Boolean.TRUE.equals(s.getRevenueAlertEnabled()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Members, retention and posted revenue for [revenueFrom, revenueTo), scoped
+     * to one branch. Scheduled jobs have no request (and so no open-in-view
+     * EntityManager), so the branch filter is enabled here, inside the
+     * transaction, rather than relying on BranchFilterAspect's ordering.
+     */
+    @Transactional(readOnly = true)
+    public BranchSnapshot branchSnapshot(Long branchId, LocalDate revenueFrom, LocalDate revenueTo) {
+        enableBranchFilter(branchId);
+        long total = memberRepository.count();
+        long active = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
+        BigDecimal revenue = postedRevenueByBranch(revenueFrom, revenueTo).getOrDefault(branchId, BigDecimal.ZERO);
+        String branchName = branchRepository.findById(branchId).map(Branch::getBranchName).orElse("Branch " + branchId);
+        return new BranchSnapshot(branchName, total, active, retentionPercent(active, total), revenue);
+    }
+
+    /** The Finance dashboard's all-time totals, scoped to one branch (see branchSnapshot). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> branchFinancialDashboard(Long branchId) {
+        enableBranchFilter(branchId);
+        return financialAnalyticsService.getDashboard();
+    }
+
+    /** Ids of every ACTIVE branch in the current tenant database (called with no active branch). */
+    @Transactional(readOnly = true)
+    public List<Long> findActiveBranchIds() {
+        return branchRepository.findByStatus("ACTIVE").stream().map(Branch::getId).collect(Collectors.toList());
+    }
+
+    /**
+     * Records one branch's month-end member counts for `month`, unless already
+     * recorded. Counts are as of the first moment of the following month, the
+     * same cut-off the overview's estimates use, so recorded and estimated
+     * months line up. Returns true if a snapshot was written.
+     */
+    @Transactional
+    public boolean captureMonthlySnapshot(Long branchId, YearMonth month) {
+        enableBranchFilter(branchId);
+        LocalDate monthStart = month.atDay(1);
+        if (biosMonthlySnapshotRepository.existsByBranchIdAndMonth(branchId, monthStart)) {
+            return false;
+        }
+        LocalDateTime monthEnd = month.plusMonths(1).atDay(1).atStartOfDay();
+        long membersAtEnd = memberRepository.countJoinedBefore(monthEnd);
+        long membersAtStart = memberRepository.countJoinedBefore(monthStart.atStartOfDay());
+
+        BiosMonthlySnapshot snapshot = new BiosMonthlySnapshot();
+        snapshot.setBranchId(branchId);
+        snapshot.setMonth(monthStart);
+        snapshot.setTotalMembers(Math.toIntExact(membersAtEnd));
+        snapshot.setActiveMembers(Math.toIntExact(memberRepository.countEffectivelyActiveJoinedBefore(monthEnd)));
+        snapshot.setNewMembers(Math.toIntExact(membersAtEnd - membersAtStart));
+        biosMonthlySnapshotRepository.save(snapshot);
+        return true;
+    }
+
+    private void enableBranchFilter(Long branchId) {
+        entityManager.unwrap(Session.class).enableFilter("branchFilter").setParameter("branchId", branchId);
+    }
+
+    private Map<Long, BigDecimal> postedRevenueByBranch(LocalDate from, LocalDate to) {
+        Map<Long, BigDecimal> revenueByBranch = new HashMap<>();
+        for (Object[] row : journalVoucherLineRepository.sumPostedRevenueByBranch(from, to)) {
+            if (row[0] != null && row[1] != null) {
+                revenueByBranch.put((Long) row[0], (BigDecimal) row[1]);
+            }
+        }
+        return revenueByBranch;
+    }
+
+    private static double retentionPercent(long active, long total) {
+        return total > 0
+                ? BigDecimal.valueOf(active).divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100)).setScale(1, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+    }
+
+    private static long toLong(Object value) {
+        return value != null ? ((Number) value).longValue() : 0L;
     }
 }

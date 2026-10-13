@@ -136,7 +136,7 @@
 
 /* Tab bars with more tabs than fit become a swipeable strip (as on phones). */
 @container (max-width: 1100px) {
-  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5) {
+  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5, .bios-engine-modules) {
     display: flex;
     flex-wrap: nowrap;
     justify-content: flex-start;
@@ -144,10 +144,10 @@
     scrollbar-width: none;
     scroll-snap-type: x proximity;
   }
-  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5)::-webkit-scrollbar {
+  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5, .bios-engine-modules)::-webkit-scrollbar {
     display: none;
   }
-  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5) > [data-slot="tabs-trigger"] {
+  [data-bios-ui] [data-slot="tabs-list"]:is(.lg\:grid-cols-12, .grid-cols-6, .grid-cols-5, .bios-engine-modules) > [data-slot="tabs-trigger"] {
     flex: 1 0 auto;
     padding-left: 0.875rem;
     padding-right: 0.875rem;
@@ -167,4 +167,12 @@
   [data-bios-ui] [data-slot="card"],
   [data-bios-ui] [data-slot="tabs-trigger"] { transition: none; }
   [data-bios-ui] [data-slot="tabs-content"][data-state="active"] { animation: none; }
+}
+
+/* BI Engine module tabs: all nine on one row from the lg breakpoint (64rem) up.
+   lg:grid-cols-9 isn't in the precompiled Tailwind build, so it lives here. */
+@media (width >= 64rem) {
+  .bios-engine-modules {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
 }

@@ -1,0 +1,552 @@
+/* Member analytics dialog — mirrors the "GymBios Web App Design" prototype.
+   Written as a module because the precompiled Tailwind snapshot lacks most
+   of the prototype's utilities. */
+
+.dialog {
+  display: block;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 0.75rem;
+}
+
+/* Radix close button sits on the teal header. */
+.dialog > button:last-of-type {
+  color: #fff;
+  opacity: 0.85;
+  z-index: 2;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.hero {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #327f74, #2b7a78);
+  color: #fff;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.heroTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-right: 1.5rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.avatar {
+  width: 4rem;
+  height: 4rem;
+  flex-shrink: 0;
+  border: 2px solid rgb(255 255 255 / 0.3);
+}
+
+.avatarFallback {
+  background: rgb(255 255 255 / 0.2);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.identityText {
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.memberId {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.pillGood { background: #d1fae5; color: #047857; }
+.pillBad { background: #fee2e2; color: #b91c1c; }
+.pillWarn { background: #fef3c7; color: #a16207; }
+.pillInfo { background: #cffafe; color: #0e7490; }
+
+.heroMeta {
+  text-align: right;
+  font-size: 0.875rem;
+  color: rgb(255 255 255 / 0.8);
+  flex-shrink: 0;
+}
+
+.heroMeta p {
+  margin: 0;
+}
+
+.heroPlan {
+  margin-top: 0.25rem !important;
+  font-weight: 600;
+  color: #fff;
+}
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.kpi {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.1);
+  min-width: 0;
+}
+
+.kpiLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.kpiValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiSub {
+  font-size: 0.75rem;
+  color: rgb(255 255 255 / 0.6);
+  text-transform: capitalize;
+}
+
+/* ── Body ───────────────────────────────────────────────────────────── */
+.body {
+  padding: 1.5rem;
+}
+
+.notice {
+  margin-bottom: 1rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.5rem;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8125rem;
+}
+
+.tabsList {
+  margin-bottom: 1.5rem;
+}
+
+.tabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card, #fff);
+  min-width: 0;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cardTitle > svg {
+  color: #327f74;
+}
+
+.cardTitleNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+
+.chartEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 140px;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legend i {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+}
+
+/* Member info */
+.infoList {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.infoRow:last-child {
+  border-bottom: 0;
+}
+
+.infoRow dt {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.infoRow dd {
+  margin: 0;
+  max-width: 60%;
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Engagement rings */
+.rings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ringItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ring {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+}
+
+.ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring svg circle {
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.ring span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #327f74;
+}
+
+.ringLabel {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.ringHint {
+  margin: 0.125rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+/* KPI tiles */
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  min-width: 0;
+}
+
+.tile svg {
+  flex-shrink: 0;
+}
+
+.tileGreen { background: #ecfdf5; }
+.tileTeal { background: #f0fdfa; }
+.tileBlue { background: #eff6ff; }
+.tileRed { background: #fef2f2; }
+
+.tileLabel {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.tileValue {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Tables */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.progressCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.track {
+  flex: 1;
+  width: 6rem;
+  max-width: 8rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.scoreList .track {
+  width: 100%;
+  max-width: none;
+}
+
+.track > div {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+.descCell {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credit {
+  color: #047857;
+  font-weight: 500;
+}
+
+.emptyCell {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+/* Engagement tab */
+.scoreList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scoreHead {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.scoreHead span {
+  color: var(--muted-foreground);
+}
+
+.achievements {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.achievement {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  opacity: 0.5;
+}
+
+.achievement.earned {
+  background: #f0fdfa;
+  opacity: 1;
+}
+
+.achievementIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #d1d5db;
+}
+
+.earned .achievementIcon {
+  background: #327f74;
+}
+
+.achievementLabel {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.achievementDesc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.achievementCheck {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.healthGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  font-size: 0.875rem;
+}
+
+.healthItem {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+.healthValue {
+  margin: 0.125rem 0 0;
+  font-weight: 500;
+}
+
+/* ── Small screens ──────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .hero,
+  .body {
+    padding: 1rem;
+  }
+
+  .heroTop {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .heroMeta {
+    text-align: left;
+  }
+
+  .kpiStrip,
+  .rings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid2,
+  .grid3,
+  .healthGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tabsList {
+    width: 100%;
+    overflow-x: auto;
+  }
+}

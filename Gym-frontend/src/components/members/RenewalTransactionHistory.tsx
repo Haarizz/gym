@@ -31,6 +31,7 @@ import { receiptsService, type Receipt } from "../../utils/supabase/receipts-ser
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { downloadReceiptInvoice } from "../../utils/receipt-invoice";
 import { splitPaid } from "../../utils/payment-split";
+import { StatFilterNotice } from "./MemberStatCards";
 
 type RenewalKind = "Renewal" | "Upgrade" | "Downgrade" | "Plan Change";
 
@@ -60,7 +61,35 @@ const num = (v: unknown) => {
  * plan is the member's latest New/Renewal receipt before it; a different plan at a
  * higher (lower) price is shown as an Upgrade (Downgrade).
  */
-export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: number }) {
+export type RenewalHistoryFilter = "renewals" | "changes";
+
+export interface RenewalHistoryStats {
+  renewals: number;
+  /** Upgrades, downgrades and same-price plan changes */
+  changes: number;
+  renewalsCollected: number;
+  changesCollected: number;
+}
+
+export const RENEWAL_FILTER_LABELS: Record<RenewalHistoryFilter, string> = {
+  renewals: "Renewals (same plan)",
+  changes: "Upgrades, downgrades & plan changes",
+};
+
+const matchesKind = (kind: RenewalKind, filter: RenewalHistoryFilter) =>
+  filter === "renewals" ? kind === "Renewal" : kind !== "Renewal";
+
+export function RenewalTransactionHistory({
+  refreshKey = 0,
+  filter = null,
+  onClearFilter,
+  onStats,
+}: {
+  refreshKey?: number;
+  filter?: RenewalHistoryFilter | null;
+  onClearFilter?: () => void;
+  onStats?: (stats: RenewalHistoryStats) => void;
+}) {
   const { currencyCode } = useCurrency();
   const [renewals, setRenewals] = useState<Receipt[]>([]);
   const [planPurchases, setPlanPurchases] = useState<Receipt[]>([]);
@@ -108,6 +137,13 @@ export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: num
         const idx = history.findIndex((r) => String(r.id) === String(receipt.id));
         const prev = idx > 0 ? history[idx - 1] : null;
         const newPlan = receipt.plan_name || "—";
+        // BG_103: newer receipts carry the kind decided at renewal time against the
+        // member's actual previous plan; receipt history can be stale (e.g. a plan
+        // changed via Edit Member leaves no receipt), so it's only the fallback.
+        const stored = receipt.renewal_kind;
+        if (stored === "Renewal" || stored === "Upgrade" || stored === "Downgrade") {
+          return { receipt, kind: stored, previousPlan: stored === "Renewal" ? newPlan : prev?.plan_name ?? null, newPlan };
+        }
         let kind: RenewalKind = "Renewal";
         if (prev?.plan_name && receipt.plan_name && prev.plan_name !== receipt.plan_name) {
           const diff = num(receipt.amount) - num(prev.amount);
@@ -117,7 +153,22 @@ export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: num
       });
   }, [renewals, planPurchases]);
 
-  const visible = showAll ? rows : rows.slice(0, PAGE_PREVIEW);
+  useEffect(() => {
+    if (loading || error || !onStats) return;
+    const paid = (list: RenewalRow[]) => list.reduce((sum, r) => sum + num(r.receipt.paid_amount ?? r.receipt.amount), 0);
+    const renewalRows = rows.filter((r) => matchesKind(r.kind, "renewals"));
+    const changeRows = rows.filter((r) => matchesKind(r.kind, "changes"));
+    onStats({
+      renewals: renewalRows.length,
+      changes: changeRows.length,
+      renewalsCollected: paid(renewalRows),
+      changesCollected: paid(changeRows),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, loading, error]);
+
+  const shownRows = filter ? rows.filter((r) => matchesKind(r.kind, filter)) : rows;
+  const visible = showAll ? shownRows : shownRows.slice(0, PAGE_PREVIEW);
   const renewalCount = rows.filter((r) => r.kind === "Renewal").length;
   const upgradeCount = rows.filter((r) => r.kind === "Upgrade").length;
   const totalCollected = rows.reduce((sum, r) => sum + num(r.receipt.paid_amount ?? r.receipt.amount), 0);
@@ -197,7 +248,7 @@ export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: num
   };
 
   return (
-    <Card className="border-primary/10 shadow-md">
+    <Card id="renewal-history" className="border-primary/10 shadow-md">
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -215,16 +266,17 @@ export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: num
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            {rows.length > PAGE_PREVIEW && (
+            {shownRows.length > PAGE_PREVIEW && (
               <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
                 {showAll ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {showAll ? "Show Less" : `View All (${rows.length})`}
+                {showAll ? "Show Less" : `View All (${shownRows.length})`}
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
+        {filter && <StatFilterNotice label={RENEWAL_FILTER_LABELS[filter]} onClear={onClearFilter} />}
         {error ? (
           <div className="flex items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-red-700">
             <span className="flex items-center gap-2 text-sm"><AlertCircle className="h-4 w-4" />{error}</span>
@@ -238,6 +290,10 @@ export function RenewalTransactionHistory({ refreshKey = 0 }: { refreshKey?: num
           <div className="text-center py-10 text-muted-foreground">
             <RefreshCw className="h-8 w-8 mx-auto mb-2 text-primary" />
             <p className="text-sm">No renewals or upgrades yet. They'll appear here as soon as one is processed.</p>
+          </div>
+        ) : shownRows.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <p className="text-sm">No transactions match this filter.</p>
           </div>
         ) : (
           <div className="rounded-md border overflow-x-auto">

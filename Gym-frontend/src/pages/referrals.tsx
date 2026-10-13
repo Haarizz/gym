@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { referralService, type ReferralResponse, type ReferralSettings, type RewardRuleResponse } from '../utils/supabase/referral-service';
 import { rewardService } from '../utils/supabase/reward-service';
@@ -123,9 +124,18 @@ interface ReferralReward {
   ruleName: string;
 }
 
+const REFERRAL_TABS = ['overview', 'members', 'activity', 'my-rewards', 'reward-queue', 'rewards', 'analytics', 'settings'];
+
 export function Referrals() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
+  // BG_67: notifications deep-link here with ?tab=… (e.g. the Reward Queue); follow it on
+  // arrival and whenever it changes while the page is already open.
+  const location = useLocation();
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab && REFERRAL_TABS.includes(tab)) setActiveTab(tab);
+  }, [location.search, location.key]);
   const [selectedMember, setSelectedMember] = useState<string>('');
   const [showAddReferral, setShowAddReferral] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

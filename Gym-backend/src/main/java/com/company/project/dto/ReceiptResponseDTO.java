@@ -34,6 +34,7 @@ public class ReceiptResponseDTO {
     private String remarks;
     private java.math.BigDecimal discountAmount;
     private String discountLabel;
+    private String renewalKind;
     private String membershipType;
     private java.math.BigDecimal paidAmount;
     private java.math.BigDecimal dueAmount;
@@ -72,6 +73,7 @@ public class ReceiptResponseDTO {
         dto.remarks         = r.getRemarks();
         dto.discountAmount  = r.getDiscountAmount();
         dto.discountLabel   = r.getDiscountLabel();
+        dto.renewalKind     = r.getRenewalKind();
         dto.membershipType  = r.getMembershipType();
         java.math.BigDecimal totalAmt = r.getAmount() != null ? r.getAmount() : java.math.BigDecimal.ZERO;
         dto.paidAmount      = r.getPaidAmount() != null ? r.getPaidAmount() : java.math.BigDecimal.ZERO;
@@ -116,6 +118,7 @@ public class ReceiptResponseDTO {
     public String getRemarks() { return remarks; }
     public java.math.BigDecimal getDiscountAmount() { return discountAmount; }
     public String getDiscountLabel() { return discountLabel; }
+    public String getRenewalKind() { return renewalKind; }
     public String getMembershipType() { return membershipType; }
     public java.math.BigDecimal getPaidAmount() { return paidAmount; }
     public java.math.BigDecimal getDueAmount() { return dueAmount; }

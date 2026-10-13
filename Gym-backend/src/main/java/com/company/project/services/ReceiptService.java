@@ -94,7 +94,12 @@ public class ReceiptService {
             BigDecimal legsTotal = BigDecimal.ZERO;
             if (inv.getPaymentBreakdown() != null) {
                 for (com.company.project.dto.PaymentSplitDTO leg : inv.getPaymentBreakdown()) {
+                    // A "Credit" leg is the part sold on account (posted to receivables),
+                    // not money received — it must stay in the balance as a debt.
+                    if ("Credit".equalsIgnoreCase(leg.getMethod())) continue;
                     BigDecimal amount = leg.getAmount() != null ? leg.getAmount() : BigDecimal.ZERO;
+                    // Never credit more than the invoice actually records as paid.
+                    amount = amount.min(paid.subtract(legsTotal));
                     if (amount.signum() <= 0) continue;
                     legsTotal = legsTotal.add(amount);
                     rows.add(salesPaymentRow(inv, leg.getPaymentDate() != null ? leg.getPaymentDate() : invDate, leg.getMethod(), amount));

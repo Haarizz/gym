@@ -2,6 +2,7 @@ import type { Receipt } from './supabase/receipts-service';
 import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, COMPANY_HEADER_CSS, type CompanyDetails } from './company-details';
 import { getVatRate, splitVatInclusive, DEFAULT_VAT_RATE } from './tax';
 import { getReceiptColors, receiptColorsCss, DEFAULT_RECEIPT_COLORS, type ReceiptColors } from './receipt-colors';
+import { printHtml } from './print-html';
 
 export interface ReceiptPrintItem {
   description: string;
@@ -175,7 +176,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
             .print-info { display: none; }
             @page {
                 size: A4;
-                margin: 8mm 10mm;
+                margin: 12mm 14mm;
             }
         }
     </style>
@@ -232,7 +233,6 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
         </div>
         <div class="print-info">Receipt generated on ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}<br>This is a computer-generated receipt and is valid without signature.</div>
     </div>
-    <script>window.onload = function(){ window.print(); }</script>
 </body>
 </html>`;
 }
@@ -298,17 +298,14 @@ export function buildReceiptInvoiceHtml(receipt: Receipt, currencyCode: string, 
 // first popup finishes opening) triggering two print windows/dialogs at once.
 let printInFlight = false;
 
-// Opens the print window synchronously (required by popup blockers, which only
-// allow window.open within the click handler's own call stack), then fills it
-// in once the company branding has loaded.
+// Prints through a hidden iframe once the company branding has loaded, so only
+// the browser's print dialog appears — no extra tab/window.
 export async function downloadReceiptInvoice(receipt: Receipt, currencyCode: string) {
   if (printInFlight) return;
   printInFlight = true;
   try {
-    const win = window.open("", "_blank", "width=820,height=900");
     const [company, vatRate, colors] = await Promise.all([getCompanyDetails(), getVatRate(), getReceiptColors()]);
-    const html = buildReceiptInvoiceHtml(receipt, currencyCode, company, vatRate, colors);
-    if (win) { win.document.write(html); win.document.close(); }
+    printHtml(buildReceiptInvoiceHtml(receipt, currencyCode, company, vatRate, colors));
   } finally {
     printInFlight = false;
   }
@@ -316,7 +313,7 @@ export async function downloadReceiptInvoice(receipt: Receipt, currencyCode: str
 
 // A Receipt Voucher is a Financials/ledger document (source + category +
 // notes, no VAT/member-billing framing), so it doesn't fit ReceiptPrintData —
-// but it must still print through the same isolated-window mechanism as a
+// but it must still print through the same isolated-document (iframe) mechanism as a
 // member receipt, not the old hidden-DOM-node + window.print() approach that
 // paginated on the whole page's (invisible) layout height instead of just the
 // voucher's own content and produced several mostly-blank pages.
@@ -425,7 +422,7 @@ export function buildReceiptVoucherHtml(data: ReceiptVoucherPrintData, company: 
             .footer-note { margin-bottom: 8px; line-height: 1.5; }
             .contact-info { margin-top: 12px; padding-top: 12px; line-height: 1.5; }
             .print-info { display: none; }
-            @page { size: A4; margin: 8mm 10mm; }
+            @page { size: A4; margin: 12mm 14mm; }
         }
     </style>
 </head>
@@ -477,7 +474,6 @@ export function buildReceiptVoucherHtml(data: ReceiptVoucherPrintData, company: 
         </div>
         <div class="print-info">Voucher generated on ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} at ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}${data.createdAtStr ? `<br>Created at: ${escapeHtml(data.createdAtStr)}` : ""}</div>
     </div>
-    <script>window.onload = function(){ window.print(); }</script>
 </body>
 </html>`;
 }
@@ -488,10 +484,8 @@ export async function downloadReceiptVoucher(data: ReceiptVoucherPrintData) {
   if (voucherPrintInFlight) return;
   voucherPrintInFlight = true;
   try {
-    const win = window.open("", "_blank", "width=820,height=900");
     const company = await getCompanyDetails();
-    const html = buildReceiptVoucherHtml(data, company);
-    if (win) { win.document.write(html); win.document.close(); }
+    printHtml(buildReceiptVoucherHtml(data, company));
   } finally {
     voucherPrintInFlight = false;
   }

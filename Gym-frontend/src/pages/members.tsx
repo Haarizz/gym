@@ -21,6 +21,15 @@ import { MemberAddons } from "./member-addons";
 import { MemberReceipts } from "./member-receipts";
 import { rewardService, walletService, type ReferralReward, type Wallet as RewardWallet } from "../utils/supabase/reward-service";
 import {
+  ArrowUpDown,
+  Ban,
+  CalendarClock,
+  CalendarX,
+  Coins,
+  Hourglass,
+  Puzzle,
+  Receipt as ReceiptIcon,
+  UserRoundPlus,
   Plus,
   Search,
   UserPlus,
@@ -59,8 +68,15 @@ import {
 } from 'lucide-react';
 import { RenewalTransactionHistory } from "../components/members/RenewalTransactionHistory";
 import { DueForRenewalList } from "../components/members/DueForRenewalList";
+import { MemberAnalyticsDialog } from "../components/members/MemberAnalyticsDialog";
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
-import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
+import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
+import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
+import type { DueFilter, DueStats } from "../components/members/DueForRenewalList";
+import type { RenewalHistoryFilter, RenewalHistoryStats } from "../components/members/RenewalTransactionHistory";
+import type { FreezeFilter, FreezeStats } from "../components/members/FreezeTransactionHistory";
+import type { AddonStats } from "./member-addons";
+import type { ReceiptStats } from "./member-receipts";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
 import { membersService, Member } from '../utils/supabase/members-service';
@@ -131,7 +147,7 @@ interface MembersProps {
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
   const navigate = useNavigate();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, formatCurrency } = useCurrency();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Only gates the full-page skeleton on first mount. Search/filter/pagination
@@ -166,6 +182,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [analyticsMember, setAnalyticsMember] = useState<Member | null>(null);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
   const [profileRewards, setProfileRewards] = useState<ReferralReward[]>([]);
@@ -209,6 +226,51 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [transactionType, setTransactionType] = useState("all");
   const [payMode, setPayMode] = useState("all");
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // ── Per-tab stat cards ─────────────────────────────────────────────────
+  // Each tab's list reports its own counts (onStats) and takes the clicked
+  // card as its filter, so a card's number always matches what it shows.
+  const [renewalCardFilter, setRenewalCardFilter] = useState<DueFilter | RenewalHistoryFilter | null>(null);
+  const [dueStats, setDueStats] = useState<DueStats | null>(null);
+  const [renewalStats, setRenewalStats] = useState<RenewalHistoryStats | null>(null);
+  const [addonFilter, setAddonFilter] = useState("all");
+  const [addonStats, setAddonStats] = useState<AddonStats | null>(null);
+  const [receiptFilter, setReceiptFilter] = useState("all");
+  const [receiptStats, setReceiptStats] = useState<ReceiptStats | null>(null);
+  const [freezeFilter, setFreezeFilter] = useState<FreezeFilter | null>(null);
+  const [freezeStats, setFreezeStats] = useState<FreezeStats | null>(null);
+  const [reportCounts, setReportCounts] = useState<Partial<Record<string, number>>>({});
+  const [reportAutoKey, setReportAutoKey] = useState(0);
+  const [pendingTransactionsReport, setPendingTransactionsReport] = useState(false);
+
+  // Report-card counts use each report's default window, so a card's number is
+  // exactly what clicking it generates.
+  useEffect(() => {
+    if (activeTab !== "reports") return;
+    let cancelled = false;
+    setReportCounts({});
+    const set = (key: string) => (n: number) => { if (!cancelled) setReportCounts(prev => ({ ...prev, [key]: n })); };
+    receiptsService.getReceipts({}, { limit: 2000 })
+      .then(res => {
+        // Same "Last 30 Days" rule as handleGenerateReport
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        return res.receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff).length;
+      })
+      .then(set("membership"))
+      .catch(() => {});
+    (["renewals", "joined", "expiring", "expired"] as LifecycleReportType[]).forEach(type => {
+      countLifecycleReport(type).then(set(type)).catch(() => {});
+    });
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
+  // The Transactions card resets the report filters, then generates once they've applied.
+  useEffect(() => {
+    if (!pendingTransactionsReport) return;
+    setPendingTransactionsReport(false);
+    handleGenerateReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTransactionsReport]);
 
   // Schedule form states
   const [scheduleName, setScheduleName] = useState("");
@@ -468,22 +530,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const expiredMembers = statusCounts.expired;
   const frozenMembers = statusCounts.frozen;
 
-  const autoUnfreezePending = members.filter(m => {
-    const status = (m.membership_status || "").toLowerCase();
-    return status === "frozen" && m.freeze_end_date != null;
-  }).length;
-
-  const totalFreezeDays = members.reduce((total, m) => {
-    const status = (m.membership_status || "").toLowerCase();
-    if (status === "frozen" && m.freeze_start_date) {
-      const start = new Date(m.freeze_start_date);
-      const end = m.freeze_end_date ? new Date(m.freeze_end_date) : new Date();
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return total + diffDays;
-    }
-    return total;
-  }, 0);
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Active": return "bg-green-100 text-green-800";
@@ -615,7 +661,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const reportTypeSelectEl = (
     <div>
       <Label className="text-sm mb-2 block">Report Type</Label>
-      <Select value={reportType} onValueChange={(v) => { setReportType(v); setReportGenerated(false); }}>
+      <Select value={reportType} onValueChange={(v) => { setReportType(v); setReportGenerated(false); setReportAutoKey(0); }}>
         <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
@@ -1221,6 +1267,151 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     );
   }
 
+  // ── Stat cards for the active tab ──────────────────────────────────────
+  const scrollToSection = (id: string) => {
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const money = (n: number) => formatCurrency(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const tabStatCards = ((): { cards: StatCardDef[]; activeKey: string | null; onSelect: (key: string) => void } => {
+    switch (activeTab) {
+      case "renewals": {
+        const isDue = (k: string) => k === "overdue" || k === "due7" || k === "due30";
+        return {
+          cards: [
+            { key: "overdue", label: "Expired", value: dueStats?.overdue ?? null, sub: "Lapsed in the last 90 days", icon: CalendarX, tone: "red" },
+            { key: "due7", label: "Expiring in 7 Days", value: dueStats?.due7 ?? null, sub: "Renew this week", icon: Hourglass, tone: "amber" },
+            { key: "due30", label: "Expiring in 30 Days", value: dueStats?.due30 ?? null, sub: "Due within a month", icon: CalendarClock, tone: "blue" },
+            {
+              key: "renewals", label: "Renewals", value: renewalStats?.renewals ?? null, icon: RefreshCw, tone: "green",
+              sub: renewalStats ? `${money(renewalStats.renewalsCollected)} collected` : "Same-plan renewals",
+            },
+            {
+              key: "changes", label: "Upgrades & Downgrades", value: renewalStats?.changes ?? null, icon: ArrowUpDown, tone: "purple",
+              sub: renewalStats ? `${money(renewalStats.changesCollected)} collected` : "Plan changes",
+            },
+          ],
+          activeKey: renewalCardFilter,
+          onSelect: (key) => {
+            const next = renewalCardFilter === key ? null : (key as DueFilter | RenewalHistoryFilter);
+            setRenewalCardFilter(next);
+            if (!next) return;
+            if (isDue(next)) {
+              // The due list is hidden while a member is loaded into the renewal form.
+              setSelectedMemberForRenewal(null);
+              setSelectedNewPlan(null);
+              setOperationType(null);
+              setRenewalSearchTerm("");
+              renewalPaymentManager.clearLines();
+              scrollToSection("due-for-renewal");
+            } else {
+              scrollToSection("renewal-history");
+            }
+          },
+        };
+      }
+      case "addons":
+        return {
+          cards: [
+            {
+              key: "all", label: "Total Add-ons", value: addonStats?.total ?? null, icon: Puzzle, tone: "primary",
+              sub: addonStats ? `${money(addonStats.revenue)} revenue` : "All add-on purchases",
+            },
+            { key: "Active", label: "Active", value: addonStats?.active ?? null, sub: "Currently running", icon: CheckCircle, tone: "green" },
+            { key: "expiring", label: "Expiring in 7 Days", value: addonStats?.expiring ?? null, sub: "Active, ending soon", icon: Hourglass, tone: "amber" },
+            { key: "Expired", label: "Expired", value: addonStats?.expired ?? null, sub: "Past their expiry date", icon: CalendarX, tone: "red" },
+            { key: "Cancelled", label: "Cancelled", value: addonStats?.cancelled ?? null, sub: "Cancelled purchases", icon: Ban, tone: "cyan" },
+          ],
+          activeKey: addonFilter,
+          onSelect: (key) => {
+            setAddonFilter(addonFilter === key ? "all" : key);
+            scrollToSection("addon-transactions");
+          },
+        };
+      case "receipts":
+        return {
+          cards: [
+            {
+              key: "all", label: "All Receipts", value: receiptStats?.total ?? null, icon: ReceiptIcon, tone: "primary",
+              sub: receiptStats ? `${money(receiptStats.received)} received` : "Every receipt",
+            },
+            { key: "Paid", label: "Paid", value: receiptStats?.paid ?? null, sub: "Fully settled", icon: CheckCircle, tone: "green" },
+            {
+              key: "Partial", label: "Partially Paid", value: receiptStats?.partial ?? null, icon: Coins, tone: "amber",
+              sub: receiptStats ? `${money(receiptStats.partialDue)} still due` : "Balance remaining",
+            },
+            { key: "Pending", label: "Pending", value: receiptStats?.pending ?? null, sub: "Awaiting payment", icon: Clock, tone: "blue" },
+            { key: "Overdue", label: "Overdue", value: receiptStats?.overdue ?? null, sub: "Past the due date", icon: AlertCircle, tone: "red" },
+          ],
+          activeKey: receiptFilter,
+          onSelect: (key) => {
+            setReceiptFilter(receiptFilter === key ? "all" : key);
+            scrollToSection("member-receipts");
+          },
+        };
+      case "freeze":
+        return {
+          cards: [
+            { key: "frozen", label: "Currently Frozen", value: freezeStats?.frozen ?? null, sub: "Memberships on hold", icon: Snowflake, tone: "cyan" },
+            { key: "ending7", label: "Unfreezing in 7 Days", value: freezeStats?.ending7 ?? null, sub: "Auto-unfreeze due", icon: Hourglass, tone: "amber" },
+            { key: "month", label: "Frozen This Month", value: freezeStats?.month ?? null, sub: "Freezes started", icon: Calendar, tone: "blue" },
+            { key: "unfrozen", label: "Unfrozen", value: freezeStats?.unfrozen ?? null, sub: "Completed freezes", icon: Play, tone: "green" },
+            {
+              key: "charged", label: "Paid Freezes", value: freezeStats?.charged ?? null, icon: Coins, tone: "purple",
+              sub: freezeStats ? `${money(freezeStats.chargedAmount)} in fees` : "Freezes with a fee",
+            },
+          ],
+          activeKey: freezeFilter,
+          onSelect: (key) => {
+            const next = freezeFilter === key ? null : (key as FreezeFilter);
+            setFreezeFilter(next);
+            if (next) scrollToSection("freeze-history");
+          },
+        };
+      case "reports":
+        return {
+          cards: [
+            { key: "membership", label: "Transactions", value: reportCounts.membership ?? null, sub: "Last 30 days", icon: FileText, tone: "primary" },
+            { key: "renewals", label: "Renewals", value: reportCounts.renewals ?? null, sub: "Last 30 days", icon: RefreshCw, tone: "green" },
+            { key: "joined", label: "New Joiners", value: reportCounts.joined ?? null, sub: "Last 30 days", icon: UserRoundPlus, tone: "blue" },
+            { key: "expiring", label: "Expiring Soon", value: reportCounts.expiring ?? null, sub: "Next 30 days", icon: Hourglass, tone: "amber" },
+            { key: "expired", label: "Expired", value: reportCounts.expired ?? null, sub: "Last 30 days", icon: CalendarX, tone: "red" },
+          ],
+          activeKey: reportType,
+          onSelect: (key) => {
+            setReportType(key);
+            if (key === "membership") {
+              // The count is for the unfiltered last 30 days — match it.
+              setDateRange("last-30-days");
+              setMembershipType("all");
+              setTransactionType("all");
+              setPayMode("all");
+              setPendingTransactionsReport(true);
+            } else {
+              setReportAutoKey(k => k + 1);
+            }
+            scrollToSection("members-report");
+          },
+        };
+      default:
+        return {
+          cards: [
+            { key: "all", label: "Total Members", value: totalMembersCount, sub: "Registered members", icon: UserPlus, tone: "primary" },
+            { key: "active", label: "Active Members", value: activeMembers, sub: "Currently active", icon: UserPlus, tone: "green" },
+            { key: "inactive", label: "Inactive", value: inactiveMembers, sub: "Inactive members", icon: Pause, tone: "blue" },
+            { key: "expired", label: "Expired", value: expiredMembers, sub: "Need renewal", icon: Calendar, tone: "red" },
+            { key: "frozen", label: "Frozen", value: frozenMembers, sub: "Membership frozen", icon: Snowflake, tone: "cyan" },
+          ],
+          activeKey: selectedStatus,
+          onSelect: (key) => {
+            setSelectedStatus(key === "all" || selectedStatus === key ? "all" : key);
+            setCurrentPage(1);
+          },
+        };
+    }
+  })();
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -1234,93 +1425,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'all' ? { boxShadow: '0 0 0 2px #6366f1' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus('all'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Total Members</CardTitle>
-            <div className="bg-gradient-light p-2 rounded-lg">
-              <UserPlus className="h-4 w-4 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{totalMembersCount}</div>
-            <p className="text-xs text-muted-foreground">Registered members</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'active' ? { boxShadow: '0 0 0 2px #16a34a' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'active' ? 'all' : 'active'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Active Members</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <UserPlus className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeMembers}</div>
-            <p className="text-xs text-muted-foreground">Currently active</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'inactive' ? { boxShadow: '0 0 0 2px #2563eb' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'inactive' ? 'all' : 'inactive'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Inactive</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <Pause className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{inactiveMembers}</div>
-            <p className="text-xs text-muted-foreground">Inactive members</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'expired' ? { boxShadow: '0 0 0 2px #dc2626' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'expired' ? 'all' : 'expired'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Expired</CardTitle>
-            <div className="bg-red-50 p-2 rounded-lg">
-              <Calendar className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{expiredMembers}</div>
-            <p className="text-xs text-muted-foreground">Need renewal</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={selectedStatus === 'frozen' ? { boxShadow: '0 0 0 2px #0891b2' } : undefined}
-          onClick={() => { setActiveTab('members'); setSelectedStatus(selectedStatus === 'frozen' ? 'all' : 'frozen'); }}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Freezed</CardTitle>
-            <div className="bg-cyan-50 p-2 rounded-lg">
-              <Snowflake className="h-4 w-4 text-cyan-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-cyan-600">{frozenMembers}</div>
-            <p className="text-xs text-muted-foreground">Membership frozen</p>
-          </CardContent>
-        </Card>
-
-      </div>
+      <MemberStatCards cards={tabStatCards.cards} activeKey={tabStatCards.activeKey} onSelect={tabStatCards.onSelect} />
 
       <style>{`
         @keyframes tabSlideIn {
@@ -1603,45 +1708,54 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             ) : (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="View Profile"
-                                  onClick={() => openMemberHistory(member)}
-                                >
-                                  <Eye className="h-4 w-4 text-slate-500" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="Send Message"
-                                >
-                                  <Mail className="h-4 w-4 text-slate-500" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  title="Edit Member"
-                                  onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
-                                >
-                                  <Pencil className="h-4 w-4 text-slate-500" />
-                                </Button>
-                                {isFamilyHeadBillingHead(member) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="Renew Family"
-                                    onClick={() => openFamilyRenewalDialog(member)}
-                                  >
-                                    <FaArrowsRotate className="h-4 w-4 text-slate-500" />
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Actions">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreVertical className="h-4 w-4 text-slate-500" />
                                   </Button>
-                                )}
-                              </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => openMemberHistory(member)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Profile
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setAnalyticsMember(member)}>
+                                    <BarChart3 className="h-4 w-4 mr-2" />
+                                    Analytics
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => navigate(`/members/edit/${getMemberId(member)}`)}
+                                  >
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Member
+                                  </DropdownMenuItem>
+                                  {isFamilyHeadBillingHead(member) && (
+                                    <DropdownMenuItem className="cursor-pointer" onClick={() => openFamilyRenewalDialog(member)}>
+                                      <FaArrowsRotate className="h-4 w-4 mr-2" />
+                                      Renew Family
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    disabled={!member.email || member.email.includes('@family.local')}
+                                    onClick={() => { window.location.href = `mailto:${member.email}`; }}
+                                  >
+                                    <Mail className="h-4 w-4 mr-2" />
+                                    Send Email
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    disabled={!member.phone}
+                                    onClick={() => { window.location.href = `tel:${member.phone}`; }}
+                                  >
+                                    <Phone className="h-4 w-4 mr-2" />
+                                    Call
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </TableCell>
                         </TableRow>
@@ -2078,17 +2192,21 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             </CardContent>
           </Card>
 
-          {/* Members who need renewing, most overdue first — pick one to start */}
-          {!selectedMemberForRenewal && (
+          {/* Members who need renewing, most overdue first — pick one to start.
+              Hidden (not unmounted) while renewing, so the stat cards keep its counts. */}
+          <div hidden={!!selectedMemberForRenewal}>
             <DueForRenewalList
               refreshKey={renewalHistoryKey}
+              filter={renewalCardFilter === "renewals" || renewalCardFilter === "changes" ? null : renewalCardFilter}
+              onClearFilter={() => setRenewalCardFilter(null)}
+              onStats={setDueStats}
               onSelect={(memberDbId) => {
                 membersService.getMemberById(String(memberDbId))
                   .then((member) => { if (member) selectMemberForRenewal(member); })
                   .catch(() => toast.error("Couldn't load that member"));
               }}
             />
-          )}
+          </div>
 
           {/* Step 2: Choose New Plan */}
           {selectedMemberForRenewal && (
@@ -2548,7 +2666,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </Dialog>
 
           {/* Renewal & Upgrade Transaction History */}
-          <RenewalTransactionHistory refreshKey={renewalHistoryKey} />
+          <RenewalTransactionHistory
+            refreshKey={renewalHistoryKey}
+            filter={renewalCardFilter === "renewals" || renewalCardFilter === "changes" ? renewalCardFilter : null}
+            onClearFilter={() => setRenewalCardFilter(null)}
+            onStats={setRenewalStats}
+          />
 
           {/* Empty State */}
           {!selectedMemberForRenewal && (
@@ -2567,11 +2690,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </TabsContent>
 
         <TabsContent value="addons">
-          <MemberAddons embedded />
+          <MemberAddons embedded statusFilter={addonFilter} onStatusFilterChange={setAddonFilter} onStats={setAddonStats} />
         </TabsContent>
 
         <TabsContent value="receipts">
-          <MemberReceipts embedded />
+          <MemberReceipts embedded statusFilter={receiptFilter} onStatusFilterChange={setReceiptFilter} onStats={setReceiptStats} />
         </TabsContent>
 
         <TabsContent value="freeze" className="space-y-6">
@@ -2595,45 +2718,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="border-blue-200 bg-blue-50/50">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <Snowflake className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-1">Currently Frozen</p>
-                    <p className="font-bold text-gray-900">{frozenMembers} Members</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-green-200 bg-green-50/50">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
-                        <Clock className="h-6 w-6 text-green-600" />
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-1">Auto Unfreeze Pending</p>
-                    <p className="font-bold text-gray-900">{autoUnfreezePending} Members</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-orange-200 bg-orange-50/50">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="h-12 w-12 rounded-lg bg-orange-100 flex items-center justify-center">
-                        <Calendar className="h-6 w-6 text-orange-600" />
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-1">Total Freeze Days</p>
-                    <p className="font-bold text-gray-900">{totalFreezeDays} Days</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="mt-6 border-[#2B7A78]/20 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-r from-[#DFF5F4]/30 to-white">
+              <Card className="border-[#2B7A78]/20 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-r from-[#DFF5F4]/30 to-white">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-3">
                     <div className="h-10 w-10 rounded-lg bg-[#2B7A78] flex items-center justify-center flex-shrink-0">
@@ -2669,12 +2754,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               </Card>
 
               {/* Freeze / Unfreeze Transaction History */}
-              <FreezeTransactionHistory />
+              <FreezeTransactionHistory filter={freezeFilter} onClearFilter={() => setFreezeFilter(null)} onStats={setFreezeStats} />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
+          <div id="members-report" />
           {/* Header with Breadcrumb */}
           <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
             <span>Community</span>
@@ -2696,6 +2782,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           {isLifecycleReport ? (
             <MembershipLifecycleReport
               reportType={reportType as LifecycleReportType}
+              autoGenerateKey={reportAutoKey}
               reportTypeSelect={reportTypeSelectEl}
             />
           ) : (
@@ -3167,6 +3254,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      <MemberAnalyticsDialog
+        member={analyticsMember}
+        status={analyticsMember ? getComputedStatus(analyticsMember) : undefined}
+        fee={analyticsMember ? getDisplayFee(analyticsMember) : undefined}
+        onOpenChange={(open) => { if (!open) setAnalyticsMember(null); }}
+      />
 
       {selectedMember && (
         <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>

@@ -47,7 +47,8 @@ import {
   Zap,
   TrendingUpDown
 } from 'lucide-react';
-import { type BiosLiveData, SampleDataBadge, SampleTitle, formatSignedPercent } from './bios-live';
+import { type BiosLiveData, formatSignedPercent, useBiosInsights, InsightsStatus, NoData, shareOf } from './bios-live';
+import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface MemberAnalyticsDialogProps {
   open: boolean;
@@ -76,29 +77,39 @@ export function MemberAnalyticsDialog({
   const [selectedSegment, setSelectedSegment] = React.useState('all');
   const [timeRange, setTimeRange] = React.useState('6months');
 
-  // Member Segments — one per membership type, from the live member list.
-  // Fee, LTV, engagement, visits and age aren't tracked per type, so they show "—".
+  // Real member figures, loaded when the dialog opens.
+  const { data: insights, loading: insightsLoading, error: insightsError } =
+    useBiosInsights(() => biosInsightsService.getMembers(), open, live.branchKey);
+  const segmentFacts = new Map((insights?.segments ?? []).map((row) => [row.membership_type, row]));
+
+  // Member Segments — one per membership type.
   const SEGMENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
   const toSegmentName = (type: string) =>
     `${type.replace(/[_-]+/g, ' ').trim().replace(/\b\w/g, (c) => c.toUpperCase())} Members`;
   const memberSegments: Array<{
-    segment: string; count: number; percentage: number; engagement: number | null; ltv: number | null;
-    retention: number; churnRate: number; avgAge: number | null; monthlyFee: number | null; avgVisits: number | null; color: string;
+    segment: string; count: number; percentage: number; ltv: number | null;
+    retention: number; churnRate: number; avgAge: number | null; monthlyFee: number | null; avgVisits: number | null;
+    classBookings: number | null; ptBookings: number | null; avgTenure: number | null; color: string;
   }> = Object.entries(live.membershipTypeStats)
     .sort((a, b) => b[1].total - a[1].total)
-    .map(([type, stats], index) => ({
-      segment: toSegmentName(type),
-      count: stats.total,
-      percentage: live.totalMembers > 0 ? Number(((stats.total / live.totalMembers) * 100).toFixed(1)) : 0,
-      engagement: null,
-      ltv: null,
-      retention: stats.total > 0 ? Number(((stats.active / stats.total) * 100).toFixed(1)) : 0,
-      churnRate: stats.total > 0 ? Number(((stats.expired / stats.total) * 100).toFixed(1)) : 0,
-      avgAge: null,
-      monthlyFee: null,
-      avgVisits: null,
-      color: SEGMENT_COLORS[index % SEGMENT_COLORS.length]
-    }));
+    .map(([type, stats], index) => {
+      const facts = segmentFacts.get(type);
+      return {
+        segment: toSegmentName(type),
+        count: stats.total,
+        percentage: live.totalMembers > 0 ? Number(((stats.total / live.totalMembers) * 100).toFixed(1)) : 0,
+        ltv: facts?.avg_ltv ?? null,
+        retention: stats.total > 0 ? Number(((stats.active / stats.total) * 100).toFixed(1)) : 0,
+        churnRate: stats.total > 0 ? Number(((stats.expired / stats.total) * 100).toFixed(1)) : 0,
+        avgAge: facts?.avg_age ?? null,
+        monthlyFee: facts?.avg_monthly_fee ?? null,
+        avgVisits: facts ? facts.avg_visits30 : null,
+        classBookings: facts ? facts.class_bookings_per_active30 : null,
+        ptBookings: facts ? facts.pt_bookings_per_active30 : null,
+        avgTenure: facts?.avg_tenure_months ?? null,
+        color: SEGMENT_COLORS[index % SEGMENT_COLORS.length]
+      };
+    });
 
   // Retention Trends
   const retentionTrends = live.memberTrend.map((p) => ({
@@ -112,12 +123,15 @@ export function MemberAnalyticsDialog({
   const churnDelta = Number((currentChurn - previousChurn).toFixed(1));
   const membersAtRisk = live.overdueMembers + live.suspendedMembers;
 
-  // Engagement Metrics by Segment
-  const engagementBySegment = [
-    { segment: 'Premium', checkIns: 95, classes: 88, pt: 92, events: 78 },
-    { segment: 'Standard', checkIns: 78, classes: 72, pt: 45, events: 52 },
-    { segment: 'Basic', checkIns: 65, classes: 58, pt: 15, events: 28 }
-  ];
+  // Engagement by Segment — per active member over the last 30 days.
+  const engagementBySegment = (insights?.segments ?? []).filter((row) => row.active_members > 0).map((row) => ({
+    segment: row.membership_type,
+    checkIns: row.avg_visits30,
+    classes: row.class_bookings_per_active30,
+    pt: row.pt_bookings_per_active30
+  }));
+  const engagement = insights?.engagement;
+  const noVisitMembers = insights?.activity_levels.find((level) => level.label === 'No visits')?.count ?? 0;
 
   // Member Growth Over Time (member counts only grow in this history, so churn isn't charted)
   const memberGrowth = live.memberTrend.map((p) => ({
@@ -131,67 +145,57 @@ export function MemberAnalyticsDialog({
   const newLastMonth = live.memberTrend.length > 1 ? live.memberTrend[live.memberTrend.length - 2].newMembers : 0;
   const newMembersChange = newLastMonth > 0 ? Number((((newThisMonth - newLastMonth) / newLastMonth) * 100).toFixed(1)) : null;
 
-  // Demographics - Age Distribution
-  const ageDistribution = [
-    { ageGroup: '18-24', count: 142, percentage: 16.8, avgSpend: 349 },
-    { ageGroup: '25-34', count: 298, percentage: 35.2, avgSpend: 485 },
-    { ageGroup: '35-44', count: 245, percentage: 29.0, avgSpend: 625 },
-    { ageGroup: '45-54', count: 127, percentage: 15.0, avgSpend: 698 },
-    { ageGroup: '55+', count: 35, percentage: 4.1, avgSpend: 545 }
-  ];
+  // Demographics
+  const ageDistribution = (insights?.age_bands ?? []).map((band) => ({
+    ageGroup: band.label,
+    count: band.count,
+    percentage: shareOf(band.count, insights?.members_with_birth_date ?? 0),
+    avgSpend: band.avg_ltv
+  }));
+  const GENDER_COLORS: Record<string, string> = { Male: '#3b82f6', Female: '#ec4899', 'Not recorded': '#9ca3af' };
+  const genderTotal = (insights?.genders ?? []).reduce((sum, g) => sum + g.count, 0);
+  const genderDistribution = (insights?.genders ?? []).map((g, index) => ({
+    gender: g.label,
+    count: g.count,
+    percentage: shareOf(g.count, genderTotal),
+    color: GENDER_COLORS[g.label] ?? SEGMENT_COLORS[index % SEGMENT_COLORS.length]
+  }));
+  const topNationality = insights?.nationalities[0] ?? null;
 
-  // Demographics - Gender
-  const genderDistribution = [
-    { gender: 'Male', count: 482, percentage: 56.9, color: '#3b82f6' },
-    { gender: 'Female', count: 365, percentage: 43.1, color: '#ec4899' }
-  ];
+  // Lifetime Value — everything a member has paid on receipts.
+  const ltvAnalysis = (insights?.segments ?? []).filter((row) => row.avg_ltv != null).map((row) => ({
+    segment: row.membership_type,
+    avgLTV: row.avg_ltv as number,
+    avgTenure: row.avg_tenure_months,
+    monthlyRevenue: row.avg_monthly_fee,
+    activeMembers: row.active_members
+  })).sort((a, b) => b.avgLTV - a.avgLTV);
+  const highestLtv = ltvAnalysis[0] ?? null;
+  const lowestLtv = ltvAnalysis.length > 1 ? ltvAnalysis[ltvAnalysis.length - 1] : null;
 
-  // Lifetime Value Analysis
-  const ltvAnalysis = [
-    {
-      segment: 'Premium',
-      avgLTV: 4500,
-      avgTenure: 18,
-      monthlyRevenue: 799,
-      retentionBonus: 450,
-      upsellValue: 320
-    },
-    {
-      segment: 'Standard',
-      avgLTV: 2800,
-      avgTenure: 14,
-      monthlyRevenue: 549,
-      retentionBonus: 280,
-      upsellValue: 180
-    },
-    {
-      segment: 'Basic',
-      avgLTV: 1600,
-      avgTenure: 10,
-      monthlyRevenue: 349,
-      retentionBonus: 150,
-      upsellValue: 95
-    }
-  ];
+  // Acquisition Channels — leads by source over the last 12 months.
+  const acquisitionChannels = (insights?.acquisition ?? []).map((row) => ({
+    channel: row.source,
+    leads: row.leads,
+    members: row.converted,
+    conversion: shareOf(row.converted, row.leads),
+    ltv: row.avg_ltv_converted
+  }));
+  const totalLeads = acquisitionChannels.reduce((sum, c) => sum + c.leads, 0);
+  const totalConverted = acquisitionChannels.reduce((sum, c) => sum + c.members, 0);
+  const bestConverting = [...acquisitionChannels].filter((c) => c.leads >= 3).sort((a, b) => b.conversion - a.conversion)[0] ?? null;
 
-  // Acquisition Channels
-  const acquisitionChannels = [
-    { channel: 'Social Media', members: 245, cost: 45, ltv: 2850, roi: 6233 },
-    { channel: 'Referrals', members: 189, cost: 25, ltv: 3200, roi: 12700 },
-    { channel: 'Walk-ins', members: 156, cost: 0, ltv: 2100, roi: Infinity },
-    { channel: 'Google Ads', members: 128, cost: 85, ltv: 2650, roi: 3018 },
-    { channel: 'Corporate', members: 89, cost: 120, ltv: 4200, roi: 3400 },
-    { channel: 'Events', members: 55, cost: 95, ltv: 2950, roi: 3005 }
-  ];
-
-  // Member Activity Levels
-  const activityLevels = [
-    { level: 'Highly Active', count: 234, percentage: 27.6, visits: '15+ per month', color: '#10b981' },
-    { level: 'Active', count: 312, percentage: 36.8, visits: '8-14 per month', color: '#3b82f6' },
-    { level: 'Moderate', count: 201, percentage: 23.7, visits: '4-7 per month', color: '#f59e0b' },
-    { level: 'Low Activity', count: 78, percentage: 9.2, visits: '1-3 per month', color: '#ef4444' },
-    { level: 'Inactive', count: 22, percentage: 2.6, visits: '0 this month', color: '#6b7280' }
-  ];
+  // Member Activity Levels — check-ins in the last 30 days, effectively active members.
+  const ACTIVITY_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#6b7280'];
+  const ACTIVITY_NAMES = ['Highly Active', 'Active', 'Moderate', 'Low Activity', 'Inactive'];
+  const activityTotal = (insights?.activity_levels ?? []).reduce((sum, level) => sum + level.count, 0);
+  const activityLevels = (insights?.activity_levels ?? []).map((level, index) => ({
+    level: ACTIVITY_NAMES[index] ?? level.label,
+    count: level.count,
+    percentage: shareOf(level.count, activityTotal),
+    visits: `${level.label} in the last 30 days`,
+    color: ACTIVITY_COLORS[index % ACTIVITY_COLORS.length]
+  }));
 
   // Risk Segmentation — from membership and payment status.
   const riskSegmentation = [
@@ -218,24 +222,25 @@ export function MemberAnalyticsDialog({
     }
   ];
 
-  // Member Satisfaction Scores
-  const satisfactionScores = [
-    { category: 'Facilities', score: 4.6, target: 4.5, trend: 'up' },
-    { category: 'Staff', score: 4.8, target: 4.7, trend: 'up' },
-    { category: 'Classes', score: 4.5, target: 4.6, trend: 'stable' },
-    { category: 'Equipment', score: 4.3, target: 4.5, trend: 'down' },
-    { category: 'Cleanliness', score: 4.7, target: 4.6, trend: 'up' },
-    { category: 'Value for Money', score: 4.4, target: 4.5, trend: 'stable' }
-  ];
+  // Member Satisfaction — post-workout feedback from the member app (1-5 stars), last 90 days.
+  const satisfaction = insights?.satisfaction;
+  const satisfactionScores = satisfaction ? [
+    { category: 'Overall Experience', score: satisfaction.overall, trend: satisfaction.previous_overall == null || satisfaction.overall == null ? 'stable'
+      : satisfaction.overall > satisfaction.previous_overall ? 'up' : satisfaction.overall < satisfaction.previous_overall ? 'down' : 'stable' },
+    { category: 'Trainers', score: satisfaction.trainer, trend: 'stable' },
+    { category: 'Equipment', score: satisfaction.equipment, trend: 'stable' },
+    { category: 'Facilities', score: satisfaction.facility, trend: 'stable' },
+    { category: 'App Reviews', score: satisfaction.reviews.average, trend: 'stable' }
+  ].filter((row): row is { category: string; score: number; trend: string } => row.score != null) : [];
 
-  // Member Journey Stages
-  const journeyStages = [
-    { stage: 'New (0-3 months)', count: 187, percentage: 22.1, retention: 78.5 },
-    { stage: 'Growing (3-6 months)', count: 156, percentage: 18.4, retention: 85.2 },
-    { stage: 'Established (6-12 months)', count: 234, percentage: 27.6, retention: 92.4 },
-    { stage: 'Loyal (12-24 months)', count: 189, percentage: 22.3, retention: 95.8 },
-    { stage: 'Advocate (24+ months)', count: 81, percentage: 9.6, retention: 97.6 }
-  ];
+  // Member Journey Stages — members by time since joining, and how many are still active.
+  const stageTotal = (insights?.tenure_stages ?? []).reduce((sum, stage) => sum + stage.members, 0);
+  const journeyStages = (insights?.tenure_stages ?? []).map((stage) => ({
+    stage: stage.label,
+    count: stage.members,
+    percentage: shareOf(stage.members, stageTotal),
+    retention: shareOf(stage.active_members, stage.members)
+  }));
 
   const getTrendIcon = (trend: string) => {
     if (trend === 'up') return <TrendingUp className="h-4 w-4 text-green-500" />;
@@ -311,16 +316,17 @@ export function MemberAnalyticsDialog({
                       </div>
                     </div>
                     <Separator />
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Engagement Score</span>
-                        <span className="font-medium">{segment.engagement === null ? '—' : `${segment.engagement}%`}</span>
-                      </div>
-                      <Progress value={segment.engagement ?? 0} className="h-2" />
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Visits / active member (30d)</span>
+                      <span className="font-medium">{segment.avgVisits ?? '—'}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Avg Visits/Month</span>
-                      <span className="font-medium">{segment.avgVisits ?? '—'}</span>
+                      <span className="text-muted-foreground">Class / PT bookings (30d)</span>
+                      <span className="font-medium">{segment.classBookings == null ? '—' : `${segment.classBookings} / ${segment.ptBookings}`}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Avg Tenure</span>
+                      <span className="font-medium">{segment.avgTenure == null ? '—' : `${segment.avgTenure} months`}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Avg Age</span>
@@ -360,9 +366,11 @@ export function MemberAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Activity Level Distribution</SampleTitle></CardTitle>
+                <CardTitle className="text-base">Activity Level Distribution</CardTitle>
+                <CardDescription>Check-ins in the last 30 days, active members</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
                 <div className="space-y-3">
                   {activityLevels.map((level, index) => (
                     <div key={index}>
@@ -509,10 +517,11 @@ export function MemberAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Member Journey Stages</SampleTitle></CardTitle>
-                <CardDescription>Retention rates by membership duration</CardDescription>
+                <CardTitle className="text-base">Member Journey Stages</CardTitle>
+                <CardDescription>Members by time since joining, and the share still active</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
                 <div className="space-y-3">
                   {journeyStages.map((stage, index) => (
                     <div key={index}>
@@ -520,7 +529,7 @@ export function MemberAnalyticsDialog({
                         <span className="text-sm font-medium">{stage.stage}</span>
                         <div className="text-right">
                           <span className="text-sm font-medium">{stage.count} members</span>
-                          <span className="text-xs text-green-600 ml-2">({stage.retention}% retention)</span>
+                          <span className="text-xs text-green-600 ml-2">({stage.retention}% still active)</span>
                         </div>
                       </div>
                       <Progress value={stage.percentage} className="h-2" />
@@ -533,27 +542,28 @@ export function MemberAnalyticsDialog({
 
           {/* Engagement Tab */}
           <TabsContent value="engagement" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
+            <InsightsStatus loading={insightsLoading} error={insightsError} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Engagement by Member Segment</CardTitle>
-                <CardDescription>Activity patterns across membership tiers</CardDescription>
+                <CardDescription>Per active member, last 30 days</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart data={engagementBySegment}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="segment" />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                    <Radar name="Check-ins" dataKey="checkIns" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
-                    <Radar name="Classes" dataKey="classes" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.4} />
-                    <Radar name="PT Sessions" dataKey="pt" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} />
-                    <Radar name="Events" dataKey="events" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
-                    <Legend />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {insights && engagementBySegment.length === 0 && <NoData>No active members yet.</NoData>}
+                {engagementBySegment.length > 0 && (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={engagementBySegment}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="segment" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="checkIns" fill="#10b981" name="Check-ins" />
+                      <Bar dataKey="classes" fill="#3b82f6" name="Class bookings" />
+                      <Bar dataKey="pt" fill="#8b5cf6" name="PT bookings" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -561,46 +571,43 @@ export function MemberAnalyticsDialog({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Average Engagement Metrics</CardTitle>
+                  <CardDescription>Active members, last 30 days</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Check-ins per Month</span>
-                        <span className="text-sm font-medium">12.8</span>
+                  {engagement && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Check-ins per active member</span>
+                        <span className="text-sm font-medium">{engagement.avg_visits_per_active30}</span>
                       </div>
-                      <Progress value={85} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Class Attendance</span>
-                        <span className="text-sm font-medium">72.5%</span>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">Booked at least one class</span>
+                          <span className="text-sm font-medium">{engagement.class_uptake_percent}%</span>
+                        </div>
+                        <Progress value={engagement.class_uptake_percent} className="h-2" />
                       </div>
-                      <Progress value={72.5} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">PT Session Uptake</span>
-                        <span className="text-sm font-medium">45.2%</span>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">Booked at least one PT session</span>
+                          <span className="text-sm font-medium">{engagement.pt_uptake_percent}%</span>
+                        </div>
+                        <Progress value={engagement.pt_uptake_percent} className="h-2" />
                       </div>
-                      <Progress value={45.2} className="h-2" />
                     </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Event Participation</span>
-                        <span className="text-sm font-medium">52.8%</span>
-                      </div>
-                      <Progress value={52.8} className="h-2" />
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Member Satisfaction</CardTitle>
+                  <CardDescription>
+                    {satisfaction ? `${satisfaction.responses} post-workout ratings in the last 90 days, ${satisfaction.reviews.count} app reviews` : 'Member app feedback'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {satisfaction && satisfactionScores.length === 0 && <NoData>No member feedback yet.</NoData>}
                   <div className="space-y-3">
                     {satisfactionScores.map((item, index) => (
                       <div key={index}>
@@ -619,43 +626,39 @@ export function MemberAnalyticsDialog({
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Engagement Insights</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2 p-3 bg-green-50 rounded">
-                    <ThumbsUp className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">High Engagement Correlation</p>
-                      <p className="text-xs text-green-700">Members attending classes have 87% higher retention rate</p>
+            {engagement && engagement.active_members > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Engagement Insights</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-2 p-3 bg-yellow-50 rounded">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-900">{noVisitMembers} active {noVisitMembers === 1 ? "member hasn't" : "members haven't"} visited in 30 days</p>
+                        <p className="text-xs text-yellow-700">{shareOf(noVisitMembers, engagement.active_members)}% of active members — worth a check-in before they lapse.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
+                      <Activity className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">Class uptake {engagement.class_uptake_percent}%, PT uptake {engagement.pt_uptake_percent}%</p>
+                        <p className="text-xs text-blue-700">Share of active members who booked at least once in the last 30 days.</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
-                    <Activity className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Engagement Sweet Spot</p>
-                      <p className="text-xs text-blue-700">12-15 visits per month shows optimal engagement without burnout</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 p-3 bg-yellow-50 rounded">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-yellow-900">At-Risk Pattern Detected</p>
-                      <p className="text-xs text-yellow-700">Members with declining check-ins for 3+ weeks need outreach</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Demographics Tab */}
           <TabsContent value="demographics" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
+            <InsightsStatus loading={insightsLoading} error={insightsError} />
+            {insights && insights.members_with_birth_date === 0 && (
+              <NoData>No member birth dates are recorded yet, so age figures are empty.</NoData>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
@@ -666,7 +669,7 @@ export function MemberAnalyticsDialog({
                     <BarChart data={ageDistribution}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="ageGroup" />
-                      <YAxis />
+                      <YAxis allowDecimals={false} />
                       <Tooltip />
                       <Legend />
                       <Bar dataKey="count" fill="#3b82f6" name="Members" />
@@ -714,7 +717,7 @@ export function MemberAnalyticsDialog({
                       <TableHead>Age Group</TableHead>
                       <TableHead className="text-right">Members</TableHead>
                       <TableHead className="text-right">Percentage</TableHead>
-                      <TableHead className="text-right">Avg Monthly Spend</TableHead>
+                      <TableHead className="text-right">Avg Lifetime Spend</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -723,7 +726,7 @@ export function MemberAnalyticsDialog({
                         <TableCell className="font-medium">{age.ageGroup}</TableCell>
                         <TableCell className="text-right">{age.count}</TableCell>
                         <TableCell className="text-right">{age.percentage}%</TableCell>
-                        <TableCell className="text-right">{formatCurrency(age.avgSpend)}</TableCell>
+                        <TableCell className="text-right">{age.avgSpend != null ? formatCurrency(age.avgSpend) : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -737,7 +740,7 @@ export function MemberAnalyticsDialog({
                   <div className="text-center">
                     <Cake className="h-8 w-8 text-blue-600 mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Average Age</p>
-                    <p className="text-2xl font-bold">32.4 years</p>
+                    <p className="text-2xl font-bold">{insights?.average_age != null ? `${insights.average_age} years` : '—'}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -745,9 +748,9 @@ export function MemberAnalyticsDialog({
               <Card>
                 <CardContent className="p-6">
                   <div className="text-center">
-                    <MapPin className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Avg Distance</p>
-                    <p className="text-2xl font-bold">4.2 km</p>
+                    <Users className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Birth Dates Recorded</p>
+                    <p className="text-2xl font-bold">{insights ? `${shareOf(insights.members_with_birth_date, live.totalMembers)}%` : '—'}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -755,9 +758,9 @@ export function MemberAnalyticsDialog({
               <Card>
                 <CardContent className="p-6">
                   <div className="text-center">
-                    <Briefcase className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Professionals</p>
-                    <p className="text-2xl font-bold">68%</p>
+                    <MapPin className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Top Nationality</p>
+                    <p className="text-2xl font-bold">{topNationality ? topNationality.label : '—'}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -765,9 +768,9 @@ export function MemberAnalyticsDialog({
               <Card>
                 <CardContent className="p-6">
                   <div className="text-center">
-                    <GraduationCap className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Students</p>
-                    <p className="text-2xl font-bold">12%</p>
+                    <Briefcase className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Nationalities</p>
+                    <p className="text-2xl font-bold">{insights ? insights.nationalities.length : '—'}{insights && insights.nationalities.length >= 6 ? '+' : ''}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -776,17 +779,15 @@ export function MemberAnalyticsDialog({
 
           {/* Lifetime Value Tab */}
           <TabsContent value="ltv" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
+            <InsightsStatus loading={insightsLoading} error={insightsError} />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Average LTV</p>
-                      <p className="text-2xl font-bold text-green-600">{formatCurrency(2967)}</p>
-                      <p className="text-xs text-green-600 mt-1">Across all segments</p>
+                      <p className="text-2xl font-bold text-green-600">{insights?.ltv.average != null ? formatCurrency(insights.ltv.average) : '—'}</p>
+                      <p className="text-xs text-green-600 mt-1">{insights ? `Across ${insights.ltv.paying_members} paying members` : 'Lifetime paid per member'}</p>
                     </div>
                     <DollarSign className="h-10 w-10 text-green-600 opacity-20" />
                   </div>
@@ -798,8 +799,8 @@ export function MemberAnalyticsDialog({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Highest LTV</p>
-                      <p className="text-2xl font-bold text-purple-600">{formatCurrency(4500)}</p>
-                      <p className="text-xs text-purple-600 mt-1">Premium segment</p>
+                      <p className="text-2xl font-bold text-purple-600">{highestLtv ? formatCurrency(highestLtv.avgLTV) : '—'}</p>
+                      <p className="text-xs text-purple-600 mt-1">{highestLtv ? highestLtv.segment : 'By membership type'}</p>
                     </div>
                     <Award className="h-10 w-10 text-purple-600 opacity-20" />
                   </div>
@@ -811,8 +812,8 @@ export function MemberAnalyticsDialog({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Avg Tenure</p>
-                      <p className="text-2xl font-bold text-blue-600">14 months</p>
-                      <p className="text-xs text-blue-600 mt-1">Member lifetime</p>
+                      <p className="text-2xl font-bold text-blue-600">{insights?.ltv.avg_tenure_months != null ? `${insights.ltv.avg_tenure_months} months` : '—'}</p>
+                      <p className="text-xs text-blue-600 mt-1">Joining to lapse, or to today</p>
                     </div>
                     <Clock className="h-10 w-10 text-blue-600 opacity-20" />
                   </div>
@@ -823,17 +824,18 @@ export function MemberAnalyticsDialog({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Lifetime Value by Segment</CardTitle>
+                <CardDescription>Everything members have paid on receipts, averaged per membership type</CardDescription>
               </CardHeader>
               <CardContent>
+                {insights && ltvAnalysis.length === 0 && <NoData>No member payments recorded yet.</NoData>}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Segment</TableHead>
+                      <TableHead>Membership Type</TableHead>
                       <TableHead className="text-right">Avg LTV</TableHead>
                       <TableHead className="text-right">Avg Tenure</TableHead>
-                      <TableHead className="text-right">Monthly Revenue</TableHead>
-                      <TableHead className="text-right">Retention Bonus</TableHead>
-                      <TableHead className="text-right">Upsell Value</TableHead>
+                      <TableHead className="text-right">Avg Monthly Fee</TableHead>
+                      <TableHead className="text-right">Active Members</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -841,10 +843,9 @@ export function MemberAnalyticsDialog({
                       <TableRow key={index}>
                         <TableCell className="font-medium">{segment.segment}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(segment.avgLTV)}</TableCell>
-                        <TableCell className="text-right">{segment.avgTenure} months</TableCell>
-                        <TableCell className="text-right">{formatCurrency(segment.monthlyRevenue)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(segment.retentionBonus)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(segment.upsellValue)}</TableCell>
+                        <TableCell className="text-right">{segment.avgTenure != null ? `${segment.avgTenure} months` : '—'}</TableCell>
+                        <TableCell className="text-right">{segment.monthlyRevenue != null ? formatCurrency(segment.monthlyRevenue) : '—'}</TableCell>
+                        <TableCell className="text-right">{segment.activeMembers}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -852,56 +853,51 @@ export function MemberAnalyticsDialog({
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">LTV by Segment Comparison</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={ltvAnalysis}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="segment" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Legend />
-                    <Bar dataKey="avgLTV" fill="#10b981" name="Average LTV" />
-                    <Bar dataKey="retentionBonus" fill="#3b82f6" name="Retention Bonus" />
-                    <Bar dataKey="upsellValue" fill="#8b5cf6" name="Upsell Value" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {ltvAnalysis.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">LTV by Segment Comparison</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={ltvAnalysis}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="segment" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Legend />
+                      <Bar dataKey="avgLTV" fill="#10b981" name="Average LTV" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">LTV Optimization Opportunities</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded">
-                    <Star className="h-5 w-5 text-purple-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-purple-900">Premium Upsell Potential</p>
-                      <p className="text-xs text-purple-700">234 standard members show premium usage patterns - potential {formatCurrency(398800)} LTV increase</p>
+            {highestLtv && lowestLtv && engagement && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">LTV Observations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded">
+                      <Star className="h-5 w-5 text-purple-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-purple-900">{highestLtv.segment} members are worth the most</p>
+                        <p className="text-xs text-purple-700">{formatCurrency(highestLtv.avgLTV)} on average vs {formatCurrency(lowestLtv.avgLTV)} for {lowestLtv.segment}.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
+                      <Zap className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">PT uptake is {engagement.pt_uptake_percent}%</p>
+                        <p className="text-xs text-blue-700">Share of active members who booked a PT session in the last 30 days.</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2 p-3 bg-green-50 rounded">
-                    <TrendingUp className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">Retention Extension Impact</p>
-                      <p className="text-xs text-green-700">Extending avg tenure by 3 months would increase total LTV by {formatCurrency(752600)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
-                    <Zap className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Cross-sell Opportunity</p>
-                      <p className="text-xs text-blue-700">67% of members don't use PT services - estimated {formatCurrency(285000)} additional revenue</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Growth Tab */}
@@ -973,31 +969,32 @@ export function MemberAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Acquisition Channels Performance</SampleTitle></CardTitle>
+                <CardTitle className="text-base">Acquisition Channels Performance</CardTitle>
+                <CardDescription>Leads by source over the last 12 months</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
+                {insights && acquisitionChannels.length === 0 && <NoData>No leads recorded in the last 12 months.</NoData>}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Channel</TableHead>
-                      <TableHead className="text-right">Members</TableHead>
-                      <TableHead className="text-right">Cost/Member</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead className="text-right">Leads</TableHead>
+                      <TableHead className="text-right">Became Members</TableHead>
+                      <TableHead className="text-right">Conversion</TableHead>
                       <TableHead className="text-right">Avg LTV</TableHead>
-                      <TableHead className="text-right">ROI %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {acquisitionChannels.map((channel, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{channel.channel}</TableCell>
+                        <TableCell className="text-right">{channel.leads}</TableCell>
                         <TableCell className="text-right">{channel.members}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(channel.cost)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(channel.ltv)}</TableCell>
                         <TableCell className="text-right">
-                          <Badge className="bg-green-100 text-green-800">
-                            {channel.roi === Infinity ? '∞' : `${channel.roi}%`}
-                          </Badge>
+                          <Badge className="bg-green-100 text-green-800">{channel.conversion}%</Badge>
                         </TableCell>
+                        <TableCell className="text-right">{channel.ltv != null ? formatCurrency(channel.ltv) : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1005,36 +1002,40 @@ export function MemberAnalyticsDialog({
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Growth Insights</SampleTitle></CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2 p-3 bg-green-50 rounded">
-                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-green-900">Referrals Performing Best</p>
-                      <p className="text-xs text-green-700">Referral channel has highest ROI (12,700%) and best retention rate</p>
+            {totalLeads > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Growth Insights</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-2 p-3 bg-green-50 rounded">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900">{totalConverted} of {totalLeads} leads became members</p>
+                        <p className="text-xs text-green-700">{shareOf(totalConverted, totalLeads)}% overall conversion over the last 12 months.</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
-                    <TrendingUp className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Corporate Growth Opportunity</p>
-                      <p className="text-xs text-blue-700">Corporate members have highest LTV ({formatCurrency(4200)}) - expand B2B efforts</p>
+                    <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded">
+                      <TrendingUp className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">{acquisitionChannels[0].channel} brings the most leads</p>
+                        <p className="text-xs text-blue-700">{acquisitionChannels[0].leads} leads, {acquisitionChannels[0].conversion}% converted.</p>
+                      </div>
                     </div>
+                    {bestConverting && (
+                      <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded">
+                        <Award className="h-5 w-5 text-purple-600 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-purple-900">{bestConverting.channel} converts best</p>
+                          <p className="text-xs text-purple-700">{bestConverting.conversion}% of its {bestConverting.leads} leads became members.</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-start space-x-2 p-3 bg-purple-50 rounded">
-                    <Award className="h-5 w-5 text-purple-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-purple-900">Social Media Success</p>
-                      <p className="text-xs text-purple-700">Social media brings most volume (245 members) with strong ROI</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 

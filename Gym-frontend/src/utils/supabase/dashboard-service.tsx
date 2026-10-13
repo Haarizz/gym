@@ -109,8 +109,8 @@ export const dashboardService = {
   },
 
   // Revenue Dashboard tab — dates are inclusive yyyy-MM-dd
-  async getRevenueSummary(from: string, to: string, granularity?: RevenueGranularity) {
-    const params = new URLSearchParams({ from, to });
+  async getRevenueSummary(from: string, to: string, granularity?: RevenueGranularity, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
     if (granularity) params.set('granularity', granularity);
     return apiCall(`/dashboard/revenue-summary?${params.toString()}`) as Promise<ApiResponse<RevenueSummary>>;
   },
@@ -265,7 +265,65 @@ export interface RevenueSummary {
   activeMembers: { count: number; newInPeriod: number };
   paymentMethods: RevenueBreakdownRow[];
   streams: Record<RevenueStreamKey, RevenueStreamSummary>;
-  trend: { label: string; start: string; revenue: number; expenses: number | null }[];
+  trend: RevenueTrendPoint[];
+  /** Which period the trends and comparisons are measured against */
+  compare: RevenueCompareMode;
+  comparison: RevenueComparison;
+  insights: RevenueInsights;
+}
+
+export type RevenueCompareMode = 'previous' | 'last-year';
+
+export interface RevenueTrendPoint {
+  label: string;
+  start: string;
+  revenue: number;
+  expenses: number | null;
+}
+
+/** Headline figures for the comparison period (previous period or same dates last year). */
+export interface RevenueComparison {
+  label: string;
+  totalCollection: Omit<RevenueStreamSummary, 'breakdown'>;
+  expenses: { total: number; count: number };
+  netRevenue: { total: number };
+  transactions: number;
+  avgTransaction: number;
+  discounts: number;
+  payingMembers: number;
+  /** Same bucket size as the current trend; aligned to it by index */
+  trend: RevenueTrendPoint[];
+}
+
+/** A report row with the comparison period alongside. count = distinct transactions. */
+export interface RevenueCompareRow {
+  name: string;
+  amount: number;
+  count: number;
+  previousAmount: number;
+  previousCount: number;
+  /** % of this report's current total */
+  share?: number;
+}
+
+export interface RevenueInsights {
+  transactions: number;
+  avgTransaction: number;
+  revenuePerMember: number;
+  payingMembers: number;
+  discounts: { total: number; count: number };
+  /** Snapshot as of now, not tied to the selected range */
+  outstanding: { membership: number; membershipCount: number; salesInvoices: number; total: number };
+  streams: RevenueCompareRow[];
+  paymentMethods: RevenueCompareRow[];
+  transactionTypes: RevenueCompareRow[];
+  expenseCategories: RevenueCompareRow[];
+  topPlans: RevenueCompareRow[];
+  topProducts: RevenueCompareRow[];
+  topMembers: RevenueCompareRow[];
+  staff: RevenueCompareRow[];
+  weekdays: RevenueCompareRow[];
+  hours: { hour: number; name: string; amount: number; count: number }[];
 }
 
 export interface ApiResponse<T> {

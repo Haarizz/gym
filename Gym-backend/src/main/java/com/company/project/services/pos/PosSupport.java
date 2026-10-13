@@ -72,6 +72,16 @@ public class PosSupport {
         return false;
     }
 
+    /** The gym owner (ADMIN role) — the top of the approval chain within their gym. */
+    public boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        for (GrantedAuthority a : auth.getAuthorities()) {
+            if ("ROLE_ADMIN".equals(a.getAuthority())) return true;
+        }
+        return false;
+    }
+
     /** The caller's active branch; POS writes are refused in All Branches mode. */
     public Long requireBranch() {
         Long branchId = BranchContextHolder.getActiveBranchId();

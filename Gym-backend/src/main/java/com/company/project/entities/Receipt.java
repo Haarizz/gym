@@ -84,6 +84,11 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Column(name = "discount_label")
     private String discountLabel;
 
+    // "Renewal" | "Upgrade" | "Downgrade" on Renewal receipts, decided at renewal time
+    // against the member's previous plan (BG_103); null on other and older receipts.
+    @Column(name = "renewal_kind", length = 20)
+    private String renewalKind;
+
     // "Individual" | "Family" | "Corporate"
     @Column(name = "membership_type")
     private String membershipType;
@@ -220,6 +225,9 @@ public class Receipt extends BaseEntity implements BranchAware {
 
     public String getDiscountLabel() { return discountLabel; }
     public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
+
+    public String getRenewalKind() { return renewalKind; }
+    public void setRenewalKind(String renewalKind) { this.renewalKind = renewalKind; }
 
     public String getMembershipType() { return membershipType; }
     public void setMembershipType(String membershipType) { this.membershipType = membershipType; }

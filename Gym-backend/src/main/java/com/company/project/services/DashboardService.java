@@ -169,7 +169,10 @@ public class DashboardService {
         for (Receipt r : sales) {
             String key = switch (r.getTransactionType()) {
                 case "New" -> "new";
-                case "Renewal" -> isUpgrade(r, planHistory.get(subscriberKey(r))) ? "upgrade" : "renew";
+                case "Renewal" -> r.getRenewalKind() != null
+                        // BG_103: decided at renewal time against the member's actual previous plan
+                        ? ("Upgrade".equals(r.getRenewalKind()) ? "upgrade" : "renew")
+                        : (isUpgrade(r, planHistory.get(subscriberKey(r))) ? "upgrade" : "renew");
                 case "Add-on" -> "addons";
                 default -> "dayPass";
             };

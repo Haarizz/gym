@@ -303,6 +303,30 @@ export const shippingLabel = (t: DocType) => (t === 'sales-invoice' ? 'Delivery 
 
 const fmt = (n: number) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// BG_97: a product's catalog description has no length limit, and printing it whole let
+// one line item push an invoice onto a second sheet. The printed description is kept to
+// a few short lines; the full text stays on the product itself.
+const MAX_DESC_LINES = 4;
+const MAX_DESC_CHARS = 240;
+
+function clampDescription(lines: string[]): string[] {
+  const out: string[] = [];
+  let budget = MAX_DESC_CHARS;
+  for (const line of lines) {
+    if (out.length === MAX_DESC_LINES || budget <= 0) {
+      out[out.length - 1] = out[out.length - 1].replace(/…?$/, '…');
+      break;
+    }
+    if (line.length > budget) {
+      out.push(line.slice(0, budget).trimEnd() + '…');
+      break;
+    }
+    out.push(line);
+    budget -= line.length;
+  }
+  return out;
+}
+
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
   'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -529,10 +553,10 @@ export function DocumentView({ s, doc, forPrint = false }: { s: DocTemplateSetti
           <tbody>
             {doc.lines.map((l, i) => {
               const [shortLine, ...detailLines] = (l.description ?? '').split('\n').map(x => x.trim()).filter(Boolean);
-              const descLines = [
+              const descLines = clampDescription([
                 s.showShortDescription ? shortLine : undefined,
                 ...(s.showDetailedDescription ? detailLines : []),
-              ].filter(Boolean) as string[];
+              ].filter(Boolean) as string[]);
               const subInfo = [
                 s.colBrand && l.brand && ['Brand', l.brand, false],
                 s.colSKU && l.sku && ['SKU', l.sku, false],
@@ -568,7 +592,7 @@ export function DocumentView({ s, doc, forPrint = false }: { s: DocTemplateSetti
                     </td>
                   )}
                   {s.colDescription && (
-                    <td style={td()}>
+                    <td style={{ ...td(), overflowWrap: 'anywhere' }}>
                       {descLines.map((d, di) => <span key={di} style={{ display: 'block', lineHeight: 1.6, color: '#444' }}>{'· '}{d}</span>)}
                       {l.discountPercent > 0 && (
                         <p style={{ margin: '4px 0 0', color: '#e11d48', fontSize: `${f - 1}px`, fontWeight: 600 }}>Discount @ {l.discountPercent}%</p>

@@ -173,7 +173,7 @@ export function ApprovalHistory() {
           />
         </div>
         <Select value={statusFilter} onValueChange={(v) => applyStatus(v as StatusFilter)}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

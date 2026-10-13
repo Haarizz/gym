@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { getCompanyDetails } from "../utils/company-details";
 import { getVatRate, splitVatInclusive } from "../utils/tax";
 import { buildFullReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
+import { printHtml } from "../utils/print-html";
 import { getReceiptColors } from "../utils/receipt-colors";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Checkbox } from "../components/ui/checkbox";
@@ -304,9 +305,6 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     if (printInFlightRef.current) return;
     printInFlightRef.current = true;
 
-    // window.open must happen synchronously within the click handler or popup
-    // blockers reject it, so open first and fill it in once company details load.
-    const win = window.open("", "_blank", "width=800,height=900");
     const [company, vatRatePercent] = await Promise.all([getCompanyDetails(), getVatRate()]);
 
     const totalPaid   = calculateTotalPayment();
@@ -341,10 +339,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       transactionRef: transactionReference || undefined,
     };
 
-    const html = buildFullReceiptHtml(printData, company, await getReceiptColors());
-
-    if (win) { win.document.write(html); win.document.close(); }
-    printInFlightRef.current = false;
+    try {
+      // Hidden-iframe print: only the browser's print dialog appears, no new tab.
+      printHtml(buildFullReceiptHtml(printData, company, await getReceiptColors()));
+    } finally {
+      printInFlightRef.current = false;
+    }
   };
   const handleSendSMS      = () => toast.success("Sending via SMS",     { description: `Sent to ${selectedMember?.phone}` });
   const handleSendEmail    = () => toast.success("Sending via Email",   { description: `Sent to ${selectedMember?.email}` });

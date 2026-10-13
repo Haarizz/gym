@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { notificationService, AppNotification } from "../utils/supabase/notification-service";
 import styles from "../components/shared/NotificationPanel.module.css";
+import { notificationTarget } from "../utils/notification-links";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,8 @@ function NotificationRow({
 
   function handleClick() {
     if (isUnread) onRead(notification.id);
-    if (notification.actionUrl) navigate(notification.actionUrl);
+    const target = notificationTarget(notification.actionUrl);
+    if (target) navigate(target);
   }
 
   return (

@@ -34,7 +34,8 @@ import {
   Building2,
   Globe
 } from 'lucide-react';
-import { type BiosLiveData, SampleDataBadge, SampleTitle, formatSignedPercent, clampPercent, compactCurrency } from './bios-live';
+import { type BiosLiveData, formatSignedPercent, clampPercent, compactCurrency, useBiosInsights } from './bios-live';
+import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface ExecutiveDashboardDialogProps {
   open: boolean;
@@ -65,21 +66,30 @@ export function ExecutiveDashboardDialog({
     healthStatus: live.overallHealthLabel,
     profitMargin: Number(live.profitMargin.toFixed(1)),
     operatingExpenses: expenseRatio,
-    netProfit: live.netIncome,
-    // No market/competitor data source yet — illustrative values.
-    marketPosition: 'Strong',
-    competitiveAdvantage: 'High'
+    netProfit: live.netIncome
   };
 
-  // Strategic Metrics
+  // Strategic Metrics — measured figures against the targets set in BiOS Configuration
+  // (no target = shown without one). Satisfaction comes from member app feedback.
+  const { data: memberInsights } = useBiosInsights(() => biosInsightsService.getMembers(), open, live.branchKey);
+  const settings = live.settings;
+  const monthRevenue = live.monthlyTrend.length > 0 ? live.monthlyTrend[live.monthlyTrend.length - 1].revenue : 0;
+  const metricStatus = (score: number, target: number | null) =>
+    target == null ? 'Tracking' : score >= target ? 'Excellent' : score >= target * 0.9 ? 'Good' : score >= target * 0.75 ? 'Fair' : 'Poor';
   const strategicMetrics = [
-    { category: 'Revenue Growth', score: 95, target: 85, status: 'Excellent' },
-    { category: 'Member Satisfaction', score: 88, target: 80, status: 'Good' },
-    { category: 'Market Penetration', score: 76, target: 75, status: 'Good' },
-    { category: 'Brand Awareness', score: 82, target: 85, status: 'Fair' },
-    { category: 'Operational Excellence', score: 91, target: 90, status: 'Excellent' },
-    { category: 'Innovation Index', score: 73, target: 80, status: 'Fair' }
-  ];
+    ...(live.monthlyRevenueTarget ? [{
+      category: 'Revenue vs Monthly Target', score: Number(((monthRevenue / live.monthlyRevenueTarget) * 100).toFixed(1)), target: 100 as number | null
+    }] : []),
+    { category: 'Member Retention', score: live.retentionRate,
+      target: (settings?.benchmark_retention_percent ?? (settings?.alert_enabled ? settings.alert_retention_threshold : null)) ?? null },
+    { category: 'Profit Margin', score: Number(live.profitMargin.toFixed(1)), target: settings?.benchmark_operating_margin_percent ?? null },
+    ...(memberInsights?.satisfaction.overall != null ? [{
+      category: 'Member Satisfaction', score: Number(((memberInsights.satisfaction.overall / 5) * 100).toFixed(1)), target: null as number | null
+    }] : []),
+    ...(memberInsights ? [{
+      category: 'Class Uptake (30 days)', score: memberInsights.engagement.class_uptake_percent, target: null as number | null
+    }] : [])
+  ].map((metric) => ({ ...metric, status: metricStatus(metric.score, metric.target) }));
 
   // Business Health Indicators — same components as the page's overall health score.
   const staffAvgAchievement = live.topStaff.length > 0
@@ -155,77 +165,6 @@ export function ExecutiveDashboardDialog({
     ...forecastLabels.map((month, i) => ({ month, actual: null, forecast: Math.max(0, Math.round(lastActual + avgMonthlyChange * (i + 1))) as number | null }))
   ];
 
-  // Strategic Initiatives
-  const strategicInitiatives = [
-    {
-      initiative: 'Digital Transformation',
-      status: 'In Progress',
-      completion: 67,
-      owner: 'CTO',
-      deadline: '2024-12-31',
-      impact: 'High'
-    },
-    {
-      initiative: 'Member Experience Enhancement',
-      status: 'In Progress',
-      completion: 85,
-      owner: 'COO',
-      deadline: '2024-10-15',
-      impact: 'High'
-    },
-    {
-      initiative: 'Revenue Diversification',
-      status: 'Planning',
-      completion: 25,
-      owner: 'CFO',
-      deadline: '2025-03-31',
-      impact: 'Medium'
-    },
-    {
-      initiative: 'Market Expansion',
-      status: 'Planning',
-      completion: 15,
-      owner: 'CEO',
-      deadline: '2025-06-30',
-      impact: 'High'
-    }
-  ];
-
-  // Competitive Position
-  const competitivePosition = [
-    { aspect: 'Pricing', yours: 85, competitor: 75 },
-    { aspect: 'Facilities', yours: 92, competitor: 80 },
-    { aspect: 'Member Service', yours: 88, competitor: 85 },
-    { aspect: 'Technology', yours: 78, competitor: 82 },
-    { aspect: 'Brand', yours: 82, competitor: 88 },
-    { aspect: 'Location', yours: 90, competitor: 75 }
-  ];
-
-  // Key Decisions Required
-  const decisionsRequired = [
-    {
-      decision: 'Q4 Marketing Budget Allocation',
-      urgency: 'High',
-      deadline: '2024-10-01',
-      options: 'Digital vs Traditional split',
-      recommendation: 'Increase digital to 70%'
-    },
-    {
-      decision: 'Facility Expansion vs Equipment Upgrade',
-      urgency: 'High',
-      deadline: '2024-10-15',
-      options: 'Expand space or upgrade equipment',
-      recommendation: 'Equipment upgrade (higher ROI)'
-    },
-    {
-      decision: 'New Service Line Launch',
-      urgency: 'Medium',
-      deadline: '2024-11-30',
-      options: 'Nutrition consulting or Wellness spa',
-      recommendation: 'Nutrition (aligns with core)'
-    }
-  ];
-
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case 'up': return <TrendingUp className="h-4 w-4 text-green-500" />;
@@ -258,13 +197,11 @@ export function ExecutiveDashboardDialog({
         </DialogHeader>
 
         <Tabs defaultValue="summary" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="strategic">Strategic</TabsTrigger>
             <TabsTrigger value="health">Business Health</TabsTrigger>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="initiatives">Initiatives</TabsTrigger>
-            <TabsTrigger value="decisions">Decisions</TabsTrigger>
           </TabsList>
 
           {/* Executive Summary Tab */}
@@ -343,18 +280,6 @@ export function ExecutiveDashboardDialog({
                       </div>
                       <Progress value={clampPercent(executiveSummary.operatingExpenses)} className="h-2" />
                     </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <SampleDataBadge />
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Market Position</span>
-                        <Badge className="bg-green-100 text-green-800">{executiveSummary.marketPosition}</Badge>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Competitive Edge</span>
-                        <Badge className="bg-blue-100 text-blue-800">{executiveSummary.competitiveAdvantage}</Badge>
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -382,48 +307,30 @@ export function ExecutiveDashboardDialog({
 
           {/* Strategic Metrics Tab */}
           <TabsContent value="strategic" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base"><SampleTitle>Strategic Performance Metrics</SampleTitle></CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {strategicMetrics.map((metric, index) => (
-                      <div key={index}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm">{metric.category}</span>
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getStatusColor(metric.status)}>{metric.status}</Badge>
-                            <span className="text-sm font-medium">{metric.score}%</span>
-                          </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Strategic Performance Metrics</CardTitle>
+                <CardDescription>Measured figures against the targets set in BiOS Configuration</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {strategicMetrics.map((metric, index) => (
+                    <div key={index}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm">{metric.category}</span>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getStatusColor(metric.status)}>{metric.status}</Badge>
+                          <span className="text-sm font-medium">{metric.score}%</span>
                         </div>
-                        <Progress value={metric.score} className="h-2" />
-                        <p className="text-xs text-muted-foreground mt-1">Target: {metric.target}%</p>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base"><SampleTitle>Competitive Position Analysis</SampleTitle></CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={350}>
-                    <RadarChart data={competitivePosition}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="aspect" />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                      <Radar name="Your Business" dataKey="yours" stroke="#2B7A78" fill="#2B7A78" fillOpacity={0.6} />
-                      <Radar name="Competitor Avg" dataKey="competitor" stroke="#E63946" fill="#E63946" fillOpacity={0.3} />
-                      <Legend />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
+                      <Progress value={clampPercent(metric.score)} className="h-2" />
+                      <p className="text-xs text-muted-foreground mt-1">{metric.target != null ? `Target: ${metric.target}%` : 'No target set'}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" className="mt-4" onClick={live.onConfigure}>Set targets</Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Business Health Tab */}
@@ -524,134 +431,6 @@ export function ExecutiveDashboardDialog({
             </div>
           </TabsContent>
 
-          {/* Strategic Initiatives Tab */}
-          <TabsContent value="initiatives" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Active Strategic Initiatives</SampleTitle></CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Initiative</TableHead>
-                      <TableHead>Owner</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Deadline</TableHead>
-                      <TableHead>Impact</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {strategicInitiatives.map((initiative, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{initiative.initiative}</TableCell>
-                        <TableCell>{initiative.owner}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{initiative.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Progress value={initiative.completion} className="h-2 w-20" />
-                            <span className="text-xs">{initiative.completion}%</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">{initiative.deadline}</TableCell>
-                        <TableCell>
-                          <Badge className={initiative.impact === 'High' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
-                            {initiative.impact}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {strategicInitiatives.map((initiative, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <CardTitle className="text-sm">{initiative.initiative}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-medium">{initiative.completion}%</span>
-                      </div>
-                      <Progress value={initiative.completion} className="h-2" />
-                      <div className="flex justify-between items-center pt-2">
-                        <Badge variant="outline">{initiative.status}</Badge>
-                        <Button size="sm" variant="ghost">View Details</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Key Decisions Tab */}
-          <TabsContent value="decisions" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              {decisionsRequired.map((decision, index) => (
-                <Card key={index} className="border-blue-200">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                        <div>
-                          <CardTitle className="text-base">{decision.decision}</CardTitle>
-                          <div className="flex items-center space-x-4 mt-2">
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">Deadline: {decision.deadline}</span>
-                            </div>
-                            <Badge className={decision.urgency === 'High' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
-                              {decision.urgency} Urgency
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Decision Options</p>
-                        <p className="text-sm">{decision.options}</p>
-                      </div>
-                      <div className="p-3 bg-green-50 rounded-lg">
-                        <div className="flex items-start space-x-2">
-                          <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-medium text-green-800">Recommended</p>
-                            <p className="text-sm text-green-700">{decision.recommendation}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button size="sm" className="bg-[#2B7A78] hover:bg-[#236663]">
-                          Approve Recommendation
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          Request Analysis
-                        </Button>
-                        <Button size="sm" variant="ghost">
-                          Schedule Meeting
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end space-x-2 pt-4 border-t">

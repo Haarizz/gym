@@ -1,14 +1,13 @@
 import React from 'react';
-import { FlaskConical } from 'lucide-react';
 import type { GymDataContext } from '../../utils/ai-service';
-import type { BiosBranchComparisonRow } from '../../utils/supabase/bios-service';
+import type { BiosBranchComparisonRow, BiosSettings } from '../../utils/supabase/bios-service';
 import type { StaffTarget } from '../../utils/supabase/staff-service';
 
 /**
  * Everything the BiOS page already derives from real data, handed to the
- * design's analysis dialogs and BI Engine views so they show live figures
- * wherever a source exists. Sections without a backend source keep the
- * design's illustrative values and carry a <SampleDataBadge />.
+ * design's analysis dialogs and BI Engine views. Figures the page doesn't
+ * already hold come from /api/bios/insights/* (useBiosInsights below); sections
+ * GymBios has no data for were removed rather than shown with made-up numbers.
  */
 export interface BiosLiveData {
   /** false until the first successful load — every figure below is then a placeholder. */
@@ -50,6 +49,10 @@ export interface BiosLiveData {
   suspendedMembers: number;
   topStaff: StaffTarget[];
   branchComparison: BiosBranchComparisonRow[];
+  /** Saved BiOS Configuration (targets, alerts, schedule, benchmarks); null until loaded. */
+  settings: BiosSettings | null;
+  /** Changes with the active branch — reload key for the dialogs' insight fetches. */
+  branchKey: string | number;
   /** Downloads the KPI summary CSV and logs it as a report. */
   onExportReport: () => void;
   /** Downloads the full data CSV and logs it as an export. */
@@ -85,27 +88,135 @@ export const downloadCsv = (filename: string, header: string[], rows: Array<Arra
 };
 
 /**
- * Marks a section whose numbers are illustrative — there is no data source for
- * it in GymBios yet — so nobody mistakes them for their gym's figures.
+ * Loads one /api/bios/insights group the first time `enabled` turns true (a
+ * dialog opening), and again whenever `reloadKey` changes (e.g. the branch).
  */
-export function SampleDataBadge({ className = '' }: { className?: string }) {
+export function useBiosInsights<T>(load: () => Promise<T>, enabled: boolean, reloadKey: unknown = null) {
+  const [data, setData] = React.useState<T | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const loadedKey = React.useRef<unknown>(undefined);
+
+  React.useEffect(() => {
+    if (!enabled || loadedKey.current === reloadKey) return;
+    let cancelled = false;
+    loadedKey.current = reloadKey;
+    setLoading(true);
+    setError(null);
+    load()
+      .then((result) => { if (!cancelled) setData(result); })
+      .catch((e) => {
+        if (cancelled) return;
+        loadedKey.current = undefined;
+        setError(e instanceof Error ? e.message : 'Failed to load');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, reloadKey]);
+
+  return { data, loading, error };
+}
+
+/** Placeholder while an insights group loads, or when it failed to. */
+export function InsightsStatus({ loading, error }: { loading: boolean; error: string | null }) {
+  if (error) return <p className="text-sm text-red-600 py-6 text-center">{error}</p>;
+  if (loading) return <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>;
+  return null;
+}
+
+/** Shown where a section has nothing recorded yet, instead of an empty chart. */
+export function NoData({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-muted-foreground py-6 text-center">{children}</p>;
+}
+
+/**
+ * Every automated BiOS job (see BiosScheduler on the backend) with its real
+ * settings — the reports/alerts this branch actually has, not a design mock-up.
+ */
+export function biosSchedules(settings: BiosSettings | null) {
+  const weekly = (settings?.schedule_frequency ?? 'WEEKLY') !== 'MONTHLY';
+  return [
+    {
+      name: 'BiOS Business Summary',
+      schedule: weekly ? 'Mondays at 7:30 AM' : '1st of the month at 7:30 AM',
+      condition: weekly ? 'Covers the previous 7 days' : 'Covers the previous month',
+      recipients: settings?.schedule_email || '—',
+      enabled: !!settings?.schedule_enabled
+    },
+    {
+      name: 'Retention Alert',
+      schedule: 'Daily at 8:00 AM',
+      condition: `When retention drops below ${settings?.alert_retention_threshold ?? 80}%`,
+      recipients: settings?.alert_email || '—',
+      enabled: !!settings?.alert_enabled
+    },
+    {
+      name: 'Revenue Pace Alert',
+      schedule: 'Daily at 8:15 AM',
+      condition: settings?.monthly_revenue_target
+        ? `When month-end projection is under ${settings?.revenue_alert_threshold_percent ?? 90}% of target`
+        : 'Needs a monthly revenue target',
+      recipients: settings?.alert_email || '—',
+      enabled: !!settings?.revenue_alert_enabled
+    },
+    {
+      name: 'Month-end Member Snapshot',
+      schedule: '1st of the month at 12:30 AM',
+      condition: 'Records member counts for the trend chart',
+      recipients: 'System',
+      enabled: true
+    }
+  ];
+}
+
+export function BiosScheduleTable({ settings, onConfigure }: { settings: BiosSettings | null; onConfigure: () => void }) {
+  const rows = biosSchedules(settings);
   return (
-    <span
-      title="Illustrative figures — this section has no connected data source yet"
-      className={`inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 whitespace-nowrap ${className}`}
-    >
-      <FlaskConical className="h-3 w-3" />
-      Sample data
-    </span>
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-2 pr-4 font-medium">Report / Alert</th>
+              <th className="py-2 pr-4 font-medium">Schedule</th>
+              <th className="py-2 pr-4 font-medium">When</th>
+              <th className="py-2 pr-4 font-medium">Recipients</th>
+              <th className="py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.name} className="border-b">
+                <td className="py-2 pr-4 font-medium">{row.name}</td>
+                <td className="py-2 pr-4">{row.schedule}</td>
+                <td className="py-2 pr-4 text-muted-foreground">{row.condition}</td>
+                <td className="py-2 pr-4">{row.recipients}</td>
+                <td className="py-2">
+                  <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${row.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                    {row.enabled ? 'On' : 'Off'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Emails go out only when SMTP is configured on the server.{' '}
+        <button type="button" style={{ textDecoration: 'underline' }} onClick={onConfigure}>Change these in BiOS Configuration</button>
+      </p>
+    </div>
   );
 }
 
-/** A CardTitle row with the sample badge pushed to the right. */
-export function SampleTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="flex items-center justify-between gap-2 w-full">
-      <span>{children}</span>
-      <SampleDataBadge />
-    </span>
-  );
-}
+export const WEEKDAY_LABELS =['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export const hourLabel = (hour: number) =>
+  hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+
+/** % change, or null when there's no previous value to compare with. */
+export const changePercent = (current: number, previous: number): number | null =>
+  previous !== 0 ? Number((((current - previous) / Math.abs(previous)) * 100).toFixed(1)) : (current > 0 ? null : 0);
+
+export const shareOf = (part: number, whole: number) => (whole > 0 ? Number(((part / whole) * 100).toFixed(1)) : 0);
