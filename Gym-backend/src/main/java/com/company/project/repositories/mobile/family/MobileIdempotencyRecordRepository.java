@@ -25,4 +25,16 @@ public interface MobileIdempotencyRecordRepository extends JpaRepository<MobileI
     @Modifying
     @Query("UPDATE MobileIdempotencyRecord r SET r.status = 'FAILED', r.updatedAt = :now WHERE r.idempotencyKey = :key AND r.leaseId = :leaseId AND r.status = 'IN_PROGRESS'")
     int failLease(@Param("key") UUID key, @Param("leaseId") UUID leaseId, @Param("now") LocalDateTime now);
+
+    /**
+     * Claims a brand-new key atomically: returns 1 if this call created the row, 0 if
+     * another request already holds it. save() can't be used here — with an assigned id
+     * it merges, so a racing request would silently overwrite the winner's lease.
+     */
+    @Modifying
+    @Query(value = "INSERT INTO mobile_idempotency_records (idempotency_key, status, request_fingerprint, lease_id, created_at, updated_at) "
+            + "VALUES (:key, 'IN_PROGRESS', :fingerprint, :leaseId, :now, :now) ON CONFLICT (idempotency_key) DO NOTHING",
+            nativeQuery = true)
+    int insertIfAbsent(@Param("key") UUID key, @Param("fingerprint") String fingerprint,
+                       @Param("leaseId") UUID leaseId, @Param("now") LocalDateTime now);
 }

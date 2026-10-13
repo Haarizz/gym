@@ -52,7 +52,13 @@ public class MobileIdempotencyService {
         newRecord.setLeaseId(UUID.randomUUID());
         newRecord.setStatus("IN_PROGRESS");
         newRecord.setRequestFingerprint(payloadFingerprint);
-        return idempotencyRepository.save(newRecord);
+        // Atomic claim: a concurrent request with the same key that also saw no row
+        // loses here instead of overwriting this lease and running the purchase twice.
+        if (idempotencyRepository.insertIfAbsent(idempotencyKey, payloadFingerprint,
+                newRecord.getLeaseId(), newRecord.getCreatedAt()) == 0) {
+            throw new IllegalStateException("Request is already in progress.");
+        }
+        return newRecord;
     }
 
     // Executes inline (REQUIRED) in the calling transaction.
