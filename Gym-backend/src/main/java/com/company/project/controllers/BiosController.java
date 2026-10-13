@@ -3,7 +3,10 @@ package com.company.project.controllers;
 import com.company.project.dto.BiosActivityLogRequestDTO;
 import com.company.project.dto.BiosActivityLogResponseDTO;
 import com.company.project.dto.BiosBranchComparisonDTO;
+import com.company.project.dto.BiosInsightsDTO;
+import com.company.project.dto.BiosOverviewDTO;
 import com.company.project.dto.BiosSettingsDTO;
+import com.company.project.services.BiosInsightsService;
 import com.company.project.services.BiosService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +18,11 @@ import java.util.List;
 public class BiosController {
 
     private final BiosService biosService;
+    private final BiosInsightsService biosInsightsService;
 
-    public BiosController(BiosService biosService) {
+    public BiosController(BiosService biosService, BiosInsightsService biosInsightsService) {
         this.biosService = biosService;
+        this.biosInsightsService = biosInsightsService;
     }
 
     /**
@@ -49,6 +54,38 @@ public class BiosController {
             @RequestParam String type,
             @RequestParam(defaultValue = "10") int limit) {
         return ResponseEntity.ok(biosService.getRecentActivity(type, limit));
+    }
+
+    /**
+     * Member KPIs and the month-by-month member trend, counted in the database
+     * for the active branch (or every branch in All Branches mode) — replaces the
+     * page downloading up to 5,000 members to count them itself.
+     */
+    @GetMapping("/overview")
+    public ResponseEntity<BiosOverviewDTO> getOverview(@RequestParam(defaultValue = "6") int months) {
+        return ResponseEntity.ok(biosService.getOverview(months));
+    }
+
+    // Real-data payloads for the analysis dialogs; each dialog loads its own group when opened.
+
+    @GetMapping("/insights/revenue")
+    public ResponseEntity<BiosInsightsDTO.RevenueInsights> getRevenueInsights(@RequestParam(defaultValue = "90") int days) {
+        return ResponseEntity.ok(biosInsightsService.getRevenueInsights(days));
+    }
+
+    @GetMapping("/insights/members")
+    public ResponseEntity<BiosInsightsDTO.MemberInsights> getMemberInsights() {
+        return ResponseEntity.ok(biosInsightsService.getMemberInsights());
+    }
+
+    @GetMapping("/insights/operations")
+    public ResponseEntity<BiosInsightsDTO.OperationsInsights> getOperationsInsights() {
+        return ResponseEntity.ok(biosInsightsService.getOperationsInsights());
+    }
+
+    @GetMapping("/insights/marketing")
+    public ResponseEntity<BiosInsightsDTO.MarketingInsights> getMarketingInsights(@RequestParam(defaultValue = "365") int days) {
+        return ResponseEntity.ok(biosInsightsService.getMarketingInsights(days));
     }
 
     /** Per-branch snapshot — only meaningful while viewing "All Branches". */

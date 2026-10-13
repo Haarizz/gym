@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { notificationTarget } from "../../utils/notification-links";
 import {
   CheckCircle,
   Info,
@@ -99,10 +100,13 @@ function NotificationRow({
   notification,
   onRead,
   onDelete,
+  onNavigate,
 }: {
   notification: AppNotification;
   onRead: (id: number) => void;
   onDelete: (id: number) => void;
+  /** Closes the panel — it's a sheet with an overlay, so leaving it open hid the page navigated to. */
+  onNavigate: () => void;
 }) {
   const navigate = useNavigate();
   const cfg = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO;
@@ -114,7 +118,12 @@ function NotificationRow({
 
   function handleClick() {
     if (isUnread) onRead(notification.id);
-    if (notification.actionUrl) navigate(notification.actionUrl);
+    const target = notificationTarget(notification.actionUrl);
+    if (target) {
+      // BG_67: close first — the page changed behind the still-open sheet, so "View" looked dead.
+      onNavigate();
+      navigate(target);
+    }
   }
 
   return (
@@ -413,7 +422,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 <div>
                   <SectionLabel label="Today" count={todayItems.length} />
                   {todayItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} onNavigate={onClose} />
                   ))}
                 </div>
               )}
@@ -422,7 +431,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 <div>
                   <SectionLabel label="Yesterday" count={yesterdayItems.length} />
                   {yesterdayItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} onNavigate={onClose} />
                   ))}
                 </div>
               )}
@@ -431,7 +440,7 @@ export function NotificationPanel({ open, onClose, onCountChange }: Props) {
                 <div>
                   <SectionLabel label="Earlier" count={earlierItems.length} />
                   {earlierItems.map((n) => (
-                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} />
+                    <NotificationRow key={n.id} notification={n} onRead={handleRead} onDelete={handleDelete} onNavigate={onClose} />
                   ))}
                 </div>
               )}

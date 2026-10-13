@@ -57,6 +57,7 @@ class FamilyPlanChangeServiceTest {
 
         // Real pricing/cap rules — they're pure functions of the plan.
         when(memberService.memberPriceForIndex(any(), anyInt())).thenCallRealMethod();
+        when(memberService.pricesPerMember(any())).thenCallRealMethod();
         doCallRealMethod().when(memberService).enforceFamilyMemberCaps(any(), anyLong(), anyLong());
 
         when(memberRepository.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(db.get(inv.<Long>getArgument(0))));

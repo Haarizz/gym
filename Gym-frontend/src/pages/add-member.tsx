@@ -146,6 +146,37 @@ const calculateAge = (dob: string): number | null => {
 // Synthetic discount-list id prefix for a referral coupon applied via the promo code field.
 const COUPON_DISCOUNT_PREFIX = 'coupon:';
 
+// Same phone number written two ways ("+971 50 123 4567" vs "0501234567") still
+// matches: compare digits only, and the last 9 digits when a country/trunk prefix differs.
+const isSamePhone = (a: string, b: string) => {
+  const da = a.replace(/\D/g, '');
+  const db = b.replace(/\D/g, '');
+  if (da.length < 7 || db.length < 7) return false;
+  return da === db || (da.length >= 9 && db.length >= 9 && da.slice(-9) === db.slice(-9));
+};
+
+const normalizeName = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * BG_99: which emergency-contact field just repeats the member's own details, if any.
+ * The name counts as the member's own when it equals their first name or full name.
+ */
+const emergencyContactMatchesMember = (f: {
+  firstName: string; lastName: string; phone: string;
+  emergencyContactName: string; emergencyContactPhone: string;
+}): 'emergencyContactPhone' | 'emergencyContactName' | null => {
+  if (f.emergencyContactPhone.trim() && isSamePhone(f.emergencyContactPhone, f.phone)) {
+    return 'emergencyContactPhone';
+  }
+  const contact = normalizeName(f.emergencyContactName);
+  if (contact) {
+    const first = normalizeName(f.firstName);
+    const full = normalizeName(`${f.firstName} ${f.lastName}`);
+    if (contact === full || (first && contact === first)) return 'emergencyContactName';
+  }
+  return null;
+};
+
 export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
@@ -1000,6 +1031,24 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
           duration: 4000
         });
         const el = document.getElementById(invalidField);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el?.focus({ preventScroll: true });
+        return;
+      }
+    }
+
+    // BG_99: the emergency contact must be someone else — not the member's own number
+    // or name. Checked in edit mode too whenever a contact is filled in.
+    {
+      const sameContact = emergencyContactMatchesMember(formData);
+      if (sameContact) {
+        toast.error('Emergency contact must be someone else', {
+          description: sameContact === 'emergencyContactPhone'
+            ? "Emergency contact number must be different from the member's phone number."
+            : "Emergency contact name must be different from the member's name.",
+          duration: 4000
+        });
+        const el = document.getElementById(sameContact);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el?.focus({ preventScroll: true });
         return;

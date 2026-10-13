@@ -45,7 +45,8 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
-import { type BiosLiveData, SampleDataBadge, SampleTitle, formatSignedPercent, clampPercent } from './bios-live';
+import { type BiosLiveData, formatSignedPercent, clampPercent, useBiosInsights, InsightsStatus, NoData, BiosScheduleTable, downloadCsv, shareOf } from './bios-live';
+import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface PerformanceMetricsDialogProps {
   open: boolean;
@@ -138,15 +139,25 @@ export function PerformanceMetricsDialog({
     }
   ];
 
-  // Historical Performance Data
-  const historicalPerformance = [
-    { date: '2024-09-20', checkIns: 235, occupancy: 72, revenue: 4200, efficiency: 89 },
-    { date: '2024-09-21', checkIns: 248, occupancy: 76, revenue: 4550, efficiency: 91 },
-    { date: '2024-09-22', checkIns: 256, occupancy: 78, revenue: 4800, efficiency: 92 },
-    { date: '2024-09-23', checkIns: 242, occupancy: 74, revenue: 4400, efficiency: 88 },
-    { date: '2024-09-24', checkIns: 268, occupancy: 82, revenue: 5100, efficiency: 94 },
-    { date: '2024-09-25', checkIns: 245, occupancy: 75, revenue: 4850, efficiency: 90 }
-  ];
+  // Daily history (last 14 days) and departments, loaded when the dialog opens.
+  const { data: operations, loading: operationsLoading, error: operationsError } =
+    useBiosInsights(() => biosInsightsService.getOperations(), open, live.branchKey);
+  const historicalPerformance = (operations?.daily ?? []).map((day) => ({
+    date: new Date(`${day.date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    checkIns: day.check_ins,
+    occupancy: day.capacity > 0 ? Math.round((day.bookings / day.capacity) * 100) : null,
+    revenue: Math.round(day.revenue)
+  }));
+  const historyDays = historicalPerformance.length;
+  const average = (values: number[]) => (values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+  const avgCheckIns = Math.round(average(historicalPerformance.map((d) => d.checkIns)));
+  const occupancyDays = historicalPerformance.filter((d) => d.occupancy != null).map((d) => d.occupancy as number);
+  const avgOccupancy = occupancyDays.length > 0 ? Math.round(average(occupancyDays)) : null;
+  const avgRevenue = average(historicalPerformance.map((d) => d.revenue));
+  const busiestDay = [...historicalPerformance].sort((a, b) => b.checkIns - a.checkIns)[0] ?? null;
+  const exportHistory = () => downloadCsv('bios-daily-performance.csv',
+    ['Date', 'Check-ins', 'Class occupancy %', `Revenue (${live.currencyCode})`],
+    (operations?.daily ?? []).map((d) => [d.date, d.check_ins, d.capacity > 0 ? Math.round((d.bookings / d.capacity) * 100) : '', d.revenue]));
 
   // Hourly Performance (Today) — check-ins per hour from today's attendance.
   const hourlyPerformance = [...live.peakHours]
@@ -181,42 +192,6 @@ export function PerformanceMetricsDialog({
           };
     });
 
-  // Scheduled Reports
-  const scheduledReports = [
-    {
-      name: 'Daily Performance Summary',
-      frequency: 'Daily',
-      time: '11:00 PM',
-      recipients: 'Management Team',
-      lastSent: '2024-09-24',
-      status: 'Active'
-    },
-    {
-      name: 'Weekly Metrics Report',
-      frequency: 'Weekly',
-      time: 'Monday 9:00 AM',
-      recipients: 'All Staff',
-      lastSent: '2024-09-23',
-      status: 'Active'
-    },
-    {
-      name: 'Monthly Performance Review',
-      frequency: 'Monthly',
-      time: '1st of month, 10:00 AM',
-      recipients: 'Executives',
-      lastSent: '2024-09-01',
-      status: 'Active'
-    },
-    {
-      name: 'Real-time Alert Digest',
-      frequency: 'Hourly',
-      time: 'Every hour',
-      recipients: 'Operations Manager',
-      lastSent: '2024-09-25',
-      status: 'Active'
-    }
-  ];
-
   // Performance Targets — the live metrics plus revenue per member vs your benchmark.
   const isPercentMetric = (metric: string) =>
     metric.includes('Rate') || metric.includes('Efficiency') || metric.includes('Occupancy') || metric.includes('Utilization');
@@ -241,14 +216,13 @@ export function PerformanceMetricsDialog({
     }] : [])
   ];
 
-  // Department Performance
-  const departmentPerformance = [
-    { department: 'Front Desk', efficiency: 95, satisfaction: 4.7, target: 90 },
-    { department: 'Personal Training', efficiency: 88, satisfaction: 4.8, target: 85 },
-    { department: 'Group Classes', efficiency: 82, satisfaction: 4.5, target: 80 },
-    { department: 'Maintenance', efficiency: 91, satisfaction: 4.4, target: 90 },
-    { department: 'Retail', efficiency: 76, satisfaction: 4.2, target: 75 }
-  ];
+  // Department Performance — this month's staff targets, grouped by department.
+  const departmentPerformance = (operations?.departments ?? []).map((d) => ({
+    department: d.department,
+    staff: d.staff,
+    revenue: d.revenue_target > 0 ? Math.round((d.revenue_achieved / d.revenue_target) * 100) : null,
+    sessions: d.sessions_target > 0 ? Math.round((d.sessions_achieved / d.sessions_target) * 100) : null
+  }));
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
@@ -344,19 +318,25 @@ export function PerformanceMetricsDialog({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base"><SampleTitle>Department Performance</SampleTitle></CardTitle>
+                  <CardTitle className="text-base">Department Performance</CardTitle>
+                  <CardDescription>This month's staff targets achieved, by department</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <RadarChart data={departmentPerformance}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="department" />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                      <Radar name="Efficiency" dataKey="efficiency" stroke="#2B7A78" fill="#2B7A78" fillOpacity={0.6} />
-                      <Radar name="Satisfaction" dataKey="satisfaction" stroke="#E63946" fill="#E63946" fillOpacity={0.3} />
-                      <Legend />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                  <InsightsStatus loading={operationsLoading} error={operationsError} />
+                  {operations && departmentPerformance.length === 0 && <NoData>No staff targets set for this month.</NoData>}
+                  {departmentPerformance.length > 0 && (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={departmentPerformance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="department" />
+                        <YAxis unit="%" />
+                        <Tooltip formatter={(value) => `${value}%`} />
+                        <Legend />
+                        <Bar dataKey="revenue" fill="#2B7A78" name="Revenue target %" />
+                        <Bar dataKey="sessions" fill="#E63946" name="Sessions target %" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
 
@@ -488,103 +468,92 @@ export function PerformanceMetricsDialog({
 
           {/* Historical Tab */}
           <TabsContent value="historical" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold">Last 7 Days Performance</h3>
-                <p className="text-sm text-muted-foreground">Historical trends and patterns</p>
+                <h3 className="font-semibold">Last {historyDays || 14} Days Performance</h3>
+                <p className="text-sm text-muted-foreground">Check-ins, class occupancy and money taken per day</p>
               </div>
-              <div className="flex space-x-2">
-                <Button size="sm" variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter
-                </Button>
-                <Button size="sm" variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-              </div>
+              <Button size="sm" variant="outline" onClick={exportHistory} disabled={!operations}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
+            <InsightsStatus loading={operationsLoading} error={operationsError} />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Check-ins & Occupancy Trend</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={historicalPerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="checkIns" stroke="#2B7A78" strokeWidth={2} name="Check-ins" />
-                    <Line type="monotone" dataKey="occupancy" stroke="#3b82f6" strokeWidth={2} name="Occupancy %" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {operations && (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Check-ins & Class Occupancy</CardTitle>
+                    <CardDescription>Occupancy = class and PT bookings as a share of session capacity</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={historicalPerformance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="checkIns" stroke="#2B7A78" strokeWidth={2} name="Check-ins" />
+                        <Line type="monotone" dataKey="occupancy" stroke="#3b82f6" strokeWidth={2} name="Occupancy %" connectNulls />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Revenue & Efficiency</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={historicalPerformance}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${live.currencyCode})`} />
-                      <Bar dataKey="efficiency" fill="#8b5cf6" name="Efficiency %" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Daily Revenue</CardTitle>
+                      <CardDescription>Receipts and POS sales</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={historicalPerformance}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                          <Legend />
+                          <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${live.currencyCode})`} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Performance Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Average Check-ins</span>
-                        <span className="text-sm font-medium">249/day</span>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Performance Statistics</CardTitle>
+                      <CardDescription>Daily averages over the last {historyDays} days</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Average Check-ins</span>
+                          <span className="text-sm font-medium">{avgCheckIns}/day</span>
+                        </div>
+                        <div>
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm">Average Class Occupancy</span>
+                            <span className="text-sm font-medium">{avgOccupancy != null ? `${avgOccupancy}%` : '—'}</span>
+                          </div>
+                          <Progress value={avgOccupancy ?? 0} className="h-2" />
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Average Revenue</span>
+                          <span className="text-sm font-medium">{formatCurrency(avgRevenue)}/day</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Busiest Day</span>
+                          <span className="text-sm font-medium">{busiestDay && busiestDay.checkIns > 0 ? `${busiestDay.date} (${busiestDay.checkIns} check-ins)` : '—'}</span>
+                        </div>
                       </div>
-                      <Progress value={88} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Average Occupancy</span>
-                        <span className="text-sm font-medium">76%</span>
-                      </div>
-                      <Progress value={76} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Average Revenue</span>
-                        <span className="text-sm font-medium">{formatCurrency(4650)}</span>
-                      </div>
-                      <Progress value={84} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm">Average Efficiency</span>
-                        <span className="text-sm font-medium">90.7%</span>
-                      </div>
-                      <Progress value={90.7} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            )}
           </TabsContent>
 
           {/* Targets Tab */}
@@ -728,140 +697,20 @@ export function PerformanceMetricsDialog({
           <TabsContent value="schedule" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold flex items-center gap-2">Scheduled Reports <SampleDataBadge /></h3>
-                <p className="text-sm text-muted-foreground">Automated performance reports and alerts</p>
+                <h3 className="font-semibold">Scheduled Reports</h3>
+                <p className="text-sm text-muted-foreground">Automated reports and alerts for this branch</p>
               </div>
               <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onConfigure}>
                 <Calendar className="h-4 w-4 mr-2" />
-                New Schedule
+                Edit Schedule
               </Button>
             </div>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Active Schedules</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Report Name</TableHead>
-                      <TableHead>Frequency</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Recipients</TableHead>
-                      <TableHead>Last Sent</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scheduledReports.map((report, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{report.name}</TableCell>
-                        <TableCell>{report.frequency}</TableCell>
-                        <TableCell>{report.time}</TableCell>
-                        <TableCell>{report.recipients}</TableCell>
-                        <TableCell>{report.lastSent}</TableCell>
-                        <TableCell>
-                          <Badge className="bg-green-100 text-green-800">{report.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="ghost">
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <CardContent className="pt-6">
+                <BiosScheduleTable settings={live.settings} onConfigure={live.onConfigure} />
               </CardContent>
             </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Create New Schedule</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Report Type</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select report type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="daily">Daily Summary</SelectItem>
-                          <SelectItem value="weekly">Weekly Performance</SelectItem>
-                          <SelectItem value="monthly">Monthly Review</SelectItem>
-                          <SelectItem value="custom">Custom Report</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Frequency</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hourly">Hourly</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Recipients</Label>
-                      <Input placeholder="Enter email addresses" />
-                    </div>
-                    <Button className="w-full bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onConfigure}>
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Create Schedule
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Schedule Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Auto-Send Reports</p>
-                        <p className="text-xs text-muted-foreground">Send reports automatically</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Include Charts</p>
-                        <p className="text-xs text-muted-foreground">Attach visualizations</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">PDF Format</p>
-                        <p className="text-xs text-muted-foreground">Export as PDF</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Delivery Confirmation</p>
-                        <p className="text-xs text-muted-foreground">Notify on successful send</p>
-                      </div>
-                      <Switch />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           {/* Alerts Tab */}

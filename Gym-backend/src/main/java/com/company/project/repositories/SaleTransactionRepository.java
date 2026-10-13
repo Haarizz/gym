@@ -63,8 +63,8 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     @Query("SELECT t FROM SaleTransaction t WHERE t.status = 'COMPLETED' AND t.createdAt >= :start AND t.createdAt < :end")
     List<SaleTransaction> findCompletedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    // (transactionId, categoryName, quantity, lineTotal) for every line of a completed sale in [start, end)
-    @Query("SELECT i.transactionId, COALESCE(c.name, 'Uncategorized'), i.quantity, i.totalAmount " +
+    // (transactionId, categoryName, quantity, lineTotal, productName) for every line of a completed sale in [start, end)
+    @Query("SELECT i.transactionId, COALESCE(c.name, 'Uncategorized'), i.quantity, i.totalAmount, i.productName " +
            "FROM SaleTransactionItem i " +
            "JOIN SaleTransaction t ON i.transactionId = t.id " +
            "LEFT JOIN com.company.project.entities.Product p ON i.productId = p.id " +

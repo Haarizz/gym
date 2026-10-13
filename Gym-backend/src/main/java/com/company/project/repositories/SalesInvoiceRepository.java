@@ -24,6 +24,19 @@ public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, Long
     List<Object[]> sumDueByMember(@Param("memberIds") Collection<Long> memberIds);
 
     /**
+     * Revenue Dashboard: confirmed Sales-module invoices that have received money. POS
+     * invoices are left out — their money is already counted from the POS sale itself.
+     */
+    @Query("SELECT i FROM SalesInvoice i WHERE i.status = 'CONFIRMED' AND i.amountPaid > 0 "
+            + "AND (i.source IS NULL OR i.source <> 'POS')")
+    List<com.company.project.entities.SalesInvoice> findPaidManualInvoices();
+
+    /** Revenue Dashboard: total still owed on confirmed Sales Invoices (products sold on account). */
+    @Query("SELECT COALESCE(SUM(i.totalAmount - i.amountPaid), 0) FROM SalesInvoice i "
+            + "WHERE i.status = 'CONFIRMED' AND i.totalAmount > i.amountPaid")
+    java.math.BigDecimal sumOutstandingDue();
+
+    /**
      * Row lock (SELECT ... FOR UPDATE) taken by confirm / record-payment / cancel, so two
      * concurrent requests on the same invoice (double-click, two tabs) run one after the
      * other and the second sees the first's status and amount paid.

@@ -41,7 +41,37 @@ export interface BiosBranchComparisonRow {
   month_revenue: number;
 }
 
+/** One month of the member trend — see BiosOverviewDTO.MemberTrendPoint. */
+export interface BiosMemberTrendPoint {
+  period: string; // YYYY-MM
+  members: number;
+  active_members: number;
+  new_members: number;
+  retention: number;
+  churn: number;
+  source: 'live' | 'snapshot' | 'estimated';
+}
+
+/** Member KPIs counted by the backend, with statuses effective as of today. */
+export interface BiosOverview {
+  as_of: string;
+  total_members: number;
+  active_members: number;
+  expired_members: number;
+  suspended_members: number;
+  overdue_members: number;
+  recent_joins: number;
+  membership_types: { membership_type: string; total: number; active: number; expired: number }[];
+  member_trend: BiosMemberTrendPoint[];
+}
+
 class BiosService {
+  async getOverview(months = 6): Promise<BiosOverview> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/bios/overview?months=${months}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch BiOS overview: ${response.status}`));
+    return response.json();
+  }
+
   async getSettings(): Promise<BiosSettings> {
     const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/bios/settings`);
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch BiOS settings: ${response.status}`));

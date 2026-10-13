@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { CurrencyValue } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
+import { StatFilterNotice } from "./MemberStatCards";
 import styles from "./DueForRenewalList.module.css";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
@@ -27,10 +28,39 @@ interface DueRow {
   outstandingBalance?: number;
 }
 
+export type DueFilter = "overdue" | "due7" | "due30";
+
+export interface DueStats {
+  /** Lapsed within the last EXPIRED_WINDOW days */
+  overdue: number;
+  /** Expiring today through 7 days out */
+  due7: number;
+  /** Expiring today through EXPIRING_WINDOW days out */
+  due30: number;
+}
+
+export const DUE_FILTER_LABELS: Record<DueFilter, string> = {
+  overdue: `Expired in the last ${EXPIRED_WINDOW} days`,
+  due7: "Expiring in the next 7 days",
+  due30: `Expiring in the next ${EXPIRING_WINDOW} days`,
+};
+
+const matchesDueFilter = (days: number | null | undefined, filter: DueFilter) => {
+  if (days === null || days === undefined) return false;
+  if (filter === "overdue") return days < 0;
+  if (filter === "due7") return days >= 0 && days <= 7;
+  return days >= 0 && days <= EXPIRING_WINDOW;
+};
+
 interface DueForRenewalListProps {
   /** Bumped after a renewal so the renewed member drops off the list */
   refreshKey?: number;
   onSelect: (memberDbId: number) => void;
+  /** Narrows the list to one stat-card bucket. */
+  filter?: DueFilter | null;
+  onClearFilter?: () => void;
+  /** Reports the bucket counts the stat cards show. */
+  onStats?: (stats: DueStats) => void;
 }
 
 async function fetchRows(type: "expired" | "expiring", from: Date, to: Date): Promise<DueRow[]> {
@@ -55,7 +85,7 @@ function dueLabel(days: number | null | undefined) {
  * about to, longest-overdue first, so the desk can work down the list. Picking one
  * loads them into the renewal form above.
  */
-export function DueForRenewalList({ refreshKey = 0, onSelect }: DueForRenewalListProps) {
+export function DueForRenewalList({ refreshKey = 0, onSelect, filter = null, onClearFilter, onStats }: DueForRenewalListProps) {
   const [rows, setRows] = useState<DueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -87,10 +117,22 @@ export function DueForRenewalList({ refreshKey = 0, onSelect }: DueForRenewalLis
     [rows],
   );
   const overdue = sorted.filter((r) => (r.daysFromToday ?? 0) < 0).length;
-  const visible = showAll ? sorted : sorted.slice(0, PAGE_PREVIEW);
+
+  useEffect(() => {
+    if (loading || error || !onStats) return;
+    onStats({
+      overdue: rows.filter((r) => matchesDueFilter(r.daysFromToday, "overdue")).length,
+      due7: rows.filter((r) => matchesDueFilter(r.daysFromToday, "due7")).length,
+      due30: rows.filter((r) => matchesDueFilter(r.daysFromToday, "due30")).length,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, loading, error]);
+
+  const shown = filter ? sorted.filter((r) => matchesDueFilter(r.daysFromToday, filter)) : sorted;
+  const visible = showAll ? shown : shown.slice(0, PAGE_PREVIEW);
 
   return (
-    <Card className="border-primary/10 shadow-md">
+    <Card id="due-for-renewal" className="border-primary/10 shadow-md">
       <CardHeader className="border-b bg-slate-50/50 py-4">
         <div className={styles.header}>
           <CalendarClock className="h-5 w-5 text-primary" />
@@ -105,9 +147,13 @@ export function DueForRenewalList({ refreshKey = 0, onSelect }: DueForRenewalLis
         </div>
       </CardHeader>
       <CardContent className="p-2">
+        {filter && <StatFilterNotice label={DUE_FILTER_LABELS[filter]} onClear={onClearFilter} />}
         {error && <p className={styles.message}>Couldn't load members due for renewal.</p>}
         {!loading && !error && sorted.length === 0 && (
           <p className={styles.message}>Nobody is due — no memberships expired in the last {EXPIRED_WINDOW} days or expire in the next {EXPIRING_WINDOW}.</p>
+        )}
+        {!loading && !error && sorted.length > 0 && shown.length === 0 && (
+          <p className={styles.message}>No members match this filter.</p>
         )}
         {visible.map((r) => {
           const due = dueLabel(r.daysFromToday);
@@ -135,10 +181,10 @@ export function DueForRenewalList({ refreshKey = 0, onSelect }: DueForRenewalLis
             </button>
           );
         })}
-        {sorted.length > PAGE_PREVIEW && (
+        {shown.length > PAGE_PREVIEW && (
           <div className={styles.more}>
             <Button variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? "Show less" : `Show all ${sorted.length}`}
+              {showAll ? "Show less" : `Show all ${shown.length}`}
             </Button>
           </div>
         )}

@@ -252,6 +252,7 @@ class MobileFamilyPurchaseServiceTest {
     void convertFamilyHeadBilling() {
         plan.setFamilyBillingMode("family_head");
         when(memberService.memberPriceForIndex(eq(plan), anyInt())).thenReturn(bd("300"));
+        when(memberService.pricesPerMember(plan)).thenCallRealMethod();
         when(idempotencyService.acquireOrRenewLease(key, "fp")).thenReturn(lease);
         when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
         when(memberRepository.findById(42L)).thenReturn(Optional.of(existingMember()));

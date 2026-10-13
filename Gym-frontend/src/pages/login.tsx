@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -27,6 +27,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { GymBiosPricing } from "./gymbios-pricing";
+import { SESSION_EXPIRED_FLAG, SESSION_EXPIRED_MESSAGE } from "../utils/session-expiry";
+import { useNavigate, useLocation } from "react-router-dom";
+
+// Public (logged-out) URL for the "Request a demo" pricing page shown over the login screen.
+export const REQUEST_DEMO_PATH = "/request-demo";
 
 interface LoginProps {
   onLogin: (
@@ -44,8 +49,24 @@ export function Login({ onLogin }: LoginProps) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
+  // BG_102: the pricing overlay is driven by the URL (/request-demo) rather than local
+  // state, so the address bar matches what's on screen and Back returns to /login.
+  const navigate = useNavigate();
+  const location = useLocation();
+  const showPricing = location.pathname === REQUEST_DEMO_PATH;
+  const setShowPricing = (show: boolean) => navigate(show ? REQUEST_DEMO_PATH : "/login");
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  // BG_98: tell the user why they're back on the login screen after their token expired.
+  useEffect(() => {
+    if (!sessionStorage.getItem(SESSION_EXPIRED_FLAG)) return;
+    // Deferred: <Toaster /> is rendered after <Login /> in App, so it isn't listening yet.
+    const timer = window.setTimeout(() => {
+      sessionStorage.removeItem(SESSION_EXPIRED_FLAG);
+      toast.info(SESSION_EXPIRED_MESSAGE);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [errors, setErrors] = useState({
     email: "",
     password: "",
@@ -446,7 +467,7 @@ export function Login({ onLogin }: LoginProps) {
                     type="button"
                     variant="outline"
                     onClick={() => handleSocialLogin("google")}
-                    className="h-11 border-gray-200 hover:bg-gray-50"
+                    className="h-11 border-gray-200 hover:bg-primary/5 hover:border-primary/40 hover:text-primary hover:shadow-sm"
                     disabled={isLoading}
                   >
                     <Chrome className="h-5 w-5 mr-2" />
@@ -456,7 +477,7 @@ export function Login({ onLogin }: LoginProps) {
                     type="button"
                     variant="outline"
                     onClick={() => handleSocialLogin("apple")}
-                    className="h-11 border-gray-200 hover:bg-gray-50"
+                    className="h-11 border-gray-200 hover:bg-primary/5 hover:border-primary/40 hover:text-primary hover:shadow-sm"
                     disabled={isLoading}
                   >
                     <Apple className="h-5 w-5 mr-2" />

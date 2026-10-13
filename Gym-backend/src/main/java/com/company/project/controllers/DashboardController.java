@@ -84,13 +84,16 @@ public class DashboardController {
         return ResponseEntity.ok(new GenericResponse<>(true, dashboardService.getPendingTasks()));
     }
 
-    // Web "Revenue Dashboard" tab: collection, expenses and per-stream breakdown for [from, to] (inclusive dates)
+    // Web "Revenue Dashboard" tab: collection, expenses, per-stream breakdown and detailed reports for
+    // [from, to] (inclusive dates), compared with the previous period or the same dates last year
+    // (compare=previous|last-year)
     @GetMapping("/revenue-summary")
     public ResponseEntity<GenericResponse<?>> getRevenueSummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
-            @RequestParam(required = false) String granularity) {
-        return ResponseEntity.ok(new GenericResponse<>(true, revenueDashboardService.getSummary(from, to, granularity)));
+            @RequestParam(required = false) String granularity,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, revenueDashboardService.getSummary(from, to, granularity, compare)));
     }
 
     @GetMapping("/member-churn")

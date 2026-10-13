@@ -65,4 +65,41 @@
     .hover\:bg-\[\#236663\]:hover { background-color: #236663; }
     .hover\:bg-\[\#d32f3f\]:hover { background-color: #d32f3f; }
   }
+
+  /* Dialog / sheet widths. A DialogContent className like "sm:max-w-[400px]"
+     replaces the base "sm:max-w-lg" (tailwind-merge drops the conflict), so when
+     the replacement class was missing from the snapshot nothing capped the width
+     and the dialog stretched across the whole screen. Phones (< 768px) still get
+     the bottom-sheet layout from responsive.css. */
+  .max-w-sm { max-width: 24rem; }
+  .max-w-xl { max-width: 36rem; }
+  .max-w-5xl { max-width: 64rem; }
+  .max-w-\[340px\] { max-width: 340px; }
+  .max-w-\[900px\] { max-width: 900px; }
+  .max-w-\[1100px\] { max-width: 1100px; }
+  .w-\[95vw\] { width: 95vw; }
+  .w-\[96vw\] { width: 96vw; }
+  /* Bottom-sheet heights (add-challenge, membership-renewal, my-stats) */
+  .h-\[75vh\] { height: 75vh; }
+  .h-\[80vh\] { height: 80vh; }
+  .h-\[85vh\] { height: 85vh; }
+
+  @media (width >= 40rem) {
+    .sm\:max-w-md { max-width: 28rem; }
+    .sm\:max-w-3xl { max-width: 48rem; }
+    .sm\:max-w-\[300px\] { max-width: 300px; }
+    .sm\:max-w-\[400px\] { max-width: 400px; }
+    .sm\:max-w-\[420px\] { max-width: 420px; }
+    .sm\:max-w-\[460px\] { max-width: 460px; }
+    .sm\:max-w-\[480px\] { max-width: 480px; }
+    .sm\:max-w-\[560px\] { max-width: 560px; }
+    .sm\:max-w-\[900px\] { max-width: 900px; }
+    .sm\:max-w-\[1100px\] { max-width: 1100px; }
+    .sm\:w-\[680px\] { width: 680px; }
+  }
+
+  @media (width >= 48rem) {
+    .md\:max-w-4xl { max-width: 56rem; }
+    .md\:max-w-5xl { max-width: 64rem; }
+  }
 }

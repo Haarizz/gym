@@ -15,4 +15,7 @@ public interface PosCreditPaymentRepository extends JpaRepository<PosCreditPayme
     List<PosCreditPayment> findByPosSessionIdOrderByCreatedAtDesc(Long posSessionId);
 
     List<PosCreditPayment> findByBusinessDateOrderByCreatedAtDesc(LocalDate businessDate);
+
+    // POS credit settled in [start, end) — web Revenue Dashboard counts it when it's received
+    List<PosCreditPayment> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

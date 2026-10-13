@@ -1026,6 +1026,8 @@ public class MemberService {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
         }
+        String previousPlan = member.getMembershipPlan();
+        BigDecimal previousFee = member.getMembershipFee();
         if (request.getPlanName()        != null) member.setMembershipPlan(request.getPlanName());
         if (request.getMembershipFee()   != null) member.setMembershipFee(request.getMembershipFee());
         if (request.getMembershipType()  != null) member.setMembershipType(request.getMembershipType());
@@ -1097,6 +1099,7 @@ public class MemberService {
                 itemized || billedToHeadFees.signum() > 0 ? fee : null,
                 itemized ? request.getMinorCharges() : null,
                 request.getProcessedByStaffId());
+        receipt.setRenewalKind(renewalKind(previousPlan, previousFee, saved.getMembershipPlan()));
         if (reward != null) receipt.setRemarks(reward.note());
         receipt = receiptService.recordDiscount(receipt,
                 orZero(request.getOfferDiscount()).add(reward != null ? reward.discount() : BigDecimal.ZERO),
@@ -1123,6 +1126,26 @@ public class MemberService {
         }
 
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * BG_103: what a renewal was, judged against the plan the member was on just before
+     * it — the same rule the Renewals & Upgrades screen shows as "Detected as ...": the
+     * same plan is a renewal; a different plan is a downgrade when cheaper than the
+     * current one (its catalog price, else the member's current fee), otherwise an upgrade.
+     */
+    private String renewalKind(String previousPlan, BigDecimal previousFee, String newPlan) {
+        if (previousPlan == null || newPlan == null
+                || previousPlan.trim().equalsIgnoreCase(newPlan.trim())) {
+            return "Renewal";
+        }
+        BigDecimal before = planRepository.findByName(previousPlan).map(MembershipPlan::getPrice)
+                .orElse(previousFee != null ? previousFee : BigDecimal.ZERO);
+        BigDecimal after = planRepository.findByName(newPlan).map(MembershipPlan::getPrice)
+                .orElse(BigDecimal.ZERO);
+        if (before == null) before = BigDecimal.ZERO;
+        if (after == null) after = BigDecimal.ZERO;
+        return after.compareTo(before) < 0 ? "Downgrade" : "Upgrade";
     }
 
     /** A Reward Pass / coupon taken off a renewal: what it was (for the receipt) and how much. */
@@ -1213,6 +1236,8 @@ public class MemberService {
         Member guardian = memberRepository.findByMemberId(minor.getFamilyHeadId())
                 .orElseThrow(() -> new EntityNotFoundException("Guardian not found for this minor."));
 
+        String previousPlan = minor.getMembershipPlan();
+        BigDecimal previousFee = minor.getMembershipFee();
         if (request.getPlanName() != null) minor.setMembershipPlan(request.getPlanName());
         BigDecimal fee = request.getFee() != null ? request.getFee() : minor.getMembershipFee();
         minor.setMembershipFee(fee);
@@ -1251,6 +1276,7 @@ public class MemberService {
                 savedGuardian, savedMinor, feeAmount, paidAmount, "Renewal", null,
                 request.getPaymentBreakdown(), request.getBankAccountCode(), request.getBankAccountName(),
                 request.getProcessedByStaffId());
+        receipt.setRenewalKind(renewalKind(previousPlan, previousFee, savedMinor.getMembershipPlan()));
 
         if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
             financialEventService.onMemberPaymentReceived(receipt);
@@ -1295,6 +1321,8 @@ public class MemberService {
             throw new BusinessRuleViolationException("This family's plan is not billed as a single family invoice — "
                     + "renew each member individually instead.");
         }
+        String previousPlan = head.getMembershipPlan();
+        BigDecimal previousFee = head.getMembershipFee();
         if (request.getPlanName() != null) head.setMembershipPlan(request.getPlanName());
         if (request.getPaymentStatus() != null) head.setPaymentStatus(request.getPaymentStatus());
         if (request.getPaymentMethod() != null) head.setPaymentMethodUsed(request.getPaymentMethod());
@@ -1349,6 +1377,7 @@ public class MemberService {
                 savedHead, "Renewal", savedHead.getPaymentStatus(), request.getPaymentBreakdown(),
                 request.getBankAccountCode(), request.getBankAccountName(), totalFee,
                 memberCharges.isEmpty() ? null : memberCharges, request.getProcessedByStaffId());
+        receipt.setRenewalKind(renewalKind(previousPlan, previousFee, savedHead.getMembershipPlan()));
 
         if (renewalPaid) {
             financialEventService.onMemberPaymentReceived(receipt);

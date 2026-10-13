@@ -47,6 +47,8 @@ export interface Receipt {
   payment_method: string;
   status: string;
   plan_name?: string;
+  // "Renewal" | "Upgrade" | "Downgrade" — set on Renewal receipts at renewal time (BG_103)
+  renewal_kind?: string | null;
   valid_from?: string;
   valid_till?: string;
   processed_by?: string;

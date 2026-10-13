@@ -51,7 +51,7 @@ interface KPIReportDialogProps {
   revenueData: Array<{
     month: string;
     revenue: number;
-    target: number;
+    target: number | null;
   }>;
   membershipData: Array<{
     month: string;
@@ -334,7 +334,7 @@ export function KPIReportDialog({
                       <YAxis />
                       <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyCode), '']} />
                       <Bar dataKey="revenue" fill="#2B7A78" />
-                      <Bar dataKey="target" fill="#E63946" />
+                      {revenueData.some((point) => point.target != null) && <Bar dataKey="target" fill="#E63946" />}
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

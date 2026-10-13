@@ -82,7 +82,44 @@ import type { CreditCustomer } from "../payments/modals/CreditModal";
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
   embedded?: boolean;
+  /** "all" | "Active" | "expiring" | "Expired" | "Cancelled" — controlled by the Members stat cards. */
+  statusFilter?: string;
+  onStatusFilterChange?: (value: string) => void;
+  onStats?: (stats: AddonStats) => void;
 }
+
+export interface AddonStats {
+  total: number;
+  active: number;
+  /** Active, expiring today through 7 days out */
+  expiring: number;
+  expired: number;
+  cancelled: number;
+  revenue: number;
+}
+
+/**
+ * Nothing flips an add-on to "Expired" when its expiry date passes, so an
+ * "Active" add-on past its expiry date is treated as Expired everywhere here.
+ */
+const effectiveAddonStatus = (txn: MemberAddon): string => {
+  if (txn.status !== "Active" || !txn.expiry_date) return txn.status;
+  const expiry = new Date(txn.expiry_date);
+  expiry.setHours(23, 59, 59, 999);
+  return expiry < new Date() ? "Expired" : "Active";
+};
+
+const isExpiringWithinWeek = (txn: MemberAddon) => {
+  if (effectiveAddonStatus(txn) !== "Active" || !txn.expiry_date) return false;
+  const expiry = new Date(txn.expiry_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(expiry.getFullYear(), expiry.getMonth(), expiry.getDate()).getTime() - today.getTime()) / 86_400_000);
+  return days >= 0 && days <= 7;
+};
+
+const matchesAddonFilter = (txn: MemberAddon, filter: string) =>
+  filter === "all" ? true : filter === "expiring" ? isExpiringWithinWeek(txn) : effectiveAddonStatus(txn) === filter;
 
 interface Member {
   id: string;
@@ -174,6 +211,13 @@ function buildFacilityAddonCards(facilities: FacilityApi[]): Addon[] {
 
 // Use the MemberAddon type from the API service directly
 
+// BG_104: matches AddonPlanService.MAX_DESCRIPTION_LENGTH on the backend.
+const MAX_PLAN_DESCRIPTION_LENGTH = 250;
+
+// Long unbroken descriptions (e.g. a pasted URL) must wrap instead of widening the
+// layout; table cells are whitespace-nowrap by default.
+const WRAP_TEXT_STYLE: React.CSSProperties = { whiteSpace: "normal", overflowWrap: "anywhere" };
+
 const EMPTY_PLAN_FORM = {
   name: "",
   description: "",
@@ -183,7 +227,7 @@ const EMPTY_PLAN_FORM = {
 };
 
 
-export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
+export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilterChange, onStats }: MemberAddonsProps) {
   const { currencyCode } = useCurrency();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -215,7 +259,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [customValidity, setCustomValidity] = useState<number>(30);
   const [customAmount, setCustomAmount] = useState<number>(0);
   const [transactionSearchQuery, setTransactionSearchQuery] = useState("");
-  const [transactionStatusFilter, setTransactionStatusFilter] = useState<string>("all");
+  // The Members page drives this filter from its stat cards; standalone it's local.
+  const [localStatusFilter, setLocalStatusFilter] = useState<string>("all");
+  const transactionStatusFilter = statusFilter ?? localStatusFilter;
+  const setTransactionStatusFilter = onStatusFilterChange ?? setLocalStatusFilter;
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
 
   // Add-on plan catalog — admin-editable, replacing what used to be a
@@ -227,6 +274,9 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const [editingPlan, setEditingPlan] = useState<Addon | null>(null);
   const [isAddingPlan, setIsAddingPlan] = useState(false);
   const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
+  // Only reachable when editing a legacy plan saved before the limit existed — maxLength
+  // stops new input past it.
+  const descriptionTooLong = planForm.description.length > MAX_PLAN_DESCRIPTION_LENGTH;
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   const loadAddonPlans = () => {
@@ -265,7 +315,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     setEditingPlan(plan);
     setPlanForm({
       name: plan.name,
-      description: plan.description,
+      description: plan.description ?? "",
       price: plan.price,
       validity: plan.validity,
       category: plan.category,
@@ -282,6 +332,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   const handleSavePlan = async () => {
     if (!planForm.name.trim()) {
       toast.error("Plan name is required");
+      return;
+    }
+    if (planForm.description.length > MAX_PLAN_DESCRIPTION_LENGTH) {
+      toast.error(`Description must be at most ${MAX_PLAN_DESCRIPTION_LENGTH} characters`);
       return;
     }
     if (planForm.price <= 0) {
@@ -373,11 +427,22 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     }
   }, [isPurchaseModalOpen]);
 
+  // BG_105: each search bumps this id so a slower, older type-ahead response can't
+  // reopen the results list over a member that was already picked.
+  const memberSearchSeq = React.useRef(0);
+
   const handleMemberSearch = async () => {
     if (!searchQuery.trim()) return;
+    const seq = ++memberSearchSeq.current;
     try {
       const results = await membersService.searchMembers(searchQuery);
-      if (results.length > 0) {
+      if (seq !== memberSearchSeq.current) return;
+      if (results.length > 1) {
+        // Several matches — let the user pick instead of silently taking the first.
+        setSelectedMember(null);
+        setSearchSuggestions(results.slice(0, 6));
+        setShowSuggestions(true);
+      } else if (results.length === 1) {
         const found = toLocalMember(results[0]);
         setSelectedMember(found);
         setSearchSuggestions([]);
@@ -394,13 +459,15 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   // Live search-as-you-type — mirrors the suggestions pattern in members.tsx (Renewals tab)
   const handleSearchInputChange = (value: string) => {
     setSearchQuery(value);
+    const seq = ++memberSearchSeq.current;
     if (value.trim().length > 1) {
       membersService.searchMembers(value)
         .then(results => {
+          if (seq !== memberSearchSeq.current) return;
           setSearchSuggestions(results.slice(0, 6));
           setShowSuggestions(results.length > 0);
         })
-        .catch(() => setSearchSuggestions([]));
+        .catch(() => { if (seq === memberSearchSeq.current) setSearchSuggestions([]); });
     } else {
       setSearchSuggestions([]);
       setShowSuggestions(false);
@@ -408,6 +475,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
   };
 
   const selectMemberFromSuggestions = (member: ApiMember) => {
+    memberSearchSeq.current++;
     setSelectedMember(toLocalMember(member));
     setSearchQuery(member.name);
     setSearchSuggestions([]);
@@ -442,9 +510,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
       );
     }
 
-    if (transactionStatusFilter !== "all") {
-      filtered = filtered.filter((txn) => txn.status === transactionStatusFilter);
-    }
+    filtered = filtered.filter((txn) => matchesAddonFilter(txn, transactionStatusFilter));
 
     return filtered.sort((a, b) => {
       const da = a.purchase_date ? new Date(a.purchase_date).getTime() : 0;
@@ -596,7 +662,21 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
     .filter((txn) => txn.status !== "Cancelled")
     .reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
 
-  const activeAddons = transactions.filter((txn) => txn.status === "Active").length;
+  const activeAddons = transactions.filter((txn) => effectiveAddonStatus(txn) === "Active").length;
+
+  useEffect(() => {
+    if (transactionsLoading || !onStats) return;
+    const count = (f: string) => transactions.filter((txn) => matchesAddonFilter(txn, f)).length;
+    onStats({
+      total: transactions.length,
+      active: count("Active"),
+      expiring: count("expiring"),
+      expired: count("Expired"),
+      cancelled: count("Cancelled"),
+      revenue: totalRevenue,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, transactionsLoading]);
 
   return (
     <div className={embedded ? "" : "min-h-screen bg-background"}>
@@ -637,6 +717,8 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             </div>
           </div>
 
+          {/* Inside Members these figures live in the page's stat cards instead. */}
+          {!embedded && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -677,12 +759,13 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
               </CardContent>
             </Card>
           </div>
+          )}
 
         </div>
       </div>
 
       <div className="p-6">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card id="addon-transactions" className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -703,12 +786,13 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                 />
               </div>
               <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
-                <SelectTrigger className="w-full sm:w-44">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filter by Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="expiring">Expiring in 7 days</SelectItem>
                   <SelectItem value="Expired">Expired</SelectItem>
                   <SelectItem value="Cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -784,14 +868,14 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                         <TableCell>
                           <Badge
                             className={
-                              txn.status === "Active"
+                              effectiveAddonStatus(txn) === "Active"
                                 ? "bg-green-100 text-green-800"
-                                : txn.status === "Expired"
+                                : effectiveAddonStatus(txn) === "Expired"
                                 ? "bg-gray-100 text-gray-800"
                                 : "bg-red-100 text-red-800"
                             }
                           >
-                            {txn.status}
+                            {effectiveAddonStatus(txn)}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -841,31 +925,33 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                       value={searchQuery}
                       onChange={(e) => handleSearchInputChange(e.target.value)}
                       onFocus={() => { if (searchSuggestions.length > 0) setShowSuggestions(true); }}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                       onKeyDown={(e) => e.key === "Enter" && handleMemberSearch()}
                       className="pl-10"
                     />
-                    {showSuggestions && searchSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-2 rounded-xl border-2 border-border bg-white shadow-xl overflow-hidden">
-                        {searchSuggestions.map((member) => (
-                          <div
-                            key={member.id}
-                            onMouseDown={() => selectMemberFromSuggestions(member)}
-                            className="px-4 py-2.5 hover:bg-slate-50/50 cursor-pointer transition-colors border-b border-border last:border-b-0"
-                          >
-                            <p className="text-sm font-medium">{member.name}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {member.member_id || member.id} • {member.phone}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                   <Button onClick={handleMemberSearch} className="shrink-0">
                     Search
                   </Button>
                 </div>
+                {/* BG_105: results sit in the normal flow (not an absolute dropdown) so they push
+                    the selected-member card and Step 2 down instead of overlapping them. */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-border bg-white overflow-y-auto" style={{ maxHeight: 280 }}>
+                    {searchSuggestions.map((member) => (
+                      <button
+                        type="button"
+                        key={member.id}
+                        onClick={() => selectMemberFromSuggestions(member)}
+                        className="block w-full text-left px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-border last:border-b-0"
+                      >
+                        <p className="text-sm font-medium">{member.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {member.member_id || member.id} • {member.phone}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {selectedMember && (
@@ -970,8 +1056,10 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                           </div>
                           <Badge variant="secondary" className="text-[10px]">{addon.category}</Badge>
                         </div>
-                        <p className="text-sm font-semibold leading-snug mb-1">{addon.name}</p>
-                        <p className="text-[11px] text-muted-foreground mb-3">{addon.description}</p>
+                        <p className="text-sm font-semibold leading-snug mb-1" style={WRAP_TEXT_STYLE}>{addon.name}</p>
+                        <p className="text-[11px] text-muted-foreground mb-3 line-clamp-2" style={WRAP_TEXT_STYLE} title={addon.description}>
+                          {addon.description}
+                        </p>
                         <div className="mt-auto">
                           <div className="flex items-center justify-between mb-3 pt-2 border-t">
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1016,9 +1104,9 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
 
       {/* Purchase Confirmation Dialog */}
       <Dialog open={isPurchaseDialogOpen} onOpenChange={setIsPurchaseDialogOpen}>
-        <DialogContent className="max-w-lg p-0">
+        <DialogContent className="max-w-lg p-0 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="px-6 py-4 border-b">
+          <div className="px-6 py-4 border-b shrink-0">
             <div className="flex items-center gap-3">
               {selectedAddon && (
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br ${getCategoryColor(selectedAddon.category)} shadow-sm shrink-0`}>
@@ -1033,7 +1121,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
           </div>
 
           {selectedAddon && (
-            <div className="space-y-4 px-6 py-5">
+            <div className="space-y-4 px-6 py-5 flex-1 min-h-0 overflow-y-auto">
               {/* Addon summary */}
               <div className="rounded-xl border bg-muted/30 px-4 py-3 flex items-center justify-between">
                 <div>
@@ -1197,7 +1285,7 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
             </div>
           )}
 
-          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end gap-2">
+          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end gap-2 shrink-0">
             <Button variant="outline" onClick={() => setIsPurchaseDialogOpen(false)}>
               Cancel
             </Button>
@@ -1314,13 +1402,30 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                     />
                   </div>
                   <div className="sm:col-span-2 space-y-1.5">
-                    <Label className="text-xs">Description</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="addon-plan-description" className="text-xs">Description</Label>
+                      <span
+                        className={`text-xs tabular-nums ${descriptionTooLong ? "text-red-600" : "text-muted-foreground"}`}
+                      >
+                        {planForm.description.length}/{MAX_PLAN_DESCRIPTION_LENGTH}
+                      </span>
+                    </div>
                     <Textarea
+                      id="addon-plan-description"
                       value={planForm.description}
                       onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
                       placeholder="Short description shown to staff when purchasing"
                       rows={2}
+                      maxLength={MAX_PLAN_DESCRIPTION_LENGTH}
+                      className={descriptionTooLong ? "border-red-500" : undefined}
+                      aria-invalid={descriptionTooLong || undefined}
+                      aria-describedby={descriptionTooLong ? "addon-plan-description-error" : undefined}
                     />
+                    {descriptionTooLong && (
+                      <p id="addon-plan-description-error" className="text-xs text-red-600">
+                        Description must be at most {MAX_PLAN_DESCRIPTION_LENGTH} characters
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Category</Label>
@@ -1392,9 +1497,11 @@ export function MemberAddons({ onNavigate, embedded }: MemberAddonsProps) {
                   <TableBody>
                     {addonPlans.map((plan) => (
                       <TableRow key={plan.id}>
-                        <TableCell>
+                        <TableCell style={{ ...WRAP_TEXT_STYLE, maxWidth: 320 }}>
                           <p className="text-sm font-medium">{plan.name}</p>
-                          <p className="text-xs text-muted-foreground">{plan.description}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2" title={plan.description}>
+                            {plan.description}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-[10px]">{plan.category}</Badge>

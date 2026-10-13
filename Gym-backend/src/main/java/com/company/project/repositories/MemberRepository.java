@@ -87,6 +87,13 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Query("SELECT COALESCE(SUM(m.outstandingBalance), 0) FROM Member m WHERE m.paymentStatus = 'overdue'")
     BigDecimal sumOverdueBalance();
 
+    // Revenue Dashboard: every unpaid membership balance, whatever the payment status says
+    @Query("SELECT COALESCE(SUM(m.outstandingBalance), 0) FROM Member m WHERE m.outstandingBalance > 0")
+    BigDecimal sumOutstandingBalance();
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.outstandingBalance > 0")
+    long countWithOutstandingBalance();
+
     // ── Automation trigger queries ─────────────────────────────────────────────
 
     /** Members whose membership expires within [now, windowEnd] and are not already expired. */
@@ -143,6 +150,64 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
                                      @Param("search") String search, Pageable pageable);
 
     long countByApprovalStatus(String approvalStatus);
+
+    // ── BiOS ────────────────────────────────────────────────────────────────
+    // membershipStatus is never flipped to "expired" when the end date passes, so
+    // BiOS counts by *effective* status as of :asOf — the same rule as the member
+    // list's status filter (MemberService) and the frontend's getComputedStatus().
+
+    String BIOS_END_DATE = "COALESCE(m.membershipEndDate, m.expiryDate)";
+    String BIOS_JOIN_DATE = "COALESCE(m.joinDate, m.membershipStartDate, m.createdAt)";
+    String BIOS_EFFECTIVELY_ACTIVE = "(LOWER(m.membershipStatus) = 'active' AND (" + BIOS_END_DATE + " IS NULL OR "
+            + BIOS_END_DATE + " >= :asOf))";
+    String BIOS_EFFECTIVELY_EXPIRED = "(LOWER(m.membershipStatus) = 'expired' OR (LOWER(m.membershipStatus) NOT IN "
+            + "('pending_approval', 'frozen', 'suspended') AND " + BIOS_END_DATE + " < :asOf))";
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
+    long countEffectivelyActive(@Param("asOf") LocalDateTime asOf);
+
+    /** Effectively active at :asOf among members who had joined by then — for month-end snapshots. */
+    @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE + " AND " + BIOS_JOIN_DATE + " < :asOf")
+    long countEffectivelyActiveJoinedBefore(@Param("asOf") LocalDateTime asOf);
+
+    /** Rows of [branchId, totalMembers, activeMembers] — backs the BiOS branch comparison. */
+    @Query("SELECT m.branchId, COUNT(m), SUM(CASE WHEN " + BIOS_EFFECTIVELY_ACTIVE + " THEN 1 ELSE 0 END) "
+            + "FROM Member m GROUP BY m.branchId")
+    List<Object[]> countTotalAndActiveByBranch(@Param("asOf") LocalDateTime asOf);
+
+    /** Rows of [membershipType, total, active, expired, suspended, paymentOverdue] for the BiOS overview. */
+    @Query("SELECT m.membershipType, COUNT(m), "
+            + "SUM(CASE WHEN " + BIOS_EFFECTIVELY_ACTIVE + " THEN 1 ELSE 0 END), "
+            + "SUM(CASE WHEN " + BIOS_EFFECTIVELY_EXPIRED + " THEN 1 ELSE 0 END), "
+            + "SUM(CASE WHEN LOWER(m.membershipStatus) = 'suspended' THEN 1 ELSE 0 END), "
+            + "SUM(CASE WHEN LOWER(m.paymentStatus) = 'overdue' THEN 1 ELSE 0 END) "
+            + "FROM Member m GROUP BY m.membershipType")
+    List<Object[]> biosStatusBreakdownByMembershipType(@Param("asOf") LocalDateTime asOf);
+
+    /** Rows of [year, month, joins] for members who joined on or after :from. */
+    @Query("SELECT YEAR(" + BIOS_JOIN_DATE + "), MONTH(" + BIOS_JOIN_DATE + "), COUNT(m) FROM Member m "
+            + "WHERE " + BIOS_JOIN_DATE + " >= :from "
+            + "GROUP BY YEAR(" + BIOS_JOIN_DATE + "), MONTH(" + BIOS_JOIN_DATE + ")")
+    List<Object[]> countJoinsByMonthSince(@Param("from") LocalDateTime from);
+
+    @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_JOIN_DATE + " < :before")
+    long countJoinedBefore(@Param("before") LocalDateTime before);
+
+    /**
+     * Best estimate of how many members were active at :asOf in the past, for
+     * months with no BiosMonthlySnapshot: their current period covered :asOf, or
+     * a New/Renewal receipt's validity window did. Members with no receipts and a
+     * newer current period are missed, so this undercounts rather than invents.
+     */
+    @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_JOIN_DATE + " < :asOf "
+            + "AND (m.membershipStatus IS NULL OR LOWER(m.membershipStatus) <> 'pending_approval') "
+            + "AND ((m.membershipStartDate < :asOf AND " + BIOS_END_DATE + " >= :asOf) "
+            + "OR EXISTS (SELECT r.id FROM Receipt r WHERE r.memberDbId = m.id "
+            + "AND r.transactionType IN ('New', 'Renewal') "
+            + "AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') "
+            + "AND (r.status IS NULL OR LOWER(r.status) NOT IN ('cancelled', 'refunded', 'void')) "
+            + "AND r.validFrom < :asOf AND r.validTill >= :asOf))")
+    long countEstimatedActiveAt(@Param("asOf") LocalDateTime asOf);
 
     /**
      * Display names for community authors, across every branch. Native on purpose:

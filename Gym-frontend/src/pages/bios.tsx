@@ -10,7 +10,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, Area, ComposedChart, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
   Brain,
   Monitor,
@@ -60,7 +60,6 @@ import { aiService, type AIInsight, type GymDataContext } from '../utils/ai-serv
 import { attendanceService } from '../utils/supabase/attendance-service';
 import { expensesService } from '../utils/supabase/expenses-service';
 import { financialAnalyticsService } from '../utils/supabase/financial-analytics-service';
-import { membersService } from '../utils/supabase/members-service';
 import { biosService, type BiosSettings, type BiosActivityLogEntry, type BiosBranchComparisonRow } from '../utils/supabase/bios-service';
 import { staffService, type StaffTarget } from '../utils/supabase/staff-service';
 import { useBranch } from '../utils/branch-context';
@@ -81,7 +80,7 @@ import '../styles/bios.css';
 type RevenueChartPoint = {
   month: string;
   revenue: number;
-  target: number;
+  target: number | null;
 };
 
 type MemberChartPoint = {
@@ -90,6 +89,7 @@ type MemberChartPoint = {
   retention: number;
   churn: number;
   newMembers?: number;
+  estimated?: boolean;
 };
 
 type RevenueSourcePoint = {
@@ -266,17 +266,6 @@ const getBenchmarkPerformance = (value: number, industry: number): BenchmarkPoin
   return value > industry ? 'above' : 'below';
 };
 
-const parseDateValue = (value?: string | null) => {
-  if (!value) {
-    return null;
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const getMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
 const getRollingMonths = (count: number) => {
   const now = new Date();
 
@@ -312,6 +301,8 @@ export function BiOS() {
   const [revenueSourceData, setRevenueSourceData] = useState<RevenueSourcePoint[]>(revenueBySource);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Last loaded/saved settings — what the dialogs describe (the form state below may hold unsaved edits).
+  const [savedSettings, setSavedSettings] = useState<BiosSettings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [monthlyRevenueTarget, setMonthlyRevenueTarget] = useState('');
   const [dailyCheckInTargetPercent, setDailyCheckInTargetPercent] = useState('33');
@@ -365,11 +356,8 @@ export function BiOS() {
     setDataLoading(true);
 
     try {
-      const [membersResp, attStats, finDash, monthlyTrend, revBySource, expStats] = await Promise.all([
-        membersService.getMembers({}, { page: 1, limit: 5000 }).catch(() => ({
-          members: [],
-          pagination: { page: 1, limit: 5000, total: 0, totalPages: 0 }
-        })),
+      const [overview, attStats, finDash, monthlyTrend, revBySource, expStats] = await Promise.all([
+        biosService.getOverview(months).catch(() => null),
         attendanceService.getAttendanceStats().catch(() => null),
         financialAnalyticsService.getDashboard().catch(() => null),
         financialAnalyticsService.getMonthlyTrend(months).catch(() => []),
@@ -377,28 +365,18 @@ export function BiOS() {
         expensesService.getStats().catch(() => null)
       ]);
 
-      const memberList = membersResp.members;
-      const currentMonthKey = getMonthKey(new Date());
+      if (!overview) {
+        toast.error('Failed to load member figures');
+      }
 
-      const membershipTypes = memberList.reduce<Record<string, number>>((accumulator, member) => {
-        const membershipType = member.membership_type || 'Unknown';
-        accumulator[membershipType] = (accumulator[membershipType] || 0) + 1;
-        return accumulator;
-      }, {});
+      // Counted by the backend (statuses effective as of today) — see BiosService.getOverview.
+      const membershipTypes = Object.fromEntries(
+        (overview?.membership_types ?? []).map((row) => [row.membership_type, row.total])
+      );
 
-      setMembershipTypeStats(memberList.reduce<Record<string, { total: number; active: number; expired: number }>>((accumulator, member) => {
-        const type = member.membership_type || 'Unknown';
-        const stats = accumulator[type] || (accumulator[type] = { total: 0, active: 0, expired: 0 });
-        stats.total += 1;
-        if (member.membership_status === 'active') stats.active += 1;
-        if (member.membership_status === 'expired') stats.expired += 1;
-        return accumulator;
-      }, {}));
-
-      const recentJoins = memberList.filter((member) => {
-        const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
-        return joinedAt ? getMonthKey(joinedAt) === currentMonthKey : false;
-      }).length;
+      setMembershipTypeStats(Object.fromEntries(
+        (overview?.membership_types ?? []).map((row) => [row.membership_type, { total: row.total, active: row.active, expired: row.expired }])
+      ));
 
       const context: GymDataContext = {
         totalRevenue: finDash?.totalRevenue ?? 0,
@@ -415,13 +393,13 @@ export function BiOS() {
           source: entry.source,
           amount: entry.amount
         })),
-        totalMembers: memberList.length,
-        activeMembers: memberList.filter((member) => member.membership_status === 'active').length,
-        expiredMembers: memberList.filter((member) => member.membership_status === 'expired').length,
-        overdueMembers: memberList.filter((member) => member.payment_status === 'overdue').length,
-        suspendedMembers: memberList.filter((member) => member.membership_status === 'suspended').length,
+        totalMembers: overview?.total_members ?? 0,
+        activeMembers: overview?.active_members ?? 0,
+        expiredMembers: overview?.expired_members ?? 0,
+        overdueMembers: overview?.overdue_members ?? 0,
+        suspendedMembers: overview?.suspended_members ?? 0,
         membershipTypes,
-        recentJoins,
+        recentJoins: overview?.recent_joins ?? 0,
         todayCheckIns: attStats?.totalToday ?? 0,
         avgSessionMinutes: attStats?.averageDuration ?? 0,
         peakHours: attStats?.peakHours ?? {},
@@ -444,36 +422,26 @@ export function BiOS() {
         ? monthlyTrend.map((point) => ({
             month: point.month,
             revenue: Math.round(point.revenue),
-            target: Math.round(point.revenue * 0.92)
+            target: null
           }))
         : rollingMonths.map(({ label }) => ({
             month: label,
             revenue: 0,
-            target: 0
+            target: null
           }));
 
       setRevenueChartData(liveRevenueChart);
 
-      const liveMemberChart = rollingMonths.map(({ label, end }) => {
-        const monthKey = getMonthKey(end);
-        let newMembers = 0;
-        const membersInPeriod = memberList.filter((member) => {
-          const joinedAt = parseDateValue(member.join_date || member.membership_start_date || member.created_at);
-          if (joinedAt && getMonthKey(joinedAt) === monthKey) newMembers += 1;
-          return joinedAt ? joinedAt <= end : false;
-        });
-
-        const activeMembersInPeriod = membersInPeriod.filter((member) => member.membership_status === 'active').length;
-        const retention = membersInPeriod.length > 0
-          ? Number(((activeMembersInPeriod / membersInPeriod.length) * 100).toFixed(1))
-          : 0;
-
+      const liveMemberChart = (overview?.member_trend ?? []).map((point) => {
+        const [year, month] = point.period.split('-').map(Number);
+        const label = new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'short' });
         return {
-          month: label,
-          members: membersInPeriod.length,
-          retention,
-          churn: Number((100 - retention).toFixed(1)),
-          newMembers
+          month: point.source === 'estimated' ? `${label}*` : label,
+          members: point.members,
+          retention: point.retention,
+          churn: point.churn,
+          newMembers: point.new_members,
+          estimated: point.source === 'estimated'
         };
       });
 
@@ -507,6 +475,7 @@ export function BiOS() {
   useEffect(() => {
     biosService.getSettings()
       .then((settings) => {
+        setSavedSettings(settings);
         setMonthlyRevenueTarget(settings.monthly_revenue_target != null ? String(settings.monthly_revenue_target) : '');
         setDailyCheckInTargetPercent(settings.daily_checkin_target_percent != null ? String(settings.daily_checkin_target_percent) : '33');
         setAlertEnabled(settings.alert_enabled);
@@ -524,7 +493,8 @@ export function BiOS() {
         setBenchmarkOperatingMarginPercent(settings.benchmark_operating_margin_percent != null ? String(settings.benchmark_operating_margin_percent) : '');
       })
       .catch(() => {});
-  }, []);
+  // Settings are per branch, so reload them when the branch changes.
+  }, [activeBranchId]);
 
   const loadActivityLogs = useCallback(() => {
     biosService.getRecentActivity('REPORT', 20)
@@ -607,7 +577,7 @@ export function BiOS() {
         benchmark_staff_efficiency_percent: benchmarkStaffEfficiencyPercent.trim() ? Number(benchmarkStaffEfficiencyPercent) : undefined,
         benchmark_operating_margin_percent: benchmarkOperatingMarginPercent.trim() ? Number(benchmarkOperatingMarginPercent) : undefined,
       };
-      await biosService.updateSettings(payload);
+      setSavedSettings(await biosService.updateSettings(payload));
       toast.success('BiOS settings saved');
       setSettingsOpen(false);
     } catch (error) {
@@ -965,6 +935,8 @@ export function BiOS() {
     suspendedMembers: gymData?.suspendedMembers ?? 0,
     topStaff: topStaffTargets,
     branchComparison,
+    settings: savedSettings,
+    branchKey: activeBranchId ?? 'all',
     onExportReport: handleGenerateReport,
     onExportData: handleExportData,
     onConfigure: () => {
@@ -1619,7 +1591,9 @@ export function BiOS() {
                 <Tooltip formatter={(value: number) => [`${(value/1000).toFixed(0)}K ${currencyCode}`, '']} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10b981" name="Actual Revenue" strokeWidth={2} />
-                <Line type="monotone" dataKey="target" stroke="#6b7280" name="Target" strokeDasharray="5 5" />
+                {displayedRevenueChartData.some((point) => point.target != null) && (
+                  <Line type="monotone" dataKey="target" stroke="#6b7280" name="Target" strokeDasharray="5 5" />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -1644,16 +1618,23 @@ export function BiOS() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={memberChartData}>
+              {/* ComposedChart, not AreaChart: an AreaChart silently drops <Line> children, so retention never drew. */}
+              <ComposedChart data={memberChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis />
+                <YAxis yAxisId="members" />
+                <YAxis yAxisId="retention" orientation="right" domain={[0, 100]} unit="%" />
                 <Tooltip />
                 <Legend />
-                <Area type="monotone" dataKey="members" stackId="1" stroke="#3b82f6" fill="#3b82f6" name="Total Members" />
-                <Line type="monotone" dataKey="retention" stroke="#10b981" name="Retention %" strokeWidth={2} />
-              </AreaChart>
+                <Area yAxisId="members" type="monotone" dataKey="members" stroke="#3b82f6" fill="#3b82f6" name="Total Members" />
+                <Line yAxisId="retention" type="monotone" dataKey="retention" stroke="#10b981" name="Retention %" strokeWidth={2} />
+              </ComposedChart>
             </ResponsiveContainer>
+            {memberChartData.some((point) => point.estimated) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                * Estimated from membership periods and receipts. Month-end figures are recorded automatically from now on.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -53,12 +53,28 @@ import { useGlobalSearchPrefill } from "../components/global-search/use-global-s
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
   embedded?: boolean;
+  /** "all" | "Paid" | "Partial" | "Pending" | "Overdue" — controlled by the Members stat cards. */
+  statusFilter?: string;
+  onStatusFilterChange?: (value: string) => void;
+  onStats?: (stats: ReceiptStats) => void;
+}
+
+export interface ReceiptStats {
+  total: number;
+  paid: number;
+  partial: number;
+  pending: number;
+  overdue: number;
+  /** Money actually received across these receipts */
+  received: number;
+  /** Unpaid remainder on Partial receipts */
+  partialDue: number;
 }
 
 // Mirrors Billing → Member Receipts exactly (same data source, same table,
 // same view/download/send behavior) so the two stay visually and functionally
 // identical wherever a receipts list is shown.
-export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
+export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFilterChange, onStats }: MemberReceiptsProps) {
   const { currencyCode } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -68,8 +84,13 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
   const [selectedTransactionType, setSelectedTransactionType] = useState<string>(
     (location.state as { receiptType?: string } | null)?.receiptType || "all-transactions"
   );
-  const [selectedStatus, setSelectedStatus] = useState("all");
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  // The Members page drives the status filter from its stat cards; standalone it's local.
+  const [localStatus, setLocalStatus] = useState("all");
+  const selectedStatus = statusFilter ?? localStatus;
+  const setSelectedStatus = onStatusFilterChange ?? setLocalStatus;
+  // Every receipt matching search + type; the status filter is applied locally so
+  // the stat-card counts and the filtered table always come from the same rows.
+  const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
   const [loadingReceipts, setLoadingReceipts] = useState(true);
 
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
@@ -77,17 +98,43 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
   const [sendChannels, setSendChannels] = useState<string[]>([]);
 
   useEffect(() => {
-    const filters: { search?: string; transactionType?: string; status?: string } = {};
+    const filters: { search?: string; transactionType?: string } = {};
     if (searchTerm) filters.search = searchTerm;
     if (selectedTransactionType !== 'all-transactions') filters.transactionType = selectedTransactionType;
-    if (selectedStatus !== 'all') filters.status = selectedStatus;
 
+    let cancelled = false;
     setLoadingReceipts(true);
-    receiptsService.getReceipts(filters, { limit: 50 })
-      .then(r => setReceipts(r.receipts))
+    receiptsService.getReceipts(filters, { limit: 5000 })
+      .then(r => { if (!cancelled) setAllReceipts(r.receipts); })
       .catch(console.error)
-      .finally(() => setLoadingReceipts(false));
-  }, [searchTerm, selectedTransactionType, selectedStatus]);
+      .finally(() => { if (!cancelled) setLoadingReceipts(false); });
+    return () => { cancelled = true; };
+  }, [searchTerm, selectedTransactionType]);
+
+  const receipts = React.useMemo(
+    () => (selectedStatus === 'all' ? allReceipts : allReceipts.filter(r => r.status === selectedStatus)),
+    [allReceipts, selectedStatus],
+  );
+
+  useEffect(() => {
+    if (loadingReceipts || !onStats) return;
+    const count = (s: string) => allReceipts.filter(r => r.status === s).length;
+    onStats({
+      total: allReceipts.length,
+      paid: count('Paid'),
+      partial: count('Partial'),
+      pending: count('Pending'),
+      overdue: count('Overdue'),
+      received: allReceipts
+        .filter(r => r.approval_status !== 'REJECTED')
+        .reduce((sum, r) => sum + Number(r.paid_amount ?? 0), 0),
+      partialDue: allReceipts
+        .filter(r => r.status === 'Partial')
+        // due_amount already counts later settlements against the bill.
+        .reduce((sum, r) => sum + Math.max(0, Number(r.due_amount ?? (Number(r.amount ?? 0) - Number(r.paid_amount ?? 0)))), 0),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allReceipts, loadingReceipts]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -166,7 +213,7 @@ export function MemberReceipts({ onNavigate, embedded }: MemberReceiptsProps) {
       )}
 
       <div className={embedded ? "" : "p-6"}>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
+        <Card id="member-receipts" className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>

@@ -135,6 +135,38 @@ async function fetchReport<T>(path: string): Promise<T[]> {
   return (body?.data ?? []) as T[];
 }
 
+/** Expiring Soon looks ahead; every other report looks back. */
+const defaultRangeFor = (type: LifecycleReportType): RangeKey => (type === "expiring" ? "next-30" : "last-30");
+
+type ReportRows =
+  | { kind: "freeze"; rows: FreezeRow[] }
+  | { kind: "receipts"; rows: Receipt[] }
+  | { kind: "members"; rows: MemberRow[] };
+
+/** The rows a report shows for a window — shared by the report and its stat-card count. */
+async function loadReportRows(type: LifecycleReportType, window: { from: string; to: string }): Promise<ReportRows> {
+  if (type === "freeze") {
+    return { kind: "freeze", rows: await fetchReport<FreezeRow>(`/membership-reports/freezes?from=${window.from}&to=${window.to}`) };
+  }
+  if (type === "renewals" || type === "transactions") {
+    const res = await receiptsService.getReceipts(type === "renewals" ? { transactionType: "Renewal" } : {}, { page: 1, limit: 2000 });
+    const rows = (res.receipts ?? [])
+      .filter((r) => {
+        const d = r.transaction_date ? format(parseISO(r.transaction_date), ISO) : "";
+        return d >= window.from && d <= window.to;
+      })
+      .sort((a, b) => (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""));
+    return { kind: "receipts", rows };
+  }
+  return { kind: "members", rows: await fetchReport<MemberRow>(`/membership-reports/members?type=${type}&from=${window.from}&to=${window.to}`) };
+}
+
+/** How many rows a report shows on its default window (last / next 30 days). */
+export async function countLifecycleReport(type: LifecycleReportType): Promise<number> {
+  const window = resolveRange(defaultRangeFor(type), { from: "", to: "" })!;
+  return (await loadReportRows(type, window)).rows.length;
+}
+
 function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
   const cell = (v: unknown) => {
     const s = v === null || v === undefined ? "" : String(v);
@@ -157,13 +189,16 @@ function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
 export function MembershipLifecycleReport({
   reportType,
   reportTypeSelect,
+  autoGenerateKey = 0,
 }: {
   reportType: LifecycleReportType;
   reportTypeSelect: React.ReactNode;
+  /** Bump to (re)generate the report on its default window. */
+  autoGenerateKey?: number;
 }) {
   const { currencyCode } = useCurrency();
   const isFuture = reportType === "expiring";
-  const [range, setRange] = useState<RangeKey>(isFuture ? "next-30" : "last-30");
+  const [range, setRange] = useState<RangeKey>(defaultRangeFor(reportType));
   const [custom, setCustom] = useState({ from: "", to: "" });
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -174,7 +209,7 @@ export function MembershipLifecycleReport({
 
   // Switching report type starts fresh with a sensible default window
   useEffect(() => {
-    setRange(reportType === "expiring" ? "next-30" : "last-30");
+    setRange(defaultRangeFor(reportType));
     setGenerated(false);
     setMemberRows([]);
     setFreezeRows([]);
@@ -182,8 +217,17 @@ export function MembershipLifecycleReport({
     setPage(1);
   }, [reportType]);
 
-  const generate = async () => {
-    const window = resolveRange(range, custom);
+  // A stat card on the Members page picked this report: run it on its default window.
+  useEffect(() => {
+    if (!autoGenerateKey) return;
+    const key = defaultRangeFor(reportType);
+    setRange(key);
+    generate(key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerateKey]);
+
+  const generate = async (rangeKey: RangeKey = range) => {
+    const window = resolveRange(rangeKey, custom);
     if (!window) {
       toast.error("Pick both a start and an end date");
       return;
@@ -194,20 +238,10 @@ export function MembershipLifecycleReport({
     }
     setLoading(true);
     try {
-      if (reportType === "freeze") {
-        setFreezeRows(await fetchReport<FreezeRow>(`/membership-reports/freezes?from=${window.from}&to=${window.to}`));
-      } else if (reportType === "renewals" || reportType === "transactions") {
-        const res = await receiptsService.getReceipts(reportType === "renewals" ? { transactionType: "Renewal" } : {}, { page: 1, limit: 2000 });
-        const rows = (res.receipts ?? [])
-          .filter((r) => {
-            const d = r.transaction_date ? format(parseISO(r.transaction_date), ISO) : "";
-            return d >= window.from && d <= window.to;
-          })
-          .sort((a, b) => (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""));
-        setRenewalRows(rows);
-      } else {
-        setMemberRows(await fetchReport<MemberRow>(`/membership-reports/members?type=${reportType}&from=${window.from}&to=${window.to}`));
-      }
+      const result = await loadReportRows(reportType, window);
+      if (result.kind === "freeze") setFreezeRows(result.rows);
+      else if (result.kind === "receipts") setRenewalRows(result.rows);
+      else setMemberRows(result.rows);
       setGenerated(true);
       setPage(1);
     } catch (e: any) {
@@ -302,7 +336,7 @@ export function MembershipLifecycleReport({
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={generate} disabled={loading} className="bg-gradient-primary hover:bg-gradient-primary-hover">
+            <Button onClick={() => generate()} disabled={loading} className="bg-gradient-primary hover:bg-gradient-primary-hover">
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
               {loading ? "Generating..." : "Generate Report"}
             </Button>

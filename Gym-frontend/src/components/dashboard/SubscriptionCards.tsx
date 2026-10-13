@@ -93,8 +93,10 @@ export function SubscriptionCards({ period, periodLabel, refreshKey = 0, onNavig
                   <card.icon size={18} />
                 </span>
                 {showValues ? (
-                  <span className={styles.count} title={`${stats?.pendingCount ?? 0} pending of ${stats?.count ?? 0} sold`}>
-                    {stats?.pendingCount ?? 0}
+                  // BG_103: the badge is how many were sold in the period — it used to show
+                  // only the unpaid ones, so a fully paid sale left it at 0.
+                  <span className={styles.count} title={`${stats?.count ?? 0} sold · ${stats?.pendingCount ?? 0} pending payment`}>
+                    {stats?.count ?? 0}
                   </span>
                 ) : (
                   <span className={`${styles.skeleton} ${styles.skeletonCount}`} />

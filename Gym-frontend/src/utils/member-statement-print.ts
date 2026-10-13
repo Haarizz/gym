@@ -1,6 +1,7 @@
 import type { MemberStatement } from "./supabase/billing-service";
 import { getCompanyDetails } from "./company-details";
 import { buildXlsx, downloadBlob, type XlsxCell } from "./xlsx-export";
+import { printHtml } from "./print-html";
 
 const esc = (v: unknown) =>
   String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -124,49 +125,7 @@ export async function printMemberStatement(s: MemberStatement, currencyCode: str
   </div>
 </div>
 </body></html>`;
-  printHtmlInIframe(html);
-}
-
-let activePrintFrame: HTMLIFrameElement | null = null;
-
-function printHtmlInIframe(html: string) {
-  activePrintFrame?.remove();
-  const frame = document.createElement("iframe");
-  frame.setAttribute("aria-hidden", "true");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
-  document.body.appendChild(frame);
-  activePrintFrame = frame;
-
-  const doc = frame.contentDocument!;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  let printed = false;
-  const doPrint = () => {
-    if (printed) return;
-    printed = true;
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
-    // Remove the frame once printing is done, with a fallback in case afterprint never fires
-    const cleanup = () => {
-      if (activePrintFrame === frame) activePrintFrame = null;
-      frame.remove();
-    };
-    frame.contentWindow?.addEventListener("afterprint", cleanup, { once: true });
-    setTimeout(cleanup, 60_000);
-  };
-
-  // Wait for the logo so it appears in the printout, but not forever
-  const pending = Array.from(doc.images).filter((img) => !img.complete);
-  if (pending.length === 0) {
-    setTimeout(doPrint, 50);
-  } else {
-    let left = pending.length;
-    const done = () => { if (--left === 0) doPrint(); };
-    pending.forEach((img) => { img.onload = done; img.onerror = done; });
-    setTimeout(doPrint, 3000);
-  }
+  printHtml(html);
 }
 
 /** Downloads the statement as a real .xlsx file */

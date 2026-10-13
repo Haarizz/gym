@@ -101,7 +101,14 @@ public class AddonPlanService {
                 .orElseThrow(() -> new EntityNotFoundException("Add-on plan not found: " + id));
     }
 
+    /** Mirrors the counter on the Manage Add-on Plans form (member-addons.tsx), BG_104. */
+    static final int MAX_DESCRIPTION_LENGTH = 250;
+
     private void applyRequest(AddonPlan plan, AddonPlanDTO dto) {
+        if (dto.getDescription() != null && dto.getDescription().length() > MAX_DESCRIPTION_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Description must be at most " + MAX_DESCRIPTION_LENGTH + " characters");
+        }
         if (dto.getName()        != null) plan.setName(dto.getName());
         if (dto.getDescription() != null) plan.setDescription(dto.getDescription());
         if (dto.getPrice()       != null) plan.setPrice(dto.getPrice());

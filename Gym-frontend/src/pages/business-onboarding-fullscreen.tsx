@@ -205,6 +205,7 @@ export function BusinessOnboardingFullscreen({
     if (open) {
       setData((prev) => ({ ...prev, plan: selectedPlan ?? prev.plan }));
       setStep(1);
+      setBusinessNameError(false);
     }
   }, [open, selectedPlan]);
 
@@ -223,7 +224,16 @@ export function BusinessOnboardingFullscreen({
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // BG_101: Business name is the only required field — flag it inline (red border +
+  // message) instead of letting the user advance and only failing at submit.
+  const [businessNameError, setBusinessNameError] = useState(false);
+
   const handleNext = () => {
+    if (step === 1 && !data.businessName.trim()) {
+      setBusinessNameError(true);
+      document.getElementById("ob-business-name")?.focus();
+      return;
+    }
     if (step < totalSteps) setStep(step + 1);
   };
 
@@ -237,6 +247,7 @@ export function BusinessOnboardingFullscreen({
     if (submitting) return;
     if (!data.businessName.trim()) {
       toast.error("Business name is required");
+      setBusinessNameError(true);
       setStep(1);
       return;
     }
@@ -357,6 +368,11 @@ export function BusinessOnboardingFullscreen({
             .ob-input:focus {
               border-color: var(--primary);
               outline: none;
+            }
+            .ob-input.ob-input-error,
+            .ob-input.ob-input-error:hover,
+            .ob-input.ob-input-error:focus {
+              border-color: #ef4444;
             }
             .ob-option {
               border-color: #e2e8f0;
@@ -619,17 +635,27 @@ export function BusinessOnboardingFullscreen({
                         <>
                           <div className="grid gap-6 sm:grid-cols-2">
                             <div className="col-span-2">
-                              <Label className="text-sm font-medium text-slate-700">
-                                Business name
+                              <Label htmlFor="ob-business-name" className="text-sm font-medium text-slate-700">
+                                Business name <span className="text-red-500">*</span>
                               </Label>
                               <Input
-                                className="mt-2 h-11 ob-input"
+                                id="ob-business-name"
+                                className={`mt-2 h-11 ob-input${businessNameError ? " ob-input-error" : ""}`}
                                 placeholder="Eg. EMMA Fitness Club"
                                 value={data.businessName}
-                                onChange={(e) =>
-                                  handleChange("businessName", e.target.value)
-                                }
+                                aria-required="true"
+                                aria-invalid={businessNameError || undefined}
+                                aria-describedby={businessNameError ? "ob-business-name-error" : undefined}
+                                onChange={(e) => {
+                                  handleChange("businessName", e.target.value);
+                                  if (e.target.value.trim()) setBusinessNameError(false);
+                                }}
                               />
+                              {businessNameError && (
+                                <p id="ob-business-name-error" className="mt-1 text-xs text-red-600">
+                                  Business name is required
+                                </p>
+                              )}
                             </div>
 
                             <div>

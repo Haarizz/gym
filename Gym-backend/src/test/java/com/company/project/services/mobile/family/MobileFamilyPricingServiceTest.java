@@ -60,6 +60,7 @@ class MobileFamilyPricingServiceTest {
     @DisplayName("family_head billing with auto-calculate: one combined invoice from price-per-member")
     void familyHeadAutoCalcQuote() {
         when(memberService.memberPriceForIndex(any(), anyInt())).thenReturn(bd("300"));
+        when(memberService.pricesPerMember(any())).thenCallRealMethod();
 
         MobileFamilyPricingService.Quote q = pricingService.quote(familyPlan("family_head"), List.of(false, true));
 

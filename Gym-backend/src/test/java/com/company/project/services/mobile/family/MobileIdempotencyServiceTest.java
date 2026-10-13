@@ -56,12 +56,23 @@ class MobileIdempotencyServiceTest {
     void testNewLease() {
         UUID newKey = UUID.randomUUID();
         when(repository.findById(newKey)).thenReturn(Optional.empty());
-        when(repository.save(any(MobileIdempotencyRecord.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(repository.insertIfAbsent(eq(newKey), eq("fingerprint1"), any(UUID.class), any(LocalDateTime.class))).thenReturn(1);
 
         MobileIdempotencyRecord lease = idempotencyService.acquireOrRenewLease(newKey, "fingerprint1");
         assertNotNull(lease);
         assertEquals("IN_PROGRESS", lease.getStatus());
         assertNotNull(lease.getLeaseId());
+        verify(repository, never()).save(any(MobileIdempotencyRecord.class));
+    }
+
+    @Test
+    @DisplayName("Should refuse a new key that a concurrent request claimed first")
+    void testNewLeaseLostRace() {
+        UUID newKey = UUID.randomUUID();
+        when(repository.findById(newKey)).thenReturn(Optional.empty());
+        when(repository.insertIfAbsent(eq(newKey), eq("fingerprint1"), any(UUID.class), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThrows(IllegalStateException.class, () -> idempotencyService.acquireOrRenewLease(newKey, "fingerprint1"));
     }
 
     @Test

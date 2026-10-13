@@ -4,6 +4,7 @@
  */
 
 import { setPermissions } from "../permissions";
+import { isTokenExpired, clearExpiredSession, expireSessionAndReload, SESSION_EXPIRED_MESSAGE } from "../session-expiry";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -32,6 +33,11 @@ class AuthService {
   async initialize(): Promise<boolean> {
     const storedToken = sessionStorage.getItem("token");
     if (!storedToken) return false;
+    if (isTokenExpired(storedToken)) {
+      clearExpiredSession();
+      setPermissions([]);
+      return false;
+    }
 
     // Try to reconstruct user from stored data
     const storedUserRaw = sessionStorage.getItem("gymbios_user");
@@ -256,6 +262,13 @@ class AuthService {
     options: RequestInit = {}
   ): Promise<Response> {
     const token = this.getAccessToken();
+    if (isTokenExpired(token) && !url.includes('/auth/')) {
+      expireSessionAndReload();
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", message: SESSION_EXPIRED_MESSAGE }),
+        { status: 401, statusText: "Unauthorized", headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     const activeBranchId = sessionStorage.getItem('activeBranchId');
     const isAllBranches = activeBranchId === null || activeBranchId === 'null' || activeBranchId === 'undefined';
     const branchHeader = !isAllBranches 

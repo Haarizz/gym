@@ -42,7 +42,8 @@ import {
   Award,
   Activity
 } from 'lucide-react';
-import { type BiosLiveData, SampleDataBadge, SampleTitle, formatSignedPercent, clampPercent } from './bios-live';
+import { type BiosLiveData, formatSignedPercent, clampPercent, useBiosInsights, InsightsStatus, NoData, WEEKDAY_LABELS, hourLabel, changePercent, shareOf } from './bios-live';
+import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface RevenueAnalyticsDialogProps {
   open: boolean;
@@ -57,7 +58,7 @@ interface RevenueAnalyticsDialogProps {
   revenueData: Array<{
     month: string;
     revenue: number;
-    target: number;
+    target: number | null;
   }>;
   formatCurrency: (amount: number) => string;
   getCurrentPeriod: () => string;
@@ -77,109 +78,84 @@ export function RevenueAnalyticsDialog({
   const [selectedPeriod, setSelectedPeriod] = React.useState('monthly');
   const [selectedSource, setSelectedSource] = React.useState('all');
 
-  // Revenue by Payment Method
-  const revenueByPayment = [
-    { method: 'Credit Card', amount: 67850, percentage: 54, transactions: 423, avgTransaction: 160.4 },
-    { method: 'Cash', amount: 28900, percentage: 23, transactions: 189, avgTransaction: 153.0 },
-    { method: 'Bank Transfer', amount: 18500, percentage: 15, transactions: 67, avgTransaction: 276.1 },
-    { method: 'Digital Wallet', amount: 10500, percentage: 8, transactions: 98, avgTransaction: 107.1 }
-  ];
+  // Real figures for the last 90 days (receipts + POS sales), loaded when the dialog opens.
+  const { data: insights, loading: insightsLoading, error: insightsError } =
+    useBiosInsights(() => biosInsightsService.getRevenue(90), open, live.branchKey);
+  const windowDays = insights?.window_days ?? 90;
 
-  // Revenue by Time Period
-  const revenueByDay = [
-    { day: 'Monday', revenue: 17800, transactions: 118, avgTransaction: 150.8 },
-    { day: 'Tuesday', revenue: 19200, transactions: 127, avgTransaction: 151.2 },
-    { day: 'Wednesday', revenue: 18900, transactions: 122, avgTransaction: 154.9 },
-    { day: 'Thursday', revenue: 20100, transactions: 134, avgTransaction: 150.0 },
-    { day: 'Friday', revenue: 16700, transactions: 108, avgTransaction: 154.6 },
-    { day: 'Saturday', revenue: 21450, transactions: 142, avgTransaction: 151.1 },
-    { day: 'Sunday', revenue: 11600, transactions: 76, avgTransaction: 152.6 }
-  ];
+  const paymentTotal = (insights?.payment_methods ?? []).reduce((sum, m) => sum + m.amount, 0);
+  const revenueByPayment = (insights?.payment_methods ?? []).map((m) => ({
+    method: m.method,
+    amount: m.amount,
+    percentage: shareOf(m.amount, paymentTotal),
+    transactions: m.transactions,
+    avgTransaction: m.transactions > 0 ? m.amount / m.transactions : 0
+  }));
 
-  // Revenue by Hour
-  const revenueByHour = [
-    { hour: '6 AM', revenue: 1200, members: 15 },
-    { hour: '7 AM', revenue: 2800, members: 28 },
-    { hour: '8 AM', revenue: 4200, members: 42 },
-    { hour: '9 AM', revenue: 3500, members: 35 },
-    { hour: '10 AM', revenue: 2800, members: 25 },
-    { hour: '11 AM', revenue: 2200, members: 18 },
-    { hour: '12 PM', revenue: 3200, members: 32 },
-    { hour: '1 PM', revenue: 3800, members: 38 },
-    { hour: '2 PM', revenue: 2900, members: 28 },
-    { hour: '3 PM', revenue: 2400, members: 22 },
-    { hour: '4 PM', revenue: 3100, members: 31 },
-    { hour: '5 PM', revenue: 4500, members: 45 },
-    { hour: '6 PM', revenue: 5800, members: 58 },
-    { hour: '7 PM', revenue: 6200, members: 62 },
-    { hour: '8 PM', revenue: 4700, members: 47 },
-    { hour: '9 PM', revenue: 3200, members: 32 }
-  ];
+  const revenueByDay = (insights?.by_weekday ?? []).map((d) => ({
+    day: WEEKDAY_LABELS[d.slot],
+    revenue: Math.round(d.amount),
+    transactions: d.transactions,
+    avgTransaction: d.transactions > 0 ? d.amount / d.transactions : 0
+  }));
 
-  // Membership Revenue Breakdown
-  const membershipRevenue = [
-    { 
-      tier: 'Premium',
-      members: 156,
-      monthlyFee: 799,
-      totalRevenue: 124644,
-      growth: 12.5,
-      churnRate: 4.2,
-      avgLifetime: 18
-    },
-    { 
-      tier: 'Standard',
-      members: 423,
-      monthlyFee: 549,
-      totalRevenue: 232227,
-      growth: 8.3,
-      churnRate: 8.1,
-      avgLifetime: 14
-    },
-    { 
-      tier: 'Basic',
-      members: 268,
-      monthlyFee: 349,
-      totalRevenue: 93532,
-      growth: 5.2,
-      churnRate: 12.3,
-      avgLifetime: 10
-    }
-  ];
+  // Only the hours the gym actually took money in, first to last.
+  const hours = insights?.by_hour ?? [];
+  const firstHour = hours.findIndex((h) => h.transactions > 0);
+  const lastHour = hours.length - 1 - [...hours].reverse().findIndex((h) => h.transactions > 0);
+  const revenueByHour = firstHour < 0 ? [] : hours.slice(firstHour, lastHour + 1).map((h) => ({
+    hour: hourLabel(h.slot),
+    revenue: Math.round(h.amount),
+    transactions: h.transactions
+  }));
 
-  // Personal Training Revenue
-  const ptRevenue = [
-    { trainer: 'John Smith', sessions: 48, revenue: 7200, avgRate: 150, utilization: 92 },
-    { trainer: 'Sarah Johnson', sessions: 52, revenue: 7800, avgRate: 150, utilization: 100 },
-    { trainer: 'Mike Williams', sessions: 41, revenue: 6150, avgRate: 150, utilization: 79 },
-    { trainer: 'Emily Brown', sessions: 36, revenue: 5400, avgRate: 150, utilization: 69 }
-  ];
+  const membershipRevenue = (insights?.membership_types ?? []).map((t) => ({
+    tier: t.membership_type,
+    members: t.active_members,
+    totalMembers: t.members,
+    monthlyFee: t.avg_monthly_fee,
+    totalRevenue: t.revenue,
+    growth: changePercent(t.revenue, t.previous_revenue),
+    churnRate: t.lapsed_percent,
+    avgLifetime: t.avg_tenure_months
+  }));
 
-  // Class Revenue
-  const classRevenue = [
-    { class: 'Yoga', sessions: 24, attendees: 312, revenue: 4680, avgPerSession: 195 },
-    { class: 'Spin', sessions: 20, attendees: 280, revenue: 4200, avgPerSession: 210 },
-    { class: 'HIIT', sessions: 18, attendees: 234, revenue: 3510, avgPerSession: 195 },
-    { class: 'Pilates', sessions: 16, attendees: 192, revenue: 2880, avgPerSession: 180 },
-    { class: 'Boxing', sessions: 12, attendees: 156, revenue: 2340, avgPerSession: 195 }
-  ];
+  const ptRevenue = (insights?.trainers ?? []).map((t) => ({
+    trainer: t.name,
+    sessions: t.sessions,
+    bookings: t.bookings,
+    revenue: t.revenue,
+    utilization: t.capacity > 0 ? Math.round((t.bookings / t.capacity) * 100) : null
+  }));
 
-  // Retail Revenue
-  const retailRevenue = [
-    { category: 'Supplements', sales: 42, revenue: 2940, avgSale: 70, margin: 35 },
-    { category: 'Apparel', sales: 28, revenue: 1680, avgSale: 60, margin: 45 },
-    { category: 'Equipment', sales: 15, revenue: 2250, avgSale: 150, margin: 30 },
-    { category: 'Beverages', sales: 156, revenue: 780, avgSale: 5, margin: 60 }
-  ];
+  const classRevenue = (insights?.classes ?? []).map((c) => ({
+    class: c.name,
+    sessions: c.sessions,
+    attendees: c.bookings,
+    revenue: c.revenue,
+    avgPerSession: c.sessions > 0 ? c.revenue / c.sessions : 0
+  }));
 
-  // Revenue Growth Drivers
-  const growthDrivers = [
-    { driver: 'New Member Signups', contribution: 42500, percentage: 33.8, growth: 15.2 },
-    { driver: 'Membership Upgrades', contribution: 18900, percentage: 15.0, growth: 22.4 },
-    { driver: 'Personal Training Growth', contribution: 12300, percentage: 9.8, growth: 18.7 },
-    { driver: 'Class Attendance Increase', contribution: 8700, percentage: 6.9, growth: 12.1 },
-    { driver: 'Retail Sales Growth', contribution: 4200, percentage: 3.3, growth: 8.5 }
-  ];
+  const retailRevenue = (insights?.retail ?? []).map((r) => ({
+    category: r.category,
+    sales: r.units,
+    revenue: r.revenue,
+    avgSale: r.transactions > 0 ? r.revenue / r.transactions : 0,
+    margin: r.revenue > 0 && r.cost > 0 ? Number((((r.revenue - r.cost) / r.revenue) * 100).toFixed(1)) : null
+  }));
+
+  // Revenue Growth Drivers — each stream's last 30 days vs the 30 days before.
+  const streamTotal = (insights?.streams ?? []).reduce((sum, d) => sum + d.current, 0);
+  const growthDrivers = (insights?.streams ?? []).map((d) => ({
+    driver: d.stream,
+    contribution: d.current,
+    percentage: shareOf(d.current, streamTotal),
+    growth: changePercent(d.current, d.previous)
+  }));
+
+  const conversionRate = insights && insights.leads > 0
+    ? Number(((insights.converted_leads / insights.leads) * 100).toFixed(1))
+    : null;
 
   // Revenue Forecast — straight-line projection of the live monthly trend, ±5% band.
   const trend = live.monthlyTrend;
@@ -200,6 +176,9 @@ export function RevenueAnalyticsDialog({
     })
   ];
   const nextMonthForecast = projectMonth(1);
+  const avgNewMembers = live.memberTrend.length > 0
+    ? Number((live.memberTrend.reduce((sum, p) => sum + p.newMembers, 0) / live.memberTrend.length).toFixed(1))
+    : 0;
   const next3MonthsForecast = projectMonth(1) + projectMonth(2) + projectMonth(3);
   const next6MonthsForecast = Array.from({ length: 6 }, (_, i) => projectMonth(i + 1)).reduce((a, b) => a + b, 0);
 
@@ -228,12 +207,76 @@ export function RevenueAnalyticsDialog({
     averageRevenuePerMember: live.revenuePerMember,
     revenueGrowthRate: live.revenueGrowthRate,
     targetAchievement,
-    // No visitor/lead funnel data feeds BiOS yet — illustrative.
-    conversionRate: 23.5
+    conversionRate
   };
   const recurringShare = revenueMetrics.totalRevenue > 0
     ? ((revenueMetrics.recurringRevenue / revenueMetrics.totalRevenue) * 100).toFixed(1)
     : '0.0';
+
+  const pct = (value: number) => `${value.toFixed(1)}%`;
+  const revenueInsights: Array<{ title: string; text: string; icon: React.ReactNode; border: string }> = [];
+  if (lastPoint && prevPoint && prevPoint.revenue > 0) {
+    const growth = ((lastPoint.revenue - prevPoint.revenue) / prevPoint.revenue) * 100;
+    revenueInsights.push({
+      title: growth >= 0 ? 'Revenue is up on last month' : 'Revenue is down on last month',
+      text: `${lastPoint.month}: ${formatCurrency(lastPoint.revenue)} vs ${formatCurrency(prevPoint.revenue)} in ${prevPoint.month} (${growth >= 0 ? '+' : ''}${pct(growth)}).`
+        + (live.monthlyRevenueTarget ? ` That is ${pct((lastPoint.revenue / live.monthlyRevenueTarget) * 100)} of your monthly target.` : ''),
+      icon: growth >= 0 ? <TrendingUp className="h-5 w-5 text-green-600 mt-1" /> : <TrendingDown className="h-5 w-5 text-red-600 mt-1" />,
+      border: growth >= 0 ? 'border-l-green-500' : 'border-l-red-500'
+    });
+  }
+  if (revenueByHour.length > 0) {
+    const hourTotal = revenueByHour.reduce((sum, h) => sum + h.revenue, 0);
+    const peak = [...revenueByHour].sort((a, b) => b.revenue - a.revenue)[0];
+    if (hourTotal > 0) revenueInsights.push({
+      title: 'Busiest payment hour',
+      text: `${peak.hour} brought in ${pct((peak.revenue / hourTotal) * 100)} of the last ${windowDays} days' takings (${peak.transactions} payments).`,
+      icon: <Zap className="h-5 w-5 text-blue-600 mt-1" />,
+      border: 'border-l-blue-500'
+    });
+  }
+  const sellingTiers = membershipRevenue.filter((t) => t.totalRevenue > 0);
+  if (sellingTiers.length > 0) {
+    const tierTotal = sellingTiers.reduce((sum, t) => sum + t.totalRevenue, 0);
+    revenueInsights.push({
+      title: `${sellingTiers[0].tier} leads membership sales`,
+      text: `${pct((sellingTiers[0].totalRevenue / tierTotal) * 100)} of new and renewal sales in the last ${windowDays} days (${formatCurrency(sellingTiers[0].totalRevenue)}).`,
+      icon: <Users className="h-5 w-5 text-purple-600 mt-1" />,
+      border: 'border-l-purple-500'
+    });
+  }
+  const retailTotal = retailRevenue.reduce((sum, r) => sum + r.revenue, 0);
+  if (retailTotal > 0 && paymentTotal > 0) {
+    const best = [...retailRevenue].sort((a, b) => (b.margin ?? -1) - (a.margin ?? -1))[0];
+    revenueInsights.push({
+      title: 'Retail share of takings',
+      text: `POS sales were ${pct((retailTotal / paymentTotal) * 100)} of the last ${windowDays} days' takings.`
+        + (best?.margin != null ? ` ${best.category} has the best margin at ${best.margin}%.` : ''),
+      icon: <ShoppingCart className="h-5 w-5 text-orange-600 mt-1" />,
+      border: 'border-l-orange-500'
+    });
+  }
+  const tradingDays = revenueByDay.filter((d) => d.revenue > 0);
+  if (tradingDays.length >= 2) {
+    const sorted = [...tradingDays].sort((a, b) => b.revenue - a.revenue);
+    const top = sorted[0];
+    const bottom = sorted[sorted.length - 1];
+    revenueInsights.push({
+      title: `${bottom.day} is the quietest day`,
+      text: `${bottom.day} took ${formatCurrency(bottom.revenue)} vs ${formatCurrency(top.revenue)} on ${top.day} over the last ${windowDays} days.`,
+      icon: <AlertTriangle className="h-5 w-5 text-yellow-600 mt-1" />,
+      border: 'border-l-yellow-500'
+    });
+  }
+  if (revenueByPayment.length >= 2) {
+    const topAvg = [...revenueByPayment].sort((a, b) => b.avgTransaction - a.avgTransaction)[0];
+    revenueInsights.push({
+      title: 'Payment methods',
+      text: `${revenueByPayment[0].method} carries the most money (${pct(revenueByPayment[0].percentage)}). ${topAvg.method} has the highest average payment (${formatCurrency(topAvg.avgTransaction)}).`,
+      icon: <CreditCard className="h-5 w-5 text-cyan-600 mt-1" />,
+      border: 'border-l-cyan-500'
+    });
+  }
 
   const getTrendIcon = (change: number) => {
     if (change > 0) return <TrendingUp className="h-4 w-4 text-green-500" />;
@@ -369,10 +412,12 @@ export function RevenueAnalyticsDialog({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base"><SampleTitle>Revenue by Payment Method</SampleTitle></CardTitle>
-                  <CardDescription>Payment preferences and transaction values</CardDescription>
+                  <CardTitle className="text-base">Revenue by Payment Method</CardTitle>
+                  <CardDescription>Receipts and POS sales, last {windowDays} days</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <InsightsStatus loading={insightsLoading} error={insightsError} />
+                  {insights && revenueByPayment.length === 0 && <NoData>No payments recorded in this period.</NoData>}
                   <div className="space-y-3">
                     {revenueByPayment.map((method, index) => (
                       <div key={index}>
@@ -398,9 +443,12 @@ export function RevenueAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Revenue by Day of Week</SampleTitle></CardTitle>
+                <CardTitle className="text-base">Revenue by Day of Week</CardTitle>
+                <CardDescription>Last {windowDays} days</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
+                {insights && (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={revenueByDay}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -412,15 +460,19 @@ export function RevenueAnalyticsDialog({
                     <Bar dataKey="transactions" fill="#3b82f6" name="Transactions" />
                   </BarChart>
                 </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Revenue by Hour</SampleTitle></CardTitle>
-                <CardDescription>Peak revenue hours and member activity</CardDescription>
+                <CardTitle className="text-base">Revenue by Hour</CardTitle>
+                <CardDescription>When payments are taken, last {windowDays} days</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
+                {insights && revenueByHour.length === 0 && <NoData>No payments recorded in this period.</NoData>}
+                {revenueByHour.length > 0 && (
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={revenueByHour}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -429,50 +481,51 @@ export function RevenueAnalyticsDialog({
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                     <Legend />
                     <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name={`Revenue (${live.currencyCode})`} />
-                    <Area type="monotone" dataKey="members" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} name="Active Members" />
+                    <Area type="monotone" dataKey="transactions" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} name="Transactions" />
                   </AreaChart>
                 </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Sources Tab */}
           <TabsContent value="sources" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
+            <InsightsStatus loading={insightsLoading} error={insightsError} />
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Membership Revenue Breakdown</CardTitle>
+                <CardDescription>New and renewal sales in the last {windowDays} days, vs the {windowDays} days before</CardDescription>
               </CardHeader>
               <CardContent>
+                {insights && membershipRevenue.length === 0 && <NoData>No membership sales recorded yet.</NoData>}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tier</TableHead>
-                      <TableHead className="text-right">Members</TableHead>
-                      <TableHead className="text-right">Monthly Fee</TableHead>
-                      <TableHead className="text-right">Total Revenue</TableHead>
+                      <TableHead>Membership Type</TableHead>
+                      <TableHead className="text-right">Active Members</TableHead>
+                      <TableHead className="text-right">Avg Monthly Fee</TableHead>
+                      <TableHead className="text-right">Sales</TableHead>
                       <TableHead className="text-right">Growth</TableHead>
-                      <TableHead className="text-right">Churn Rate</TableHead>
-                      <TableHead className="text-right">Avg Lifetime</TableHead>
+                      <TableHead className="text-right">Lapsed</TableHead>
+                      <TableHead className="text-right">Avg Tenure</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {membershipRevenue.map((tier, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{tier.tier}</TableCell>
-                        <TableCell className="text-right">{tier.members}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(tier.monthlyFee)}</TableCell>
+                        <TableCell className="text-right">{tier.members} <span className="text-xs text-muted-foreground">of {tier.totalMembers}</span></TableCell>
+                        <TableCell className="text-right">{tier.monthlyFee != null ? formatCurrency(tier.monthlyFee) : '—'}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(tier.totalRevenue)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end">
-                            <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                            <span className="text-green-600">+{tier.growth}%</span>
+                            {getTrendIcon(tier.growth ?? 0)}
+                            <span className={getTrendColor(tier.growth ?? 0)}>{formatSignedPercent(tier.growth)}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">{tier.churnRate}%</TableCell>
-                        <TableCell className="text-right">{tier.avgLifetime} months</TableCell>
+                        <TableCell className="text-right">{tier.avgLifetime != null ? `${tier.avgLifetime} months` : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -484,15 +537,17 @@ export function RevenueAnalyticsDialog({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Personal Training Revenue</CardTitle>
+                  <CardDescription>PT sessions in the last {windowDays} days, by trainer</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {insights && ptRevenue.length === 0 && <NoData>No PT sessions in this period.</NoData>}
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Trainer</TableHead>
                         <TableHead className="text-right">Sessions</TableHead>
                         <TableHead className="text-right">Revenue</TableHead>
-                        <TableHead className="text-right">Utilization</TableHead>
+                        <TableHead className="text-right">Booked</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -502,9 +557,11 @@ export function RevenueAnalyticsDialog({
                           <TableCell className="text-right">{trainer.sessions}</TableCell>
                           <TableCell className="text-right">{formatCurrency(trainer.revenue)}</TableCell>
                           <TableCell className="text-right">
-                            <Badge className={trainer.utilization >= 90 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                              {trainer.utilization}%
-                            </Badge>
+                            {trainer.utilization == null ? '—' : (
+                              <Badge className={trainer.utilization >= 90 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                {trainer.utilization}%
+                              </Badge>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -516,8 +573,10 @@ export function RevenueAnalyticsDialog({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Class Revenue</CardTitle>
+                  <CardDescription>Class sessions in the last {windowDays} days</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {insights && classRevenue.length === 0 && <NoData>No classes in this period.</NoData>}
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -545,13 +604,15 @@ export function RevenueAnalyticsDialog({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Retail & Supplements Revenue</CardTitle>
+                <CardDescription>POS sales by product category, last {windowDays} days</CardDescription>
               </CardHeader>
               <CardContent>
+                {insights && retailRevenue.length === 0 && <NoData>No POS sales in this period.</NoData>}
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Sales Count</TableHead>
+                      <TableHead className="text-right">Units Sold</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
                       <TableHead className="text-right">Avg Sale</TableHead>
                       <TableHead className="text-right">Margin</TableHead>
@@ -565,7 +626,7 @@ export function RevenueAnalyticsDialog({
                         <TableCell className="text-right">{formatCurrency(category.revenue)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(category.avgSale)}</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant="outline">{category.margin}%</Badge>
+                          {category.margin == null ? '—' : <Badge variant="outline">{category.margin}%</Badge>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -591,7 +652,9 @@ export function RevenueAnalyticsDialog({
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                     <Legend />
                     <Bar dataKey="revenue" fill="#10b981" name="Actual Revenue" />
-                    <Line type="monotone" dataKey="target" stroke="#6b7280" strokeWidth={2} strokeDasharray="5 5" name="Target" />
+                    {revenueData.some((point) => point.target != null) && (
+                      <Line type="monotone" dataKey="target" stroke="#6b7280" strokeWidth={2} strokeDasharray="5 5" name="Target" />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -599,10 +662,12 @@ export function RevenueAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Revenue Growth Drivers</SampleTitle></CardTitle>
-                <CardDescription>Key contributors to revenue growth</CardDescription>
+                <CardTitle className="text-base">Revenue Growth Drivers</CardTitle>
+                <CardDescription>Money taken per stream, last 30 days vs the 30 days before</CardDescription>
               </CardHeader>
               <CardContent>
+                <InsightsStatus loading={insightsLoading} error={insightsError} />
+                {insights && growthDrivers.length === 0 && <NoData>No payments in the last 60 days.</NoData>}
                 <div className="space-y-4">
                   {growthDrivers.map((driver, index) => (
                     <div key={index}>
@@ -610,7 +675,7 @@ export function RevenueAnalyticsDialog({
                         <span className="text-sm font-medium">{driver.driver}</span>
                         <div className="flex items-center space-x-3">
                           <Badge variant="outline">{driver.percentage}% of total</Badge>
-                          <span className="text-sm font-medium text-green-600">+{driver.growth}%</span>
+                          <span className={`text-sm font-medium ${getTrendColor(driver.growth ?? 0)}`}>{formatSignedPercent(driver.growth)}</span>
                           <span className="text-sm font-medium">{formatCurrency(driver.contribution)}</span>
                         </div>
                       </div>
@@ -654,9 +719,11 @@ export function RevenueAnalyticsDialog({
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground flex items-center gap-2">Conversion Rate <SampleDataBadge /></p>
-                      <p className="text-2xl font-bold text-purple-600">{revenueMetrics.conversionRate}%</p>
-                      <p className="text-xs text-purple-600 mt-1">Visitor to member</p>
+                      <p className="text-sm text-muted-foreground">Lead Conversion</p>
+                      <p className="text-2xl font-bold text-purple-600">{revenueMetrics.conversionRate != null ? `${revenueMetrics.conversionRate}%` : '—'}</p>
+                      <p className="text-xs text-purple-600 mt-1">
+                        {insights ? `${insights.converted_leads} of ${insights.leads} leads, last ${windowDays} days` : 'Leads converted to members'}
+                      </p>
                     </div>
                     <Award className="h-10 w-10 text-purple-600 opacity-20" />
                   </div>
@@ -848,49 +915,38 @@ export function RevenueAnalyticsDialog({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base"><SampleTitle>Forecast Assumptions</SampleTitle></CardTitle>
+                <CardTitle className="text-base">Forecast Assumptions</CardTitle>
+                <CardDescription>What the straight-line projection above is based on</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Growth Drivers</h4>
+                    <h4 className="font-medium">Inputs</h4>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       <li className="flex items-start">
                         <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                        <span>New member acquisition rate: +12 per month</span>
+                        <span>Average monthly revenue change: {formatCurrency(Math.round(avgMonthlyChange))} over the last {trend.length} months</span>
                       </li>
                       <li className="flex items-start">
                         <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                        <span>Membership upgrade rate: 8% per quarter</span>
+                        <span>New members: {avgNewMembers} per month on average</span>
                       </li>
                       <li className="flex items-start">
                         <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                        <span>PT sessions growth: +5% monthly</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckCircle className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                        <span>Class attendance increase: +3% monthly</span>
+                        <span>Recurring (membership) share of revenue: {recurringShare}%</span>
                       </li>
                     </ul>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-medium">Risk Factors</h4>
+                    <h4 className="font-medium">Risks</h4>
                     <ul className="space-y-1 text-sm text-muted-foreground">
                       <li className="flex items-start">
                         <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-                        <span>Seasonal variation: -5% in summer months</span>
+                        <span>Retention is {live.retentionRate}%: {live.expiredMembers} lapsed and {live.overdueMembers} overdue members</span>
                       </li>
                       <li className="flex items-start">
                         <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-                        <span>Churn rate: 10.5% baseline</span>
-                      </li>
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-                        <span>Market competition impact</span>
-                      </li>
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-                        <span>Economic conditions volatility</span>
+                        <span>A straight line ignores seasonality — treat months further out with more caution</span>
                       </li>
                     </ul>
                   </div>
@@ -901,124 +957,23 @@ export function RevenueAnalyticsDialog({
 
           {/* Insights Tab */}
           <TabsContent value="insights" className="space-y-4">
-            <div className="flex justify-end">
-              <SampleDataBadge />
-            </div>
+            <InsightsStatus loading={insightsLoading} error={insightsError} />
+            {insights && revenueInsights.length === 0 && <NoData>Not enough activity yet to draw insights.</NoData>}
             <div className="grid grid-cols-1 gap-4">
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <TrendingUp className="h-5 w-5 text-green-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Strong Revenue Growth</CardTitle>
-                      <CardDescription className="mt-1">
-                        Revenue has grown by 12.3% month-over-month, exceeding the target by 4.8%. This growth is driven primarily by new member signups and membership upgrades.
-                      </CardDescription>
+              {revenueInsights.map((insight) => (
+                <Card key={insight.title} className={`border-l-4 ${insight.border}`}>
+                  <CardHeader>
+                    <div className="flex items-start space-x-3">
+                      {insight.icon}
+                      <div>
+                        <CardTitle className="text-base">{insight.title}</CardTitle>
+                        <CardDescription className="mt-1">{insight.text}</CardDescription>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-l-4 border-l-blue-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <Zap className="h-5 w-5 text-blue-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Peak Revenue Hours Identified</CardTitle>
-                      <CardDescription className="mt-1">
-                        6-8 PM generates 28% of daily revenue. Consider implementing premium pricing during peak hours or expanding capacity to maximize revenue potential.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <Users className="h-5 w-5 text-purple-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Premium Tier Opportunity</CardTitle>
-                      <CardDescription className="mt-1">
-                        Premium members generate 3.2x more revenue per member than basic tier. Only 18% of members are in premium tier, suggesting significant upsell opportunity.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-l-4 border-l-orange-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <ShoppingCart className="h-5 w-5 text-orange-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Retail Revenue Potential</CardTitle>
-                      <CardDescription className="mt-1">
-                        Retail represents only 3.9% of total revenue but has highest growth rate at 10.2%. Supplements show strong margin (35%) and consistent demand.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-l-4 border-l-yellow-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Weekend Revenue Gap</CardTitle>
-                      <CardDescription className="mt-1">
-                        Sunday revenue is 46% lower than peak days (Saturday). Consider special weekend promotions or events to improve Sunday performance.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-l-4 border-l-cyan-500">
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <CreditCard className="h-5 w-5 text-cyan-600 mt-1" />
-                    <div>
-                      <CardTitle className="text-base">Payment Method Insights</CardTitle>
-                      <CardDescription className="mt-1">
-                        Bank transfers have highest average transaction value ({formatCurrency(276)}) but only represent 15% of revenue. Consider incentivizing this payment method to reduce processing fees.
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
+                  </CardHeader>
+                </Card>
+              ))}
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Recommended Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2">
-                    <Badge className="bg-green-100 text-green-800">High Priority</Badge>
-                    <p className="text-sm">Launch premium tier upgrade campaign targeting standard members with high engagement</p>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <Badge className="bg-green-100 text-green-800">High Priority</Badge>
-                    <p className="text-sm">Implement dynamic pricing for peak hours (6-8 PM) to maximize revenue</p>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <Badge className="bg-yellow-100 text-yellow-800">Medium Priority</Badge>
-                    <p className="text-sm">Expand retail selection and improve merchandising in high-traffic areas</p>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <Badge className="bg-yellow-100 text-yellow-800">Medium Priority</Badge>
-                    <p className="text-sm">Create Sunday-specific programming to boost weekend revenue</p>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <Badge className="bg-blue-100 text-blue-800">Low Priority</Badge>
-                    <p className="text-sm">Incentivize bank transfer payments to reduce credit card processing fees</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
 

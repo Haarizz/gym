@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { addYears, format, isValid, parseISO, subYears } from "date-fns";
+import { addYears, differenceInCalendarDays, format, isSameMonth, isValid, parseISO, subYears } from "date-fns";
 import { AlertCircle, Clock, Download, Eye, EyeOff, FileText, Hash, Play, Receipt, RefreshCw, Snowflake, User, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -9,6 +9,7 @@ import { Skeleton } from "../ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { CurrencyGlyph } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
+import { StatFilterNotice } from "./MemberStatCards";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 const PREVIEW_ROWS = 10;
@@ -59,7 +60,64 @@ const sourceLabel = (s?: string | null) => (s === "MOBILE" ? "Member (App)" : s 
  * built from the membership_freezes records (via /membership-reports/freezes).
  * Each freeze is a "Freeze" row; once it has ended it also gets an "Unfreeze" row.
  */
-export function FreezeTransactionHistory({ refreshKey = 0 }: { refreshKey?: number }) {
+export type FreezeFilter = "frozen" | "ending7" | "month" | "unfrozen" | "charged";
+
+export interface FreezeStats {
+  frozen: number;
+  /** Still frozen, with a planned end today through 7 days out */
+  ending7: number;
+  /** Freezes that started this calendar month */
+  month: number;
+  unfrozen: number;
+  charged: number;
+  chargedAmount: number;
+}
+
+export const FREEZE_FILTER_LABELS: Record<FreezeFilter, string> = {
+  frozen: "Currently frozen",
+  ending7: "Unfreezing in the next 7 days",
+  month: "Freezes started this month",
+  unfrozen: "Unfreezes",
+  charged: "Freezes with a fee",
+};
+
+const daysUntil = (v?: string | null) => {
+  if (!v) return null;
+  const d = parseISO(v);
+  return isValid(d) ? differenceInCalendarDays(d, new Date()) : null;
+};
+
+const isThisMonth = (v?: string | null) => {
+  if (!v) return false;
+  const d = parseISO(v);
+  return isValid(d) && isSameMonth(d, new Date());
+};
+
+/** Whether a freeze record belongs to a stat-card bucket. */
+const recordMatches = (r: FreezeRecord, filter: FreezeFilter) => {
+  switch (filter) {
+    case "frozen": return r.status === "Frozen";
+    case "ending7": {
+      const d = daysUntil(r.plannedEnd);
+      return r.status === "Frozen" && d !== null && d >= 0 && d <= 7;
+    }
+    case "month": return isThisMonth(r.freezeStart);
+    case "unfrozen": return !!r.endedAt;
+    case "charged": return Number(r.chargeAmount || 0) > 0;
+  }
+};
+
+export function FreezeTransactionHistory({
+  refreshKey = 0,
+  filter = null,
+  onClearFilter,
+  onStats,
+}: {
+  refreshKey?: number;
+  filter?: FreezeFilter | null;
+  onClearFilter?: () => void;
+  onStats?: (stats: FreezeStats) => void;
+}) {
   const [records, setRecords] = useState<FreezeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +174,25 @@ export function FreezeTransactionHistory({ refreshKey = 0 }: { refreshKey?: numb
     return out.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (a.action === "Unfreeze" ? -1 : 1));
   }, [records]);
 
-  const visible = showAll ? rows : rows.slice(0, PREVIEW_ROWS);
+  useEffect(() => {
+    if (loading || error || !onStats) return;
+    const count = (f: FreezeFilter) => records.filter((r) => recordMatches(r, f)).length;
+    onStats({
+      frozen: count("frozen"),
+      ending7: count("ending7"),
+      month: count("month"),
+      unfrozen: count("unfrozen"),
+      charged: count("charged"),
+      chargedAmount: records.reduce((s, r) => s + Number(r.chargeAmount || 0), 0),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records, loading, error]);
+
+  // "Unfreezes" lists the Unfreeze rows; every other bucket lists the Freeze rows.
+  const shownRows = filter
+    ? rows.filter((row) => (filter === "unfrozen" ? row.action === "Unfreeze" : row.action === "Freeze") && recordMatches(row.record, filter))
+    : rows;
+  const visible = showAll ? shownRows : shownRows.slice(0, PREVIEW_ROWS);
 
   const exportCsv = () => {
     if (rows.length === 0) { toast.info("No freeze transactions to export"); return; }
@@ -141,7 +217,7 @@ export function FreezeTransactionHistory({ refreshKey = 0 }: { refreshKey?: numb
   };
 
   return (
-    <Card className="mt-6 shadow-sm" style={{ borderColor: "rgba(43, 122, 120, 0.2)" }}>
+    <Card id="freeze-history" className="mt-6 shadow-sm" style={{ borderColor: "rgba(43, 122, 120, 0.2)" }}>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -159,16 +235,17 @@ export function FreezeTransactionHistory({ refreshKey = 0 }: { refreshKey?: numb
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            {rows.length > PREVIEW_ROWS && (
+            {shownRows.length > PREVIEW_ROWS && (
               <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
                 {showAll ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {showAll ? "Show Less" : `View All (${rows.length})`}
+                {showAll ? "Show Less" : `View All (${shownRows.length})`}
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
+        {filter && <StatFilterNotice label={FREEZE_FILTER_LABELS[filter]} onClear={onClearFilter} />}
         {error ? (
           <div className="flex items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-red-700">
             <span className="flex items-center gap-2 text-sm"><AlertCircle className="h-4 w-4" />{error}</span>
@@ -180,6 +257,10 @@ export function FreezeTransactionHistory({ refreshKey = 0 }: { refreshKey?: numb
           <div className="text-center py-10 text-muted-foreground">
             <Snowflake className="h-8 w-8 mx-auto mb-2 text-primary" />
             <p className="text-sm">No freezes yet. Freeze and unfreeze actions will appear here.</p>
+          </div>
+        ) : shownRows.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <p className="text-sm">No freeze transactions match this filter.</p>
           </div>
         ) : (
           <div className="rounded-md border overflow-x-auto">

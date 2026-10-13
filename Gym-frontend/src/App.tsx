@@ -117,7 +117,7 @@ import { MemberReceipts } from "./pages/member-receipts";
 import { FreezeUnfreeze } from "./pages/freeze-unfreeze";
 import { CreateReceipt } from "./pages/create-receipt";
 import { Facilities } from "./pages/facilities";
-import { Login } from "./pages/login";
+import { Login, REQUEST_DEMO_PATH } from "./pages/login";
 import { EmergencyProfile } from "./pages/emergency-profile";
 import { Recruitment } from "./pages/recruitment";
 import { PayrollReports } from "./pages/payroll-reports";
@@ -973,13 +973,14 @@ export default function App() {
     if (isLoading || isEmergencyRoute) return;
     const here = location.pathname;
     if (!isAuthenticated) {
-      if (here !== '/login') {
+      // REQUEST_DEMO_PATH is the login screen's public pricing page (BG_102).
+      if (here !== '/login' && here !== REQUEST_DEMO_PATH) {
         if (here !== '/' && here !== '/dashboard') {
           try { sessionStorage.setItem(RETURN_TO_KEY, here + location.search); } catch { /* ignore */ }
         }
         navigate('/login', { replace: true });
       }
-    } else if (here === '/login') {
+    } else if (here === '/login' || here === REQUEST_DEMO_PATH) {
       let returnTo: string | null = null;
       try {
         returnTo = sessionStorage.getItem(RETURN_TO_KEY);
