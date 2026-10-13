@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local environment — holds secrets (e.g. VITE_CLAUDE_API_KEY); never commit. See .env.example.
+.env
