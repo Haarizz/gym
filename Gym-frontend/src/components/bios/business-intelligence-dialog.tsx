@@ -336,7 +336,7 @@ export function BusinessIntelligenceDialog({
                           return null;
                         }}
                       />
-                      <Scatter data={impactConfidenceData} fill="#2B7A78" />
+                      <Scatter data={impactConfidenceData} fill="#0F766E" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </CardContent>

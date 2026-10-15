@@ -24,6 +24,12 @@ export interface RolePageResponse {
   pagination: { page: number; limit: number; total: number; total_pages: number };
 }
 
+export interface AssignableRole {
+  id: string | number;
+  role_name: string;
+  description?: string | null;
+}
+
 export interface PermissionItem {
   key: string;
   action: string;
@@ -101,6 +107,15 @@ class RolesService {
       const body = await response.json().catch(() => ({}));
       throw new Error((body as any)?.message || `Failed to duplicate role: ${response.status}`);
     }
+    return response.json();
+  }
+
+  /** Roles a staff member can be given (excludes platform/member roles; ADMIN only for owners). */
+  async getAssignableRoles(): Promise<AssignableRole[]> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/administration/roles/assignable`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch roles: ${response.status}`);
     return response.json();
   }
 

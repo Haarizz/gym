@@ -282,9 +282,9 @@ export function CreatePostModal({ onPostCreated, trigger }: { onPostCreated?: ()
                           height: getThumbHeight(cropRatio),
                           overflow: "hidden",
                           borderRadius: 8,
-                          border: "1px solid #e2e8f0",
+                          border: "1px solid light-dark(#e2e8f0, var(--border))",
                           boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                          backgroundColor: "#f1f5f9",
+                          backgroundColor: "light-dark(#f1f5f9, var(--muted-bg))",
                         }}
                       >
                         <img

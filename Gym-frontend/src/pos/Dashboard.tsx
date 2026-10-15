@@ -249,7 +249,7 @@ export function Dashboard() {
             <div key={c.label} className={s.stat}>
               <div className={s.statBody}>
                 <div className={s.statHead}><span className={s.statLabel}>{c.label}</span><span className={s.statIcon}>{c.icon}</span></div>
-                <div className={s.statValue}>{c.value ?? <span style={{ display: "inline-block", width: 90, height: 22, borderRadius: 6, background: "#E2E8F0" }} />}</div>
+                <div className={s.statValue}>{c.value ?? <span style={{ display: "inline-block", width: 90, height: 22, borderRadius: 6, background: "light-dark(#E2E8F0, var(--border))" }} />}</div>
               </div>
               <div className={s.statFoot}>{c.foot}</div>
             </div>

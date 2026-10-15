@@ -17,6 +17,8 @@ public class StaffPerformanceMetricsDTO {
     private String staffId;
     private BigDecimal revenueTarget;
     private BigDecimal revenueAchieved;
+    /** This month's commission: membership sales at the role's rates plus POS sales at its POS rates. */
+    private BigDecimal commissionEarned;
     private int achievementPercentage;
     private int conversionRate;
     private int ptSessions;
@@ -30,6 +32,8 @@ public class StaffPerformanceMetricsDTO {
     public void setStaffId(String staffId) { this.staffId = staffId; }
     public BigDecimal getRevenueTarget() { return revenueTarget; }
     public void setRevenueTarget(BigDecimal revenueTarget) { this.revenueTarget = revenueTarget; }
+    public BigDecimal getCommissionEarned() { return commissionEarned; }
+    public void setCommissionEarned(BigDecimal commissionEarned) { this.commissionEarned = commissionEarned; }
     public BigDecimal getRevenueAchieved() { return revenueAchieved; }
     public void setRevenueAchieved(BigDecimal revenueAchieved) { this.revenueAchieved = revenueAchieved; }
     public int getAchievementPercentage() { return achievementPercentage; }

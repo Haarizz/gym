@@ -1116,7 +1116,7 @@ export function MemberHub({ onNavigate }: MemberHubProps = {}) {
                                     width: toCssAspectRatio(post.image.aspectRatio) ? "auto" : "100%",
                                     objectFit: "cover",
                                     borderRadius: 12,
-                                    border: "1px solid #e5e7eb",
+                                    border: "1px solid light-dark(#e5e7eb, var(--border))",
                                   }}
                                 />
                               </div>

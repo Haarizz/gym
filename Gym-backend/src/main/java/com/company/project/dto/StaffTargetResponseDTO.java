@@ -24,6 +24,8 @@ public class StaffTargetResponseDTO {
     private Integer newClientsTarget;
     private Integer newClientsAchieved;
     private String unitTargetsJson;
+    /** Live units sold this period by unit type (admissions, renewals, addons, walkins, pos_sales, pos_items). */
+    private java.util.Map<String, Integer> unitsAchieved;
     private BigDecimal commissionEarned;
     private String trend;
     private Integer forecast;
@@ -140,6 +142,35 @@ public class StaffTargetResponseDTO {
     public void setNewClientsTarget(Integer newClientsTarget) { this.newClientsTarget = newClientsTarget; }
     public Integer getNewClientsAchieved() { return newClientsAchieved; }
     public void setNewClientsAchieved(Integer newClientsAchieved) { this.newClientsAchieved = newClientsAchieved; }
+    public java.util.Map<String, Integer> getUnitsAchieved() { return unitsAchieved; }
+    public void setUnitsAchieved(java.util.Map<String, Integer> unitsAchieved) { this.unitsAchieved = unitsAchieved; }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * Attaches the live unit counts and fills each unit target's achieved_units from them
+     * (floored at any stored value). Targets on unit types that can't be tracked (old free-text
+     * services) keep what was stored.
+     */
+    public StaffTargetResponseDTO withUnits(java.util.Map<String, Integer> units) {
+        this.unitsAchieved = units;
+        if (units == null || unitTargetsJson == null || unitTargetsJson.isBlank()) return this;
+        try {
+            java.util.List<java.util.Map<String, Object>> list = JSON.readValue(unitTargetsJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {});
+            for (java.util.Map<String, Object> unit : list) {
+                Integer live = units.get(String.valueOf(unit.get("service")));
+                if (live == null) continue;
+                int stored = unit.get("achieved_units") instanceof Number n ? n.intValue() : 0;
+                unit.put("achieved_units", Math.max(stored, live));
+            }
+            unitTargetsJson = JSON.writeValueAsString(list);
+        } catch (Exception ignored) {
+            // Malformed JSON: leave it as stored.
+        }
+        return this;
+    }
+
     public String getUnitTargetsJson() { return unitTargetsJson; }
     public void setUnitTargetsJson(String unitTargetsJson) { this.unitTargetsJson = unitTargetsJson; }
     public BigDecimal getCommissionEarned() { return commissionEarned; }

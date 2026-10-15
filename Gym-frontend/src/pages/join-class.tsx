@@ -426,7 +426,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
             <Button
               variant={viewMode === 'discover' ? 'default' : 'outline'}
               onClick={() => setViewMode('discover')}
-              style={viewMode === 'discover' ? { backgroundColor: '#327F74' } : {}}
+              style={viewMode === 'discover' ? { backgroundColor: 'var(--primary)' } : {}}
             >
               <Search className="h-4 w-4 mr-2" />
               Browse Classes
@@ -434,7 +434,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
             <Button
               variant={viewMode === 'my-classes' ? 'default' : 'outline'}
               onClick={() => setViewMode('my-classes')}
-              style={viewMode === 'my-classes' ? { backgroundColor: '#327F74' } : {}}
+              style={viewMode === 'my-classes' ? { backgroundColor: 'var(--primary)' } : {}}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               My Classes
@@ -570,7 +570,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                         </div>
                         <Button 
                           className="w-full" 
-                          style={{ backgroundColor: '#327F74' }}
+                          style={{ backgroundColor: 'var(--primary)' }}
                           onClick={() => setShowFilters(false)}
                         >
                           Apply Filters
@@ -620,7 +620,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                   variant={selectedType === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedType('all')}
-                  style={selectedType === 'all' ? { backgroundColor: '#327F74' } : {}}
+                  style={selectedType === 'all' ? { backgroundColor: 'var(--primary)' } : {}}
                 >
                   All Classes
                 </Button>
@@ -632,7 +632,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                       variant={selectedType === type.id ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setSelectedType(type.id)}
-                      style={selectedType === type.id ? { backgroundColor: '#327F74' } : {}}
+                      style={selectedType === type.id ? { backgroundColor: 'var(--primary)' } : {}}
                     >
                       <Icon className="h-4 w-4 mr-2" />
                       {type.name}
@@ -751,7 +751,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
                               </div>
                               <Button
                                 className="w-full"
-                                style={{ backgroundColor: isFull ? '#94a3b8' : '#327F74' }}
+                                style={{ backgroundColor: isFull ? '#94a3b8' : 'var(--primary)' }}
                                 disabled={isFull && classItem.waitlist >= 10}
                               >
                                 {isFull ? (
@@ -996,7 +996,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
               <div className="flex gap-3">
                 <Button
                   className="flex-1"
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={handleJoinClass}
                   disabled={isClassFull(selectedClass) && selectedClass.waitlist >= 10}
                 >
@@ -1145,7 +1145,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
               {/* Confirm Button */}
               <Button
                 className="w-full h-12 text-lg"
-                style={{ backgroundColor: '#327F74' }}
+                style={{ backgroundColor: 'var(--primary)' }}
                 onClick={handleConfirmBooking}
                 disabled={!agreedToPolicy}
               >
@@ -1182,7 +1182,7 @@ export function JoinClass({ onNavigate }: JoinClassProps = {}) {
             <div className="space-y-3">
               <Button
                 className="w-full"
-                style={{ backgroundColor: '#327F74' }}
+                style={{ backgroundColor: 'var(--primary)' }}
                 onClick={() => {
                   setShowSuccessDialog(false);
                   setViewMode('my-classes');

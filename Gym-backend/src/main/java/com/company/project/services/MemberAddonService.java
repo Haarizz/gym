@@ -4,6 +4,8 @@ import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
 import com.company.project.dto.PaginationDTO;
+import com.company.project.dto.ReceiptResponseDTO;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Member;
 import com.company.project.entities.MemberAddon;
 import com.company.project.entities.Receipt;
@@ -80,6 +82,16 @@ public class MemberAddonService {
         return MemberAddonResponseDTO.fromEntity(addon);
     }
 
+    /** The receipt this add-on purchase generated, for reprinting from the Add-ons table. */
+    public ReceiptResponseDTO getAddonReceipt(Long id) {
+        MemberAddon addon = memberAddonRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("MemberAddon not found with id: " + id));
+        if (addon.getReceiptId() == null) {
+            throw new EntityNotFoundException("No receipt was generated for add-on " + addon.getTransactionId());
+        }
+        return receiptService.getReceiptById(addon.getReceiptId());
+    }
+
     // ── Write ───────────────────────────────────────────────────────────────
 
     public MemberAddonResponseDTO createAddon(MemberAddonRequestDTO request) {
@@ -115,6 +127,7 @@ public class MemberAddonService {
 
         // First save to get the auto-generated DB id
         MemberAddon saved = memberAddonRepository.save(addon);
+        ReceiptResponseDTO createdReceipt = null;
 
         // Generate the business transaction ID: TXN-XXXXXXXXXX (zero-padded sequential)
         saved.setTransactionId("TXN-" + String.format("%010d", saved.getId()));
@@ -159,6 +172,7 @@ public class MemberAddonService {
                     savedGuardian, targetMember, fee, paidNow, "Add-on",
                     "Add-on: " + (saved.getAddonName() != null ? saved.getAddonName() : "Add-on"),
                     saved.getPaymentBreakdown(), null, null, request.getProcessedByStaffId());
+            createdReceipt = ReceiptResponseDTO.fromEntity(receipt);
 
             // Cash-basis: only post/voucher whatever was actually collected now,
             // never the full add-on fee if part of it is left as a due.
@@ -226,11 +240,18 @@ public class MemberAddonService {
                 receipt.setValidTill(saved.getExpiryDate());
                 receipt.setMembershipType(targetMember.getMembershipType());
                 receipt.setProcessedBy(receiptService.resolveProcessedByName(request.getProcessedByStaffId()));
-                receiptService.createReceipt(receipt);
+                createdReceipt = receiptService.createReceipt(receipt);
             }
         }
 
-        return MemberAddonResponseDTO.fromEntity(saved);
+        if (createdReceipt != null && createdReceipt.getId() != null) {
+            saved.setReceiptId(Long.valueOf(createdReceipt.getId()));
+            saved = memberAddonRepository.save(saved);
+        }
+
+        MemberAddonResponseDTO response = MemberAddonResponseDTO.fromEntity(saved);
+        response.setReceipt(createdReceipt);
+        return response;
     }
 
     public MemberAddonResponseDTO updateAddonStatus(Long id, String status) {

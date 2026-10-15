@@ -121,7 +121,8 @@ export function mapPlanToWizardData(plan?: MembershipPlan): PlanWizardData {
     description: plan.description,
     type: plan.type,
     planType: normalizePlanType(plan.planType),
-    status: plan.status,
+    // The server stores "Active"; the wizard's options are upper-case.
+    status: (plan.status ?? '').toUpperCase(),
     durationType: plan.durationType,
     durationValue: plan.durationValue,
     price: String(plan.price),

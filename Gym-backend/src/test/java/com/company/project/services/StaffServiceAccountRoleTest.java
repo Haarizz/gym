@@ -130,7 +130,9 @@ class StaffServiceAccountRoleTest {
     void neverGrantsThePlatformAdminRole() {
         accountHas(staffRole);
 
-        service.updateStaff(5L, editRoleTo("Gymbios_Admin"));
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.company.project.exceptions.BusinessRuleViolationException.class,
+                () -> service.updateStaff(5L, editRoleTo("Gymbios_Admin")));
 
         verify(userRoleRepository, never()).save(any(UserRole.class));
     }

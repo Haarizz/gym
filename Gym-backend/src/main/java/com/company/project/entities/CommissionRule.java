@@ -23,6 +23,14 @@ public class CommissionRule extends BaseEntity {
     @Column(name = "admission_commission", precision = 5, scale = 2)
     private BigDecimal admissionCommission;
 
+    // POS sales rung up by this role (V88): a percentage of each completed sale's net
+    // amount and/or a fixed amount per completed sale. Null = no POS commission.
+    @Column(name = "pos_commission", precision = 5, scale = 2)
+    private BigDecimal posCommission;
+
+    @Column(name = "pos_commission_per_sale", precision = 10, scale = 2)
+    private BigDecimal posCommissionPerSale;
+
     // JSON: [{"threshold":100,"bonus":2.0},{"threshold":120,"bonus":3.0}]
     @Column(name = "target_bonuses_json", columnDefinition = "TEXT")
     private String targetBonusesJson = "[]";
@@ -35,6 +43,10 @@ public class CommissionRule extends BaseEntity {
     public void setBaseCommission(BigDecimal baseCommission) { this.baseCommission = baseCommission; }
     public BigDecimal getAdmissionCommission() { return admissionCommission; }
     public void setAdmissionCommission(BigDecimal admissionCommission) { this.admissionCommission = admissionCommission; }
+    public BigDecimal getPosCommission() { return posCommission; }
+    public void setPosCommission(BigDecimal posCommission) { this.posCommission = posCommission; }
+    public BigDecimal getPosCommissionPerSale() { return posCommissionPerSale; }
+    public void setPosCommissionPerSale(BigDecimal posCommissionPerSale) { this.posCommissionPerSale = posCommissionPerSale; }
     public String getTargetBonusesJson() { return targetBonusesJson; }
     public void setTargetBonusesJson(String targetBonusesJson) { this.targetBonusesJson = targetBonusesJson; }
 }

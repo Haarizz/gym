@@ -199,6 +199,14 @@ public class MobileStaffLedgerService {
                 formatPercent(progressCalculator.admissionCommissionRate(rule))));
         items.add(new CommissionStructureItemDTO("BASE", "Renewals, add-ons & walk-ins",
                 formatPercent(progressCalculator.baseCommissionRate(rule))));
+        if (progressCalculator.hasPosRates(rule)) {
+            BigDecimal pct = rule.get().getPosCommission();
+            BigDecimal perSale = rule.get().getPosCommissionPerSale();
+            List<String> parts = new ArrayList<>();
+            if (pct != null && pct.signum() > 0) parts.add(formatPercent(pct));
+            if (perSale != null && perSale.signum() > 0) parts.add(perSale.stripTrailingZeros().toPlainString() + " per sale");
+            items.add(new CommissionStructureItemDTO("POS", "POS sales", String.join(" + ", parts)));
+        }
 
         String bonusesJson = rule.map(CommissionRule::getTargetBonusesJson).orElse(null);
         if (bonusesJson != null && !bonusesJson.isBlank()) {

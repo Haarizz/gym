@@ -512,7 +512,7 @@ export function PriceCheckDialog({ open, onOpenChange, products, onAdd }: {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#2B7A78" }}><Money value={p.sellingPrice} /></div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)" }}><Money value={p.sellingPrice} /></div>
                   <Button size="sm" variant="outline" className="mt-2" onClick={() => { onAdd(p); onOpenChange(false); }}>Add to sale</Button>
                 </div>
               </div>

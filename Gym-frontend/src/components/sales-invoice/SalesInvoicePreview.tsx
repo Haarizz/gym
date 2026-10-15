@@ -380,7 +380,7 @@ function InvoiceRecord({
             </div>
           </RailCard>
           {settled && (
-            <div className={cx(styles.notice, styles.noticeInfo)} style={{ background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}>
+            <div className={cx(styles.notice, styles.noticeInfo)} style={{ background: 'light-dark(#ecfdf5, oklch(27% 0.039 166.1))', borderColor: 'light-dark(#a7f3d0, oklch(38% 0.08 164.2))', color: 'light-dark(#065f46, oklch(82% 0.086 166.9))' }}>
               <CheckCircle2 size={14} style={{ flexShrink: 0, marginTop: 2 }} /> This invoice is fully settled.
             </div>
           )}

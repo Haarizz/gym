@@ -217,7 +217,7 @@ export function FreezeTransactionHistory({
   };
 
   return (
-    <Card id="freeze-history" className="mt-6 shadow-sm" style={{ borderColor: "rgba(43, 122, 120, 0.2)" }}>
+    <Card id="freeze-history" className="mt-6 shadow-sm" style={{ borderColor: "color-mix(in srgb, var(--primary) 20%, transparent)" }}>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -266,7 +266,7 @@ export function FreezeTransactionHistory({
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow style={{ background: "rgba(223, 245, 244, 0.5)" }}>
+                <TableRow style={{ background: "color-mix(in srgb, var(--primary-soft) 50%, transparent)" }}>
                   <TableHead>Receipt No</TableHead>
                   <TableHead>Transaction ID</TableHead>
                   <TableHead>Member Details</TableHead>

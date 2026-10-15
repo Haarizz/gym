@@ -518,7 +518,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
             <Button
               variant={viewMode === 'book' ? 'default' : 'outline'}
               onClick={() => setViewMode('book')}
-              style={viewMode === 'book' ? { backgroundColor: '#327F74' } : {}}
+              style={viewMode === 'book' ? { backgroundColor: 'var(--primary)' } : {}}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Book Session
@@ -526,7 +526,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
             <Button
               variant={viewMode === 'sessions' ? 'default' : 'outline'}
               onClick={() => setViewMode('sessions')}
-              style={viewMode === 'sessions' ? { backgroundColor: '#327F74' } : {}}
+              style={viewMode === 'sessions' ? { backgroundColor: 'var(--primary)' } : {}}
             >
               <Clock className="h-4 w-4 mr-2" />
               My Sessions
@@ -975,7 +975,7 @@ export function BookSession({ onNavigate }: BookSessionProps = {}) {
                   {/* Confirm Button */}
                   <Button
                     className="w-full h-12 text-lg"
-                    style={{ backgroundColor: '#327F74' }}
+                    style={{ backgroundColor: 'var(--primary)' }}
                     onClick={handleConfirmBooking}
                     disabled={bookingLoading}
                   >

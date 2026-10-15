@@ -38,6 +38,11 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
            "AND LOWER(s.type) <> 'pt' GROUP BY s.name ORDER BY s.name")
     List<Object[]> sumClassCapacityByNameBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
+    // Non-cancelled PT sessions in the period across every trainer (institution-wide targets)
+    @Query("SELECT COUNT(s) FROM TrainingSession s WHERE LOWER(s.type) = 'pt' " +
+           "AND LOWER(s.status) <> 'cancelled' AND s.date BETWEEN :start AND :end")
+    long countPtSessionsBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
     // (trainerId, sessionCount) for non-cancelled PT sessions in the period
     @Query("SELECT s.trainer.id, COUNT(s) FROM TrainingSession s " +
            "WHERE s.trainer.id IN :trainerIds AND LOWER(s.type) = 'pt' " +

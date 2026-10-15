@@ -100,19 +100,13 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        if (request.getRoles() == null || request.getRoles().isEmpty()) {
-            Role userRoleEntity = roleRepository.findByRoleName("USER")
-                    .orElseThrow(() -> new RuntimeException("Error: Role 'USER' is not found."));
-            UserRole userRole = new UserRole(null, user, userRoleEntity);
-            userRoleRepository.save(userRole);
-        } else {
-            for (String roleName : request.getRoles()) {
-                Role roleEntity = roleRepository.findByRoleName(roleName)
-                        .orElseThrow(() -> new RuntimeException("Error: Role '" + roleName + "' is not found."));
-                UserRole userRole = new UserRole(null, user, roleEntity);
-                userRoleRepository.save(userRole);
-            }
-        }
+        // This endpoint is public, so any "roles" in the request are ignored: a
+        // self-registered account always gets the basic USER role. Honouring them let
+        // anyone sign up as GYMBIOS_ADMIN (platform owner) or ADMIN. Real roles are
+        // given through Staffs & Trainers or Gym Management, which check the caller.
+        Role userRoleEntity = roleRepository.findByRoleName("USER")
+                .orElseThrow(() -> new RuntimeException("Error: Role 'USER' is not found."));
+        userRoleRepository.save(new UserRole(null, user, userRoleEntity));
     }
 
     public AuthResponseDTO login(AuthRequestDTO request) {

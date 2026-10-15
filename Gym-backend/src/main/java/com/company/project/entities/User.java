@@ -28,6 +28,10 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /** The user's own UI theme: "light", "dark" or "system"; null = never chosen (V89). */
+    @Column(name = "theme_preference", length = 10)
+    private String themePreference;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private Set<UserRole> userRoles = new HashSet<>();
 
@@ -57,6 +61,8 @@ public class User extends BaseEntity {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public String getThemePreference() { return themePreference; }
+    public void setThemePreference(String themePreference) { this.themePreference = themePreference; }
 
     public Set<UserRole> getUserRoles() { return userRoles; }
     public void setUserRoles(Set<UserRole> userRoles) { this.userRoles = userRoles; }

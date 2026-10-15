@@ -612,8 +612,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                       style={{
                         padding: '6px 14px',
                         border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                        background: active ? 'var(--primary)' : '#fff',
-                        color: active ? '#fff' : 'var(--muted-foreground)',
+                        background: active ? 'var(--primary)' : 'var(--card)',
+                        color: active ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
                       }}
                     >
                       {p.label}
@@ -621,8 +621,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         className="rounded-full text-xs font-semibold"
                         style={{
                           padding: '1px 8px',
-                          background: active ? 'rgba(255,255,255,0.22)' : '#f1f5f9',
-                          color: active ? '#fff' : 'var(--muted-foreground)',
+                          background: active ? 'color-mix(in srgb, var(--primary-foreground) 22%, transparent)' : 'light-dark(#f1f5f9, var(--muted-bg))',
+                          color: active ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
                         }}
                       >
                         {count}
@@ -1001,7 +1001,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <UserRoundSearch className="h-5 w-5" style={{ color: '#2B7A78' }} />Generate Statement of Account
+                <UserRoundSearch className="h-5 w-5" style={{ color: 'var(--primary)' }} />Generate Statement of Account
               </CardTitle>
               <CardDescription>Select a member to see every receipt billed and paid against them, in one place</CardDescription>
             </CardHeader>
@@ -1070,7 +1070,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </div>
               <div className="mt-4 flex gap-2">
                 <Button
-                  style={{ backgroundColor: '#2B7A78' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   className="text-white"
                   disabled={!soaSelectedMember || soaLoading}
                   onClick={handleGenerateStatement}
@@ -1250,8 +1250,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     <YAxis tickFormatter={(v) => `${currencyCode} ${(v/1000).toFixed(0)}k`} />
                     <Tooltip formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
                     <Legend />
-                    <Bar dataKey="collected" fill="#2B7A78" name="Collected" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="target"    fill="#DFF5F4" name="Target"    radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="collected" fill="#0F766E" name="Collected" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="target"    fill="#E0F5F2" name="Target"    radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -1468,7 +1468,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5" style={{ color: '#2B7A78' }} />Send Receipt
+              <Send className="h-5 w-5" style={{ color: 'var(--primary)' }} />Send Receipt
             </DialogTitle>
             <DialogDescription>
               {sendingReceipt?.receipt_no} — {sendingReceipt?.member_name}
@@ -1501,7 +1501,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             <Button variant="outline" onClick={() => { setSendingReceipt(null); setSendChannels([]); }}>Cancel</Button>
             <Button
               disabled={sendChannels.length === 0}
-              style={{ backgroundColor: '#2B7A78' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               className="text-white"
               onClick={handleSendReceipt}
             >
@@ -1547,7 +1547,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             <Button variant="outline" onClick={() => { setReminderMember(null); setBulkReminderOpen(false); }}>Cancel</Button>
             <Button
               disabled={reminderChannels.length === 0}
-              style={{ backgroundColor: '#2B7A78' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               className="text-white"
               onClick={handleSendReminder}
             >

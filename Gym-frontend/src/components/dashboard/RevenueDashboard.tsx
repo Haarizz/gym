@@ -75,14 +75,14 @@ interface DateRange {
 
 // GymBios palette
 const COLORS = {
-  primary: '#2B7A78',
-  accent: '#E63946',
+  primary: '#0F766E',
+  accent: '#B91C1C',
   cash: '#10B981',
   card: '#3B82F6',
   other: '#F59E0B',
 };
 
-const CHART_COLORS = ['#2B7A78', '#3B82F6', '#10B981', '#F59E0B', '#E63946', '#8B5CF6', '#EC4899'];
+const CHART_COLORS = ['#0F766E', '#3B82F6', '#10B981', '#F59E0B', '#B91C1C', '#8B5CF6', '#EC4899'];
 
 // Labelled by the period each preset covers (see presetRange) — "Daily" used to read
 // as "today" although it shows the last 7 days, one point per day.

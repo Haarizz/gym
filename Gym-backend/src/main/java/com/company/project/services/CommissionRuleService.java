@@ -39,6 +39,8 @@ public class CommissionRuleService {
         rule.setRole(req.getRole());
         rule.setBaseCommission(req.getBaseCommission());
         rule.setAdmissionCommission(req.getAdmissionCommission());
+        rule.setPosCommission(nonNegative(req.getPosCommission(), "POS commission %"));
+        rule.setPosCommissionPerSale(nonNegative(req.getPosCommissionPerSale(), "POS commission per sale"));
         if (req.getTargetBonusesJson() != null) rule.setTargetBonusesJson(req.getTargetBonusesJson());
         return CommissionRuleResponseDTO.fromEntity(ruleRepository.save(rule));
     }
@@ -49,8 +51,17 @@ public class CommissionRuleService {
         if (req.getRole() != null) rule.setRole(req.getRole());
         if (req.getBaseCommission() != null) rule.setBaseCommission(req.getBaseCommission());
         if (req.getAdmissionCommission() != null) rule.setAdmissionCommission(req.getAdmissionCommission());
+        if (req.getPosCommission() != null) rule.setPosCommission(nonNegative(req.getPosCommission(), "POS commission %"));
+        if (req.getPosCommissionPerSale() != null) rule.setPosCommissionPerSale(nonNegative(req.getPosCommissionPerSale(), "POS commission per sale"));
         if (req.getTargetBonusesJson() != null) rule.setTargetBonusesJson(req.getTargetBonusesJson());
         return CommissionRuleResponseDTO.fromEntity(ruleRepository.save(rule));
+    }
+
+    private static java.math.BigDecimal nonNegative(java.math.BigDecimal value, String label) {
+        if (value != null && value.signum() < 0) {
+            throw new com.company.project.exceptions.BusinessRuleViolationException(label + " can't be negative");
+        }
+        return value;
     }
 
     public void deleteRule(Long id) {

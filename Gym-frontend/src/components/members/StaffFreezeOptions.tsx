@@ -80,7 +80,7 @@ export function StaffFreezeOptions({
   return (
     <div className="space-y-3">
       {days > 0 && (
-        <div className="rounded-lg border p-4 space-y-2 text-sm" style={{ borderColor: 'rgba(43, 122, 120, 0.3)' }}>
+        <div className="rounded-lg border p-4 space-y-2 text-sm" style={{ borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)' }}>
           <div className="flex items-center justify-between">
             <span className="text-gray-600">Total Days</span>
             <span className="font-bold text-gray-900">{days} days</span>
@@ -98,7 +98,7 @@ export function StaffFreezeOptions({
               <div className="flex items-start justify-between pt-2 border-t border-gray-200">
                 <span className="font-medium text-gray-900">Charge for Extra Days</span>
                 <div className="text-right">
-                  <p className="font-bold" style={{ color: waiveCharge ? '#6B7280' : '#E63946', textDecoration: waiveCharge ? 'line-through' : undefined }}>
+                  <p className="font-bold" style={{ color: waiveCharge ? 'light-dark(#6B7280, oklch(82% 0.023 264.4))' : 'var(--danger)', textDecoration: waiveCharge ? 'line-through' : undefined }}>
                     <CurrencyGlyph /> {charge.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -132,8 +132,8 @@ export function StaffFreezeOptions({
         </div>
       )}
 
-      <div className="flex items-start gap-2 rounded-lg p-3 text-xs text-gray-600" style={{ border: '1px solid rgba(43, 122, 120, 0.2)' }}>
-        <Info className="h-4 w-4 shrink-0" style={{ color: '#2B7A78' }} />
+      <div className="flex items-start gap-2 rounded-lg p-3 text-xs text-gray-600" style={{ border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
+        <Info className="h-4 w-4 shrink-0" style={{ color: 'var(--primary)' }} />
         <span>
           {allowance.autoUnfreeze
             ? <>This plan unfreezes automatically — the membership reactivates on {endDate ? format(addDays(endDate, 1), 'dd MMM yyyy') : 'the day after the end date'}.</>

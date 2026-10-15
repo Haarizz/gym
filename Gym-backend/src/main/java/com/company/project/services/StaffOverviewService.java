@@ -117,6 +117,7 @@ public class StaffOverviewService {
             dto.setStaffId(String.valueOf(s.getId()));
 
             BigDecimal achieved = progressCalculator.computeRevenue(s, username, startOfMonth, startOfNextMonth);
+            dto.setCommissionEarned(progressCalculator.computeCommission(s, username, startOfMonth, startOfNextMonth));
             BigDecimal target = BigDecimal.ZERO;
             Optional<StaffTarget> targetOpt = staffTargetRepository
                     .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(s.getId(), today.getYear(), today.getMonthValue())

@@ -3,10 +3,14 @@ package com.company.project.services;
 import com.company.project.entities.CommissionRule;
 import com.company.project.entities.Lead;
 import com.company.project.entities.Receipt;
+import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.Staff;
 import com.company.project.repositories.CommissionRuleRepository;
 import com.company.project.repositories.LeadRepository;
 import com.company.project.repositories.ReceiptRepository;
+import com.company.project.repositories.SaleTransactionItemRepository;
+import com.company.project.repositories.SaleTransactionRepository;
+import com.company.project.repositories.TrainingSessionRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -48,12 +52,21 @@ public class StaffProgressCalculator {
     private final ReceiptRepository receiptRepository;
     private final LeadRepository leadRepository;
     private final CommissionRuleRepository commissionRuleRepository;
+    private final SaleTransactionRepository saleTransactionRepository;
+    private final SaleTransactionItemRepository saleTransactionItemRepository;
+    private final TrainingSessionRepository trainingSessionRepository;
 
     public StaffProgressCalculator(ReceiptRepository receiptRepository, LeadRepository leadRepository,
-                                   CommissionRuleRepository commissionRuleRepository) {
+                                   CommissionRuleRepository commissionRuleRepository,
+                                   SaleTransactionRepository saleTransactionRepository,
+                                   SaleTransactionItemRepository saleTransactionItemRepository,
+                                   TrainingSessionRepository trainingSessionRepository) {
         this.receiptRepository = receiptRepository;
         this.leadRepository = leadRepository;
         this.commissionRuleRepository = commissionRuleRepository;
+        this.saleTransactionRepository = saleTransactionRepository;
+        this.saleTransactionItemRepository = saleTransactionItemRepository;
+        this.trainingSessionRepository = trainingSessionRepository;
     }
 
     /** The commission rule configured for the staff member's role, if any. */
@@ -80,33 +93,200 @@ public class StaffProgressCalculator {
      * configured CommissionRule.
      */
     public BigDecimal computeCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        return computeCommission(staff, username, start, end, computeRevenue(staff, username, start, end));
+        // Membership payments only: POS sales are commissioned at the POS rates below, never
+        // also at the base rate, even though both count toward the revenue target.
+        Optional<CommissionRule> rule = findCommissionRule(staff);
+        BigDecimal membershipRevenue = computeMembershipRevenue(staff, username, start, end);
+        BigDecimal admissionRevenue = computeRevenue(staff, username, start, end, "New");
+        BigDecimal otherRevenue = membershipRevenue.subtract(admissionRevenue).max(BigDecimal.ZERO);
+        return commissionOn(admissionRevenue, admissionCommissionRate(rule))
+                .add(commissionOn(otherRevenue, baseCommissionRate(rule)))
+                .add(computePosCommission(rule, username, start, end));
     }
 
-    /** Same as the 4-arg overload, reusing an already computed total revenue for the range. */
-    public BigDecimal computeCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end, BigDecimal totalRevenue) {
-        Optional<CommissionRule> rule = findCommissionRule(staff);
-        BigDecimal admissionRevenue = computeRevenue(staff, username, start, end, "New");
-        BigDecimal otherRevenue = totalRevenue.subtract(admissionRevenue).max(BigDecimal.ZERO);
-        return commissionOn(admissionRevenue, admissionCommissionRate(rule))
-                .add(commissionOn(otherRevenue, baseCommissionRate(rule)));
+    /**
+     * Commission on POS sales the staff member rang up (sale_transactions.created_by is the
+     * cashier's login): the role's posCommission % of each completed sale's net amount (total
+     * minus refunds) plus its posCommissionPerSale for every completed sale. Fully refunded
+     * and voided sales earn nothing. Zero when the role has no POS rates.
+     */
+    public BigDecimal computePosCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        return computePosCommission(findCommissionRule(staff), username, start, end);
+    }
+
+    private BigDecimal computePosCommission(Optional<CommissionRule> rule, String username,
+                                            LocalDateTime start, LocalDateTime end) {
+        if (!hasPosRates(rule) || username == null || username.isBlank()) return BigDecimal.ZERO;
+        return posSales(username, start, end).stream()
+                .map(sale -> posCommissionOn(sale, rule))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Completed POS sales rung up by this login in the range, newest first. */
+    public List<SaleTransaction> posSales(String username, LocalDateTime start, LocalDateTime end) {
+        return completedSales(username, start, end);
+    }
+
+    /** Completed POS sales in the range, by one cashier login or (null) by everyone. */
+    private List<SaleTransaction> completedSales(String cashierOrAll, LocalDateTime start, LocalDateTime end) {
+        Specification<SaleTransaction> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (cashierOrAll != null) predicates.add(cb.equal(root.get("createdBy"), cashierOrAll));
+            predicates.add(cb.equal(root.get("status"), "COMPLETED"));
+            predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), start));
+            predicates.add(cb.lessThan(root.get("createdAt"), end));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return saleTransactionRepository.findAll(spec, org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+    }
+
+    // ── Whole gym (institution-wide targets) ─────────────────────────────────
+
+    /**
+     * Revenue toward an institution-wide target: every membership payment received plus every
+     * completed POS sale (net of refunds) in the range, whoever took it — including the owner
+     * and sales with no staff attached. Scoped to the active branch by the branch filter.
+     */
+    public BigDecimal computeGymRevenue(LocalDateTime start, LocalDateTime end) {
+        BigDecimal membership = receiptRepository.findAll(receiptSpec(null, null, start, end, null)).stream()
+                .map(StaffProgressCalculator::receivedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pos = completedSales(null, start, end).stream()
+                .map(StaffProgressCalculator::posNet)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return membership.add(pos);
+    }
+
+    /** Units across the whole gym in the range (same unit types as computeUnits). */
+    public java.util.Map<String, Integer> computeGymUnits(LocalDateTime start, LocalDateTime end) {
+        return countUnits(null, null, true, start, end);
+    }
+
+    public boolean hasPosRates(Optional<CommissionRule> rule) {
+        return rule.map(r -> positive(r.getPosCommission()) || positive(r.getPosCommissionPerSale())).orElse(false);
+    }
+
+    /** One sale's POS commission: % of its net amount plus the fixed per-sale amount. */
+    public BigDecimal posCommissionOn(SaleTransaction sale, Optional<CommissionRule> rule) {
+        if (rule.isEmpty()) return BigDecimal.ZERO;
+        BigDecimal net = posNet(sale);
+        BigDecimal commission = positive(rule.get().getPosCommission())
+                ? commissionOn(net, rule.get().getPosCommission())
+                : BigDecimal.ZERO;
+        if (positive(rule.get().getPosCommissionPerSale())) {
+            commission = commission.add(rule.get().getPosCommissionPerSale());
+        }
+        return commission;
+    }
+
+    private static boolean positive(BigDecimal value) {
+        return value != null && value.signum() > 0;
     }
 
     public BigDecimal commissionOn(BigDecimal revenue, BigDecimal ratePercent) {
         return revenue.multiply(ratePercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Revenue toward the staff member's target: membership payments they took plus POS sales
+     * they rang up (net of refunds). Both ways of selling fill the same target.
+     */
     public BigDecimal computeRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        return computeMembershipRevenue(staff, username, start, end).add(computePosRevenue(username, start, end));
+    }
+
+    /** Money received on membership receipts (admissions, renewals, add-ons, walk-ins) only. */
+    public BigDecimal computeMembershipRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
         return computeRevenue(staff, username, start, end, null);
     }
 
+    /** Net (after refunds) value of the completed POS sales this login rang up in the range. */
+    public BigDecimal computePosRevenue(String username, LocalDateTime start, LocalDateTime end) {
+        if (username == null || username.isBlank()) return BigDecimal.ZERO;
+        return posSales(username, start, end).stream()
+                .map(StaffProgressCalculator::posNet)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal posNet(SaleTransaction sale) {
+        BigDecimal total = sale.getTotalAmount() != null ? sale.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal refunded = sale.getRefundedAmount() != null ? sale.getRefundedAmount() : BigDecimal.ZERO;
+        return total.subtract(refunded).max(BigDecimal.ZERO);
+    }
+
     /**
-     * Same as the 4-arg overload, but optionally restricted to one Receipt.transactionType
+     * Membership receipts only, optionally restricted to one Receipt.transactionType
      * (e.g. "New" for admissions) — lets commission calculations apply a different rate to
      * new-member admissions than to renewals/add-ons/walk-ins.
      */
     public BigDecimal computeRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end, String transactionType) {
-        Specification<Receipt> spec = (root, query, cb) -> {
+        List<Receipt> receipts = receiptRepository.findAll(receiptSpec(staff, username, start, end, transactionType));
+        return receipts.stream()
+                .map(StaffProgressCalculator::receivedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Unit types a target can count (Set Targets › unit targets), keyed as stored in unit_targets_json. */
+    public static final List<String> UNIT_TYPES =
+            List.of("admissions", "renewals", "addons", "walkins", "pos_sales", "pos_items", "pt_sessions");
+
+    /** Receipt.transactionType behind each membership unit type. */
+    private static final java.util.Map<String, String> RECEIPT_UNIT_TYPES = java.util.Map.of(
+            "New", "admissions", "Renewal", "renewals", "Add-on", "addons", "Daily Entry", "walkins");
+
+    /**
+     * Units the staff member sold in the range, by unit type: membership receipts they took
+     * (admissions, renewals, add-ons, walk-ins; instalment "Payment" receipts aren't new units)
+     * POS sales they rang up (completed sales, and the items on them), and PT sessions they
+     * delivered as the trainer (not cancelled, and dated today or earlier: a session booked for
+     * later this month counts once its day arrives).
+     */
+    public java.util.Map<String, Integer> computeUnits(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        return countUnits(staff, username, false, start, end);
+    }
+
+    private java.util.Map<String, Integer> countUnits(Staff staff, String username, boolean wholeGym,
+                                                      LocalDateTime start, LocalDateTime end) {
+        java.util.Map<String, Integer> units = new java.util.LinkedHashMap<>();
+        UNIT_TYPES.forEach(type -> units.put(type, 0));
+        for (Receipt r : receiptRepository.findAll(receiptSpec(staff, username, start, end, null))) {
+            String type = RECEIPT_UNIT_TYPES.get(r.getTransactionType());
+            if (type != null) units.merge(type, 1, Integer::sum);
+        }
+        if (wholeGym || (username != null && !username.isBlank())) {
+            List<SaleTransaction> sales = completedSales(wholeGym ? null : username, start, end);
+            units.put("pos_sales", sales.size());
+            if (!sales.isEmpty()) {
+                int items = saleTransactionItemRepository
+                        .findByTransactionIdIn(sales.stream().map(SaleTransaction::getId).toList())
+                        .stream()
+                        .mapToInt(i -> i.getQuantity() != null ? i.getQuantity() : 0)
+                        .sum();
+                units.put("pos_items", items);
+            }
+        }
+        if (wholeGym || staff.getId() != null) {
+            java.time.LocalDate from = start.toLocalDate();
+            java.time.LocalDate lastDay = end.toLocalDate().minusDays(1);
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate to = lastDay.isAfter(today) ? today : lastDay;
+            if (!to.isBefore(from)) {
+                int pt = wholeGym
+                        ? (int) trainingSessionRepository.countPtSessionsBetween(from, to)
+                        : trainingSessionRepository
+                                .countPtSessionsByTrainerBetween(List.of(staff.getId()), from, to).stream()
+                                .mapToInt(row -> ((Number) row[1]).intValue())
+                                .sum();
+                units.put("pt_sessions", pt);
+            }
+        }
+        return units;
+    }
+
+    private Specification<Receipt> receiptSpec(Staff staff, String username, LocalDateTime start, LocalDateTime end,
+                                               String transactionType) {
+        return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(root.get("status").in(REVENUE_RECEIPT_STATUSES));
             predicates.add(cb.or(
@@ -117,7 +297,7 @@ public class StaffProgressCalculator {
                             cb.greaterThanOrEqualTo(root.get("createdAt"), start),
                             cb.lessThan(root.get("createdAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
+            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
                         cb.equal(root.get("createdBy"), username)
@@ -128,11 +308,6 @@ public class StaffProgressCalculator {
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-
-        List<Receipt> receipts = receiptRepository.findAll(spec);
-        return receipts.stream()
-                .map(StaffProgressCalculator::receivedAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public int computeConversions(Staff staff, String username, LocalDateTime start, LocalDateTime end) {

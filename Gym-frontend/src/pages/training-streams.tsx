@@ -73,6 +73,26 @@ const emptyForm = (): TrainingStreamRequest => ({
   stream_type: 'live',
 });
 
+// Mirrors TrainingStreamService's checks so bad values get a clear message
+// here instead of a server error (BG_114).
+const MAX_DURATION_MINUTES = 1440;
+function streamFormError(f: Partial<TrainingStreamRequest>): string | null {
+  if (!f.title?.trim()) return 'Stream title is required';
+  if (!f.category) return 'Select a category';
+  const d = f.duration;
+  if (d == null || !Number.isInteger(d) || d < 1 || d > MAX_DURATION_MINUTES) {
+    return `Duration must be a whole number between 1 and ${MAX_DURATION_MINUTES} minutes`;
+  }
+  const m = f.max_participants;
+  if (m != null && (!Number.isInteger(m) || m < 1 || m > 2147483647)) {
+    return 'Max participants must be a whole number of at least 1 (leave it empty for no limit)';
+  }
+  if (f.scheduled_time && !/^d{4}-d{2}-d{2}Td{2}:d{2}/.test(f.scheduled_time)) {
+    return 'Enter a valid schedule date';
+  }
+  return null;
+}
+
 export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
   const [streams, setStreams] = useState<TrainingStreamApi[]>([]);
   const [analytics, setAnalytics] = useState<TrainingStreamAnalytics | null>(null);
@@ -164,7 +184,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
 
   // --- Create Stream ---
   const handleCreate = async () => {
-    if (!createForm.title || !createForm.category || !createForm.duration) return;
+    const formError = streamFormError(createForm);
+    if (formError) { alert(formError); return; }
     try {
       setCreating(true);
       const created = await trainingStreamsService.createStream(createForm);
@@ -198,6 +219,8 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
 
   const handleSaveEdit = async () => {
     if (!editStream) return;
+    const formError = streamFormError(editForm);
+    if (formError) { alert(formError); return; }
     try {
       setSaving(true);
       const updated = await trainingStreamsService.updateStream(editStream.id, editForm);
@@ -415,13 +438,13 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                   </div>
                   <div className="space-y-2">
                     <Label>Max Participants</Label>
-                    <Input type="number" value={createForm.max_participants ?? ''} onChange={e => setCreateForm(f => ({ ...f, max_participants: Number(e.target.value) }))} />
+                    <Input type="number" value={createForm.max_participants ?? ''} onChange={e => setCreateForm(f => ({ ...f, max_participants: e.target.value === '' ? null : Number(e.target.value) }))} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Schedule Date</Label>
-                    <Input type="date" onChange={e => {
+                    <Input type="date" max="9999-12-31" onChange={e => {
                       const time = createForm.scheduled_time?.split('T')[1] ?? '00:00';
                       setCreateForm(f => ({ ...f, scheduled_time: e.target.value ? `${e.target.value}T${time}` : null }));
                     }} />
@@ -615,7 +638,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                                 )}
                               </div>
                               {stream.description && (
-                                <p className="text-sm text-muted-foreground">{stream.description}</p>
+                                <p className="text-sm text-muted-foreground" style={{ overflowWrap: "anywhere" }}>{stream.description}</p>
                               )}
                               <div className="flex items-center space-x-4 mt-3 text-sm">
                                 <div className="flex items-center">
@@ -1010,7 +1033,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 </div>
               </div>
               {viewStream.description && (
-                <p className="text-sm text-muted-foreground border-t pt-3">{viewStream.description}</p>
+                <p className="text-sm text-muted-foreground border-t pt-3" style={{ overflowWrap: "anywhere" }}>{viewStream.description}</p>
               )}
               {viewStream.stream_url && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground border-t pt-3">
@@ -1180,7 +1203,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 </div>
               </div>
               {watchStream.description && (
-                <p className="text-sm text-muted-foreground border-t pt-3">{watchStream.description}</p>
+                <p className="text-sm text-muted-foreground border-t pt-3" style={{ overflowWrap: "anywhere" }}>{watchStream.description}</p>
               )}
             </div>
             <div className="flex justify-between">
@@ -1247,7 +1270,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 </div>
                 <div className="space-y-2">
                   <Label>Max Participants</Label>
-                  <Input type="number" value={editForm.max_participants ?? ''} onChange={e => setEditForm(f => ({ ...f, max_participants: Number(e.target.value) }))} />
+                  <Input type="number" value={editForm.max_participants ?? ''} onChange={e => setEditForm(f => ({ ...f, max_participants: e.target.value === '' ? null : Number(e.target.value) }))} />
                 </div>
               </div>
               <div className="space-y-2">

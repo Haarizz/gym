@@ -71,6 +71,47 @@ import {
 } from "recharts";
 import { cn } from "../components/ui/utils";
 import { format } from "date-fns";
+import { unitLabel } from "../utils/target-units";
+
+type UnitTarget = { service: string; target_units: number; achieved_units: number };
+
+function parseUnitTargets(json?: string): UnitTarget[] {
+  try { return JSON.parse(json || '[]'); } catch { return []; }
+}
+
+/**
+ * A target's unit figures for Units View: progress over its unit targets when it has any;
+ * the live units sold (memberships + POS bills) either way.
+ */
+function unitStats(t: StaffTarget) {
+  const unitTargets = parseUnitTargets(t.unit_targets_json);
+  const units = t.units_achieved || {};
+  const target = unitTargets.reduce((n, u) => n + (Number(u.target_units) || 0), 0);
+  const achievedOnTargets = unitTargets.reduce((n, u) => n + (Number(u.achieved_units) || 0), 0);
+  const sold = (units.admissions || 0) + (units.renewals || 0) + (units.addons || 0)
+    + (units.walkins || 0) + (units.pos_sales || 0) + (units.pt_sessions || 0);
+  return {
+    unitTargets,
+    units,
+    target,
+    achieved: target > 0 ? achievedOnTargets : sold,
+    sold,
+    percentage: target > 0 ? Math.round((achievedOnTargets / target) * 1000) / 10 : 0,
+  };
+}
+
+/** "2 new admissions · 1 renewal · 3 POS sales (6 items)" */
+function unitsBreakdown(units: Record<string, number>): string {
+  const parts: string[] = [];
+  const add = (n: number | undefined, one: string, many: string) => { if (n) parts.push(`${n} ${n === 1 ? one : many}`); };
+  add(units.admissions, 'admission', 'admissions');
+  add(units.renewals, 'renewal', 'renewals');
+  add(units.addons, 'add-on', 'add-ons');
+  add(units.walkins, 'walk-in', 'walk-ins');
+  add(units.pt_sessions, 'PT session', 'PT sessions');
+  if (units.pos_sales) parts.push(`${units.pos_sales} POS ${units.pos_sales === 1 ? 'sale' : 'sales'} (${units.pos_items || 0} items)`);
+  return parts.length ? parts.join(' · ') : 'No units sold yet';
+}
 
 const COLORS = {
   primary: "#0047AB",
@@ -140,12 +181,18 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
     individualTargets.forEach(t => {
       const dept = t.staff_department || 'Unknown';
       if (!deptMap[dept]) deptMap[dept] = { department: dept, target: 0, achieved: 0, staff: 0 };
-      deptMap[dept].target += t.revenue_target || 0;
-      deptMap[dept].achieved += t.revenue_achieved || 0;
+      if (viewMode === 'units') {
+        const u = unitStats(t);
+        deptMap[dept].target += u.target;
+        deptMap[dept].achieved += u.achieved;
+      } else {
+        deptMap[dept].target += t.revenue_target || 0;
+        deptMap[dept].achieved += t.revenue_achieved || 0;
+      }
       deptMap[dept].staff += 1;
     });
     return Object.values(deptMap);
-  }, [individualTargets]);
+  }, [individualTargets, viewMode]);
 
   // Trend data is not available week-by-week from the API; use empty array
   const trendData: Array<{date: string; target: number; actual: number; forecast: number}> = [];
@@ -499,12 +546,25 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
               </SelectContent>
             </Select>
 
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "revenue" | "units")}>
-              <TabsList>
-                <TabsTrigger value="revenue">Revenue View</TabsTrigger>
-                <TabsTrigger value="units">Units View</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* Plain buttons so the active view is unmistakable (filled vs outline). */}
+            <div className="flex items-center gap-1" role="group" aria-label="Leaderboard view">
+              <Button
+                size="sm"
+                variant={viewMode === "revenue" ? "default" : "outline"}
+                aria-pressed={viewMode === "revenue"}
+                onClick={() => setViewMode("revenue")}
+              >
+                <DollarSign className="h-4 w-4 mr-1" /> Revenue View
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === "units" ? "default" : "outline"}
+                aria-pressed={viewMode === "units"}
+                onClick={() => setViewMode("units")}
+              >
+                <Target className="h-4 w-4 mr-1" /> Units View
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -526,10 +586,10 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                   <TableHead className="w-[50px]"></TableHead>
                   <TableHead>Staff</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Target ({currencyCode})</TableHead>
-                  <TableHead>Achieved ({currencyCode})</TableHead>
+                  <TableHead>{viewMode === 'units' ? 'Target (units)' : `Target (${currencyCode})`}</TableHead>
+                  <TableHead>{viewMode === 'units' ? 'Achieved (units)' : `Achieved (${currencyCode})`}</TableHead>
                   <TableHead>Progress</TableHead>
-                  <TableHead>Commission</TableHead>
+                  <TableHead>{viewMode === 'units' ? 'Units sold' : 'Commission'}</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Forecast</TableHead>
                   <TableHead>Actions</TableHead>
@@ -549,13 +609,15 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                     </TableCell>
                   </TableRow>
                 ) : filteredStaffData.map((t) => {
-                  const pct = t.percentage || 0;
+                  const u = unitStats(t);
+                  const unitsMode = viewMode === 'units';
+                  const pct = unitsMode ? u.percentage : (t.percentage || 0);
+                  const hasUnitTargets = u.target > 0;
                   const forecast = t.forecast || 0;
                   const achieved = t.revenue_achieved || 0;
                   const commission = t.commission_earned || 0;
                   const staffROI = achieved > 0 ? ((achieved - commission) / achieved * 100) : 0;
-                  let unitTargets: Array<{service: string; target_units: number; achieved_units: number}> = [];
-                  try { unitTargets = JSON.parse(t.unit_targets_json || '[]'); } catch {}
+                  const unitTargets = u.unitTargets;
 
                   return (
                     <React.Fragment key={t.id}>
@@ -593,11 +655,19 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium"><CurrencyGlyph /> {(t.revenue_target || 0).toLocaleString()}</span>
+                          {unitsMode ? (
+                            <span className="font-medium">{hasUnitTargets ? `${u.target.toLocaleString()} units` : '—'}</span>
+                          ) : (
+                            <span className="font-medium"><CurrencyGlyph /> {(t.revenue_target || 0).toLocaleString()}</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <span className="font-medium"><CurrencyGlyph /> {achieved.toLocaleString()}</span>
+                            {unitsMode ? (
+                              <span className="font-medium">{u.achieved.toLocaleString()} units</span>
+                            ) : (
+                              <span className="font-medium"><CurrencyGlyph /> {achieved.toLocaleString()}</span>
+                            )}
                             {t.trend === "up" ? (
                               <ArrowUp className="h-4 w-4 text-success" />
                             ) : (
@@ -608,7 +678,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                         <TableCell>
                           <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium">{pct.toFixed(1)}%</span>
+                              <span className="text-sm font-medium">{unitsMode && !hasUnitTargets ? 'No unit targets' : `${pct.toFixed(1)}%`}</span>
                               <span className="text-xs text-muted-foreground">
                                 <BarChart3 className="h-3 w-3 mr-1 inline" />
                                 {pct >= 85 ? "Excellent" : pct >= 70 ? "Good" : "Needs Attention"}
@@ -622,9 +692,13 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium text-foreground">
-                            <CurrencyGlyph /> {commission.toLocaleString()}
-                          </span>
+                          {unitsMode ? (
+                            <span className="text-xs text-muted-foreground">{unitsBreakdown(u.units)}</span>
+                          ) : (
+                            <span className="font-medium text-foreground">
+                              <CurrencyGlyph /> {commission.toLocaleString()}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge className={cn("text-xs", getStatusColor(pct >= 85 ? "excellent" : pct >= 70 ? "good" : pct >= 50 ? "on-track" : "behind"))}>
@@ -687,7 +761,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                                     return (
                                       <div key={index} className="p-3 rounded-lg border border-primary/10 shadow-md hover:shadow-lg transition-shadow">
                                         <div className="flex justify-between items-center mb-2">
-                                          <span className="text-sm font-medium">{unit.service}</span>
+                                          <span className="text-sm font-medium">{unitLabel(unit.service)}</span>
                                           <span className="text-sm text-muted-foreground">
                                             {unit.achieved_units}/{unit.target_units}
                                           </span>
@@ -796,7 +870,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
               <BarChart3 className="h-5 w-5 mr-2 text-secondary" />
               Department Performance
             </CardTitle>
-            <CardDescription>Performance comparison across departments</CardDescription>
+            <CardDescription>{viewMode === 'units' ? 'Units sold vs unit targets by department' : 'Revenue vs targets by department'}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -805,7 +879,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <XAxis dataKey="department" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [viewMode === 'units' ? `${value.toLocaleString()} units` : `${currencyCode} ${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />

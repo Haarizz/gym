@@ -65,8 +65,8 @@ const PaymentEntryRow = React.memo(
           alignItems: "center",
           gap: 12,
           borderRadius: 10,
-          border: error ? "1px solid #fca5a5" : "1px solid #e5e7eb",
-          backgroundColor: error ? "#fef2f2" : "#fff",
+          border: error ? "1px solid light-dark(#fca5a5, oklch(38% 0.08 19.6))" : "1px solid light-dark(#e5e7eb, var(--border))",
+          backgroundColor: error ? "light-dark(#fef2f2, var(--muted-bg))" : "light-dark(#fff, var(--card))",
           padding: 12,
           cursor: "pointer",
           transition: "background-color 0.15s",
@@ -102,7 +102,7 @@ const PaymentEntryRow = React.memo(
               {detailParts.join(" · ")}
             </div>
           )}
-          {error && <div style={{ fontSize: 12, color: "#dc2626", marginTop: 2 }}>{error}</div>}
+          {error && <div style={{ fontSize: 12, color: "light-dark(#dc2626, oklch(82% 0.15 27.3))", marginTop: 2 }}>{error}</div>}
         </div>
         <div style={{ fontWeight: 700 }}>
           <CurrencyValue amount={line.amount} />
@@ -256,7 +256,7 @@ export function PaymentAllocationPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#6b7280", marginBottom: 10 }}>Add Payment</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))", marginBottom: 10 }}>Add Payment</div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(4, availableTiles.length)}, 1fr)`, gap: 10 }}>
           {availableTiles.map((tile) => (
             <button
@@ -269,8 +269,8 @@ export function PaymentAllocationPanel({
                 alignItems: "center",
                 gap: 8,
                 borderRadius: 10,
-                border: "2px solid #e5e7eb",
-                backgroundColor: "#fff",
+                border: "2px solid light-dark(#e5e7eb, var(--border))",
+                backgroundColor: "light-dark(#fff, var(--card))",
                 padding: 14,
                 cursor: "pointer",
                 transition: "box-shadow 0.15s, border-color 0.15s",
@@ -300,7 +300,7 @@ export function PaymentAllocationPanel({
               </div>
               <span style={{ fontSize: 12.5, fontWeight: 600 }}>{tile.label}</span>
               {tile.type === PAYMENT_TYPES.WALLET && walletBalance != null && (
-                <span style={{ fontSize: 11, color: "#92400e" }}>Balance <CurrencyValue amount={walletBalance} /></span>
+                <span style={{ fontSize: 11, color: "light-dark(#92400e, oklch(82% 0.125 46.2))" }}>Balance <CurrencyValue amount={walletBalance} /></span>
               )}
             </button>
           ))}
@@ -327,7 +327,7 @@ export function PaymentAllocationPanel({
               <CurrencyValue amount={overAllocated ? allocated - invoiceTotal : remaining} />
             </div>
           </div>
-          <div style={{ textAlign: "right", fontSize: 13.5, color: "#6b7280" }}>
+          <div style={{ textAlign: "right", fontSize: 13.5, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>
             <CurrencyValue amount={allocated} /> / <CurrencyValue amount={invoiceTotal} />
           </div>
         </div>
@@ -338,27 +338,27 @@ export function PaymentAllocationPanel({
           className={overAllocated ? "[&>div]:bg-red-600" : fullyAllocated ? "[&>div]:bg-green-600" : undefined}
         />
 
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ borderTop: "1px solid light-dark(rgba(0,0,0,0.08), var(--border))", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
-            <span style={{ color: "#6b7280" }}>Amount Due</span>
+            <span style={{ color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>Amount Due</span>
             <span>
               <CurrencyValue amount={invoiceTotal} />
             </span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
-            <span style={{ color: "#6b7280" }}>Allocated</span>
+            <span style={{ color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>Allocated</span>
             <span>
               <CurrencyValue amount={allocated} />
             </span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
-            <span style={{ color: "#6b7280" }}>Remaining</span>
+            <span style={{ color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>Remaining</span>
             <span>
               <CurrencyValue amount={remaining} />
             </span>
           </div>
           {creditTotal > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: "#7c3aed" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: "light-dark(#7c3aed, oklch(82% 0.15 293))" }}>
               <span>Transferred to Accounts Receivable</span>
               <span>
                 <CurrencyValue amount={creditTotal} />
@@ -366,7 +366,7 @@ export function PaymentAllocationPanel({
             </div>
           )}
           {change > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, fontWeight: 600, color: "#15803d" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, fontWeight: 600, color: "light-dark(#15803d, oklch(82% 0.137 150.1))" }}>
               <span>Change to Return</span>
               <span>
                 <CurrencyValue amount={change} />
@@ -376,7 +376,7 @@ export function PaymentAllocationPanel({
           {warnCashOverTender && change > 0 && (
             <div
               role="alert"
-              style={{ fontSize: 13, color: "#92400e", backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "8px 12px" }}
+              style={{ fontSize: 13, color: "light-dark(#92400e, oklch(82% 0.125 46.2))", backgroundColor: "light-dark(#fffbeb, oklch(27% 0.039 95.3))", border: "1px solid light-dark(#fcd34d, oklch(38% 0.08 91.6))", borderRadius: 8, padding: "8px 12px" }}
             >
               Cash received is more than the <CurrencyValue amount={invoiceTotal} /> due — check the amount. You'll be asked
               to confirm the <CurrencyValue amount={change} /> change before the payment is saved.
@@ -389,18 +389,18 @@ export function PaymentAllocationPanel({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            borderTop: "1px solid rgba(0,0,0,0.08)",
+            borderTop: "1px solid light-dark(rgba(0,0,0,0.08), var(--border))",
             paddingTop: 12,
             fontSize: 13.5,
           }}
         >
-          <span style={{ fontWeight: 700, letterSpacing: 0.4, fontSize: 11.5, color: "#6b7280" }}>PAYMENT SUMMARY</span>
+          <span style={{ fontWeight: 700, letterSpacing: 0.4, fontSize: 11.5, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>PAYMENT SUMMARY</span>
           <span style={{ fontWeight: 600 }}>{summaryLabel}</span>
         </div>
       </div>
 
       <div>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#6b7280", marginBottom: 10 }}>Payment Entries</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))", marginBottom: 10 }}>Payment Entries</div>
         {paymentLines.length === 0 ? (
           <div
             style={{
@@ -408,7 +408,7 @@ export function PaymentAllocationPanel({
               color: "#9ca3af",
               textAlign: "center",
               padding: "24px 0",
-              border: "1px dashed #e5e7eb",
+              border: "1px dashed light-dark(#e5e7eb, var(--border))",
               borderRadius: 10,
             }}
           >

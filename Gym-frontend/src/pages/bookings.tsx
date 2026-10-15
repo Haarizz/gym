@@ -456,7 +456,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl" style={{ color: '#2B7A78' }}>
+              <DialogTitle className="text-xl" style={{ color: 'var(--primary)' }}>
                 Create New Booking
               </DialogTitle>
               <DialogDescription>
@@ -472,13 +472,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <div 
                       className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium"
                       style={bookingStep >= step 
-                        ? { backgroundColor: '#2B7A78', color: 'white' } 
-                        : { backgroundColor: '#e5e7eb', color: '#4b5563' }
+                        ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } 
+                        : { backgroundColor: 'light-dark(#e5e7eb, var(--border))', color: 'light-dark(#4b5563, oklch(82% 0.026 256.8))' }
                       }
                     >
                       {step}
                     </div>
-                    {step < 3 && <div className="w-12 h-1" style={{ backgroundColor: bookingStep > step ? '#2B7A78' : '#e5e7eb' }} />}
+                    {step < 3 && <div className="w-12 h-1" style={{ backgroundColor: bookingStep > step ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))' }} />}
                   </div>
                 ))}
               </div>
@@ -492,7 +492,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <Button 
                       variant={!isGuestBooking ? "default" : "outline"}
                       onClick={() => setIsGuestBooking(false)}
-                      style={!isGuestBooking ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={!isGuestBooking ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       <User className="h-4 w-4 mr-2" />
                       Member
@@ -500,7 +500,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <Button 
                       variant={isGuestBooking ? "default" : "outline"}
                       onClick={() => setIsGuestBooking(true)}
-                      style={isGuestBooking ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={isGuestBooking ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       <UserPlus className="h-4 w-4 mr-2" />
                       Guest
@@ -525,13 +525,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
                             key={member.id}
                             className="p-3 border rounded-lg cursor-pointer transition-all"
                             style={{
-                              borderColor: selectedMember?.id === member.id ? '#2B7A78' : '#e5e7eb',
-                              backgroundColor: selectedMember?.id === member.id ? '#2B7A7810' : '#ffffff'
+                              borderColor: selectedMember?.id === member.id ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))',
+                              backgroundColor: selectedMember?.id === member.id ? 'color-mix(in srgb, var(--primary) 6.3%, transparent)' : 'light-dark(#ffffff, var(--card))'
                             }}
                             onClick={() => setSelectedMember(member)}
                           >
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-medium" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}>
+                              <div className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-medium" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
                                 {member.name.split(' ').map(n => n[0]).join('')}
                               </div>
                               <div className="flex-1">
@@ -583,7 +583,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <Button 
                       onClick={() => setBookingStep(2)}
                       disabled={!isGuestBooking ? !selectedMember : !guestDetails.name || !guestDetails.email || !guestDetails.phone}
-                      style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                      style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                     >
                       Next Step
                     </Button>
@@ -601,7 +601,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       variant={selectedBookingType === 'all' ? "default" : "outline"}
                       onClick={() => setSelectedBookingType('all')}
                       size="sm"
-                      style={selectedBookingType === 'all' ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={selectedBookingType === 'all' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       All
                     </Button>
@@ -609,7 +609,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       variant={selectedBookingType === 'class' ? "default" : "outline"}
                       onClick={() => setSelectedBookingType('class')}
                       size="sm"
-                      style={selectedBookingType === 'class' ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={selectedBookingType === 'class' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       <Users className="h-4 w-4 mr-1" />
                       Classes
@@ -618,7 +618,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       variant={selectedBookingType === 'pt' ? "default" : "outline"}
                       onClick={() => setSelectedBookingType('pt')}
                       size="sm"
-                      style={selectedBookingType === 'pt' ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={selectedBookingType === 'pt' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       <User className="h-4 w-4 mr-1" />
                       Personal Training
@@ -627,7 +627,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       variant={selectedBookingType === 'facility' ? "default" : "outline"}
                       onClick={() => setSelectedBookingType('facility')}
                       size="sm"
-                      style={selectedBookingType === 'facility' ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={selectedBookingType === 'facility' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       <Building className="h-4 w-4 mr-1" />
                       Facility
@@ -643,8 +643,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         key={cls.id}
                         className="p-4 border rounded-lg cursor-pointer transition-all"
                         style={{
-                          borderColor: selectedClass?.id === cls.id ? '#2B7A78' : '#e5e7eb',
-                          backgroundColor: selectedClass?.id === cls.id ? '#2B7A7810' : isFull ? '#f9fafb' : '#ffffff',
+                          borderColor: selectedClass?.id === cls.id ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))',
+                          backgroundColor: selectedClass?.id === cls.id ? 'color-mix(in srgb, var(--primary) 6.3%, transparent)' : isFull ? 'light-dark(#f9fafb, var(--muted-bg))' : 'light-dark(#ffffff, var(--card))',
                           opacity: isFull ? 0.5 : 1,
                           cursor: isFull ? 'not-allowed' : 'pointer'
                         }}
@@ -652,7 +652,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 rounded-lg text-white flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}>
+                            <div className="w-12 h-12 rounded-lg text-white flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
                               {getTypeIcon(cls.type)}
                             </div>
                             <div>
@@ -678,7 +678,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-lg" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {cls.price}</div>
+                            <div className="font-semibold text-lg" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {cls.price}</div>
                           </div>
                         </div>
                       </div>
@@ -693,7 +693,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <Button 
                       onClick={() => setBookingStep(3)}
                       disabled={!selectedClass}
-                      style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                      style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                     >
                       Next Step
                     </Button>
@@ -706,7 +706,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Step 3: Confirm Booking</h3>
                   
-                  <Card style={{ borderColor: '#2B7A7840' }}>
+                  <Card style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)' }}>
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
@@ -747,7 +747,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         )}
                         <div className="flex justify-between items-center border-t pt-3">
                           <span className="font-medium">Total Amount:</span>
-                          <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
+                          <span className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
                             {selectedPassId !== 'none'
                               ? <>Free <span className="text-sm font-normal text-gray-500">(Reward Pass)</span></>
                               : <><CurrencyGlyph /> {selectedClass.price}</>}
@@ -757,11 +757,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     </CardContent>
                   </Card>
 
-                  <div className="p-4 rounded-lg" style={{ backgroundColor: '#2B7A7810' }}>
+                  <div className="p-4 rounded-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 6.3%, transparent)' }}>
                     <div className="flex items-start space-x-3">
-                      <QrCode className="h-5 w-5 mt-1" style={{ color: '#2B7A78' }} />
+                      <QrCode className="h-5 w-5 mt-1" style={{ color: 'var(--primary)' }} />
                       <div className="text-sm">
-                        <p className="font-medium" style={{ color: '#2B7A78' }}>QR Code Access</p>
+                        <p className="font-medium" style={{ color: 'var(--primary)' }}>QR Code Access</p>
                         <p className="text-gray-600 mt-1">
                           {isGuestBooking 
                             ? "QR code will be sent via WhatsApp and email for facility access"
@@ -776,7 +776,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <Button variant="outline" onClick={() => setBookingStep(2)}>
                       Previous
                     </Button>
-                    <Button onClick={handleCreateBooking} style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}>
+                    <Button onClick={handleCreateBooking} style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}>
                       Confirm Booking
                     </Button>
                   </div>
@@ -999,9 +999,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
           </div>
 
           {/* Row 3: Upcoming Bookings Timeline */}
-          <Card style={{ borderColor: '#2B7A7820' }}>
+          <Card style={{ borderColor: 'color-mix(in srgb, var(--primary) 12.5%, transparent)' }}>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2" style={{ color: '#2B7A78' }}>
+              <CardTitle className="flex items-center space-x-2" style={{ color: 'var(--primary)' }}>
                 <Clock className="h-5 w-5" />
                 <span>Upcoming Bookings Timeline</span>
               </CardTitle>
@@ -1009,13 +1009,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
             <CardContent>
               {todaysBookings.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2B7A7820' }}>
-                    <Calendar className="h-12 w-12" style={{ color: '#2B7A78' }} />
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12.5%, transparent)' }}>
+                    <Calendar className="h-12 w-12" style={{ color: 'var(--primary)' }} />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2" style={{ color: '#1E293B' }}>No bookings scheduled</h3>
+                  <h3 className="text-lg font-semibold mb-2" style={{ color: 'light-dark(#1E293B, oklch(82% 0.037 260))' }}>No bookings scheduled</h3>
                   <p className="text-gray-500 mb-6">Get started by creating your first booking</p>
                   <Button 
-                    style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                     onClick={() => {
                       setShowBookingDialog(true);
                       setBookingStep(1);
@@ -1033,8 +1033,8 @@ export function Bookings({ onNavigate }: BookingsProps) {
                         key={booking.id} 
                         className="flex-shrink-0 w-72 p-4 rounded-lg border-l-4"
                         style={{
-                          borderLeftColor: booking.type === 'class' ? '#2B7A78' : booking.type === 'pt' ? '#2B7A78' : '#2B7A78',
-                          backgroundColor: booking.type === 'class' ? '#F0F9FF' : booking.type === 'pt' ? '#F0FDF4' : '#F0FDFA'
+                          borderLeftColor: booking.type === 'class' ? 'var(--primary)' : booking.type === 'pt' ? 'var(--primary)' : 'var(--primary)',
+                          backgroundColor: booking.type === 'class' ? 'light-dark(#F0F9FF, var(--muted-bg))' : booking.type === 'pt' ? 'light-dark(#F0FDF4, var(--muted-bg))' : 'light-dark(#F0FDFA, var(--muted-bg))'
                         }}
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -1623,7 +1623,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                 </Button>
                 <Button
                   className="flex-1"
-                  style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                   onClick={handleConfirmDeleteBooking}
                 >
                   Delete

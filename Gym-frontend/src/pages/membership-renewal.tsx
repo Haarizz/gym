@@ -517,12 +517,12 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
         </div>
 
         {/* Membership Snapshot Card */}
-        <Card className="mb-6 border-2" style={{ borderColor: '#327F74' }}>
+        <Card className="mb-6 border-2" style={{ borderColor: 'var(--primary)' }}>
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-6">
               {/* Left: Member Info */}
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 border-4" style={{ borderColor: '#327F74' }}>
+                <Avatar className="h-20 w-20 border-4" style={{ borderColor: 'var(--primary)' }}>
                   <AvatarImage src={data.memberPhoto} />
                   <AvatarFallback className="text-xl bg-[#327F74] text-white">
                     {data.memberName.split(' ').map(n => n[0]).join('')}
@@ -584,7 +584,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               {/* Right: Quick Actions */}
               <div className="flex flex-col gap-2 md:w-48">
                 <Button
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={() => setMainTab('renewal')}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
@@ -805,7 +805,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
 
                         <Button 
                           className="w-full" 
-                          style={{ backgroundColor: plan.type === 'Best Value' ? '#327F74' : undefined }}
+                          style={{ backgroundColor: plan.type === 'Best Value' ? 'var(--primary)' : undefined }}
                           variant={plan.type === 'Best Value' ? 'default' : 'outline'}
                         >
                           {plan.type === 'Upgrade' ? 'Upgrade Now' : 'Renew Now'}
@@ -888,7 +888,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
 
                     <Button
                       className="w-full h-12"
-                      style={{ backgroundColor: '#327F74' }}
+                      style={{ backgroundColor: 'var(--primary)' }}
                       onClick={() => setShowPaymentSheet(true)}
                       disabled={selectedDues.length === 0}
                     >
@@ -1185,7 +1185,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
               <div className="space-y-3">
                 <Button
                   className="w-full h-12 text-lg"
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={handleConfirmRenewal}
                 >
                   <CheckCircle2 className="h-5 w-5 mr-2" />
@@ -1270,7 +1270,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             {/* Confirm Payment */}
             <Button
               className="w-full h-12 text-lg"
-              style={{ backgroundColor: '#327F74' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               onClick={handlePayDue}
               disabled={selectedDues.length === 0}
             >
@@ -1360,7 +1360,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             {/* Submit Button */}
             <Button
               className="w-full h-12"
-              style={{ backgroundColor: '#327F74' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               onClick={handleRequestFreeze}
               disabled={!freezeForm.endDate || !canSubmitFreeze}
             >
@@ -1406,7 +1406,7 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             <div className="space-y-3">
               <Button
                 className="w-full"
-                style={{ backgroundColor: '#327F74' }}
+                style={{ backgroundColor: 'var(--primary)' }}
                 onClick={() => {
                   setShowSuccessDialog(false);
                   setMainTab('details');

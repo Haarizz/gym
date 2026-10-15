@@ -57,13 +57,13 @@ export function WalletModal({ open, onClose, onConfirm, target, balance, editing
       confirmLabel={confirmLabel}
       confirmDisabled={numericAmount <= 0 || tooMuch}
       footer={
-        <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
+        <div style={{ borderTop: "1px solid light-dark(#e5e7eb, var(--border))", paddingTop: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 30 }}>
-            <span style={{ fontSize: 13.5, color: "#6b7280" }}>Wallet balance available</span>
+            <span style={{ fontSize: 13.5, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>Wallet balance available</span>
             <span style={{ fontSize: 13.5, fontWeight: 600 }}><CurrencyValue amount={balance} /></span>
           </div>
           {tooMuch && (
-            <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>
+            <div style={{ fontSize: 13, color: "light-dark(#dc2626, oklch(82% 0.15 27.3))", fontWeight: 600 }}>
               The most the wallet can pay here is <CurrencyValue amount={max} />.
             </div>
           )}

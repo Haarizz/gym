@@ -481,7 +481,7 @@ export function TaxCompliance() {
 
                       <div>
                         <div className="text-sm text-muted-foreground mb-1">Pending Amount</div>
-                        <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                        <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {totalOwed.toLocaleString()}
                         </div>
                       </div>
@@ -634,7 +634,7 @@ export function TaxCompliance() {
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <Building2 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Corporate Tax Summary
                 </CardTitle>
                 <CardDescription>
@@ -646,7 +646,7 @@ export function TaxCompliance() {
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.deductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.taxableProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable ({annualTaxSummary ? (annualTaxSummary.corporateTaxRate * 100).toFixed(0) : 9}%)</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.corporateTaxPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable ({annualTaxSummary ? (annualTaxSummary.corporateTaxRate * 100).toFixed(0) : 9}%)</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.corporateTaxPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
                 <p className="text-xs text-gray-400">
                   UAE Corporate Tax: 0% on the first <CurrencyGlyph /> {annualTaxSummary?.corporateTaxZeroRateThreshold.toLocaleString() ?? '375,000'} of taxable profit, 9% above it.
@@ -661,7 +661,7 @@ export function TaxCompliance() {
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Receipt className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <Receipt className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   VAT Return Report
                 </CardTitle>
                 <CardDescription>
@@ -672,7 +672,7 @@ export function TaxCompliance() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.outputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.inputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.netVatPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.netVatPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
                 <p className="text-xs text-gray-400">
                   Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills.
@@ -687,7 +687,7 @@ export function TaxCompliance() {
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <DollarSign className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Excise Tax Report
                 </CardTitle>
                 <CardDescription>Tax on specific goods/services</CardDescription>
@@ -696,7 +696,7 @@ export function TaxCompliance() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 0.00</span></div>
                   <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">—</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: '#2B7A78' }}><CurrencyGlyph /> 0.00</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> 0.00</span></div>
                 </div>
                 <p className="text-xs text-gray-400">
                   No products are flagged as excisable yet (e.g. energy drinks, tobacco) — this app doesn't track excise category or rate per product, so this will read zero until that's built.
@@ -856,7 +856,7 @@ export function TaxCompliance() {
                                 </div>
                                 <div>
                                   <span className="text-muted-foreground">Amount:</span>
-                                  <div className="font-medium" style={{ color: '#2B7A78' }}>
+                                  <div className="font-medium" style={{ color: 'var(--primary)' }}>
                                     {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
                                   </div>
                                 </div>
@@ -952,7 +952,7 @@ export function TaxCompliance() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowFilingDialog(false)}>Cancel</Button>
             <Button onClick={handleSaveFiling} disabled={savingFiling || !filingForm.taxPeriod || !filingForm.dueDate}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}>
               {savingFiling ? "Saving..." : editingFiling ? "Update" : "Create"}
             </Button>
           </DialogFooter>
@@ -985,7 +985,7 @@ export function TaxCompliance() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMarkFiledDialog(false)}>Cancel</Button>
             <Button onClick={handleMarkFiled} disabled={savingMarkFiled || !markFiledForm.filedDate}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}>
               {savingMarkFiled ? "Saving..." : "Confirm Filed"}
             </Button>
           </DialogFooter>
@@ -1055,7 +1055,7 @@ export function TaxCompliance() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTaxCodeDialog(false)}>Cancel</Button>
             <Button onClick={handleSaveTaxCode} disabled={!taxCodeForm.code || !taxCodeForm.name}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}>
               {editingTaxCode ? "Save Changes" : "Create Tax Code"}
             </Button>
           </DialogFooter>

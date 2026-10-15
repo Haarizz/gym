@@ -631,7 +631,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                 <>
                   <div className={styles.sumRow}><span>Previous outstanding</span><CurrencyValue amount={previousOutstanding} options={fmt2} /></div>
                   <div className={styles.sumRow}><span>This invoice</span><CurrencyValue amount={thisBalance} options={fmt2} /></div>
-                  <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? '#dc2626' : undefined }}>
+                  <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : undefined }}>
                     <span>Total due from member</span><CurrencyValue amount={newOutstanding} options={fmt2} />
                   </div>
                   <p className={cx(styles.tiny, styles.muted)} style={{ marginTop: 8, lineHeight: 1.5 }}>
@@ -700,7 +700,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                                 <div className={styles.lineSub}>
                                   {l.productSku && <span className={styles.mono}>{l.productSku}</span>}
                                   {!readOnly && (
-                                    <span style={{ color: short ? '#dc2626' : '#059669', fontWeight: 600 }}>
+                                    <span style={{ color: short ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : 'light-dark(#059669, oklch(82% 0.127 163.2))', fontWeight: 600 }}>
                                       Avail: {avail} {p?.defaultUnit ?? ''}{short ? ' — insufficient' : ''}
                                     </span>
                                   )}
@@ -713,7 +713,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                           <td className={cx(styles.center, styles.muted)}>{l.unitOfMeasure}</td>
                           <td>
                             <input id={`si-qty-${l.key}`} type="number" min={1} step={1} className={cx(styles.cellInput, styles.center)}
-                              style={short ? { color: '#dc2626' } : undefined}
+                              style={short ? { color: 'light-dark(#dc2626, oklch(82% 0.15 27.3))' } : undefined}
                               value={l.quantity || ''} placeholder="0" disabled={readOnly}
                               onChange={e => updateLine(l.key, { quantity: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`si-price-${l.key}`)?.focus(); } }} />
@@ -853,7 +853,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
               <div className={styles.sumRow}><span>Received on this Invoice</span><span className={styles.success}>− <CurrencyValue amount={amountPaid} options={fmt2} /></span></div>
             )}
             {isMember ? (
-              <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? '#dc2626' : undefined, fontSize: 16 }}>
+              <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : undefined, fontSize: 16 }}>
                 <span>New Total Outstanding</span><CurrencyValue amount={newOutstanding} options={fmt2} />
               </div>
             ) : (
@@ -883,7 +883,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
                         <span>Req: <b>{need}</b></span>
                         <span>Avail: <b>{avail}</b></span>
                       </div>
-                      <div style={{ marginTop: 2, fontWeight: 600, color: ok ? '#047857' : '#b91c1c' }}>
+                      <div style={{ marginTop: 2, fontWeight: 600, color: ok ? 'light-dark(#047857, oklch(82% 0.105 165.6))' : 'var(--danger)' }}>
                         {ok ? 'In stock' : stockCheckEnabled === false ? 'Short — Stock Check is off' : 'Insufficient — confirm is blocked'}
                       </div>
                     </div>
@@ -922,7 +922,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
             return err ? (
               <div className={styles.alert}><AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /><span>{err}</span></div>
             ) : (
-              <div className={styles.notice} style={{ background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}>
+              <div className={styles.notice} style={{ background: 'light-dark(#ecfdf5, oklch(27% 0.039 166.1))', borderColor: 'light-dark(#a7f3d0, oklch(38% 0.08 164.2))', color: 'light-dark(#065f46, oklch(82% 0.086 166.9))' }}>
                 <CheckCircle2 size={14} style={{ flexShrink: 0, marginTop: 1 }} /> Ready to confirm.
               </div>
             );

@@ -65,7 +65,7 @@ export function PayrollAnalytics() {
        const dept = emp.department || 'Other';
        deptMap.set(dept, (deptMap.get(dept) || 0) + cost);
     });
-    const colors = ["#2B7A78", "#3b82f6", "#f59e0b", "#8b5cf6", "#10b981", "#ef4444"];
+    const colors = ["#0F766E", "#3b82f6", "#f59e0b", "#8b5cf6", "#10b981", "#ef4444"];
     return Array.from(deptMap.entries()).map(([name, value], i) => ({
       name, value, color: colors[i % colors.length]
     }));
@@ -127,7 +127,7 @@ export function PayrollAnalytics() {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+          <Button size="sm" onClick={handleExport} style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}>
             <Download className="mr-2 h-4 w-4" />
             Export PDF
           </Button>
@@ -206,8 +206,8 @@ export function PayrollAnalytics() {
                   <AreaChart data={monthlyTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2B7A78" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#2B7A78" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#0F766E" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#0F766E" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -222,7 +222,7 @@ export function PayrollAnalytics() {
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
                     <Legend />
-                    <Area yAxisId="left" type="monotone" dataKey="cost" stroke="#2B7A78" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" name="Total Cost" />
+                    <Area yAxisId="left" type="monotone" dataKey="cost" stroke="#0F766E" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" name="Total Cost" />
                     <Line yAxisId="right" type="monotone" dataKey="headcount" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} name="Headcount" />
                   </AreaChart>
                 ) : (

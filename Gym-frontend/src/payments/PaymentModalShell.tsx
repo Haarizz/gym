@@ -167,7 +167,7 @@ export function PaymentModalShell({
               width: 44,
               height: 44,
               borderRadius: "50%",
-              backgroundColor: "rgba(255,255,255,0.2)",
+              backgroundColor: "light-dark(rgba(255,255,255,0.2), color-mix(in srgb, var(--card) 20%, transparent))",
               flexShrink: 0,
             }}
           >
@@ -189,13 +189,13 @@ export function PaymentModalShell({
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              background: "rgba(255,255,255,0.15)",
+              background: "light-dark(rgba(255,255,255,0.15), color-mix(in srgb, var(--card) 15%, transparent))",
               border: "none",
               cursor: "pointer",
               flexShrink: 0,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "light-dark(rgba(255,255,255,0.28), color-mix(in srgb, var(--card) 28%, transparent))")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "light-dark(rgba(255,255,255,0.15), color-mix(in srgb, var(--card) 15%, transparent))")}
           >
             ✕
           </button>
@@ -216,7 +216,7 @@ export function PaymentModalShell({
                 height: 62,
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, color: "#6b7280", textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))", textTransform: "uppercase" }}>
                 {amountLabel}
               </span>
               <span
@@ -252,12 +252,12 @@ export function PaymentModalShell({
                     fontSize: 13.5,
                     fontWeight: 600,
                     color: accentColor,
-                    background: "#fff",
+                    background: "light-dark(#fff, var(--card))",
                     cursor: "pointer",
                     transition: "background-color 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "light-dark(#f3f4f6, var(--muted-bg))")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "light-dark(#fff, var(--card))")}
                 >
                   {chip.label}
                 </button>
@@ -283,10 +283,10 @@ export function PaymentModalShell({
                     justifyContent: "center",
                     borderRadius: 10,
                     border: "none",
-                    backgroundColor: isBackspace ? "#fef2f2" : "#f3f4f6",
+                    backgroundColor: isBackspace ? "light-dark(#fef2f2, var(--muted-bg))" : "light-dark(#f3f4f6, var(--muted-bg))",
                     fontSize: 19,
                     fontWeight: 600,
-                    color: isBackspace ? "#dc2626" : "#111827",
+                    color: isBackspace ? "light-dark(#dc2626, oklch(82% 0.15 27.3))" : "light-dark(#111827, oklch(82% 0.032 264.7))",
                     cursor: "pointer",
                     transition: "background-color 0.15s",
                   }}
@@ -308,9 +308,9 @@ export function PaymentModalShell({
             <div
               style={{
                 fontSize: 13.5,
-                color: "#dc2626",
-                backgroundColor: "#fef2f2",
-                border: "1px solid #fecaca",
+                color: "light-dark(#dc2626, oklch(82% 0.15 27.3))",
+                backgroundColor: "light-dark(#fef2f2, var(--muted-bg))",
+                border: "1px solid light-dark(#fecaca, oklch(38% 0.059 18.3))",
                 borderRadius: 8,
                 padding: "10px 14px",
               }}
@@ -331,7 +331,7 @@ export function PaymentModalShell({
             display: "flex",
             gap: 10,
             padding: "14px 24px",
-            borderTop: "1px solid #e5e7eb",
+            borderTop: "1px solid light-dark(#e5e7eb, var(--border))",
             flexShrink: 0,
           }}
         >

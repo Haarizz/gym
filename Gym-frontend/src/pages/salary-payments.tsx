@@ -436,7 +436,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
     }));
   }, [summaryStats.modeDistribution]);
 
-  const COLORS = ['#2B7A78', '#E63946', '#F4A261', '#2A9D8F', '#E76F51'];
+  const COLORS = ['#0F766E', '#B91C1C', '#F4A261', '#2A9D8F', '#E76F51'];
 
   return (
     <div className="p-6 space-y-6">
@@ -622,7 +622,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <TableCell className="text-green-600">+{employee.allowances.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{employee.deductions.toLocaleString()}</TableCell>
                       <TableCell>
-                        <span className="font-bold" style={{ color: '#2B7A78' }}>
+                        <span className="font-bold" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
@@ -636,7 +636,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         <Button
                           size="sm"
                           onClick={() => handleOpenIndividualPayment(employee)}
-                          style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                          style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                         >
                           <Send className="mr-1 h-4 w-4" />
                           Pay
@@ -684,7 +684,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <Button
                     onClick={() => setShowBulkPaymentModal(true)}
                     disabled={selectedEmployees.length === 0}
-                    style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                   >
                     <Send className="mr-2 h-4 w-4" />
                     Process Payment ({selectedEmployees.length})
@@ -740,7 +740,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       </TableCell>
                       <TableCell>{employee.department || "—"}</TableCell>
                       <TableCell>
-                        <span className="font-bold" style={{ color: '#2B7A78' }}>
+                        <span className="font-bold" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {employee.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
@@ -761,7 +761,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <span className="font-medium">Total Selected: {selectedEmployees.length} employees</span>
                     </div>
                     <div>
-                      <span className="font-bold" style={{ color: '#2B7A78' }}>
+                      <span className="font-bold" style={{ color: 'var(--primary)' }}>
                         Total Amount: <CurrencyGlyph /> {employees
                           .filter(e => selectedEmployees.includes(e.id))
                           .reduce((sum, e) => sum + e.netSalary, 0)
@@ -782,7 +782,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <PieChart className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Payment Mode Distribution
                 </CardTitle>
                 <CardDescription>Breakdown by payment method</CardDescription>
@@ -820,7 +820,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Payment Statistics
                 </CardTitle>
                 <CardDescription>Current month overview</CardDescription>
@@ -830,7 +830,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <Card className="bg-muted/50 border-0 shadow-none">
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                        <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
                           {paymentHistory.length}
                         </div>
                         <div className="text-sm text-muted-foreground">Total Payments</div>
@@ -840,7 +840,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <Card className="bg-muted/50 border-0 shadow-none">
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                        <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {paymentHistory.reduce((sum, p) => sum + p.netSalary, 0).toLocaleString()}
                         </div>
                         <div className="text-sm text-muted-foreground">Amount Paid</div>
@@ -859,7 +859,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                         {getPaymentModeIcon(mode)}
                         <span className="font-medium">{mode}</span>
                       </div>
-                      <span className="font-bold" style={{ color: '#2B7A78' }}>
+                      <span className="font-bold" style={{ color: 'var(--primary)' }}>
                         <CurrencyGlyph /> {amount.toLocaleString()}
                       </span>
                     </div>
@@ -996,7 +996,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                       <Separator />
                       <div className="flex justify-between">
                         <span className="font-bold">Net Payable:</span>
-                        <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
+                        <span className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {Math.max(0, selectedEmployee.baseSalary + paymentAdjustments.allowances - paymentAdjustments.deductions).toLocaleString()}
                         </span>
                       </div>
@@ -1053,7 +1053,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Split className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                        <Split className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                         <div>
                           <Label htmlFor="split-toggle" className="cursor-pointer">Enable Split Payment</Label>
                           <p className="text-sm text-muted-foreground">
@@ -1087,7 +1087,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                     </div>
 
                     {splitPayments.map((split, index) => (
-                      <Card key={split.id} className="border-2" style={{ borderColor: '#2B7A78' }}>
+                      <Card key={split.id} className="border-2" style={{ borderColor: 'var(--primary)' }}>
                         <CardContent className="pt-6">
                           <div className="flex gap-3 items-start">
                             <div className="flex-1 space-y-4">
@@ -1291,7 +1291,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             </Button>
             <Button
               onClick={handleProcessIndividualPayment}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
             >
               <Send className="mr-2 h-4 w-4" />
               Process Payment
@@ -1320,7 +1320,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   </div>
                   <div className="flex justify-between">
                     <span className="font-bold">Total Amount:</span>
-                    <span className="text-xl font-bold" style={{ color: '#2B7A78' }}>
+                    <span className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
                       <CurrencyGlyph /> {employees
                         .filter(e => selectedEmployees.includes(e.id))
                         .reduce((sum, e) => sum + e.netSalary, 0)
@@ -1380,7 +1380,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <ArrowLeftRight className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                    <ArrowLeftRight className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                     <div>
                       <Label htmlFor="bulk-split-toggle" className="cursor-pointer">Enable Split Payment</Label>
                       <p className="text-sm text-muted-foreground">
@@ -1453,7 +1453,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                 </p>
 
                 {bulkSplitPayments.map((split) => (
-                  <Card key={split.id} className="border-2" style={{ borderColor: '#2B7A78' }}>
+                  <Card key={split.id} className="border-2" style={{ borderColor: 'var(--primary)' }}>
                     <CardContent className="pt-6">
                       <div className="flex gap-3 items-start">
                         <div className="flex-1 grid grid-cols-2 gap-3">
@@ -1530,7 +1530,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
                   .map(emp => (
                     <div key={emp.id} className="flex justify-between p-2 bg-muted rounded">
                       <span className="font-medium">{emp.name}</span>
-                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {emp.netSalary.toLocaleString()}</span>
+                      <span style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {emp.netSalary.toLocaleString()}</span>
                     </div>
                   ))}
               </div>
@@ -1542,7 +1542,7 @@ export function SalaryPayments({ onNavigate }: SalaryPaymentsProps) {
             </Button>
             <Button
               onClick={handleProcessBulkPayment}
-              style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
             >
               <Send className="mr-2 h-4 w-4" />
               Process Bulk Payment

@@ -3,7 +3,9 @@ package com.company.project.controllers;
 import com.company.project.dto.AuthRequestDTO;
 import com.company.project.dto.AuthResponseDTO;
 import com.company.project.dto.RegisterRequestDTO;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.services.AuthService;
+import com.company.project.services.UserPreferenceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,9 +14,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserPreferenceService userPreferenceService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, UserPreferenceService userPreferenceService) {
         this.authService = authService;
+        this.userPreferenceService = userPreferenceService;
     }
 
     @PostMapping("/register")
@@ -73,6 +77,38 @@ public class AuthController {
             return ResponseEntity.ok(java.util.Map.of("message", "Password changed successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * GET /api/auth/preferences
+     * The signed-in user's own settings: { "theme": "light" | "dark" | "system" | null }.
+     * The admin web app applies the theme right after login so it follows the user across devices.
+     */
+    @GetMapping("/preferences")
+    public ResponseEntity<?> getPreferences() {
+        try {
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("theme", userPreferenceService.getThemePreference());
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(e.getMessage());
+        }
+    }
+
+    /**
+     * PUT /api/auth/preferences
+     * Body: { "theme": "light" | "dark" | "system" }
+     */
+    @PutMapping("/preferences")
+    public ResponseEntity<?> updatePreferences(@RequestBody java.util.Map<String, String> body) {
+        try {
+            String theme = userPreferenceService.setThemePreference(body.get("theme"));
+            return ResponseEntity.ok(java.util.Map.of("theme", theme));
+        } catch (BusinessRuleViolationException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(e.getMessage());
         }
     }
 }

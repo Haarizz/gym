@@ -17,8 +17,8 @@ import { authService } from "../../utils/supabase/auth-service";
 import { buildXlsx, downloadBlob, type XlsxCell } from "../../utils/xlsx-export";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
-const TEAL = "#2B7A78";
-const CHART_COLORS = ["#2B7A78", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981"];
+const TEAL = "#0F766E";
+const CHART_COLORS = ["#0F766E", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981"];
 
 type Row = Record<string, any>;
 interface DayReportData {

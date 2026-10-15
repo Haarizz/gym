@@ -3,7 +3,7 @@
  * Supabase has been removed. All authentication goes through /api/auth/*.
  */
 
-import { setPermissions } from "../permissions";
+import { getPermissions, setPermissions } from "../permissions";
 import { isTokenExpired, clearExpiredSession, expireSessionAndReload, SESSION_EXPIRED_MESSAGE } from "../session-expiry";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
@@ -128,6 +128,9 @@ class AuthService {
         sessionStorage.setItem("gymbios_auth",       "true");
         sessionStorage.setItem("gymbios_auth_source","backend");
         if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
+        // Sidebar subtitle ("Power Gym · Main Branch"); only sent for gym owners.
+        if (gymName) sessionStorage.setItem("gymbios_gym_name", gymName);
+        else sessionStorage.removeItem("gymbios_gym_name");
         if (staffName) sessionStorage.setItem("gymbios_staff_name", staffName);
         
         // Branch context initialization
@@ -203,6 +206,7 @@ class AuthService {
     sessionStorage.removeItem("gymbios_auth_source");
     sessionStorage.removeItem("gymbios_demo_mode");
     sessionStorage.removeItem("gymbios_role_name");
+    sessionStorage.removeItem("gymbios_gym_name");
     sessionStorage.removeItem("gymbios_staff_name");
     sessionStorage.removeItem("accessibleBranches");
     sessionStorage.removeItem("activeBranchId");
@@ -254,6 +258,41 @@ class AuthService {
     }
   }
 
+  private permissionsRefresh: Promise<void> | null = null;
+
+  /**
+   * Re-reads the signed-in user's role and permissions from the server, so an admin's
+   * edit in Roles & Permissions (or a role change on the staff record) applies to
+   * someone already signed in without them having to log out. Concurrent calls share
+   * one request.
+   */
+  refreshPermissions(): Promise<void> {
+    if (!this.isAuthenticated()) return Promise.resolve();
+    if (this.permissionsRefresh) return this.permissionsRefresh;
+    this.permissionsRefresh = (async () => {
+      try {
+        const response = await this.makeAuthenticatedRequest(`${backendBaseUrl}/auth/me`);
+        if (!response.ok) return;
+        const result = await response.json();
+        if (Array.isArray(result.roles)) {
+          sessionStorage.setItem("roles", JSON.stringify(result.roles));
+          const roleName = result.roleName ?? result.role_name ?? result.roles[0];
+          if (roleName) sessionStorage.setItem("gymbios_role_name", roleName);
+        }
+        if (Array.isArray(result.permissions)) {
+          const next = [...result.permissions].sort().join(",");
+          const current = [...getPermissions()].sort().join(",");
+          if (next !== current) setPermissions(result.permissions);
+        }
+      } catch {
+        // Offline or a transient failure: keep the last known permissions.
+      } finally {
+        this.permissionsRefresh = null;
+      }
+    })();
+    return this.permissionsRefresh;
+  }
+
   // ── HTTP helper ──────────────────────────────────────────────────────────
 
   /** Make a fetch request with the JWT bearer token attached. */
@@ -297,7 +336,7 @@ class AuthService {
       }
     }
 
-    return fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -306,6 +345,12 @@ class AuthService {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+    // A permission denial means our cached permissions are stale (the role was
+    // edited): refresh them so the sidebar and buttons catch up right away.
+    if (response.status === 403 && !url.includes('/auth/')) {
+      void this.refreshPermissions();
+    }
+    return response;
   }
 }
 

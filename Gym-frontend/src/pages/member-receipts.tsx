@@ -507,7 +507,7 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5" style={{ color: '#2B7A78' }} />Send Receipt
+              <Send className="h-5 w-5" style={{ color: 'var(--primary)' }} />Send Receipt
             </DialogTitle>
             <DialogDescription>
               {sendingReceipt?.receipt_no} — {sendingReceipt?.member_name}
@@ -540,7 +540,7 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
             <Button variant="outline" onClick={() => { setSendingReceipt(null); setSendChannels([]); }}>Cancel</Button>
             <Button
               disabled={sendChannels.length === 0}
-              style={{ backgroundColor: '#2B7A78' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               className="text-white"
               onClick={handleSendReceipt}
             >

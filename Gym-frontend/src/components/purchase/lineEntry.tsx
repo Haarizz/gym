@@ -106,7 +106,7 @@ export function FastEntry({ inputRef, products, onPick, onCustom, onBrowse, pric
               </span>
               <span style={{ textAlign: 'right', flexShrink: 0 }}>
                 <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}><CurrencyGlyph /> {money(priceOf(p, priceBasis))}</span>
-                <span className={styles.tiny} style={{ color: p.stockStatus === 'OUT_OF_STOCK' ? '#dc2626' : p.stockStatus === 'LOW_STOCK' ? '#d97706' : '#059669' }}>
+                <span className={styles.tiny} style={{ color: p.stockStatus === 'OUT_OF_STOCK' ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : p.stockStatus === 'LOW_STOCK' ? 'light-dark(#d97706, oklch(82% 0.15 58.3))' : 'light-dark(#059669, oklch(82% 0.127 163.2))' }}>
                   Stock {stockOf ? stockOf(p) : p.totalStock ?? 0}
                 </span>
               </span>
@@ -373,7 +373,7 @@ export function ProductSelector({ open, onOpenChange, products, onAdd, target = 
                         {p.description && <div className={cx(styles.tiny, styles.muted)} style={{ marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 440 }}>{p.description}</div>}
                         <div className={styles.psMeta}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <Package size={12} /> Stock: <strong style={{ color: out ? '#dc2626' : 'var(--foreground)' }}>{stock}</strong> {p.defaultUnit ?? ''}
+                            <Package size={12} /> Stock: <strong style={{ color: out ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : 'var(--foreground)' }}>{stock}</strong> {p.defaultUnit ?? ''}
                           </span>
                           {p.barcode && <span>Barcode: {p.barcode}</span>}
                         </div>

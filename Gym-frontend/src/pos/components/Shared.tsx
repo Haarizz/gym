@@ -139,7 +139,7 @@ export function MemberPicker({ value, onChange, placeholder = "Search member by 
   const options: (PickedMember | null)[] = [...(allowWalkIn ? [null] : []), ...results];
   return (
     <div style={{ position: "relative" }}>
-      <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: "#94A3B8" }} />
+      <Search size={15} style={{ position: "absolute", left: 11, top: 12, color: "light-dark(#94A3B8, oklch(82% 0.035 256.8))" }} />
       <input
         className={s.custInput}
         value={q}
@@ -257,7 +257,7 @@ export function Empty({ icon, title, hint }: { icon: React.ReactNode; title: str
   return (
     <div className={s.empty}>
       {icon}
-      <div style={{ fontWeight: 600, color: "#475569" }}>{title}</div>
+      <div style={{ fontWeight: 600, color: "light-dark(#475569, oklch(82% 0.037 257.3))" }}>{title}</div>
       {hint && <div className={s.small}>{hint}</div>}
     </div>
   );

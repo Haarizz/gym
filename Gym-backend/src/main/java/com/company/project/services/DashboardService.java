@@ -110,7 +110,7 @@ public class DashboardService {
         BigDecimal revenue = revenueDashboardService.totalCollection(pr.from(), pr.to());
         BigDecimal previousRevenue = revenueDashboardService.totalCollection(pr.prevFrom(), pr.prevTo());
 
-        long activeMembers = memberRepository.countByMembershipStatus("active");
+        long activeMembers = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         long joined = memberRepository.countByJoinDateBetween(pr.start(), pr.end());
         long previousJoined = memberRepository.countByJoinDateBetween(pr.prevStart(), pr.prevEnd());
 

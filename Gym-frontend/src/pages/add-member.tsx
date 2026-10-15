@@ -2540,7 +2540,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Medical Conditions */}
                 <div className="space-y-2">
                   <Label htmlFor="medicalConditions" className="flex items-center space-x-2">
-                    <FaCircleExclamation className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                    <FaCircleExclamation className="h-4 w-4" style={{ color: 'var(--primary)' }} />
                     <span>Medical Conditions</span>
                   </Label>
                   <Textarea
@@ -2580,7 +2580,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 {/* Current Medications */}
                 <div className="space-y-2">
                   <Label htmlFor="currentMedications" className="flex items-center space-x-2">
-                    <FaPills className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                    <FaPills className="h-4 w-4" style={{ color: 'var(--primary)' }} />
                     <span>Current Medications</span>
                   </Label>
                   <Textarea
@@ -2651,7 +2651,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="height" className="flex items-center space-x-2">
-                      <FaRuler className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                      <FaRuler className="h-4 w-4" style={{ color: 'var(--primary)' }} />
                       <span>Height (cm)</span>
                     </Label>
                     <Input
@@ -2667,7 +2667,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="weight" className="flex items-center space-x-2">
-                      <FaWeightScale className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                      <FaWeightScale className="h-4 w-4" style={{ color: 'var(--primary)' }} />
                       <span>Weight (kg)</span>
                     </Label>
                     <Input

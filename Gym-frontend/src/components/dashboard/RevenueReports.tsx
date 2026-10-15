@@ -11,7 +11,7 @@ import { CurrencyGlyph } from "../../utils/currency";
 import type { RevenueCompareRow, RevenueSummary } from "../../utils/supabase/dashboard-service";
 import styles from "./RevenueReports.module.css";
 
-const CURRENT_COLOR = "#2B7A78";
+const CURRENT_COLOR = "#0F766E";
 const COMPARE_COLOR = "#94A3B8";
 
 const num = (v: unknown) => {

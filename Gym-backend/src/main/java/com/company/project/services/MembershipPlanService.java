@@ -30,7 +30,7 @@ public class MembershipPlanService {
     public List<MembershipPlanResponseDTO> getPlans(String status) {
         Long activeBranchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
         List<MembershipPlan> plans = (status != null && !status.isBlank())
-                ? planRepository.findByStatus(status)
+                ? planRepository.findByStatus(normalizeStatus(status))
                 : planRepository.findAllByOrderByCreatedAtDesc();
         return plans.stream()
                 .filter(p -> activeBranchId == null || p.getBranchId() == null || activeBranchId.equals(p.getBranchId()))
@@ -134,7 +134,7 @@ public class MembershipPlanService {
         if (req.getPrice()               != null) plan.setPrice(req.getPrice());
         if (req.getDiscount()            != null) plan.setDiscount(req.getDiscount());
         if (req.getOfferType()           != null) applyOffer(plan, req);
-        if (req.getStatus()              != null) plan.setStatus(req.getStatus());
+        if (req.getStatus()              != null) plan.setStatus(normalizeStatus(req.getStatus()));
         if (req.getDescription()         != null) plan.setDescription(req.getDescription());
         if (req.getMaxSessions()         != null) plan.setMaxSessions(req.getMaxSessions());
         if (req.getAssignableTrainers()  != null) plan.setAssignableTrainers(req.getAssignableTrainers());
@@ -210,6 +210,17 @@ public class MembershipPlanService {
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("Invalid offer " + which + " date: " + raw);
         }
+    }
+
+    // Status is stored as "Active"/"Inactive"/"Draft"/... regardless of the
+    // client's casing — the mobile plan wizard sends "ACTIVE", which the
+    // case-sensitive findByStatus("Active") lookups (web plan pickers, member
+    // app plan change) and the web Active Plans card then missed (BG_112).
+    static String normalizeStatus(String status) {
+        if (status == null) return null;
+        String s = status.trim();
+        if (s.isEmpty()) return s;
+        return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
     }
 
     // Guards computeExpiry() (MemberService) against silently backdating a

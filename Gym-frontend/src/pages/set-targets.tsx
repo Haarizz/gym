@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 import { format } from "date-fns";
+import { TARGET_UNIT_TYPES, unitLabel } from "../utils/target-units";
 
 interface UnitTarget {
   id: string;
@@ -45,23 +46,8 @@ interface TargetFormData {
   unitTargets: UnitTarget[];
 }
 
-// Static services list (could be fetched from API in the future)
-const services = [
-  { id: "karate", name: "Karate", category: "Martial Arts" },
-  { id: "martial-arts", name: "Martial Arts", category: "Martial Arts" },
-  { id: "yoga", name: "Yoga", category: "Wellness" },
-  { id: "swimming", name: "Swimming", category: "Aquatic" },
-  { id: "mma", name: "MMA", category: "Martial Arts" },
-  { id: "hiit", name: "HIIT", category: "Fitness" },
-  { id: "personal-training", name: "Personal Training", category: "Training" },
-  { id: "group-fitness", name: "Group Fitness", category: "Fitness" },
-  { id: "membership-basic", name: "Basic Membership", category: "Membership" },
-  { id: "membership-premium", name: "Premium Membership", category: "Membership" },
-  { id: "membership-vip", name: "VIP Membership", category: "Membership" },
-  { id: "protein-shake", name: "Protein Shake", category: "POS Product" },
-  { id: "energy-drink", name: "Energy Drink", category: "POS Product" },
-  { id: "gym-gear", name: "Gym Gear", category: "POS Product" }
-];
+// Unit types a target can count; each is tracked live from membership receipts and POS sales.
+const services = TARGET_UNIT_TYPES;
 
 interface SetTargetsProps {
   onNavigate: (section: string) => void;
@@ -461,14 +447,14 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 <Target className="h-5 w-5 mr-2 text-primary" />
                 Unit Targets
               </CardTitle>
-              <CardDescription>Set specific unit targets for services and products</CardDescription>
+              <CardDescription>Count units — memberships, POS sales and PT sessions — tracked automatically</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.unitTargets.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No unit targets set yet.</p>
-                  <p className="text-sm">Click "Add Service/Product Target" to get started.</p>
+                  <p className="text-sm">Click "Add Unit Target" to get started.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -485,7 +471,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                               "h-8",
                               errors[`unitTarget_${index}_service`] && "border-destructive"
                             )}>
-                              <SelectValue placeholder="Select service" />
+                              <SelectValue placeholder="Select unit type" />
                             </SelectTrigger>
                             <SelectContent>
                               {services.map((service) => (
@@ -540,7 +526,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                 className="w-full text-primary border-primary/20 hover:bg-primary/5"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Service/Product Target
+                Add Unit Target
               </Button>
             </CardContent>
           </Card>
@@ -616,7 +602,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                         return (
                           <div key={target.id} className="flex justify-between items-center">
                             <span className="text-sm">
-                              {service ? service.name : "Unknown Service"}
+                              {service ? service.name : unitLabel(target.service)}
                             </span>
                             <Badge variant="secondary" className="text-xs">
                               {target.targetUnits} units

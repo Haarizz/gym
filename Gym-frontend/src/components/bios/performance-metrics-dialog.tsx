@@ -332,8 +332,8 @@ export function PerformanceMetricsDialog({
                         <YAxis unit="%" />
                         <Tooltip formatter={(value) => `${value}%`} />
                         <Legend />
-                        <Bar dataKey="revenue" fill="#2B7A78" name="Revenue target %" />
-                        <Bar dataKey="sessions" fill="#E63946" name="Sessions target %" />
+                        <Bar dataKey="revenue" fill="#0F766E" name="Revenue target %" />
+                        <Bar dataKey="sessions" fill="#B91C1C" name="Sessions target %" />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -458,8 +458,8 @@ export function PerformanceMetricsDialog({
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Area type="monotone" dataKey="checkIns" stroke="#2B7A78" fill="#2B7A78" fillOpacity={0.6} name="Check-ins" />
-                    <Area type="monotone" dataKey="occupancy" stroke="#E63946" fill="#E63946" fillOpacity={0.3} name="Share of Day %" />
+                    <Area type="monotone" dataKey="checkIns" stroke="#0F766E" fill="#0F766E" fillOpacity={0.6} name="Check-ins" />
+                    <Area type="monotone" dataKey="occupancy" stroke="#B91C1C" fill="#B91C1C" fillOpacity={0.3} name="Share of Day %" />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -495,7 +495,7 @@ export function PerformanceMetricsDialog({
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="checkIns" stroke="#2B7A78" strokeWidth={2} name="Check-ins" />
+                        <Line type="monotone" dataKey="checkIns" stroke="#0F766E" strokeWidth={2} name="Check-ins" />
                         <Line type="monotone" dataKey="occupancy" stroke="#3b82f6" strokeWidth={2} name="Occupancy %" connectNulls />
                       </LineChart>
                     </ResponsiveContainer>

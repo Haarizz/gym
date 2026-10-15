@@ -318,7 +318,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
         <Button 
           onClick={() => setShowRequestDialog(true)}
           disabled={loading}
-          style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+          style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
         >
           <Plus className="mr-2 h-4 w-4" />
           New Advance Request
@@ -491,7 +491,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                       </TableCell>
                       <TableCell>
                         {advance.approvedAmount > 0 ? (
-                          <span className="font-medium" style={{ color: '#2B7A78' }}>
+                          <span className="font-medium" style={{ color: 'var(--primary)' }}>
                             <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </span>
                         ) : (
@@ -514,7 +514,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                               variant="outline" 
                               size="sm"
                               onClick={() => handleOpenApprovalDialog(advance)}
-                              style={{ color: '#2B7A78', borderColor: '#2B7A78' }}
+                              style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
                             >
                               <Check className="h-4 w-4 mr-1" />
                               Approve
@@ -591,7 +591,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         <div>
                           <div className="text-sm text-muted-foreground mb-1">Total Amount</div>
-                          <div className="text-lg font-bold" style={{ color: '#2B7A78' }}>
+                          <div className="text-lg font-bold" style={{ color: 'var(--primary)' }}>
                             <CurrencyGlyph /> {advance.approvedAmount.toLocaleString()}
                           </div>
                         </div>
@@ -618,7 +618,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         <div className="rounded-lg p-4 bg-muted/50">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <CalendarIcon className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                              <CalendarIcon className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                               <div>
                                 <div className="font-medium">Next Deduction</div>
                                 <div className="text-sm text-muted-foreground">
@@ -659,7 +659,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <Users className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Advance Summary Report
                 </CardTitle>
                 <CardDescription>By employee, department, or period</CardDescription>
@@ -691,7 +691,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <History className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <History className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Deduction Audit Report
                 </CardTitle>
                 <CardDescription>Tracks payroll deduction history</CardDescription>
@@ -723,7 +723,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" style={{ color: '#E63946' }} />
+                  <AlertCircle className="h-5 w-5" style={{ color: 'var(--danger)' }} />
                   Outstanding Loan Report
                 </CardTitle>
                 <CardDescription>Lists all active or overdue advances</CardDescription>
@@ -736,7 +736,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Outstanding Balance</span>
-                    <span className="font-medium" style={{ color: '#E63946' }}>
+                    <span className="font-medium" style={{ color: 'var(--danger)' }}>
                       <CurrencyGlyph /> {totalOutstandingAmount.toLocaleString()}
                     </span>
                   </div>
@@ -789,7 +789,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                         <TableCell>{deptAdvances.length}</TableCell>
                         <TableCell>{approvedCount}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" style={{ color: '#2B7A78', borderColor: '#2B7A78' }}>
+                          <Badge variant="outline" style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}>
                             {activeCount}
                           </Badge>
                         </TableCell>
@@ -797,7 +797,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                           <span className="font-medium"><CurrencyGlyph /> {totalAmount.toLocaleString()}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium" style={{ color: '#E63946' }}>
+                          <span className="font-medium" style={{ color: 'var(--danger)' }}>
                             <CurrencyGlyph /> {outstanding.toLocaleString()}
                           </span>
                         </TableCell>
@@ -947,7 +947,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
             <Button 
               onClick={handleAddRequest}
               disabled={!requestFormData.employeeId || !requestFormData.requestedAmount}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
             >
               Submit Request
             </Button>
@@ -1108,8 +1108,8 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               onClick={handleApproveRequest}
               style={{ 
                 background: approvalFormData.approvalStatus === "Approved" 
-                  ? 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' 
-                  : 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', 
+                  ? 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' 
+                  : 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', 
                 color: 'white' 
               }}
             >
@@ -1136,7 +1136,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <CardContent className="pt-6">
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Approved Amount</div>
-                      <div className="text-xl font-bold" style={{ color: '#2B7A78' }}>
+                      <div className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
                         <CurrencyGlyph /> {selectedAdvance.approvedAmount.toLocaleString()}
                       </div>
                     </div>
@@ -1156,7 +1156,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   <CardContent className="pt-6">
                     <div className="text-center">
                       <div className="text-sm text-muted-foreground mb-1">Balance</div>
-                      <div className="text-xl font-bold" style={{ color: '#E63946' }}>
+                      <div className="text-xl font-bold" style={{ color: 'var(--danger)' }}>
                         <CurrencyGlyph /> {selectedAdvance.balance.toLocaleString()}
                       </div>
                     </div>

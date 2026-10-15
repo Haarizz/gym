@@ -23,9 +23,9 @@
   white-space: nowrap;
 }
 
-.up { color: #047857; background: #ecfdf5; }
-.down { color: #b91c1c; background: #fef2f2; }
-.flat { color: var(--muted-foreground); background: #f3f4f6; }
+.up { color: light-dark(#047857, oklch(82% 0.105 165.6)); background: light-dark(#ecfdf5, oklch(27% 0.039 166.1)); }
+.down { color: light-dark(#b91c1c, oklch(82% 0.15 27.5)); background: light-dark(#fef2f2, var(--muted-bg)); }
+.flat { color: var(--muted-foreground); background: light-dark(#f3f4f6, var(--muted-bg)); }
 
 /* ── Second KPI row ── */
 .tiles {
@@ -40,7 +40,7 @@
   gap: 0.25rem;
   padding: 0.875rem 1rem;
   border-radius: 0.75rem;
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
   min-width: 0;
 }
@@ -85,7 +85,7 @@
 .panel {
   padding: 1.25rem;
   border-radius: 0.75rem;
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   min-width: 0;
 }
@@ -136,7 +136,7 @@
 
 .table td {
   padding: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid light-dark(#f1f5f9, var(--border));
   vertical-align: top;
 }
 
@@ -173,7 +173,7 @@
   height: 0.375rem;
   margin: 0.375rem 0 0.25rem;
   border-radius: 9999px;
-  background: #f1f5f9;
+  background: light-dark(#f1f5f9, var(--muted-bg));
   overflow: hidden;
 }
 
@@ -213,7 +213,7 @@
   gap: 0.75rem;
   padding: 1rem;
   border-radius: 0.75rem;
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
   color: var(--primary);
   min-width: 0;
@@ -227,7 +227,7 @@
   margin: 0.125rem 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--foreground, #111827);
+  color: var(--foreground, light-dark(#111827, oklch(82% 0.032 264.7)));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -238,7 +238,7 @@
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   font-size: 0.8125rem;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
@@ -259,7 +259,7 @@
   gap: 0.25rem;
   padding: 0.1875rem;
   border-radius: 0.5rem;
-  background: #f1f5f9;
+  background: light-dark(#f1f5f9, var(--muted-bg));
   font-size: 0.8125rem;
 }
 
@@ -279,7 +279,7 @@
 }
 
 .compareSwitch button[aria-pressed="true"] {
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   color: var(--primary);
   font-weight: 600;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);

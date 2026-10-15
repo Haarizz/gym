@@ -18,6 +18,7 @@ import {
   Pencil,
   Trash2,
   X,
+  Printer,
 } from "lucide-react";
 import { FaCircleCheck, FaStar } from "react-icons/fa6";
 import {
@@ -77,6 +78,7 @@ import { PaymentAllocationPanel } from "../payments/PaymentAllocationPanel";
 import { buildPaymentPayload } from "../payments/paymentPayload";
 import { toLegacyPayment } from "../payments/legacyPaymentBridge";
 import { PAYMENT_TYPES } from "../payments/paymentModel";
+import { downloadReceiptInvoice } from "../utils/receipt-invoice";
 import type { CreditCustomer } from "../payments/modals/CreditModal";
 
 interface MemberAddonsProps {
@@ -264,6 +266,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
   const transactionStatusFilter = statusFilter ?? localStatusFilter;
   const setTransactionStatusFilter = onStatusFilterChange ?? setLocalStatusFilter;
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
+  const [printingAddonId, setPrintingAddonId] = useState<string | null>(null);
 
   // Add-on plan catalog — admin-editable, replacing what used to be a
   // hardcoded array. addonPlans holds every plan (incl. inactive ones, shown
@@ -651,6 +654,26 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     toast.success("Receipt sent via WhatsApp/SMS");
   };
 
+  const handlePrintAddonReceipt = async (txn: MemberAddon) => {
+    setPrintingAddonId(txn.id);
+    try {
+      const receipt = txn.receipt ?? await addonsService.getAddonReceipt(txn.id);
+      await downloadReceiptInvoice(receipt, currencyCode);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load the receipt for this add-on.");
+    } finally {
+      setPrintingAddonId(null);
+    }
+  };
+
+  const handleDownloadReceipt = () => {
+    const receipt = lastCreatedAddon?.receipt;
+    if (!receipt) return;
+    downloadReceiptInvoice(receipt, currencyCode).catch(() => {
+      toast.error("Failed to generate receipt. Please try again.");
+    });
+  };
+
   const handleOpenPurchaseModal = () => {
     setSelectedMember(null);
     setSearchQuery("");
@@ -813,18 +836,19 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                     <TableHead>Amount ({currencyCode})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transactionsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         Loading transactions...
                       </TableCell>
                     </TableRow>
                   ) : filteredTransactions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No transactions found
                       </TableCell>
                     </TableRow>
@@ -877,6 +901,17 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                           >
                             {effectiveAddonStatus(txn)}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline" size="sm"
+                            className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
+                            title="Print Receipt"
+                            disabled={printingAddonId === txn.id}
+                            onClick={() => handlePrintAddonReceipt(txn)}
+                          >
+                            <Printer className="h-4 w-4 text-primary" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1349,7 +1384,12 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
           </div>
 
           <div className="px-8 py-6 border-t bg-slate-50/60 flex gap-2">
-            <Button variant="outline" className="flex-1 gap-2 text-xs h-9">
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 text-xs h-9"
+              onClick={handleDownloadReceipt}
+              disabled={!lastCreatedAddon?.receipt}
+            >
               <Download className="h-3.5 w-3.5" />
               Download Receipt
             </Button>

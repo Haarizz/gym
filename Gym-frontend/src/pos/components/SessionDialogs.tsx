@@ -273,7 +273,7 @@ export function CashMovementDialog({ open, onOpenChange, onDone, initialType = "
             <div className={`${s.small} ${s.muted}`} style={{ marginBottom: 6 }}>This session</div>
             <div style={{ maxHeight: 130, overflowY: "auto" }}>
               {recent.map((m) => (
-                <div key={m.id} className={s.rowBetween} style={{ fontSize: 12, padding: "4px 0", borderBottom: "1px solid #F1F5F9" }}>
+                <div key={m.id} className={s.rowBetween} style={{ fontSize: 12, padding: "4px 0", borderBottom: "1px solid light-dark(#F1F5F9, var(--border))" }}>
                   <span><Pill tone={m.type === "DROP_IN" ? "green" : "red"}>{m.type === "DROP_IN" ? "In" : "Out"}</Pill> <span className={s.muted}>{fmtTime(m.createdAt)} · {m.category || m.reason || "—"}</span></span>
                   <span className={s.mono}><Money value={m.amount} /></span>
                 </div>

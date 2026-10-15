@@ -59,8 +59,8 @@ import { trainingService, TrainingSessionApi } from "../utils/supabase/training-
 import { staffService, Staff } from "../utils/supabase/staff-service";
 
 const classTypes = [
-  { id: "class", name: "Group Class", color: "#2B7A78", icon: Users },
-  { id: "pt", name: "Personal Training", color: "#E63946", icon: Dumbbell },
+  { id: "class", name: "Group Class", color: "#0F766E", icon: Users },
+  { id: "pt", name: "Personal Training", color: "#B91C1C", icon: Dumbbell },
   { id: "facility", name: "Facility Booking", color: "#2563EB", icon: MapPin },
 ];
 
@@ -417,7 +417,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 newDate.setDate(selectedDate.getDate() - 7);
                 setSelectedDate(newDate);
               }}
-              style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+              style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -439,7 +439,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 newDate.setDate(selectedDate.getDate() + 7);
                 setSelectedDate(newDate);
               }}
-              style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+              style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -447,16 +447,16 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
           <Button
             variant="outline"
             onClick={() => setSelectedDate(new Date())}
-            style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+            style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
           >
             Today
           </Button>
         </div>
 
         {/* Calendar Grid */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-x-auto" style={{ borderColor: '#2B7A7820' }}>
+        <div className="bg-white rounded-xl shadow-sm border overflow-x-auto" style={{ borderColor: 'color-mix(in srgb, var(--primary) 12.5%, transparent)' }}>
           {/* Day Headers */}
-          <div className="grid grid-cols-8 min-w-[800px]" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}>
+          <div className="grid grid-cols-8 min-w-[800px]" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
             <div className="p-3 text-center">
               <span className="text-white font-medium text-sm">Time</span>
             </div>
@@ -614,15 +614,15 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       <div className="bg-white rounded-xl shadow-sm border border-primary/10 overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow style={{ backgroundColor: '#2B7A7810' }}>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Class Name</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Trainer</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Type</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Date & Time</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Location</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Capacity</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Status</TableHead>
-              <TableHead className="font-semibold" style={{ color: '#2B7A78' }}>Actions</TableHead>
+            <TableRow style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 6.3%, transparent)' }}>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Class Name</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Trainer</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Type</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Date & Time</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Location</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Capacity</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Status</TableHead>
+              <TableHead className="font-semibold" style={{ color: 'var(--primary)' }}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -643,7 +643,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={classItem.trainer.avatar} />
-                        <AvatarFallback className="text-xs text-white" style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)' }}>
+                        <AvatarFallback className="text-xs text-white" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
                           {classItem.trainer.name.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
@@ -653,7 +653,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   <TableCell>
                     <Badge 
                       variant="outline" 
-                      style={{ color: '#2B7A78', borderColor: '#2B7A7840' }}
+                      style={{ color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)' }}
                     >
                       {typeConfig.name}
                     </Badge>
@@ -683,7 +683,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   <TableCell>
                     <Badge 
                       variant={classItem.status === 'active' ? 'default' : 'secondary'}
-                      style={classItem.status === 'active' ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                      style={classItem.status === 'active' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                     >
                       {classItem.status}
                     </Badge>
@@ -695,7 +695,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                         variant="outline"
                         onClick={() => handleViewClass(classItem)}
                         className="h-7 w-7 p-0"
-                        style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                        style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
                       >
                         <Eye className="h-3 w-3" />
                       </Button>
@@ -706,7 +706,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                             variant="outline"
                             onClick={() => handleEditClass(classItem)}
                             className="h-7 w-7 p-0"
-                            style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                            style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
                           >
                             <Edit3 className="h-3 w-3" />
                           </Button>
@@ -715,7 +715,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                             variant="outline"
                             onClick={() => handleDeleteClass(classItem)}
                             className="h-7 w-7 p-0"
-                            style={{ borderColor: '#E6394640', color: '#E63946' }}
+                            style={{ borderColor: 'color-mix(in srgb, var(--danger) 25.1%, transparent)', color: 'var(--danger)' }}
                           >
                             <X className="h-3 w-3" />
                           </Button>
@@ -724,7 +724,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                         <Button
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                          style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                           onClick={() => handleBookClass(classItem)}
                         >
                           Book
@@ -862,7 +862,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
 
             {/* Description */}
             <div>
-              <h3 className="font-semibold mb-2" style={{ color: '#2B7A78' }}>About This Class</h3>
+              <h3 className="font-semibold mb-2" style={{ color: 'var(--primary)' }}>About This Class</h3>
               <p className="text-gray-600 leading-relaxed">
                 {selectedClass.description}
               </p>
@@ -874,7 +874,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 <>
                   <Button
                     className="flex-1"
-                    style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                     onClick={() => {
                       handleEditClass(selectedClass);
                       setShowClassDialog(false);
@@ -886,7 +886,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   <Button
                     variant="outline"
                     className="flex-1"
-                    style={{ borderColor: '#E6394640', color: '#E63946' }}
+                    style={{ borderColor: 'color-mix(in srgb, var(--danger) 25.1%, transparent)', color: 'var(--danger)' }}
                     onClick={() => handleDeleteClass(selectedClass)}
                   >
                     <X className="h-4 w-4 mr-2" />
@@ -894,7 +894,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
                     onClick={() => setShowClassDialog(false)}
                   >
                     Close
@@ -904,7 +904,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 <>
                   <Button
                     className="flex-1"
-                    style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                     onClick={() => {
                       handleBookClass(selectedClass);
                       setShowClassDialog(false);
@@ -915,7 +915,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
                     onClick={() => {
                       toast.info("Share Class", {
                         description: "Share functionality coming soon!"
@@ -926,7 +926,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    style={{ borderColor: '#2B7A7840', color: '#2B7A78' }}
+                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
                     onClick={() => setShowClassDialog(false)}
                   >
                     Close
@@ -1076,7 +1076,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   variant={view === "calendar" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setView("calendar")}
-                  style={view === "calendar" ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                  style={view === "calendar" ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                   className={view === "calendar" ? "" : "hover:bg-white"}
                 >
                   <Grid3X3 className="h-4 w-4" />
@@ -1085,7 +1085,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                   variant={view === "list" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setView("list")}
-                  style={view === "list" ? { background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' } : {}}
+                  style={view === "list" ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
                   className={view === "list" ? "" : "hover:bg-white"}
                 >
                   <List className="h-4 w-4" />
@@ -1312,7 +1312,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 </Button>
                 <Button
                   className="flex-1"
-                  style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                   onClick={handleConfirmDeleteClass}
                 >
                   Delete

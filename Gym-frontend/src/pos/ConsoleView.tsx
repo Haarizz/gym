@@ -782,7 +782,7 @@ function AuditTab({ canView }: { canView: boolean }) {
           </tbody>
         </table>
       </div>
-      <div className={s.panelHead} style={{ borderTop: "1px solid #EEF2F6", borderBottom: 0 }}>
+      <div className={s.panelHead} style={{ borderTop: "1px solid light-dark(#EEF2F6, var(--border))", borderBottom: 0 }}>
         <span className={s.muted}>Page {page} of {pages}</span>
         <div className={s.rowWrap}>
           <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>

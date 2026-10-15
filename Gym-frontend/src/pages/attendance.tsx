@@ -224,7 +224,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card
           className="border-primary/10 shadow-md cursor-pointer"
-          style={recordSort.startsWith('time') ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={recordSort.startsWith('time') ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
           title="Click to sort check-ins by time"
           onClick={() => {
             setActiveAttendanceTab('today');
@@ -248,7 +248,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
         <Card
           className="border-primary/10 shadow-md cursor-pointer"
-          style={recordSort.startsWith('duration') ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={recordSort.startsWith('duration') ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
           title="Click to sort check-ins by duration"
           onClick={() => {
             setActiveAttendanceTab('today');
@@ -270,7 +270,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
         <Card
           className="border-primary/10 shadow-md cursor-pointer"
-          style={peakHourOnly ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={peakHourOnly ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
           title="Click to filter check-ins to the peak hour"
           onClick={() => { setActiveAttendanceTab('today'); setPeakHourOnly(v => !v); setRecordSort('none'); }}
         >
@@ -288,7 +288,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
 
         <Card
           className="border-primary/10 shadow-md cursor-pointer"
-          style={activeAttendanceTab === 'weekly' ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={activeAttendanceTab === 'weekly' ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
           title="Click to view attendance trends"
           onClick={() => { setActiveAttendanceTab('weekly'); setRecordSort('none'); setPeakHourOnly(false); }}
         >
@@ -616,7 +616,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                     <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Bar dataKey="visits" fill="#2B7A78" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="visits" fill="#0F766E" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -669,7 +669,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="visits" stroke="#2B7A78" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="visits" stroke="#0F766E" strokeWidth={2} dot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}

@@ -29,9 +29,9 @@ import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { dashboardService, type RevenueGranularity, type RevenueSummary } from "../../utils/supabase/dashboard-service";
 
 const ISO = "yyyy-MM-dd";
-const CURRENT = "#2B7A78";
+const CURRENT = "#0F766E";
 const PREVIOUS = "#94a3b8";
-const EXPENSE = "#E63946";
+const EXPENSE = "#B91C1C";
 
 const num = (v: unknown) => {
   const n = Number(v ?? 0);
