@@ -108,10 +108,10 @@ export function CreditModal({
       error={exceedsTarget ? `Credit cannot exceed the remaining ${target.toFixed(2)}.` : null}
       fields={
         fixedParty ? (
-          <div style={{ fontSize: 13.5, borderRadius: 10, border: "1px solid #ddd6fe", padding: 14, backgroundColor: "#f5f3ff" }}>
-            <div style={{ fontSize: 12, color: "#6b7280" }}>{fixedParty.roleLabel}</div>
-            <div style={{ fontWeight: 600, color: "#4c1d95", marginTop: 2 }}>{fixedParty.name}</div>
-            <p style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
+          <div style={{ fontSize: 13.5, borderRadius: 10, border: "1px solid light-dark(#ddd6fe, oklch(38% 0.055 293.3))", padding: 14, backgroundColor: "light-dark(#f5f3ff, var(--muted-bg))" }}>
+            <div style={{ fontSize: 12, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>{fixedParty.roleLabel}</div>
+            <div style={{ fontWeight: 600, color: "light-dark(#4c1d95, oklch(82% 0.15 293.7))", marginTop: 2 }}>{fixedParty.name}</div>
+            <p style={{ fontSize: 12, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))", marginTop: 6 }}>
               This amount is not paid now — it stays in {fixedParty.accountLabel} as {fixedParty.roleLabel.toLowerCase()} outstanding.
             </p>
           </div>
@@ -136,7 +136,7 @@ export function CreditModal({
               />
             </div>
             {!selectedCustomer && customerQuery && customers.length > 0 && (
-              <div style={{ marginTop: 6, border: "1px solid #e5e7eb", borderRadius: 8, maxHeight: 144, overflowY: "auto" }}>
+              <div style={{ marginTop: 6, border: "1px solid light-dark(#e5e7eb, var(--border))", borderRadius: 8, maxHeight: 144, overflowY: "auto" }}>
                 {customers.map((c) => (
                   <button
                     key={c.code}
@@ -164,7 +164,7 @@ export function CreditModal({
               </div>
             )}
             {selectedCustomer && (
-              <div style={{ marginTop: 6, fontSize: 12, color: "#6d28d9", fontWeight: 600 }}>
+              <div style={{ marginTop: 6, fontSize: 12, color: "light-dark(#6d28d9, oklch(82% 0.15 292.6))", fontWeight: 600 }}>
                 Selected: {selectedCustomer.name} ({selectedCustomer.code})
               </div>
             )}
@@ -181,7 +181,7 @@ export function CreditModal({
               placeholder="0"
               style={{ marginTop: 6 }}
             />
-            <p style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
+            <p style={{ fontSize: 12, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))", marginTop: 6 }}>
               Any amount received now is recorded as a separate Cash line; the rest goes on the customer's account.
             </p>
           </div>
@@ -191,14 +191,14 @@ export function CreditModal({
               style={{
                 fontSize: 13.5,
                 borderRadius: 10,
-                border: "1px solid #e5e7eb",
+                border: "1px solid light-dark(#e5e7eb, var(--border))",
                 padding: 14,
-                backgroundColor: "#f9fafb",
+                backgroundColor: "light-dark(#f9fafb, var(--muted-bg))",
                 display: "flex",
                 justifyContent: "space-between",
               }}
             >
-              <span style={{ color: "#6b7280" }}>On account</span>
+              <span style={{ color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>On account</span>
               <span style={{ fontWeight: 600 }}>{creditPortion.toFixed(2)}</span>
             </div>
           )}

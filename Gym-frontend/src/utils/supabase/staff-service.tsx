@@ -102,6 +102,8 @@ export interface StaffTarget {
   new_clients_target: number;
   new_clients_achieved: number;
   unit_targets_json: string;
+  // Live units sold this period by unit type (see utils/target-units.ts).
+  units_achieved?: Record<string, number>;
   commission_earned: number;
   trend: string;
   forecast: number;
@@ -115,7 +117,21 @@ export interface CommissionRule {
   // which still applies to everything else (renewals, add-ons, walk-ins).
   // Falls back to base_commission when not set.
   admission_commission?: number;
+  // POS sales the role rings up: % of each completed sale (net of refunds) and/or a
+  // fixed amount per sale. Unset/0 = no POS commission.
+  pos_commission?: number | null;
+  pos_commission_per_sale?: number | null;
   target_bonuses_json: string;
+}
+
+/** GET /api/staff/performance — this month's live figures per staff member. */
+export interface StaffListPerformance {
+  staff_id: string;
+  revenue_target: number;
+  revenue_achieved: number;
+  achievement_percentage: number;
+  commission_earned: number;
+  performance_status?: string;
 }
 
 export interface StaffPerformance {
@@ -310,6 +326,16 @@ class StaffService {
     return response.json();
   }
 
+  /** This month's target progress and commission for the given staff (max 100 ids). */
+  async getStaffListPerformance(ids: string[]): Promise<StaffListPerformance[]> {
+    if (ids.length === 0) return [];
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/staff/performance?ids=${encodeURIComponent(ids.join(','))}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch staff performance: ${response.status}`);
+    return response.json();
+  }
+
   // ── Commission Rules ─────────────────────────────────────────────────────
 
   async getCommissionRules(): Promise<CommissionRule[]> {
@@ -324,6 +350,8 @@ class StaffService {
     role?: string;
     base_commission?: number;
     admission_commission?: number;
+    pos_commission?: number;
+    pos_commission_per_sale?: number;
     target_bonuses_json?: string;
   }): Promise<CommissionRule> {
     const response = await authService.makeAuthenticatedRequest(
@@ -338,6 +366,8 @@ class StaffService {
     role: string;
     base_commission: number;
     admission_commission?: number;
+    pos_commission?: number;
+    pos_commission_per_sale?: number;
     target_bonuses_json: string;
   }): Promise<CommissionRule> {
     const response = await authService.makeAuthenticatedRequest(

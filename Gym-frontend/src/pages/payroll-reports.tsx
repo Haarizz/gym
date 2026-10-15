@@ -91,7 +91,7 @@ export function PayrollReports() {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={handleExport} style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}>
+          <Button size="sm" onClick={handleExport} style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}>
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>

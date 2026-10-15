@@ -100,7 +100,7 @@ export function SearchableSelect({
             }
           }}
           className={cn("w-full justify-between font-normal", className)}
-          style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(230, 57, 70, 0.15)" } : undefined}
+          style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(185, 28, 28, 0.15)" } : undefined}
         >
           <span className={cn("truncate", !selected && "text-muted-foreground")}>
             {loading ? "Loading..." : selected ? selected.label : placeholder}

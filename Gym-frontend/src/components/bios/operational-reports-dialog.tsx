@@ -400,7 +400,7 @@ export function OperationalReportsDialog({
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="reports" stroke="#2B7A78" strokeWidth={2} name="Reports Generated" />
+                    <Line type="monotone" dataKey="reports" stroke="#0F766E" strokeWidth={2} name="Reports Generated" />
                     <Line type="monotone" dataKey="exports" stroke="#3b82f6" strokeWidth={2} name="Data Exports" />
                   </LineChart>
                 </ResponsiveContainer>

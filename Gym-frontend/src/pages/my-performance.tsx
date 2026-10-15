@@ -312,7 +312,7 @@ export function MyPerformance({ onNavigate }: MyPerformanceProps) {
                         <YAxis yAxisId="conversions" orientation="right" stroke="#00c5cb" allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            background: "white",
+                            background: "light-dark(white, var(--card))",
                             border: "1px solid #0047AB20",
                             borderRadius: "8px",
                             boxShadow: "0 4px 6px rgba(0,0,0,0.1)"

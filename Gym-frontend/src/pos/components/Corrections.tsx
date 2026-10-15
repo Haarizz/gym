@@ -228,12 +228,12 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
             ) : (
               <div className={s.stack}>
                 <Input autoFocus value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Search member name, ID or phone…" />
-                <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid #EEF2F6", borderRadius: 8 }}>
+                <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid light-dark(#EEF2F6, var(--border))", borderRadius: 8 }}>
                   <button type="button" className={s.clickRow} onClick={() => setMember("WALK_IN")}
-                    style={{ display: "flex", width: "100%", padding: "8px 12px", background: member === "WALK_IN" ? "#E6F2F1" : undefined }}>Walk-in customer</button>
+                    style={{ display: "flex", width: "100%", padding: "8px 12px", background: member === "WALK_IN" ? "light-dark(#E6F2F1, var(--muted-bg))" : undefined }}>Walk-in customer</button>
                   {members.map((m) => (
                     <button type="button" key={m.id} className={s.clickRow} onClick={() => setMember(m)}
-                      style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "8px 12px", borderTop: "1px solid #F1F5F9", background: member !== "WALK_IN" && member?.id === m.id ? "#E6F2F1" : undefined }}>
+                      style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "8px 12px", borderTop: "1px solid light-dark(#F1F5F9, var(--border))", background: member !== "WALK_IN" && member?.id === m.id ? "light-dark(#E6F2F1, var(--muted-bg))" : undefined }}>
                       <span className={s.strong}>{m.name}</span><span className={`${s.small} ${s.muted}`}>{m.memberCode || ""} {m.phone || ""}</span>
                     </button>
                   ))}
@@ -460,11 +460,11 @@ export function CorrectionsTab() {
       {dash && (
         <div className={s.grid2} style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 10 }}>
           {tiles.map(([label, n, st]) => (
-            <button key={label} type="button" className={s.panel} style={{ textAlign: "left", cursor: "pointer", outline: status === st ? "2px solid #2B7A78" : undefined }}
+            <button key={label} type="button" className={s.panel} style={{ textAlign: "left", cursor: "pointer", outline: status === st ? "2px solid var(--primary)" : undefined }}
               onClick={() => { setStatus(st === "MINE" ? "PENDING_APPROVAL" : st); setPage(1); }}>
               <div className={s.panelBody} style={{ padding: 12 }}>
                 <div className={`${s.small} ${s.muted}`}>{label}</div>
-                <div className={s.strong} style={{ fontSize: 22, color: st === "MINE" && n > 0 ? "#B45309" : undefined }}>{n}</div>
+                <div className={s.strong} style={{ fontSize: 22, color: st === "MINE" && n > 0 ? "light-dark(#B45309, oklch(82% 0.146 49))" : undefined }}>{n}</div>
               </div>
             </button>
           ))}
@@ -520,7 +520,7 @@ export function CorrectionsTab() {
             </tbody>
           </table>
         </div>
-        <div className={s.panelHead} style={{ borderTop: "1px solid #EEF2F6", borderBottom: 0 }}>
+        <div className={s.panelHead} style={{ borderTop: "1px solid light-dark(#EEF2F6, var(--border))", borderBottom: 0 }}>
           <span className={s.muted}>Page {page} of {pages}</span>
           <div className={s.rowWrap}>
             <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>

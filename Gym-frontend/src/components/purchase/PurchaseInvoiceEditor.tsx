@@ -750,7 +750,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
               <div className={styles.sumRow}><span>Paid on this Invoice</span><span className={styles.success}>− <CurrencyValue amount={amountPaid} options={fmt2} /></span></div>
             )}
             {form.supplierId ? (
-              <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? '#dc2626' : undefined, fontSize: 16 }}>
+              <div className={styles.sumTotal} style={{ color: newOutstanding > 0 ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : undefined, fontSize: 16 }}>
                 <span>Total Payable to Supplier</span><CurrencyValue amount={newOutstanding} options={fmt2} />
               </div>
             ) : (
@@ -777,8 +777,8 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
                       <span>Now: <b>{current}</b></span>
                       {adds ? <span>+{incoming} → <b>{current + incoming}</b> {p?.defaultUnit ?? ''}</span> : <span className={styles.muted}>{form.invoiceType === 'PO' && pending ? 'already received on PO' : 'no change'}</span>}
                     </div>
-                    {p?.stockStatus === 'LOW_STOCK' && <div style={{ marginTop: 2, fontWeight: 600, color: '#b45309' }}>Low stock item</div>}
-                    {p?.stockStatus === 'OUT_OF_STOCK' && <div style={{ marginTop: 2, fontWeight: 600, color: '#b91c1c' }}>Currently out of stock</div>}
+                    {p?.stockStatus === 'LOW_STOCK' && <div style={{ marginTop: 2, fontWeight: 600, color: 'light-dark(#b45309, oklch(82% 0.146 49))' }}>Low stock item</div>}
+                    {p?.stockStatus === 'OUT_OF_STOCK' && <div style={{ marginTop: 2, fontWeight: 600, color: 'var(--danger)' }}>Currently out of stock</div>}
                   </div>
                 );
               }) : (
@@ -810,7 +810,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
           </div>
 
           {!readOnly && form.lines.length > 0 && !validate() && (
-            <div className={cx(styles.notice)} style={{ background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}>
+            <div className={cx(styles.notice)} style={{ background: 'light-dark(#ecfdf5, oklch(27% 0.039 166.1))', borderColor: 'light-dark(#a7f3d0, oklch(38% 0.08 164.2))', color: 'light-dark(#065f46, oklch(82% 0.086 166.9))' }}>
               <CheckCircle2 size={14} style={{ flexShrink: 0, marginTop: 1 }} /> Ready to save.
             </div>
           )}

@@ -137,7 +137,7 @@ public class AttendanceService {
                 .map(e -> formatHour(e.getKey()))
                 .orElse("—");
 
-        long totalActive = memberRepository.countByMembershipStatus("active");
+        long totalActive = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         double rate = totalActive > 0 ? Math.round((today.size() * 100.0 / totalActive) * 10) / 10.0 : 0;
 
         AttendanceStatsDTO stats = new AttendanceStatsDTO();
@@ -252,7 +252,7 @@ public class AttendanceService {
         List<Attendance> records = attendanceRepository.findByDateRange(
                 start.atStartOfDay(), end.plusDays(1).atStartOfDay());
 
-        long totalActiveMembers = memberRepository.countByMembershipStatus("active");
+        long totalActiveMembers = memberRepository.countEffectivelyActive(LocalDate.now().atStartOfDay());
         long totalDays = ChronoUnit.DAYS.between(start, end) + 1;
 
         // ── Daily summary ─────────────────────────────────────────────────────

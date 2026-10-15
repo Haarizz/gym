@@ -397,7 +397,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
             <Card className={panelCardClass}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Search className="h-5 w-5" style={{ color: '#2B7A78' }} />Find Member
+                  <Search className="h-5 w-5" style={{ color: 'var(--primary)' }} />Find Member
                 </CardTitle>
                 <CardDescription>Search by Name, Mobile Number, Member ID, or Email</CardDescription>
               </CardHeader>
@@ -461,7 +461,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
               <Card className={`${panelCardClass} ring-1 ring-[#2B7A78]/20`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" style={{ color: '#2B7A78' }} />Selected Member
+                    <User className="h-5 w-5" style={{ color: 'var(--primary)' }} />Selected Member
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -532,7 +532,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                        <FileText className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                         Pending Bills / Dues
                       </CardTitle>
                       <div className="flex items-center gap-2">
@@ -555,7 +555,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           size="sm"
                           onClick={handleAutoApplyPayment}
                           className="gap-2"
-                          style={{ borderColor: '#2B7A78', color: '#2B7A78' }}
+                          style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
                         >
                           <CheckCircle className="h-4 w-4" />Auto-Apply Payment
                         </Button>
@@ -627,7 +627,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                                     value={paymentAmounts[bill.id] || ""}
                                     onChange={(e) => handlePaymentAmountChange(bill.id, e.target.value)}
                                     className="text-right w-28"
-                                    style={{ borderColor: paymentAmounts[bill.id] ? '#2B7A78' : '' }}
+                                    style={{ borderColor: paymentAmounts[bill.id] ? 'var(--primary)' : '' }}
                                   />
                                 </td>
                               </tr>
@@ -638,7 +638,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           <tr className="bg-slate-50/50">
                             <td colSpan={7} className="py-3 px-2 text-right text-sm">Total to Pay Now:</td>
                             <td className="py-3 px-2 text-right">
-                              <span className="text-lg" style={{ color: '#2B7A78' }}>
+                              <span className="text-lg" style={{ color: 'var(--primary)' }}>
                                 <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                               </span>
                             </td>
@@ -688,7 +688,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
               <Card className={panelCardClass}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" style={{ color: '#2B7A78' }} />Settle Payment
+                    <DollarSign className="h-5 w-5" style={{ color: 'var(--primary)' }} />Settle Payment
                   </CardTitle>
                   <CardDescription>Choose payment method and enter transaction details</CardDescription>
                 </CardHeader>
@@ -748,7 +748,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
               <Card className={`${panelCardClass} ring-1 ring-[#2B7A78]/20`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" style={{ color: '#2B7A78' }} />Finalize Receipt
+                    <Receipt className="h-5 w-5" style={{ color: 'var(--primary)' }} />Finalize Receipt
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -759,7 +759,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                     </div>
                     <div className="flex justify-between items-center p-3 bg-[#DFF5F4] rounded-lg">
                       <span>Receipt Total:</span>
-                      <span className="text-xl" style={{ color: '#2B7A78' }}><CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}</span>
+                      <span className="text-xl" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-[#F9FAFB] rounded-lg">
                       <span className="text-muted-foreground">Balance Remaining:</span>
@@ -784,7 +784,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           onClick={handleGenerateReceipt}
                           disabled={calculateTotalPayment() === 0 || submitting || !paymentManager.settleable}
                           className="w-full text-white gap-2"
-                          style={{ backgroundColor: '#2B7A78' }}
+                          style={{ backgroundColor: 'var(--primary)' }}
                           size="lg"
                         >
                           {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
@@ -794,7 +794,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           variant="outline"
                           onClick={resetForm}
                           className="w-full gap-2"
-                          style={{ borderColor: '#E63946', color: '#E63946' }}
+                          style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
                           size="lg"
                         >
                           Cancel
@@ -815,7 +815,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                             variant="outline"
                             onClick={handlePrintReceipt}
                             className="gap-2"
-                            style={{ borderColor: '#2B7A78', color: '#2B7A78' }}
+                            style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
                           >
                             <Printer className="h-4 w-4" />Print Receipt
                           </Button>
@@ -836,7 +836,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                         <Button
                           onClick={resetForm}
                           className="w-full gap-2"
-                          style={{ backgroundColor: '#2B7A78' }}
+                          style={{ backgroundColor: 'var(--primary)' }}
                           variant="default"
                         >
                           Create New Receipt
@@ -854,7 +854,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                 <CardContent className="pt-6">
                   <div className="text-center py-8 space-y-4">
                     <div className="p-4 rounded-full bg-[#DFF5F4] w-20 h-20 mx-auto flex items-center justify-center">
-                      <Receipt className="h-10 w-10" style={{ color: '#2B7A78' }} />
+                      <Receipt className="h-10 w-10" style={{ color: 'var(--primary)' }} />
                     </div>
                     <div>
                       <h3 className="text-lg mb-2">Get Started</h3>
@@ -898,7 +898,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <Card style={{ backgroundColor: '#F9FAFB' }}>
+            <Card style={{ backgroundColor: 'light-dark(#F9FAFB, var(--muted-bg))' }}>
               <CardContent className="pt-6">
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
@@ -955,11 +955,11 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
               </div>
             </div>
 
-            <Card style={{ backgroundColor: '#DFF5F4', border: 'none' }}>
+            <Card style={{ backgroundColor: 'var(--primary-soft)', border: 'none' }}>
               <CardContent className="pt-4">
                 <div className="flex justify-between items-center">
                   <span className="text-lg">Total Amount Paid:</span>
-                  <span className="text-2xl" style={{ color: '#2B7A78' }}>
+                  <span className="text-2xl" style={{ color: 'var(--primary)' }}>
                     <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                   </span>
                 </div>
@@ -969,10 +969,10 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setShowReceiptModal(false)}>Close</Button>
-            <Button variant="outline" onClick={handlePrintReceipt} className="gap-2" style={{ borderColor: '#2B7A78', color: '#2B7A78' }}>
+            <Button variant="outline" onClick={handlePrintReceipt} className="gap-2" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
               <Printer className="h-4 w-4" />Print
             </Button>
-            <Button onClick={handleDownloadPDF} style={{ backgroundColor: '#2B7A78' }} className="text-white gap-2">
+            <Button onClick={handleDownloadPDF} style={{ backgroundColor: 'var(--primary)' }} className="text-white gap-2">
               <Download className="h-4 w-4" />Download PDF
             </Button>
           </DialogFooter>
@@ -984,13 +984,13 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
-              <Send className="h-6 w-6" style={{ color: '#2B7A78' }} />Send Receipt via Digital Channels
+              <Send className="h-6 w-6" style={{ color: 'var(--primary)' }} />Send Receipt via Digital Channels
             </DialogTitle>
             <DialogDescription>Select one or more channels to send the receipt</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <Card style={{ backgroundColor: '#F9FAFB', border: 'none' }}>
+            <Card style={{ backgroundColor: 'light-dark(#F9FAFB, var(--muted-bg))', border: 'none' }}>
               <CardContent className="pt-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -1003,7 +1003,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Amount:</span>
-                    <span className="font-medium" style={{ color: '#2B7A78' }}>
+                    <span className="font-medium" style={{ color: 'var(--primary)' }}>
                       <CurrencyGlyph /> {calculateTotalPayment().toFixed(2)}
                     </span>
                   </div>
@@ -1017,9 +1017,9 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
               <Label className="text-base mb-3 block">Select Channels *</Label>
               <div className="space-y-3">
                 {[
-                  { ch: "SMS",       icon: <MessageSquare className="h-5 w-5" style={{ color: '#2B7A78' }} />, contact: selectedMember?.phone },
-                  { ch: "WhatsApp",  icon: <Send className="h-5 w-5" style={{ color: '#2B7A78' }} />,         contact: selectedMember?.phone },
-                  { ch: "Email",     icon: <Mail className="h-5 w-5" style={{ color: '#2B7A78' }} />,         contact: selectedMember?.email },
+                  { ch: "SMS",       icon: <MessageSquare className="h-5 w-5" style={{ color: 'var(--primary)' }} />, contact: selectedMember?.phone },
+                  { ch: "WhatsApp",  icon: <Send className="h-5 w-5" style={{ color: 'var(--primary)' }} />,         contact: selectedMember?.phone },
+                  { ch: "Email",     icon: <Mail className="h-5 w-5" style={{ color: 'var(--primary)' }} />,         contact: selectedMember?.email },
                 ].map(opt => (
                   <div
                     key={opt.ch}
@@ -1043,7 +1043,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
             </div>
 
             {selectedDigitalChannel.length > 0 && (
-              <Card style={{ backgroundColor: '#DFF5F4', border: 'none' }}>
+              <Card style={{ backgroundColor: 'var(--primary-soft)', border: 'none' }}>
                 <CardContent className="pt-4">
                   <p className="text-sm"><strong>Selected:</strong> {selectedDigitalChannel.join(", ")}</p>
                 </CardContent>
@@ -1058,7 +1058,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
             <Button
               onClick={handleSendViaDigital}
               disabled={selectedDigitalChannel.length === 0}
-              style={{ backgroundColor: '#2B7A78' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               className="text-white gap-2"
             >
               <Send className="h-4 w-4" />Send Receipt

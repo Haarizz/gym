@@ -5,6 +5,7 @@ import com.company.project.dto.TrainingStreamRequestDTO;
 import com.company.project.dto.TrainingStreamResponseDTO;
 import com.company.project.entities.Staff;
 import com.company.project.entities.TrainingStream;
+import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.StaffRepository;
 import com.company.project.repositories.TrainingStreamRepository;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class TrainingStreamService {
+
+    /** A session can't run longer than a day. */
+    static final int MAX_DURATION_MINUTES = 1440;
 
     private final TrainingStreamRepository streamRepository;
     private final StaffRepository staffRepository;
@@ -57,13 +61,13 @@ public class TrainingStreamService {
     @Transactional
     public TrainingStreamResponseDTO createStream(TrainingStreamRequestDTO request) {
         if (!StringUtils.hasText(request.getTitle())) {
-            throw new RuntimeException("Stream title is required");
+            throw new IllegalArgumentException("Stream title is required");
         }
         if (!StringUtils.hasText(request.getCategory())) {
-            throw new RuntimeException("Stream category is required");
+            throw new IllegalArgumentException("Stream category is required");
         }
         if (request.getDuration() == null || request.getDuration() <= 0) {
-            throw new RuntimeException("Stream duration is required");
+            throw new IllegalArgumentException("Stream duration is required");
         }
 
         TrainingStream stream = new TrainingStream();
@@ -75,7 +79,7 @@ public class TrainingStreamService {
     @Transactional
     public TrainingStreamResponseDTO updateStream(Long id, TrainingStreamRequestDTO request) {
         TrainingStream stream = streamRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stream not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Stream not found"));
         applyRequest(stream, request);
         streamRepository.save(stream);
         return toResponse(stream);
@@ -84,7 +88,7 @@ public class TrainingStreamService {
     @Transactional
     public void deleteStream(Long id) {
         if (!streamRepository.existsById(id)) {
-            throw new RuntimeException("Stream not found");
+            throw new EntityNotFoundException("Stream not found");
         }
         streamRepository.deleteById(id);
     }
@@ -92,9 +96,9 @@ public class TrainingStreamService {
     @Transactional
     public TrainingStreamResponseDTO startStream(Long id) {
         TrainingStream stream = streamRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stream not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Stream not found"));
         if (!"Scheduled".equals(stream.getStatus())) {
-            throw new RuntimeException("Only scheduled streams can be started");
+            throw new IllegalStateException("Only scheduled streams can be started");
         }
         stream.setStatus("Live");
         streamRepository.save(stream);
@@ -104,9 +108,9 @@ public class TrainingStreamService {
     @Transactional
     public TrainingStreamResponseDTO endStream(Long id) {
         TrainingStream stream = streamRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Stream not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Stream not found"));
         if (!"Live".equals(stream.getStatus())) {
-            throw new RuntimeException("Only live streams can be ended");
+            throw new IllegalStateException("Only live streams can be ended");
         }
         stream.setStatus("Ended");
         stream.setParticipants(0);
@@ -170,12 +174,18 @@ public class TrainingStreamService {
     }
 
     private void applyRequest(TrainingStream stream, TrainingStreamRequestDTO request) {
+        if (request.getDuration() != null && (request.getDuration() <= 0 || request.getDuration() > MAX_DURATION_MINUTES)) {
+            throw new IllegalArgumentException("Duration must be between 1 and " + MAX_DURATION_MINUTES + " minutes");
+        }
+        if (request.getMaxParticipants() != null && request.getMaxParticipants() <= 0) {
+            throw new IllegalArgumentException("Max participants must be at least 1");
+        }
         if (StringUtils.hasText(request.getTitle())) {
             stream.setTitle(request.getTitle());
         }
         if (request.getInstructorId() != null) {
             Staff instructor = staffRepository.findById(request.getInstructorId())
-                    .orElseThrow(() -> new RuntimeException("Instructor not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("The selected instructor no longer exists"));
             stream.setInstructor(instructor);
         }
         if (StringUtils.hasText(request.getCategory())) {

@@ -28,6 +28,13 @@ public class RoleController {
         return ResponseEntity.ok(roleService.listRoles(search, page, limit));
     }
 
+    /** Roles that can be given to a staff member — for the Add/Edit Staff role picker. */
+    @GetMapping("/assignable")
+    @PreAuthorize("hasAnyAuthority('STAFF_VIEW', 'STAFF_CREATE', 'STAFF_EDIT', 'ADMINISTRATION_VIEW')")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> listAssignableRoles() {
+        return ResponseEntity.ok(roleService.listAssignableRoles());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMINISTRATION_VIEW')")
     public ResponseEntity<RoleResponseDTO> getRole(@PathVariable Long id) {

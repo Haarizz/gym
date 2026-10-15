@@ -23,8 +23,8 @@
 /* ── Header ─────────────────────────────────────────────────────────── */
 .hero {
   padding: 1.5rem;
-  background: linear-gradient(135deg, #327f74, #2b7a78);
-  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary));
+  color: var(--primary-foreground);
   border-radius: 0.75rem 0.75rem 0 0;
 }
 
@@ -48,11 +48,11 @@
   width: 4rem;
   height: 4rem;
   flex-shrink: 0;
-  border: 2px solid rgb(255 255 255 / 0.3);
+  border: 2px solid light-dark(rgb(255 255 255 / 0.3), color-mix(in srgb, var(--border) 30%, transparent));
 }
 
 .avatarFallback {
-  background: rgb(255 255 255 / 0.2);
+  background: light-dark(rgb(255 255 255 / 0.2), color-mix(in srgb, var(--card) 20%, transparent));
   color: #fff;
   font-size: 1.25rem;
   font-weight: 700;
@@ -94,10 +94,10 @@
   white-space: nowrap;
 }
 
-.pillGood { background: #d1fae5; color: #047857; }
-.pillBad { background: #fee2e2; color: #b91c1c; }
-.pillWarn { background: #fef3c7; color: #a16207; }
-.pillInfo { background: #cffafe; color: #0e7490; }
+.pillGood { background: light-dark(#d1fae5, oklch(27% 0.066 163.1)); color: light-dark(#047857, oklch(82% 0.105 165.6)); }
+.pillBad { background: light-dark(#fee2e2, oklch(27% 0.048 17.7)); color: light-dark(#b91c1c, oklch(82% 0.15 27.5)); }
+.pillWarn { background: light-dark(#fef3c7, oklch(27% 0.07 95.6)); color: light-dark(#a16207, oklch(82% 0.121 66.4)); }
+.pillInfo { background: light-dark(#cffafe, oklch(27% 0.06 203.4)); color: light-dark(#0e7490, oklch(82% 0.094 223.1)); }
 
 .heroMeta {
   text-align: right;
@@ -125,7 +125,7 @@
 .kpi {
   padding: 0.75rem;
   border-radius: 0.5rem;
-  background: rgb(255 255 255 / 0.1);
+  background: light-dark(rgb(255 255 255 / 0.1), color-mix(in srgb, var(--card) 10%, transparent));
   min-width: 0;
 }
 
@@ -161,8 +161,8 @@
   margin-bottom: 1rem;
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem;
-  background: #fef3c7;
-  color: #92400e;
+  background: light-dark(#fef3c7, oklch(27% 0.07 95.6));
+  color: light-dark(#92400e, oklch(82% 0.125 46.2));
   font-size: 0.8125rem;
 }
 
@@ -192,7 +192,7 @@
   padding: 1.25rem 1.5rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: var(--card, #fff);
+  background: var(--card, light-dark(#fff, var(--card)));
   min-width: 0;
 }
 
@@ -206,7 +206,7 @@
 }
 
 .cardTitle > svg {
-  color: #327f74;
+  color: var(--primary);
 }
 
 .cardTitleNote {
@@ -270,7 +270,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.4rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid light-dark(#f3f4f6, var(--border));
 }
 
 .infoRow:last-child {
@@ -329,7 +329,7 @@
   justify-content: center;
   font-size: 0.875rem;
   font-weight: 700;
-  color: #327f74;
+  color: var(--primary);
 }
 
 .ringLabel {
@@ -360,10 +360,10 @@
   flex-shrink: 0;
 }
 
-.tileGreen { background: #ecfdf5; }
-.tileTeal { background: #f0fdfa; }
-.tileBlue { background: #eff6ff; }
-.tileRed { background: #fef2f2; }
+.tileGreen { background: light-dark(#ecfdf5, oklch(27% 0.039 166.1)); }
+.tileTeal { background: light-dark(#f0fdfa, var(--muted-bg)); }
+.tileBlue { background: light-dark(#eff6ff, var(--muted-bg)); }
+.tileRed { background: light-dark(#fef2f2, var(--muted-bg)); }
 
 .tileLabel {
   margin: 0;
@@ -396,7 +396,7 @@
   max-width: 8rem;
   height: 0.5rem;
   border-radius: 9999px;
-  background: #f3f4f6;
+  background: light-dark(#f3f4f6, var(--muted-bg));
   overflow: hidden;
 }
 
@@ -419,7 +419,7 @@
 }
 
 .credit {
-  color: #047857;
+  color: light-dark(#047857, oklch(82% 0.105 165.6));
   font-weight: 500;
 }
 
@@ -459,12 +459,12 @@
   gap: 0.75rem;
   padding: 0.5rem;
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--background);
   opacity: 0.5;
 }
 
 .achievement.earned {
-  background: #f0fdfa;
+  background: light-dark(#f0fdfa, var(--muted-bg));
   opacity: 1;
 }
 
@@ -476,11 +476,11 @@
   height: 2rem;
   flex-shrink: 0;
   border-radius: 9999px;
-  background: #d1d5db;
+  background: light-dark(#d1d5db, var(--border));
 }
 
 .earned .achievementIcon {
-  background: #327f74;
+  background: var(--primary);
 }
 
 .achievementLabel {
@@ -510,7 +510,7 @@
 .healthItem {
   padding: 0.75rem;
   border-radius: 0.5rem;
-  background: #f9fafb;
+  background: var(--background);
 }
 
 .healthValue {

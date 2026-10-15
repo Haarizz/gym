@@ -859,7 +859,7 @@ export function Terminal() {
 
   // ── Shared pieces ───────────────────────────────────────────────────────
   const promoRow = cart.promo && (
-    <div className={`${s.totalsRow} ${totals.promoError ? "" : s.bbGreen}`} style={totals.promoError ? { color: "#B45309" } : undefined}>
+    <div className={`${s.totalsRow} ${totals.promoError ? "" : s.bbGreen}`} style={totals.promoError ? { color: "light-dark(#B45309, oklch(82% 0.146 49))" } : undefined}>
       <span>
         <Ticket size={11} style={{ display: "inline", verticalAlign: -1 }} /> {cart.promo.name}{cart.promo.code ? ` (${cart.promo.code})` : ""}
         {" "}<button type="button" className={s.removeBtn} style={{ height: 14 }} onClick={() => setCart((c) => ({ ...c, promo: null }))} title="Remove promotion"><X size={11} /></button>

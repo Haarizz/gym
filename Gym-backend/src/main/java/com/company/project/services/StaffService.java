@@ -207,9 +207,7 @@ public class StaffService {
             if (!hasCredentials) {
                 throw new RuntimeException("Username and password are required to enable login");
             }
-            if (userRepository.existsByUsername(req.getAppUsername())) {
-                throw new RuntimeException("Username already taken: " + req.getAppUsername());
-            }
+            claimLoginIdentity(req.getAppUsername(), staff.getEmail());
             User user = new User();
             user.setUsername(req.getAppUsername());
             user.setEmail(staff.getEmail());
@@ -233,9 +231,7 @@ public class StaffService {
                     .orElseThrow(() -> new RuntimeException("Linked user account not found"));
             if (req.getAppUsername() != null && !req.getAppUsername().isBlank()
                     && !req.getAppUsername().equals(user.getUsername())) {
-                if (userRepository.existsByUsername(req.getAppUsername())) {
-                    throw new RuntimeException("Username already taken: " + req.getAppUsername());
-                }
+                claimLoginIdentity(req.getAppUsername(), null);
                 if (TenantContextHolder.getCurrentTenant() != null) {
                     userDirectoryRepository.findByUsernameOrEmail(user.getUsername(), user.getUsername())
                             .ifPresent(entry -> {
@@ -263,11 +259,82 @@ public class StaffService {
         return staff;
     }
 
+    /**
+     * Makes sure a new staff login can use this username and email. Deleting a staff
+     * member only disables their login (other records may reference it), which used to
+     * leave its username and email taken forever: re-adding the person failed with the
+     * database's vague "duplicate value" error. Such a leftover login (disabled, no staff
+     * record, not a member's or owner's) is released here; anything else gets a clear error.
+     */
+    private void claimLoginIdentity(String username, String email) {
+        if (username != null && !username.isBlank()) {
+            userRepository.findByUsername(username.trim()).ifPresent(holder -> {
+                if (!releaseIfLeftover(holder)) {
+                    throw new com.company.project.exceptions.BusinessRuleViolationException(
+                            "The username '" + username.trim() + "' is already taken. Choose another one.");
+                }
+            });
+        }
+        if (email != null && !email.isBlank()) {
+            userRepository.findByEmail(email.trim()).ifPresent(holder -> {
+                if (!releaseIfLeftover(holder)) {
+                    throw new com.company.project.exceptions.BusinessRuleViolationException(
+                            "The email " + email.trim() + " is already used by another login (username: "
+                                    + holder.getUsername() + "). Use a different email.");
+                }
+            });
+        }
+        // Logins are found across every gym by username or email, so they must be unique platform-wide.
+        if (TenantContextHolder.getCurrentTenant() != null) {
+            for (String value : new String[] { username, email }) {
+                if (value == null || value.isBlank()) continue;
+                userDirectoryRepository.findByUsernameOrEmail(value.trim(), value.trim()).ifPresent(entry -> {
+                    throw new com.company.project.exceptions.BusinessRuleViolationException(
+                            "'" + value.trim() + "' is already used by a login at "
+                                    + (TenantContextHolder.getCurrentTenant().equals(entry.getTenantSlug()) ? "this gym" : "another gym")
+                                    + ". Use a different one.");
+                });
+            }
+        }
+    }
+
+    /** Renames a deleted staff member's leftover login so its username/email can be reused. */
+    private boolean releaseIfLeftover(User user) {
+        if (user.isEnabled() || staffRepository.findByUserId(user.getId()).isPresent()) return false;
+        boolean protectedAccount = userRoleRepository.findByUserId(user.getId()).stream()
+                .map(ur -> ur.getRole().getRoleName().toUpperCase())
+                .anyMatch(name -> name.equals("MEMBER") || name.equals(RoleService.OWNER_ROLE_NAME)
+                        || name.equals(RoleService.ADMIN_ROLE_NAME));
+        if (protectedAccount) return false;
+        releaseLogin(user);
+        return true;
+    }
+
+    private void releaseLogin(User user) {
+        String oldUsername = user.getUsername();
+        String oldEmail = user.getEmail();
+        String prefix = "deleted-" + user.getId() + "-";
+        if (oldUsername != null && !oldUsername.startsWith(prefix)) user.setUsername(prefix + oldUsername);
+        if (oldEmail != null && !oldEmail.startsWith(prefix)) user.setEmail(prefix + oldEmail);
+        user.setEnabled(false);
+        userRepository.saveAndFlush(user);
+        // A disabled login needs no routing entry; drop it so the name is free platform-wide.
+        String tenant = TenantContextHolder.getCurrentTenant();
+        if (tenant != null && oldUsername != null) {
+            userDirectoryRepository.findByUsernameOrEmail(oldUsername, oldEmail != null ? oldEmail : oldUsername)
+                    .filter(entry -> tenant.equals(entry.getTenantSlug()))
+                    .ifPresent(userDirectoryRepository::delete);
+        }
+    }
+
     /** Matches the Administration → Staff role dropdown value to a security Role, falling back to STAFF. */
     private Role resolveSecurityRole(String staffRoleText) {
         if (staffRoleText != null && !staffRoleText.isBlank()) {
             Role match = roleRepository.findByRoleNameIgnoreCase(staffRoleText.trim()).orElse(null);
-            if (match != null) return match;
+            if (match != null) {
+                RoleService.assertAssignable(match);
+                return match;
+            }
         }
         return roleRepository.findByRoleName("STAFF")
                 .orElseThrow(() -> new RuntimeException("STAFF role not found"));
@@ -301,9 +368,7 @@ public class StaffService {
             }
         } else {
             // No account yet — create one
-            if (userRepository.existsByUsername(appUsername)) {
-                throw new RuntimeException("Username already taken: " + appUsername);
-            }
+            claimLoginIdentity(appUsername, staff.getEmail());
             User user = new User();
             user.setUsername(appUsername);
             user.setEmail(staff.getEmail());
@@ -388,6 +453,7 @@ public class StaffService {
 
         List<UserRole> current = userRoleRepository.findByUserId(user.getId());
         if (current.size() == 1 && current.get(0).getRole().getId().equals(securityRole.getId())) return;
+        RoleService.assertAssignable(securityRole);
         current.forEach(userRoleRepository::delete);
         userRoleRepository.save(new UserRole(null, user, securityRole));
     }
@@ -405,18 +471,33 @@ public class StaffService {
         trainingStreamRepository.clearInstructor(id);
         staffBranchRepository.deleteByStaffId(id);
 
-        // Revoke the linked app login rather than deleting the user, which other records may reference.
+        // Revoke the linked app login rather than deleting the user, which other records may
+        // reference, and free its username/email so the person can be added again later.
         if (staff.getUserId() != null) {
-            userRepository.findById(staff.getUserId()).ifPresent(user -> {
-                user.setEnabled(false);
-                userRepository.save(user);
-            });
+            userRepository.findById(staff.getUserId()).ifPresent(this::releaseLogin);
         }
 
         staffRepository.delete(staff);
     }
 
     private void applyRequest(StaffRequestDTO req, Staff staff) {
+        // The platform-owner role is never a staff role, not even as a job title.
+        for (String roleText : new String[] { req.getRole(), req.getAppRole() }) {
+            if (roleText != null && roleText.trim().equalsIgnoreCase(RoleService.ADMIN_ROLE_NAME)) {
+                throw new com.company.project.exceptions.BusinessRuleViolationException(
+                        "The " + RoleService.ADMIN_ROLE_NAME + " role can't be assigned to staff");
+            }
+        }
+        // employees.email is unique: say who has it instead of the generic duplicate error.
+        if (req.getEmail() != null && !req.getEmail().isBlank()) {
+            staffRepository.findByEmail(req.getEmail().trim())
+                    .filter(other -> !other.getId().equals(staff.getId()))
+                    .ifPresent(other -> {
+                        throw new com.company.project.exceptions.BusinessRuleViolationException(
+                                "Another staff member (" + other.getName() + ") already uses the email "
+                                        + req.getEmail().trim() + ".");
+                    });
+        }
         if (req.getName() != null)         staff.setName(req.getName());
         if (req.getEmail() != null)        staff.setEmail(req.getEmail());
         if (req.getPhone() != null)        staff.setPhone(req.getPhone());

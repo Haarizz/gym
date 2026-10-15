@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -91,6 +92,29 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    /**
+     * The request body couldn't be bound — a value of the wrong shape for its
+     * field (an unparseable date, a number too large for an int, text where a
+     * number belongs). That's a client error, but it used to fall through to the
+     * catch-all below as a 500 with Jackson's raw parse text (BG_114).
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        String field = null;
+        for (Throwable t = ex.getCause(); t != null && field == null; t = t.getCause()) {
+            if (t instanceof com.fasterxml.jackson.databind.JsonMappingException jme && !jme.getPath().isEmpty()) {
+                field = jme.getPath().get(jme.getPath().size() - 1).getFieldName();
+            }
+        }
+        String message = field != null
+                ? "Invalid value for '" + field + "'"
+                : "The request contains an invalid value";
+        if (ex.getMessage() != null && ex.getMessage().contains("out of range of int")) {
+            message += " — the number is too large";
+        }
+        return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", message);
     }
 
     /**

@@ -83,11 +83,11 @@ export function CardModal({ open, onClose, onConfirm, target, editingLine, offer
                     style={{
                       fontSize: 12,
                       borderRadius: 8,
-                      border: selected ? "1px solid #2563eb" : "1px solid #e5e7eb",
+                      border: selected ? "1px solid #2563eb" : "1px solid light-dark(#e5e7eb, var(--border))",
                       padding: "8px 8px",
                       fontWeight: 500,
-                      backgroundColor: selected ? "#eff6ff" : "#fff",
-                      color: selected ? "#1d4ed8" : "#111827",
+                      backgroundColor: selected ? "light-dark(#eff6ff, var(--muted-bg))" : "light-dark(#fff, var(--card))",
+                      color: selected ? "light-dark(#1d4ed8, oklch(82% 0.15 264.4))" : "light-dark(#111827, oklch(82% 0.032 264.7))",
                       cursor: "pointer",
                       transition: "background-color 0.15s",
                     }}

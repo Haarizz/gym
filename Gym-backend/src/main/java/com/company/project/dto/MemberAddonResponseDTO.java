@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import com.company.project.entities.MemberAddon;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -30,6 +31,9 @@ public class MemberAddonResponseDTO {
     private List<PaymentSplitDTO> paymentBreakdown;
     private String createdAt;
     private String updatedAt;
+    // Only set on the create response: the customer-facing receipt the purchase
+    // just generated, so the success dialog can print it without a second call.
+    private ReceiptResponseDTO receipt;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -76,4 +80,8 @@ public class MemberAddonResponseDTO {
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public ReceiptResponseDTO getReceipt() { return receipt; }
+
+    public void setReceipt(ReceiptResponseDTO receipt) { this.receipt = receipt; }
 }

@@ -896,7 +896,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                           <XAxis dataKey="date" stroke="#555555" />
                           <YAxis stroke="#555555" />
-                          <Tooltip contentStyle={{ background: "white", border: "1px solid #0047AB20", borderRadius: "8px" }} />
+                          <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
                           <Legend />
                           <Area type="monotone" dataKey="visits" name="Check-ins" stroke="#0047AB" fill="url(#areaGradient)" strokeWidth={2} />
                         </AreaChart>
@@ -921,7 +921,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                             <XAxis dataKey="type" stroke="#555555" />
                             <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "white", border: "1px solid #0047AB20", borderRadius: "8px" }} />
+                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
                             <Legend />
                             <Bar dataKey="count" name="Visits" fill="url(#classBarGradient)" radius={[8, 8, 0, 0]} />
                           </BarChart>
@@ -1001,7 +1001,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                             <XAxis dataKey="month" stroke="#555555" />
                             <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "white", border: "1px solid #0047AB20", borderRadius: "8px" }} />
+                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
                             <Line type="monotone" dataKey="visits" name="Visits" stroke="#0047AB" strokeWidth={3} dot={{ fill: "#0047AB", r: 5 }} />
                           </LineChart>
                         </ResponsiveContainer>
@@ -1217,7 +1217,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                             <XAxis dataKey="hour" stroke="#555555" />
                             <YAxis stroke="#555555" />
-                            <Tooltip contentStyle={{ background: "white", border: "1px solid #0047AB20", borderRadius: "8px" }} />
+                            <Tooltip contentStyle={{ background: "light-dark(white, var(--card))", border: "1px solid #0047AB20", borderRadius: "8px" }} />
                             <Legend />
                             <Bar dataKey="Mon" fill="url(#peakGradient)" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="Wed" fill="#00c5cb" radius={[4, 4, 0, 0]} />

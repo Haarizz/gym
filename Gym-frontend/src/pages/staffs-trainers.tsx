@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { toast } from 'sonner';
-import { staffService, Staff, CommissionRule, StaffCertification } from '../utils/supabase/staff-service';
-import { rolesService, Role } from '../utils/supabase/roles-service';
+import { staffService, Staff, CommissionRule, StaffCertification, StaffListPerformance } from '../utils/supabase/staff-service';
+import { rolesService, Role, AssignableRole } from '../utils/supabase/roles-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -87,7 +87,29 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
 // Single set of roles used both as the employee's job role and their app login/RBAC role,
 // so Add/Edit Employee only asks for one "Role" instead of two confusingly similar fields.
-const SECURITY_ROLES = ['Gymbios_Admin', 'Receptionist', 'Trainer', 'Accountant', 'Manager'];
+// The real list comes from Roles & Permissions (so custom roles can be assigned); this is
+// only the fallback if it can't be loaded.
+const FALLBACK_STAFF_ROLES = ['Receptionist', 'Trainer', 'Accountant', 'Manager'];
+
+/** "RECEPTIONIST" -> "Receptionist"; custom mixed-case names are kept as typed. The
+ * backend matches the stored text to a role case-insensitively. */
+const roleLabel = (name: string) =>
+  name === name.toUpperCase()
+    ? name.toLowerCase().replace(/(^|[_\s])(\w)/g, (_m, sep, c) => sep + c.toUpperCase())
+    : name;
+
+/** Picker options, keeping a staff member's current free-text role selectable. */
+function staffRoleOptions(roles: AssignableRole[], current?: string): string[] {
+  const options = roles.length ? roles.map(r => roleLabel(r.role_name)) : [...FALLBACK_STAFF_ROLES];
+  if (current && !options.some(o => o.toLowerCase() === current.toLowerCase())) options.push(current);
+  return options;
+}
+
+/** The option matching a stored role regardless of case ("TRAINER" vs "Trainer"). */
+function staffRoleValue(options: string[], current?: string): string {
+  if (!current) return '';
+  return options.find(o => o.toLowerCase() === current.toLowerCase()) ?? current;
+}
 
 // "Add Certification" rows the admin left empty shouldn't be saved as nameless certificates.
 const withoutBlankCerts = (certs: StaffCertification[]) => certs.filter(c => c.cert_name?.trim());
@@ -96,7 +118,43 @@ const ERROR_BORDER: React.CSSProperties = { borderColor: '#dc2626' };
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="text-xs mt-1" style={{ color: '#dc2626' }}>{message}</p>;
+  return <p className="text-xs mt-1" style={{ color: 'light-dark(#dc2626, oklch(82% 0.15 27.3))' }}>{message}</p>;
+}
+
+/** Money for the list: whole numbers stay whole, otherwise two decimals. */
+const formatMoney = (value?: number | null) =>
+  Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+// ── POS commission inputs (Target & Commission Settings) ───────────────────
+/** A role's POS commission: % of each completed POS sale and/or a fixed amount per sale. */
+function PosCommissionFields({ percent, perSale, onChange }: {
+  percent: number;
+  perSale: number;
+  onChange: (pos: { posCommission: number; posCommissionPerSale: number }) => void;
+}) {
+  const clamp = (v: string) => Math.max(0, Number(v) || 0);
+  return (
+    <div className="space-y-2 rounded-md bg-muted/30 p-3">
+      <Label className="text-xs font-semibold text-muted-foreground">POS Sales</Label>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">POS Commission (%)</Label>
+          <Input type="number" min="0" step="0.1" value={percent} className="h-8 text-sm"
+            onChange={e => onChange({ posCommission: clamp(e.target.value), posCommissionPerSale: perSale })}
+          />
+          <p className="text-xs text-muted-foreground">Of each POS sale (after refunds)</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Fixed per Sale (<CurrencyGlyph />)</Label>
+          <Input type="number" min="0" step="0.5" value={perSale} className="h-8 text-sm"
+            onChange={e => onChange({ posCommission: percent, posCommissionPerSale: clamp(e.target.value) })}
+          />
+          <p className="text-xs text-muted-foreground">Added for every completed sale</p>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Credited to the cashier who rang up the sale. Leave both at 0 for no POS commission.</p>
+    </div>
+  );
 }
 
 // ── Controlled Certifications tab (Add & Edit modals) ──────────────────────
@@ -265,14 +323,18 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  // This month's live target progress + commission (membership and POS sales) per staff id.
+  const [perfById, setPerfById] = useState<Record<string, StaffListPerformance>>({});
   const [commissionRulesList, setCommissionRulesList] = useState<CommissionRule[]>([]);
   // All roles from Roles & Permissions (system + user-created) — the source of truth
   // for which roles a commission rule can target.
   const [allRoles, setAllRoles] = useState<Role[]>([]);
+  // Roles this user may give a staff member (Add/Edit Employee role picker).
+  const [assignableRoles, setAssignableRoles] = useState<AssignableRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingRules, setIsSavingRules] = useState(false);
-  const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; admissionCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
-  const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; admissionCommission: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
+  const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
+  const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
   const [roleTargets, setRoleTargets] = useState<Record<string, { revenue: number; sessions: number; newClients: number }>>({});
   const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
     name: string; email: string; phone: string; role: string; department: string;
@@ -340,6 +402,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   useEffect(() => {
     loadStaff();
     loadCommissionRules();
+    rolesService.getAssignableRoles().then(setAssignableRoles).catch(e => console.error('Failed to load roles', e));
   }, []);
 
   // Reload settings data whenever the dialog opens
@@ -359,6 +422,21 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     setRoleTargets(roles);
   }, [showTargetSettings]);
 
+  useEffect(() => {
+    const ids = staffList.map(s => String(s.id)).slice(0, 100);
+    if (ids.length === 0) { setPerfById({}); return; }
+    let cancelled = false;
+    staffService.getStaffListPerformance(ids)
+      .then(list => {
+        if (cancelled) return;
+        const map: Record<string, StaffListPerformance> = {};
+        list.forEach(p => { map[String(p.staff_id)] = p; });
+        setPerfById(map);
+      })
+      .catch(e => console.error('Failed to load staff performance', e));
+    return () => { cancelled = true; };
+  }, [staffList]);
+
   const loadStaff = async () => {
     setIsLoading(true);
     try {
@@ -372,11 +450,17 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     try {
       const rules = await staffService.getCommissionRules();
       setCommissionRulesList(rules);
-      const edits: Record<string, {baseCommission: number; targetBonuses: Array<{threshold:number;bonus:number}>}> = {};
+      const edits: typeof commissionRulesEdits = {};
       rules.forEach(r => {
         let bonuses: Array<{threshold:number;bonus:number}> = [];
         try { bonuses = JSON.parse(r.target_bonuses_json || '[]'); } catch {}
-        edits[r.id] = { baseCommission: r.base_commission, targetBonuses: bonuses };
+        edits[r.id] = {
+          baseCommission: r.base_commission,
+          admissionCommission: r.admission_commission ?? r.base_commission,
+          posCommission: r.pos_commission ?? 0,
+          posCommissionPerSale: r.pos_commission_per_sale ?? 0,
+          targetBonuses: bonuses,
+        };
       });
       setCommissionRulesEdits(edits);
     } catch (e) { console.error('Failed to load commission rules', e); }
@@ -681,6 +765,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           await staffService.updateCommissionRule(rule.id, {
             base_commission: edits.baseCommission,
             admission_commission: edits.admissionCommission,
+            pos_commission: edits.posCommission,
+            pos_commission_per_sale: edits.posCommissionPerSale,
             target_bonuses_json: JSON.stringify(edits.targetBonuses)
           });
         }
@@ -692,6 +778,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             role: nr.role.trim(),
             base_commission: nr.baseCommission,
             admission_commission: nr.admissionCommission,
+            pos_commission: nr.posCommission,
+            pos_commission_per_sale: nr.posCommissionPerSale,
             target_bonuses_json: JSON.stringify(nr.targetBonuses)
           });
         }
@@ -732,8 +820,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           bVal = new Date(b.join_date);
           break;
         case 'commission':
-          aVal = 0;
-          bVal = 0;
+          aVal = Number(perfById[String(a.id)]?.commission_earned ?? 0);
+          bVal = Number(perfById[String(b.id)]?.commission_earned ?? 0);
           break;
         default:
           aVal = a.name;
@@ -1102,28 +1190,35 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">—</span>
-                              <Badge className={`text-xs ${getTargetColor(0)}`}>
-                                <CurrencyGlyph /> 0
-                              </Badge>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${getTargetProgressColor(0)}`}
-                                style={{ width: `0%` }}
-                              ></div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Target: <CurrencyGlyph /> {(employee.monthly_target || 0).toLocaleString()}
-                            </div>
-                          </div>
+                          {(() => {
+                            const perf = perfById[String(employee.id)];
+                            const pct = perf?.achievement_percentage ?? 0;
+                            const target = Number(perf?.revenue_target || employee.monthly_target || 0);
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">{perf ? `${pct}%` : '—'}</span>
+                                  <Badge className={`text-xs ${getTargetColor(pct)}`}>
+                                    <CurrencyGlyph /> {formatMoney(perf?.revenue_achieved)}
+                                  </Badge>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${getTargetProgressColor(pct)}`}
+                                    style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                                  ></div>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Target: <CurrencyGlyph /> {target.toLocaleString()}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center space-x-1" title="This month: membership sales + POS sales">
                             <DollarSign className="h-4 w-4 text-green-600" />
-                            <span className="font-medium"><CurrencyGlyph /> 0</span>
+                            <span className="font-medium"><CurrencyGlyph /> {formatMoney(perfById[String(employee.id)]?.commission_earned)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1338,11 +1433,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                             <div className="text-sm text-gray-600">New Clients</div>
                           </div>
                           <div className="text-center p-3 bg-purple-50 rounded-lg">
-                            <div className="text-lg font-bold text-purple-600"><CurrencyGlyph /> 0</div>
+                            <div className="text-lg font-bold text-purple-600"><CurrencyGlyph /> {formatMoney(perfById[String(selectedEmployee.id)]?.revenue_achieved)}</div>
                             <div className="text-sm text-gray-600">Revenue Generated</div>
                           </div>
                           <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                            <div className="text-lg font-bold text-yellow-600"><CurrencyGlyph /> 0</div>
+                            <div className="text-lg font-bold text-yellow-600"><CurrencyGlyph /> {formatMoney(perfById[String(selectedEmployee.id)]?.commission_earned)}</div>
                             <div className="text-sm text-gray-600">Commission Earned</div>
                           </div>
                         </div>
@@ -1401,7 +1496,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 <div className="flex flex-col items-center gap-3 p-4 rounded-lg border border-primary/10 bg-muted/20">
                   <p className="text-sm font-medium self-start">Adjust Photo — drag to reposition</p>
                   <div
-                    style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid #d1d5db', background: '#e5e7eb', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
+                    style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid light-dark(#d1d5db, var(--border))', background: 'light-dark(#e5e7eb, var(--border))', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
                     onMouseDown={handlePhotoMouseDown}
                     onMouseMove={handlePhotoMouseMove}
                     onMouseUp={handlePhotoMouseUp}
@@ -1426,7 +1521,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 <div className="flex items-center gap-6 p-4 rounded-lg border border-primary/10 bg-muted/20">
                   <button
                     type="button"
-                    style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: newEmployeeBasicInfo.photo_url ? 'pointer' : 'default' }}
+                    style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: 'light-dark(#f1f5f9, var(--muted-bg))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: newEmployeeBasicInfo.photo_url ? 'pointer' : 'default' }}
                     onClick={() => { if (newEmployeeBasicInfo.photo_url) { setPhotoViewerSrc(newEmployeeBasicInfo.photo_url); setPhotoViewerName(newEmployeeBasicInfo.name || 'Employee'); setPhotoViewerOpen(true); } }}
                   >
                     {newEmployeeBasicInfo.photo_url
@@ -1485,7 +1580,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SECURITY_ROLES.map(r => (
+                      {staffRoleOptions(assignableRoles).map(r => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1686,7 +1781,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   <div className="flex flex-col items-center gap-3 p-4 rounded-lg border border-primary/10 bg-muted/20">
                     <p className="text-sm font-medium self-start">Adjust Photo — drag to reposition</p>
                     <div
-                      style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid #d1d5db', background: '#e5e7eb', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
+                      style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid light-dark(#d1d5db, var(--border))', background: 'light-dark(#e5e7eb, var(--border))', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
                       onMouseDown={handlePhotoMouseDown}
                       onMouseMove={handlePhotoMouseMove}
                       onMouseUp={handlePhotoMouseUp}
@@ -1711,7 +1806,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   <div className="flex items-center gap-6 p-4 rounded-lg border border-primary/10 bg-muted/20">
                     <button
                       type="button"
-                      style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: editEmployeeData.photo_url ? 'pointer' : 'default' }}
+                      style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: 'light-dark(#f1f5f9, var(--muted-bg))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: editEmployeeData.photo_url ? 'pointer' : 'default' }}
                       onClick={() => { if (editEmployeeData.photo_url) { setPhotoViewerSrc(editEmployeeData.photo_url); setPhotoViewerName(editEmployeeData.name); setPhotoViewerOpen(true); } }}
                     >
                       {editEmployeeData.photo_url
@@ -1749,10 +1844,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                   </div>
                   <div>
                     <Label>Role <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
-                    <Select value={editEmployeeData.role} onValueChange={v => setEditEmployeeData(p => p ? {...p, role: v} : p)}>
+                    <Select
+                      value={staffRoleValue(staffRoleOptions(assignableRoles, editEmployeeData.role), editEmployeeData.role)}
+                      onValueChange={v => setEditEmployeeData(p => p ? {...p, role: v} : p)}
+                    >
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {SECURITY_ROLES.map(r => (
+                        {staffRoleOptions(assignableRoles, editEmployeeData.role).map(r => (
                           <SelectItem key={r} value={r}>{r}</SelectItem>
                         ))}
                       </SelectContent>
@@ -2198,7 +2296,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
               {/* Existing rules */}
               {commissionRulesList.map((rule) => {
-                const edits = commissionRulesEdits[rule.id] || { baseCommission: rule.base_commission, admissionCommission: rule.admission_commission ?? rule.base_commission, targetBonuses: [] };
+                const edits = commissionRulesEdits[rule.id] || { baseCommission: rule.base_commission, admissionCommission: rule.admission_commission ?? rule.base_commission, posCommission: rule.pos_commission ?? 0, posCommissionPerSale: rule.pos_commission_per_sale ?? 0, targetBonuses: [] };
                 return (
                   <Card key={rule.id} className="border-primary/10 shadow-sm">
                     <CardHeader className="pb-2 pt-4 px-4">
@@ -2224,6 +2322,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                           <p className="text-xs text-muted-foreground">New member signups</p>
                         </div>
                       </div>
+                      <PosCommissionFields
+                        percent={edits.posCommission}
+                        perSale={edits.posCommissionPerSale}
+                        onChange={(pos) => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, ...pos } }))}
+                      />
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
                         {edits.targetBonuses.map((bonus, index) => (
@@ -2315,6 +2418,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                         <p className="text-xs text-muted-foreground">New member signups</p>
                       </div>
                     </div>
+                    <PosCommissionFields
+                      percent={nr.posCommission}
+                      perSale={nr.posCommissionPerSale}
+                      onChange={(pos) => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, ...pos } : r))}
+                    />
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
                       {nr.targetBonuses.map((bonus, index) => (
@@ -2354,7 +2462,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 !commissionRulesList.some(r => r.role === role) && !pendingNewRules.some(r => r.role === role)
               ) ? (
                 <Button variant="outline" className="w-full border-dashed text-primary border-primary/30 hover:bg-primary/5"
-                  onClick={() => setPendingNewRules(prev => [...prev, { tempId: Date.now().toString(), role: '', baseCommission: 5, admissionCommission: 5, targetBonuses: [] }])}>
+                  onClick={() => setPendingNewRules(prev => [...prev, { tempId: Date.now().toString(), role: '', baseCommission: 5, admissionCommission: 5, posCommission: 0, posCommissionPerSale: 0, targetBonuses: [] }])}>
                   <Plus className="h-4 w-4 mr-2" /> Add Commission Rule
                 </Button>
               ) : (

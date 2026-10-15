@@ -1088,7 +1088,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   />
                   <p
                     className="text-xs text-right"
-                    style={{ color: description.length >= MAX_DESCRIPTION_LENGTH ? '#dc2626' : '#64748b' }}
+                    style={{ color: description.length >= MAX_DESCRIPTION_LENGTH ? 'light-dark(#dc2626, oklch(82% 0.15 27.3))' : 'light-dark(#64748b, oklch(82% 0.041 257.4))' }}
                   >
                     {description.length}/{MAX_DESCRIPTION_LENGTH}
                   </p>

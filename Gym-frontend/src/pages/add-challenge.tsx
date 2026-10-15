@@ -407,7 +407,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
             <p className="text-gray-600 mt-1">Join a challenge & stay consistent</p>
           </div>
           <Button
-            style={{ backgroundColor: '#327F74' }}
+            style={{ backgroundColor: 'var(--primary)' }}
             onClick={() => setShowCreateWizard(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -547,7 +547,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                           </div>
                           <Button 
                             className="w-full" 
-                            style={{ backgroundColor: '#327F74' }}
+                            style={{ backgroundColor: 'var(--primary)' }}
                             onClick={() => setShowFilters(false)}
                           >
                             Apply Filters
@@ -582,7 +582,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                     variant={selectedCategory === 'all' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedCategory('all')}
-                    style={selectedCategory === 'all' ? { backgroundColor: '#327F74' } : {}}
+                    style={selectedCategory === 'all' ? { backgroundColor: 'var(--primary)' } : {}}
                   >
                     All
                   </Button>
@@ -594,7 +594,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                         variant={selectedCategory === cat.id ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setSelectedCategory(cat.id)}
-                        style={selectedCategory === cat.id ? { backgroundColor: '#327F74' } : {}}
+                        style={selectedCategory === cat.id ? { backgroundColor: 'var(--primary)' } : {}}
                       >
                         <Icon className="h-4 w-4 mr-2" />
                         {cat.name}
@@ -683,7 +683,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                               <div className="flex gap-2">
                                 <Button
                                   className="flex-1"
-                                  style={{ backgroundColor: '#327F74' }}
+                                  style={{ backgroundColor: 'var(--primary)' }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleJoinChallenge(challenge);
@@ -762,7 +762,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                                       cx="64"
                                       cy="64"
                                       r="56"
-                                      stroke="#327F74"
+                                      stroke="#0F766E"
                                       strokeWidth="8"
                                       fill="none"
                                       strokeDasharray={`${2 * Math.PI * 56}`}
@@ -836,7 +836,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                                 {/* Actions */}
                                 <div className="flex gap-2">
                                   <Button
-                                    style={{ backgroundColor: '#327F74' }}
+                                    style={{ backgroundColor: 'var(--primary)' }}
                                     onClick={() => handleTrackProgress(challenge)}
                                   >
                                     <Target className="h-4 w-4 mr-2" />
@@ -874,7 +874,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                     variant={leaderboardMode === 'overall' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setLeaderboardMode('overall')}
-                    style={leaderboardMode === 'overall' ? { backgroundColor: '#327F74' } : {}}
+                    style={leaderboardMode === 'overall' ? { backgroundColor: 'var(--primary)' } : {}}
                   >
                     Overall
                   </Button>
@@ -882,7 +882,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                     variant={leaderboardMode === 'friends' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setLeaderboardMode('friends')}
-                    style={leaderboardMode === 'friends' ? { backgroundColor: '#327F74' } : {}}
+                    style={leaderboardMode === 'friends' ? { backgroundColor: 'var(--primary)' } : {}}
                   >
                     Friends
                   </Button>
@@ -890,7 +890,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                     variant={leaderboardMode === 'branch' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setLeaderboardMode('branch')}
-                    style={leaderboardMode === 'branch' ? { backgroundColor: '#327F74' } : {}}
+                    style={leaderboardMode === 'branch' ? { backgroundColor: 'var(--primary)' } : {}}
                   >
                     My Branch
                   </Button>
@@ -1202,7 +1202,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
               <div className="flex gap-3">
                 <Button
                   className="flex-1"
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={() => {
                     setShowJoinSheet(true);
                   }}
@@ -1348,7 +1348,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
               {/* Confirm Button */}
               <Button
                 className="w-full h-12 text-lg"
-                style={{ backgroundColor: '#327F74' }}
+                style={{ backgroundColor: 'var(--primary)' }}
                 onClick={handleConfirmJoin}
                 disabled={!agreedToRules}
               >
@@ -1388,7 +1388,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
             <div className="space-y-3">
               <Button
                 className="w-full"
-                style={{ backgroundColor: '#327F74' }}
+                style={{ backgroundColor: 'var(--primary)' }}
                 onClick={() => {
                   setShowSuccessDialog(false);
                   setMainTab('my-challenges');
@@ -1499,7 +1499,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
             {/* Submit */}
             <Button
               className="w-full h-12"
-              style={{ backgroundColor: '#327F74' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               onClick={handleSubmitProgress}
             >
               <CheckCircle2 className="h-5 w-5 mr-2" />
@@ -1695,14 +1695,14 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
               </Button>
               {createStep < 4 ? (
                 <Button
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={() => setCreateStep(createStep + 1)}
                 >
                   Next
                 </Button>
               ) : (
                 <Button
-                  style={{ backgroundColor: '#327F74' }}
+                  style={{ backgroundColor: 'var(--primary)' }}
                   onClick={handleCreateChallenge}
                 >
                   Create Challenge

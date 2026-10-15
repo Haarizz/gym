@@ -10,7 +10,7 @@
   --lf-line: rgba(15, 23, 42, 0.12);
   --lf-line-strong: rgba(15, 23, 42, 0.22);
   --lf-field: rgba(255, 255, 255, 0.88);
-  --lf-brand: var(--primary, #2b7a78);
+  --lf-brand: var(--primary, #0f766e);
   --lf-brand-soft: rgba(43, 122, 120, 0.14);
   --lf-danger: #c62a37;
   --lf-danger-soft: rgba(230, 57, 70, 0.12);
@@ -40,9 +40,9 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(42rem 32rem at 8% -8%, rgba(43, 122, 120, 0.2), transparent 62%),
+    radial-gradient(42rem 32rem at 8% -8%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 62%),
     radial-gradient(36rem 30rem at 100% 8%, rgba(94, 196, 186, 0.16), transparent 60%),
-    radial-gradient(44rem 30rem at 50% 112%, rgba(43, 122, 120, 0.1), transparent 60%),
+    radial-gradient(44rem 30rem at 50% 112%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 60%),
     radial-gradient(30rem 24rem at 0% 90%, rgba(245, 190, 110, 0.08), transparent 60%);
 }
 
@@ -115,7 +115,7 @@
   border-radius: 10px;
   color: #fff;
   background: linear-gradient(145deg, #3a9592, var(--lf-brand));
-  box-shadow: 0 4px 10px -4px rgba(43, 122, 120, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--primary) 60%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .eyebrow {
@@ -208,7 +208,7 @@
   font-size: 14px;
   line-height: 1.3;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--foreground);
 }
 
 .required {
@@ -349,7 +349,7 @@
 }
 
 .menu [cmdk-item][data-selected="true"] {
-  background: rgba(43, 122, 120, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
   color: var(--lf-ink);
 }
 
@@ -475,7 +475,7 @@
   margin-top: 20px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(230, 57, 70, 0.25);
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
   background: rgba(254, 242, 242, 0.9);
   color: #9f1d2a;
   font-size: 14px;
@@ -497,8 +497,8 @@
   gap: 12px;
   padding: 14px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(43, 122, 120, 0.14);
-  background: rgba(43, 122, 120, 0.05);
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
   font-size: 14px;
   line-height: 1.55;
   color: var(--lf-text);
@@ -507,11 +507,11 @@
 }
 
 .consent:hover {
-  border-color: rgba(43, 122, 120, 0.28);
+  border-color: color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .consent[data-invalid="true"] {
-  border-color: rgba(230, 57, 70, 0.45);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   background: rgba(254, 242, 242, 0.7);
 }
 
@@ -550,7 +550,7 @@
   color: var(--lf-brand);
   font-weight: 600;
   text-decoration: underline;
-  text-decoration-color: rgba(43, 122, 120, 0.35);
+  text-decoration-color: color-mix(in srgb, var(--primary) 35%, transparent);
   text-underline-offset: 3px;
   transition: text-decoration-color 0.16s var(--lf-ease);
 }
@@ -583,7 +583,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     0 1px 2px rgba(15, 23, 42, 0.12),
-    0 10px 24px -12px rgba(43, 122, 120, 0.75);
+    0 10px 24px -12px color-mix(in srgb, var(--primary) 75%, transparent);
   transition:
     transform 0.16s var(--lf-ease),
     box-shadow 0.16s var(--lf-ease),
@@ -596,7 +596,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     0 2px 4px rgba(15, 23, 42, 0.12),
-    0 14px 28px -12px rgba(43, 122, 120, 0.85);
+    0 14px 28px -12px color-mix(in srgb, var(--primary) 85%, transparent);
 }
 
 .submit:active:not(:disabled) {
@@ -608,7 +608,7 @@
   outline: none;
   box-shadow:
     0 0 0 3px #fff,
-    0 0 0 6px rgba(43, 122, 120, 0.45);
+    0 0 0 6px color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 .submit:disabled {
@@ -674,7 +674,7 @@
 }
 
 .statusIconSuccess {
-  background: rgba(43, 122, 120, 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--lf-brand);
 }
 

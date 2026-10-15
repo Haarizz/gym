@@ -3,6 +3,7 @@ package com.company.project.controllers;
 import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
+import com.company.project.dto.ReceiptResponseDTO;
 import com.company.project.services.MemberAddonService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +41,14 @@ public class MemberAddonController {
     @GetMapping("/{id}")
     public ResponseEntity<MemberAddonResponseDTO> getAddonById(@PathVariable Long id) {
         return ResponseEntity.ok(memberAddonService.getAddonById(id));
+    }
+
+    /**
+     * GET /api/member-addons/{id}/receipt — the receipt the purchase generated.
+     */
+    @GetMapping("/{id}/receipt")
+    public ResponseEntity<ReceiptResponseDTO> getAddonReceipt(@PathVariable Long id) {
+        return ResponseEntity.ok(memberAddonService.getAddonReceipt(id));
     }
 
     /**

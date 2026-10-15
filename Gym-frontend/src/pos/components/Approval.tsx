@@ -86,7 +86,7 @@ export function ApprovalProvider({ children }: { children: React.ReactNode }) {
           </DialogHeader>
           <div className={s.pinDots} style={{ margin: "6px 0" }}>
             {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
-              <span key={i} className={s.pinDot} style={{ borderColor: "#2B7A78", background: i < pin.length ? "#2B7A78" : "transparent" }} />
+              <span key={i} className={s.pinDot} style={{ borderColor: "var(--primary)", background: i < pin.length ? "var(--primary)" : "transparent" }} />
             ))}
           </div>
           <div className={s.keypadLight}>

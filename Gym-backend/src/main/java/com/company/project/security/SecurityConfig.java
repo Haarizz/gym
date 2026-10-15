@@ -102,57 +102,11 @@ public class SecurityConfig {
                 // matcher is left unowned rather than granted to any role.
                 .requestMatchers("/api/admin/**").denyAll()
 
-                // Manager endpoints
-                .requestMatchers("/api/manager/**").hasRole("MANAGER")
-
-                // Payroll & HR — restricted to HR
-                .requestMatchers("/api/payroll/**", "/api/employees/**", "/api/recruitment/**")
-                    .hasRole("HR")
-
-                // Financial endpoints — Accountant, Manager, and the gym owner (ADMIN).
-                // ADMIN was missing here despite the app's own fine-grained permission
-                // catalog already granting BILLING_VIEW/CREATE/EDIT (etc.) to that role
-                // by default (see DefaultRolePermissions.GRANTS) — this URL-level role
-                // gate ran BEFORE any controller/permission check, so a gym owner's own
-                // real, granted permissions never even got the chance to apply: every
-                // owner (confirmed on Test Gym and Power Gym alike) got a flat 403 on
-                // their own member's billing statement, cash-in-hand/ledger data, etc.
-                // (bios/settings holds org-wide revenue targets and alert/report
-                // recipient emails — the same sensitivity as the other financial
-                // config here, so it gets the same role gate)
-                .requestMatchers("/api/billing/**", "/api/expenses/**", "/api/ledgers/**", "/api/financials/**", "/api/bios/**")
-                    .hasAnyRole("MANAGER", "ACCOUNTANT", "ADMIN")
-
-                // Core gym operations — any authenticated user
-                .requestMatchers(
-                    "/api/members/**",
-                    "/api/staff/**",
-                    "/api/attendance/**",
-                    "/api/products/**",
-                    "/api/warehouses/**",
-                    "/api/product-categories/**",
-                    "/api/product-brands/**",
-                    "/api/plans/**",
-                    "/api/promotions/**",
-                    "/api/leads/**",
-                    "/api/bookings/**",
-                    "/api/classes/**",
-                    "/api/dashboard/**",
-                    "/api/pos/**",
-                    "/api/suppliers/**",
-                    "/api/purchase-orders/**",
-                    "/api/supplier-bills/**",
-                    "/api/sales-invoices/**",
-                    "/api/wastage-returns/**",
-                    "/api/recipes/**",
-                    "/api/production-orders/**",
-                    "/api/referrals/**",
-                    "/api/follow-ups/**"
-                ).authenticated()
-
-                // Everything else under /api (journal-vouchers, invoices, wallet, rewards,
-                // financial-reports, etc.) — not yet bucketed into a role above, but must
-                // never fall through to permitAll. Requires at least a valid session.
+                // Everything else under /api needs a valid session. What a signed-in
+                // staff user may do per module is decided by their role's ticked
+                // permissions (Roles & Permissions), enforced by ModulePermissionFilter
+                // below — not by hard-coded role names, which used to lock custom roles
+                // (and, for billing, even gym owners) out of modules they were granted.
                 .requestMatchers("/api/**").authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -163,7 +117,9 @@ public class SecurityConfig {
             // Tenant context filter runs after JWT to read the tenant claim (Phase 2 multi-tenant
             // groundwork, no-op while tenant.routing.enabled=false); branch context runs after that.
             .addFilterAfter(tenantContextFilter, JwtAuthenticationFilter.class)
-            .addFilterAfter(branchContextFilter, TenantContextFilter.class);
+            .addFilterAfter(branchContextFilter, TenantContextFilter.class)
+            // Role permission matrix, once the user and their tenant/branch are known.
+            .addFilterAfter(new ModulePermissionFilter(), BranchContextFilter.class);
 
         return http.build();
     }

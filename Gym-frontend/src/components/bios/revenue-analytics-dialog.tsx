@@ -456,7 +456,7 @@ export function RevenueAnalyticsDialog({
                     <YAxis />
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                     <Legend />
-                    <Bar dataKey="revenue" fill="#2B7A78" name={`Revenue (${live.currencyCode})`} />
+                    <Bar dataKey="revenue" fill="#0F766E" name={`Revenue (${live.currencyCode})`} />
                     <Bar dataKey="transactions" fill="#3b82f6" name="Transactions" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -798,7 +798,7 @@ export function RevenueAnalyticsDialog({
                       <XAxis type="number" />
                       <YAxis dataKey="source" type="category" width={120} />
                       <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Bar dataKey="amount" fill="#2B7A78" />
+                      <Bar dataKey="amount" fill="#0F766E" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

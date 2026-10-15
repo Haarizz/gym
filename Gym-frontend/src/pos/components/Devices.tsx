@@ -218,7 +218,7 @@ export function DevicesTab({ canEdit }: { canEdit: boolean }) {
             {profiles.length === 0 && <div className={s.muted}>No profiles yet.</div>}
             <div className={s.stack}>
               {profiles.map((p) => (
-                <div key={p.id} style={{ border: "1px solid #EEF2F6", borderRadius: 8, padding: 10, opacity: p.status === "ACTIVE" ? 1 : 0.55 }}>
+                <div key={p.id} style={{ border: "1px solid light-dark(#EEF2F6, var(--border))", borderRadius: 8, padding: 10, opacity: p.status === "ACTIVE" ? 1 : 0.55 }}>
                   <div className={s.rowBetween}>
                     <span><span className={s.strong}>{p.name}</span> <span className={`${s.small} ${s.muted}`}>v{p.version}</span></span>
                     {canEdit && <span className={s.rowWrap}>

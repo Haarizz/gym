@@ -66,6 +66,11 @@ public class MemberAddon extends BaseEntity {
     @Convert(converter = PaymentBreakdownConverter.class)
     private List<PaymentSplitDTO> paymentBreakdown;
 
+    // The customer-facing receipt this purchase generated (V90) — lets the
+    // Add-ons table reprint it. Null when no receipt was created.
+    @Column(name = "receipt_id")
+    private Long receiptId;
+
     public MemberAddon() {}
 
     // ── Getters & Setters ────────────────────────────────────────────────────
@@ -117,4 +122,7 @@ public class MemberAddon extends BaseEntity {
 
     public List<PaymentSplitDTO> getPaymentBreakdown() { return paymentBreakdown; }
     public void setPaymentBreakdown(List<PaymentSplitDTO> paymentBreakdown) { this.paymentBreakdown = paymentBreakdown; }
+
+    public Long getReceiptId() { return receiptId; }
+    public void setReceiptId(Long receiptId) { this.receiptId = receiptId; }
 }

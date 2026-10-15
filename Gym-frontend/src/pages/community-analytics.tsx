@@ -692,7 +692,7 @@ export function CommunityAnalytics() {
             <Card
               key={index}
               className={`${statCardShell} ${cardAction ? "cursor-pointer" : ""}`}
-              style={cardHighlighted ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+              style={cardHighlighted ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
               title={kpi.title === "Target Progress" || kpi.title === "Total Collections"
                 ? "Click to cycle Today / Yesterday / This Month"
                 : cardAction ? `Click to view ${kpi.title === "Member Retention" ? "Churn Prediction" : "Engagement"}` : undefined}

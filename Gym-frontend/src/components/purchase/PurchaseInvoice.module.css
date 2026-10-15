@@ -185,11 +185,11 @@
 }
 
 .danger {
-  color: #dc2626;
+  color: light-dark(#dc2626, oklch(82% 0.15 27.3));
 }
 
 .success {
-  color: #059669;
+  color: light-dark(#059669, oklch(82% 0.127 163.2));
 }
 
 .fadeIn {
@@ -215,12 +215,12 @@
   white-space: nowrap;
 }
 
-.pillGray    { background: #f3f4f6; color: #374151; }
-.pillBlue    { background: #dbeafe; color: #1e40af; }
-.pillGreen   { background: #dcfce7; color: #166534; }
-.pillAmber   { background: #fef3c7; color: #92400e; }
-.pillRed     { background: #fee2e2; color: #991b1b; }
-.pillPurple  { background: #f3e8ff; color: #6b21a8; }
+.pillGray    { background: light-dark(#f3f4f6, var(--muted-bg)); color: light-dark(#374151, oklch(82% 0.031 259.7)); }
+.pillBlue    { background: light-dark(#dbeafe, oklch(27% 0.048 255.6)); color: light-dark(#1e40af, oklch(82% 0.15 265.6)); }
+.pillGreen   { background: light-dark(#dcfce7, oklch(27% 0.059 156.7)); color: light-dark(#166534, oklch(82% 0.108 151.3)); }
+.pillAmber   { background: light-dark(#fef3c7, oklch(27% 0.07 95.6)); color: light-dark(#92400e, oklch(82% 0.125 46.2)); }
+.pillRed     { background: light-dark(#fee2e2, oklch(27% 0.048 17.7)); color: light-dark(#991b1b, oklch(82% 0.15 26.9)); }
+.pillPurple  { background: light-dark(#f3e8ff, oklch(27% 0.049 307.2)); color: light-dark(#6b21a8, oklch(82% 0.15 303.7)); }
 .pillPrimary {
   background: color-mix(in oklab, var(--primary) 12%, var(--card));
   color: var(--primary);
@@ -405,9 +405,9 @@
 }
 
 .iconBtnPrimary { color: var(--primary); }
-.iconBtnGreen   { color: #059669; }
-.iconBtnRed     { color: #dc2626; }
-.iconBtnAmber   { color: #d97706; }
+.iconBtnGreen   { color: light-dark(#059669, oklch(82% 0.127 163.2)); }
+.iconBtnRed     { color: light-dark(#dc2626, oklch(82% 0.15 27.3)); }
+.iconBtnAmber   { color: light-dark(#d97706, oklch(82% 0.15 58.3)); }
 
 .emptyCell {
   padding: 56px 16px !important;
@@ -641,8 +641,8 @@
   text-overflow: ellipsis;
 }
 
-.tileRed   { background: #fef2f2; }
-.tileGreen { background: #ecfdf5; }
+.tileRed   { background: light-dark(#fef2f2, var(--muted-bg)); }
+.tileGreen { background: light-dark(#ecfdf5, oklch(27% 0.039 166.1)); }
 
 .workspace {
   display: grid;
@@ -847,9 +847,9 @@
   line-height: 1.5;
 }
 
-.noticeInfo  { background: #eff6ff; color: #1e40af; }
-.noticeWarn  { background: #fffbeb; color: #92400e; }
-.noticeError { background: #fef2f2; color: #991b1b; }
+.noticeInfo  { background: light-dark(#eff6ff, var(--muted-bg)); color: light-dark(#1e40af, oklch(82% 0.15 265.6)); }
+.noticeWarn  { background: light-dark(#fffbeb, oklch(27% 0.039 95.3)); color: light-dark(#92400e, oklch(82% 0.125 46.2)); }
+.noticeError { background: light-dark(#fef2f2, var(--muted-bg)); color: light-dark(#991b1b, oklch(82% 0.15 26.9)); }
 
 .detailsGrid {
   display: grid;
@@ -949,8 +949,8 @@
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fffbeb;
-  color: #92400e;
+  background: light-dark(#fffbeb, oklch(27% 0.039 95.3));
+  color: light-dark(#92400e, oklch(82% 0.125 46.2));
   font-size: 13px;
   line-height: 1.5;
 }
@@ -970,8 +970,8 @@
   gap: 4px;
   padding: 1px 8px;
   border-radius: 6px;
-  background: #dbeafe;
-  color: #1e40af;
+  background: light-dark(#dbeafe, oklch(27% 0.048 255.6));
+  color: light-dark(#1e40af, oklch(82% 0.15 265.6));
   font-size: 12px;
   font-weight: 500;
 }
@@ -1082,7 +1082,7 @@
 }
 
 .removeBtn:hover {
-  color: #dc2626;
+  color: light-dark(#dc2626, oklch(82% 0.15 27.3));
 }
 
 .searchCell {
@@ -1235,9 +1235,9 @@
   margin-top: 8px;
 }
 
-.stockOk  { background: #ecfdf5; }
-.stockLow { background: #fffbeb; }
-.stockOut { background: #fef2f2; }
+.stockOk  { background: light-dark(#ecfdf5, oklch(27% 0.039 166.1)); }
+.stockLow { background: light-dark(#fffbeb, oklch(27% 0.039 95.3)); }
+.stockOut { background: light-dark(#fef2f2, var(--muted-bg)); }
 
 .railScroll {
   max-height: 280px;
@@ -1432,7 +1432,7 @@
   margin-top: 12px;
   padding: 12px;
   border-radius: 10px;
-  background: #fffbeb;
+  background: light-dark(#fffbeb, oklch(27% 0.039 95.3));
   box-shadow: inset 0 0 0 1px #fde68a;
 }
 

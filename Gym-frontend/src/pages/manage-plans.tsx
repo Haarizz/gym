@@ -602,7 +602,7 @@ export function ManagePlans() {
   };
 
   const getStatusColor = (status: string) => {
-    return status === "Active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800";
+    return status?.toLowerCase() === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800";
   };
 
   const getTypeColor = (type: string) => {
@@ -837,7 +837,8 @@ export function ManagePlans() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    {plans.filter(p => p.status === "Active").length}
+                    {/* Case-insensitive, like the status filter it toggles (BG_112) */}
+                    {plans.filter(p => p.status?.toLowerCase() === "active").length}
                   </div>
                   <p className="text-xs text-muted-foreground">Currently available</p>
                 </CardContent>
@@ -1070,7 +1071,7 @@ export function ManagePlans() {
                         <>
                           <div className="flex flex-wrap gap-1">
                             {getFacilityNames(plan.selectedFacilities).slice(0, 2).map((facilityName, index) => (
-                              <Badge key={index} variant="outline" className="text-xs" style={{ color: '#2B7A78', borderColor: '#2B7A78' }}>
+                              <Badge key={index} variant="outline" className="text-xs" style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}>
                                 {facilityName}
                               </Badge>
                             ))}
@@ -1739,7 +1740,7 @@ export function ManagePlans() {
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center space-x-2">
-                  <Building2 className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <Building2 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   <Label className="text-base cursor-pointer">Access to Facilities</Label>
                 </div>
                 <ChevronDown className={`h-4 w-4 ${planStyles.chevron}`} data-open={isFacilitiesAccessOpen} />

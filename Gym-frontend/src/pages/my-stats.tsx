@@ -100,8 +100,8 @@ const weightTrendData = [
 
 // Workout distribution data
 const workoutTypeData = [
-  { name: 'Strength', value: 45, color: '#327F74' },
-  { name: 'Cardio', value: 30, color: '#E63946' },
+  { name: 'Strength', value: 45, color: '#0F766E' },
+  { name: 'Cardio', value: 30, color: '#B91C1C' },
   { name: 'Mobility', value: 15, color: '#FFA500' },
   { name: 'Classes', value: 10, color: '#3B82F6' },
 ];
@@ -390,7 +390,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 border-4" style={{ borderColor: '#327F74' }}>
+            <Avatar className="h-16 w-16 border-4" style={{ borderColor: 'var(--primary)' }}>
               <AvatarImage src={memberData.photo} />
               <AvatarFallback className="text-xl bg-[#327F74] text-white">
                 {memberData.name.split(' ').map(n => n[0]).join('')}
@@ -410,7 +410,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                   key={range}
                   variant={dateRange === range ? 'default' : 'outline'}
                   className="cursor-pointer capitalize"
-                  style={dateRange === range ? { backgroundColor: '#327F74' } : {}}
+                  style={dateRange === range ? { backgroundColor: 'var(--primary)' } : {}}
                   onClick={() => setDateRange(range)}
                 >
                   {range === '3months' ? '3 Months' : range}
@@ -530,7 +530,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                         cx="64"
                         cy="64"
                         r="56"
-                        stroke="#327F74"
+                        stroke="#0F766E"
                         strokeWidth="12"
                         fill="none"
                         strokeDasharray={`${2 * Math.PI * 56}`}
@@ -576,7 +576,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                         cx="64"
                         cy="64"
                         r="56"
-                        stroke="#E63946"
+                        stroke="#B91C1C"
                         strokeWidth="12"
                         fill="none"
                         strokeDasharray={`${2 * Math.PI * 56}`}
@@ -589,7 +589,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                       <p className="text-xs text-gray-600">of -5kg</p>
                     </div>
                   </div>
-                  <p className="text-sm font-semibold" style={{ color: '#E63946' }}>48% Complete</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>48% Complete</p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -635,7 +635,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                         key={metric}
                         variant={chartMetric === metric ? 'default' : 'outline'}
                         className="cursor-pointer capitalize"
-                        style={chartMetric === metric ? { backgroundColor: '#327F74' } : {}}
+                        style={chartMetric === metric ? { backgroundColor: 'var(--primary)' } : {}}
                         onClick={() => setChartMetric(metric)}
                       >
                         {metric}
@@ -651,7 +651,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                     <XAxis dataKey={dateRange === 'month' ? 'week' : 'month'} />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey={chartMetric} fill="#327F74" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey={chartMetric} fill="#0F766E" radius={[8, 8, 0, 0]} />
                   </RechartsBarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -757,7 +757,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                       <XAxis dataKey="day" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="visits" fill="#327F74" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="visits" fill="#0F766E" radius={[8, 8, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -933,8 +933,8 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                   <AreaChart data={weightTrendData}>
                     <defs>
                       <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#327F74" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#327F74" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#0F766E" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#0F766E" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -945,7 +945,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                     <Area 
                       type="monotone" 
                       dataKey="weight" 
-                      stroke="#327F74" 
+                      stroke="#0F766E" 
                       fill="url(#colorWeight)" 
                       strokeWidth={3}
                       name="Current Weight"
@@ -953,7 +953,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                     <Line 
                       type="monotone" 
                       dataKey="target" 
-                      stroke="#E63946" 
+                      stroke="#B91C1C" 
                       strokeDasharray="5 5" 
                       name="Target Weight"
                       dot={false}
@@ -1429,7 +1429,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
 
             <Button
               className="w-full h-12"
-              style={{ backgroundColor: '#327F74' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               onClick={handleSetGoal}
             >
               <Flag className="h-5 w-5 mr-2" />
@@ -1518,7 +1518,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
 
             <Button
               className="w-full h-12"
-              style={{ backgroundColor: '#327F74' }}
+              style={{ backgroundColor: 'var(--primary)' }}
               onClick={() => {
                 setShowMeasurementSheet(false);
                 toast.success('Measurements Updated!', {

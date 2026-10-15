@@ -128,7 +128,13 @@ function fmtDate(value?: string | null): string {
 // those really are separate events. Callers that need ledger totals (Total
 // Billed/Total Paid) should keep summing the un-merged lines — this is only
 // for "how many transactions actually happened" display purposes.
-function mergeTransactionLines(lines: StatementLine[]): StatementLine[] {
+//
+// Rows come back oldest → newest, the same order as the Financial & Payment
+// History tab beside it — newest-first here made a fresh renewal look missing
+// to anyone scrolling to the end (BG_115). A merged pair is flagged so the
+// table can label it "Invoice + Payment" rather than just "Payment".
+type DisplayLine = StatementLine & { merged?: boolean };
+function mergeTransactionLines(lines: StatementLine[]): DisplayLine[] {
   const groups = new Map<string, StatementLine[]>();
   const ungrouped: StatementLine[] = [];
   lines.forEach(l => {
@@ -137,7 +143,7 @@ function mergeTransactionLines(lines: StatementLine[]): StatementLine[] {
     const group = groups.get(key);
     if (group) group.push(l); else groups.set(key, [l]);
   });
-  const merged: StatementLine[] = [...ungrouped];
+  const merged: DisplayLine[] = [...ungrouped];
   groups.forEach(group => {
     const invoiceLines = group.filter(l => l.type === 'Invoice');
     const paymentLines = group.filter(l => l.type === 'Payment');
@@ -147,12 +153,13 @@ function mergeTransactionLines(lines: StatementLine[]): StatementLine[] {
         ...paymentLines[0],
         description: invoiceLines[0].description,
         invoice_no: invoiceLines[0].invoice_no,
+        merged: true,
       });
     } else {
       merged.push(...group);
     }
   });
-  return merged.sort((a, b) => (safeDate(b.date)?.getTime() ?? 0) - (safeDate(a.date)?.getTime() ?? 0));
+  return merged.sort((a, b) => (safeDate(a.date)?.getTime() ?? 0) - (safeDate(b.date)?.getTime() ?? 0));
 }
 
 function fmtDateTime(value?: string | null): string {
@@ -1801,7 +1808,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                 <TableCell className="font-medium">{fmtDate(line.date)}</TableCell>
                                 <TableCell>
                                   <Badge className={line.type === 'Invoice' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}>
-                                    {line.type}
+                                    {line.merged ? 'Invoice + Payment' : line.type}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>

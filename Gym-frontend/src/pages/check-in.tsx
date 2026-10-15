@@ -496,7 +496,7 @@ export function CheckIn() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card
           className="border-primary/10 shadow-md cursor-pointer"
-          style={activeTab === 'registered' && !activeOnlyFilter ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={activeTab === 'registered' && !activeOnlyFilter ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
           onClick={() => { setActiveTab('registered'); setActiveOnlyFilter(false); }}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

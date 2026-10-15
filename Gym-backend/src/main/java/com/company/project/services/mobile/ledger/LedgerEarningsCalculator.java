@@ -249,6 +249,29 @@ public class LedgerEarningsCalculator {
             ));
         }
 
+        // POS sales this staff member rang up, at their role's POS rates.
+        if (progressCalculator.hasPosRates(rule) && username != null && !username.isBlank()) {
+            LocalDateTime now = LocalDateTime.now();
+            List<SaleTransaction> sales = progressCalculator.posSales(username, now.minusMonths(3), now.plusDays(1));
+            for (SaleTransaction sale : sales.subList(0, Math.min(RECENT_RECEIPTS_LIMIT, sales.size()))) {
+                BigDecimal commission = progressCalculator.posCommissionOn(sale, rule);
+                if (commission.compareTo(BigDecimal.ZERO) <= 0) continue;
+                LocalDate date = sale.getCreatedAt() != null ? sale.getCreatedAt().toLocalDate() : null;
+                boolean paid = date != null && findPaymentFor(payments, YearMonth.from(date))
+                        .map(LedgerEarningsCalculator::isPaid)
+                        .orElse(false);
+                list.add(new LedgerEntry(
+                        "pos-" + sale.getId(),
+                        "COMMISSION",
+                        "Commission - POS sale " + (sale.getTransactionNumber() != null ? sale.getTransactionNumber() : ""),
+                        sale.getMemberName() != null ? sale.getMemberName() : "Walk-in customer",
+                        date,
+                        commission,
+                        paid
+                ));
+            }
+        }
+
         list.sort(Comparator.comparing(LedgerEntry::date, Comparator.nullsLast(Comparator.reverseOrder())));
         return list;
     }

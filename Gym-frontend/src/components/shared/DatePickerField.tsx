@@ -71,7 +71,7 @@ export function DatePickerField({
           aria-invalid={invalid || undefined}
           aria-describedby={ariaDescribedBy}
           className="w-full justify-between font-normal"
-          style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(230, 57, 70, 0.15)" } : undefined}
+          style={invalid ? { borderColor: "var(--destructive)", boxShadow: "0 0 0 3px rgba(185, 28, 28, 0.15)" } : undefined}
         >
           <span className="flex items-center gap-2 min-w-0">
             <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />

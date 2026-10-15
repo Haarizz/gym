@@ -412,7 +412,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
                     <div><span className={styles.eyebrow}>TRN / Tax ID</span><span>{supplier.taxId || '—'}</span></div>
                   </div>
                   {supplierOpenOrders.length > 0 && (
-                    <div className={styles.alert} style={{ background: '#eff6ff', color: '#1e40af' }}>
+                    <div className={styles.alert} style={{ background: 'light-dark(#eff6ff, var(--muted-bg))', color: 'light-dark(#1e40af, oklch(82% 0.15 265.6))' }}>
                       <Info size={14} style={{ flexShrink: 0, marginTop: 2 }} />
                       <span>
                         {supplierOpenOrders.length} other open order{supplierOpenOrders.length === 1 ? '' : 's'} with this supplier:{' '}

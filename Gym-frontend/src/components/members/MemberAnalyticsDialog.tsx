@@ -61,9 +61,9 @@ const toneFor = (status: string) => {
 };
 
 const achievementTone = (pct: number) =>
-  pct >= 100 ? { color: '#327F74', label: 'Excellent', cls: styles.pillGood }
+  pct >= 100 ? { color: '#0F766E', label: 'Excellent', cls: styles.pillGood }
     : pct >= 70 ? { color: '#f59e0b', label: 'Good', cls: styles.pillWarn }
-      : { color: '#E63946', label: 'Low', cls: styles.pillBad };
+      : { color: '#B91C1C', label: 'Low', cls: styles.pillBad };
 
 export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: MemberAnalyticsDialogProps) {
   const { formatCurrency: formatWithSymbol } = useCurrency();
@@ -161,12 +161,12 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
     ).size;
     const engagement = [
       {
-        subject: 'Attendance', fill: '#327F74',
+        subject: 'Attendance', fill: '#0F766E',
         value: Math.min(100, Math.round((visitsLast30 / MONTHLY_VISIT_TARGET) * 100)),
         hint: `${visitsLast30} visits in the last 30 days vs ${MONTHLY_VISIT_TARGET} target`,
       },
       {
-        subject: 'Consistency', fill: '#2B7A78',
+        subject: 'Consistency', fill: '#0F766E',
         value: Math.round((activeWeeks / weeksWindow) * 100),
         hint: `Visited in ${activeWeeks} of the last ${weeksWindow} week${weeksWindow === 1 ? '' : 's'}`,
       },
@@ -286,13 +286,13 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
                           <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                           <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
                           <RTooltip formatter={(v: any, name: any) => [`${v} visits`, name]} />
-                          <Bar dataKey="visits" name="Actual" fill="#327F74" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="target" name="Target" fill="#E63946" radius={[4, 4, 0, 0]} opacity={0.25} />
+                          <Bar dataKey="visits" name="Actual" fill="#0F766E" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="target" name="Target" fill="#B91C1C" radius={[4, 4, 0, 0]} opacity={0.25} />
                         </BarChart>
                       </ResponsiveContainer>
                       <div className={styles.legend}>
-                        <span><i style={{ background: '#327F74' }} /> Actual</span>
-                        <span><i style={{ background: '#E63946', opacity: 0.5 }} /> Target ({MONTHLY_VISIT_TARGET}/mo)</span>
+                        <span><i style={{ background: 'var(--primary)' }} /> Actual</span>
+                        <span><i style={{ background: 'var(--danger)', opacity: 0.5 }} /> Target ({MONTHLY_VISIT_TARGET}/mo)</span>
                       </div>
                     </>
                   )}
@@ -350,7 +350,7 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
               <div className={styles.grid3}>
                 {[
                   { label: 'Total Visits', value: visitsVal(stats.totalVisits), icon: <CheckCircle size={20} color="#10b981" />, tone: styles.tileGreen },
-                  { label: 'Avg / Month', value: visitsVal(avgPerMonth), icon: <TrendingUp size={20} color="#327F74" />, tone: styles.tileTeal },
+                  { label: 'Avg / Month', value: visitsVal(avgPerMonth), icon: <TrendingUp size={20} color="#0F766E" />, tone: styles.tileTeal },
                   { label: `Target (${MONTHLY_VISIT_TARGET}/mo)`, value: visitsVal(`${targetPct}%`), icon: <Target size={20} color="#3b82f6" />, tone: styles.tileBlue },
                 ].map(k => (
                   <div key={k.label} className={`${styles.tile} ${k.tone}`}>
@@ -367,16 +367,16 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
                     <ComposedChart data={stats.attendanceData}>
                       <defs>
                         <linearGradient id="memberAnalyticsVisits" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#327F74" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#327F74" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#0F766E" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#0F766E" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                       <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
                       <RTooltip />
-                      <Area type="monotone" dataKey="visits" stroke="#327F74" strokeWidth={2} fill="url(#memberAnalyticsVisits)" name="Visits" />
-                      <Line type="monotone" dataKey="target" stroke="#E63946" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Target" />
+                      <Area type="monotone" dataKey="visits" stroke="#0F766E" strokeWidth={2} fill="url(#memberAnalyticsVisits)" name="Visits" />
+                      <Line type="monotone" dataKey="target" stroke="#B91C1C" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Target" />
                     </ComposedChart>
                   </ResponsiveContainer>
                 )}
@@ -433,11 +433,11 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
             <TabsContent value="financial" className={styles.tabBody}>
               <div className={styles.grid3}>
                 {[
-                  { label: 'Membership Fee', value: formatCurrency(feeValue), icon: <CreditCard size={20} color="#327F74" />, tone: styles.tileTeal },
+                  { label: 'Membership Fee', value: formatCurrency(feeValue), icon: <CreditCard size={20} color="#0F766E" />, tone: styles.tileTeal },
                   { label: 'Lifetime Revenue', value: moneyVal(formatCurrency(stats.totalPaid)), icon: <Banknote size={20} color="#10b981" />, tone: styles.tileGreen },
                   {
                     label: 'Outstanding', value: moneyVal(formatCurrency(Math.max(0, stats.outstanding))),
-                    icon: <Wallet size={20} color={stats.outstanding > 0 ? '#E63946' : '#3b82f6'} />,
+                    icon: <Wallet size={20} color={stats.outstanding > 0 ? '#B91C1C' : '#3b82f6'} />,
                     tone: stats.outstanding > 0 ? styles.tileRed : styles.tileBlue,
                   },
                 ].map(k => (
@@ -458,8 +458,8 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
                       <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} width={48} />
                       <RTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v)), name]} />
                       <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="billed" fill="#E63946" opacity={0.35} radius={[4, 4, 0, 0]} name="Billed" />
-                      <Bar dataKey="paid" fill="#327F74" radius={[4, 4, 0, 0]} name="Paid" />
+                      <Bar dataKey="billed" fill="#B91C1C" opacity={0.35} radius={[4, 4, 0, 0]} name="Billed" />
+                      <Bar dataKey="paid" fill="#0F766E" radius={[4, 4, 0, 0]} name="Paid" />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -538,7 +538,7 @@ export function MemberAnalyticsDialog({ member, status, fee, onOpenChange }: Mem
                             <p className={styles.achievementLabel}>{a.label}</p>
                             <p className={styles.achievementDesc}>{a.desc}</p>
                           </div>
-                          {earned && <CheckCircle size={16} color="#327F74" className={styles.achievementCheck} />}
+                          {earned && <CheckCircle size={16} color="#0F766E" className={styles.achievementCheck} />}
                         </div>
                       );
                     })}

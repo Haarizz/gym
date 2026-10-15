@@ -157,7 +157,7 @@ export function CreditBalanceDialog({ open, onOpenChange, initialMember, onUseMe
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Member name, ID or mobile…" />
         </div>
         {rows.length > 0 && (
-          <div className={s.bbCustList} style={{ border: "1px solid #E2E8F0", borderRadius: 10, maxHeight: 180 }}>
+          <div className={s.bbCustList} style={{ border: "1px solid light-dark(#E2E8F0, var(--border))", borderRadius: 10, maxHeight: 180 }}>
             {rows.map((m) => (
               <button key={m.id} type="button" className={s.bbCustRow} onClick={() => { setPicked(m); setRows([]); setQ(""); }}>
                 <span className={s.bbCustDot}>{m.name.charAt(0).toUpperCase()}</span>
@@ -183,11 +183,11 @@ export function CreditBalanceDialog({ open, onOpenChange, initialMember, onUseMe
               <div className={`${s.callout} ${s.calloutWarn}`}>Membership fees outstanding: <b style={{ marginLeft: 4 }}><Money value={credit.membershipOutstanding} /></b></div>
             )}
             {credit && credit.openSales.length > 0 && (
-              <div className={s.bbCustList} style={{ border: "1px solid #E2E8F0", borderRadius: 10, maxHeight: 200 }}>
+              <div className={s.bbCustList} style={{ border: "1px solid light-dark(#E2E8F0, var(--border))", borderRadius: 10, maxHeight: 200 }}>
                 {credit.openSales.map((o) => (
                   <div key={o.transactionId} className={s.bbCustRow} style={{ cursor: "default" }}>
                     <span style={{ minWidth: 0, flex: 1 }}><span className={s.bbCustRowName}>{o.transactionNumber}</span><span className={s.bbCustRowSub}>{fmtDate(o.createdAt)} · sale <Money value={o.totalAmount} /></span></span>
-                    <b style={{ color: "#B45309" }}><Money value={o.outstanding} /></b>
+                    <b style={{ color: "light-dark(#B45309, oklch(82% 0.146 49))" }}><Money value={o.outstanding} /></b>
                   </div>
                 ))}
               </div>
@@ -452,11 +452,11 @@ export function CouponDialog({ open, onOpenChange, base, current, onApply, onRem
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className={s.strong}>{found.name}</div>
               <div className={`${s.small} ${s.muted}`}>{found.source === "COUPON" ? "Referral coupon" : "Promotion"} · {ruleSummary(found)}</div>
-              {preview.error && <div className={s.small} style={{ color: "#B45309", marginTop: 4 }}>{preview.error}</div>}
+              {preview.error && <div className={s.small} style={{ color: "light-dark(#B45309, oklch(82% 0.146 49))", marginTop: 4 }}>{preview.error}</div>}
             </div>
             <div style={{ textAlign: "right" }}>
               <div className={`${s.small} ${s.muted}`}>Saves</div>
-              <div className={s.bbCreditAmt} style={{ color: "#047857" }}><Money value={preview.amount} /></div>
+              <div className={s.bbCreditAmt} style={{ color: "light-dark(#047857, oklch(82% 0.105 165.6))" }}><Money value={preview.amount} /></div>
             </div>
           </div>
         )}
@@ -504,11 +504,11 @@ export function PromotionsDialog({ open, onOpenChange, base, current, onApply, o
             const p = promoDiscountOf(rule, base);
             const applied = current?.promotionId != null && current.promotionId === r.promotionId;
             return (
-              <div key={r.promotionId ?? r.code ?? r.name} className={s.bbHistRow} style={{ cursor: "default", background: applied ? "rgba(43,122,120,0.08)" : undefined }}>
+              <div key={r.promotionId ?? r.code ?? r.name} className={s.bbHistRow} style={{ cursor: "default", background: applied ? "color-mix(in srgb, var(--primary) 8%, transparent)" : undefined }}>
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span className={s.bbRowName}>{r.name}{r.code ? <span className={s.bbRowCode} style={{ display: "inline", marginLeft: 6 }}>{r.code}</span> : null}</span>
                   <span className={s.bbRowCode}>{ruleSummary(r)}</span>
-                  {p.error && <span className={s.small} style={{ color: "#B45309", display: "block" }}>{p.error}</span>}
+                  {p.error && <span className={s.small} style={{ color: "light-dark(#B45309, oklch(82% 0.146 49))", display: "block" }}>{p.error}</span>}
                 </span>
                 <span className={s.bbHistRight}>
                   <span className={s.bbHistAmt}>−<Money value={p.amount} /></span>

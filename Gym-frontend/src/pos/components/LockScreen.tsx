@@ -103,7 +103,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         )}
         {error && <div style={{ color: "#FCA5A5", fontSize: 13, marginTop: 10 }}>{error}</div>}
         <button type="button" disabled={busy || (mode === "password" ? !password : pin.length < 4)} onClick={unlock}
-          style={{ width: "100%", height: 48, marginTop: 14, borderRadius: 12, border: 0, background: "#2B7A78", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
+          style={{ width: "100%", height: 48, marginTop: 14, borderRadius: 12, border: 0, background: "var(--primary)", color: "var(--primary-foreground)", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
           {busy ? "Checking…" : "Unlock"}
         </button>
       </div>

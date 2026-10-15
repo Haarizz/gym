@@ -214,7 +214,7 @@ export function CustomersView() {
               </div>
               {credit.recentPayments.length > 0 && (
                 <>
-                  <div className={s.panelHead} style={{ borderTop: "1px solid #EEF2F6" }}><div className={s.panelTitle}>Recent payments</div></div>
+                  <div className={s.panelHead} style={{ borderTop: "1px solid light-dark(#EEF2F6, var(--border))" }}><div className={s.panelTitle}>Recent payments</div></div>
                   <div className={s.tableWrap}>
                     <table className={s.table}>
                       <thead><tr><th>Receipt</th><th>Date</th><th>Method</th><th className={s.num}>Amount</th><th /></tr></thead>

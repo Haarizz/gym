@@ -72,10 +72,6 @@ public class StaffTargetService {
 
     /** Computes each target's live achieved figures from actual sales/lead data, floored at the stored value. */
     private StaffTargetResponseDTO toEnrichedDto(StaffTarget t) {
-        if (t.getStaff() == null) {
-            // Institution-wide targets have no single staff to attribute sales to; report stored figures as-is.
-            return StaffTargetResponseDTO.fromEntity(t);
-        }
         LocalDateTime start;
         LocalDateTime end;
         if (t.getStartDate() != null && t.getEndDate() != null) {
@@ -89,11 +85,17 @@ public class StaffTargetService {
             return StaffTargetResponseDTO.fromEntity(t);
         }
         Staff staff = t.getStaff();
+        if (staff == null) {
+            // Institution-wide target: the whole gym's takings and units for the period.
+            return StaffTargetResponseDTO.fromEntity(t, progressCalculator.computeGymRevenue(start, end), null, null)
+                    .withUnits(progressCalculator.computeGymUnits(start, end));
+        }
         String username = staff.getAppUsername() != null ? staff.getAppUsername() : "";
         BigDecimal liveRevenue = progressCalculator.computeRevenue(staff, username, start, end);
         int liveConversions = progressCalculator.computeConversions(staff, username, start, end);
-        BigDecimal liveCommission = progressCalculator.computeCommission(staff, username, start, end, liveRevenue);
-        return StaffTargetResponseDTO.fromEntity(t, liveRevenue, liveConversions, liveCommission);
+        BigDecimal liveCommission = progressCalculator.computeCommission(staff, username, start, end);
+        return StaffTargetResponseDTO.fromEntity(t, liveRevenue, liveConversions, liveCommission)
+                .withUnits(progressCalculator.computeUnits(staff, username, start, end));
     }
 
     public StaffTargetResponseDTO createTarget(StaffTargetRequestDTO req) {

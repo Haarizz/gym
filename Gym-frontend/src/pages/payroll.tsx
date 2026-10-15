@@ -391,7 +391,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
     }
   };
 
-  const COLORS = ['#2B7A78', '#E63946', '#F4A261', '#2A9D8F', '#E76F51', '#264653'];
+  const COLORS = ['#0F766E', '#B91C1C', '#F4A261', '#2A9D8F', '#E76F51', '#264653'];
 
   return (
     <div className="p-6 space-y-6">
@@ -406,7 +406,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
         <Button
           onClick={() => setShowGenerateDialog(true)}
           disabled={loadingEmployees}
-          style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+          style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
         >
           <Plus className="mr-2 h-4 w-4" />
           Generate Payroll
@@ -514,14 +514,14 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <CalendarIcon className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Quick Actions
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
                   className="w-full justify-start"
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                   onClick={() => setShowGenerateDialog(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -550,7 +550,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={`${cardShell} lg:col-span-2`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <FileText className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Recent Payroll Cycles
                 </CardTitle>
               </CardHeader>
@@ -586,7 +586,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
           <Card className={cardShell}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                <TrendingUp className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                 Monthly Payroll Trend
               </CardTitle>
               <CardDescription>Net payroll amount over the last 3 months</CardDescription>
@@ -598,7 +598,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
-                  <Line type="monotone" dataKey="amount" stroke="#2B7A78" strokeWidth={2} />
+                  <Line type="monotone" dataKey="amount" stroke="#0F766E" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -639,7 +639,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <CardContent className="pt-6">
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Gross Salary</div>
-                          <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                          <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
                             <CurrencyGlyph /> {selectedCycle.grossSalary.toLocaleString()}
                           </div>
                         </div>
@@ -659,7 +659,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <CardContent className="pt-6">
                         <div className="text-center">
                           <div className="text-sm text-muted-foreground mb-1">Net Payable</div>
-                          <div className="text-2xl font-bold" style={{ color: '#2B7A78' }}>
+                          <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>
                             <CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}
                           </div>
                         </div>
@@ -741,7 +741,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                           </TableCell>
                           <TableCell className="text-red-600">-{payroll.deductions.toLocaleString()}</TableCell>
                           <TableCell>
-                            <span className="font-bold" style={{ color: '#2B7A78' }}>
+                            <span className="font-bold" style={{ color: 'var(--primary)' }}>
                               <CurrencyGlyph /> {payroll.netSalary.toLocaleString()}
                             </span>
                           </TableCell>
@@ -778,7 +778,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   </Button>
                   <Button
                     onClick={() => setShowApprovalDialog(true)}
-                    style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Approve Payroll
@@ -790,7 +790,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                 <div className="flex justify-end gap-3">
                   <Button
                     onClick={handleDisbursePayroll}
-                    style={{ background: 'linear-gradient(135deg, #E63946 0%, #E63946 100%)', color: 'white' }}
+                    style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
                   >
                     <Send className="mr-2 h-4 w-4" />
                     Disburse & Generate Payslips
@@ -808,7 +808,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                 </p>
                 <Button
                   onClick={() => setShowGenerateDialog(true)}
-                  style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+                  style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Generate Payroll
@@ -850,7 +850,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <TableCell><CurrencyGlyph /> {cycle.grossSalary.toLocaleString()}</TableCell>
                       <TableCell className="text-red-600">-{cycle.totalDeductions.toLocaleString()}</TableCell>
                       <TableCell>
-                        <span className="font-medium" style={{ color: '#2B7A78' }}>
+                        <span className="font-medium" style={{ color: 'var(--primary)' }}>
                           <CurrencyGlyph /> {cycle.netSalary.toLocaleString()}
                         </span>
                       </TableCell>
@@ -889,7 +889,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <PieChart className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Department-wise Payroll
                 </CardTitle>
                 <CardDescription>Net salary distribution by department</CardDescription>
@@ -927,7 +927,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={cardShell}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Deduction Breakdown
                 </CardTitle>
                 <CardDescription>Total deductions by type</CardDescription>
@@ -940,7 +940,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                       <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
-                      <Bar dataKey="value" fill="#E63946" />
+                      <Bar dataKey="value" fill="#B91C1C" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -957,7 +957,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <FileText className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Monthly Payroll Summary
                 </CardTitle>
               </CardHeader>
@@ -975,7 +975,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <Users className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Attendance vs Salary
                 </CardTitle>
               </CardHeader>
@@ -993,7 +993,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className={`${cardShell} cursor-pointer`}>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" style={{ color: '#2B7A78' }} />
+                  <TrendingUp className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                   Overtime Trends
                 </CardTitle>
               </CardHeader>
@@ -1053,7 +1053,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             <Card className="bg-muted/50">
               <CardContent className="pt-6">
                 <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4" style={{ color: '#2B7A78' }} />
+                  <RefreshCw className="h-4 w-4" style={{ color: 'var(--primary)' }} />
                   Auto-Fetch from Attendance
                 </h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
@@ -1077,7 +1077,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               </CardContent>
             </Card>
 
-            <Card style={{ backgroundColor: '#2B7A78', color: 'white' }}>
+            <Card style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}>
               <CardContent className="pt-6">
                 <div className="text-sm opacity-90 mb-1">Salary Calculation Formula:</div>
                 <div className="font-mono text-xs">
@@ -1092,7 +1092,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Button>
             <Button
               onClick={handleGeneratePayroll}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Generate & Calculate
@@ -1209,7 +1209,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
               <Separator />
 
               {/* Net Payable */}
-              <Card style={{ backgroundColor: '#2B7A78', color: 'white' }}>
+              <Card style={{ backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <span className="text-lg">Net Payable Amount:</span>
@@ -1225,7 +1225,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Button>
             <Button
               onClick={() => toast.success("Payslip downloaded successfully!")}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
             >
               <Download className="mr-2 h-4 w-4" />
               Download PDF
@@ -1267,7 +1267,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
                     <Separator />
                     <div className="flex justify-between font-bold">
                       <span>Net Payable:</span>
-                      <span style={{ color: '#2B7A78' }}><CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}</span>
+                      <span style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {selectedCycle.netSalary.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -1291,7 +1291,7 @@ export function Payroll({ onNavigate }: PayrollProps) {
             </Button>
             <Button
               onClick={handleApprovePayroll}
-              style={{ background: 'linear-gradient(135deg, #2B7A78 0%, #2B7A78 100%)', color: 'white' }}
+              style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
             >
               <CheckCircle className="mr-2 h-4 w-4" />
               Approve Payroll

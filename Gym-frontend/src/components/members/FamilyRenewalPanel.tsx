@@ -365,7 +365,7 @@ export function FamilyRenewalPanel({ head, planName, planType, discountAmount, r
             {loadingQuote && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' }}>
+            <div className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: 'light-dark(#fecaca, oklch(38% 0.059 18.3))', background: 'light-dark(#fef2f2, var(--muted-bg))', color: 'var(--danger-hover)' }}>
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>

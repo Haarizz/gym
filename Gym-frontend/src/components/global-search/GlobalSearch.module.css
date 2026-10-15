@@ -191,7 +191,7 @@
   gap: 8px;
   padding: 16px 12px;
   font-size: 13px;
-  color: var(--destructive, #dc2626);
+  color: var(--destructive, light-dark(#dc2626, oklch(82% 0.15 27.3)));
 }
 
 .footer {

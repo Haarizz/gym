@@ -8,6 +8,8 @@ public class CommissionRuleResponseDTO {
     private String role;
     private BigDecimal baseCommission;
     private BigDecimal admissionCommission;
+    private BigDecimal posCommission;
+    private BigDecimal posCommissionPerSale;
     private String targetBonusesJson;
 
     public static CommissionRuleResponseDTO fromEntity(CommissionRule r) {
@@ -16,6 +18,8 @@ public class CommissionRuleResponseDTO {
         dto.role = r.getRole();
         dto.baseCommission = r.getBaseCommission();
         dto.admissionCommission = r.getAdmissionCommission();
+        dto.posCommission = r.getPosCommission();
+        dto.posCommissionPerSale = r.getPosCommissionPerSale();
         dto.targetBonusesJson = r.getTargetBonusesJson();
         return dto;
     }
@@ -28,6 +32,10 @@ public class CommissionRuleResponseDTO {
     public void setBaseCommission(BigDecimal baseCommission) { this.baseCommission = baseCommission; }
     public BigDecimal getAdmissionCommission() { return admissionCommission; }
     public void setAdmissionCommission(BigDecimal admissionCommission) { this.admissionCommission = admissionCommission; }
+    public BigDecimal getPosCommission() { return posCommission; }
+    public void setPosCommission(BigDecimal posCommission) { this.posCommission = posCommission; }
+    public BigDecimal getPosCommissionPerSale() { return posCommissionPerSale; }
+    public void setPosCommissionPerSale(BigDecimal posCommissionPerSale) { this.posCommissionPerSale = posCommissionPerSale; }
     public String getTargetBonusesJson() { return targetBonusesJson; }
     public void setTargetBonusesJson(String targetBonusesJson) { this.targetBonusesJson = targetBonusesJson; }
 }

@@ -110,7 +110,7 @@
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: light-dark(#fff, var(--card));
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -121,7 +121,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #fff;
+  background: light-dark(#fff, var(--card));
 }
 
 .noImage {
@@ -149,7 +149,7 @@
   padding: 0;
   border: 2px solid transparent;
   border-radius: 8px;
-  background: #fff;
+  background: light-dark(#fff, var(--card));
   overflow: hidden;
   cursor: pointer;
 }
@@ -289,13 +289,13 @@
   font-weight: 500;
   line-height: 18px;
   white-space: nowrap;
-  background: #f3f4f6;
-  color: #374151;
+  background: light-dark(#f3f4f6, var(--muted-bg));
+  color: light-dark(#374151, oklch(82% 0.031 259.7));
 }
 
-.pillGreen { background: #dcfce7; color: #166534; }
-.pillAmber { background: #fef3c7; color: #92400e; }
-.pillRed { background: #fee2e2; color: #991b1b; }
+.pillGreen { background: light-dark(#dcfce7, oklch(27% 0.059 156.7)); color: light-dark(#166534, oklch(82% 0.108 151.3)); }
+.pillAmber { background: light-dark(#fef3c7, oklch(27% 0.07 95.6)); color: light-dark(#92400e, oklch(82% 0.125 46.2)); }
+.pillRed { background: light-dark(#fee2e2, oklch(27% 0.048 17.7)); color: light-dark(#991b1b, oklch(82% 0.15 26.9)); }
 .pillPrimary {
   background: color-mix(in oklab, var(--primary) 12%, var(--card));
   color: var(--primary);

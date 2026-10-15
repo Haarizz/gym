@@ -89,7 +89,7 @@ type PaymentModeBucket = { name: string; amount: number; value: number; color: s
 type ReportPeriod = { key: string; label: string; start: Date; end: Date; total: number; categories: RevenueBucket[]; methods: PaymentModeBucket[] };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Memberships: "#2B7A78",
+  Memberships: "#0F766E",
   "Personal Training": "#3b82f6",
   "Group Classes": "#f59e0b",
   Merchandise: "#8b5cf6",
@@ -152,7 +152,7 @@ const PAYMENT_METHOD_KEY_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_METHOD_COLORS: Record<string, string> = {
-  Cash: "#2B7A78",
+  Cash: "#0F766E",
   Card: "#34d399",
   Cheque: "#3b82f6",
   "Bank Transfer": "#8b5cf6",
@@ -1057,7 +1057,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           <Card
             key={index}
             className={`${statCardShell} cursor-pointer`}
-            style={activeKpiCard === index ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+            style={activeKpiCard === index ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
             title={`Click to view ${kpi.tab} report`}
             onClick={() => { setReportsTab(kpi.tab); setActiveKpiCard(index); }}
           >
@@ -1165,7 +1165,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
                     <XAxis dataKey="hour" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="usage" fill="#2B7A78" />
+                    <Bar dataKey="usage" fill="#0F766E" />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -1307,7 +1307,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip />
-                      <Line type="monotone" dataKey="revenue" stroke="#2B7A78" strokeWidth={2} />
+                      <Line type="monotone" dataKey="revenue" stroke="#0F766E" strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -1394,7 +1394,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
                       <XAxis dataKey="class" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="percentage" fill="#2B7A78" />
+                      <Bar dataKey="percentage" fill="#0F766E" />
                     </BarChart>
                   </ResponsiveContainer>
                 )}

@@ -455,10 +455,10 @@ export function BusinessOnboardingFullscreen({
                           initial={false}
                           animate={{
                             backgroundColor: active
-                              ? "rgba(43, 122, 120, 0.08)"
+                              ? "rgba(15, 118, 110, 0.08)"
                               : "transparent",
                             boxShadow: active
-                              ? "0 0 0 1px rgba(43, 122, 120, 0.15), 0 1px 2px rgba(15, 23, 42, 0.06)"
+                              ? "0 0 0 1px rgba(15, 118, 110, 0.15), 0 1px 2px rgba(15, 23, 42, 0.06)"
                               : "0 0 0 0 transparent",
                           }}
                           whileHover={
@@ -1008,7 +1008,7 @@ export function BusinessOnboardingFullscreen({
               <div
                 className="px-8 py-6 border-t border-slate-200 backdrop-blur-sm"
                 style={{
-                  backgroundColor: "rgba(248, 250, 252, 0.8)",
+                  backgroundColor: "light-dark(rgba(248, 250, 252, 0.8), color-mix(in srgb, var(--muted-bg) 80%, transparent))",
                   boxShadow: "0 -4px 12px -8px rgba(15, 23, 42, 0.08)",
                 }}
               >

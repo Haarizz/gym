@@ -363,8 +363,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // Status counts fetched independently (unfiltered) so KPI cards are always accurate
   const [statusCounts, setStatusCounts] = useState<{
     total: number; active: number; inactive: number;
-    expired: number; frozen: number; suspended: number;
-  }>({ total: 0, active: 0, inactive: 0, expired: 0, frozen: 0, suspended: 0 });
+    expired: number; frozen: number; suspended: number; pendingApproval: number;
+  }>({ total: 0, active: 0, inactive: 0, expired: 0, frozen: 0, suspended: 0, pendingApproval: 0 });
 
   const loadMembers = async () => {
     try {
@@ -444,6 +444,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         expired: all.filter((m: Member) => getComputedStatus(m) === 'Expired').length,
         frozen: all.filter((m: Member) => getComputedStatus(m) === 'Frozen').length,
         suspended: all.filter((m: Member) => getComputedStatus(m) === 'Suspended').length,
+        pendingApproval: all.filter((m: Member) => getComputedStatus(m) === 'pending_approval').length,
       });
     } catch (e) {
       console.error('Failed to load status counts:', e);
@@ -529,6 +530,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const inactiveMembers = statusCounts.inactive;
   const expiredMembers = statusCounts.expired;
   const frozenMembers = statusCounts.frozen;
+  const suspendedMembers = statusCounts.suspended;
+  const pendingApprovalMembers = statusCounts.pendingApproval;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -923,9 +926,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     window.dispatchEvent(new Event('pendingMembersUpdated'));
   };
 
-  // Combine regular members with pending members for display
+  // Combine regular members with pending members for display. The drafts are
+  // client-side only, so the server's status filter never sees them — hide them
+  // unless the filter would include a "Pending Approval" row.
   const combinedMembers = React.useMemo(() => {
-    const pending = pendingMembers.map(pm => ({
+    const showPending = selectedStatus === 'all' || selectedStatus === 'pending_approval';
+    const pending = (showPending ? pendingMembers : []).map(pm => ({
       id: pm.memberId,
       name: pm.fullName,
       email: pm.email,
@@ -945,7 +951,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }));
 
     return [...pending, ...members];
-  }, [pendingMembers, members]);
+  }, [pendingMembers, members, selectedStatus]);
 
   // Renewals & Upgrades helper functions
   const handleRenewalSearch = (value: string) => {
@@ -1402,6 +1408,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             { key: "inactive", label: "Inactive", value: inactiveMembers, sub: "Inactive members", icon: Pause, tone: "blue" },
             { key: "expired", label: "Expired", value: expiredMembers, sub: "Need renewal", icon: Calendar, tone: "red" },
             { key: "frozen", label: "Frozen", value: frozenMembers, sub: "Membership frozen", icon: Snowflake, tone: "cyan" },
+            // Total counts every member, so these get a card whenever they're
+            // non-zero — otherwise the status cards don't add up to Total (BG_111).
+            ...(suspendedMembers > 0
+              ? [{ key: "suspended", label: "Suspended", value: suspendedMembers, sub: "Membership suspended", icon: Ban, tone: "purple" as const }]
+              : []),
+            ...(pendingApprovalMembers > 0
+              ? [{ key: "pending_approval", label: "Pending Approval", value: pendingApprovalMembers, sub: "Awaiting approval", icon: Clock, tone: "amber" as const }]
+              : []),
           ],
           activeKey: selectedStatus,
           onSelect: (key) => {
@@ -1490,6 +1504,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <SelectItem value="suspended">Suspended</SelectItem>
                     <SelectItem value="expired">Expired</SelectItem>
                     <SelectItem value="frozen">Frozen</SelectItem>
+                    <SelectItem value="pending_approval">Pending Approval</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline">

@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import { parseApiError } from './api-error';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -28,7 +29,7 @@ export interface TrainingStreamRequest {
   category: string;
   duration: number;
   difficulty?: string;
-  max_participants?: number;
+  max_participants?: number | null;
   status?: string;
   scheduled_time?: string | null;
   description?: string;
@@ -59,7 +60,7 @@ class TrainingStreamsService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/training-streams?${query.toString()}`
     );
-    if (!response.ok) throw new Error(`Failed to fetch streams: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch streams: ${response.status}`));
     return response.json();
   }
 
@@ -68,7 +69,7 @@ class TrainingStreamsService {
       `${backendBaseUrl}/training-streams`,
       { method: 'POST', body: JSON.stringify(payload) }
     );
-    if (!response.ok) throw new Error(`Failed to create stream: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to create stream: ${response.status}`));
     return response.json();
   }
 
@@ -77,7 +78,7 @@ class TrainingStreamsService {
       `${backendBaseUrl}/training-streams/${id}`,
       { method: 'PUT', body: JSON.stringify(payload) }
     );
-    if (!response.ok) throw new Error(`Failed to update stream: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to update stream: ${response.status}`));
     return response.json();
   }
 
@@ -86,7 +87,7 @@ class TrainingStreamsService {
       `${backendBaseUrl}/training-streams/${id}`,
       { method: 'DELETE' }
     );
-    if (!response.ok) throw new Error(`Failed to delete stream: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to delete stream: ${response.status}`));
   }
 
   async startStream(id: string): Promise<TrainingStreamApi> {
@@ -94,7 +95,7 @@ class TrainingStreamsService {
       `${backendBaseUrl}/training-streams/${id}/start`,
       { method: 'POST' }
     );
-    if (!response.ok) throw new Error(`Failed to start stream: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to start stream: ${response.status}`));
     return response.json();
   }
 
@@ -103,7 +104,7 @@ class TrainingStreamsService {
       `${backendBaseUrl}/training-streams/${id}/end`,
       { method: 'POST' }
     );
-    if (!response.ok) throw new Error(`Failed to end stream: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to end stream: ${response.status}`));
     return response.json();
   }
 
@@ -111,7 +112,7 @@ class TrainingStreamsService {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/training-streams/analytics`
     );
-    if (!response.ok) throw new Error(`Failed to fetch analytics: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch analytics: ${response.status}`));
     return response.json();
   }
 }

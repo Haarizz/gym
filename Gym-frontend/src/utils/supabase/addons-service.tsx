@@ -1,4 +1,5 @@
 import { authService } from './auth-service';
+import type { Receipt } from './receipts-service';
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -20,6 +21,8 @@ export interface MemberAddon {
   notes?: string;
   created_at: string;
   updated_at: string;
+  /** Only on the createAddon response — the receipt the purchase generated. */
+  receipt?: Receipt;
 }
 
 export interface AddonsResponse {
@@ -83,6 +86,17 @@ class AddonsService {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.message || `Failed to create addon: ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async getAddonReceipt(id: string): Promise<Receipt> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/member-addons/${id}/receipt`
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Failed to fetch receipt: ${response.status}`);
     }
     return response.json();
   }

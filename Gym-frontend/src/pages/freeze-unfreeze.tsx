@@ -41,13 +41,14 @@ interface FreezeUnfreezeProps {
 }
 
 // GymBios design colours (applied inline — the app ships a fixed Tailwind build)
-const TEAL = '#2B7A78';
-const TEAL_LIGHT = '#DFF5F4';
+// Theme variable: only used in style objects, so it follows light/dark mode.
+const TEAL = 'var(--primary)';
+const TEAL_LIGHT = 'var(--primary-soft)';
 const headerStyle: React.CSSProperties = {
-  background: `linear-gradient(to right, ${TEAL_LIGHT}, #ffffff)`,
-  borderBottom: '1px solid rgba(43, 122, 120, 0.1)',
+  background: `linear-gradient(to right, ${TEAL_LIGHT}, var(--card))`,
+  borderBottom: '1px solid color-mix(in srgb, var(--primary) 10%, transparent)',
 };
-const cardBorder: React.CSSProperties = { borderColor: 'rgba(43, 122, 120, 0.2)' };
+const cardBorder: React.CSSProperties = { borderColor: 'color-mix(in srgb, var(--primary) 20%, transparent)' };
 
 const initials = (name: string) => (name || '').split(' ').filter(Boolean).map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 const fmt = (d?: string | Date | null) => (d ? format(new Date(d), 'dd MMM yyyy') : '—');
@@ -324,8 +325,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
         </div>
 
         <div className="flex items-center space-x-3 mb-2">
-          <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${TEAL}, #1a4d4b)` }}>
-            <Snowflake className="h-5 w-5 text-white" />
+          <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${TEAL}, var(--primary-hover))` }}>
+            <Snowflake className="h-5 w-5" style={{ color: 'var(--primary-foreground)' }} />
           </div>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Freeze / Unfreeze Memberships</h1>
@@ -377,7 +378,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                           >
                             <div className="flex items-center space-x-3">
                               <Avatar className="h-10 w-10" style={{ border: `2px solid ${TEAL}` }}>
-                                <AvatarFallback className="text-white" style={{ background: TEAL }}>{initials(member.name)}</AvatarFallback>
+                                <AvatarFallback style={{ background: TEAL, color: 'var(--primary-foreground)' }}>{initials(member.name)}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 truncate">{member.name}</p>
@@ -401,12 +402,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
 
               {/* Selected Member Details */}
               {selectedMember && (
-                <Card style={{ borderColor: 'rgba(43, 122, 120, 0.3)', background: 'rgba(223, 245, 244, 0.3)' }}>
+                <Card style={{ borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)', background: 'color-mix(in srgb, var(--primary-soft) 30%, transparent)' }}>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3 min-w-0">
                         <Avatar className="h-12 w-12" style={{ border: `2px solid ${TEAL}` }}>
-                          <AvatarFallback className="text-white" style={{ background: TEAL }}>{initials(selectedMember.name)}</AvatarFallback>
+                          <AvatarFallback style={{ background: TEAL, color: 'var(--primary-foreground)' }}>{initials(selectedMember.name)}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
                           <p className="font-semibold text-gray-900 truncate">{selectedMember.name}</p>
@@ -418,7 +419,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-3" style={{ borderTop: '1px solid rgba(43, 122, 120, 0.2)' }}>
+                    <div className="grid grid-cols-2 gap-3 pt-3" style={{ borderTop: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
                       <div>
                         <p className="text-xs text-gray-600">Plan</p>
                         <p className="font-medium text-sm">{selectedMember.membership_plan || '—'}</p>
@@ -457,7 +458,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                           </div>
                         </div>
 
-                        <div className="pt-2" style={{ borderTop: '1px solid rgba(43, 122, 120, 0.2)' }}>
+                        <div className="pt-2" style={{ borderTop: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-600">Balance Days Remaining</p>
                             <p className="font-bold" style={{ color: TEAL }}>{allowance.remainingDays} days</p>
@@ -551,7 +552,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                   <Button
                     onClick={handleFreezeMembership}
                     className="w-full text-white"
-                    style={{ background: '#E63946' }}
+                    style={{ background: 'var(--danger)' }}
                     disabled={!freezeStartDate || !freezeEndDate || !canSubmit || isSubmitting}
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
@@ -603,10 +604,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
               </div>
 
               {/* Frozen Members Table */}
-              <div className="rounded-lg overflow-hidden overflow-x-auto" style={{ border: '1px solid rgba(43, 122, 120, 0.2)' }}>
+              <div className="rounded-lg overflow-hidden overflow-x-auto" style={{ border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
                 <Table>
                   <TableHeader>
-                    <TableRow style={{ background: 'rgba(223, 245, 244, 0.5)' }}>
+                    <TableRow style={{ background: 'color-mix(in srgb, var(--primary-soft) 50%, transparent)' }}>
                       <TableHead>Member Name</TableHead>
                       <TableHead>Member ID</TableHead>
                       <TableHead>Plan Name</TableHead>
@@ -628,7 +629,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                             <TableCell>
                               <div className="flex items-center space-x-3">
                                 <Avatar className="h-8 w-8" style={{ border: `1px solid ${TEAL}` }}>
-                                  <AvatarFallback className="text-white text-xs" style={{ background: TEAL }}>{initials(member.name)}</AvatarFallback>
+                                  <AvatarFallback className="text-xs" style={{ background: TEAL, color: 'var(--primary-foreground)' }}>{initials(member.name)}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <p className="font-medium text-sm">{member.name}</p>
@@ -664,7 +665,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => openHistory(member)}
-                                  style={{ borderColor: 'rgba(43, 122, 120, 0.3)', color: TEAL }}
+                                  style={{ borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)', color: TEAL }}
                                 >
                                   <Eye className="h-3 w-3 mr-1" />
                                   History
@@ -736,7 +737,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <Card style={{ ...cardBorder, background: 'rgba(223, 245, 244, 0.3)' }}>
+            <Card style={{ ...cardBorder, background: 'color-mix(in srgb, var(--primary-soft) 30%, transparent)' }}>
               <CardContent className="p-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
@@ -761,10 +762,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
               </CardContent>
             </Card>
 
-            <div className="rounded-lg overflow-hidden" style={{ border: '1px solid rgba(43, 122, 120, 0.2)' }}>
+            <div className="rounded-lg overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
               <Table>
                 <TableHeader>
-                  <TableRow style={{ background: 'rgba(223, 245, 244, 0.5)' }}>
+                  <TableRow style={{ background: 'color-mix(in srgb, var(--primary-soft) 50%, transparent)' }}>
                     <TableHead>Start Date</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Days</TableHead>
@@ -797,7 +798,7 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                         <TableCell>{record.reason || '—'}</TableCell>
                         <TableCell>
                           {Number(record.chargeAmount) > 0 ? (
-                            <span className="font-medium" style={{ color: '#E63946' }}><CurrencyGlyph /> {Number(record.chargeAmount).toLocaleString()}</span>
+                            <span className="font-medium" style={{ color: 'var(--danger)' }}><CurrencyGlyph /> {Number(record.chargeAmount).toLocaleString()}</span>
                           ) : record.chargeWaived ? (
                             <span className="text-gray-600">Waived</span>
                           ) : (

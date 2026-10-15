@@ -78,7 +78,7 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.5rem;
-  background: rgb(255 255 255 / 0.2);
+  background: light-dark(rgb(255 255 255 / 0.2), color-mix(in srgb, var(--card) 20%, transparent));
 }
 
 .count {
@@ -87,7 +87,7 @@
   line-height: 1.25rem;
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  background: rgb(255 255 255 / 0.25);
+  background: light-dark(rgb(255 255 255 / 0.25), color-mix(in srgb, var(--card) 25%, transparent));
 }
 
 .title {
@@ -113,7 +113,7 @@
 .skeleton {
   display: block;
   border-radius: 0.375rem;
-  background: rgb(255 255 255 / 0.3);
+  background: light-dark(rgb(255 255 255 / 0.3), color-mix(in srgb, var(--card) 30%, transparent));
   animation: pulse 1.5s ease-in-out infinite;
 }
 
