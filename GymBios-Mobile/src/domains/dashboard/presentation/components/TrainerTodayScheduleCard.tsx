@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
@@ -21,6 +22,7 @@ export function TrainerTodayScheduleCard({
   onFinishSession,
   onMessageMember,
 }: TrainerTodayScheduleCardProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const handleViewAll = () => {
@@ -34,9 +36,9 @@ export function TrainerTodayScheduleCard({
   return (
     <GlassSurface radius={Radius.lg} style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Today's Schedule</Text>
+        <Text style={styles.title}>{t('dashboard.trainer.schedule.title')}</Text>
         <Pressable onPress={handleViewAll} hitSlop={8}>
-          <Text style={styles.viewAllText}>View All</Text>
+          <Text style={styles.viewAllText}>{t('dashboard.trainer.schedule.viewAll')}</Text>
         </Pressable>
       </View>
 
@@ -44,6 +46,7 @@ export function TrainerTodayScheduleCard({
         {sessions.map((session, index) => {
           const isCompleted = session.status === 'completed';
           const isInProgress = session.status === 'in_progress';
+          const memberOrClass = session.className || session.member || t('dashboard.trainer.schedule.noMember');
 
           return (
             <View
@@ -66,7 +69,7 @@ export function TrainerTodayScheduleCard({
 
                 {/* Session Details */}
                 <View style={styles.sessionDetails}>
-                  <Text style={styles.memberName}>{session.className || session.member || 'No Member'}</Text>
+                  <Text style={styles.memberName}>{memberOrClass}</Text>
                   <Text style={styles.sessionSubtext}>
                     {session.type} • {session.focus}
                   </Text>
@@ -74,7 +77,7 @@ export function TrainerTodayScheduleCard({
                   {isCompleted ? (
                     <View style={styles.completedBadgeRow}>
                       <Feather name="check-circle" size={12} color="#16A34A" />
-                      <Text style={styles.completedBadgeText}>Completed</Text>
+                      <Text style={styles.completedBadgeText}>{t('dashboard.trainer.schedule.completed')}</Text>
                     </View>
                   ) : (
                     <View style={styles.actionsRow}>
@@ -83,20 +86,20 @@ export function TrainerTodayScheduleCard({
                           style={[styles.startButton, styles.finishButton]}
                           onPress={() => onFinishSession?.(session)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Finish session with ${session.className || session.member}`}
+                          accessibilityLabel={t('dashboard.trainer.schedule.finishSessionA11y', { name: memberOrClass })}
                         >
                           <Feather name="square" size={12} color="#FFFFFF" />
-                          <Text style={styles.startButtonText}>Finish Session</Text>
+                          <Text style={styles.startButtonText}>{t('dashboard.trainer.schedule.finishSession')}</Text>
                         </Pressable>
                       ) : (
                         <Pressable
                           style={styles.startButton}
                           onPress={() => onStartSession?.(session)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Start session with ${session.className || session.member}`}
+                          accessibilityLabel={t('dashboard.trainer.schedule.startSessionA11y', { name: memberOrClass })}
                         >
                           <Feather name="play" size={12} color="#FFFFFF" />
-                          <Text style={styles.startButtonText}>Start Session</Text>
+                          <Text style={styles.startButtonText}>{t('dashboard.trainer.schedule.startSession')}</Text>
                         </Pressable>
                       )}
 
@@ -104,7 +107,7 @@ export function TrainerTodayScheduleCard({
                         style={styles.messageButton}
                         onPress={() => onMessageMember?.(session)}
                         accessibilityRole="button"
-                        accessibilityLabel={`Message ${session.member}`}
+                        accessibilityLabel={t('dashboard.trainer.schedule.messageMemberA11y', { name: session.member || memberOrClass })}
                       >
                         <Feather name="message-circle" size={16} color="#475569" />
                       </Pressable>

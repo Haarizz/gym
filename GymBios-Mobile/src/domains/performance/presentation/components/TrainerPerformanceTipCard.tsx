@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,12 +10,16 @@ interface TrainerPerformanceTipCardProps {
 }
 
 export function TrainerPerformanceTipCard({ tip }: TrainerPerformanceTipCardProps) {
-  let message = '';
-  if (tip.sessionsRemaining <= 0) {
-    message = "You have hit your monthly session target! Great job keep it up! 🎯";
-  } else {
-    message = `You're ${tip.remainingPercentage}% away from your monthly target. Book ${tip.sessionsRemaining} more session${tip.sessionsRemaining === 1 ? '' : 's'} to stay on track!`;
-  }
+  const { t } = useTranslation();
+
+  const message =
+    tip.sessionsRemaining <= 0
+      ? t('trainerPerformance.tipTargetHit')
+      : t('trainerPerformance.tipRemaining', {
+          percent: tip.remainingPercentage,
+          remaining: tip.sessionsRemaining,
+          count: tip.sessionsRemaining,
+        });
 
   return (
     <LinearGradient
@@ -23,7 +28,7 @@ export function TrainerPerformanceTipCard({ tip }: TrainerPerformanceTipCardProp
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Performance Tip 💡</Text>
+      <Text style={styles.title}>{t('trainerPerformance.tipTitle')}</Text>
       <Text style={styles.tipText}>{message}</Text>
     </LinearGradient>
   );

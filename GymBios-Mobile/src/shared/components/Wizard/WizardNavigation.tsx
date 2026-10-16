@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
@@ -28,9 +29,11 @@ export function WizardNavigation({
   mode,
   submitLabelOverride,
 }: WizardNavigationProps) {
+  const { t } = useTranslation();
+
   const submitLabel =
     submitLabelOverride ??
-    (mode === 'edit' ? 'Save Changes' : 'Create Staff');
+    (mode === 'edit' ? t('shared.wizard.saveChanges') : t('shared.wizard.createStaff'));
 
   return (
     <View style={styles.container}>
@@ -38,7 +41,7 @@ export function WizardNavigation({
         <View style={styles.buttonWrapper}>
           {isFirst ? (
             <Button
-              label="Cancel"
+              label={t('shared.cancel')}
               variant="secondary"
               onPress={onCancel}
               size="lg"
@@ -46,7 +49,7 @@ export function WizardNavigation({
             />
           ) : (
             <Button
-              label="Back"
+              label={t('shared.goBack')}
               variant="secondary"
               onPress={onPrevious}
               size="lg"
@@ -69,7 +72,7 @@ export function WizardNavigation({
             />
           ) : (
             <Button
-              label="Next"
+              label={t('shared.next')}
               onPress={onNext}
               disabled={!canProceed}
               size="lg"

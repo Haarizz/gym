@@ -5,17 +5,38 @@ import type {
   MemberCheckOutResponse,
   MemberFeedbackPayload,
   MemberFeedbackResponse,
+  MemberWorkoutResponse,
 } from '../domain/MemberFeedback';
+
+/** The backend serialises snake_case; accept either spelling. */
+function pick<T>(data: Record<string, any>, camel: string, snake: string): T | undefined {
+  return (data[camel] ?? data[snake]) as T | undefined;
+}
 
 export const memberCheckInApi = {
   async getStatus(): Promise<MemberCheckInStatus> {
     const response = await apiClient.get<MemberCheckInStatus>('/mobile/member/check-in/status');
-    const data = response.data;
+    const data = response.data as Record<string, any>;
     return {
       ...data,
-      checkedIn: data.checkedIn ?? data.checked_in ?? false,
-      attendanceId: data.attendanceId ?? data.attendance_id ?? null,
-      checkInTime: data.checkInTime ?? data.check_in_time ?? null,
+      checkedIn: pick<boolean>(data, 'checkedIn', 'checked_in') ?? false,
+      attendanceId: pick<number>(data, 'attendanceId', 'attendance_id') ?? null,
+      checkInTime: pick<string>(data, 'checkInTime', 'check_in_time') ?? null,
+      limitUnit: pick<string>(data, 'limitUnit', 'limit_unit') ?? null,
+      limitValue: pick<number>(data, 'limitValue', 'limit_value') ?? null,
+      used: pick<number>(data, 'used', 'used') ?? null,
+      limitPeriod: pick<string>(data, 'limitPeriod', 'limit_period') ?? null,
+      checkInsToday: pick<number>(data, 'checkInsToday', 'check_ins_today'),
+      maxCheckInsPerDay: pick<number>(data, 'maxCheckInsPerDay', 'max_check_ins_per_day'),
+      nextCheckInAllowedAt: pick<string>(data, 'nextCheckInAllowedAt', 'next_check_in_allowed_at') ?? null,
+      canCheckIn: pick<boolean>(data, 'canCheckIn', 'can_check_in'),
+      blockedReason: pick<string>(data, 'blockedReason', 'blocked_reason') ?? null,
+      workoutStartTime: pick<string>(data, 'workoutStartTime', 'workout_start_time') ?? null,
+      workoutEndTime: pick<string>(data, 'workoutEndTime', 'workout_end_time') ?? null,
+      workoutMinutes: pick<number>(data, 'workoutMinutes', 'workout_minutes') ?? null,
+      unclosedAttendanceId: pick<number>(data, 'unclosedAttendanceId', 'unclosed_attendance_id') ?? null,
+      unclosedCheckInTime: pick<string>(data, 'unclosedCheckInTime', 'unclosed_check_in_time') ?? null,
+      unclosedAutoCloseTime: pick<string>(data, 'unclosedAutoCloseTime', 'unclosed_auto_close_time') ?? null,
     };
   },
 
@@ -43,7 +64,18 @@ export const memberCheckInApi = {
       checkInTime: data.checkInTime ?? data.check_in_time,
       checkOutTime: data.checkOutTime ?? data.check_out_time,
       durationMinutes: data.durationMinutes ?? data.duration_minutes,
+      workoutMinutes: pick<number>(data as Record<string, any>, 'workoutMinutes', 'workout_minutes') ?? null,
     };
+  },
+
+  async startWorkout(): Promise<MemberWorkoutResponse> {
+    const response = await apiClient.post('/mobile/member/workout/start', {});
+    return toWorkout(response.data);
+  },
+
+  async endWorkout(): Promise<MemberWorkoutResponse> {
+    const response = await apiClient.post('/mobile/member/workout/end', {});
+    return toWorkout(response.data);
   },
 
   async submitFeedback(payload: MemberFeedbackPayload): Promise<MemberFeedbackResponse> {
@@ -87,3 +119,12 @@ export const memberCheckInApi = {
     return response.data;
   },
 };
+
+function toWorkout(data: Record<string, any>): MemberWorkoutResponse {
+  return {
+    attendanceId: pick<number>(data, 'attendanceId', 'attendance_id'),
+    workoutStartTime: pick<string>(data, 'workoutStartTime', 'workout_start_time') ?? null,
+    workoutEndTime: pick<string>(data, 'workoutEndTime', 'workout_end_time') ?? null,
+    workoutMinutes: pick<number>(data, 'workoutMinutes', 'workout_minutes') ?? null,
+  };
+}

@@ -187,6 +187,7 @@ public class MemberDashboardResponseDTO {
     public static class CheckInStatusDTO {
         private boolean checkedIn;
         private Long activeAttendanceId;
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.company.project.json.UtcLocalDateTimeSerializer.class)
         private LocalDateTime checkInTime;
 
         public CheckInStatusDTO() {}

@@ -1,7 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
-import { CurrencyValue } from '@/core/providers';
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import type { TrainerTaxDocument, TrainerTaxInformation } from '../../domain/TrainerLedgerData';
 
@@ -16,36 +17,41 @@ export function TrainerLedgerTaxSection({
   taxDocuments,
   onDocumentPress,
 }: TrainerLedgerTaxSectionProps) {
+  const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
+
   return (
     <View style={styles.container}>
       {/* Tax Info Alert Box */}
       <View style={styles.taxAlertCard}>
-        <Text style={styles.taxAlertTitle}>Tax Information</Text>
+        <Text style={styles.taxAlertTitle}>{t('ledger.tax.title')}</Text>
         <Text style={styles.taxAlertBody}>
-          Your YTD earnings: <MoneyOrDash amount={taxInfo.ytdEarnings} />.
+          {t('ledger.tax.ytdEarnings', {
+            earnings: taxInfo.ytdEarnings != null ? formatCurrency(taxInfo.ytdEarnings) : '—',
+          })}
         </Text>
       </View>
 
       {/* Year to Date Summary */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Year to Date Summary</Text>
+        <Text style={styles.cardTitle}>{t('ledger.tax.summaryTitle')}</Text>
         <View style={styles.summaryList}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Earnings</Text>
+            <Text style={styles.summaryLabel}>{t('ledger.tax.totalEarnings')}</Text>
             <Text style={styles.summaryValue}><MoneyOrDash amount={taxInfo.ytdEarnings} /></Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Sessions</Text>
+            <Text style={styles.summaryLabel}>{t('ledger.tax.totalSessions')}</Text>
             <Text style={styles.summaryValue}>{taxInfo.totalSessions}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Avg. per Session</Text>
+            <Text style={styles.summaryLabel}>{t('ledger.tax.avgPerSession')}</Text>
             <Text style={[styles.summaryValue, { color: '#16A34A' }]}>
               <MoneyOrDash amount={taxInfo.avgPerSession} />
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.lastSummaryRow]}>
-            <Text style={styles.summaryLabel}>Active Clients</Text>
+            <Text style={styles.summaryLabel}>{t('ledger.tax.activeClients')}</Text>
             <Text style={styles.summaryValue}>{taxInfo.activeClients}</Text>
           </View>
         </View>
@@ -53,10 +59,10 @@ export function TrainerLedgerTaxSection({
 
       {/* Tax Documents */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Tax Documents</Text>
+        <Text style={styles.cardTitle}>{t('ledger.tax.documentsTitle')}</Text>
         <View style={styles.docsList}>
           {taxDocuments.length === 0 && (
-            <Text style={styles.emptyText}>No tax documents have been issued yet.</Text>
+            <Text style={styles.emptyText}>{t('ledger.tax.noDocumentsEmpty')}</Text>
           )}
           {taxDocuments.map((doc) => (
             <Pressable
@@ -64,7 +70,7 @@ export function TrainerLedgerTaxSection({
               style={styles.docRow}
               onPress={() => onDocumentPress?.(doc)}
               accessibilityRole="button"
-              accessibilityLabel={`Download ${doc.title}`}
+              accessibilityLabel={t('ledger.earnings.downloadA11y', { title: doc.title })}
             >
               <Text style={styles.docTitle}>{doc.title}</Text>
               <Feather name="download" size={16} color="#64748B" />

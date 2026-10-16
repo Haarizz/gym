@@ -11,16 +11,19 @@ import { TrainerLedgerBreakdownSection } from '../components/TrainerLedgerBreakd
 import { TrainerLedgerTransactionsSection } from '../components/TrainerLedgerTransactionsSection';
 import { TrainerLedgerTaxSection } from '../components/TrainerLedgerTaxSection';
 
+import { useTranslation } from 'react-i18next';
+
 type LedgerTab = 'breakdown' | 'transactions' | 'tax';
 
 export function TrainerLedgerScreen() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
   const { data, isLoading, isError, refetch, isRefetching } = useTrainerLedger();
 
   if (isLoading && !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading ledger..." />
+        <Loader message={t('ledger.loading')} />
       </View>
     );
   }
@@ -30,9 +33,9 @@ export function TrainerLedgerScreen() {
       <View style={styles.loaderContainer}>
         <EmptyState
           icon="alert-circle"
-          title="Couldn't load your ledger"
-          description={isError ? 'Check your connection and try again.' : 'No ledger data is available yet.'}
-          buttonLabel="Retry"
+          title={t('ledger.errorTitle')}
+          description={isError ? t('ledger.errorNetwork') : t('ledger.errorEmpty')}
+          buttonLabel={t('ledger.retry')}
           onPress={() => refetch()}
         />
       </View>
@@ -65,7 +68,7 @@ export function TrainerLedgerScreen() {
           <Text
             style={[styles.tabText, activeTab === 'breakdown' && styles.tabTextActive]}
           >
-            Breakdown
+            {t('ledger.tabs.breakdown')}
           </Text>
         </Pressable>
 
@@ -76,7 +79,7 @@ export function TrainerLedgerScreen() {
           <Text
             style={[styles.tabText, activeTab === 'transactions' && styles.tabTextActive]}
           >
-            Transactions
+            {t('ledger.tabs.transactions')}
           </Text>
         </Pressable>
 
@@ -85,7 +88,7 @@ export function TrainerLedgerScreen() {
           onPress={() => setActiveTab('tax')}
         >
           <Text style={[styles.tabText, activeTab === 'tax' && styles.tabTextActive]}>
-            Tax Info
+            {t('ledger.tabs.tax')}
           </Text>
         </Pressable>
       </View>

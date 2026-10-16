@@ -7,6 +7,7 @@ import com.company.project.repositories.UserProfileRepository;
 import com.company.project.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.Period;
@@ -44,6 +45,13 @@ public class MobileProfileService {
     private static final int MIN_AGE_YEARS = 10;
     private static final int MAX_AGE_YEARS = 100;
 
+    // Allowed body metric ranges. Keep in sync with
+    // GymBios-Mobile/src/domains/profile/domain/bodyMetricsRules.ts.
+    private static final double MIN_HEIGHT_CM = 20;
+    private static final double MAX_HEIGHT_CM = 250;
+    private static final double MIN_WEIGHT_KG = 20;
+    private static final double MAX_WEIGHT_KG = 300;
+
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
     private final StaffRepository staffRepository;
@@ -75,24 +83,38 @@ public class MobileProfileService {
     }
 
     public MobileProfileDTO getProfileByUserId(Long userId) {
+        return getProfileByUserId(userId, true);
+    }
+
+    /**
+     * global=false is a gym-created login (staff gave the member app credentials on the
+     * web). Its members row is what the web panel shows, so it wins over user_profiles
+     * for every field both hold — otherwise the app and the web drift into two different
+     * people (see updateProfile, which writes those fields back to the members row).
+     */
+    public MobileProfileDTO getProfileByUserId(Long userId, boolean global) {
+        Member member = global ? null : findGymMember(userId);
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    UserProfile newProfile = new UserProfile();
-                    newProfile.setUser(userRepository.getReferenceById(userId));
-                    newProfile.setFullName("Member"); // Add a default since fullName is non-null
-                    return userProfileRepository.save(newProfile);
-                });
+                .orElseGet(() -> userProfileRepository.save(newProfile(userId, member)));
+        if (member != null) {
+            // Also heals rows saved before the two were kept in step (persisted on commit).
+            syncFromMember(profile, member);
+        }
         return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
     }
 
     public MobileProfileDTO updateProfile(Long userId, MobileProfileDTO request) {
+        return updateProfile(userId, request, true);
+    }
+
+    public MobileProfileDTO updateProfile(Long userId, MobileProfileDTO request, boolean global) {
+        Member member = global ? null : findGymMember(userId);
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    UserProfile newProfile = new UserProfile();
-                    newProfile.setUser(userRepository.getReferenceById(userId));
-                    newProfile.setFullName("Member");
-                    return newProfile;
-                });
+                .orElseGet(() -> newProfile(userId, member));
+        if (member != null) {
+            // Validate this edit against the gym's current values, not stale ones.
+            syncFromMember(profile, member);
+        }
 
         if (request.getFullName() != null) profile.setFullName(request.getFullName());
         if (request.getPhone() != null) profile.setPhone(request.getPhone());
@@ -115,17 +137,102 @@ public class MobileProfileService {
         if (request.getAddress() != null) profile.setAddress(request.getAddress());
         if (request.getEmergencyContact() != null) profile.setEmergencyContact(request.getEmergencyContact());
         if (request.getEmergencyPhone() != null) profile.setEmergencyPhone(request.getEmergencyPhone());
+        // Only checked when either number changes, so unrelated updates on older
+        // profiles that already match aren't blocked.
+        boolean phonesChanged = request.getPhone() != null || request.getEmergencyPhone() != null;
+        if (phonesChanged && samePhone(profile.getEmergencyPhone(), profile.getPhone())) {
+            throw new IllegalArgumentException("Emergency contact number must be different from your own number");
+        }
         if (request.getBloodType() != null) profile.setBloodType(request.getBloodType());
         if (request.getMedicalConditions() != null) profile.setMedicalConditions(request.getMedicalConditions());
         if (request.getAllergies() != null) profile.setAllergies(request.getAllergies());
         if (request.getCurrentMedications() != null) profile.setCurrentMedications(request.getCurrentMedications());
         if (request.getChronicIllnesses() != null) profile.setChronicIllnesses(request.getChronicIllnesses());
-        if (request.getHeight() != null) profile.setHeight(request.getHeight());
-        if (request.getWeight() != null) profile.setWeight(request.getWeight());
+        if (request.getHeight() != null) {
+            validateRange("Height", request.getHeight(), MIN_HEIGHT_CM, MAX_HEIGHT_CM, "cm");
+            profile.setHeight(request.getHeight());
+        }
+        if (request.getWeight() != null) {
+            validateRange("Weight", request.getWeight(), MIN_WEIGHT_KG, MAX_WEIGHT_KG, "kg");
+            profile.setWeight(request.getWeight());
+        }
         if (request.getPhotoUrl() != null) profile.setPhotoUrl(request.getPhotoUrl());
 
         profile = userProfileRepository.save(profile);
+        if (member != null) {
+            writeBackToMember(request, profile, member);
+            memberRepository.save(member);
+        }
         return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
+    }
+
+    /** The members row of a gym-created login, or null (staff accounts, or no member record). */
+    private Member findGymMember(Long userId) {
+        return memberRepository.findByUserId(userId).orElse(null);
+    }
+
+    private UserProfile newProfile(Long userId, Member member) {
+        UserProfile profile = new UserProfile();
+        profile.setUser(userRepository.getReferenceById(userId));
+        profile.setFullName("Member"); // Add a default since fullName is non-null
+        if (member != null) {
+            // Start from what the gym already recorded, so the member isn't sent through
+            // profile completion to retype it.
+            syncFromMember(profile, member);
+        }
+        return profile;
+    }
+
+    // Copies every field the gym has filled in onto the profile; blanks on the members
+    // row leave the profile's own value alone.
+    private static void syncFromMember(UserProfile profile, Member member) {
+        if (StringUtils.hasText(member.getName())) profile.setFullName(member.getName());
+        if (StringUtils.hasText(member.getPhone())) profile.setPhone(member.getPhone());
+        if (member.getDateOfBirth() != null) profile.setDateOfBirth(member.getDateOfBirth());
+        if (StringUtils.hasText(member.getGender())) profile.setGender(member.getGender());
+        if (StringUtils.hasText(member.getNationality())) profile.setNationality(member.getNationality());
+        if (StringUtils.hasText(member.getAddress())) profile.setAddress(member.getAddress());
+        String emergencyName = firstText(member.getEmergencyContactName(), member.getEmergencyContact());
+        if (emergencyName != null) profile.setEmergencyContact(emergencyName);
+        String emergencyPhone = firstText(member.getEmergencyContactPhone(), member.getEmergencyPhone());
+        if (emergencyPhone != null) profile.setEmergencyPhone(emergencyPhone);
+        if (StringUtils.hasText(member.getBloodType())) profile.setBloodType(member.getBloodType());
+        if (StringUtils.hasText(member.getMedicalConditions())) profile.setMedicalConditions(member.getMedicalConditions());
+        if (StringUtils.hasText(member.getAllergies())) profile.setAllergies(member.getAllergies());
+        if (member.getHeight() != null) profile.setHeight(member.getHeight());
+        if (member.getWeight() != null) profile.setWeight(member.getWeight());
+        if (StringUtils.hasText(member.getPhotoUrl())) profile.setPhotoUrl(member.getPhotoUrl());
+    }
+
+    // Only the fields this request changed, using the values just validated and saved
+    // on the profile. Name and phone are never blanked on the gym's record. The web form
+    // fills both emergency pairs, so both are kept in step.
+    private static void writeBackToMember(MobileProfileDTO request, UserProfile profile, Member member) {
+        if (request.getFullName() != null && StringUtils.hasText(profile.getFullName())) member.setName(profile.getFullName());
+        if (request.getPhone() != null && StringUtils.hasText(profile.getPhone())) member.setPhone(profile.getPhone());
+        if (request.getDateOfBirth() != null) member.setDateOfBirth(profile.getDateOfBirth());
+        if (request.getGender() != null) member.setGender(profile.getGender());
+        if (request.getNationality() != null) member.setNationality(profile.getNationality());
+        if (request.getAddress() != null) member.setAddress(profile.getAddress());
+        if (request.getEmergencyContact() != null) {
+            member.setEmergencyContact(profile.getEmergencyContact());
+            member.setEmergencyContactName(profile.getEmergencyContact());
+        }
+        if (request.getEmergencyPhone() != null) {
+            member.setEmergencyPhone(profile.getEmergencyPhone());
+            member.setEmergencyContactPhone(profile.getEmergencyPhone());
+        }
+        if (request.getBloodType() != null) member.setBloodType(profile.getBloodType());
+        if (request.getMedicalConditions() != null) member.setMedicalConditions(profile.getMedicalConditions());
+        if (request.getAllergies() != null) member.setAllergies(profile.getAllergies());
+        if (request.getHeight() != null) member.setHeight(profile.getHeight());
+        if (request.getWeight() != null) member.setWeight(profile.getWeight());
+        if (request.getPhotoUrl() != null) member.setPhotoUrl(profile.getPhotoUrl());
+    }
+
+    private static String firstText(String a, String b) {
+        if (StringUtils.hasText(a)) return a;
+        return StringUtils.hasText(b) ? b : null;
     }
 
     private void validateAge(LocalDate dateOfBirth) {
@@ -136,6 +243,26 @@ public class MobileProfileService {
         if (age > MAX_AGE_YEARS) {
             throw new IllegalArgumentException("Age cannot be more than " + MAX_AGE_YEARS + " years");
         }
+    }
+
+    private void validateRange(String field, double value, double min, double max, String unit) {
+        if (!Double.isFinite(value) || value < min || value > max) {
+            throw new IllegalArgumentException(
+                    field + " must be between " + (int) min + " and " + (int) max + " " + unit);
+        }
+    }
+
+    // Compares on the last 10 digits so formatting and country-code differences
+    // still match. Keep in sync with GymBios-Mobile/src/domains/profile/domain/contactRules.ts.
+    private static boolean samePhone(String a, String b) {
+        String keyA = phoneKey(a);
+        return !keyA.isEmpty() && keyA.equals(phoneKey(b));
+    }
+
+    private static String phoneKey(String phone) {
+        if (phone == null) return "";
+        String digits = phone.replaceAll("[^0-9]", "");
+        return digits.length() > 10 ? digits.substring(digits.length() - 10) : digits;
     }
 
     private MobileProfileDTO withAccountEmail(MobileProfileDTO dto, Long userId) {

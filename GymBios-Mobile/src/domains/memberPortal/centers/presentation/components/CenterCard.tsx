@@ -1,5 +1,7 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { tOr } from '@/core/i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
@@ -36,6 +38,7 @@ interface CenterCardProps {
 }
 
 export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm }: CenterCardProps) {
+  const { t } = useTranslation();
   const coverUrl = resolveImageUrl(center.coverImageUrl);
   const showGenderBadge = !!center.accessType && center.accessType !== 'Mixed';
   const showRating = center.reviewCount > 0 && center.avgRating != null;
@@ -57,7 +60,7 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
           {distanceKm != null && (
             <View style={styles.distanceBadge}>
               <Feather name="navigation" size={9} color="#FFFFFF" />
-              <Text style={styles.distanceText}>{distanceKm.toFixed(1)} km</Text>
+              <Text style={styles.distanceText}>{t('centers.card.km', { value: distanceKm.toFixed(1) })}</Text>
             </View>
           )}
         </View>
@@ -69,14 +72,14 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
               {categoryStyle && (
                 <View style={[styles.tag, { backgroundColor: categoryStyle.bg }]}>
                   <Text style={[styles.tagText, { color: categoryStyle.text }]} numberOfLines={1}>
-                    {center.centerType}
+                    {tOr(`centers.categories.${center.centerType}`, center.centerType ?? '')}
                   </Text>
                 </View>
               )}
               {showGenderBadge && (
                 <View style={[styles.tag, { backgroundColor: genderStyle?.bg ?? '#F1F5F9' }]}>
                   <Text style={[styles.tagText, { color: genderStyle?.text ?? BrandColors.tealDark }]} numberOfLines={1}>
-                    {center.accessType}
+                    {tOr(`centers.accessTypes.${center.accessType}`, center.accessType ?? '')}
                   </Text>
                 </View>
               )}
@@ -109,14 +112,14 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
       {/* Price + payment methods */}
       <View style={styles.footer}>
         <View style={styles.priceBlock}>
-          <Text style={styles.startingFromLabel}>Starting from</Text>
+          <Text style={styles.startingFromLabel}>{t('centers.card.startingFrom')}</Text>
           {center.startingPrice != null ? (
             <View style={styles.priceRow}>
               <Text style={styles.startingPrice}><CurrencyValue amount={center.startingPrice} /></Text>
-              <Text style={styles.perMonthText}> /month</Text>
+              <Text style={styles.perMonthText}>{t('centers.card.perMonth')}</Text>
             </View>
           ) : (
-            <Text style={styles.startingPrice}>View Subscriptions</Text>
+            <Text style={styles.startingPrice}>{t('centers.card.viewSubscriptions')}</Text>
           )}
         </View>
 
@@ -127,7 +130,7 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
             {paymentMethods.filter((m) => m !== 'BNPL' && PAYMENT_ICON[m]).slice(0, 2).map((method) => (
               <View key={method} style={styles.paymentIconChip}>
                 <FeatherIcon name={PAYMENT_ICON[method]} size={11} color={BrandColors.textSecondary} />
-                <Text style={styles.paymentIconText}>{method}</Text>
+                <Text style={styles.paymentIconText}>{tOr(`centers.paymentModes.${method}`, method)}</Text>
               </View>
             ))}
             {paymentMethods.includes('BNPL') && (
@@ -145,15 +148,15 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
           style={({ pressed }) => [styles.viewDetailsButton, pressed && styles.pressed]}
           onPress={() => onViewDetails(center)}
           accessibilityRole="button"
-          accessibilityLabel={`View details for ${center.centerName}`}
+          accessibilityLabel={t('centers.card.viewDetailsA11y', { name: center.centerName })}
         >
-          <Text style={styles.viewDetailsText}>View Details</Text>
+          <Text style={styles.viewDetailsText}>{t('centers.card.viewDetails')}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
           onPress={() => onBuyMembership(center)}
           accessibilityRole="button"
-          accessibilityLabel={`Subscribe at ${center.centerName}`}
+          accessibilityLabel={t('centers.card.subscribeA11y', { name: center.centerName })}
         >
           <LinearGradient
             colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -161,7 +164,7 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
             end={{ x: 1, y: 0 }}
             style={styles.buyButton}
           >
-            <Text style={styles.buyButtonText}>Subscribe</Text>
+            <Text style={styles.buyButtonText}>{t('centers.card.subscribe')}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -193,7 +196,7 @@ const styles = StyleSheet.create({
   },
   distanceBadge: {
     position: 'absolute',
-    left: 6,
+    start: 6,
     bottom: 6,
     flexDirection: 'row',
     alignItems: 'center',

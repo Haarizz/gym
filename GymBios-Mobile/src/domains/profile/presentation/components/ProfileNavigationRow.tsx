@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, I18nManager } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -54,7 +54,11 @@ export function ProfileNavigationRow({
           </View>
         )}
 
-        <Feather name="chevron-right" size={20} color="#94a3b8" />
+        <Feather
+          name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+          size={20}
+          color="#94a3b8"
+        />
       </GlassSurface>
     </Pressable>
   );
@@ -80,7 +84,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   textContainer: {
     flex: 1,
@@ -99,7 +103,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: 2,
     borderRadius: Radius.full,
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   badgeText: {
     color: '#166534',

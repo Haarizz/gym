@@ -148,6 +148,45 @@ export interface StaffPerformance {
   motivation: { remaining_conversions: number; message: string; status: string };
 }
 
+export interface StaffRatingSummary {
+  staff_id: number;
+  average_rating: number;
+  rating_count: number;
+  /** Count per star value; index 0 = 1 star, index 4 = 5 stars. */
+  distribution: number[];
+}
+
+export interface StaffRating {
+  id: number;
+  staff_id: number;
+  member_id: number;
+  member_name: string;
+  rating: number;
+  comment?: string;
+  /** "What stood out" keys picked in the app — see STAFF_RATING_TAG_LABELS. */
+  tags: string[];
+  /** Other members see "Anonymous member"; gym staff still see the author. */
+  anonymous: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// English labels for the "What stood out" keys the mobile app sends.
+export const STAFF_RATING_TAG_LABELS: Record<string, string> = {
+  motivating: 'Motivating',
+  knows_form: 'Knows form',
+  punctual: 'Punctual',
+  good_plans: 'Good plans',
+  patient: 'Patient',
+  fun_sessions: 'Fun sessions',
+  helpful: 'Helpful',
+  quick: 'Quick',
+  polite: 'Polite',
+  clear_answers: 'Clear answers',
+  friendly: 'Friendly',
+  knowledgeable: 'Knowledgeable',
+};
+
 class StaffService {
 
   // ── Staff CRUD ──────────────────────────────────────────────────────────
@@ -378,6 +417,20 @@ class StaffService {
       { method: 'POST', body: JSON.stringify(data) }
     );
     if (!response.ok) throw new Error(`Failed to create commission rule: ${response.status}`);
+    return response.json();
+  }
+
+  // ── Member ratings of staff (submitted from the mobile app) ─────────────
+
+  async getRatingSummaries(): Promise<StaffRatingSummary[]> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/staff-ratings/summary`);
+    if (!response.ok) throw new Error(`Failed to fetch staff ratings: ${response.status}`);
+    return response.json();
+  }
+
+  async getRatings(staffId: string): Promise<StaffRating[]> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/staff-ratings/${staffId}`);
+    if (!response.ok) throw new Error(`Failed to fetch staff reviews: ${response.status}`);
     return response.json();
   }
 }

@@ -67,14 +67,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     // ── Duplicate / active session prevention ─────────────────────────────────
 
-    @Query("SELECT COUNT(a) > 0 FROM Attendance a " +
-           "WHERE a.member.id = :memberId AND a.status = 'active' " +
-           "AND a.checkInTime >= :startOfDay AND a.checkInTime < :endOfDay")
-    boolean existsActiveSessionForMember(
-            @Param("memberId") Long memberId,
-            @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("endOfDay") LocalDateTime endOfDay
-    );
+    // Latest open session regardless of day — includes one left open from an earlier day
+    Optional<Attendance> findFirstByMember_IdAndStatusOrderByCheckInTimeDesc(Long memberId, String status);
 
     // ── Check-in policy (CheckInPolicyService) ───────────────────────────────
 

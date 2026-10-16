@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: 'Ayuda y consultas',
+    newEnquiryCta: 'Enviar una nueva consulta',
+    newEnquiryCtaSubtitle: 'Membresía, facturación, clases, instalaciones…',
+    tabs: {
+      ALL: 'Todas',
+      OPEN: 'Abiertas',
+      REPLIED: 'Respondidas',
+      CLOSED: 'Cerradas',
+    },
+    status: {
+      OPEN: 'Esperando respuesta',
+      REPLIED: 'Respondida',
+      CLOSED: 'Cerrada',
+    },
+    empty: 'Aún no hay consultas',
+    emptySubtitle: 'Las preguntas que envíes a tu gimnasio aparecerán aquí con su respuesta.',
+    nothingHere: 'Aquí no hay nada todavía.',
+    loadFailed: 'No se pudieron cargar tus consultas.',
+    youPrefix: 'Tú:',
+    gymFallback: 'Tu gimnasio',
+    reference: '#{{id}}',
+    newEnquiry: 'Nueva consulta',
+    categoryPrompt: '¿De qué se trata?',
+    subject: 'Asunto',
+    subjectPlaceholder: 'p. ej., Congelar la membresía 2 semanas',
+    message: 'Detalles',
+    messagePlaceholder: 'Cuéntanos qué necesitas: fechas, importes o nombres de clases ayudan al gimnasio a responder antes.',
+    formHint: 'Recibirás una notificación cuando el gimnasio responda. Puedes tener hasta {{count}} consultas pendientes a la vez.',
+    submit: 'Enviar consulta',
+    submitting: 'Enviando…',
+    submitted: 'Consulta enviada. El gimnasio responderá aquí.',
+    submitFailed: 'No se pudo enviar tu consulta. Inténtalo de nuevo.',
+    steps: {
+      submitted: 'Enviada',
+      replied: 'Respondida',
+      closed: 'Cerrada',
+    },
+    openedOn: 'Abierta el {{date}}',
+    gymBadge: 'GIMNASIO',
+    received: 'Recibida · el gimnasio responderá pronto',
+    closedOn: 'Cerrada por el gimnasio · {{date}}',
+    closedFooter: 'Esta consulta está cerrada.',
+    followUpHint: '¿Necesitas más ayuda?',
+    raiseNew: 'Enviar una nueva consulta',
+    categories: {
+      GENERAL: 'General',
+      MEMBERSHIP: 'Membresía',
+      BILLING: 'Facturación',
+      FACILITIES: 'Instalaciones',
+      TRAINER: 'Entrenadores',
+      CLASSES: 'Clases',
+      FEEDBACK: 'Opinión',
+      OTHER: 'Otro',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

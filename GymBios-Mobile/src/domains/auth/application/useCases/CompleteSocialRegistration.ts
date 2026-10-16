@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import type { Result } from '@/core/types';
 import type { Session } from '../../domain/entities/Session';
 import type { SocialProvider } from '../../domain/entities/SocialAuthOutcome';
@@ -17,13 +18,13 @@ export class CompleteSocialRegistration {
 
   execute(input: CompleteSocialRegistrationDto): Promise<Result<Session, string>> {
     if (!input.pendingToken) {
-      return Promise.resolve({ success: false, error: 'Registration session not found. Please sign in again.' });
+      return Promise.resolve({ success: false, error: i18n.t('auth.errors.signInSessionNotFound') });
     }
     const username = input.username.trim();
     if (!username || !USERNAME_PATTERN.test(username)) {
       return Promise.resolve({
         success: false,
-        error: 'Username must contain only letters, numbers, and underscores.',
+        error: i18n.t('auth.errors.usernameCharsLong'),
       });
     }
     return this.authRepository.completeSocialRegistration(input.provider, input.pendingToken, username, input.fullName);

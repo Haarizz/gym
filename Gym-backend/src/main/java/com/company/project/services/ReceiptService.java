@@ -590,6 +590,12 @@ public class ReceiptService {
                 .orElse(null);
     }
 
+    /** The rejected receipt of a member's mobile purchase, for MemberService.approveMemberPayment re-approving it. */
+    public Receipt findRejectedReceiptForMember(Long memberDbId) {
+        return receiptRepository.findTopByMemberDbIdAndApprovalStatusOrderByIdDesc(memberDbId, "REJECTED")
+                .orElse(null);
+    }
+
     /**
      * Marks a pending receipt APPROVED and, now that reception has confirmed the
      * cash/credit was actually received, posts it to the General Ledger — deferred

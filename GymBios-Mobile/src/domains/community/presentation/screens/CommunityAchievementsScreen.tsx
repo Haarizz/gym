@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -15,6 +16,7 @@ import type { CommunityPost } from '../../domain/community.types';
  * No duplicate feed implementation.
  */
 export function CommunityAchievementsScreen() {
+  const { t } = useTranslation();
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
 
   const {
@@ -35,7 +37,7 @@ export function CommunityAchievementsScreen() {
       <View style={styles.sectionHeader}>
         <Feather name="award" size={18} color="#F59E0B" />
         <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-          Community Achievements
+          {t('community.achievementsTitle')}
         </Typography>
       </View>
 

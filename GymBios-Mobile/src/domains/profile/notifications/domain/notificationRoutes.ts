@@ -34,6 +34,12 @@ const ROUTES: Record<string, RouteResolver> = {
   community: (role) =>
     ['(admin)', '(member)', '(staff)', '(trainer)'].includes(role) ? `/${role}/community` : null,
   bookings: (role) => (role === '(member)' ? '/(member)/bookings' : null),
+  enquiries: (role, item) => {
+    if (role !== '(member)') return null;
+    return hasId(item.referenceId)
+      ? `/(member)/profile?view=enquiries&enquiryId=${item.referenceId}`
+      : '/(member)/profile?view=enquiries';
+  },
   'membership-renewal': (role) => (role === '(member)' ? '/(member)/membership' : null),
   'membership-payment': (role, item) => {
     if (role !== '(member)') return null;

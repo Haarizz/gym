@@ -37,6 +37,11 @@ export interface AttendanceListItem {
   check_out_time?: string | null;
   total_minutes?: number | null;
   formatted_duration?: string | null;
+  // Workout timer the member ran from the app during this visit
+  workout_start_time?: string | null;
+  workout_end_time?: string | null;
+  workout_minutes?: number | null;
+  formatted_workout_duration?: string | null;
   activity_type?: string | null;
   status: string;
   type: string;

@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import { apiClient } from '@/core/network/apiClient';
 import type { CommunityRepository } from '../application/CommunityRepository';
 import type {
@@ -201,7 +202,7 @@ export class ApiGlobalCommunityRepository implements CommunityRepository {
       authorUserId: 0,
       authorMemberId: null,
       ownedByMe: p.author?.is_mine ?? false,
-      authorUsername: p.author?.display_name ?? 'GymBios member',
+      authorUsername: p.author?.display_name ?? i18n.t('community.memberFallback'),
       authorRoles: p.author?.role ? [p.author.role] : [],
       createdAt: p.created_at,
       archived: p.status === 'ARCHIVED',
@@ -231,7 +232,7 @@ export class ApiGlobalCommunityRepository implements CommunityRepository {
       authorUserId: 0,
       authorMemberId: null,
       ownedByMe: c.author?.is_mine ?? false,
-      authorUsername: c.author?.display_name ?? 'GymBios member',
+      authorUsername: c.author?.display_name ?? i18n.t('community.memberFallback'),
       authorRoles: c.author?.role ? [c.author.role] : [],
       createdAt: c.created_at,
       isMine: c.author?.is_mine ?? false,

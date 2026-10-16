@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { format, parse } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { format } from 'date-fns';
 
 import { AppBottomSheet, Input, Button, Dropdown, DatePicker, TimePicker } from '@/shared/components';
 import { Spacing } from '@/core/theme';
@@ -14,13 +15,8 @@ export interface SessionFormSheetProps {
   onClose: () => void;
 }
 
-const CLASS_TYPES = [
-  { label: 'Group Class', value: 'CLASS' },
-  { label: 'Personal Training', value: 'PT' },
-  { label: 'Facility Booking', value: 'FACILITY' },
-];
-
 export function SessionFormSheet({ visible, mode, initialData, onClose }: SessionFormSheetProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [type, setType] = useState('CLASS');
   const [date, setDate] = useState<Date | null>(new Date());
@@ -29,6 +25,12 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
   const [location, setLocation] = useState('');
   const [capacity, setCapacity] = useState('');
   const [price, setPrice] = useState('');
+
+  const classTypes = useMemo(() => [
+    { label: t('schedule.sessionForm.types.groupClass'), value: 'CLASS' },
+    { label: t('schedule.sessionForm.types.pt'), value: 'PT' },
+    { label: t('schedule.sessionForm.types.facility'), value: 'FACILITY' },
+  ], [t]);
 
   const createMutation = useCreateTrainerSession();
   const updateMutation = useUpdateTrainerSession();
@@ -61,8 +63,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
 
   const handleSubmit = () => {
     if (!name || !date || !startTime || !endTime) {
-      // Basic presentation validation
-      alert('Please fill out all required fields');
+      alert(t('schedule.sessionForm.validationRequired'));
       return;
     }
 
@@ -72,7 +73,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
       date: format(date, 'yyyy-MM-dd'),
       start_time: startTime,
       end_time: endTime,
-      duration_minutes: 60, // Simplify for demo, ideally calculated from start/end
+      duration_minutes: 60,
       location,
       capacity: parseInt(capacity, 10) || 0,
       price: parseFloat(price) || 0,
@@ -84,7 +85,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
           onClose();
         },
         onError: (err) => {
-          alert(`Failed to create session: ${err.message}`);
+          alert(t('schedule.sessionForm.createFailed', { message: err.message }));
         }
       });
     } else if (mode === 'edit' && initialData?.id) {
@@ -93,7 +94,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
           onClose();
         },
         onError: (err) => {
-          alert(`Failed to update session: ${err.message}`);
+          alert(t('schedule.sessionForm.updateFailed', { message: err.message }));
         }
       });
     }
@@ -102,14 +103,14 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
   return (
     <AppBottomSheet
       visible={visible}
-      title={mode === 'edit' ? 'Reschedule Class' : 'Add New Class'}
-      subtitle={mode === 'edit' ? 'Update the class schedule details' : 'Create a new training class or session'}
+      title={mode === 'edit' ? t('schedule.sessionForm.rescheduleTitle') : t('schedule.sessionForm.addNewTitle')}
+      subtitle={mode === 'edit' ? t('schedule.sessionForm.rescheduleSubtitle') : t('schedule.sessionForm.addNewSubtitle')}
       onClose={onClose}
     >
       <View style={styles.formContainer}>
         <Input
-          label="Class Name"
-          placeholder="e.g., Morning Yoga Flow"
+          label={t('schedule.sessionForm.className')}
+          placeholder={t('schedule.sessionForm.classNamePlaceholder')}
           value={name}
           onChangeText={setName}
         />
@@ -117,16 +118,16 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <Dropdown
-              label="Class Type"
+              label={t('schedule.sessionForm.classType')}
               value={type}
-              options={CLASS_TYPES}
+              options={classTypes}
               onChange={setType}
               required
             />
           </View>
           <View style={styles.halfWidth}>
             <DatePicker
-              label="Date"
+              label={t('schedule.sessionForm.date')}
               value={date || undefined}
               onChange={setDate}
               required
@@ -137,7 +138,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <TimePicker
-              label="Start Time"
+              label={t('schedule.sessionForm.startTime')}
               value={startTime}
               onChange={setStartTime}
               required
@@ -145,7 +146,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
           </View>
           <View style={styles.halfWidth}>
             <TimePicker
-              label="End Time"
+              label={t('schedule.sessionForm.endTime')}
               value={endTime}
               onChange={setEndTime}
               required
@@ -154,8 +155,8 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
         </View>
 
         <Input
-          label="Location"
-          placeholder="e.g., Studio A"
+          label={t('schedule.sessionForm.location')}
+          placeholder={t('schedule.sessionForm.locationPlaceholder')}
           value={location}
           onChangeText={setLocation}
         />
@@ -163,7 +164,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <Input
-              label="Capacity"
+              label={t('schedule.sessionForm.capacity')}
               placeholder="20"
               keyboardType="number-pad"
               value={capacity}
@@ -172,7 +173,7 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
           </View>
           <View style={styles.halfWidth}>
             <Input
-              label="Price"
+              label={t('schedule.sessionForm.price')}
               placeholder="0"
               keyboardType="decimal-pad"
               value={price}
@@ -183,14 +184,14 @@ export function SessionFormSheet({ visible, mode, initialData, onClose }: Sessio
 
         <View style={styles.actions}>
           <Button
-            title="Cancel"
+            title={t('schedule.sessionForm.cancel')}
             variant="outline"
             onPress={onClose}
             style={styles.actionButton}
             disabled={isSubmitting}
           />
           <Button
-            title={mode === 'edit' ? 'Save Changes' : 'Create Class'}
+            title={mode === 'edit' ? t('schedule.sessionForm.saveChanges') : t('schedule.sessionForm.createClass')}
             onPress={handleSubmit}
             loading={isSubmitting}
             style={styles.actionButton}

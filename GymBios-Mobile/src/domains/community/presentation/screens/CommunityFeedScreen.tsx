@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -12,6 +13,7 @@ import { CommunityCommentsSheet } from '../components/CommunityCommentsSheet';
 import type { CommunityPost } from '../../domain/community.types';
 
 export function CommunityFeedScreen() {
+  const { t } = useTranslation();
   const { searchInput, setSearchInput, debouncedQuery, selectedType, setSelectedType } =
     useCommunityFilters();
 
@@ -39,7 +41,7 @@ export function CommunityFeedScreen() {
         <SearchBar
           value={searchInput}
           onChangeText={setSearchInput}
-          placeholder="Search community posts…"
+          placeholder={t('community.searchPlaceholder')}
         />
       </View>
 

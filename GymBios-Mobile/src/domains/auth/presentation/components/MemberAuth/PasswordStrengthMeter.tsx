@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Typography } from '@/shared/components';
 
@@ -15,9 +16,10 @@ interface PasswordStrengthMeterProps {
 }
 
 export function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
+  const { t } = useTranslation();
   const strengthScore = calculatePasswordStrength(password);
   const strengthColors = ['#D65454', '#E2762B', '#EFA80D', '#16815F'];
-  const strengthLabels = ['Weak', 'Fair', 'Good', 'Strong'];
+  const strengthLabels = [t('auth.strength.weak'), t('auth.strength.fair'), t('auth.strength.good'), t('auth.strength.strong')];
 
   return (
     <>
@@ -39,7 +41,7 @@ export function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) 
       </View>
       <Typography style={styles.strengthLabel}>
         {password.length === 0
-          ? 'Use 8+ characters'
+          ? t('auth.strength.hint')
           : strengthLabels[Math.max(strengthScore - 1, 0)]}
       </Typography>
     </>

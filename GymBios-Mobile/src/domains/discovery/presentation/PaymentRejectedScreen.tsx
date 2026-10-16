@@ -1,4 +1,5 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
@@ -26,6 +27,7 @@ export function PaymentRejectedScreen({
   onRefresh,
   isRefreshing,
 }: PaymentRejectedScreenProps) {
+  const { t } = useTranslation();
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -41,26 +43,30 @@ export function PaymentRejectedScreen({
       <View style={styles.iconCircle}>
         <Feather name="x-circle" size={36} color="#DC2626" />
       </View>
-      <Text style={styles.title}>Payment Rejected</Text>
+      <Text style={styles.title}>{t('approval.rejectedScreenTitle')}</Text>
       <Text style={styles.subtitle}>
-        {gymName ? `Your payment at ${gymName}` : 'Your payment'}
-        {membershipPlan ? ` for ${membershipPlan}` : ''} was not approved by gym staff, so your
-        membership hasn't been activated.
+        {gymName && membershipPlan
+          ? t('approval.rejectedAtGymForPlan', { gym: gymName, plan: membershipPlan })
+          : gymName
+            ? t('approval.rejectedAtGym', { gym: gymName })
+            : membershipPlan
+              ? t('approval.rejectedPlanOnly', { plan: membershipPlan })
+              : t('approval.rejectedGeneric')}
       </Text>
       <View style={styles.reasonCard}>
-        <Text style={styles.reasonLabel}>Reason</Text>
+        <Text style={styles.reasonLabel}>{t('approval.reason')}</Text>
         <Text style={styles.reasonText}>
-          {rejectionReason?.trim() || 'No reason was given. Please contact the gym for details.'}
+          {rejectionReason?.trim() || t('approval.noReason')}
         </Text>
       </View>
       <View style={styles.infoCard}>
         <Feather name="info" size={16} color="#6B7280" style={{ marginTop: 2 }} />
         <Text style={styles.infoText}>
-          Please contact the gym's reception to sort out the payment, or purchase a plan again.
+          {t('approval.rejectedInfo')}
         </Text>
       </View>
       <Button
-        title="Browse Gyms"
+        title={t('approval.browseGyms')}
         onPress={() => router.push('/(member)/centers' as any)}
         style={styles.button}
       />

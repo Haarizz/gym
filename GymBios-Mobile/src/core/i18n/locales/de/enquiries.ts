@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: 'Hilfe & Anfragen',
+    newEnquiryCta: 'Neue Anfrage stellen',
+    newEnquiryCtaSubtitle: 'Mitgliedschaft, Abrechnung, Kurse, Ausstattung…',
+    tabs: {
+      ALL: 'Alle',
+      OPEN: 'Offen',
+      REPLIED: 'Beantwortet',
+      CLOSED: 'Geschlossen',
+    },
+    status: {
+      OPEN: 'Wartet auf Antwort',
+      REPLIED: 'Beantwortet',
+      CLOSED: 'Geschlossen',
+    },
+    empty: 'Noch keine Anfragen',
+    emptySubtitle: 'Fragen an dein Studio erscheinen hier mit der Antwort.',
+    nothingHere: 'Hier ist noch nichts.',
+    loadFailed: 'Deine Anfragen konnten nicht geladen werden.',
+    youPrefix: 'Du:',
+    gymFallback: 'Dein Studio',
+    reference: '#{{id}}',
+    newEnquiry: 'Neue Anfrage',
+    categoryPrompt: 'Worum geht es?',
+    subject: 'Betreff',
+    subjectPlaceholder: 'z. B. Mitgliedschaft 2 Wochen pausieren',
+    message: 'Details',
+    messagePlaceholder: 'Beschreibe dein Anliegen – Daten, Beträge oder Kursnamen helfen dem Studio, schneller zu antworten.',
+    formHint: 'Du wirst benachrichtigt, sobald das Studio antwortet. Du kannst bis zu {{count}} unbeantwortete Anfragen gleichzeitig haben.',
+    submit: 'Anfrage senden',
+    submitting: 'Wird gesendet…',
+    submitted: 'Anfrage gesendet. Das Studio antwortet hier.',
+    submitFailed: 'Deine Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.',
+    steps: {
+      submitted: 'Gesendet',
+      replied: 'Beantwortet',
+      closed: 'Geschlossen',
+    },
+    openedOn: 'Gestellt am {{date}}',
+    gymBadge: 'STUDIO',
+    received: 'Eingegangen · das Studio antwortet bald',
+    closedOn: 'Vom Studio geschlossen · {{date}}',
+    closedFooter: 'Diese Anfrage ist geschlossen.',
+    followUpHint: 'Brauchst du weitere Hilfe?',
+    raiseNew: 'Neue Anfrage stellen',
+    categories: {
+      GENERAL: 'Allgemein',
+      MEMBERSHIP: 'Mitgliedschaft',
+      BILLING: 'Abrechnung',
+      FACILITIES: 'Ausstattung',
+      TRAINER: 'Trainer',
+      CLASSES: 'Kurse',
+      FEEDBACK: 'Feedback',
+      OTHER: 'Sonstiges',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

@@ -170,8 +170,8 @@ function ToastCard({ toast: t }: { toast: ToastItem }) {
 const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
@@ -198,12 +198,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginEnd: 10,
   },
   iconText: { fontSize: 13, fontWeight: '700' },
   textWrap: { flex: 1 },
   title: { fontSize: 13, fontWeight: '700', marginBottom: 1 },
   message: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
-  actionBtn: { paddingHorizontal: 8, paddingVertical: 4, marginLeft: 6 },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4, marginStart: 6 },
   actionText: { fontSize: 12.5, fontWeight: '700', textDecorationLine: 'underline' },
 });

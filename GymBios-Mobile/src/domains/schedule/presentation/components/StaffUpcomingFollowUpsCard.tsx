@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { UpcomingFollowUp } from '../../domain/StaffScheduleData';
 
@@ -11,20 +12,22 @@ interface StaffUpcomingFollowUpsCardProps {
 export function StaffUpcomingFollowUpsCard({
   followUps,
 }: StaffUpcomingFollowUpsCardProps) {
+  const { t, i18n } = useTranslation();
+
   const getMonthAndDay = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      const month = d.toLocaleDateString(i18n.language, { month: 'short' });
       const day = d.getDate();
       return { month, day };
     } catch {
-      return { month: 'MAR', day: 26 };
+      return { month: '', day: '' };
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Upcoming Follow-ups</Text>
+      <Text style={styles.title}>{t('schedule.staff.upcomingFollowUps')}</Text>
 
       <View style={styles.list}>
         {followUps.map((item, idx) => {

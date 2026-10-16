@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: 'Retour',
+    confirm: 'Confirmer',
+    cancel: 'Annuler',
+    done: 'OK',
+    previous: 'Précédent',
+    next: 'Suivant',
+    search: 'Rechercher...',
+    notAdded: 'Non renseigné',
+    selectOption: 'Choisir une option',
+    dropdown: 'Liste déroulante',
+    selectDate: 'Choisir une date',
+    datePicker: 'Sélecteur de date',
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
+    selectMonth: 'Choisir le mois',
+    selectYear: 'Choisir l’année',
+    confirmDate: 'Confirmer la date',
+    dismissBackdrop: 'Fermer',
+    userAvatar: 'Avatar de l’utilisateur',
+    initialsAvatar: 'Avatar {{initials}}',
+
+    photo: {
+      changeA11y: 'Changer la photo de profil',
+      addA11y: 'Ajouter une photo de profil',
+      selectA11y: 'Touchez pour choisir une photo',
+      tapToChange: 'Touchez pour changer la photo',
+      tapToAdd: 'Touchez pour ajouter une photo',
+      title: 'Photo de profil',
+      subtitle: 'Choisissez une option',
+      takePhoto: 'Prendre une photo',
+      chooseFromGallery: 'Choisir dans la galerie',
+      removePhoto: 'Supprimer la photo',
+      permissionTitle: 'Autorisation requise',
+      cameraNeeded: 'L’accès à l’appareil photo est nécessaire pour prendre une photo.',
+      cameraOff: 'L’accès à l’appareil photo est désactivé. Activez-le dans les Réglages pour prendre une photo.',
+      cameraUnavailable: 'L’appareil photo n’est pas disponible sur cet appareil.',
+      galleryNeeded: 'L’accès à la galerie est nécessaire pour choisir une photo.',
+      galleryOff: 'L’accès aux photos est désactivé. Activez-le dans les Réglages pour choisir une photo.',
+      galleryFailed: 'Impossible d’ouvrir la galerie.',
+      uploadFailedStatus: 'Échec du téléversement de la photo ({{status}})',
+      uploadFailedNetwork: 'Échec du téléversement de la photo (erreur réseau)',
+      uploadTimeout: 'Délai d’attente dépassé pour la photo',
+    },
+
+    trafficLight: {
+      low: 'Faible',
+      medium: 'Moyen',
+      high: 'Élevé',
+    },
+
+    timePicker: {
+      selectTime: 'Sélectionner l’heure',
+      now: 'Maintenant',
+      setTime: 'Régler l’heure · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: 'Enregistrer les modifications',
+      createStaff: 'Créer un employé',
+    },
+
+    roleMode: {
+      virtualStudio: 'Studio virtuel',
+      virtualStudioDesc: 'Créez et gérez des programmes de fitness en ligne, des sessions en direct et des abonnements numériques.',
+      comingSoon: 'Bientôt disponible',
+    },
+
+    charts: {
+      noData: 'Aucune donnée disponible',
+      noDataDesc: 'Il n’y a aucune donnée de graphique à afficher pour les critères sélectionnés.',
+      loading: 'Chargement du graphique...',
+      unableToLoad: 'Impossible de charger le graphique',
+      loadFailed: 'Échec du chargement des données du graphique',
+      retry: 'Réessayer',
+    },
+
+    noInternet: {
+      title: 'Pas de connexion Internet',
+      tryAgain: 'Réessayer',
+      checkConnection: 'Vérifiez votre Wi-Fi ou vos données mobiles et réessayez.',
+      tipToggleWifi: 'Désactivez puis réactivez le Wi-Fi',
+      tipMobileData: 'Vérifiez que les données mobiles sont activées',
+      tipSignal: 'Déplacez-vous vers une zone mieux couverte',
+      retryA11y: 'Réessayer la connexion',
+    },
+
+    receipt: {
+      title: 'Détails du reçu',
+      subtitle: 'Justificatif de transaction',
+      loading: 'Chargement du reçu...',
+      loadError: 'Impossible de charger le reçu.',
+      billedTo: 'Facturé à',
+      memberName: 'Nom du membre',
+      memberId: 'ID membre',
+      phone: 'Téléphone',
+      transactionInfo: 'Informations de transaction',
+      type: 'Type',
+      paymentMethod: 'Moyen de paiement',
+      subscription: 'Abonnement / Service',
+      validity: 'Validité',
+      processedBy: 'Traité par',
+      paymentSummary: 'Récapitulatif du paiement',
+      price: 'Prix',
+      discount: 'Remise',
+      totalAmount: 'Montant total',
+      amountPaid: 'Montant payé',
+      balanceDue: 'Solde dû',
+      download: 'Télécharger le reçu',
+      sharingUnavailableTitle: 'Partage indisponible',
+      sharingUnavailable: 'Impossible de partager le PDF sur cet appareil.',
+      errorTitle: 'Erreur',
+      pdfFailed: 'Impossible de générer le PDF du reçu.',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

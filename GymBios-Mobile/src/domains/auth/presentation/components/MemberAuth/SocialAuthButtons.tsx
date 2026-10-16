@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/shared/components';
@@ -20,11 +21,12 @@ export function SocialAuthButtons({
   isAppleLoading,
   isAppleAvailable,
 }: SocialAuthButtonsProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {isGoogleAvailable ? (
         <Button
-          label="Continue with Google"
+          label={t('auth.continueWithGoogle')}
           variant="outline"
           size="lg"
           loading={isGoogleLoading}
@@ -34,7 +36,7 @@ export function SocialAuthButtons({
       ) : null}
       {isAppleAvailable ? (
         <Button
-          label="Continue with Apple"
+          label={t('auth.continueWithApple')}
           variant="outline"
           size="lg"
           loading={isAppleLoading}

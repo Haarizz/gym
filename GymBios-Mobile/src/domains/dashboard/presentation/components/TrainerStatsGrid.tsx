@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
@@ -12,6 +13,8 @@ interface TrainerStatsGridProps {
 }
 
 export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.grid}>
       {/* Sessions Today */}
@@ -20,7 +23,7 @@ export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: 'rgba(50, 127, 116, 0.15)' }]}>
             <Feather name="calendar" size={16} color={BrandColors.teal} />
           </View>
-          <Text style={styles.cardLabel}>Sessions Today</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.trainer.stats.sessionsToday')}</Text>
         </View>
         <Text style={styles.cardValue}>
           {stats.sessionsCompleted}/{stats.sessionsScheduled}
@@ -33,7 +36,7 @@ export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 199, 66, 0.15)' }]}>
             <CurrencyIcon size={16} color={BrandColors.memberGold} />
           </View>
-          <Text style={styles.cardLabel}>Today's Earnings</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.trainer.stats.todayEarnings')}</Text>
         </View>
         <Text style={[styles.cardValue, { color: BrandColors.memberGold }]}>
           <CurrencyValue amount={stats.todayEarnings} />
@@ -46,7 +49,7 @@ export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
             <Feather name="users" size={16} color="#9333EA" />
           </View>
-          <Text style={styles.cardLabel}>Active Members</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.trainer.stats.activeMembers')}</Text>
         </View>
         <Text style={styles.cardValue}>{stats.activeMembers}</Text>
       </GlassSurface>
@@ -57,7 +60,7 @@ export function TrainerStatsGrid({ stats }: TrainerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#DCFCE7' }]}>
             <Feather name="target" size={16} color="#16A34A" />
           </View>
-          <Text style={styles.cardLabel}>Monthly Target</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.trainer.stats.monthlyTarget')}</Text>
         </View>
         <Text style={[styles.cardValue, { color: '#16A34A' }]}>
           {stats.monthlyTargetPercentage}%

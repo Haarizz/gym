@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
@@ -11,7 +12,9 @@ interface SearchBarProps {
   placeholder?: string;
 }
 
-export function SearchBar({ value, onChangeText, placeholder = 'Search...' }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder: placeholderProp }: SearchBarProps) {
+  const { t } = useTranslation();
+  const placeholder = placeholderProp ?? t('shared.search');
   const theme = useTheme();
 
   return (

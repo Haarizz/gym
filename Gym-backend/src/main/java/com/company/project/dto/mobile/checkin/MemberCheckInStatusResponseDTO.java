@@ -1,12 +1,31 @@
 package com.company.project.dto.mobile.checkin;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class MemberCheckInStatusResponseDTO {
 
     private boolean checkedIn;
     private Long attendanceId;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
+
+    // Workout timer on the current visit (null until started / while running)
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime workoutStartTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime workoutEndTime;
+    private Integer workoutMinutes;
+
+    // A visit from an earlier day with no check-out. The member is not "checked in";
+    // the next check-in closes it at unclosedAutoCloseTime.
+    private Long unclosedAttendanceId;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime unclosedCheckInTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime unclosedAutoCloseTime;
 
     // Check-in allowance (CheckInPolicyService). limitValue == null means unlimited.
     private String limitUnit;
@@ -15,6 +34,7 @@ public class MemberCheckInStatusResponseDTO {
     private String limitPeriod;
     private int checkInsToday;
     private int maxCheckInsPerDay;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime nextCheckInAllowedAt;
     private boolean canCheckIn;
     private String blockedReason;
@@ -50,6 +70,24 @@ public class MemberCheckInStatusResponseDTO {
     public void setCheckInTime(LocalDateTime checkInTime) {
         this.checkInTime = checkInTime;
     }
+
+    public LocalDateTime getWorkoutStartTime() { return workoutStartTime; }
+    public void setWorkoutStartTime(LocalDateTime workoutStartTime) { this.workoutStartTime = workoutStartTime; }
+
+    public LocalDateTime getWorkoutEndTime() { return workoutEndTime; }
+    public void setWorkoutEndTime(LocalDateTime workoutEndTime) { this.workoutEndTime = workoutEndTime; }
+
+    public Integer getWorkoutMinutes() { return workoutMinutes; }
+    public void setWorkoutMinutes(Integer workoutMinutes) { this.workoutMinutes = workoutMinutes; }
+
+    public Long getUnclosedAttendanceId() { return unclosedAttendanceId; }
+    public void setUnclosedAttendanceId(Long unclosedAttendanceId) { this.unclosedAttendanceId = unclosedAttendanceId; }
+
+    public LocalDateTime getUnclosedCheckInTime() { return unclosedCheckInTime; }
+    public void setUnclosedCheckInTime(LocalDateTime unclosedCheckInTime) { this.unclosedCheckInTime = unclosedCheckInTime; }
+
+    public LocalDateTime getUnclosedAutoCloseTime() { return unclosedAutoCloseTime; }
+    public void setUnclosedAutoCloseTime(LocalDateTime unclosedAutoCloseTime) { this.unclosedAutoCloseTime = unclosedAutoCloseTime; }
 
     public String getLimitUnit() { return limitUnit; }
     public void setLimitUnit(String limitUnit) { this.limitUnit = limitUnit; }

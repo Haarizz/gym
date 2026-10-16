@@ -21,6 +21,19 @@ export function isMemberAccessLocked(status: MembershipApprovalStatus | undefine
 }
 
 /**
+ * True once tenant-scoped member endpoints are safe to call: /api/members/me has
+ * answered and access isn't locked. Non-members are never gated. Use it as the
+ * `enabled` flag of queries mounted outside MemberApprovalGate (profile hub,
+ * providers), which would otherwise fire straight into TenantContextFilter's 403.
+ */
+export function useMemberTenantAccess(): boolean {
+  const appRole = useAuthStore((s) => s.appRole);
+  const isMember = appRole === 'member';
+  const approval = useMembershipApprovalStatus({ enabled: isMember });
+  return !isMember || (!approval.isLoading && !isMemberAccessLocked(approval.data));
+}
+
+/**
  * Checks GET /api/members/me for the active tenant's Cash/Credit/Mixed purchase
  * approval gate (see MobileDiscoveryController.purchaseMembership on the backend).
  * While PENDING, TenantContextFilter 403s every other member-facing mobile

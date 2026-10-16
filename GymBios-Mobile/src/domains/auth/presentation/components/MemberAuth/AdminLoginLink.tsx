@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -6,6 +7,7 @@ import { Typography } from '@/shared/components';
 import { ROLE_SELECTION_HREF } from '../../navigation/routes';
 
 export function AdminLoginLink() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   return (
@@ -13,7 +15,7 @@ export function AdminLoginLink() {
       style={styles.adminLink}
       onPress={() => router.push(ROLE_SELECTION_HREF)}>
       <Feather name="shield" size={16} color="#6E7C77" />
-      <Typography style={styles.adminLinkText}>Administrator login</Typography>
+      <Typography style={styles.adminLinkText}>{t('auth.adminLogin')}</Typography>
     </Pressable>
   );
 }

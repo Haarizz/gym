@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Loader, ConfirmationModal } from '@/shared/components';
@@ -17,6 +18,7 @@ import { CustomDateRangeSheet } from '../components/CustomDateRangeSheet';
 import { TrainerAvailabilitySheet } from '../components/TrainerAvailabilitySheet';
 
 export function TrainerScheduleScreen() {
+  const { t } = useTranslation();
   const [filterType, setFilterType] = useState('this_week');
   const [customRange, setCustomRange] = useState({ start: new Date(), end: new Date() });
   const [showCustomRange, setShowCustomRange] = useState(false);
@@ -53,7 +55,7 @@ export function TrainerScheduleScreen() {
           sheetState.closeSheet();
         },
         onError: (err) => {
-          alert(`Failed to delete session: ${err.message}`);
+          alert(t('schedule.trainer.failedToDeleteSession', { message: err.message }));
           sheetState.closeSheet();
         }
       });
@@ -81,7 +83,7 @@ export function TrainerScheduleScreen() {
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading schedule..." />
+        <Loader message={t('schedule.loadingSchedule')} />
       </View>
     );
   }
@@ -90,10 +92,10 @@ export function TrainerScheduleScreen() {
     return (
       <View style={styles.loaderContainer}>
         <Text style={styles.errorText}>
-          {isError ? String(error) : 'No schedule data available.'}
+          {isError ? String(error) : t('schedule.noScheduleData')}
         </Text>
         <Pressable onPress={() => refetch()} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <Text style={styles.retryButtonText}>{t('schedule.retry')}</Text>
         </Pressable>
       </View>
     );
@@ -141,9 +143,9 @@ export function TrainerScheduleScreen() {
 
       <ConfirmationModal
         visible={sheetState.mode === 'delete'}
-        title="Delete Session?"
-        message="Are you sure you want to delete this session? This action cannot be undone."
-        confirmText="Delete"
+        title={t('schedule.trainer.deleteSessionTitle')}
+        message={t('schedule.trainer.deleteSessionMessage')}
+        confirmText={t('schedule.trainer.deleteSessionConfirm')}
         variant="danger"
         loading={deleteMutation.isPending}
         onClose={sheetState.closeSheet}

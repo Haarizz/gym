@@ -1,4 +1,4 @@
-import { StyleSheet, View, Pressable } from 'react-native';
+import { StyleSheet, View, Pressable, I18nManager } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -23,7 +23,11 @@ export function CheckInHubCard({ title, description, iconName, onPress }: CheckI
           <Typography variant="subtitle" style={styles.title}>{title}</Typography>
           <Typography variant="bodySmall" color="textSecondary">{description}</Typography>
         </View>
-        <Feather name="chevron-right" size={20} color={BrandColors.textSecondary} />
+        <Feather
+          name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+          size={20}
+          color={BrandColors.textSecondary}
+        />
       </Surface>
     </Pressable>
   );
@@ -49,7 +53,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6F0EA', // Light primary color background
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   textContainer: {
     flex: 1,

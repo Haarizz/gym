@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { format, parse } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyGlyph } from '@/core/providers';
@@ -24,6 +25,7 @@ export function StaffClassForm({
   onCancel,
   isSubmitting,
 }: StaffClassFormProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   
   const [name, setName] = useState(initialValues?.name ?? '');
@@ -55,12 +57,12 @@ export function StaffClassForm({
 
   const handleCreate = () => {
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Required';
-    if (!type) newErrors.type = 'Required';
-    if (!trainerId) newErrors.trainerId = 'Required';
-    if (!date) newErrors.date = 'Required';
-    if (!startTime) newErrors.startTime = 'Required';
-    if (!endTime) newErrors.endTime = 'Required';
+    if (!name.trim()) newErrors.name = t('schedule.staffClassForm.requiredError');
+    if (!type) newErrors.type = t('schedule.staffClassForm.requiredError');
+    if (!trainerId) newErrors.trainerId = t('schedule.staffClassForm.requiredError');
+    if (!date) newErrors.date = t('schedule.staffClassForm.requiredError');
+    if (!startTime) newErrors.startTime = t('schedule.staffClassForm.requiredError');
+    if (!endTime) newErrors.endTime = t('schedule.staffClassForm.requiredError');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -72,7 +74,7 @@ export function StaffClassForm({
       const startParsed = parse(startTime, 'HH:mm', new Date());
       const endParsed = parse(endTime, 'HH:mm', new Date());
       if (startParsed >= endParsed) {
-        setErrors({ endTime: 'Must be after start time' });
+        setErrors({ endTime: t('schedule.staffClassForm.endTimeError') });
         return;
       }
     }
@@ -93,12 +95,12 @@ export function StaffClassForm({
   };
 
   const classTypeOptions = [
-    { label: 'Group Class', value: 'group_class' },
-    { label: 'Private Session', value: 'private_session' },
-    { label: 'Workshop', value: 'workshop' },
-    { label: 'PT', value: 'pt' },
-    { label: 'Yoga', value: 'yoga' },
-    { label: 'Cardio', value: 'cardio' },
+    { label: t('schedule.staffClassForm.types.groupClass'), value: 'group_class' },
+    { label: t('schedule.staffClassForm.types.privateSession'), value: 'private_session' },
+    { label: t('schedule.staffClassForm.types.workshop'), value: 'workshop' },
+    { label: t('schedule.staffClassForm.types.pt'), value: 'pt' },
+    { label: t('schedule.staffClassForm.types.yoga'), value: 'yoga' },
+    { label: t('schedule.staffClassForm.types.cardio'), value: 'cardio' },
   ];
 
   const trainerOptions = (trainers ?? []).map(t => ({
@@ -113,12 +115,12 @@ export function StaffClassForm({
         showsVerticalScrollIndicator={false}
       >
         <Typography variant="caption" style={styles.sectionLabel}>
-          CLASS DETAILS
+          {t('schedule.staffClassForm.sectionClassDetails')}
         </Typography>
         <View style={styles.card}>
           <Input
-            label="Class Name"
-            placeholder="e.g., Morning Yoga Flow"
+            label={t('schedule.staffClassForm.className')}
+            placeholder={t('schedule.staffClassForm.classNamePlaceholder')}
             value={name}
             onChangeText={(text) => { setName(text); setErrors(prev => ({ ...prev, name: '' })); }}
             error={errors.name}
@@ -128,8 +130,8 @@ export function StaffClassForm({
           <View style={styles.row}>
             <View style={styles.flex1}>
               <Dropdown
-                label="Class Type"
-                placeholder="Select type"
+                label={t('schedule.staffClassForm.classType')}
+                placeholder={t('schedule.staffClassForm.selectTypePlaceholder')}
                 value={type}
                 onChange={(val) => { setType(val); setErrors(prev => ({ ...prev, type: '' })); }}
                 options={classTypeOptions}
@@ -138,8 +140,8 @@ export function StaffClassForm({
             </View>
             <View style={styles.flex1}>
               <Dropdown
-                label="Trainer"
-                placeholder={isTrainersLoading ? "Loading..." : "Select trainer"}
+                label={t('schedule.staffClassForm.trainer')}
+                placeholder={isTrainersLoading ? t('schedule.staffClassForm.loadingTrainers') : t('schedule.staffClassForm.selectTrainerPlaceholder')}
                 value={trainerId}
                 onChange={(val) => { setTrainerId(val); setErrors(prev => ({ ...prev, trainerId: '' })); }}
                 options={trainerOptions}
@@ -151,11 +153,11 @@ export function StaffClassForm({
         </View>
 
         <Typography variant="caption" style={styles.sectionLabel}>
-          DATE & TIME
+          {t('schedule.staffClassForm.sectionDateTime')}
         </Typography>
         <View style={styles.card}>
           <DatePicker
-            label="Date"
+            label={t('schedule.staffClassForm.date')}
             value={date}
             onChange={(d) => { setDate(d ?? undefined); setErrors(prev => ({ ...prev, date: '' })); }}
             error={errors.date}
@@ -164,7 +166,7 @@ export function StaffClassForm({
           <View style={styles.row}>
             <View style={styles.flex1}>
               <TimePicker
-                label="Start Time"
+                label={t('schedule.staffClassForm.startTime')}
                 value={startTime}
                 onChange={(t) => { setStartTime(t); setErrors(prev => ({ ...prev, startTime: '' })); }}
                 error={errors.startTime}
@@ -172,7 +174,7 @@ export function StaffClassForm({
             </View>
             <View style={styles.flex1}>
               <TimePicker
-                label="End Time"
+                label={t('schedule.staffClassForm.endTime')}
                 value={endTime}
                 onChange={(t) => { setEndTime(t); setErrors(prev => ({ ...prev, endTime: '' })); }}
                 error={errors.endTime}
@@ -182,12 +184,12 @@ export function StaffClassForm({
         </View>
 
         <Typography variant="caption" style={styles.sectionLabel}>
-          LOCATION & CAPACITY
+          {t('schedule.staffClassForm.sectionLocationCapacity')}
         </Typography>
         <View style={styles.card}>
           <Input
-            label="Location"
-            placeholder="e.g., Studio A"
+            label={t('schedule.staffClassForm.location')}
+            placeholder={t('schedule.staffClassForm.locationPlaceholder')}
             value={location}
             onChangeText={setLocation}
             containerStyle={styles.field}
@@ -195,7 +197,7 @@ export function StaffClassForm({
           <View style={styles.row}>
             <View style={styles.flex1}>
               <Input
-                label="Capacity"
+                label={t('schedule.staffClassForm.capacity')}
                 keyboardType="numeric"
                 value={capacity}
                 onChangeText={setCapacity}
@@ -203,7 +205,7 @@ export function StaffClassForm({
             </View>
             <View style={styles.flex1}>
               <Input
-                label="Price"
+                label={t('schedule.staffClassForm.price')}
                 keyboardType="numeric"
                 leftIcon={<Typography variant="body" style={{ color: theme.textSecondary }}><CurrencyGlyph /></Typography>}
                 value={price}
@@ -220,13 +222,13 @@ export function StaffClassForm({
           style={styles.btnCancel}
           onPress={onCancel}
           disabled={isSubmitting}
-          title="Cancel"
+          title={t('schedule.staffClassForm.cancel')}
         />
         <Button
           style={styles.btnCreate}
           onPress={handleCreate}
           loading={isSubmitting}
-          title={initialValues ? 'Save Changes' : 'Create Class'}
+          title={initialValues ? t('schedule.staffClassForm.saveChanges') : t('schedule.staffClassForm.createClass')}
         />
       </View>
     </View>

@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
@@ -31,6 +32,7 @@ interface CommunityBottomNavProps {
 }
 
 export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNavProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const insets = useSafeAreaInsets();
 
@@ -52,7 +54,7 @@ export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNav
             onPress={() => onTabPress(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
-            accessibilityLabel={tab.label}
+            accessibilityLabel={t(`community.nav.${tab.key}`)}
             hitSlop={4}
           >
             <Feather name={tab.icon} size={22} color={color} />
@@ -60,7 +62,7 @@ export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNav
               variant="caption"
               style={[styles.label, { color }]}
             >
-              {tab.label}
+              {t(`community.nav.${tab.key}`)}
             </Typography>
           </Pressable>
         );

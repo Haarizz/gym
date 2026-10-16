@@ -54,6 +54,9 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
 
   // Member marketplace — center detail is a full-screen page with its own sticky CTA
   ['centers', '[tenantSlug]'],
+
+  // Member staff profile — has its own back button and Rate/Message bar
+  ['team', '[staffId]'],
 ] as const;
 
 /**
@@ -77,7 +80,7 @@ export const MODULE_ROUTES = [
   'workout-feedback',
   'roles',
   'profile',
-  'trainer',
+  'team',
   'catalog',
   'catalog/t/[tenantSlug]/b/[branchId]',
   'family',

@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: 'المساعدة والاستفسارات',
+    newEnquiryCta: 'إرسال استفسار جديد',
+    newEnquiryCtaSubtitle: 'العضوية، الفواتير، الحصص، المرافق…',
+    tabs: {
+      ALL: 'الكل',
+      OPEN: 'مفتوحة',
+      REPLIED: 'تم الرد',
+      CLOSED: 'مغلقة',
+    },
+    status: {
+      OPEN: 'بانتظار الرد',
+      REPLIED: 'تم الرد',
+      CLOSED: 'مغلق',
+    },
+    empty: 'لا توجد استفسارات بعد',
+    emptySubtitle: 'ستظهر هنا الأسئلة التي ترسلها إلى ناديك مع ردّه.',
+    nothingHere: 'لا يوجد شيء هنا بعد.',
+    loadFailed: 'تعذّر تحميل استفساراتك.',
+    youPrefix: 'أنت:',
+    gymFallback: 'ناديك',
+    reference: '#{{id}}',
+    newEnquiry: 'استفسار جديد',
+    categoryPrompt: 'عمّ يدور الاستفسار؟',
+    subject: 'الموضوع',
+    subjectPlaceholder: 'مثلاً: تجميد العضوية لمدة أسبوعين',
+    message: 'التفاصيل',
+    messagePlaceholder: 'أخبرنا بما تحتاجه — التواريخ أو المبالغ أو أسماء الحصص تساعد النادي على الرد أسرع.',
+    formHint: 'سيصلك إشعار عندما يرد النادي. يمكن أن يكون لديك حتى {{count}} استفسارات بانتظار الرد في وقت واحد.',
+    submit: 'إرسال الاستفسار',
+    submitting: 'جارٍ الإرسال…',
+    submitted: 'تم إرسال الاستفسار. سيرد النادي هنا.',
+    submitFailed: 'تعذّر إرسال استفسارك. يُرجى المحاولة مرة أخرى.',
+    steps: {
+      submitted: 'أُرسل',
+      replied: 'تم الرد',
+      closed: 'مغلق',
+    },
+    openedOn: 'فُتح في {{date}}',
+    gymBadge: 'النادي',
+    received: 'تم الاستلام · سيرد النادي قريباً',
+    closedOn: 'أغلقه النادي · {{date}}',
+    closedFooter: 'هذا الاستفسار مغلق.',
+    followUpHint: 'هل تحتاج إلى مزيد من المساعدة؟',
+    raiseNew: 'إرسال استفسار جديد',
+    categories: {
+      GENERAL: 'عام',
+      MEMBERSHIP: 'العضوية',
+      BILLING: 'الفواتير',
+      FACILITIES: 'المرافق',
+      TRAINER: 'المدربون',
+      CLASSES: 'الحصص',
+      FEEDBACK: 'ملاحظات',
+      OTHER: 'أخرى',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

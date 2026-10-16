@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -214,7 +215,7 @@ export function createUseResendOtp(authOrchestrator: AuthOrchestrator) {
             duration: 12000,
           });
         } else {
-          toast.success('A new code has been sent.');
+          toast.success(i18n.t('auth.codeResent'));
         }
       },
     });

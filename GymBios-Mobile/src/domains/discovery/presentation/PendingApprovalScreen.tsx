@@ -1,4 +1,5 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -23,6 +24,7 @@ export function PendingApprovalScreen({
   onRefresh,
   isRefreshing,
 }: PendingApprovalScreenProps) {
+  const { t } = useTranslation();
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -38,17 +40,15 @@ export function PendingApprovalScreen({
       <View style={styles.iconCircle}>
         <Feather name="clock" size={36} color={BrandColors.memberGold} />
       </View>
-      <Text style={styles.title}>Payment Awaiting Approval</Text>
+      <Text style={styles.title}>{t('approval.pendingTitle')}</Text>
       <Text style={styles.subtitle}>
-        {gymName ? `Your payment at ${gymName}` : 'Your payment'} is submitted and waiting for
-        gym staff to confirm it was received.
+        {gymName ? t('approval.pendingAtGym', { gym: gymName }) : t('approval.pending')}
         {membershipPlan ? ` (${membershipPlan})` : ''}
       </Text>
       <View style={styles.infoCard}>
         <Feather name="info" size={16} color="#6B7280" style={{ marginTop: 2 }} />
         <Text style={styles.infoText}>
-          Show your payment confirmation at reception if you haven't already. Your app
-          access unlocks automatically once staff approve it — pull down to check again.
+          {t('approval.pendingInfo')}
         </Text>
       </View>
     </ScrollView>

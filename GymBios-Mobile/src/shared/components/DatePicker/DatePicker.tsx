@@ -1,5 +1,6 @@
 // src/shared/components/DatePicker/DatePicker.tsx
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useState } from 'react';
 import {
   Pressable,
@@ -20,7 +21,7 @@ import type { DatePickerProps } from './types';
 
 export function DatePicker({
   label,
-  placeholder = 'Select date',
+  placeholder: placeholderProp,
   value,
   onChange,
   minimumDate,
@@ -35,6 +36,8 @@ export function DatePicker({
   rightIcon,
   style,
 }: DatePickerProps & { style?: StyleProp<ViewStyle> }) {
+  const { t } = useTranslation();
+  const placeholder = placeholderProp ?? t('shared.selectDate');
   const theme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -79,7 +82,7 @@ export function DatePicker({
         onPress={openModal}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={label ?? 'Date picker'}
+        accessibilityLabel={label ?? t('shared.datePicker')}
         accessibilityState={{ disabled }}
         style={({ pressed }) => [
           styles.field,

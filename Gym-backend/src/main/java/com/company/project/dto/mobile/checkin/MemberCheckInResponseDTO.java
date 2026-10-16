@@ -1,11 +1,15 @@
 package com.company.project.dto.mobile.checkin;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class MemberCheckInResponseDTO {
 
     private boolean checkedIn;
     private Long attendanceId;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
 
     public MemberCheckInResponseDTO() {}

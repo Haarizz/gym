@@ -1,0 +1,78 @@
+import type { LocaleResource } from '../en';
+
+const payments = {
+  approval: {
+    loading: '正在加载会员中心...',
+    approvedTitle: '付款已批准',
+    approved: '你的付款已批准，会员资格现已生效。',
+    approvedForPlan: '你购买 {{plan}} 的付款已批准，会员资格现已生效。',
+    rejectedTitle: '付款被拒绝',
+    rejected: '你的付款被拒绝。',
+    rejectedForPlan: '你购买 {{plan}} 的付款被拒绝。',
+    rejectedReason: '原因：{{reason}}',
+
+    pendingTitle: '付款等待审批',
+    pendingAtGym: '你在 {{gym}} 的付款已提交，正在等待工作人员确认收款。',
+    pending: '你的付款已提交，正在等待工作人员确认收款。',
+    pendingInfo: '如尚未出示，请在前台出示付款凭证。工作人员批准后，你的应用权限将自动开通——下拉即可刷新。',
+
+    rejectedScreenTitle: '付款被拒绝',
+    rejectedAtGymForPlan: '你在 {{gym}} 购买 {{plan}} 的付款未获工作人员批准，因此会员资格未激活。',
+    rejectedAtGym: '你在 {{gym}} 的付款未获工作人员批准，因此会员资格未激活。',
+    rejectedPlanOnly: '你购买 {{plan}} 的付款未获工作人员批准，因此会员资格未激活。',
+    rejectedGeneric: '你的付款未获工作人员批准，因此会员资格未激活。',
+    reason: '原因',
+    noReason: '未提供原因。请联系健身房了解详情。',
+    rejectedInfo: '请联系健身房前台处理付款问题，或重新购买套餐。',
+    browseGyms: '浏览健身房',
+  },
+
+  outstanding: {
+    subscription: '订阅',
+    membership: '会员',
+    statusValues: {
+      PAID: '已付清',
+      PARTIALLY_PAID: '部分付款',
+      UNPAID: '未付款',
+    },
+    membershipAmount: '会员费',
+    paid: '已付',
+    remainingBalance: '待付余额',
+    completePayment: '完成付款',
+    blockedApprovalPending: '你的会员费付款正在等待健身房审批。',
+    blockedNoBills: '此余额无法在应用内支付，请到前台付款。',
+    cantPayInApp: '此余额无法在应用内支付。',
+
+    nothingToPayNow: '目前无需付款。',
+    methodNotAllowed: '应用内无法使用 {{method}}。请选择 {{allowed}}，或到前台付款。',
+    splitNotAllowed: '分开付款需在前台办理。',
+    payFull: '请支付全部待付余额 {{amount}}。',
+    conflict: '你的余额已变化，请核对后重试。',
+    rejected: '付款未能完成。',
+    network: '由于网络中断，我们无法确认你的付款。可以放心重试——不会重复扣款。',
+
+    screenTitle: '会员费付款',
+    screenSubtitle: '待付余额',
+    notAcceptedTitle: '付款未被接受',
+    notAvailableTitle: '无法付款',
+    notAvailable: '此付款与你的会员资格无关，可能属于其他健身房或账户。',
+    goToMembership: '前往会员',
+    loadErrorTitle: '无法加载你的余额',
+    loadError: '请检查网络后重试。',
+    retry: '重试',
+    recordedTitle: '付款已记录',
+    appliedWithReceipt: '{{amount}} 已计入你的会员费（收据 {{receipt}}）。',
+    applied: '{{amount}} 已计入你的会员费。',
+    remainingAfter: '待付余额：{{amount}}。',
+    fullyPaid: '你的会员费已全部付清。',
+    backToMembership: '返回会员',
+    nothingToPayTitle: '无需付款',
+    unpaidBills: '未付账单',
+    billFallback: '账单 {{id}}',
+    retryPayment: '重试付款',
+    pay: '支付 <amount/>',
+    sheetSubtitle: '支付剩余余额 {{amount}}',
+  },
+} satisfies LocaleResource;
+
+export default payments;

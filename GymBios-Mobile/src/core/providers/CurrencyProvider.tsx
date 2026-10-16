@@ -84,7 +84,7 @@ interface FinancialSettingRow {
  * branch-scoped on the backend, so this re-fetches whenever the tenant or the
  * active branch changes. Mounted from BranchProvider, which owns the branch header.
  */
-export function useDisplayCurrencySync(branchId: number | 'ALL') {
+export function useDisplayCurrencySync(branchId: number | 'ALL', enabled = true) {
   const session = useAuthStore((s) => s.session);
   const activeTenant = useAuthStore((s) => s.activeTenant);
   const setCurrencyCode = useCurrencyStore((s) => s.setCurrencyCode);
@@ -101,7 +101,7 @@ export function useDisplayCurrencySync(branchId: number | 'ALL') {
       // No saved value for this branch means the default — same rule as the web app.
       return isCurrencyCode(saved) ? saved : DEFAULT_CURRENCY;
     },
-    enabled: !!session,
+    enabled: !!session && enabled,
     staleTime: 5 * 60_000,
     retry: 1,
   });

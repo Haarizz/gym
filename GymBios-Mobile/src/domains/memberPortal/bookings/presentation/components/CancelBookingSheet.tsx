@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Colors, Radius, Spacing } from '@/core/theme';
@@ -21,6 +22,7 @@ interface CancelBookingSheetProps {
  * the 2-hour cutoff, nothing after it) and lets them pick how a refund is paid.
  */
 export function CancelBookingSheet({ booking, loading, onClose, onConfirm }: CancelBookingSheetProps) {
+  const { t } = useTranslation();
   // The parent keys this sheet by booking, so each cancellation starts at WALLET.
   const [refundMethod, setRefundMethod] = useState<RefundMethod>('WALLET');
 
@@ -34,21 +36,21 @@ export function CancelBookingSheet({ booking, loading, onClose, onConfirm }: Can
   return (
     <AppBottomSheet
       visible={!!booking}
-      title="Cancel Booking"
+      title={t('bookings.cancel.title')}
       subtitle={booking ? booking.class : ''}
       onClose={onClose}
       footer={
         booking ? (
           <View style={styles.actions}>
             <Pressable style={({ pressed }) => [styles.keepButton, pressed && styles.pressed]} onPress={onClose}>
-              <Text style={styles.keepText}>Keep Booking</Text>
+              <Text style={styles.keepText}>{t('bookings.cancel.keep')}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, loading && styles.disabled]}
               disabled={loading}
               onPress={() => onConfirm(booking, refundMethod)}
             >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.cancelText}>Cancel Booking</Text>}
+              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.cancelText}>{t('bookings.cancel.confirm')}</Text>}
             </Pressable>
           </View>
         ) : null
@@ -58,40 +60,43 @@ export function CancelBookingSheet({ booking, loading, onClose, onConfirm }: Can
         <View style={styles.body}>
           {awaitingApproval ? (
             <Notice icon="info" tone="info">
-              Your payment hasn&apos;t been confirmed by the gym yet, so nothing has been charged.
-              {booking.walletAmount ? ' The amount taken from your wallet goes back to it.' : ''}
+              {t('bookings.cancel.awaitingApproval')}
+              {booking.walletAmount ? ` ${t('bookings.cancel.walletReturned')}` : ''}
             </Notice>
           ) : paid <= 0 && !hasPass && !partlyPaid ? (
             <Notice icon="info" tone="info">
-              This booking is free — your spot will be released for someone else.
+              {t('bookings.cancel.free')}
             </Notice>
           ) : refundable ? (
             <>
               <Notice icon="check-circle" tone="success">
                 {partlyPaid ? (
-                  <>You&apos;ll get back what you&apos;ve paid so far, and the unpaid balance is cleared</>
+                  t('bookings.cancel.refundPartly')
                 ) : paid > 0 ? (
-                  <>You&apos;ll get <Text style={styles.strong}><CurrencyValue amount={paid} /></Text> back</>
+                  <Trans
+                    i18nKey="bookings.cancel.refundAmount"
+                    components={{ b: <Text style={styles.strong} />, amount: <CurrencyValue amount={paid} /> }}
+                  />
                 ) : (
-                  <>You&apos;ll get your Reward Pass back</>
+                  t('bookings.cancel.refundPass')
                 )}
-                {deadline ? <> — you&apos;re cancelling before {deadline}.</> : '.'}
+                {deadline ? ` ${t('bookings.cancel.beforeDeadline', { deadline })}` : ''}
               </Notice>
 
               {(paid > 0 || partlyPaid) && (
                 <>
-                  <Text style={styles.sectionTitle}>How would you like your refund?</Text>
+                  <Text style={styles.sectionTitle}>{t('bookings.cancel.refundMethodTitle')}</Text>
                   <RefundOption
                     icon="credit-card"
-                    title="Wallet credit"
-                    subtitle="Instant — use it on your next booking"
+                    title={t('bookings.cancel.walletCredit')}
+                    subtitle={t('bookings.cancel.walletCreditSubtitle')}
                     selected={refundMethod === 'WALLET'}
                     onPress={() => setRefundMethod('WALLET')}
                   />
                   <RefundOption
                     icon="corner-up-left"
-                    title="Original payment method"
-                    subtitle="Coming soon"
+                    title={t('bookings.cancel.originalMethod')}
+                    subtitle={t('bookings.cancel.comingSoon')}
                     selected={false}
                     disabled
                   />
@@ -100,16 +105,19 @@ export function CancelBookingSheet({ booking, loading, onClose, onConfirm }: Can
             </>
           ) : (
             <Notice icon="alert-triangle" tone="danger">
-              This session starts in less than {REFUND_CUTOFF_HOURS} hours, so{' '}
-              <Text style={styles.strong}>no refund</Text> is given
-              {partlyPaid ? (
-                " for what you've paid, though the unpaid balance is cleared"
-              ) : paid > 0 ? (
-                <> — you&apos;ll lose the <Text style={styles.strong}><CurrencyValue amount={paid} /></Text> you paid</>
-              ) : hasPass ? (
-                ' and your Reward Pass stays used'
-              ) : null}
-              . Your spot will still be released.
+              <Trans
+                i18nKey={
+                  partlyPaid
+                    ? 'bookings.cancel.noRefundPartly'
+                    : paid > 0
+                      ? 'bookings.cancel.noRefundPaid'
+                      : hasPass
+                        ? 'bookings.cancel.noRefundPass'
+                        : 'bookings.cancel.noRefund'
+                }
+                values={{ hours: REFUND_CUTOFF_HOURS }}
+                components={{ b: <Text style={styles.strong} />, amount: <CurrencyValue amount={paid} /> }}
+              />
             </Notice>
           )}
         </View>
@@ -155,6 +163,7 @@ function RefundOption({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       style={[styles.option, selected && styles.optionSelected, disabled && styles.optionDisabled]}
@@ -170,7 +179,7 @@ function RefundOption({
       </View>
       {disabled ? (
         <View style={styles.soonBadge}>
-          <Text style={styles.soonText}>SOON</Text>
+          <Text style={styles.soonText}>{t('bookings.cancel.soonBadge')}</Text>
         </View>
       ) : (
         <Feather

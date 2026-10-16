@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -9,6 +10,7 @@ interface StaffLedgerStatsGridProps {
 }
 
 export function StaffLedgerStatsGrid({ stats }: StaffLedgerStatsGridProps) {
+  const { t } = useTranslation();
   const growthColor = stats.growth.startsWith('+')
     ? '#16A34A'
     : stats.growth.startsWith('-')
@@ -23,11 +25,11 @@ export function StaffLedgerStatsGrid({ stats }: StaffLedgerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#DCFCE7' }]}>
             <Feather name="trending-up" size={16} color="#16A34A" />
           </View>
-          <Text style={styles.label}>Growth</Text>
+          <Text style={styles.label}>{t('ledger.stats.growth')}</Text>
         </View>
         <Text style={[styles.value, { color: growthColor }]}>{stats.growth}</Text>
         <Text style={styles.subtext}>
-          {stats.growth === '—' ? 'No earnings last month' : 'vs last month'}
+          {stats.growth === '—' ? t('ledger.stats.noEarningsLastMonth') : t('ledger.stats.vsLastMonth')}
         </Text>
       </View>
 
@@ -37,7 +39,7 @@ export function StaffLedgerStatsGrid({ stats }: StaffLedgerStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#DBEAFE' }]}>
             <Feather name="calendar" size={16} color="#2563EB" />
           </View>
-          <Text style={styles.label}>Next Payout</Text>
+          <Text style={styles.label}>{t('ledger.stats.nextPayout')}</Text>
         </View>
         <Text style={styles.value}>{stats.nextPayoutDate}</Text>
         <Text style={styles.subtext}>{stats.daysRemaining}</Text>

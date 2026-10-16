@@ -8,6 +8,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   CARD_TYPE_OPTIONS,
   DEFAULT_BANK_ACCOUNTS,
@@ -41,13 +42,7 @@ interface CreditPaymentFormProps {
   onDueDateChange: (date: Date | null) => void;
 }
 
-const RECEIVED_VIA_OPTIONS = [
-  { label: 'Cash', value: 'cash' },
-  { label: 'Card', value: 'card' },
-  { label: 'Bank Transfer', value: 'bank_transfer' },
-  { label: 'Cheque', value: 'cheque' },
-  { label: 'Online Payment', value: 'online' },
-];
+const RECEIVED_VIA_METHODS = ['cash', 'card', 'bank_transfer', 'cheque', 'online'] as const;
 
 export function CreditPaymentForm({
   finalAmount,
@@ -74,6 +69,11 @@ export function CreditPaymentForm({
   onDueDateChange,
 }: CreditPaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const receivedViaOptions = RECEIVED_VIA_METHODS.map((value) => ({
+    label: t(`paymentSheet.methods.${value}.title`),
+    value,
+  }));
   const numReceived = parseFloat(receivedAmount || '0');
   const showReceivedVia = !isNaN(numReceived) && numReceived > 0;
   const remaining = Math.max(0, finalAmount - (showReceivedVia ? numReceived : 0));
@@ -89,17 +89,17 @@ export function CreditPaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#B45309' }}>
-        Credit Payment Details
+        {t('paymentSheet.form.creditDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={<>Received Amount (<CurrencyGlyph />)</>}
+            label={<Trans i18nKey="paymentSheet.form.receivedAmount" components={{ currency: <CurrencyGlyph /> }} />}
             value={receivedAmount}
             onChangeText={onReceivedAmountChange}
             keyboardType="decimal-pad"
-            placeholder="0.00 (Leave empty for full credit)"
+            placeholder={t('paymentSheet.form.receivedPlaceholder')}
             error={errors?.receivedAmount}
           />
         </View>
@@ -107,9 +107,9 @@ export function CreditPaymentForm({
         {showReceivedVia ? (
           <View style={styles.flex1}>
             <Dropdown
-              label="Received Via *"
+              label={t('paymentSheet.form.receivedVia')}
               value={receivedVia}
-              options={RECEIVED_VIA_OPTIONS}
+              options={receivedViaOptions}
               onChange={(v) => onReceivedViaChange(v as PaymentMethod)}
               error={errors?.receivedVia}
             />
@@ -121,17 +121,17 @@ export function CreditPaymentForm({
       {showReceivedVia && receivedVia === 'card' ? (
         <View style={styles.subBox}>
           <Dropdown
-            label="Card Type *"
+            label={t('paymentSheet.form.cardType')}
             value={cardType}
             options={CARD_TYPE_OPTIONS.map((o: string) => ({ label: o, value: o }))}
             onChange={onCardTypeChange}
             error={errors?.cardType}
           />
           <Input
-            label="Reference (Optional)"
+            label={t('paymentSheet.form.referenceOptional')}
             value={reference}
             onChangeText={onReferenceChange}
-            placeholder="Transaction ID"
+            placeholder={t('paymentSheet.form.transactionIdPlaceholder')}
           />
         </View>
       ) : null}
@@ -139,17 +139,17 @@ export function CreditPaymentForm({
       {showReceivedVia && receivedVia === 'cheque' ? (
         <View style={styles.subBox}>
           <Input
-            label="Cheque Number *"
+            label={t('paymentSheet.form.chequeNumber')}
             value={chequeNumber}
             onChangeText={onChequeNumberChange}
-            placeholder="Cheque number"
+            placeholder={t('paymentSheet.form.chequeNumberPlaceholder')}
             error={errors?.chequeNumber}
           />
           <Input
-            label="Bank Name (Optional)"
+            label={t('paymentSheet.form.bankNameOptional')}
             value={bankName}
             onChangeText={onBankNameChange}
-            placeholder="e.g. HDFC"
+            placeholder={t('paymentSheet.form.example', { value: 'HDFC' })}
           />
         </View>
       ) : null}
@@ -157,14 +157,14 @@ export function CreditPaymentForm({
       {showReceivedVia && receivedVia === 'bank_transfer' ? (
         <View style={styles.subBox}>
           <Input
-            label="Reference / Transaction ID *"
+            label={t('paymentSheet.form.referenceIdRequired')}
             value={reference}
             onChangeText={onReferenceChange}
-            placeholder="Transaction ID"
+            placeholder={t('paymentSheet.form.transactionIdPlaceholder')}
             error={errors?.reference}
           />
           <Dropdown
-            label="Bank Account (Ledger)"
+            label={t('paymentSheet.form.bankAccountLedger')}
             value={bankAccountId}
             options={DEFAULT_BANK_ACCOUNTS.map((a: LedgerBankAccount) => ({
               label: `${a.code} — ${a.name}`,
@@ -178,7 +178,7 @@ export function CreditPaymentForm({
       {showReceivedVia && receivedVia === 'online' ? (
         <View style={styles.subBox}>
           <Dropdown
-            label="Online Payment Type *"
+            label={t('paymentSheet.form.onlinePaymentType')}
             value={onlinePaymentType}
             options={ONLINE_PAYMENT_TYPE_OPTIONS.map((o: string) => ({ label: o, value: o }))}
             onChange={onOnlinePaymentTypeChange}
@@ -186,26 +186,26 @@ export function CreditPaymentForm({
           />
           {onlinePaymentType === 'Other' ? (
             <Input
-              label="Provider Name *"
+              label={t('paymentSheet.form.providerName')}
               value={providerName}
               onChangeText={onProviderNameChange}
-              placeholder="e.g. Razorpay"
+              placeholder={t('paymentSheet.form.example', { value: 'Razorpay' })}
               error={errors?.providerName}
             />
           ) : null}
           <Input
-            label="Transaction / Reference ID *"
+            label={t('paymentSheet.form.transactionReferenceIdRequired')}
             value={reference}
             onChangeText={onReferenceChange}
-            placeholder="Transaction ID"
+            placeholder={t('paymentSheet.form.transactionIdPlaceholder')}
             error={errors?.reference}
           />
         </View>
       ) : null}
 
       <DatePicker
-        label={`Payment Due Date ${remaining > 0 ? '*' : '(Optional)'}`}
-        placeholder="Select due date"
+        label={t(remaining > 0 ? 'paymentSheet.form.dueDate' : 'paymentSheet.form.dueDateOptional')}
+        placeholder={t('paymentSheet.form.selectDueDate')}
         value={paymentDueDate ?? null}
         onChange={onDueDateChange}
         minimumDate={new Date()}
@@ -223,7 +223,7 @@ export function CreditPaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -231,7 +231,7 @@ export function CreditPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Received Amount:
+            {t('paymentSheet.form.receivedAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: '#10B981' }}>
             <CurrencyValue amount={(showReceivedVia ? numReceived : 0)} decimals={2} />
@@ -239,7 +239,7 @@ export function CreditPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Remaining (On Credit):
+            {t('paymentSheet.form.remainingOnCredit')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: '#B45309' }}>
             <CurrencyValue amount={remaining} decimals={2} />
@@ -250,18 +250,32 @@ export function CreditPaymentForm({
           <View style={[styles.noteBox, { backgroundColor: '#F59E0B15' }]}>
             <Typography variant="caption" style={{ color: '#B45309' }}>
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
-                Full Credit:{' '}
+                {t('paymentSheet.form.fullCredit')}{' '}
               </Typography>
-              Member will have the entire <CurrencyValue amount={finalAmount} decimals={2} /> on credit.
+              <Trans
+                i18nKey="paymentSheet.form.entireOnCredit"
+                components={{ amount: <CurrencyValue amount={finalAmount} decimals={2} /> }}
+              />
             </Typography>
           </View>
         ) : (
           <View style={[styles.noteBox, { backgroundColor: '#10B98115' }]}>
             <Typography variant="caption" style={{ color: '#047857' }}>
               <Typography variant="caption" style={{ fontWeight: '700', color: '#047857' }}>
-                Partial Received:{' '}
+                {t('paymentSheet.form.partialReceived')}{' '}
               </Typography>
-              <CurrencyValue amount={numReceived} decimals={2} /> received via {receivedVia || 'other method'}. Remaining <CurrencyValue amount={remaining} decimals={2} /> recorded on credit.
+              <Trans
+                i18nKey="paymentSheet.form.receivedViaNote"
+                values={{
+                  method: receivedVia
+                    ? t(`paymentSheet.methods.${receivedVia}.title`)
+                    : t('paymentSheet.form.otherMethod'),
+                }}
+                components={{
+                  received: <CurrencyValue amount={numReceived} decimals={2} />,
+                  remaining: <CurrencyValue amount={remaining} decimals={2} />,
+                }}
+              />
             </Typography>
           </View>
         )}

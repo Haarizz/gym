@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -11,7 +12,7 @@ import type { DropdownProps } from './Dropdown.types';
 
 export function Dropdown({
   label,
-  placeholder = 'Select an option',
+  placeholder: placeholderProp,
   value,
   options,
   onChange,
@@ -20,6 +21,8 @@ export function Dropdown({
   error,
   customTrigger,
 }: DropdownProps) {
+  const { t } = useTranslation();
+  const placeholder = placeholderProp ?? t('shared.selectOption');
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
 
@@ -65,7 +68,7 @@ export function Dropdown({
             onPress={openSheet}
             disabled={disabled}
             accessibilityRole="button"
-            accessibilityLabel={label ?? 'Dropdown'}
+            accessibilityLabel={label ?? t('shared.dropdown')}
             accessibilityState={{ disabled }}
             style={({ pressed }) => [
               styles.field,
@@ -108,7 +111,7 @@ export function Dropdown({
       {/* ── Options bottom sheet ── */}
       <AppBottomSheet
         visible={sheetVisible}
-        title={label ?? 'Select an option'}
+        title={label ?? t('shared.selectOption')}
         onClose={closeSheet}
       >
         {options.map((option) => {

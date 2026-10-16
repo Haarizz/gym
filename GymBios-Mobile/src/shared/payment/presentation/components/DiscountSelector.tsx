@@ -7,6 +7,7 @@ import { Radius, Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import type { DiscountType } from '@/shared/payment/types';
 
 interface DiscountSelectorProps {
@@ -15,11 +16,7 @@ interface DiscountSelectorProps {
   onChange: (type: DiscountType, value: number) => void;
 }
 
-const DISCOUNT_TYPE_OPTIONS = [
-  { label: 'No Discount', value: 'none' },
-  { label: 'Fixed Amount', value: 'fixed' },
-  { label: 'Percentage (%)', value: 'percentage' },
-];
+const DISCOUNT_TYPES = ['none', 'fixed', 'percentage'] as const;
 
 export function DiscountSelector({
   discountType,
@@ -27,6 +24,11 @@ export function DiscountSelector({
   onChange,
 }: DiscountSelectorProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const discountTypeOptions = DISCOUNT_TYPES.map((value) => ({
+    label: t(`paymentSheet.discount.${value}`),
+    value,
+  }));
 
   return (
     <View
@@ -39,15 +41,15 @@ export function DiscountSelector({
       ]}
     >
       <Typography variant="bodySmallBold" style={styles.title}>
-        Select Discount (Optional)
+        {t('paymentSheet.discount.title')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.dropdownWrapper}>
           <Dropdown
-            label="Discount Type"
+            label={t('paymentSheet.discount.type')}
             value={discountType}
-            options={DISCOUNT_TYPE_OPTIONS}
+            options={discountTypeOptions}
             onChange={(val) => {
               const newType = val as DiscountType;
               onChange(newType, newType === 'none' ? 0 : discountValue);
@@ -60,8 +62,8 @@ export function DiscountSelector({
             <Input
               label={
                 discountType === 'percentage'
-                  ? 'Discount (%)'
-                  : <>Amount (<CurrencyGlyph />)</>
+                  ? t('paymentSheet.discount.percentLabel')
+                  : <Trans i18nKey="paymentSheet.discount.amountLabel" components={{ currency: <CurrencyGlyph /> }} />
               }
               value={discountValue > 0 ? String(discountValue) : ''}
               onChangeText={(txt) => {
@@ -69,7 +71,7 @@ export function DiscountSelector({
                 onChange(discountType, isNaN(num) ? 0 : num);
               }}
               keyboardType="decimal-pad"
-              placeholder={discountType === 'percentage' ? 'e.g. 10' : '0.00'}
+              placeholder={discountType === 'percentage' ? t('paymentSheet.form.example', { value: '10' }) : '0.00'}
             />
           </View>
         ) : null}

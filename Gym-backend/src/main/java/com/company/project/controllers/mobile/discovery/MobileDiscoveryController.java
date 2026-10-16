@@ -46,6 +46,8 @@ import java.math.BigDecimal;
 @RequestMapping("/api/mobile/discovery/centers")
 public class MobileDiscoveryController {
 
+    public static final String GYM_LOGIN_PURCHASE_MESSAGE = "Your app login was created by your gym, so plans can't be bought from here yet. Renew from the Membership screen or at reception.";
+
     private final GlobalBranchDiscoveryRepository globalDiscoveryRepository;
     private final BranchRepository branchRepository;
     private final BranchImageRepository branchImageRepository;
@@ -307,6 +309,12 @@ public class MobileDiscoveryController {
             return ResponseEntity.status(401).build();
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+        // A gym-created login's id is that gym's users.id, not a global user id — reading
+        // the global profile and linking global_user_id with it would pick up (or hand the
+        // membership to) whichever global account shares that number.
+        if (!userDetails.isGlobal()) {
+            throw new IllegalArgumentException(GYM_LOGIN_PURCHASE_MESSAGE);
+        }
         Long globalUserId = userDetails.getId();
 
         // 1. Fetch UserProfile globally (before tenant switch) in a NEW transaction
@@ -327,8 +335,10 @@ public class MobileDiscoveryController {
             Branch branch = branchRepository.findById(branchId)
                     .orElseThrow(() -> new RuntimeException("Branch not found in tenant DB"));
 
-            // Check if member already exists
-            if (memberRepository.existsByGlobalUserId(globalUserId) || memberRepository.existsByEmail(userDetails.getEmail())) {
+            // Check if member already exists. A rejected earlier purchase here isn't a
+            // membership — the member may retry (same or another plan); it's released
+            // together with the new purchase in createMemberReplacingRejected below.
+            if (memberRepository.existsUnrejectedMembership(globalUserId, userDetails.getEmail())) {
                 return ResponseEntity.status(409).build(); // Conflict
             }
 
@@ -415,7 +425,8 @@ public class MobileDiscoveryController {
             memberRequest.setMembershipStartDate(todayIso);
 
             // Execute create (generates invoice/payment)
-            MemberResponseDTO createdMember = memberService.createMember(memberRequest);
+            MemberResponseDTO createdMember = memberService.createMemberReplacingRejected(
+                    memberRequest, globalUserId, userDetails.getEmail());
 
             // Note: Currently, createMember doesn't take globalUserId in the DTO,
             // we should technically set it on the Member entity.

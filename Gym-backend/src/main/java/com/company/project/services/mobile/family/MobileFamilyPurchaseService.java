@@ -112,6 +112,12 @@ public class MobileFamilyPurchaseService {
         }
 
         String buyerEmail = MobileFamilyInvitationService.normalizeEmail(callerEmail);
+        // Rejected earlier purchases (the buyer's own, or a rejected family purchase that
+        // listed these same people) never became memberships — don't let them block a retry.
+        List<String> releaseEmails = new java.util.ArrayList<>();
+        releaseEmails.add(buyerEmail);
+        connected.forEach(c -> releaseEmails.add(MobileFamilyInvitationService.normalizeEmail(c.getEmail())));
+        memberService.releaseRejectedPurchases(globalUserId, releaseEmails);
         if (memberRepository.existsByGlobalUserId(globalUserId)
                 || (StringUtils.hasText(buyerEmail) && memberRepository.existsByEmailIgnoreCase(buyerEmail))) {
             throw new BusinessRuleViolationException("You already have a membership at this gym.");

@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { familyApi } from '../infrastructure/familyApi';
@@ -26,10 +27,15 @@ export async function claimPendingFamilyInvitations(
     setActiveTenant(claimed[0].tenantSlug);
   }
   for (const r of claimed) {
-    const gym = r.gymName ?? 'your gym';
-    toast.success(`${r.inviterName ?? 'A family member'} added you to their ${r.planName ?? 'family'} membership at ${gym}.`);
+    toast.success(
+      i18n.t('family.invitationClaimed', {
+        inviter: r.inviterName ?? i18n.t('family.aFamilyMember'),
+        plan: r.planName ?? i18n.t('family.familyFallback'),
+        gym: r.gymName ?? i18n.t('family.yourGym'),
+      }),
+    );
   }
   for (const r of results.filter((x) => x.status === 'SKIPPED_EXISTING_MEMBERSHIP')) {
-    toast.info(`You already have a membership at ${r.gymName ?? 'this gym'}, so it stays active instead of the family subscription.`);
+    toast.info(i18n.t('family.keptExistingMembership', { gym: r.gymName ?? i18n.t('family.thisGym') }));
   }
 }

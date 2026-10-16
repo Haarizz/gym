@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
@@ -14,6 +15,7 @@ interface SplashScreenProps {
 }
 
 export function SplashScreen({ onComplete }: SplashScreenProps) {
+  const { t } = useTranslation();
   const logoScale = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
 
@@ -50,7 +52,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           GymBios
         </Typography>
         <Typography variant="bodySmall" style={styles.subtitle}>
-          Your Complete Fitness Business OS
+          {t('auth.tagline')}
         </Typography>
       </Animated.View>
 

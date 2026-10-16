@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { useRouter } from 'expo-router';
@@ -18,6 +19,7 @@ import { CommunityPostComposer } from '../components/CommunityPostComposer';
  * Closed via router.back() on success or cancel.
  */
 export function CreateCommunityPostScreen() {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const router = useRouter();
   const theme = useTheme();
@@ -41,16 +43,16 @@ export function CreateCommunityPostScreen() {
           style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.6 }]}
           onPress={handleCancel}
           accessibilityRole="button"
-          accessibilityLabel="Cancel"
+          accessibilityLabel={t('community.composer.cancel')}
           hitSlop={8}
         >
           <Typography variant="bodySmallBold" style={{ color: '#7A7E8C', fontSize: 14 }}>
-            Cancel
+            {t('community.composer.cancel')}
           </Typography>
         </Pressable>
 
         <Typography variant="bodySmallBold" style={styles.headerTitle}>
-          Create Post
+          {t('community.composer.createPost')}
         </Typography>
 
         <View style={styles.headerSpacer} />
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 16,
-    marginRight: 38,
+    marginEnd: 38,
   },
   headerSpacer: {
     width: 0,

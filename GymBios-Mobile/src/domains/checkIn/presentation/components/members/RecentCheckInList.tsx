@@ -1,4 +1,5 @@
 import { FlatList, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { RecentCheckInCard } from './RecentCheckInCard';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
@@ -6,6 +7,7 @@ import { Spacing } from '@/core/theme';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 
 export function RecentCheckInList() {
+  const { t } = useTranslation();
   const { recentMembers, isLoading } = useRecentCheckIns();
 
   if (isLoading) {
@@ -20,7 +22,12 @@ export function RecentCheckInList() {
   }
 
   if (recentMembers.length === 0) {
-    return <EmptyState title="No recent check-ins" description="Latest member activity today will appear here." />;
+    return (
+      <EmptyState
+        title={t('checkIn.members.noRecentCheckIns')}
+        description={t('checkIn.members.noRecentCheckInsDesc')}
+      />
+    );
   }
 
   return (

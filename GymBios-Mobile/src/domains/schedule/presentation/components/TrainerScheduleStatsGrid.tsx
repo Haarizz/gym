@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TrainerScheduleStats } from '../../domain/TrainerScheduleData';
 
@@ -8,23 +9,25 @@ interface TrainerScheduleStatsGridProps {
 }
 
 export function TrainerScheduleStatsGrid({ stats }: TrainerScheduleStatsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* This Week */}
       <View style={styles.card}>
-        <Text style={styles.label}>This Week</Text>
+        <Text style={styles.label}>{t('schedule.stats.thisWeek')}</Text>
         <Text style={[styles.value, { color: BrandColors.trainerAmber }]}>{stats.thisWeek}</Text>
       </View>
 
       {/* Next Week */}
       <View style={styles.card}>
-        <Text style={styles.label}>Next Week</Text>
+        <Text style={styles.label}>{t('schedule.stats.nextWeek')}</Text>
         <Text style={[styles.value, { color: BrandColors.teal }]}>{stats.nextWeek}</Text>
       </View>
 
       {/* Open Slots */}
       <View style={styles.card}>
-        <Text style={styles.label}>Open Slots</Text>
+        <Text style={styles.label}>{t('schedule.stats.openSlots')}</Text>
         <Text style={[styles.value, { color: BrandColors.memberGold }]}>{stats.openSlots}</Text>
       </View>
     </View>

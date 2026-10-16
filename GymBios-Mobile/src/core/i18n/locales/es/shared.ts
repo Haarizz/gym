@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: 'Volver',
+    confirm: 'Confirmar',
+    cancel: 'Cancelar',
+    done: 'Listo',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    search: 'Buscar...',
+    notAdded: 'Sin añadir',
+    selectOption: 'Elige una opción',
+    dropdown: 'Desplegable',
+    selectDate: 'Elige la fecha',
+    datePicker: 'Selector de fecha',
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
+    selectMonth: 'Elige el mes',
+    selectYear: 'Elige el año',
+    confirmDate: 'Confirmar fecha',
+    dismissBackdrop: 'Cerrar',
+    userAvatar: 'Avatar del usuario',
+    initialsAvatar: 'Avatar de {{initials}}',
+
+    photo: {
+      changeA11y: 'Cambiar foto de perfil',
+      addA11y: 'Añadir foto de perfil',
+      selectA11y: 'Toca para elegir una foto',
+      tapToChange: 'Toca para cambiar la foto',
+      tapToAdd: 'Toca para añadir una foto',
+      title: 'Foto de perfil',
+      subtitle: 'Elige una opción',
+      takePhoto: 'Hacer foto',
+      chooseFromGallery: 'Elegir de la galería',
+      removePhoto: 'Quitar foto',
+      permissionTitle: 'Permiso necesario',
+      cameraNeeded: 'Se necesita acceso a la cámara para hacer una foto.',
+      cameraOff: 'El acceso a la cámara está desactivado. Actívalo en Ajustes para hacer una foto.',
+      cameraUnavailable: 'La cámara no está disponible en este dispositivo.',
+      galleryNeeded: 'Se necesita acceso a la galería para elegir una foto.',
+      galleryOff: 'El acceso a las fotos está desactivado. Actívalo en Ajustes para elegir una foto.',
+      galleryFailed: 'No se pudo abrir la galería.',
+      uploadFailedStatus: 'Error al subir la foto ({{status}})',
+      uploadFailedNetwork: 'Error al subir la foto (error de red)',
+      uploadTimeout: 'Tiempo de espera agotado al subir la foto',
+    },
+
+    trafficLight: {
+      low: 'Bajo',
+      medium: 'Medio',
+      high: 'Alto',
+    },
+
+    timePicker: {
+      selectTime: 'Seleccionar hora',
+      now: 'Ahora',
+      setTime: 'Definir hora · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: 'Guardar cambios',
+      createStaff: 'Crear personal',
+    },
+
+    roleMode: {
+      virtualStudio: 'Estudio virtual',
+      virtualStudioDesc: 'Crea y gestiona programas de fitness online, sesiones en vivo y membresías digitales.',
+      comingSoon: 'Próximamente',
+    },
+
+    charts: {
+      noData: 'No hay datos disponibles',
+      noDataDesc: 'No hay datos de gráfico para mostrar con los criterios seleccionados.',
+      loading: 'Cargando gráfico...',
+      unableToLoad: 'No se pudo cargar el gráfico',
+      loadFailed: 'Error al cargar los datos del gráfico',
+      retry: 'Reintentar',
+    },
+
+    noInternet: {
+      title: 'Sin conexión a internet',
+      tryAgain: 'Reintentar',
+      checkConnection: 'Comprueba tu Wi-Fi o datos móviles e inténtalo de nuevo.',
+      tipToggleWifi: 'Desactiva y vuelve a activar el Wi-Fi',
+      tipMobileData: 'Comprueba que los datos móviles estén activados',
+      tipSignal: 'Muévete a una zona con mejor cobertura',
+      retryA11y: 'Reintentar conexión',
+    },
+
+    receipt: {
+      title: 'Detalles del recibo',
+      subtitle: 'Registro de la transacción',
+      loading: 'Cargando el recibo...',
+      loadError: 'No se pudieron cargar los datos del recibo.',
+      billedTo: 'Facturado a',
+      memberName: 'Nombre del socio',
+      memberId: 'ID de socio',
+      phone: 'Teléfono',
+      transactionInfo: 'Información de la transacción',
+      type: 'Tipo',
+      paymentMethod: 'Método de pago',
+      subscription: 'Suscripción / Servicio',
+      validity: 'Validez',
+      processedBy: 'Procesado por',
+      paymentSummary: 'Resumen del pago',
+      price: 'Precio',
+      discount: 'Descuento',
+      totalAmount: 'Importe total',
+      amountPaid: 'Importe pagado',
+      balanceDue: 'Saldo pendiente',
+      download: 'Descargar recibo',
+      sharingUnavailableTitle: 'No se puede compartir',
+      sharingUnavailable: 'No se puede compartir el PDF en este dispositivo.',
+      errorTitle: 'Error',
+      pdfFailed: 'No se pudo generar el PDF del recibo.',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate, tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -9,6 +11,7 @@ import { ReceiptBottomSheet } from '@/shared/components/ReceiptBottomSheet';
 import { useMembershipPayments } from '../../hooks/useMembershipPayments';
 
 export function MembershipPaymentsTab() {
+  const { t } = useTranslation();
   const { data: payments, isLoading, isError } = useMembershipPayments();
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
 
@@ -16,7 +19,7 @@ export function MembershipPaymentsTab() {
     <View style={styles.container}>
       {/* Payment History */}
       <GlassSurface radius={Radius.lg} style={styles.card}>
-        <Text style={styles.cardTitle}>Payment History</Text>
+        <Text style={styles.cardTitle}>{t('membership.payments.historyTitle')}</Text>
         
         {isLoading && (
           <View style={styles.center}>
@@ -26,26 +29,22 @@ export function MembershipPaymentsTab() {
 
         {isError && (
           <View style={styles.center}>
-            <Text style={styles.errorText}>Failed to load payments.</Text>
+            <Text style={styles.errorText}>{t('membership.payments.loadError')}</Text>
           </View>
         )}
 
         {!isLoading && !isError && payments?.length === 0 && (
           <View style={styles.center}>
-            <Text style={styles.metaText}>No payment history found.</Text>
+            <Text style={styles.metaText}>{t('membership.payments.empty')}</Text>
           </View>
         )}
 
         {!isLoading && !isError && payments && payments.length > 0 && (
           <View style={styles.historyList}>
             {payments.map((item) => {
-              const formattedDate = item.transactionDate 
-                ? new Date(item.transactionDate).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })
-                : 'N/A';
+              const formattedDate = item.transactionDate
+                ? formatDate(item.transactionDate, 'PP')
+                : t('membership.status.notAvailable');
 
               const displayAmount = item.paidAmount ?? item.amount ?? 0;
               const discount = Number(item.discountAmount) || 0;
@@ -61,7 +60,7 @@ export function MembershipPaymentsTab() {
                       <View style={styles.discountTag}>
                         <Feather name="tag" size={11} color={BrandColors.teal} />
                         <Text style={styles.discountTagText} numberOfLines={1}>
-                          {item.discountLabel || 'Discount'} · -<CurrencyValue amount={discount} />
+                          {item.discountLabel || t('membership.payments.discount')} · -<CurrencyValue amount={discount} />
                         </Text>
                       </View>
                     )}
@@ -74,7 +73,7 @@ export function MembershipPaymentsTab() {
                       styles.statusBadgeText,
                       item.status === 'Paid' ? styles.statusPaidText : styles.statusPendingText
                     ]}>
-                      {item.status}
+                      {tOr(`membership.payments.statusValues.${item.status}`, item.status)}
                     </Text>
                   </View>
                 </Pressable>
@@ -86,11 +85,11 @@ export function MembershipPaymentsTab() {
 
       {/* Payment Method Card */}
       <GlassSurface radius={Radius.lg} style={styles.card}>
-        <Text style={styles.cardTitle}>Saved Payment Method</Text>
+        <Text style={styles.cardTitle}>{t('membership.payments.savedMethodTitle')}</Text>
         <View style={styles.emptyStateBox}>
           <Feather name="info" size={20} color={BrandColors.textSecondary} />
           <Text style={styles.emptyStateText}>
-            Saved payment methods are currently unavailable. Please use a new payment method during checkout.
+            {t('membership.payments.savedMethodUnavailable')}
           </Text>
         </View>
       </GlassSurface>

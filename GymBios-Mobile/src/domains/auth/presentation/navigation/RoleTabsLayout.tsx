@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useReducedMotion } from 'react-native-reanimated';
 import { Tabs, useRouter, useSegments } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Pressable,
@@ -26,7 +27,7 @@ import {
   isRoleHeaderHiddenRoute,
   MODULE_ROUTES,
 } from './layoutRoutes';
-import { TabIcon } from './tabConfigs';
+import { TabIcon, type TabTitleKey } from './tabConfigs';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { RoleTabBar, TAB_BAR_HEIGHT, TAB_SCENE_TRANSITION_SPEC, forTabSlide } from './RoleTabBar';
 
@@ -43,6 +44,7 @@ interface RoleTabsLayoutProps {
   tabs: Array<{
     name: string;
     title: string;
+    titleKey?: TabTitleKey;
     icon: TabIcon;
   }>;
 }
@@ -70,7 +72,7 @@ export function RoleTabsLayout({
   headerColors,
   headerColor,
   activeColor,
-  tabs,
+  tabs: tabConfigs,
 }: RoleTabsLayoutProps) {
   const router = useRouter();
   const segments = useSegments();
@@ -82,6 +84,12 @@ export function RoleTabsLayout({
   const { count: unreadCount } = useUnreadNotificationCount();
   const { selectedBranchId, availableBranches, setSelectedBranchId } = useBranchContext();
   const reduceMotion = useReducedMotion();
+  const { t } = useTranslation();
+
+  const tabs = useMemo(
+    () => tabConfigs.map((tab) => (tab.titleKey ? { ...tab, title: t(tab.titleKey) } : tab)),
+    [tabConfigs, t],
+  );
 
   const roleGroup = segments[0] || '(admin)';
 
@@ -112,7 +120,7 @@ export function RoleTabsLayout({
     ? undefined
     : availableBranches.find(b => b.id === selectedBranchId)?.branch_name;
   const branchLabel = isAdmin
-    ? selectedBranchName || 'All branches'
+    ? selectedBranchName || t('portalHeader.allBranches')
     : selectedBranchName;
 
   const isTabBarHidden = isFullScreen || isCommunityScreen;
@@ -169,7 +177,7 @@ export function RoleTabsLayout({
                     router.push(`/${roleGroup}/profile` as any);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Open profile hub"
+                  accessibilityLabel={t('portalHeader.openProfileHub')}
                 >
                   <Avatar
                     size={40}
@@ -207,7 +215,7 @@ export function RoleTabsLayout({
                 style={({ pressed }) => [styles.notificationButton, pressed && styles.headerButtonPressed]}
                 onPress={() => setIsNotificationsOpen(true)}
                 accessibilityRole="button"
-                accessibilityLabel={`Notifications, ${unreadCount} unread`}
+                accessibilityLabel={t('portalHeader.notificationsUnread', { count: unreadCount })}
               >
                 <Feather name="bell" size={19} color={headerFg} />
                 {unreadCount > 0 && (

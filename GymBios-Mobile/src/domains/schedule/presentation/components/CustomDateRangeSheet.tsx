@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AppBottomSheet, DatePicker, Button } from '@/shared/components';
 import { Spacing } from '@/core/theme';
 
@@ -12,6 +13,7 @@ export interface CustomDateRangeSheetProps {
 }
 
 export function CustomDateRangeSheet({ visible, initialStart, initialEnd, onApply, onClose }: CustomDateRangeSheetProps) {
+  const { t } = useTranslation();
   const [start, setStart] = useState<Date | null>(initialStart || new Date());
   const [end, setEnd] = useState<Date | null>(initialEnd || new Date());
 
@@ -31,22 +33,22 @@ export function CustomDateRangeSheet({ visible, initialStart, initialEnd, onAppl
   return (
     <AppBottomSheet
       visible={visible}
-      title="Select Date Range"
+      title={t('schedule.customDateRange.title')}
       onClose={onClose}
     >
       <View style={styles.container}>
         <DatePicker
-          label="Start Date"
+          label={t('schedule.customDateRange.startDate')}
           value={start || undefined}
           onChange={setStart}
         />
         <DatePicker
-          label="End Date"
+          label={t('schedule.customDateRange.endDate')}
           value={end || undefined}
           onChange={setEnd}
         />
         <View style={styles.actions}>
-          <Button title="Apply" onPress={handleApply} style={styles.button} />
+          <Button title={t('schedule.customDateRange.apply')} onPress={handleApply} style={styles.button} />
         </View>
       </View>
     </AppBottomSheet>

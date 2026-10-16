@@ -47,7 +47,7 @@ export const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   title: {
     fontSize: TypographyScale.title,

@@ -164,6 +164,11 @@ public class MobileFamilyInvitationService {
         if (dependent.getGlobalUserId() != null) {
             return ClaimStatus.INVALID;
         }
+        // A rejected purchase of their own here isn't a membership — it mustn't skip the claim.
+        memberRepository.releaseRejectedByGlobalUserId(globalUserId);
+        if (callerEmail != null && !callerEmail.isBlank()) {
+            memberRepository.releaseRejectedByEmail(callerEmail.trim());
+        }
         if (memberRepository.existsByGlobalUserId(globalUserId)
                 || memberRepository.existsOwnMembershipByEmail(callerEmail, dependent.getMemberId())) {
             invitationRepository.transitionFromPending(invitationId, "SKIPPED", LocalDateTime.now());

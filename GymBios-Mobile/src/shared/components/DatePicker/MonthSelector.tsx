@@ -7,7 +7,7 @@ import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
-import { MONTHS } from './utils';
+import { getMonthNames } from './utils';
 
 interface MonthSelectorProps {
   /** 0-based month index that is currently selected. */
@@ -61,7 +61,7 @@ export function MonthSelector({
 
   return (
     <View style={styles.grid}>
-      {MONTHS.map((name, index) => renderMonth(name, index))}
+      {getMonthNames().map((name, index) => renderMonth(name, index))}
     </View>
   );
 }

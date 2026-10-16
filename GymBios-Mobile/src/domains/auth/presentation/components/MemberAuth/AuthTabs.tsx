@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet } from 'react-native';
 import { Glass } from '@/core/theme';
 import { GlassSurface, Typography } from '@/shared/components';
@@ -8,20 +9,21 @@ interface AuthTabsProps {
 }
 
 export function AuthTabs({ activeTab, onTabChange }: AuthTabsProps) {
+  const { t } = useTranslation();
   return (
     <GlassSurface radius={16} style={styles.tabs}>
       <Pressable
         style={[styles.tab, activeTab === 'signin' && styles.tabActive]}
         onPress={() => onTabChange('signin')}>
         <Typography style={[styles.tabText, activeTab === 'signin' && styles.tabTextActive]}>
-          Sign In
+          {t('auth.signInTab')}
         </Typography>
       </Pressable>
       <Pressable
         style={[styles.tab, activeTab === 'signup' && styles.tabActive]}
         onPress={() => onTabChange('signup')}>
         <Typography style={[styles.tabText, activeTab === 'signup' && styles.tabTextActive]}>
-          Create Account
+          {t('auth.createAccountTab')}
         </Typography>
       </Pressable>
     </GlassSurface>

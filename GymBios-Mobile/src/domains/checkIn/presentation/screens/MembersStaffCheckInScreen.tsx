@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
@@ -22,6 +23,7 @@ import { useCheckIn } from '../../hooks/useCheckInActions';
 const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
 
 export function MembersStaffCheckInScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,8 +80,8 @@ export function MembersStaffCheckInScreen() {
     <ScreenLayout>
       {/* Header */}
       <AppHeader
-        title="Members & Staff"
-        subtitle="Search and perform manual check-ins"
+        title={t('checkIn.members.title')}
+        subtitle={t('checkIn.members.subtitle')}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
       />
@@ -110,12 +112,12 @@ export function MembersStaffCheckInScreen() {
             <View style={styles.sectionHeaderLeft}>
               <Feather name="users" size={14} color={BrandColors.textSecondary} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                {isSearchIdle ? 'All Members & Staff' : 'Search Results'}
+                {isSearchIdle ? t('checkIn.members.allMembersSection') : t('checkIn.members.searchResultsSection')}
               </Typography>
             </View>
             {!isDisplayLoading && (
               <Typography variant="caption" color="textSecondary">
-                {displayedMembers.length} total
+                {t('checkIn.members.totalCount', { count: displayedMembers.length })}
               </Typography>
             )}
           </View>
@@ -142,11 +144,11 @@ export function MembersStaffCheckInScreen() {
             <View style={styles.sectionHeaderLeft}>
               <Feather name="clock" size={14} color={BrandColors.textSecondary} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                Recent Check-Ins
+                {t('checkIn.members.recentCheckInsSection')}
               </Typography>
             </View>
             <Typography variant="caption" color="textSecondary">
-              Latest activity today
+              {t('checkIn.members.latestActivityToday')}
             </Typography>
           </View>
           <RecentCheckInList />

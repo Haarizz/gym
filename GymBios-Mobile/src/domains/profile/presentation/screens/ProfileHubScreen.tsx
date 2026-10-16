@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +20,8 @@ import { toast } from '@/shared/components/Toasts/toastStore';
 import { useAuthStore, useRestoreSession } from '@/domains/auth';
 import { useCurrency } from '@/core/providers';
 import { useMyWallet } from '@/domains/memberPortal/wallet/useMyWallet';
+import { useMemberTenantAccess } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
+import { openGymRatingSheet } from '@/domains/memberPortal/gymRating/gymRating';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileSummary } from '../../hooks/useProfileSummary';
@@ -36,6 +39,7 @@ interface ProfileHubScreenProps {
   onNavigateToPerformance: () => void;
   onNavigateToTransactions: () => void;
   onNavigateToWallet: () => void;
+  onNavigateToEnquiries: () => void;
   onNavigateToSettings: () => void;
   onLogout?: () => void;
 }
@@ -47,9 +51,11 @@ export function ProfileHubScreen({
   onNavigateToPerformance,
   onNavigateToTransactions,
   onNavigateToWallet,
+  onNavigateToEnquiries,
   onNavigateToSettings,
   onLogout,
 }: ProfileHubScreenProps) {
+  const { t } = useTranslation();
   const { profile, initials, firstName } = useProfile();
   const { summary } = useProfileSummary();
   const { updatePhoto } = useProfileMutations();
@@ -59,7 +65,9 @@ export function ProfileHubScreen({
   const isEmployee = appRole === 'staff' || appRole === 'trainer';
   // Only members have a wallet (booking refunds, reward credit).
   const isMember = appRole === 'member';
-  const { data: wallet } = useMyWallet(isMember);
+  // The wallet endpoint is 403'd while a purchase awaits approval (or was rejected).
+  const hasTenantAccess = useMemberTenantAccess();
+  const { data: wallet } = useMyWallet(isMember && hasTenantAccess);
   const { formatCurrency } = useCurrency();
 
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
@@ -79,7 +87,7 @@ export function ProfileHubScreen({
         try {
           await updatePhoto(uri);
         } catch {
-          toast.error('Failed to update photo. Please try again.');
+          toast.error(t('profileHub.photoUpdateFailed'));
         }
       }, SHEET_DISMISS_DELAY_MS);
     },
@@ -119,8 +127,8 @@ export function ProfileHubScreen({
           <View style={styles.navSection}>
             <ProfileNavigationRow
               icon="user"
-              title="My Profile"
-              subtitle="Personal details & credentials"
+              title={t('profileHub.myProfile')}
+              subtitle={t('profileHub.myProfileSubtitle')}
               iconBgColor="#eef7f6"
               iconColor={BrandColors.teal}
               onPress={onNavigateToProfile}
@@ -129,8 +137,8 @@ export function ProfileHubScreen({
             {!isEmployee && (
               <ProfileNavigationRow
                 icon="gift"
-                title="Referrals"
-                subtitle="Invite friends & earn rewards"
+                title={t('profileHub.referrals')}
+                subtitle={t('profileHub.referralsSubtitle')}
                 iconBgColor="#fef3c7"
                 iconColor="#d97706"
                 onPress={onNavigateToReferrals}
@@ -140,8 +148,8 @@ export function ProfileHubScreen({
             {isEmployee && (
               <ProfileNavigationRow
                 icon="activity"
-                title="My Performance"
-                subtitle="Score, trends & activity stats"
+                title={t('profileHub.myPerformance')}
+                subtitle={t('profileHub.myPerformanceSubtitle')}
                 iconBgColor="#dbeafe"
                 iconColor="#2563eb"
                 onPress={onNavigateToPerformance}
@@ -151,19 +159,41 @@ export function ProfileHubScreen({
             {isMember && (
               <ProfileNavigationRow
                 icon="briefcase"
-                title="Wallet"
-                subtitle={`${formatCurrency(wallet?.balance ?? 0)} available · refunds & credit`}
+                title={t('profileHub.wallet')}
+                subtitle={t('profileHub.walletSubtitle', { amount: formatCurrency(wallet?.balance ?? 0) })}
                 iconBgColor="#dcfce7"
                 iconColor="#16a34a"
                 onPress={onNavigateToWallet}
               />
             )}
 
+            {isMember && hasTenantAccess && (
+              <ProfileNavigationRow
+                icon="star"
+                title={t('profileHub.rateGym')}
+                subtitle={t('profileHub.rateGymSubtitle')}
+                iconBgColor="#fef3c7"
+                iconColor="#d97706"
+                onPress={openGymRatingSheet}
+              />
+            )}
+
+            {isMember && hasTenantAccess && (
+              <ProfileNavigationRow
+                icon="help-circle"
+                title={t('profileHub.raiseEnquiry')}
+                subtitle={t('profileHub.raiseEnquirySubtitle')}
+                iconBgColor="#ddebe6"
+                iconColor="#3f6e62"
+                onPress={onNavigateToEnquiries}
+              />
+            )}
+
             {profile?.role?.toLowerCase() !== 'admin' && (
               <ProfileNavigationRow
                 icon="credit-card"
-                title="Transactions"
-                subtitle="Salary, purchases & earnings"
+                title={t('profileHub.transactions')}
+                subtitle={t('profileHub.transactionsSubtitle')}
                 iconBgColor="#f3e8ff"
                 iconColor="#7c3aed"
                 onPress={onNavigateToTransactions}
@@ -172,8 +202,8 @@ export function ProfileHubScreen({
 
             <ProfileNavigationRow
               icon="settings"
-              title="Settings"
-              subtitle="Notifications, accounts & privacy"
+              title={t('profileHub.settings')}
+              subtitle={t('profileHub.settingsSubtitle')}
               iconBgColor="#f1f5f9"
               iconColor="#475569"
               onPress={onNavigateToSettings}
@@ -191,7 +221,7 @@ export function ProfileHubScreen({
               onPress={() => setLogoutModalVisible(true)}
               disabled={isLoggingOut}
               accessibilityRole="button"
-              accessibilityLabel="Log out"
+              accessibilityLabel={t('profileHub.logOutA11y')}
             >
               {isLoggingOut ? (
                 <ActivityIndicator size="small" color={BrandColors.redDeep} style={styles.logoutIcon} />
@@ -199,7 +229,7 @@ export function ProfileHubScreen({
                 <Feather name="log-out" size={16} color={BrandColors.redDeep} style={styles.logoutIcon} />
               )}
               <Typography variant="body" style={styles.logoutText}>
-                {isLoggingOut ? 'Logging out...' : 'Log Out'}
+                {t(isLoggingOut ? 'profileHub.loggingOut' : 'profileHub.logOut')}
               </Typography>
             </Pressable>
           </View>
@@ -208,10 +238,10 @@ export function ProfileHubScreen({
         {/* Custom Confirmation Modal for Logout */}
         <ConfirmationModal
           visible={logoutModalVisible}
-          title="Log out of GymBios?"
-          message="Are you sure you want to log out? You will need to sign in again to access your account."
-          confirmText="Log out"
-          cancelText="Cancel"
+          title={t('profileHub.logOutTitle')}
+          message={t('profileHub.logOutMessage')}
+          confirmText={t('profileHub.logOutConfirm')}
+          cancelText={t('profileHub.cancel')}
           variant="danger"
           icon="log-out"
           loading={isLoggingOut}
@@ -223,8 +253,8 @@ export function ProfileHubScreen({
         <AppBottomSheet
           visible={photoSheetVisible}
           onClose={() => setPhotoSheetVisible(false)}
-          title="Profile Photo"
-          subtitle="Choose an option"
+          title={t('profileHub.photoTitle')}
+          subtitle={t('profileHub.photoSubtitle')}
         >
           <Pressable
             style={({ pressed }) => [
@@ -234,7 +264,7 @@ export function ProfileHubScreen({
             onPress={() => closeSheetThen(takePhoto)}
           >
             <Feather name="camera" size={20} color={BrandColors.teal} style={styles.sheetOptionIcon} />
-            <Typography variant="body">Take Photo</Typography>
+            <Typography variant="body">{t('profileHub.takePhoto')}</Typography>
           </Pressable>
 
           <Pressable
@@ -245,7 +275,7 @@ export function ProfileHubScreen({
             onPress={() => closeSheetThen(chooseFromGallery)}
           >
             <Feather name="image" size={20} color={BrandColors.teal} style={styles.sheetOptionIcon} />
-            <Typography variant="body">Choose from Gallery</Typography>
+            <Typography variant="body">{t('profileHub.chooseFromGallery')}</Typography>
           </Pressable>
         </AppBottomSheet>
       </View>
@@ -291,7 +321,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   logoutIcon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   logoutText: {
     color: BrandColors.redDeep,
@@ -309,6 +339,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
   },
   sheetOptionIcon: {
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
 });

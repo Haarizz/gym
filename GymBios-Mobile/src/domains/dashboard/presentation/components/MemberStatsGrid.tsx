@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -10,6 +11,7 @@ interface MemberStatsGridProps {
 }
 
 export function MemberStatsGrid({ stats }: MemberStatsGridProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.grid}>
       {stats.map((stat, index) => {
@@ -21,10 +23,10 @@ export function MemberStatsGrid({ stats }: MemberStatsGridProps) {
               <Feather name={iconName} size={16} color="#FFFFFF" />
             </View>
             <Text style={styles.value} numberOfLines={1}>
-              {stat.value}
+              {stat.kind === 'streak' ? t('memberHome.stats.streakDays', { count: Number(stat.value) }) : stat.value}
             </Text>
             <Text style={styles.label} numberOfLines={1}>
-              {stat.label}
+              {t(`memberHome.stats.${stat.kind}`)}
             </Text>
           </GlassSurface>
         );

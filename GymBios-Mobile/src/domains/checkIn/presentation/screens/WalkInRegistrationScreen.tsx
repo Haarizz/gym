@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
@@ -25,6 +26,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  * On successful payment, submits the walk-in check-in to the backend.
  */
 export function WalkInRegistrationScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const queryClient = useQueryClient();
@@ -75,8 +77,8 @@ export function WalkInRegistrationScreen() {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Register Visitor"
-        subtitle="Walk-in / daily visitor registration"
+        title={t('checkIn.walkIn.registerTitle')}
+        subtitle={t('checkIn.walkIn.registerScreenSubtitle')}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
       />
@@ -102,7 +104,7 @@ export function WalkInRegistrationScreen() {
         {/* Proceed to Payment — only enabled when form is valid */}
         <View style={styles.actionBar}>
           <Button
-            label="Cancel"
+            label={t('checkIn.walkIn.cancel')}
             variant="ghost"
             onPress={() => {
               reset();
@@ -112,7 +114,7 @@ export function WalkInRegistrationScreen() {
             disabled={isSubmitting}
           />
           <Button
-            label="Proceed to Payment"
+            label={t('checkIn.walkIn.proceedToPayment')}
             variant="primary"
             onPress={handleProceedToPayment}
             style={styles.proceedBtn}
@@ -125,8 +127,8 @@ export function WalkInRegistrationScreen() {
       <PaymentBottomSheet
         visible={isPaymentVisible}
         amount={selectedPlanPrice}
-        title={selectedPlanName || 'Walk-In Pass'}
-        subtitle={`Daily visitor pass — ${fullName}`}
+        title={selectedPlanName || t('checkIn.walkIn.walkInPassFallback')}
+        subtitle={t('checkIn.walkIn.visitorPassSubtitle', { name: fullName })}
         allowDiscount={false}
         onClose={handlePaymentClose}
         onComplete={handlePaymentDone}

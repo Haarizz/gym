@@ -1,4 +1,5 @@
 import { FlatList, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { WalkInVisitorCard } from './WalkInVisitorCard';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
@@ -6,6 +7,7 @@ import { Spacing } from '@/core/theme';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 
 export function WalkInVisitorList() {
+  const { t } = useTranslation();
   const { recentVisitors, isLoading } = useRecentCheckIns();
 
   if (isLoading) {
@@ -20,7 +22,13 @@ export function WalkInVisitorList() {
   }
 
   if (recentVisitors.length === 0) {
-    return <EmptyState title="No daily visitors yet" description="Walk-in passes issued today will appear here." icon="users" />;
+    return (
+      <EmptyState
+        title={t('checkIn.walkIn.noDailyVisitorsYet')}
+        description={t('checkIn.walkIn.noDailyVisitorsYetDesc')}
+        icon="users"
+      />
+    );
   }
 
   return (

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
+import { getLanguage, useLanguageStore } from '@/core/i18n';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, GlassHeader } from '@/shared/components';
 
@@ -9,17 +11,21 @@ import { useMySettings } from '../../hooks/useMySettings';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
 import {
   LinkedAccountRow,
+  SettingNavRow,
   SettingsCard,
   SettingSwitchRow,
 } from '../components/SettingsSection';
 
 interface SettingsScreenProps {
   onBack: () => void;
+  onNavigateToLanguage: () => void;
 }
 
-export function SettingsScreen({ onBack }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenProps) {
+  const { t } = useTranslation();
   const { settings } = useMySettings();
   const { updateSettings } = useProfileMutations();
+  const language = useLanguageStore((s) => s.language);
 
   // Local state initialized with query data
   const [notifications, setNotifications] = useState(settings.notifications);
@@ -43,78 +49,89 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <GlassHeader
-        title="Settings"
-        subtitle="Notifications, linked accounts & privacy"
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
         onBack={onBack}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Language */}
+        <SettingsCard title={t('settings.languageCard')} icon="globe">
+          <SettingNavRow
+            label={t('settings.appLanguage')}
+            description={t('settings.appLanguageDescription')}
+            value={getLanguage(language).nativeName}
+            onPress={onNavigateToLanguage}
+            divider={false}
+          />
+        </SettingsCard>
+
         {/* Notification Preferences */}
-        <SettingsCard title="Notification Preferences" icon="bell">
+        <SettingsCard title={t('settings.notificationsCard')} icon="bell">
           <SettingSwitchRow
-            label="Email Notifications"
-            description="Receive summaries and account updates via email"
+            label={t('settings.emailNotifications')}
+            description={t('settings.emailNotificationsDescription')}
             value={notifications.email}
             onValueChange={(val) => handleToggleNotification('email', val)}
             divider={false}
           />
           <SettingSwitchRow
-            label="Push Notifications"
-            description="Real-time alert notifications on this device"
+            label={t('settings.pushNotifications')}
+            description={t('settings.pushNotificationsDescription')}
             value={notifications.push}
             onValueChange={(val) => handleToggleNotification('push', val)}
           />
           <SettingSwitchRow
-            label="SMS Notifications"
-            description="Urgent security and payroll notifications via SMS"
+            label={t('settings.smsNotifications')}
+            description={t('settings.smsNotificationsDescription')}
             value={notifications.sms}
             onValueChange={(val) => handleToggleNotification('sms', val)}
           />
           <SettingSwitchRow
-            label="Performance Updates"
-            description="Quarterly and monthly KPI score notifications"
+            label={t('settings.performanceUpdates')}
+            description={t('settings.performanceUpdatesDescription')}
             value={notifications.performance}
             onValueChange={(val) => handleToggleNotification('performance', val)}
           />
           <SettingSwitchRow
-            label="Target Reminders"
-            description="Alerts when target deadlines are approaching"
+            label={t('settings.targetReminders')}
+            description={t('settings.targetRemindersDescription')}
             value={notifications.targets}
             onValueChange={(val) => handleToggleNotification('targets', val)}
           />
           <SettingSwitchRow
-            label="Payroll & Earnings"
-            description="Notifications when salaries and bonuses are processed"
+            label={t('settings.payrollEarnings')}
+            description={t('settings.payrollEarningsDescription')}
             value={notifications.payroll}
             onValueChange={(val) => handleToggleNotification('payroll', val)}
           />
         </SettingsCard>
 
         {/* Linked Accounts */}
-        <SettingsCard title="Linked Accounts" icon="link">
+        <SettingsCard title={t('settings.linkedAccountsCard')} icon="link">
           {settings.linkedAccounts.map((account, index) => (
             <LinkedAccountRow key={account.id} account={account} divider={index > 0} />
           ))}
         </SettingsCard>
 
         {/* Privacy Settings */}
-        <SettingsCard title="Privacy Settings" icon="shield">
+        <SettingsCard title={t('settings.privacyCard')} icon="shield">
           <SettingSwitchRow
-            label="Profile Visibility"
-            description="Allow team members and staff to view your profile details"
+            label={t('settings.profileVisibility')}
+            description={t('settings.profileVisibilityDescription')}
             value={privacy.profileVisibility}
             onValueChange={(val) => handleTogglePrivacy('profileVisibility', val)}
             divider={false}
           />
           <SettingSwitchRow
-            label="Performance Visibility"
-            description="Share your performance achievements and score on leaderboard"
+            label={t('settings.performanceVisibility')}
+            description={t('settings.performanceVisibilityDescription')}
             value={privacy.performanceVisibility}
             onValueChange={(val) => handleTogglePrivacy('performanceVisibility', val)}
           />
           <SettingSwitchRow
-            label="Activity Status"
-            description="Show active indicators when you are signed in"
+            label={t('settings.activityStatus')}
+            description={t('settings.activityStatusDescription')}
             value={privacy.activityStatus}
             onValueChange={(val) => handleTogglePrivacy('activityStatus', val)}
           />

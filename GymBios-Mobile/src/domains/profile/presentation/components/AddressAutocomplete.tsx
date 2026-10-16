@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
@@ -17,7 +18,8 @@ interface AddressAutocompleteProps {
   label?: string;
 }
 
-export function AddressAutocomplete({ value, onChange, error, label = "Address" }: AddressAutocompleteProps) {
+export function AddressAutocomplete({ value, onChange, error, label }: AddressAutocompleteProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { getCurrentLocation, isFetchingLocation, error: locationError } = useDeviceLocation();
   const [query, setQuery] = useState(value);
@@ -100,7 +102,7 @@ export function AddressAutocomplete({ value, onChange, error, label = "Address" 
     <View style={styles.container}>
       <View style={styles.header}>
         <Typography variant="bodySmallBold" style={styles.label}>
-          {label}
+          {label ?? t('address.label')}
         </Typography>
         <TouchableOpacity 
           style={styles.locationButton} 
@@ -113,7 +115,7 @@ export function AddressAutocomplete({ value, onChange, error, label = "Address" 
             <>
               <Feather name="navigation" size={14} color={BrandColors.teal} />
               <Typography variant="caption" style={{ color: BrandColors.teal, fontWeight: '600' }}>
-                Use current location
+                {t('address.useCurrentLocation')}
               </Typography>
             </>
           )}
@@ -124,7 +126,7 @@ export function AddressAutocomplete({ value, onChange, error, label = "Address" 
         <TextInput
           value={query}
           onChangeText={searchPlaces}
-          placeholder="Search for your address"
+          placeholder={t('address.searchPlaceholder')}
           placeholderTextColor={theme.textSecondary}
           onFocus={() => {
             if (predictions.length > 0) setShowPredictions(true);
@@ -212,13 +214,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   searchIcon: {
-    marginLeft: 8,
+    marginStart: 8,
   },
   predictionsContainer: {
     position: 'absolute',
     top: 75,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     borderWidth: 1,
     borderRadius: Radius.md,
     maxHeight: 200,
@@ -236,7 +238,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   predictionIcon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   errorText: {
     marginTop: 4,

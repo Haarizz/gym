@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import { useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -25,9 +26,9 @@ export function usePhotoPicker() {
       if (!permission.granted) {
         toast.warning(
           permission.canAskAgain
-            ? 'Camera access is needed to take a photo.'
-            : 'Camera access is turned off. Enable it in Settings to take a photo.',
-          { title: 'Permission Required' },
+            ? i18n.t('shared.photo.cameraNeeded')
+            : i18n.t('shared.photo.cameraOff'),
+          { title: i18n.t('shared.photo.permissionTitle') },
         );
         return undefined;
       }
@@ -35,7 +36,7 @@ export function usePhotoPicker() {
       const result = await ImagePicker.launchCameraAsync(PICKER_OPTIONS);
       return result.canceled ? undefined : result.assets?.[0]?.uri;
     } catch {
-      toast.error('Camera is unavailable on this device.');
+      toast.error(i18n.t('shared.photo.cameraUnavailable'));
       return undefined;
     }
   }, []);
@@ -46,9 +47,9 @@ export function usePhotoPicker() {
       if (!permission.granted) {
         toast.warning(
           permission.canAskAgain
-            ? 'Gallery access is needed to select a photo.'
-            : 'Photo access is turned off. Enable it in Settings to choose a photo.',
-          { title: 'Permission Required' },
+            ? i18n.t('shared.photo.galleryNeeded')
+            : i18n.t('shared.photo.galleryOff'),
+          { title: i18n.t('shared.photo.permissionTitle') },
         );
         return undefined;
       }
@@ -56,7 +57,7 @@ export function usePhotoPicker() {
       const result = await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS);
       return result.canceled ? undefined : result.assets?.[0]?.uri;
     } catch {
-      toast.error('Unable to open image gallery.');
+      toast.error(i18n.t('shared.photo.galleryFailed'));
       return undefined;
     }
   }, []);

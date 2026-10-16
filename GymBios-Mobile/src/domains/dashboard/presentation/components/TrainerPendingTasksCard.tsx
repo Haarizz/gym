@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
@@ -14,11 +15,12 @@ export function TrainerPendingTasksCard({
   tasks,
   onToggleTask,
 }: TrainerPendingTasksCardProps) {
+  const { t } = useTranslation();
   if (!tasks || tasks.length === 0) return null;
 
   return (
     <GlassSurface tint="#D97706" radius={Radius.md} style={styles.container}>
-      <Text style={styles.title}>Pending Tasks</Text>
+      <Text style={styles.title}>{t('dashboard.trainer.pendingTasks.title')}</Text>
       <View style={styles.list}>
         {tasks.map((item) => (
           <Pressable
@@ -48,7 +50,7 @@ export function TrainerPendingTasksCard({
                 {item.task}
               </Text>
               {item.urgent && !item.completed && (
-                <Text style={styles.urgentBadge}>Urgent</Text>
+                <Text style={styles.urgentBadge}>{t('dashboard.trainer.pendingTasks.urgent')}</Text>
               )}
             </View>
           </Pressable>

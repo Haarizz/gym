@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
@@ -21,6 +22,7 @@ export interface MembershipAddonsTabProps {
 }
 
 export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }: MembershipAddonsTabProps) {
+  const { t } = useTranslation();
   const [selectedAddOn, setSelectedAddOn] = useState<AddOn | null>(null);
   const [paymentAddOn, setPaymentAddOn] = useState<AddOn | null>(null);
   
@@ -40,11 +42,13 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
       { addonId: paymentAddOn.id, paymentResult: result },
       {
         onSuccess: () => {
-          toast.success(`${paymentAddOn.name} purchased successfully.`);
+          toast.success(t('membership.addons.purchased', { name: paymentAddOn.name }));
           setPaymentAddOn(null);
         },
         onError: (err: any) => {
-          toast.error(err?.message || 'Could not process the purchase.', { title: 'Purchase Failed' });
+          toast.error(err?.message || t('membership.addons.purchaseFailed'), {
+            title: t('membership.addons.purchaseFailedTitle'),
+          });
         },
       }
     );
@@ -62,7 +66,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
     return (
       <View style={styles.container}>
         <Text style={{ textAlign: 'center', color: BrandColors.textSecondary }}>
-          Failed to load add-ons.
+          {t('membership.addons.loadError')}
         </Text>
       </View>
     );
@@ -75,14 +79,14 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
       {/* Available Add-ons Card */}
       <GlassSurface radius={Radius.lg} style={styles.card}>
         <View style={styles.headerRow}>
-          <Text style={styles.cardTitle}>Available Add-ons</Text>
+          <Text style={styles.cardTitle}>{t('membership.addons.availableTitle')}</Text>
           <Feather name="gift" size={18} color={BrandColors.memberGold} />
         </View>
 
         <View style={styles.addonList}>
           {available.length === 0 ? (
             <Text style={{ textAlign: 'center', color: BrandColors.textSecondary, paddingVertical: Spacing.two }}>
-              No add-ons available at the moment.
+              {t('membership.addons.empty')}
             </Text>
           ) : (
             available.map((addon) => (
@@ -95,9 +99,9 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
                   style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
                   onPress={() => setSelectedAddOn(addon)}
                   accessibilityRole="button"
-                  accessibilityLabel={`View details for ${addon.name}`}
+                  accessibilityLabel={t('membership.addons.viewDetailsA11y', { name: addon.name })}
                 >
-                  <Text style={styles.addButtonText}>Add</Text>
+                  <Text style={styles.addButtonText}>{t('membership.addons.add')}</Text>
                 </Pressable>
               </View>
             ))
@@ -112,10 +116,10 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
 
       {/* Active Add-ons Card */}
       <View style={styles.activeCard}>
-        <Text style={styles.activeTitle}>Your Active Add-ons</Text>
+        <Text style={styles.activeTitle}>{t('membership.addons.activeTitle')}</Text>
         {active.length === 0 ? (
           <Text style={{ color: 'rgba(255,255,255,0.8)', paddingVertical: Spacing.two }}>
-            You don't have any active add-ons yet.
+            {t('membership.addons.activeEmpty')}
           </Text>
         ) : (
           active.map((activeAddOn) => (
@@ -128,7 +132,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
           ))
         )}
         <Text style={styles.activeSubtext}>
-          Add more services to elevate your workout experience
+          {t('membership.addons.activeSubtext')}
         </Text>
       </View>
 
@@ -144,7 +148,7 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
           visible={!!paymentAddOn}
           amount={paymentAddOn.price}
           title={paymentAddOn.name}
-          subtitle={`Purchasing ${paymentAddOn.pricingUnit} add-on`}
+          subtitle={t('membership.addons.purchasingSubtitle', { unit: paymentAddOn.pricingUnit })}
           allowDiscount={false}
           onClose={() => setPaymentAddOn(null)}
           onComplete={handlePaymentComplete}
@@ -185,7 +189,7 @@ const styles = StyleSheet.create({
   },
   addonInfo: {
     flex: 1,
-    paddingRight: Spacing.two,
+    paddingEnd: Spacing.two,
   },
   addonName: {
     fontSize: 15,

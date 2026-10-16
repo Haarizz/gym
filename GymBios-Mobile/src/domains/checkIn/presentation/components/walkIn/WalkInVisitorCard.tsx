@@ -1,19 +1,22 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Surface } from '@/shared/components/Surface';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import { MemberStatusBadge } from '../members/MemberStatusBadge';
 import { Radius, Spacing } from '@/core/theme';
+import { formatDate } from '@/core/i18n';
 
 interface WalkInVisitorCardProps {
   visitor: any;
 }
 
 export function WalkInVisitorCard({ visitor }: WalkInVisitorCardProps) {
-  const name = visitor.walkInName || visitor.memberName || 'Unknown';
-  const phone = visitor.walkInPhone || 'No phone';
+  const { t } = useTranslation();
+  const name = visitor.walkInName || visitor.memberName || t('checkIn.members.unknownMember');
+  const phone = visitor.walkInPhone || t('checkIn.walkIn.noPhone');
   
-  const inTime = visitor.checkInTime ? new Date(visitor.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
+  const inTime = visitor.checkInTime ? formatDate(visitor.checkInTime, 'p') : '--:--';
 
   return (
     <Surface style={styles.card}>
@@ -23,7 +26,9 @@ export function WalkInVisitorCard({ visitor }: WalkInVisitorCardProps) {
       <View style={styles.info}>
         <Typography variant="body" style={styles.name}>{name}</Typography>
         <Typography variant="caption" color="textSecondary">{phone}</Typography>
-        <Typography variant="caption" color="textSecondary">In: {inTime}</Typography>
+        <Typography variant="caption" color="textSecondary">
+          {t('checkIn.members.inTime', { time: inTime })}
+        </Typography>
       </View>
       <View style={styles.status}>
         <MemberStatusBadge isActive={visitor.status === 'In Gym'} statusText={visitor.status || 'Active'} />
@@ -41,7 +46,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   avatar: {
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   info: {
     flex: 1,

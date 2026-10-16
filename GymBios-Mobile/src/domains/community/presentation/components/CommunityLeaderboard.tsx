@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { getIntlLocale } from '@/core/i18n';
 import { StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
@@ -21,6 +23,7 @@ interface CommunityLeaderboardProps {
 }
 
 export function CommunityLeaderboard({ entries }: CommunityLeaderboardProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
@@ -53,14 +56,14 @@ export function CommunityLeaderboard({ entries }: CommunityLeaderboardProps) {
                 {entry.username}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                {entry.totalPosts ?? 0} posts · {entry.totalLikes ?? 0} likes
+                {t('community.leaderboard.postsLikes', { posts: entry.totalPosts ?? 0, likes: entry.totalLikes ?? 0 })}
               </Typography>
             </View>
 
             {/* Score */}
             <View style={[styles.scoreBadge, { backgroundColor: primaryColor + '18' }]}>
               <Typography variant="caption" style={[styles.scoreText, { color: primaryColor }]}>
-                {(entry.engagementScore ?? 0).toLocaleString()} pts
+                {t('community.leaderboard.points', { value: (entry.engagementScore ?? 0).toLocaleString(getIntlLocale()) })}
               </Typography>
             </View>
           </View>

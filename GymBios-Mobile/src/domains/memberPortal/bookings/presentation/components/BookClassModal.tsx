@@ -7,8 +7,11 @@ import {
   Switch,
   View,
   ActivityIndicator,
+  I18nManager,
 } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatClockTime, formatDate } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { useQueryClient } from '@tanstack/react-query';
 import { BrandColors, Colors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -33,24 +36,9 @@ interface BookClassModalProps {
   onClose: () => void;
 }
 
-function formatTime(timeStr: string) {
-  try {
-    const [h, m] = timeStr.split(':');
-    let hours = parseInt(h, 10);
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    return `${hours.toString().padStart(2, '0')}:${m} ${ampm}`;
-  } catch {
-    return timeStr;
-  }
-}
+const formatTime = formatClockTime;
 
-const SESSION_TYPE_LABELS: Record<SessionType, string> = {
-  class: 'Group Class',
-  pt: 'Personal Training',
-  facility: 'Facility',
-};
+const SESSION_TYPES: SessionType[] = ['class', 'pt', 'facility'];
 
 // Mirrors the backend's PassContext.forSessionType — facility sessions take no Reward Pass.
 function passContextFor(type: SessionType | undefined): PassContext | null {
@@ -66,6 +54,7 @@ type Step = 'select' | 'review' | 'pay';
 
 export function BookClassModal({ visible, onClose }: BookClassModalProps) {
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
   const [step, setStep] = useState<Step>('select');
   const [selectedDayOffset, setSelectedDayOffset] = useState(0);
   const [selected, setSelected] = useState<AvailableClassData | null>(null);
@@ -79,11 +68,12 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
     d.setDate(d.getDate() + offset);
     return {
       offset,
-      dayName: offset === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayName: offset === 0 ? t('bookings.book.today') : formatDate(d, 'EEE'),
       dateNum: d.getDate(),
       isoString: d.toISOString().split('T')[0],
     };
-  }), []);
+    // Day names follow the app language.
+  }), [t, i18n.language]);
 
   const selectedDate = dates.find((d) => d.offset === selectedDayOffset) ?? dates[0];
 
@@ -136,11 +126,16 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
         onSuccess: (booking) => {
           if (booking.status?.toUpperCase() === 'PENDING_APPROVAL') {
             toast.success(
-              `Your seat for ${selected.className} is held while the gym confirms your ${payment?.paymentMethodUsed ?? ''} payment.`,
-              { title: 'Awaiting Approval', duration: 5000 },
+              t('bookings.book.awaitingApprovalMessage', {
+                name: selected.className,
+                method: payment?.paymentMethodUsed ?? '',
+              }),
+              { title: t('bookings.book.awaitingApprovalTitle'), duration: 5000 },
             );
           } else {
-            toast.success(`You're booked for ${selected.className}.`, { title: 'Booking Confirmed' });
+            toast.success(t('bookings.book.confirmedMessage', { name: selected.className }), {
+              title: t('bookings.book.confirmedTitle'),
+            });
           }
           close();
         },
@@ -148,14 +143,14 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
           if (err?.body?.error === 'SESSION_FULL') {
             // Someone took the last seat while this member was paying — nothing was charged.
             queryClient.invalidateQueries({ queryKey: [...queryKeys.all, 'availableClasses'] });
-            toast.error('Someone just took the last spot. You have not been charged.', {
-              title: 'Class Full',
+            toast.error(t('bookings.book.classFullMessage'), {
+              title: t('bookings.book.classFullTitle'),
               duration: 5000,
             });
             reset();
             return;
           }
-          toast.error(err?.message || 'Could not book this session.', { title: 'Booking Failed' });
+          toast.error(err?.message || t('bookings.book.failedMessage'), { title: t('bookings.book.failedTitle') });
           setStep('review');
         },
       },
@@ -178,13 +173,13 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
               <View style={styles.headerLeft}>
                 {step === 'review' && (
                   <Pressable hitSlop={12} onPress={() => setStep('select')} style={styles.backButton}>
-                    <Feather name="arrow-left" size={20} color={BrandColors.textPrimary} />
+                    <Feather name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={20} color={BrandColors.textPrimary} />
                   </Pressable>
                 )}
                 <View style={styles.headerText}>
-                  <Text style={styles.title}>{step === 'review' ? 'Review & Pay' : 'Book a Session'}</Text>
+                  <Text style={styles.title}>{step === 'review' ? t('bookings.book.reviewTitle') : t('bookings.book.title')}</Text>
                   <Text style={styles.subtitle}>
-                    {step === 'review' ? selected?.className : 'Select your preferred session and time'}
+                    {step === 'review' ? selected?.className : t('bookings.book.subtitle')}
                   </Text>
                 </View>
               </View>
@@ -196,7 +191,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
             {step === 'select' ? (
               <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
                 {/* Date Selector */}
-                <Text style={styles.sectionTitle}>Select Date</Text>
+                <Text style={styles.sectionTitle}>{t('bookings.book.selectDate')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.datesRow}>
                   {dates.map((item) => {
                     const isSelected = selectedDayOffset === item.offset;
@@ -217,7 +212,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                 </ScrollView>
 
                 {/* Class Selector */}
-                <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Available Sessions</Text>
+                <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>{t('bookings.book.availableSessions')}</Text>
                 <View style={styles.classList}>
                   {isLoading && (
                     <View style={styles.centerContainer}>
@@ -226,12 +221,12 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                   )}
                   {isError && (
                     <View style={styles.centerContainer}>
-                      <Text style={styles.errorText}>Unable to load sessions</Text>
+                      <Text style={styles.errorText}>{t('bookings.book.loadError')}</Text>
                     </View>
                   )}
                   {!isLoading && !isError && (!availableClasses || availableClasses.length === 0) && (
                     <View style={styles.centerContainer}>
-                      <Text style={styles.emptyText}>No sessions available</Text>
+                      <Text style={styles.emptyText}>{t('bookings.book.empty')}</Text>
                     </View>
                   )}
                   {!isLoading && !isError && availableClasses?.map((cls) => {
@@ -259,34 +254,34 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                         }}
                       >
                         <View style={styles.classInfo}>
-                          {cls.type && SESSION_TYPE_LABELS[cls.type] && (
-                            <Text style={styles.typeBadge}>{SESSION_TYPE_LABELS[cls.type]}</Text>
+                          {cls.type && SESSION_TYPES.includes(cls.type) && (
+                            <Text style={styles.typeBadge}>{t(`bookings.book.types.${cls.type}`)}</Text>
                           )}
                           <Text style={[styles.className, isSelected && styles.classNameSelected]}>
                             {cls.className}
                           </Text>
                           <Text style={styles.classDetails}>
                             {cls.trainerName
-                              ? `with ${cls.trainerName} • ${cls.durationMinutes} min`
+                              ? t('bookings.book.withTrainerDuration', { name: cls.trainerName, minutes: cls.durationMinutes })
                               : cls.type === 'facility'
-                                ? `${cls.durationMinutes} min`
-                                : `with Instructor • ${cls.durationMinutes} min`}
+                                ? t('bookings.book.duration', { minutes: cls.durationMinutes })
+                                : t('bookings.book.withInstructorDuration', { minutes: cls.durationMinutes })}
                           </Text>
                           <View style={styles.locationTag}>
                             <Feather name="map-pin" size={11} color={BrandColors.textSecondary} />
-                            <Text style={styles.locationText}>{cls.location || 'Location not specified'}</Text>
+                            <Text style={styles.locationText}>{cls.location || t('bookings.book.noLocation')}</Text>
                           </View>
 
                           {isBooked ? (
-                            <Text style={styles.statusTextBooked}>Already Booked</Text>
+                            <Text style={styles.statusTextBooked}>{t('bookings.book.alreadyBooked')}</Text>
                           ) : isFull ? (
                             <View style={styles.fullBadge}>
                               <Feather name="slash" size={11} color={Colors.light.error} />
-                              <Text style={styles.fullBadgeText}>Class Full — no spots left</Text>
+                              <Text style={styles.fullBadgeText}>{t('bookings.book.classFull')}</Text>
                             </View>
                           ) : cls.availableSpots != null ? (
                             <Text style={[styles.spotsText, fewLeft && styles.spotsTextFew]}>
-                              {cls.availableSpots} {cls.availableSpots === 1 ? 'spot' : 'spots'} left
+                              {t('bookings.book.spotsLeft', { count: cls.availableSpots })}
                             </Text>
                           ) : null}
                         </View>
@@ -297,7 +292,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                           {cls.price && cls.price > 0 ? (
                             <CurrencyValue style={styles.priceText} amount={cls.price} />
                           ) : (
-                            <Text style={styles.freeText}>Free</Text>
+                            <Text style={styles.freeText}>{t('bookings.book.free')}</Text>
                           )}
                         </View>
                       </Pressable>
@@ -311,10 +306,11 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                   <View style={styles.summaryCard}>
                     <Text style={styles.summaryName}>{selected.className}</Text>
                     <Text style={styles.classDetails}>
-                      {selected.date} • {formatTime(selected.startTime)} • {selected.durationMinutes} min
+                      {formatDate(selected.date, 'PP')} • {formatTime(selected.startTime)} •{' '}
+                      {t('bookings.book.duration', { minutes: selected.durationMinutes })}
                     </Text>
                     {selected.trainerName ? (
-                      <Text style={styles.classDetails}>with {selected.trainerName}</Text>
+                      <Text style={styles.classDetails}>{t('bookings.withTrainer', { name: selected.trainerName })}</Text>
                     ) : null}
                   </View>
                 )}
@@ -331,17 +327,17 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
 
                     <View style={styles.priceCard}>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Session price</Text>
+                        <Text style={styles.priceLabel}>{t('bookings.book.sessionPrice')}</Text>
                         <CurrencyValue style={styles.priceValue} amount={price} />
                       </View>
                       {discount > 0 && (
                         <View style={styles.priceRow}>
                           <Text style={styles.priceLabel}>
                             {rewardSel?.kind === 'pass'
-                              ? 'Reward Pass'
+                              ? t('bookings.book.rewardPass')
                               : rewardSel?.kind === 'coupon' && rewardSel.coupon.source === 'PROMOTION'
-                                ? rewardSel.coupon.name || 'Promotion'
-                                : 'Coupon'}
+                                ? rewardSel.coupon.name || t('bookings.book.promotion')
+                                : t('bookings.book.coupon')}
                           </Text>
                           <CurrencyValue style={styles.discountText} amount={-discount} />
                         </View>
@@ -349,9 +345,12 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                       {walletBalance > 0 && net > 0 && (
                         <View style={styles.walletRow}>
                           <View style={styles.walletText}>
-                            <Text style={styles.priceLabel}>Use wallet balance</Text>
+                            <Text style={styles.priceLabel}>{t('bookings.book.useWallet')}</Text>
                             <Text style={styles.walletHint}>
-                              <CurrencyValue amount={walletBalance} /> available
+                              <Trans
+                                i18nKey="bookings.book.walletAvailable"
+                                components={{ amount: <CurrencyValue amount={walletBalance} /> }}
+                              />
                             </Text>
                           </View>
                           <Switch
@@ -363,13 +362,13 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                       )}
                       {walletApplied > 0 && (
                         <View style={styles.priceRow}>
-                          <Text style={styles.priceLabel}>From wallet</Text>
+                          <Text style={styles.priceLabel}>{t('bookings.book.fromWallet')}</Text>
                           <CurrencyValue style={styles.discountText} amount={-walletApplied} />
                         </View>
                       )}
                       <View style={styles.divider} />
                       <View style={styles.priceRow}>
-                        <Text style={styles.totalLabel}>Total to pay</Text>
+                        <Text style={styles.totalLabel}>{t('bookings.book.totalToPay')}</Text>
                         <CurrencyValue style={styles.totalValue} amount={toPay} />
                       </View>
                     </View>
@@ -382,21 +381,30 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                           size={16}
                           color={refundable ? BrandColors.teal : Colors.light.error}
                         />
-                        <Text style={styles.policyTitle}>Cancellation policy</Text>
+                        <Text style={styles.policyTitle}>{t('bookings.book.cancellationPolicy')}</Text>
                       </View>
                       {refundable ? (
                         <Text style={styles.policyText}>
-                          Cancel before <Text style={styles.policyStrong}>{deadline ?? `${REFUND_CUTOFF_HOURS} hours before the session`}</Text>
-                          {' '}({REFUND_CUTOFF_HOURS} hours before it starts){' '}
-                          {rewardSel?.kind === 'pass' && net === 0
-                            ? 'to get your Reward Pass back.'
-                            : 'for a full refund to your wallet. Refunds to your original payment method are coming soon.'}
-                          {' '}After that, cancelling is still possible but <Text style={styles.policyStrong}>no refund</Text> is given.
+                          <Trans
+                            i18nKey={
+                              rewardSel?.kind === 'pass' && net === 0
+                                ? 'bookings.book.policyRefundablePass'
+                                : 'bookings.book.policyRefundable'
+                            }
+                            values={{
+                              deadline: deadline ?? t('bookings.book.hoursBeforeSession', { hours: REFUND_CUTOFF_HOURS }),
+                              hours: REFUND_CUTOFF_HOURS,
+                            }}
+                            components={{ b: <Text style={styles.policyStrong} /> }}
+                          />
                         </Text>
                       ) : (
                         <Text style={styles.policyText}>
-                          This session starts within {REFUND_CUTOFF_HOURS} hours, so this booking{' '}
-                          <Text style={styles.policyStrong}>can&apos;t be refunded</Text> if you cancel.
+                          <Trans
+                            i18nKey="bookings.book.policyNotRefundable"
+                            values={{ hours: REFUND_CUTOFF_HOURS }}
+                            components={{ b: <Text style={styles.policyStrong} /> }}
+                          />
                         </Text>
                       )}
                       <Pressable
@@ -410,15 +418,15 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                           size={18}
                           color={policyAccepted ? BrandColors.memberGold : BrandColors.textSecondary}
                         />
-                        <Text style={styles.checkText}>I understand the cancellation policy</Text>
+                        <Text style={styles.checkText}>{t('bookings.book.acceptPolicy')}</Text>
                       </Pressable>
                     </View>
                   </>
                 ) : (
                   <View style={styles.priceCard}>
                     <View style={styles.priceRow}>
-                      <Text style={styles.totalLabel}>Price</Text>
-                      <Text style={styles.freeTotal}>Free</Text>
+                      <Text style={styles.totalLabel}>{t('bookings.book.price')}</Text>
+                      <Text style={styles.freeTotal}>{t('bookings.book.free')}</Text>
                     </View>
                   </View>
                 )}
@@ -432,7 +440,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                   onPress={() => setStep('review')}
                   disabled={!selected}
                 >
-                  <Text style={styles.confirmButtonText}>Continue</Text>
+                  <Text style={styles.confirmButtonText}>{t('bookings.book.continue')}</Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -444,10 +452,13 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : toPay > 0 ? (
                     <Text style={styles.confirmButtonText}>
-                      Continue to Payment · <CurrencyValue amount={toPay} />
+                      <Trans
+                        i18nKey="bookings.book.continueToPayment"
+                        components={{ amount: <CurrencyValue amount={toPay} /> }}
+                      />
                     </Text>
                   ) : (
-                    <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+                    <Text style={styles.confirmButtonText}>{t('bookings.book.confirmBooking')}</Text>
                   )}
                 </Pressable>
               )}
@@ -461,7 +472,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
           visible={visible && step === 'pay'}
           amount={toPay}
           title={selected.className}
-          subtitle={`${selected.date} • ${formatTime(selected.startTime)}`}
+          subtitle={`${formatDate(selected.date, 'PP')} • ${formatTime(selected.startTime)}`}
           allowDiscount={false}
           isProcessing={isCreating}
           onClose={() => setStep('review')}
@@ -658,7 +669,7 @@ const styles = StyleSheet.create({
   rightColumn: {
     alignItems: 'flex-end',
     gap: Spacing.one + 2,
-    marginLeft: Spacing.two,
+    marginStart: Spacing.two,
   },
   timeTag: {
     backgroundColor: '#FEF3C7',

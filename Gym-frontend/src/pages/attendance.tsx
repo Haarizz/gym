@@ -35,8 +35,14 @@ function fmtAvgDuration(minutes: number) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+/** Workout timer from the member app: running, its length once ended, or '' if none. */
+function workoutLabel(r: AttendanceListItem): string {
+  if (!r.workout_start_time) return '';
+  return r.workout_end_time ? r.formatted_workout_duration || '' : 'In progress';
+}
+
 function exportCsv(items: AttendanceListItem[]) {
-  const header = 'Name,ID,Type,Check In,Check Out,Duration,Activity,Status';
+  const header = 'Name,ID,Type,Check In,Check Out,Duration,Workout,Activity,Status';
   const rows = items.map(r => [
     r.member_name || r.walk_in_name || 'Visitor',
     r.member_biz_id || '',
@@ -44,6 +50,7 @@ function exportCsv(items: AttendanceListItem[]) {
     r.check_in_time ? new Date(r.check_in_time).toLocaleString() : '',
     r.check_out_time ? new Date(r.check_out_time).toLocaleString() : '',
     r.formatted_duration || '',
+    workoutLabel(r),
     r.activity_type || '',
     r.status,
   ].join(','));
@@ -382,6 +389,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                       <TableHead>Check In</TableHead>
                       <TableHead>Check Out</TableHead>
                       <TableHead>Duration</TableHead>
+                      <TableHead>Workout</TableHead>
                       <TableHead>Activity</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead></TableHead>
@@ -432,6 +440,13 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                           </TableCell>
                           <TableCell className="font-medium text-sm">
                             {record.formatted_duration || '—'}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {record.workout_start_time && !record.workout_end_time ? (
+                              <span className="text-muted-foreground italic">In progress</span>
+                            ) : (
+                              workoutLabel(record) || '—'
+                            )}
                           </TableCell>
                           <TableCell>
                             {record.activity_type ? (

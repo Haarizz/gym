@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface TrainerAvailabilityCardProps {
@@ -8,6 +9,8 @@ interface TrainerAvailabilityCardProps {
 }
 
 export function TrainerAvailabilityCard({ onUpdateSchedule }: TrainerAvailabilityCardProps) {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient
       colors={[BrandColors.teal, BrandColors.tealDark]}
@@ -15,17 +18,17 @@ export function TrainerAvailabilityCard({ onUpdateSchedule }: TrainerAvailabilit
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Manage Availability</Text>
+      <Text style={styles.title}>{t('schedule.trainer.manageAvailability')}</Text>
       <Text style={styles.description}>
-        Set your working hours and block off time when you're unavailable
+        {t('schedule.trainer.manageAvailabilityDesc')}
       </Text>
       <Pressable
         style={styles.button}
         onPress={onUpdateSchedule}
         accessibilityRole="button"
-        accessibilityLabel="Update Schedule"
+        accessibilityLabel={t('schedule.trainer.updateSchedule')}
       >
-        <Text style={styles.buttonText}>Update Schedule</Text>
+        <Text style={styles.buttonText}>{t('schedule.trainer.updateSchedule')}</Text>
       </Pressable>
     </LinearGradient>
   );

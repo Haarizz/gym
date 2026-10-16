@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface StaffScheduleHeaderCardProps {
@@ -15,14 +16,17 @@ export function StaffScheduleHeaderCard({
   dateText,
   tasksCount,
   urgentCount = 3,
-  title = "Today's Schedule",
+  title,
   onCalendarPress,
 }: StaffScheduleHeaderCardProps) {
+  const { t } = useTranslation();
+  const displayTitle = title ?? t('schedule.todaySchedule');
+
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View style={styles.titleInfo}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>{displayTitle}</Text>
           <Text style={styles.date}>{dateText}</Text>
         </View>
         <Pressable
@@ -30,7 +34,7 @@ export function StaffScheduleHeaderCard({
           disabled={!onCalendarPress}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Pick a date"
+          accessibilityLabel={t('schedule.staff.pickDate')}
           style={({ pressed }) => [styles.calendarButton, pressed && { opacity: 0.6 }]}
         >
           <Feather name="calendar" size={24} color={BrandColors.teal} />
@@ -38,8 +42,8 @@ export function StaffScheduleHeaderCard({
       </View>
 
       <View style={styles.footerRow}>
-        <Text style={styles.tasksText}>Tasks: {tasksCount}</Text>
-        <Text style={styles.urgentText}>{urgentCount} High Priority</Text>
+        <Text style={styles.tasksText}>{t('schedule.staff.tasksCount', { count: tasksCount })}</Text>
+        <Text style={styles.urgentText}>{t('schedule.staff.urgentCount', { count: urgentCount })}</Text>
       </View>
     </View>
   );

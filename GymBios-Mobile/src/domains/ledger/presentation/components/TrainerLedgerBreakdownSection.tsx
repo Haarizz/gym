@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,11 +17,13 @@ export function TrainerLedgerBreakdownSection({
   summary,
   growth,
 }: TrainerLedgerBreakdownSectionProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Earnings Breakdown */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Earnings Breakdown</Text>
+        <Text style={styles.cardTitle}>{t('ledger.breakdown.title')}</Text>
         <View style={styles.breakdownList}>
           {breakdown.map((item, idx) => (
             <View key={idx} style={styles.breakdownItem}>
@@ -53,22 +56,22 @@ export function TrainerLedgerBreakdownSection({
         end={{ x: 1, y: 0 }}
         style={styles.comparisonCard}
       >
-        <Text style={styles.comparisonTitle}>Monthly Comparison</Text>
+        <Text style={styles.comparisonTitle}>{t('ledger.breakdown.monthlyComparisonTitle')}</Text>
         <View style={styles.comparisonList}>
           <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabel}>This Month</Text>
+            <Text style={styles.comparisonLabel}>{t('ledger.summary.thisMonth')}</Text>
             <Text style={styles.comparisonValue}>
               <CurrencyValue amount={summary.thisMonth} compact />
             </Text>
           </View>
           <View style={styles.comparisonRow}>
-            <Text style={styles.comparisonLabel}>Last Month</Text>
+            <Text style={styles.comparisonLabel}>{t('ledger.summary.lastMonth')}</Text>
             <Text style={styles.comparisonValue}>
               <CurrencyValue amount={summary.lastMonth} compact />
             </Text>
           </View>
           <View style={[styles.comparisonRow, styles.growthRow]}>
-            <Text style={styles.comparisonLabel}>Growth</Text>
+            <Text style={styles.comparisonLabel}>{t('ledger.stats.growth')}</Text>
             <Text style={[styles.comparisonValue, styles.growthValue]}>{growth}</Text>
           </View>
         </View>

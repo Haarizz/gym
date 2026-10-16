@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { isValidElement, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -32,12 +33,14 @@ export function InfoRow({
   iconBackground = 'rgba(50,127,116,0.1)',
   label,
   value,
-  emptyText = 'Not added',
+  emptyText: emptyTextProp,
   divider = true,
   right,
   onPress,
   valueLines = 2,
 }: InfoRowProps) {
+  const { t } = useTranslation();
+  const emptyText = emptyTextProp ?? t('shared.notAdded');
   const Wrapper = onPress ? Pressable : View;
   const isPlainValue =
     typeof value === 'string' || typeof value === 'number' || (isValidElement(value) && value.type === CurrencyValue);

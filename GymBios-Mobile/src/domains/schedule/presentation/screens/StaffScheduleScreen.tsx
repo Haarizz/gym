@@ -20,8 +20,10 @@ import { StaffTaskItemCard } from '../components/StaffTaskItemCard';
 import { StaffUpcomingFollowUpsCard } from '../components/StaffUpcomingFollowUpsCard';
 import { StaffProductivityTipCard } from '../components/StaffProductivityTipCard';
 import { NextFollowUpSheet } from '../components/NextFollowUpSheet';
+import { useTranslation } from 'react-i18next';
 
 export function StaffScheduleScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [taskAction, setTaskAction] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -57,18 +59,18 @@ export function StaffScheduleScreen() {
     try {
       await completeTask({ taskId: task.id, outcome, notes: notes || undefined });
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to complete follow-up.', { title: 'Error' });
+      toast.error(err?.message || t('schedule.staff.failedToComplete'), { title: t('schedule.errorTitle') });
       return;
     }
     setCompletingTask(null);
 
     if (outcome === 'converted') {
       toast.success(
-        'Lead marked as converted. Ask the front desk to register them as a member — the sale will be credited to you.',
-        { title: 'Lead Converted' },
+        t('schedule.staff.leadConvertedDesc'),
+        { title: t('schedule.staff.leadConvertedTitle') },
       );
     } else if (outcome === 'not-interested') {
-      toast.info('The lead has been closed as lost.', { title: 'Lead Closed' });
+      toast.info(t('schedule.staff.leadClosedDesc'), { title: t('schedule.staff.leadClosedTitle') });
     } else {
       setNextForTask(task);
     }
@@ -80,13 +82,16 @@ export function StaffScheduleScreen() {
     try {
       await scheduleNextFollowUp({ taskId: task.id, request });
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to schedule the next follow-up.', { title: 'Error' });
+      toast.error(err?.message || t('schedule.staff.failedToScheduleNext'), { title: t('schedule.errorTitle') });
       return;
     }
     setNextForTask(null);
     toast.success(
-      `Next follow-up with ${task.name} booked for ${format(parse(request.dueDate, 'yyyy-MM-dd', new Date()), 'MMM d')}.`,
-      { title: 'Follow-up Scheduled' },
+      t('schedule.staff.nextFollowUpSuccess', {
+        name: task.name,
+        date: format(parse(request.dueDate, 'yyyy-MM-dd', new Date()), 'MMM d'),
+      }),
+      { title: t('schedule.staff.followUpScheduledTitle') },
     );
   };
 
@@ -132,7 +137,7 @@ export function StaffScheduleScreen() {
   if ((isLoading && !data) || (isClassesLoading && !allClasses)) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading schedule..." />
+        <Loader message={t('schedule.loadingSchedule')} />
       </View>
     );
   }
@@ -140,10 +145,15 @@ export function StaffScheduleScreen() {
   if (!data) {
     return (
       <View style={styles.loaderContainer}>
-        <Text style={{ color: '#64748B' }}>Failed to load schedule.</Text>
+        <Text style={{ color: '#64748B' }}>{t('schedule.failedToLoad')}</Text>
       </View>
     );
   }
+
+  const dropdownOptions = [
+    { label: t('schedule.staff.addNewLead'), value: 'add_lead' },
+    { label: t('schedule.staff.scheduleNewClass'), value: 'schedule_class' }
+  ];
 
   return (
     <ScrollView
@@ -160,7 +170,7 @@ export function StaffScheduleScreen() {
       showsVerticalScrollIndicator={false}
     >
       <StaffScheduleHeaderCard
-        title={viewingToday ? "Today's Schedule" : 'Schedule'}
+        title={viewingToday ? t('schedule.todaySchedule') : t('schedule.title')}
         dateText={format(selectedDate, 'EEEE, MMMM d, yyyy')}
         tasksCount={combinedTasks.length}
         urgentCount={combinedTasks.filter((t) => t.priority === 'high').length}
@@ -180,7 +190,7 @@ export function StaffScheduleScreen() {
       
       <View style={styles.dropdownContainer}>
         <Dropdown
-          placeholder="Add New Task"
+          placeholder={t('schedule.staff.addNewTask')}
           value={taskAction}
           onChange={(val) => {
             setTaskAction(val);
@@ -192,10 +202,7 @@ export function StaffScheduleScreen() {
               setTaskAction(''); 
             }
           }}
-          options={[
-            { label: 'Add New Lead', value: 'add_lead' },
-            { label: 'Schedule New Class', value: 'schedule_class' }
-          ]}
+          options={dropdownOptions}
           customTrigger={(openSheet) => (
             <StaffAddTaskButton onPress={openSheet} />
           )}
@@ -205,7 +212,7 @@ export function StaffScheduleScreen() {
       {/* Today's Tasks Section */}
       <View style={styles.tasksSection}>
         <Text style={styles.sectionTitle}>
-          {viewingToday ? 'Today\'s Tasks' : `Tasks for ${format(selectedDate, 'MMM d')}`}
+          {viewingToday ? t('schedule.staff.todaysTasks') : t('schedule.staff.tasksForDate', { date: format(selectedDate, 'MMM d') })}
         </Text>
         <View style={styles.tasksList}>
           {combinedTasks.map((task) => (

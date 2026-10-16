@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BrandColors } from '@/core/theme';
 import { Loader } from '@/shared/components';
+import { useTranslation } from 'react-i18next';
 import { useMembershipApprovalStatus } from '../hooks/useMembershipApprovalStatus';
 import { PaymentRejectedScreen } from './PaymentRejectedScreen';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
@@ -18,11 +19,12 @@ import { PendingApprovalScreen } from './PendingApprovalScreen';
  */
 export function MemberApprovalGate({ children }: { children: ReactNode }) {
   const approval = useMembershipApprovalStatus();
+  const { t } = useTranslation();
 
   if (approval.isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading member portal..." />
+        <Loader message={t('approval.loading')} />
       </View>
     );
   }

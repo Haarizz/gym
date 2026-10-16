@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: 'Aide et demandes',
+    newEnquiryCta: 'Faire une nouvelle demande',
+    newEnquiryCtaSubtitle: 'Abonnement, facturation, cours, installations…',
+    tabs: {
+      ALL: 'Toutes',
+      OPEN: 'Ouvertes',
+      REPLIED: 'Répondues',
+      CLOSED: 'Fermées',
+    },
+    status: {
+      OPEN: 'En attente',
+      REPLIED: 'Répondue',
+      CLOSED: 'Fermée',
+    },
+    empty: 'Aucune demande pour l’instant',
+    emptySubtitle: 'Les questions envoyées à votre salle apparaîtront ici avec sa réponse.',
+    nothingHere: 'Rien ici pour l’instant.',
+    loadFailed: 'Impossible de charger vos demandes.',
+    youPrefix: 'Vous :',
+    gymFallback: 'Votre salle',
+    reference: '#{{id}}',
+    newEnquiry: 'Nouvelle demande',
+    categoryPrompt: 'De quoi s’agit-il ?',
+    subject: 'Objet',
+    subjectPlaceholder: 'ex. Suspendre l’abonnement 2 semaines',
+    message: 'Détails',
+    messagePlaceholder: 'Dites-nous ce dont vous avez besoin : dates, montants ou noms de cours aident la salle à répondre plus vite.',
+    formHint: 'Vous recevrez une notification quand la salle répondra. Vous pouvez avoir jusqu’à {{count}} demandes en attente à la fois.',
+    submit: 'Envoyer la demande',
+    submitting: 'Envoi…',
+    submitted: 'Demande envoyée. La salle répondra ici.',
+    submitFailed: 'Impossible d’envoyer votre demande. Veuillez réessayer.',
+    steps: {
+      submitted: 'Envoyée',
+      replied: 'Répondue',
+      closed: 'Fermée',
+    },
+    openedOn: 'Ouverte le {{date}}',
+    gymBadge: 'SALLE',
+    received: 'Reçue · la salle répondra bientôt',
+    closedOn: 'Fermée par la salle · {{date}}',
+    closedFooter: 'Cette demande est fermée.',
+    followUpHint: 'Besoin d’aide supplémentaire ?',
+    raiseNew: 'Faire une nouvelle demande',
+    categories: {
+      GENERAL: 'Général',
+      MEMBERSHIP: 'Abonnement',
+      BILLING: 'Facturation',
+      FACILITIES: 'Installations',
+      TRAINER: 'Coachs',
+      CLASSES: 'Cours',
+      FEEDBACK: 'Avis',
+      OTHER: 'Autre',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

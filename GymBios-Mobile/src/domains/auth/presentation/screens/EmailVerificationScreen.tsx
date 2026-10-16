@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,7 @@ function secondsUntil(iso: string | undefined): number {
 }
 
 export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePendingRegistration }: EmailVerificationScreenProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{
     registrationToken?: string;
@@ -97,18 +99,18 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
         </View>
 
         <View style={styles.sheet}>
-          <Typography style={styles.panelTitle}>Verify your email</Typography>
+          <Typography style={styles.panelTitle}>{t('auth.verifyTitle')}</Typography>
           <Typography style={styles.panelSub}>
-            We sent a 6-digit code to {maskedEmail ?? 'your email'}. Enter it below to finish creating your account.
+            {t('auth.verifySubtitle', { email: maskedEmail ?? t('auth.yourEmail') })}
           </Typography>
 
           {hasNoRegistration ? (
             <View style={styles.verifiedBanner}>
               <Typography style={styles.verifiedBannerText}>
-                We couldn't find an in-progress registration on this device. Please register again.
+                {t('auth.noRegistration')}
               </Typography>
               <Button
-                label="Back to registration"
+                label={t('auth.backToRegistration')}
                 size="lg"
                 onPress={() => router.replace(MEMBER_AUTH_HREF)}
                 style={styles.btnPrimary}
@@ -117,10 +119,10 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
           ) : isAlreadyVerified ? (
             <View style={styles.verifiedBanner}>
               <Typography style={styles.verifiedBannerText}>
-                Your account is ready — sign in to continue.
+                {t('auth.accountReady')}
               </Typography>
               <Button
-                label="Go to sign in"
+                label={t('auth.goToSignIn')}
                 size="lg"
                 onPress={() => router.replace(MEMBER_AUTH_HREF)}
                 style={styles.btnPrimary}
@@ -130,7 +132,7 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
             <>
               <Input
                 variant="glass"
-                label="Verification code"
+                label={t('auth.verificationCode')}
                 placeholder="000000"
                 keyboardType="number-pad"
                 maxLength={6}
@@ -142,7 +144,7 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
               />
 
               <Button
-                label="Verify"
+                label={t('auth.verify')}
                 size="lg"
                 loading={isVerifying}
                 disabled={otp.length !== 6 || !registrationToken}
@@ -153,7 +155,7 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
               <View style={styles.resendRow}>
                 {resendError ? <Typography style={styles.resendError}>{resendError}</Typography> : null}
                 <Button
-                  label={cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+                  label={cooldown > 0 ? t('auth.resendIn', { seconds: cooldown }) : t('auth.resend')}
                   variant="ghost"
                   size="md"
                   loading={isResending}
@@ -163,7 +165,7 @@ export function EmailVerificationScreen({ useVerifyOtp, useResendOtp, usePending
               </View>
 
               <Typography style={styles.backLink} onPress={() => router.replace(MEMBER_AUTH_HREF)}>
-                Wrong email? Go back
+                {t('auth.wrongEmail')}
               </Typography>
             </>
           )}

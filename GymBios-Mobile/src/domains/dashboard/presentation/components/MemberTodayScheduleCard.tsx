@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -12,25 +13,26 @@ interface MemberTodayScheduleCardProps {
 
 export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <GlassSurface radius={18} style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Today's Schedule</Text>
+        <Text style={styles.headerTitle}>{t('memberHome.schedule.title')}</Text>
         <Pressable
           hitSlop={8}
           onPress={() => router.push('/(member)/bookings' as any)}
           accessibilityRole="button"
-          accessibilityLabel="View All Bookings"
+          accessibilityLabel={t('memberHome.schedule.viewAllA11y')}
         >
-          <Text style={styles.viewAllText}>View All</Text>
+          <Text style={styles.viewAllText}>{t('memberHome.schedule.viewAll')}</Text>
         </Pressable>
       </View>
 
       {schedule.length > 0 ? (
         <View style={styles.list}>
           {schedule.map((item, index) => {
-            const isFull = item.spots.toLowerCase().includes('full');
+            const isFull = item.spotsLeft <= 0;
 
             return (
               <View key={item.id ?? index} style={styles.itemCard}>
@@ -41,8 +43,10 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
                 </View>
 
                 <View style={styles.infoContainer}>
-                  <Text style={styles.className}>{item.class}</Text>
-                  <Text style={styles.trainerName}>with {item.trainer}</Text>
+                  <Text style={styles.className}>{item.class || t('memberHome.schedule.classFallback')}</Text>
+                  <Text style={styles.trainerName}>
+                    {t('memberHome.schedule.withTrainer', { name: item.trainer || t('memberHome.schedule.instructorFallback') })}
+                  </Text>
 
                   <View style={styles.itemFooter}>
                     <View
@@ -57,7 +61,9 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
                           isFull ? styles.spotBadgeTextFull : styles.spotBadgeTextAvailable,
                         ]}
                       >
-                        {item.spots}
+                        {isFull
+                          ? t('memberHome.schedule.full')
+                          : t('memberHome.schedule.spotsLeft', { count: item.spotsLeft })}
                       </Text>
                     </View>
 
@@ -65,7 +71,7 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
                       hitSlop={8}
                       onPress={() => router.push('/(member)/bookings' as any)}
                     >
-                      <Text style={styles.detailsText}>View Details</Text>
+                      <Text style={styles.detailsText}>{t('memberHome.schedule.viewDetails')}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -79,12 +85,12 @@ export function MemberTodayScheduleCard({ schedule }: MemberTodayScheduleCardPro
           <View style={styles.emptyIconBox}>
             <Feather name="calendar" size={20} color={BrandColors.textSecondary} />
           </View>
-          <Text style={styles.emptyText}>No classes booked for today</Text>
+          <Text style={styles.emptyText}>{t('memberHome.schedule.empty')}</Text>
           <Pressable
             style={styles.bookNowButton}
             onPress={() => router.push('/(member)/bookings' as any)}
           >
-            <Text style={styles.bookNowText}>Book a Class</Text>
+            <Text style={styles.bookNowText}>{t('memberHome.schedule.bookClass')}</Text>
           </Pressable>
         </View>
       )}

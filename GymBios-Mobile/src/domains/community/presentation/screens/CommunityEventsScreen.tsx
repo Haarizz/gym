@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
@@ -11,14 +12,13 @@ import { EmptyState } from '@/shared/components';
  * When a real Events domain is introduced, this screen will be replaced.
  */
 export function CommunityEventsScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <EmptyState
         icon="calendar"
-        title="Community Events Coming Soon"
-        description={
-          'Community events will appear here when your gym\'s events feature is available.\n\nCheck back later or ask your gym admin about upcoming events.'
-        }
+        title={t('community.events.title')}
+        description={t('community.events.description')}
       />
     </View>
   );

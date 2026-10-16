@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StaffCheckInCard } from './StaffCheckInCard';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
@@ -24,6 +25,7 @@ export function StaffCheckInList({
   onCheckOut,
   activeMemberIds,
 }: StaffCheckInListProps) {
+  const { t } = useTranslation();
   if (isLoading) {
     return (
       <View style={styles.list}>
@@ -46,7 +48,12 @@ export function StaffCheckInList({
   });
 
   if (filteredPersons.length === 0) {
-    return <EmptyState title="No records found" description="Try a different search term or filter." />;
+    return (
+      <EmptyState
+        title={t('checkIn.staff.noRecordsFound')}
+        description={t('checkIn.staff.noRecordsFoundDesc')}
+      />
+    );
   }
 
   return (

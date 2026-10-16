@@ -82,6 +82,17 @@ export const AttendanceCard = memo(function AttendanceCard({
         </View>
       </View>
 
+      {record.workoutStartTime ? (
+        <View style={styles.activityRow}>
+          <Typography variant="caption" color="textSecondary">
+            Workout
+          </Typography>
+          <Typography variant="caption" style={styles.workoutText}>
+            {record.workoutEndTime ? record.formattedWorkoutDuration || '—' : 'In progress'}
+          </Typography>
+        </View>
+      ) : null}
+
       {!compact && record.activityType ? (
         <View style={styles.activityRow}>
           <Typography variant="caption" color="textSecondary">
@@ -160,6 +171,9 @@ const styles = StyleSheet.create({
   activityText: {
     color: BrandColors.teal,
     fontWeight: '600',
+  },
+  workoutText: {
+    fontWeight: '700',
   },
   checkoutBtn: {
     flexDirection: 'row',

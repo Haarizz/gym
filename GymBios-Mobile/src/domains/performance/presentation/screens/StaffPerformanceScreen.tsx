@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
+import { useTranslation } from 'react-i18next';
 import { useStaffPerformance } from '../../hooks/useStaffPerformance';
 import { StaffTargetProgressCard } from '../components/StaffTargetProgressCard';
 import { StaffKeyMetricsGrid } from '../components/StaffKeyMetricsGrid';
@@ -10,12 +11,13 @@ import { StaffBreakdownCard } from '../components/StaffBreakdownCard';
 import { StaffMotivationCard } from '../components/StaffMotivationCard';
 
 export function StaffPerformanceScreen() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isRefetching } = useStaffPerformance();
 
   if (isLoading || !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading performance..." />
+        <Loader message={t('staffPerformance.loading')} />
       </View>
     );
   }

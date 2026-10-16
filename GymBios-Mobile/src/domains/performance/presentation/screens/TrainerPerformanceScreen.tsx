@@ -1,6 +1,7 @@
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { BrandColors, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
+import { useTranslation } from 'react-i18next';
 import { useTrainerPerformance } from '../../hooks/useTrainerPerformance';
 import { TrainerTargetProgressCard } from '../components/TrainerTargetProgressCard';
 import { TrainerKeyMetricsGrid } from '../components/TrainerKeyMetricsGrid';
@@ -8,12 +9,13 @@ import { TrainerMonthlyTrendChart } from '../components/TrainerMonthlyTrendChart
 import { TrainerPerformanceTipCard } from '../components/TrainerPerformanceTipCard';
 
 export function TrainerPerformanceScreen() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isRefetching } = useTrainerPerformance();
 
   if (isLoading || !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading performance..." />
+        <Loader message={t('trainerPerformance.loading')} />
       </View>
     );
   }

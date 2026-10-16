@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +9,8 @@ interface StaffMotivationCardProps {
 }
 
 export function StaffMotivationCard({ message }: StaffMotivationCardProps) {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient
       colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -15,7 +18,7 @@ export function StaffMotivationCard({ message }: StaffMotivationCardProps) {
       end={{ x: 1, y: 0 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Keep Going! 💪</Text>
+      <Text style={styles.title}>{t('staffPerformance.keepGoing')}</Text>
       <Text style={styles.message}>{message}</Text>
     </LinearGradient>
   );

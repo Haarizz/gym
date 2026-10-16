@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import React, { useState } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -68,7 +69,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           style={[styles.image, dimensionStyle]}
           onError={() => setFailedUrl(imageUrl)}
           accessibilityRole="image"
-          accessibilityLabel={computedInitials ? `${computedInitials} avatar` : 'User avatar'}
+          accessibilityLabel={computedInitials ? i18n.t('shared.initialsAvatar', { initials: computedInitials }) : i18n.t('shared.userAvatar')}
         />
       </View>
     );
@@ -78,7 +79,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     <View
       style={[styles.container, dimensionStyle, { backgroundColor }, style]}
       accessibilityRole="text"
-      accessibilityLabel={`${displayInitials} avatar`}
+      accessibilityLabel={i18n.t('shared.initialsAvatar', { initials: displayInitials })}
     >
       <Text style={[styles.initials, { color: textColor, fontSize }]} numberOfLines={1}>
         {displayInitials}

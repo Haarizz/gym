@@ -1,5 +1,7 @@
 import { isAxiosError } from 'axios';
 
+import { i18n } from '@/core/i18n';
+
 export type SettlementErrorKind =
   /** No response — the payment may or may not have been recorded. Retry with the same key. */
   | 'network'
@@ -17,13 +19,13 @@ export function toSettlementError(error: unknown): SettlementError {
   if (isAxiosError(error) && error.response) {
     const message: string | undefined = error.response.data?.message;
     if (error.response.status === 409) {
-      return { kind: 'conflict', message: message || 'Your balance has changed. Please review and try again.' };
+      return { kind: 'conflict', message: message || i18n.t('outstanding.conflict') };
     }
-    return { kind: 'rejected', message: message || 'Payment could not be completed.' };
+    return { kind: 'rejected', message: message || i18n.t('outstanding.rejected') };
   }
   return {
     kind: 'network',
-    message: 'We couldn’t confirm your payment because the connection was lost. Retrying is safe — you won’t be charged twice.',
+    message: i18n.t('outstanding.network'),
   };
 }
 

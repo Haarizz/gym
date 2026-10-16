@@ -3,6 +3,7 @@ package com.company.project.repositories;
 import com.company.project.entities.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -209,6 +210,26 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + "AND r.validFrom < :asOf AND r.validTill >= :asOf))")
     long countEstimatedActiveAt(@Param("asOf") LocalDateTime asOf);
 
+    // "Already a member here?" for a mobile purchase — a rejected purchase doesn't count.
+    @Query("SELECT COUNT(m) > 0 FROM Member m WHERE (m.globalUserId = :globalUserId OR LOWER(m.email) = LOWER(:email)) "
+            + "AND (m.approvalStatus IS NULL OR m.approvalStatus <> 'REJECTED')")
+    boolean existsUnrejectedMembership(@Param("globalUserId") Long globalUserId, @Param("email") String email);
+
+    // A rejected mobile purchase never became a membership, but its row still holds the
+    // account's global_user_id/email, which every purchase/claim path checks for "already
+    // a member here". Unlinking frees the account to buy again while the row stays in
+    // Approval History (shown by name/phone). Native so neither the branchFilter nor
+    // BranchSecurityListener's read check blocks a rejected row from another branch.
+    @Modifying
+    @Query(value = "UPDATE members SET global_user_id = NULL, email = NULL "
+            + "WHERE approval_status = 'REJECTED' AND global_user_id = :globalUserId", nativeQuery = true)
+    int releaseRejectedByGlobalUserId(@Param("globalUserId") Long globalUserId);
+
+    @Modifying
+    @Query(value = "UPDATE members SET global_user_id = NULL, email = NULL "
+            + "WHERE approval_status = 'REJECTED' AND LOWER(email) = LOWER(:email)", nativeQuery = true)
+    int releaseRejectedByEmail(@Param("email") String email);
+
     /**
      * Display names for community authors, across every branch. Native on purpose:
      * it returns plain rows, so neither the Hibernate branchFilter nor
@@ -222,4 +243,9 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
         Long getId();
         String getName();
     }
+
+    /** Members of a branch with an app login and "active" status — candidates for a gym review request. */
+    @Query("SELECT m FROM Member m WHERE m.branchId = :branchId AND LOWER(m.membershipStatus) = 'active' "
+            + "AND (m.globalUserId IS NOT NULL OR m.userId IS NOT NULL)")
+    List<Member> findActiveAppMembersByBranchId(@Param("branchId") Long branchId);
 }

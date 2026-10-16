@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,11 +15,13 @@ export function StaffLedgerBreakdownSection({
   breakdown,
   commissionStructure,
 }: StaffLedgerBreakdownSectionProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Earnings Breakdown */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Earnings Breakdown</Text>
+        <Text style={styles.cardTitle}>{t('ledger.breakdown.title')}</Text>
         <View style={styles.breakdownList}>
           {breakdown.map((item, idx) => (
             <View key={idx} style={styles.breakdownItem}>
@@ -46,7 +49,7 @@ export function StaffLedgerBreakdownSection({
         end={{ x: 1, y: 0 }}
         style={styles.commissionCard}
       >
-        <Text style={styles.commissionTitle}>Commission Structure</Text>
+        <Text style={styles.commissionTitle}>{t('ledger.breakdown.commissionStructureTitle')}</Text>
         <View style={styles.commissionList}>
           {commissionStructure.map((item, idx) => (
             <View key={idx} style={styles.commissionRow}>

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -26,6 +27,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  * - HubFeatureCard navigation menu
  */
 export function CheckInHubScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { summary, isLoading, error, refetch, isRefetching } = useRecentCheckIns();
@@ -40,8 +42,8 @@ export function CheckInHubScreen() {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Check In"
-          subtitle="Manage member & visitor access"
+          title={t('checkIn.hub.title')}
+          subtitle={t('checkIn.hub.subtitle')}
           colors={CHECK_IN_COLORS}
         />
         <ScrollView
@@ -73,7 +75,7 @@ export function CheckInHubScreen() {
           <View style={styles.errorContainer}>
             <Feather name="alert-triangle" size={32} color="#b91c1c" />
             <Typography variant="bodySmallBold" style={styles.errorTitle}>
-              Failed to load check-in data
+              {t('checkIn.hub.loadError')}
             </Typography>
             <Typography variant="bodySmall" color="textSecondary">
               {error.message}
@@ -102,30 +104,30 @@ export function CheckInHubScreen() {
         {/* ── Summary Stats ── */}
         <View style={styles.statsGrid}>
           <AttendanceSummaryCard
-            label="Total Today"
+            label={t('checkIn.hub.stats.totalToday')}
             value={String(summary.total)}
-            subtitle="All check-ins"
+            subtitle={t('checkIn.hub.stats.totalTodaySub')}
             iconName="log-in"
             iconBg={BrandColors.teal}
           />
           <AttendanceSummaryCard
-            label="In Gym"
+            label={t('checkIn.hub.stats.inGym')}
             value={String(summary.active)}
-            subtitle="Currently active"
+            subtitle={t('checkIn.hub.stats.inGymSub')}
             iconName="activity"
             iconBg="#10b981"
           />
           <AttendanceSummaryCard
-            label="Walk-Ins"
+            label={t('checkIn.hub.stats.walkIns')}
             value={String(summary.walkIns)}
-            subtitle="Daily visitors"
+            subtitle={t('checkIn.hub.stats.walkInsSub')}
             iconName="user-plus"
             iconBg="#3b82f6"
           />
           <AttendanceSummaryCard
-            label="Checked Out"
+            label={t('checkIn.hub.stats.checkedOut')}
             value={String(summary.total - summary.active)}
-            subtitle="Completed today"
+            subtitle={t('checkIn.hub.stats.checkedOutSub')}
             iconName="log-out"
             iconBg="#f59e0b"
           />
@@ -134,8 +136,8 @@ export function CheckInHubScreen() {
         {/* ── Navigation Feature Cards ── */}
         <View style={styles.featureCards}>
           <HubFeatureCard
-            title="Members & Staff"
-            subtitle="Search members and perform manual check-ins."
+            title={t('checkIn.hub.cards.membersStaffTitle')}
+            subtitle={t('checkIn.hub.cards.membersStaffSub')}
             iconName="users"
             iconBg="#dcfce7"
             iconColor="#16a34a"
@@ -143,8 +145,8 @@ export function CheckInHubScreen() {
           />
 
           <HubFeatureCard
-            title="Walk-In / Daily Visitor"
-            subtitle="Register visitors and grant temporary access."
+            title={t('checkIn.hub.cards.walkInTitle')}
+            subtitle={t('checkIn.hub.cards.walkInSub')}
             iconName="user-plus"
             iconBg="#dbeafe"
             iconColor="#2563eb"

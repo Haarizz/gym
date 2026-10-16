@@ -1,4 +1,6 @@
-import { StyleSheet, View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/core/i18n';
+import { StyleSheet, View, Pressable, I18nManager } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { CurrencyValue } from '@/core/providers';
@@ -16,6 +18,7 @@ interface TransactionCardProps {
 }
 
 export function TransactionCard({ transaction, onPress, divider = true }: TransactionCardProps) {
+  const { t } = useTranslation();
   const Wrapper = onPress ? Pressable : View;
   const isPositive = transaction.type === 'salary' || transaction.type === 'bonus';
   const isPurchase = transaction.type === 'purchase';
@@ -48,11 +51,7 @@ export function TransactionCard({ transaction, onPress, divider = true }: Transa
           {transaction.description}
         </Typography>
         <Typography variant="caption" color="textSecondary" style={styles.date}>
-          {new Date(transaction.date).toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })}
+          {formatDate(transaction.date, 'PP')}
         </Typography>
       </View>
 
@@ -66,7 +65,7 @@ export function TransactionCard({ transaction, onPress, divider = true }: Transa
           </Typography>
         ) : (
           <Typography variant="caption" color="textSecondary">
-            Verified
+            {t('transactions.verified')}
           </Typography>
         )}
 
@@ -77,7 +76,12 @@ export function TransactionCard({ transaction, onPress, divider = true }: Transa
         </View>
       </View>
       {onPress && (
-        <Feather name="chevron-right" size={16} color={BrandColors.neutral[500]} style={{ marginLeft: 8 }} />
+        <Feather
+          name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+          size={16}
+          color={BrandColors.neutral[500]}
+          style={{ marginStart: 8 }}
+        />
       )}
     </Wrapper>
   );
@@ -99,7 +103,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   details: {
     flex: 1,

@@ -1,7 +1,8 @@
 import { apiClient } from '@/core/network/apiClient';
 
-interface LinkedGym {
-  tenantSlug: string;
+// The backend serializes JSON in snake_case (see discoveryApi), so read the wire names.
+interface LinkedGymApiModel {
+  tenant_slug: string;
   active: boolean;
 }
 
@@ -15,11 +16,11 @@ interface LinkedGym {
  */
 export async function fetchLinkedGymTenant(): Promise<string | null> {
   try {
-    const response = await apiClient.get<LinkedGym[]>('/mobile/profile/memberships', {
+    const response = await apiClient.get<LinkedGymApiModel[]>('/mobile/profile/memberships', {
       skipGlobalErrorToast: true,
     });
     const gyms = response.data ?? [];
-    return (gyms.find((g) => g.active) ?? gyms[0])?.tenantSlug ?? null;
+    return (gyms.find((g) => g.active) ?? gyms[0])?.tenant_slug ?? null;
   } catch (e) {
     console.error('Failed to fetch linked gyms', e);
     return null;

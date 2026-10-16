@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
@@ -6,10 +7,10 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components';
 
 const POST_TYPES = [
-  { value: undefined, label: 'All' },
-  { value: 'achievement', label: 'Achievements' },
-  { value: 'question', label: 'Questions' },
-  { value: 'tip', label: 'Tips' },
+  { value: undefined, labelKey: 'all' },
+  { value: 'achievement', labelKey: 'achievements' },
+  { value: 'question', labelKey: 'questions' },
+  { value: 'tip', labelKey: 'tips' },
 ] as const;
 
 interface CommunityPostFiltersProps {
@@ -18,6 +19,7 @@ interface CommunityPostFiltersProps {
 }
 
 export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPostFiltersProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
@@ -35,7 +37,7 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
 
         return (
           <Pressable
-            key={pt.label}
+            key={pt.labelKey}
             style={({ pressed }) => [
               styles.pill,
               isSelected
@@ -46,7 +48,7 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
             onPress={() => onSelectType(pt.value)}
             accessibilityRole="radio"
             accessibilityState={{ checked: isSelected }}
-            accessibilityLabel={`Filter by ${pt.label}`}
+            accessibilityLabel={t('community.filterBy', { type: t(`community.types.${pt.labelKey}`) })}
             hitSlop={4}
           >
             <Typography
@@ -56,7 +58,7 @@ export function CommunityPostFilters({ selectedType, onSelectType }: CommunityPo
                 { color: isSelected ? '#fff' : '#7A7E8C' },
               ]}
             >
-              {pt.label}
+              {t(`community.types.${pt.labelKey}`)}
             </Typography>
           </Pressable>
         );

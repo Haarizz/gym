@@ -1,14 +1,15 @@
+import { useTranslation } from 'react-i18next';
+import { formatTimeAgo, tOr } from '@/core/i18n';
 import { useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { formatDistanceToNow } from 'date-fns';
+import { Image } from 'expo-image';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -53,12 +54,7 @@ function getTypeColor(type: string, primaryColor: string): string {
 }
 
 function getTypeLabel(type: string): string {
-  switch (type) {
-    case 'achievement': return '🏆 Achievement';
-    case 'question': return '❓ Question';
-    case 'tip': return '💡 Tip';
-    default: return type;
-  }
+  return tOr(`community.types.${type}`, type);
 }
 
 function getAspectRatioNumeric(ratio: string | null | undefined): number {
@@ -77,6 +73,7 @@ interface CommunityPostCardProps {
 }
 
 export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { primaryColor } = useCommunityTheme();
   const appRole = useAuthStore((s) => s.appRole);
@@ -104,7 +101,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
     : '??';
 
   const timeAgo = post.createdAt
-    ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })
+    ? formatTimeAgo(post.createdAt, { addSuffix: true })
     : '';
 
   const typeColor = getTypeColor(post.type, primaryColor);
@@ -112,13 +109,13 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
   const handleLike = useCallback(() => {
     if (isPendingLike) return;
     if (!canInteract) {
-      toast.info('Get an active membership at any gym to like and comment on posts.', {
-        title: 'Members only',
+      toast.info(t('community.post.membersOnly'), {
+        title: t('community.post.membersOnlyTitle'),
       });
       return;
     }
     likeMutation.mutate({ postId: post.id, liked: post.likedByMe });
-  }, [canInteract, isPendingLike, likeMutation, post.id, post.likedByMe]);
+  }, [canInteract, isPendingLike, likeMutation, post.id, post.likedByMe, t]);
 
   const handleActions = useCallback(() => {
     setActionsVisible(true);
@@ -133,8 +130,8 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
     reportMutation.mutate(
       { postId: post.id, reason },
       {
-        onSuccess: () => toast.success('Thanks — the gym\'s moderators will review it.', { title: 'Reported' }),
-        onError: () => toast.error('Could not send the report.', { title: 'Error' }),
+        onSuccess: () => toast.success(t('community.post.reported'), { title: t('community.post.reportedTitle') }),
+        onError: () => toast.error(t('community.post.reportFailed'), { title: t('community.post.errorTitle') }),
       },
     );
   };
@@ -143,7 +140,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
     setActionsVisible(false);
     moderateMutation.mutate(
       { postId: post.id, action },
-      { onError: (err) => toast.error((err as Error)?.message ?? 'Could not update the post.', { title: 'Error' }) },
+      { onError: (err) => toast.error((err as Error)?.message ?? t('community.post.updateFailed'), { title: t('community.post.errorTitle') }) },
     );
   };
 
@@ -158,7 +155,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
       {/* Actions Sheet */}
       <AppBottomSheet
         visible={actionsVisible}
-        title="Post Actions"
+        title={t('community.post.actionsTitle')}
         onClose={() => setActionsVisible(false)}
       >
         {caps ? (
@@ -168,14 +165,14 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
                 onPress={() => {
                   setActionsVisible(false);
-                  Alert.alert('Hide Post', 'Hide this post from the GymBios Community? Your gym can restore it later.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Hide', style: 'destructive', onPress: () => handleModerate('hide') },
+                  Alert.alert(t('community.post.hideTitle'), t('community.post.hideBody'), [
+                    { text: t('community.post.cancel'), style: 'cancel' },
+                    { text: t('community.post.hide'), style: 'destructive', onPress: () => handleModerate('hide') },
                   ]);
                 }}
               >
                 <Feather name="eye-off" size={20} color={theme.text} />
-                <Typography variant="body">Hide Post</Typography>
+                <Typography variant="body">{t('community.post.hideTitle')}</Typography>
               </Pressable>
             )}
             {caps.canRestore && (
@@ -184,7 +181,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 onPress={() => handleModerate('restore')}
               >
                 <Feather name="eye" size={20} color={theme.text} />
-                <Typography variant="body">Restore Post</Typography>
+                <Typography variant="body">{t('community.post.restore')}</Typography>
               </Pressable>
             )}
             {(caps.canArchive || caps.canUnarchive) && (
@@ -200,7 +197,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 }}
               >
                 <Feather name="archive" size={20} color={theme.text} />
-                <Typography variant="body">{caps.canUnarchive ? 'Unarchive Post' : 'Archive Post'}</Typography>
+                <Typography variant="body">{t(caps.canUnarchive ? 'community.post.unarchivePost' : 'community.post.archivePost')}</Typography>
               </Pressable>
             )}
             {caps.canReport && (
@@ -212,7 +209,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 }}
               >
                 <Feather name="flag" size={20} color={theme.text} />
-                <Typography variant="body">Report Post</Typography>
+                <Typography variant="body">{t('community.post.report')}</Typography>
               </Pressable>
             )}
             {caps.canDelete && (
@@ -220,14 +217,14 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
                 onPress={() => {
                   setActionsVisible(false);
-                  Alert.alert('Delete Post', 'This action cannot be undone.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
+                  Alert.alert(t('community.post.deleteTitle'), t('community.post.deleteBody'), [
+                    { text: t('community.post.cancel'), style: 'cancel' },
+                    { text: t('community.post.delete'), style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
                   ]);
                 }}
               >
                 <Feather name="trash-2" size={20} color={theme.error} />
-                <Typography variant="body" color="error">Delete Post</Typography>
+                <Typography variant="body" color="error">{t('community.post.deleteTitle')}</Typography>
               </Pressable>
             )}
           </View>
@@ -238,14 +235,14 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
                 onPress={() => {
                   setActionsVisible(false);
-                  Alert.alert('Delete Post', 'This action cannot be undone.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
+                  Alert.alert(t('community.post.deleteTitle'), t('community.post.deleteBody'), [
+                    { text: t('community.post.cancel'), style: 'cancel' },
+                    { text: t('community.post.delete'), style: 'destructive', onPress: () => deleteMutation.mutate(post.id) },
                   ]);
                 }}
               >
                 <Feather name="trash-2" size={20} color={theme.error} />
-                <Typography variant="body" color="error">Delete Post</Typography>
+                <Typography variant="body" color="error">{t('community.post.deleteTitle')}</Typography>
               </Pressable>
             )}
 
@@ -257,15 +254,15 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                   if (post.archived) {
                     unarchiveMutation.mutate(post.id);
                   } else {
-                    Alert.alert('Archive Post', 'Hide this post from the main feed?', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Archive', onPress: () => archiveMutation.mutate(post.id) },
+                    Alert.alert(t('community.post.archiveTitle'), t('community.post.archiveBody'), [
+                      { text: t('community.post.cancel'), style: 'cancel' },
+                      { text: t('community.post.archive'), onPress: () => archiveMutation.mutate(post.id) },
                     ]);
                   }
                 }}
               >
                 <Feather name="archive" size={20} color={theme.text} />
-                <Typography variant="body">{post.archived ? 'Unarchive Post' : 'Archive Post'}</Typography>
+                <Typography variant="body">{t(post.archived ? 'community.post.unarchivePost' : 'community.post.archivePost')}</Typography>
               </Pressable>
             )}
           </View>
@@ -275,7 +272,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
       {/* Report reasons */}
       <AppBottomSheet
         visible={reportVisible}
-        title="Why are you reporting this post?"
+        title={t('community.post.reportReasonTitle')}
         onClose={() => setReportVisible(false)}
       >
         <View style={styles.actionsList}>
@@ -285,7 +282,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
               style={({ pressed }) => [styles.actionItem, pressed && styles.actionItemPressed]}
               onPress={() => handleReport(r.value)}
             >
-              <Typography variant="body">{r.label}</Typography>
+              <Typography variant="body">{t(`community.post.reasons.${r.value}`)}</Typography>
             </Pressable>
           ))}
         </View>
@@ -325,7 +322,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
             style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}
             onPress={handleActions}
             hitSlop={8}
-            accessibilityLabel="Post actions"
+            accessibilityLabel={t('community.post.actionsA11y')}
           >
             <Feather name="more-vertical" size={18} color={theme.textSecondary} />
           </Pressable>
@@ -359,8 +356,10 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
                 : { uri: post.image.dataUrl ?? undefined }
             }
             style={styles.image}
-            resizeMode="cover"
-            accessibilityLabel="Post image"
+            contentFit="cover"
+            recyclingKey={String(post.id)}
+            onError={(e) => console.warn(`Community image failed for post ${post.id}:`, e.error)}
+            accessibilityLabel={t('community.post.imageA11y')}
           />
         </View>
       ) : null}
@@ -369,8 +368,8 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
       {post.status === 'HIDDEN' && (
         <View style={styles.archivedBanner}>
           <Feather name="eye-off" size={12} color={theme.textSecondary} />
-          <Typography variant="caption" color="textSecondary" style={{ marginLeft: 4 }}>
-            Hidden by gym moderators
+          <Typography variant="caption" color="textSecondary" style={{ marginStart: 4 }}>
+            {t('community.post.hiddenByModerators')}
           </Typography>
         </View>
       )}
@@ -379,8 +378,8 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
       {post.archived && (
         <View style={styles.archivedBanner}>
           <Feather name="archive" size={12} color={theme.textSecondary} />
-          <Typography variant="caption" color="textSecondary" style={{ marginLeft: 4 }}>
-            Archived
+          <Typography variant="caption" color="textSecondary" style={{ marginStart: 4 }}>
+            {t('community.post.archived')}
           </Typography>
         </View>
       )}
@@ -391,7 +390,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
           style={({ pressed }) => [styles.interactionBtn, pressed && styles.interactionPressed]}
           onPress={handleLike}
           disabled={isPendingLike || (caps ? !caps.canLike : false)}
-          accessibilityLabel={post.likedByMe ? 'Unlike' : 'Like'}
+          accessibilityLabel={t(post.likedByMe ? 'community.post.unlike' : 'community.post.like')}
           hitSlop={12}
         >
           {isPendingLike ? (
@@ -417,7 +416,7 @@ export function CommunityPostCard({ post, onCommentsPress }: CommunityPostCardPr
         <Pressable
           style={({ pressed }) => [styles.interactionBtn, pressed && styles.interactionPressed]}
           onPress={() => onCommentsPress(post.id)}
-          accessibilityLabel="View comments"
+          accessibilityLabel={t('community.post.viewComments')}
           hitSlop={12}
         >
           <Feather name="message-circle" size={18} color={theme.textSecondary} />
@@ -496,7 +495,7 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: Spacing.half,
-    marginLeft: 4,
+    marginStart: 4,
   },
   menuButtonPressed: {
     opacity: 0.6,

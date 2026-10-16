@@ -1,8 +1,10 @@
 import { View, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
 import { Avatar } from '@/shared/components/Avatar';
 import { Radius, Spacing, BrandColors } from '@/core/theme';
+import { formatDate } from '@/core/i18n';
 import { MemberStatusBadge } from './MemberStatusBadge';
 
 interface CheckInConfirmationModalProps {
@@ -22,14 +24,16 @@ export function CheckInConfirmationModal({
   onCancel,
   isLoading,
 }: CheckInConfirmationModalProps) {
+  const { t } = useTranslation();
   if (!member) return null;
 
-  const name = member.name || 'Unknown';
+  const name = member.name || t('checkIn.members.unknownMember');
   const id = member.bizId || member.memberNumber || member.id;
   const type = member.membershipType || 'INDIVIDUAL';
   
-  const currentDate = new Date().toLocaleDateString();
-  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const currentDate = formatDate(now, 'PP');
+  const currentTime = formatDate(now, 'p');
 
   const isCheckIn = actionType === 'checkIn';
 
@@ -40,10 +44,12 @@ export function CheckInConfirmationModal({
           <TouchableWithoutFeedback>
             <View style={styles.content}>
               <Typography variant="subtitle" style={styles.title}>
-                {isCheckIn ? 'Confirm Check-in' : 'Confirm Check-out'}
+                {isCheckIn ? t('checkIn.members.confirmCheckInTitle') : t('checkIn.members.confirmCheckOutTitle')}
               </Typography>
               <Typography variant="bodySmall" color="textSecondary" style={styles.subtitle}>
-                {isCheckIn ? 'Checking in' : 'Checking out'} {name}
+                {isCheckIn
+                  ? t('checkIn.members.checkingInSubtitle', { name })
+                  : t('checkIn.members.checkingOutSubtitle', { name })}
               </Typography>
               
               <View style={styles.memberInfoRow}>
@@ -58,20 +64,28 @@ export function CheckInConfirmationModal({
               <View style={styles.timeRow}>
                 <View style={styles.timeCol}>
                   <Typography variant="caption" color="textSecondary">
-                    {isCheckIn ? 'Check-In Time' : 'Check-Out Time'}
+                    {isCheckIn ? t('checkIn.members.checkInTime') : t('checkIn.members.checkOutTime')}
                   </Typography>
                   <Typography variant="body">{currentTime}</Typography>
                 </View>
                 <View style={styles.timeCol}>
-                  <Typography variant="caption" color="textSecondary">Date</Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    {t('checkIn.members.date')}
+                  </Typography>
                   <Typography variant="body">{currentDate}</Typography>
                 </View>
               </View>
 
               <View style={styles.actions}>
-                <Button label="Cancel" variant="ghost" onPress={onCancel} style={styles.cancelBtn} disabled={isLoading} />
+                <Button
+                  label={t('checkIn.members.cancel')}
+                  variant="ghost"
+                  onPress={onCancel}
+                  style={styles.cancelBtn}
+                  disabled={isLoading}
+                />
                 <Button 
-                  label={isCheckIn ? "Confirm Check-In" : "Confirm Check-Out"} 
+                  label={isCheckIn ? t('checkIn.members.confirmCheckInBtn') : t('checkIn.members.confirmCheckOutBtn')} 
                   variant="primary" 
                   onPress={onConfirm} 
                   style={[styles.confirmBtn, !isCheckIn && { backgroundColor: BrandColors.danger }]} 
@@ -118,7 +132,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.four,
   },
   avatar: {
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   memberDetails: {
     flex: 1,

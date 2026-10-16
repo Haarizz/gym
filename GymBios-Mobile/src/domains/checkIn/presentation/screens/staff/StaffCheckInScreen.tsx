@@ -20,16 +20,18 @@ import { useAllMembers } from '../../hooks/useAllMembers';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 import { useCheckIn } from '../../../hooks/useCheckInActions';
 import { useCheckout } from '@/domains/attendance/hooks/useAttendanceActions';
+import { useTranslation } from 'react-i18next';
 import { useProfile } from '@/domains/profile';
 import { isOpenVisit } from '../../../domain';
 
 const CHECK_IN_COLORS: [string, string] = ['#155c4c', '#0f4a3d'];
 
 export function StaffCheckInScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { profile } = useProfile();
-  const branchName = profile?.branch || 'All Branches';
+  const branchName = profile?.branch || t('checkIn.staff.allBranches');
 
   const [listFilter, setListFilter] = useState<ListFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,8 +115,8 @@ export function StaffCheckInScreen() {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Check-In"
-        subtitle={`Manage access · ${branchName}`}
+        title={t('checkIn.staff.title')}
+        subtitle={t('checkIn.staff.headerSubtitle', { branch: branchName })}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
         rightAction={
@@ -156,7 +158,7 @@ export function StaffCheckInScreen() {
                 style={styles.addWalkInBtn}
               >
                 <Feather name="user-plus" size={15} color="#ffffff" />
-                <Text style={styles.addWalkInText}>Walk-in</Text>
+                <Text style={styles.addWalkInText}>{t('checkIn.staff.walkInBtn')}</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -166,7 +168,7 @@ export function StaffCheckInScreen() {
               style={[styles.chip, listFilter === 'all' && styles.chipActive]} 
               onPress={() => setListFilter('all')}
             >
-              <Text style={[styles.chipText, listFilter === 'all' && styles.chipTextActive]}>All</Text>
+              <Text style={[styles.chipText, listFilter === 'all' && styles.chipTextActive]}>{t('checkIn.staff.filterAll')}</Text>
               <View style={[styles.countBadge, listFilter === 'all' && styles.countBadgeActive]}>
                 <Text style={[styles.countText, listFilter === 'all' && styles.countTextActive]}>{totalCount}</Text>
               </View>
@@ -175,7 +177,7 @@ export function StaffCheckInScreen() {
               style={[styles.chip, listFilter === 'checked-in' && styles.chipActive]} 
               onPress={() => setListFilter('checked-in')}
             >
-              <Text style={[styles.chipText, listFilter === 'checked-in' && styles.chipTextActive]}>Checked In</Text>
+              <Text style={[styles.chipText, listFilter === 'checked-in' && styles.chipTextActive]}>{t('checkIn.staff.filterCheckedIn')}</Text>
               <View style={[styles.countBadge, listFilter === 'checked-in' && styles.countBadgeActive]}>
                 <Text style={[styles.countText, listFilter === 'checked-in' && styles.countTextActive]}>{checkedInCount}</Text>
               </View>
@@ -184,7 +186,7 @@ export function StaffCheckInScreen() {
               style={[styles.chip, listFilter === 'not-checked-in' && styles.chipActive]} 
               onPress={() => setListFilter('not-checked-in')}
             >
-              <Text style={[styles.chipText, listFilter === 'not-checked-in' && styles.chipTextActive]}>Not Checked In</Text>
+              <Text style={[styles.chipText, listFilter === 'not-checked-in' && styles.chipTextActive]}>{t('checkIn.staff.filterNotCheckedIn')}</Text>
               <View style={[styles.countBadge, listFilter === 'not-checked-in' && styles.countBadgeActive]}>
                 <Text style={[styles.countText, listFilter === 'not-checked-in' && styles.countTextActive]}>{notCheckedInCount}</Text>
               </View>
@@ -192,8 +194,8 @@ export function StaffCheckInScreen() {
           </View>
 
           <View style={styles.listHeading}>
-            <Text style={styles.listHeadingTitle}>Members & Visitors</Text>
-            <Text style={styles.listHeadingCount}>{totalCount} total</Text>
+            <Text style={styles.listHeadingTitle}>{t('checkIn.staff.membersAndVisitors')}</Text>
+            <Text style={styles.listHeadingCount}>{t('checkIn.members.totalCount', { count: totalCount })}</Text>
           </View>
 
           <StaffCheckInList

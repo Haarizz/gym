@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -16,6 +17,7 @@ interface MyPerformanceScreenProps {
 }
 
 export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
+  const { t } = useTranslation();
   const { performance, isLoading, error, refetch } = useMyPerformance();
   const { formatCurrency } = useCurrency();
 
@@ -25,8 +27,8 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <GlassHeader
-        title="My Performance"
-        subtitle="Performance scores, analytics & ratings"
+        title={t('performance.title')}
+        subtitle={t('performance.subtitle')}
         onBack={onBack}
       />
 
@@ -36,9 +38,9 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
         ) : error || !performance ? (
           <EmptyState
             icon="bar-chart-2"
-            title="Performance unavailable"
-            description="We couldn't load your performance right now. Make sure your account is linked to a staff profile."
-            buttonLabel="Try again"
+            title={t('performance.unavailableTitle')}
+            description={t('performance.unavailableDesc')}
+            buttonLabel={t('performance.tryAgain')}
             onPress={() => refetch()}
           />
         ) : (
@@ -50,7 +52,7 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
               <View style={styles.insightsHeader}>
                 <Feather name="bar-chart-2" size={20} color={BrandColors.teal} style={styles.insightsIcon} />
                 <Typography variant="subtitle" style={styles.insightsTitle}>
-                  Performance Analytics
+                  {t('performance.analytics')}
                 </Typography>
               </View>
 
@@ -67,7 +69,7 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                   icon="check-circle"
                   iconColor="#16a34a"
                   iconBackground="rgba(22,163,74,0.14)"
-                  label="Attendance Rate"
+                  label={t('performance.attendanceRate')}
                   value={
                     performance.attendanceRate == null ? undefined : (
                       <Typography variant="body" style={styles.attendanceValue}>
@@ -75,26 +77,32 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                       </Typography>
                     )
                   }
-                  emptyText="No schedule set"
+                  emptyText={t('performance.noScheduleSet')}
                   divider={false}
                 />
 
                 <InfoRow
                   icon="calendar"
-                  label="Days Present"
+                  label={t('performance.daysPresent')}
                   value={
                     performance.daysScheduled > 0
-                      ? `${performance.daysPresent} of ${performance.daysScheduled} scheduled`
+                      ? t('performance.daysScheduled', {
+                          present: performance.daysPresent,
+                          scheduled: performance.daysScheduled,
+                        })
                       : `${performance.daysPresent}`
                   }
                 />
 
                 <InfoRow
                   icon="dollar-sign"
-                  label="Revenue This Month"
+                  label={t('performance.revenueThisMonth')}
                   value={
                     performance.revenueTarget > 0
-                      ? `${formatCurrency(performance.revenueAchieved)} of ${formatCurrency(performance.revenueTarget)}`
+                      ? t('performance.revenueProgress', {
+                          achieved: formatCurrency(performance.revenueAchieved),
+                          target: formatCurrency(performance.revenueTarget),
+                        })
                       : formatCurrency(performance.revenueAchieved)
                   }
                 />
@@ -104,9 +112,9 @@ export function MyPerformanceScreen({ onBack }: MyPerformanceScreenProps) {
                   icon="star"
                   iconColor="#eab308"
                   iconBackground="rgba(234,179,8,0.14)"
-                  label="Ratings & Reviews"
-                  value="Member ratings for you are on the way"
-                  right={<Badge label="Coming soon" tone="muted" />}
+                  label={t('performance.ratingsAndReviews')}
+                  value={t('performance.ratingsComingSoonNotice')}
+                  right={<Badge label={t('performance.comingSoon')} tone="muted" />}
                 />
               </View>
             </GlassSurface>
@@ -136,7 +144,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   insightsIcon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   insightsTitle: {
     fontSize: 16,

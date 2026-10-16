@@ -1,0 +1,33 @@
+const settings = {
+  settings: {
+    title: 'Settings',
+    subtitle: 'Language, notifications, linked accounts & privacy',
+    languageCard: 'Language',
+    appLanguage: 'App language',
+    appLanguageDescription: 'Used for menus, buttons and messages',
+    notificationsCard: 'Notification Preferences',
+    emailNotifications: 'Email Notifications',
+    emailNotificationsDescription: 'Receive summaries and account updates via email',
+    pushNotifications: 'Push Notifications',
+    pushNotificationsDescription: 'Real-time alert notifications on this device',
+    smsNotifications: 'SMS Notifications',
+    smsNotificationsDescription: 'Urgent security and payroll notifications via SMS',
+    performanceUpdates: 'Performance Updates',
+    performanceUpdatesDescription: 'Quarterly and monthly KPI score notifications',
+    targetReminders: 'Target Reminders',
+    targetRemindersDescription: 'Alerts when target deadlines are approaching',
+    payrollEarnings: 'Payroll & Earnings',
+    payrollEarningsDescription: 'Notifications when salaries and bonuses are processed',
+    linkedAccountsCard: 'Linked Accounts',
+    connected: 'Connected',
+    privacyCard: 'Privacy Settings',
+    profileVisibility: 'Profile Visibility',
+    profileVisibilityDescription: 'Allow team members and staff to view your profile details',
+    performanceVisibility: 'Performance Visibility',
+    performanceVisibilityDescription: 'Share your performance achievements and score on leaderboard',
+    activityStatus: 'Activity Status',
+    activityStatusDescription: 'Show active indicators when you are signed in',
+  },
+};
+
+export default settings;

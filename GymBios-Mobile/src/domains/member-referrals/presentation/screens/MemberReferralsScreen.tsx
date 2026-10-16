@@ -3,6 +3,8 @@ import { View, StyleSheet, ScrollView, Pressable, Share, Platform } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
+import { formatDate, i18n, tOr } from '@/core/i18n';
 import { Badge } from '@/shared/components/Badge';
 import { Loader } from '@/shared/components/Loader';
 import { GlassBlob, GlassHeader, GlassSurface, InfoRow } from '@/shared/components';
@@ -35,30 +37,20 @@ const REWARD_BADGE_TONE = {
   CANCELLED: 'muted' as const,
 };
 
-const REWARD_TYPE_LABEL: Record<string, string> = {
-  WALLET_CREDIT: 'Wallet Credit',
-  MEMBERSHIP_EXTENSION: 'Membership Extension',
-  MEMBERSHIP_DISCOUNT: 'Membership Discount',
-  FREE_PT: 'Free PT / Class',
-  FREE_CLASS: 'Free Class',
-  COUPON: 'Coupon',
-  LOYALTY_POINTS: 'Loyalty Points',
-  GIFT: 'Gift',
-  CASH: 'Cash',
-};
 
 const isOpenReward = (r: MyReferralReward) => r.status === 'AVAILABLE' || r.status === 'CLAIMED';
 
 function rewardValueLabel(r: MyReferralReward): string {
-  if (r.rewardType === 'FREE_PT' || r.rewardType === 'FREE_CLASS') return 'One free session';
+  if (r.rewardType === 'FREE_PT' || r.rewardType === 'FREE_CLASS') return i18n.t('referralsScreen.oneFreeSession');
   if (r.rewardValue == null) return r.rewardName;
-  if (r.rewardUnit === 'PERCENT') return `${r.rewardValue}% off`;
-  if (r.rewardType === 'MEMBERSHIP_EXTENSION') return `${r.rewardValue} days`;
+  if (r.rewardUnit === 'PERCENT') return i18n.t('referralsScreen.percentOff', { value: r.rewardValue });
+  if (r.rewardType === 'MEMBERSHIP_EXTENSION') return i18n.t('referralsScreen.days', { count: r.rewardValue });
   return `${r.rewardValue}${r.currency ? ' ' + r.currency : ''}`;
 }
 
 export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data: profile, isLoading: isLoadingProfile } = useReferralProfile();
   const { data: history = [], isLoading: isLoadingHistory } = useReferralHistory();
   const { data: myClaim, isLoading: isLoadingMyClaim } = useMyReferralClaim();
@@ -70,7 +62,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
     setRetryError(null);
     retryClaim(undefined, {
       onError: (err: any) => {
-        setRetryError(err?.body?.error || err?.body?.message || 'Retry failed. Please try again later.');
+        setRetryError(err?.body?.error || err?.body?.message || t('referralsScreen.retryFailed'));
       },
     });
   };
@@ -88,26 +80,26 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
 
   const handleCopy = async () => {
     if (!referralCode) {
-      toast.error('Your referral code is not available yet.');
+      toast.error(t('referralsScreen.codeUnavailable'));
       return;
     }
     try {
       await Clipboard.setStringAsync(referralCode);
-      toast.success(`Referral code ${referralCode} copied to clipboard.`);
+      toast.success(t('referralsScreen.codeCopied', { code: referralCode }));
     } catch {
-      toast.error('Could not copy the referral code.');
+      toast.error(t('referralsScreen.copyFailed'));
     }
   };
 
   const handleShare = async () => {
     if (!referralCode) {
-      toast.error('Your referral code is not available yet.');
+      toast.error(t('referralsScreen.codeUnavailable'));
       return;
     }
     // Android ignores `url`, so the link must also be part of the message.
     const message = referralUrl
-      ? `Join me at GymBios! Use my referral code ${referralCode} or sign up here: ${referralUrl}`
-      : `Join me at GymBios! Use my referral code ${referralCode} when you sign up.`;
+      ? t('referralsScreen.shareMessageWithLink', { code: referralCode, url: referralUrl })
+      : t('referralsScreen.shareMessage', { code: referralCode });
     try {
       if (Platform.OS === 'web') {
         // RN Share is unsupported on web; use the Web Share API when present, else copy.
@@ -116,14 +108,14 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
           await nav.share({ text: message, url: referralUrl });
         } else {
           await Clipboard.setStringAsync(message);
-          toast.success('Invite message copied to clipboard.');
+          toast.success(t('referralsScreen.inviteCopied'));
         }
         return;
       }
       await Share.share(Platform.OS === 'ios' && referralUrl ? { message, url: referralUrl } : { message });
     } catch (error: any) {
       if (error?.name === 'AbortError') return;
-      toast.error('Could not open the share sheet.');
+      toast.error(t('referralsScreen.shareFailed'));
     }
   };
 
@@ -133,7 +125,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
 
-      <GlassHeader title="Referrals" subtitle="Invite friends & earn rewards" onBack={handleBack} />
+      <GlassHeader title={t('referralsScreen.title')} subtitle={t('referralsScreen.subtitle')} onBack={handleBack} />
 
       {isLoadingProfile ? (
         <View style={styles.center}>
@@ -144,13 +136,13 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
           {/* Share Card */}
           <GlassSurface radius={Radius.lg} style={[styles.card, styles.shareCard]}>
             <Typography variant="subtitle" style={styles.cardTitle}>
-              Your Referral Link
+              {t('referralsScreen.yourLink')}
             </Typography>
             {profile && profile.eligible === false ? (
               // No code until the user is an active member of a gym — a code made outside
               // a gym could never be claimed.
               <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
-                {profile.message ?? 'Join a gym to get your referral code.'}
+                {profile.message ?? t('referralsScreen.joinGym')}
               </Typography>
             ) : (
             <>
@@ -158,7 +150,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
               style={styles.codeChip}
               onPress={handleCopy}
               accessibilityRole="button"
-              accessibilityLabel="Copy referral code"
+              accessibilityLabel={t('referralsScreen.copyA11y')}
             >
               <Typography variant="body" style={styles.codeText}>
                 {referralCode ?? '—'}
@@ -166,19 +158,19 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
               <Feather name="copy" size={16} color={BrandColors.tealDark} />
             </Pressable>
             <Typography variant="bodySmall" color="textSecondary" style={styles.shareDescription}>
-              Share this link with friends. When they join, you&apos;ll earn rewards!
+              {t('referralsScreen.shareDescription')}
             </Typography>
             <View style={styles.actionRow}>
               <Pressable style={styles.copyButton} onPress={handleCopy}>
                 <Feather name="copy" size={18} color={BrandColors.tealDark} />
                 <Typography variant="bodySmallBold" style={styles.copyButtonText}>
-                  Copy Code
+                  {t('referralsScreen.copyCode')}
                 </Typography>
               </Pressable>
               <Pressable style={styles.shareButton} onPress={handleShare}>
                 <Feather name="share-2" size={18} color="#ffffff" />
                 <Typography variant="bodySmallBold" style={styles.shareButtonText}>
-                  Share Now
+                  {t('referralsScreen.shareNow')}
                 </Typography>
               </Pressable>
             </View>
@@ -191,7 +183,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
             <View style={styles.sectionHeader}>
               <Feather name="user-check" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
               <Typography variant="subtitle" style={styles.cardTitle}>
-                Referral Code You Used
+                {t('referralsScreen.codeYouUsed')}
               </Typography>
             </View>
 
@@ -199,13 +191,13 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
               <Loader />
             ) : !myClaim ? (
               <Typography variant="bodySmall" style={styles.emptyText}>
-                You haven&apos;t entered anyone&apos;s referral code.
+                {t('referralsScreen.noCodeUsed')}
               </Typography>
             ) : (
               <>
                 <InfoRow
                   icon="user"
-                  label="Referred By"
+                  label={t('referralsScreen.referredBy')}
                   divider={false}
                   value={
                     <View>
@@ -213,11 +205,11 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                         {myClaim.referrerName}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
-                        {new Date(myClaim.claimedAt).toLocaleDateString()}
+                        {formatDate(myClaim.claimedAt, 'PP')}
                       </Typography>
                     </View>
                   }
-                  right={<Badge label={myClaim.status} tone={CLAIM_BADGE_TONE[myClaim.status]} />}
+                  right={<Badge label={tOr(`referralsScreen.statuses.${myClaim.status}`, myClaim.status)} tone={CLAIM_BADGE_TONE[myClaim.status]} />}
                 />
                 {myClaim.canRetry && (
                   <>
@@ -228,7 +220,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                     >
                       <Feather name="refresh-cw" size={14} color={BrandColors.tealDark} />
                       <Typography variant="caption" style={styles.retryText}>
-                        {isRetrying ? 'Retrying...' : 'Retry'}
+                        {t(isRetrying ? 'referralsScreen.retrying' : 'referralsScreen.retry')}
                       </Typography>
                     </Pressable>
                     {retryError && (
@@ -247,7 +239,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
             <View style={styles.sectionHeader}>
               <Feather name="gift" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
               <Typography variant="subtitle" style={styles.cardTitle}>
-                My Rewards
+                {t('referralsScreen.myRewards')}
               </Typography>
             </View>
 
@@ -255,7 +247,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
               <Loader />
             ) : myRewards.length === 0 ? (
               <Typography variant="bodySmall" style={styles.emptyText}>
-                No rewards yet.
+                {t('referralsScreen.noRewards')}
               </Typography>
             ) : (
               myRewards.map((reward, index) => (
@@ -263,7 +255,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                   key={reward.id}
                   icon="award"
                   divider={index > 0}
-                  label={REWARD_TYPE_LABEL[reward.rewardType] ?? reward.rewardType}
+                  label={tOr(`referralsScreen.rewardTypes.${reward.rewardType}`, reward.rewardType)}
                   value={
                     <View>
                       <Typography variant="body" style={styles.rowValue}>
@@ -271,14 +263,19 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                       </Typography>
                       {reward.generatedDate && (
                         <Typography variant="caption" color="textSecondary">
-                          {new Date(reward.generatedDate).toLocaleDateString()}
+                          {formatDate(reward.generatedDate, 'PP')}
+                        </Typography>
+                      )}
+                      {isOpenReward(reward) && reward.expiryDate && (
+                        <Typography variant="caption" color="textSecondary">
+                          {t('referralsScreen.expires', { date: formatDate(reward.expiryDate, 'PP') })}
                         </Typography>
                       )}
                       {isOpenReward(reward) && REWARD_PASS_TYPES.includes(reward.rewardType) && (
                         <Typography variant="caption" color="textSecondary">
                           {reward.rewardType === 'MEMBERSHIP_DISCOUNT'
-                            ? 'Reward Pass — pick it when renewing'
-                            : 'Reward Pass — pick it when booking a class'}
+                            ? t('referralsScreen.passForRenewal')
+                            : t('referralsScreen.passForBooking')}
                         </Typography>
                       )}
                       {isOpenReward(reward) && reward.rewardType === 'COUPON' && reward.couponCode && (
@@ -286,17 +283,17 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                           hitSlop={8}
                           onPress={async () => {
                             await Clipboard.setStringAsync(reward.couponCode!);
-                            toast.success(`Coupon ${reward.couponCode} copied — share it with a friend.`);
+                            toast.success(t('referralsScreen.couponCopied', { code: reward.couponCode }));
                           }}
                         >
                           <Typography variant="caption" style={styles.couponCode}>
-                            {reward.couponCode} · tap to copy
+                            {t('referralsScreen.tapToCopy', { code: reward.couponCode })}
                           </Typography>
                         </Pressable>
                       )}
                     </View>
                   }
-                  right={<Badge label={reward.status} tone={REWARD_BADGE_TONE[reward.status] ?? 'default'} />}
+                  right={<Badge label={tOr(`referralsScreen.statuses.${reward.status}`, reward.status)} tone={REWARD_BADGE_TONE[reward.status] ?? 'default'} />}
                 />
               ))
             )}
@@ -307,7 +304,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
             <View style={styles.sectionHeader}>
               <Feather name="users" size={18} color={BrandColors.teal} style={styles.sectionIcon} />
               <Typography variant="subtitle" style={styles.cardTitle}>
-                Referral History
+                {t('referralsScreen.history')}
               </Typography>
             </View>
 
@@ -315,7 +312,7 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
               <Loader />
             ) : history.length === 0 ? (
               <Typography variant="bodySmall" style={styles.emptyText}>
-                No referrals yet.
+                {t('referralsScreen.noReferrals')}
               </Typography>
             ) : (
               history.map((item, index) => (
@@ -323,18 +320,18 @@ export const MemberReferralsScreen = ({ onBack }: { onBack?: () => void }) => {
                   key={item.id}
                   icon="user-plus"
                   divider={index > 0}
-                  label="Referred Member"
+                  label={t('referralsScreen.referredMember')}
                   value={
                     <View>
                       <Typography variant="body" style={styles.rowValue}>
-                        ID: {item.refereeGlobalUserId}
+                        {t('referralsScreen.memberId', { id: item.refereeGlobalUserId })}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
-                        {new Date(item.createdAt).toLocaleDateString()}
+                        {formatDate(item.createdAt, 'PP')}
                       </Typography>
                     </View>
                   }
-                  right={<Badge label={item.status} />}
+                  right={<Badge label={tOr(`referralsScreen.statuses.${item.status}`, item.status)} />}
                 />
               ))
             )}
@@ -374,7 +371,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   sectionIcon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   shareCard: {
     alignItems: 'center',

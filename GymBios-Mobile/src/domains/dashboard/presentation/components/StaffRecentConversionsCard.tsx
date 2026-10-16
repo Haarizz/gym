@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
@@ -13,6 +14,7 @@ interface StaffRecentConversionsCardProps {
 export function StaffRecentConversionsCard({
   conversions,
 }: StaffRecentConversionsCardProps) {
+  const { t } = useTranslation();
   if (!conversions || conversions.length === 0) return null;
 
   return (
@@ -24,7 +26,7 @@ export function StaffRecentConversionsCard({
     >
       <View style={styles.header}>
         <Feather name="check-circle" size={18} color="#FFFFFF" />
-        <Text style={styles.title}>Today's Wins! 🎉</Text>
+        <Text style={styles.title}>{t('dashboard.staff.recentConversions.title')}</Text>
       </View>
 
       <View style={styles.list}>

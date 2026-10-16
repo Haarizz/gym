@@ -1,3 +1,5 @@
+import { formatDate, i18n } from '@/core/i18n';
+
 export function formatRelativeTime(dateString?: string): string {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -11,26 +13,23 @@ export function formatRelativeTime(dateString?: string): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSec < 60) {
-    return 'Just now';
+    return i18n.t('notifications.justNow');
   }
   if (diffMin < 60) {
-    return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
+    return i18n.t('notifications.minutesAgo', { count: diffMin });
   }
   if (diffHours < 24) {
-    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    return i18n.t('notifications.hoursAgo', { count: diffHours });
   }
   if (diffDays === 1) {
-    return 'Yesterday';
+    return i18n.t('notifications.yesterday');
   }
   if (diffDays < 7) {
-    return `${diffDays} days ago`;
+    return i18n.t('notifications.daysAgo', { count: diffDays });
   }
 
   // Fallback to formatted date e.g. "Oct 12"
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatDate(date, 'MMM d');
 }
 
 /** Compact stamp for tight rows: "Now", "5m", "3h", "Yesterday", "4d", "Oct 12". */
@@ -43,10 +42,10 @@ export function formatShortTime(dateString?: string): string {
   const diffHours = Math.floor(diffMin / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMin < 1) return 'Now';
-  if (diffMin < 60) return `${diffMin}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (diffMin < 1) return i18n.t('notifications.now');
+  if (diffMin < 60) return i18n.t('notifications.shortMinutes', { count: diffMin });
+  if (diffHours < 24) return i18n.t('notifications.shortHours', { count: diffHours });
+  if (diffDays === 1) return i18n.t('notifications.yesterday');
+  if (diffDays < 7) return i18n.t('notifications.shortDays', { count: diffDays });
+  return formatDate(date, 'MMM d');
 }

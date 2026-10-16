@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
@@ -13,10 +14,21 @@ import { MemberStatsGrid } from '../components/MemberStatsGrid';
 import { MemberTodayScheduleCard } from '../components/MemberTodayScheduleCard';
 import { MemberQuickActions } from '../components/MemberQuickActions';
 import { MemberOfferBanner } from '../components/MemberOfferBanner';
+import { ClaimReferralSheet } from '@/domains/member-referrals/presentation/components/ClaimReferralSheet';
 
 export function MemberDashboardScreen() {
   const { data, isLoading, refetch, isRefetching, isStale } = useMemberDashboard();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const router = useRouter();
+  // Set by AuthBootstrap right after profile completion: ask for a referral code once.
+  const { claimReferral } = useLocalSearchParams<{ claimReferral?: string }>();
+  const [isReferralSheetOpen, setIsReferralSheetOpen] = useState(claimReferral === '1');
+
+  const closeReferralSheet = () => {
+    setIsReferralSheetOpen(false);
+    router.setParams({ claimReferral: undefined });
+  };
 
   // The home tab stays mounted while the member moves between tabs; refresh on
   // return if the data went stale (e.g. staff approved a pending purchase).
@@ -29,7 +41,7 @@ export function MemberDashboardScreen() {
   if (isLoading && !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading member portal..." />
+        <Loader message={t('memberHome.loading')} />
       </View>
     );
   }
@@ -63,6 +75,16 @@ export function MemberDashboardScreen() {
         <MemberQuickActions />
         <MemberOfferBanner />
       </ScrollView>
+
+      <ClaimReferralSheet
+        visible={isReferralSheetOpen}
+        onClose={closeReferralSheet}
+        onApplied={() => {
+          // A referred member goes straight to gym discovery to pick a plan.
+          closeReferralSheet();
+          router.push('/(member)/centers' as any);
+        }}
+      />
     </View>
   );
 }

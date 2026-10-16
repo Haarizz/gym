@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -10,6 +11,8 @@ interface StaffLeaderboardCardProps {
 }
 
 export function StaffLeaderboardCard({ leaderboard }: StaffLeaderboardCardProps) {
+  const { t } = useTranslation();
+
   const getRankBadgeColor = (rank: number) => {
     if (rank === 1) return BrandColors.memberGold;
     if (rank === 2) return BrandColors.trainerAmber;
@@ -20,7 +23,7 @@ export function StaffLeaderboardCard({ leaderboard }: StaffLeaderboardCardProps)
     <View style={styles.container}>
       <View style={styles.header}>
         <Feather name="award" size={18} color={BrandColors.memberGold} />
-        <Text style={styles.title}>Branch Leaderboard</Text>
+        <Text style={styles.title}>{t('staffPerformance.branchLeaderboard')}</Text>
       </View>
 
       <View style={styles.list}>
@@ -35,7 +38,9 @@ export function StaffLeaderboardCard({ leaderboard }: StaffLeaderboardCardProps)
               <View style={styles.itemInfo}>
                 <Text style={styles.name}>{item.name}</Text>
                 <View style={styles.metricsRow}>
-                  <Text style={styles.metricsText}>{item.conversions} conversions</Text>
+                  <Text style={styles.metricsText}>
+                    {t('staffPerformance.conversionsCount', { count: item.conversions })}
+                  </Text>
                   <Text style={styles.dot}>•</Text>
                   <CurrencyValue style={[styles.metricsText, styles.revenueText]} amount={item.revenue} compact />
                 </View>
@@ -43,7 +48,7 @@ export function StaffLeaderboardCard({ leaderboard }: StaffLeaderboardCardProps)
 
               {item.isCurrentUser && (
                 <View style={styles.youBadge}>
-                  <Text style={styles.youText}>YOU</Text>
+                  <Text style={styles.youText}>{t('staffPerformance.youBadge')}</Text>
                 </View>
               )}
             </View>

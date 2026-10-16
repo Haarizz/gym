@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: 'सहायता और पूछताछ',
+    newEnquiryCta: 'नई पूछताछ करें',
+    newEnquiryCtaSubtitle: 'सदस्यता, बिलिंग, क्लास, सुविधाएँ…',
+    tabs: {
+      ALL: 'सभी',
+      OPEN: 'खुली',
+      REPLIED: 'जवाब मिला',
+      CLOSED: 'बंद',
+    },
+    status: {
+      OPEN: 'जवाब की प्रतीक्षा',
+      REPLIED: 'जवाब मिला',
+      CLOSED: 'बंद',
+    },
+    empty: 'अभी कोई पूछताछ नहीं',
+    emptySubtitle: 'आप अपने जिम को जो सवाल भेजेंगे, वे जवाब के साथ यहाँ दिखेंगे।',
+    nothingHere: 'यहाँ अभी कुछ नहीं है।',
+    loadFailed: 'आपकी पूछताछ लोड नहीं हो सकी।',
+    youPrefix: 'आप:',
+    gymFallback: 'आपका जिम',
+    reference: '#{{id}}',
+    newEnquiry: 'नई पूछताछ',
+    categoryPrompt: 'यह किस बारे में है?',
+    subject: 'विषय',
+    subjectPlaceholder: 'जैसे 2 हफ़्ते के लिए सदस्यता रोकें',
+    message: 'विवरण',
+    messagePlaceholder: 'बताएँ आपको क्या चाहिए — तारीख़, राशि या क्लास के नाम से जिम जल्दी जवाब दे पाएगा।',
+    formHint: 'जिम के जवाब देने पर आपको सूचना मिलेगी। एक समय में जवाब की प्रतीक्षा में अधिकतम {{count}} पूछताछ हो सकती हैं।',
+    submit: 'पूछताछ भेजें',
+    submitting: 'भेजा जा रहा है…',
+    submitted: 'पूछताछ भेज दी गई। जिम यहीं जवाब देगा।',
+    submitFailed: 'आपकी पूछताछ नहीं भेजी जा सकी। कृपया फिर से प्रयास करें।',
+    steps: {
+      submitted: 'भेजी गई',
+      replied: 'जवाब मिला',
+      closed: 'बंद',
+    },
+    openedOn: '{{date}} को खोली गई',
+    gymBadge: 'जिम',
+    received: 'प्राप्त हुई · जिम जल्द जवाब देगा',
+    closedOn: 'जिम ने बंद की · {{date}}',
+    closedFooter: 'यह पूछताछ बंद है।',
+    followUpHint: 'और मदद चाहिए?',
+    raiseNew: 'नई पूछताछ करें',
+    categories: {
+      GENERAL: 'सामान्य',
+      MEMBERSHIP: 'सदस्यता',
+      BILLING: 'बिलिंग',
+      FACILITIES: 'सुविधाएँ',
+      TRAINER: 'ट्रेनर',
+      CLASSES: 'क्लास',
+      FEEDBACK: 'फ़ीडबैक',
+      OTHER: 'अन्य',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

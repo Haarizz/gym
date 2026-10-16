@@ -3,6 +3,7 @@ import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTrainerDashboard } from '../../hooks/useTrainerDashboard';
 import { TrainerWelcomeCard } from '../components/TrainerWelcomeCard';
 import { TrainerStatsGrid } from '../components/TrainerStatsGrid';
@@ -11,13 +12,14 @@ import { TrainerTodayScheduleCard } from '../components/TrainerTodayScheduleCard
 import { TrainerQuickActions } from '../components/TrainerQuickActions';
 
 export function TrainerDashboardScreen() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isRefetching, togglePendingTask, startSession, finishSession } = useTrainerDashboard();
   const insets = useSafeAreaInsets();
 
   if (isLoading && !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading dashboard..." />
+        <Loader message={t('dashboard.trainer.loading')} />
       </View>
     );
   }
@@ -25,7 +27,7 @@ export function TrainerDashboardScreen() {
   return (
     <View style={styles.root}>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280, overflow: 'hidden' }} pointerEvents="none">
-        <GlassBlob color={BrandColors.trainerAmber} size={260} opacity={0.24} top={-70} right={-80} />
+        <GlassBlob color={BrandColors.trainerAmber} size={260} opacity={0.24} top={-70} end={-80} />
       </View>
       <ScrollView
         style={styles.container}

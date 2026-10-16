@@ -232,6 +232,10 @@ export interface SubscriptionSummary {
     pendingCount: number;
     pendingAmount: number;
   }[];
+  /** The period's Total Revenue (KPI), and the part of it no card covers
+   *  (balance settlements, POS, class bookings, freeze charges) */
+  totalCollection: number;
+  otherIncome: number;
 }
 
 export type RevenueGranularity ='hourly' | 'daily' | 'weekly' | 'monthly';

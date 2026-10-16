@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +11,7 @@ interface TrainerTargetProgressCardProps {
 }
 
 export function TrainerTargetProgressCard({ monthlyPerformance }: TrainerTargetProgressCardProps) {
+  const { t } = useTranslation();
   const { revenue, sessions } = monthlyPerformance;
 
   return (
@@ -19,12 +21,12 @@ export function TrainerTargetProgressCard({ monthlyPerformance }: TrainerTargetP
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Monthly Performance</Text>
+      <Text style={styles.title}>{t('trainerPerformance.monthlyPerformance')}</Text>
 
       {/* Revenue Target */}
       <View style={styles.targetSection}>
         <View style={styles.targetHeader}>
-          <Text style={styles.targetLabel}>Revenue Target</Text>
+          <Text style={styles.targetLabel}>{t('trainerPerformance.revenueTarget')}</Text>
           <Text style={styles.targetValues}>
             <CurrencyValue amount={revenue.achieved} compact /> / <CurrencyValue amount={revenue.target} compact />
           </Text>
@@ -32,13 +34,15 @@ export function TrainerTargetProgressCard({ monthlyPerformance }: TrainerTargetP
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: `${revenue.percentage}%` }]} />
         </View>
-        <Text style={styles.percentageAchieved}>{revenue.percentage}% achieved</Text>
+        <Text style={styles.percentageAchieved}>
+          {t('trainerPerformance.percentAchieved', { percentage: revenue.percentage })}
+        </Text>
       </View>
 
       {/* Sessions Target */}
       <View style={styles.targetSection}>
         <View style={styles.targetHeader}>
-          <Text style={styles.targetLabel}>Session Target</Text>
+          <Text style={styles.targetLabel}>{t('trainerPerformance.sessionTarget')}</Text>
           <Text style={styles.targetValues}>
             {sessions.completed} / {sessions.target}
           </Text>
@@ -46,7 +50,9 @@ export function TrainerTargetProgressCard({ monthlyPerformance }: TrainerTargetP
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: `${sessions.percentage}%` }]} />
         </View>
-        <Text style={styles.percentageAchieved}>{sessions.percentage}% achieved</Text>
+        <Text style={styles.percentageAchieved}>
+          {t('trainerPerformance.percentAchieved', { percentage: sessions.percentage })}
+        </Text>
       </View>
     </LinearGradient>
   );

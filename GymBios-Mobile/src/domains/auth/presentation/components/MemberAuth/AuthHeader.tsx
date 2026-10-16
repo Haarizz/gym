@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +7,7 @@ import { Svg, Polyline, G, Path, Circle } from 'react-native-svg';
 import { Typography } from '@/shared/components';
 
 export function AuthHeader() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -33,7 +35,7 @@ export function AuthHeader() {
           <Typography style={styles.brandName}>GymBios</Typography>
         </View>
         <Typography style={styles.brandTag}>
-          Track workouts, book classes, own your progress.
+          {t('auth.headerTagline')}
         </Typography>
       </View>
     </View>

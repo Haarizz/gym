@@ -1,4 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
@@ -15,7 +17,7 @@ interface PlanCardProps {
   isPopular?: boolean;
 }
 
-function buildFeatures(plan: CenterPlan, facilityNames: Record<string, string>): string[] {
+function buildFeatures(t: TFunction, plan: CenterPlan, facilityNames: Record<string, string>): string[] {
   const features: string[] = [];
   if (plan.description) features.push(plan.description);
 
@@ -24,13 +26,17 @@ function buildFeatures(plan: CenterPlan, facilityNames: Record<string, string>):
   named.forEach((name) => features.push(name));
   const unnamed = facilities.length - named.length;
   if (unnamed > 0) {
-    features.push(named.length > 0 ? `+${unnamed} more facilities` : `Access to ${unnamed} facilities`);
+    features.push(
+      named.length > 0
+        ? t('centers.planCard.moreFacilities', { count: unnamed })
+        : t('centers.planCard.accessToFacilities', { count: unnamed }),
+    );
   }
 
-  if (plan.maxSessions) features.push(`Up to ${plan.maxSessions} sessions`);
-  if (plan.maxFreezeDays) features.push(`Freeze up to ${plan.maxFreezeDays} days`);
+  if (plan.maxSessions) features.push(t('centers.planCard.upToSessions', { count: plan.maxSessions }));
+  if (plan.maxFreezeDays) features.push(t('centers.planCard.freezeUpTo', { count: plan.maxFreezeDays }));
 
-  if (features.length === 0) features.push('Standard subscription features');
+  if (features.length === 0) features.push(t('centers.planCard.standardFeatures'));
   return features;
 }
 
@@ -40,19 +46,20 @@ export function PlanCard({
   facilityNames = {},
   isPopular = false,
 }: PlanCardProps) {
+  const { t } = useTranslation();
   // The plan's running offer — priced by the server, so this is what the member pays.
   const hasOffer = plan.offerActive && plan.offerDiscountAmount > 0;
   const payPrice = hasOffer ? plan.effectivePrice : plan.price;
   const duration =
     plan.duration || [plan.durationValue, plan.durationType].filter(Boolean).join(' ');
-  const features = buildFeatures(plan, facilityNames);
+  const features = buildFeatures(t, plan, facilityNames);
 
   return (
     <View style={[styles.card, isPopular && styles.popularCard]}>
       {isPopular && (
         <View style={styles.popularRow}>
           <Feather name="tag" size={12} color={BrandColors.trainerAmber} />
-          <Text style={styles.popularText}>MOST POPULAR</Text>
+          <Text style={styles.popularText}>{t('centers.planCard.mostPopular')}</Text>
         </View>
       )}
 
@@ -63,7 +70,12 @@ export function PlanCard({
           {hasOffer && (
             <View style={styles.offerPill}>
               <Text style={styles.offerText}>
-                🎉 {plan.offerLabel ? `${plan.offerLabel} · ` : ''}Save <CurrencyValue amount={plan.offerDiscountAmount} />
+                🎉{' '}
+                <Trans
+                  i18nKey={plan.offerLabel ? 'centers.planCard.saveWithLabel' : 'centers.planCard.save'}
+                  values={{ label: plan.offerLabel }}
+                  components={{ amount: <CurrencyValue amount={plan.offerDiscountAmount} /> }}
+                />
               </Text>
             </View>
           )}
@@ -89,7 +101,7 @@ export function PlanCard({
         style={({ pressed }) => [styles.selectButtonWrapper, pressed && styles.pressed]}
         onPress={() => onSelect(plan)}
         accessibilityRole="button"
-        accessibilityLabel={`Subscribe to ${plan.name}`}
+        accessibilityLabel={t('centers.planCard.subscribeA11y', { name: plan.name })}
       >
         <LinearGradient
           colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -97,7 +109,7 @@ export function PlanCard({
           end={{ x: 1, y: 0 }}
           style={styles.selectButton}
         >
-          <Text style={styles.selectButtonText}>Subscribe</Text>
+          <Text style={styles.selectButtonText}>{t('centers.planCard.subscribe')}</Text>
         </LinearGradient>
       </Pressable>
     </View>
@@ -139,7 +151,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
     alignItems: 'flex-start',
   },
   planName: {

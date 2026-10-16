@@ -1,8 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import Feather from '@expo/vector-icons/Feather';
+import { parsePlanTerm } from '../../domain/planTerm';
 
 interface MembershipPlanCardProps {
   name: string;
@@ -25,6 +27,9 @@ export function MembershipPlanCard({
   isSelected,
   onSelect,
 }: MembershipPlanCardProps) {
+  const { t } = useTranslation();
+  const term = parsePlanTerm(duration);
+  const durationLabel = term ? t(`membership.status.length.${term.unit}`, { count: term.count }) : duration;
   return (
     <Pressable
       style={[
@@ -34,18 +39,18 @@ export function MembershipPlanCard({
       onPress={onSelect}
     >
       <View style={styles.header}>
-        <Text style={[styles.name, isSelected && styles.nameSelected]}>{name}</Text>
+        <Text style={[styles.name, isSelected && styles.nameSelected]} numberOfLines={2}>{name}</Text>
         {isCurrent && (
           <View style={styles.currentBadge}>
-            <Text style={styles.currentText}>CURRENT</Text>
+            <Text style={styles.currentText}>{t('membership.planCard.current')}</Text>
           </View>
         )}
       </View>
       <Text style={[styles.duration, isSelected && styles.durationSelected]}>
-        {duration}
+        {durationLabel}
       </Text>
       <View style={styles.footer}>
-        <View>
+        <View style={styles.priceCol}>
           <Text style={[styles.price, isSelected && styles.priceSelected]}>
             <CurrencyValue amount={price} />
           </Text>
@@ -78,11 +83,14 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: Spacing.two,
     marginBottom: Spacing.one,
   },
   name: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 15,
     fontWeight: '700',
     color: BrandColors.textPrimary,
@@ -95,6 +103,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: 2,
     borderRadius: Radius.full,
+    flexShrink: 0,
   },
   currentText: {
     fontSize: 10,
@@ -114,6 +123,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  priceCol: {
+    flex: 1,
+    minWidth: 0,
   },
   price: {
     fontSize: 18,
@@ -129,6 +143,7 @@ const styles = StyleSheet.create({
     color: BrandColors.memberGold,
   },
   radio: {
+    flexShrink: 0,
     width: 20,
     height: 20,
     borderRadius: 10,

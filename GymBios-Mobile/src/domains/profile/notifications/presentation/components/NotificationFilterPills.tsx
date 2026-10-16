@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -21,6 +22,7 @@ export function NotificationFilterPills({
   unreadCount = 0,
   totalCount,
 }: NotificationFilterPillsProps) {
+  const { t } = useTranslation();
   const [trackWidth, setTrackWidth] = useState(0);
   const position = useState(() => new Animated.Value(activeFilter === 'UNREAD' ? 1 : 0))[0];
 
@@ -55,7 +57,7 @@ export function NotificationFilterPills({
           accessibilityRole="tab"
           accessibilityState={{ selected: activeFilter === 'ALL' }}
         >
-          <Text style={[styles.optionText, activeFilter === 'ALL' && styles.optionTextActive]}>All</Text>
+          <Text style={[styles.optionText, activeFilter === 'ALL' && styles.optionTextActive]}>{t('notifications.filterAll')}</Text>
           {totalCount !== undefined && totalCount > 0 && <Text style={styles.count}>{totalCount}</Text>}
         </Pressable>
 
@@ -65,7 +67,7 @@ export function NotificationFilterPills({
           accessibilityRole="tab"
           accessibilityState={{ selected: activeFilter === 'UNREAD' }}
         >
-          <Text style={[styles.optionText, activeFilter === 'UNREAD' && styles.optionTextActive]}>Unread</Text>
+          <Text style={[styles.optionText, activeFilter === 'UNREAD' && styles.optionTextActive]}>{t('notifications.filterUnread')}</Text>
           {unreadCount > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
@@ -95,7 +97,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: TRACK_PADDING,
     bottom: TRACK_PADDING,
-    left: TRACK_PADDING,
+    start: TRACK_PADDING,
     borderRadius: 999,
     backgroundColor: G.thumb,
     shadowColor: G.shadow,

@@ -10,8 +10,13 @@ public class MobileReferralProfile extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "global_user_id", nullable = false, unique = true)
+    // Set for app-registered (global) members only; a gym-created login has none.
+    @Column(name = "global_user_id", unique = true)
     private Long globalUserId;
+
+    // The owner: the referrer's members row in this gym (unique index in V95).
+    @Column(name = "member_id")
+    private Long memberId;
 
     @Column(name = "referral_code", nullable = false, unique = true, length = 16)
     private String referralCode;
@@ -28,6 +33,9 @@ public class MobileReferralProfile extends BaseEntity {
 
     public Long getGlobalUserId() { return globalUserId; }
     public void setGlobalUserId(Long globalUserId) { this.globalUserId = globalUserId; }
+
+    public Long getMemberId() { return memberId; }
+    public void setMemberId(Long memberId) { this.memberId = memberId; }
 
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }

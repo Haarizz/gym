@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +35,7 @@ export function SignUpForm({
   isAppleLoading,
   isAppleAvailable,
 }: SignUpFormProps) {
+  const { t } = useTranslation();
   const {
     control,
     handleSubmit,
@@ -62,8 +64,8 @@ export function SignUpForm({
 
   return (
     <View style={styles.panel}>
-      <Typography style={styles.panelTitle}>Create your account</Typography>
-      <Typography style={styles.panelSub}>Join your gym's member app in under a minute.</Typography>
+      <Typography style={styles.panelTitle}>{t('auth.createYourAccount')}</Typography>
+      <Typography style={styles.panelSub}>{t('auth.signUpSubtitle')}</Typography>
 
       <View style={styles.fields}>
         <Controller
@@ -72,8 +74,8 @@ export function SignUpForm({
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Full name"
-              placeholder="Your full name"
+              label={t('auth.fullName')}
+              placeholder={t('auth.yourFullName')}
               autoCapitalize="words"
               autoComplete="name"
               returnKeyType="next"
@@ -92,8 +94,8 @@ export function SignUpForm({
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Username"
-              placeholder="Choose a username"
+              label={t('auth.username')}
+              placeholder={t('auth.chooseUsername')}
               autoCapitalize="none"
               autoComplete="username"
               returnKeyType="next"
@@ -112,7 +114,7 @@ export function SignUpForm({
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Email"
+              label={t('auth.email')}
               placeholder="you@example.com"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -134,8 +136,8 @@ export function SignUpForm({
             <View style={styles.passwordField}>
               <Input
                 variant="glass"
-                label="Password"
-                placeholder="Create a password"
+                label={t('auth.password')}
+                placeholder={t('auth.createPassword')}
                 secureTextEntry
                 autoComplete="password-new"
                 returnKeyType="done"
@@ -152,12 +154,11 @@ export function SignUpForm({
       </View>
 
       <Typography style={styles.terms}>
-        By creating an account, you agree to GymBios's <Typography style={styles.termsLink}>Terms</Typography> and{' '}
-        <Typography style={styles.termsLink}>Privacy Policy</Typography>.
+        <Trans i18nKey="auth.terms" components={{ link: <Typography style={styles.termsLink} /> }} />
       </Typography>
 
       <Button
-        label="Create account"
+        label={t('auth.createAccount')}
         size="lg"
         onPress={handleSubmit(onSignup, onInvalid)}
         loading={isLoading}
@@ -168,7 +169,7 @@ export function SignUpForm({
         <>
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Typography style={styles.dividerText}>or</Typography>
+            <Typography style={styles.dividerText}>{t('auth.or')}</Typography>
             <View style={styles.dividerLine} />
           </View>
 
@@ -185,7 +186,7 @@ export function SignUpForm({
 
       <Pressable style={styles.switchLine} onPress={onSwitchToSignin}>
         <Typography style={styles.switchText}>
-          Already a member? <Typography style={styles.switchLink}>Sign in</Typography>
+          <Trans i18nKey="auth.alreadyMember" components={{ link: <Typography style={styles.switchLink} /> }} />
         </Typography>
       </Pressable>
     </View>

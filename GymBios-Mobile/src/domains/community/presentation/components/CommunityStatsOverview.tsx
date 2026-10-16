@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { tOr } from '@/core/i18n';
 import { StyleSheet, View } from 'react-native';
 
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
@@ -20,25 +22,26 @@ interface CommunityStatsOverviewProps {
 }
 
 export function CommunityStatsOverview({ stats }: CommunityStatsOverviewProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   return (
     <View>
       {/* Overview row */}
       <View style={styles.row}>
         <StatCard
-          label="Total Posts"
+          label={t('community.stats.totalPosts')}
           value={String(stats.totalPosts ?? 0)}
           iconName="file-text"
           color={primaryColor}
         />
         <StatCard
-          label="Total Likes"
+          label={t('community.stats.totalLikes')}
           value={String(stats.totalLikes ?? 0)}
           iconName="heart"
           color="#ef4444"
         />
         <StatCard
-          label="Comments"
+          label={t('community.stats.comments')}
           value={String(stats.totalComments ?? 0)}
           iconName="message-circle"
           color="#3b82f6"
@@ -49,16 +52,16 @@ export function CommunityStatsOverview({ stats }: CommunityStatsOverviewProps) {
       {stats.byType && stats.byType.length > 0 && (
         <View style={styles.section}>
           <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-            Post Type Breakdown
+            {t('community.stats.breakdown')}
           </Typography>
-          {stats.byType.map((t) => (
-            <View key={t.type} style={styles.typeRow}>
-              <View style={[styles.typeDot, { backgroundColor: getTypeColor(t.type, primaryColor) }]} />
+          {stats.byType.map((row) => (
+            <View key={row.type} style={styles.typeRow}>
+              <View style={[styles.typeDot, { backgroundColor: getTypeColor(row.type, primaryColor) }]} />
               <Typography variant="bodySmall" style={styles.typeLabel}>
-                {t.type.charAt(0).toUpperCase() + t.type.slice(1)}
+                {tOr(`community.typeNames.${row.type}`, row.type.charAt(0).toUpperCase() + row.type.slice(1))}
               </Typography>
               <Typography variant="bodySmall" color="textSecondary">
-                {t.posts ?? 0} posts · {t.likes ?? 0} likes · {t.comments ?? 0} comments
+                {t('community.stats.breakdownRow', { posts: row.posts ?? 0, likes: row.likes ?? 0, comments: row.comments ?? 0 })}
               </Typography>
             </View>
           ))}

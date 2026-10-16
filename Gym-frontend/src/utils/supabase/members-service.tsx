@@ -67,6 +67,9 @@ export interface Member {
   billed_to_head?: boolean;
   // App authentication fields
   user_id?: number;
+  // The mobile app account this member belongs to. Cleared on a rejected purchase
+  // once the account buys here again (it's superseded by the new purchase).
+  global_user_id?: number | null;
   app_username?: string;
   app_access_enabled?: boolean;
   // Which staff member actually handled this sale — credited toward their revenue
@@ -79,6 +82,9 @@ export interface Member {
   approved_by?: string | null;
   approved_at?: string | null;
   rejection_reason?: string | null;
+  // Approval History only: this rejected purchase was replaced by a newer one (at this
+  // gym or another), so it can no longer be approved.
+  superseded?: boolean | null;
 }
 
 // One row in the Add Member "Family Members" section, or the payload for

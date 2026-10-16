@@ -14,6 +14,9 @@ import { Button } from '@/shared/components/Button';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
+import type { ParseKeys } from 'i18next';
+import { i18n } from '@/core/i18n';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { ApiError } from '@/core/platform/api/types';
 import { CurrencyValue, useCurrency } from '@/core/providers';
@@ -28,12 +31,15 @@ import { usePurchaseFamilyPlan } from '../../hooks/usePurchaseFamilyPlan';
 import { useFamilyQuote } from '../../hooks/useFamilyQuote';
 import type { FamilyPurchaseRequest } from '../../infrastructure/familyApi';
 
+// Messages are resolved when validation runs, so they follow the current language.
+const msg = (key: ParseKeys) => ({ error: () => i18n.t(key) });
+
 const familyMemberSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required'),
+  name: z.string().trim().min(1, msg('family.nameRequired')),
   // Required: every family member becomes a member record, and members.email is NOT NULL.
-  email: z.string().trim().min(1, 'Email is required').email('Enter a valid email'),
+  email: z.string().trim().min(1, msg('family.emailRequired')).email(msg('family.emailInvalid')),
   phone: z.string().trim().optional(),
-  relationship: z.string().min(1, 'Relationship is required'),
+  relationship: z.string().min(1, msg('family.relationshipRequired')),
   isMinor: z.boolean(),
   dateOfBirth: z.date().nullable().optional(),
   // '' = same plan as the buyer
@@ -46,18 +52,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const FAMILY_RELATIONSHIPS = [
-  { label: 'Spouse', value: 'Spouse' },
-  { label: 'Child', value: 'Child' },
-  { label: 'Parent', value: 'Parent' },
-  { label: 'Sibling', value: 'Sibling' },
-  { label: 'Other', value: 'Other' },
-];
-
-const COUPLE_RELATIONSHIPS = [
-  { label: 'Spouse', value: 'Spouse' },
-  { label: 'Partner', value: 'Partner' },
-];
+// Values are what the API stores (English); only the labels are translated.
+const FAMILY_RELATIONSHIPS = ['Spouse', 'Child', 'Parent', 'Sibling', 'Other'] as const;
+const COUPLE_RELATIONSHIPS = ['Spouse', 'Partner'] as const;
 
 const toIsoDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -74,6 +71,7 @@ const toIsoDate = (d: Date) =>
  */
 export function FamilyPurchaseScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { tenantSlug = '', branchId: branchIdParam, planId, mode } =
     useLocalSearchParams<{ tenantSlug: string; branchId: string; planId: string; mode?: string }>();
   const branchId = Number(branchIdParam) || 0;
@@ -124,7 +122,7 @@ export function FamilyPurchaseScreen() {
       return p.id !== selectedPlan?.id && type !== 'family' && type !== 'couple';
     });
     return [
-      { label: 'Same as your subscription', value: '' },
+      { label: t('family.sameAsYours'), value: '' },
       ...individualPlans.map((p) => ({ label: `${p.name} · ${formatCurrency(p.effectivePrice ?? p.price)}`, value: String(p.id) })),
     ];
   }, [plans, selectedPlan, formatCurrency]);
@@ -141,33 +139,33 @@ export function FamilyPurchaseScreen() {
   const childCount = minorFlags.length - adultCount;
   const canAddMember = limits.total == null || watchMembers.length < limits.total;
   const limitLines = useMemo(() => {
-    if (isCouple) return ['You + your partner'];
+    if (isCouple) return [t('family.youAndPartner')];
     const lines: string[] = [];
-    if (limits.total != null) lines.push(`You + up to ${limits.total} ${limits.total === 1 ? 'person' : 'people'}`);
-    if (limits.adults != null) lines.push(`Up to ${limits.adults} other adult${limits.adults === 1 ? '' : 's'} besides you`);
-    if (limits.children != null) lines.push(`Up to ${limits.children} child${limits.children === 1 ? '' : 'ren'}`);
+    if (limits.total != null) lines.push(t('family.youPlusPeople', { count: limits.total }));
+    if (limits.adults != null) lines.push(t('family.upToAdults', { count: limits.adults }));
+    if (limits.children != null) lines.push(t('family.upToChildren', { count: limits.children }));
     return lines;
-  }, [limits, isCouple]);
+  }, [limits, isCouple, t]);
 
   const { data: quote, isFetching: isQuoteFetching, error: quoteError } =
     useFamilyQuote(tenantSlug, branchId, selectedPlan?.id, minorFlags, memberPlanIds);
 
   const handleReviewAndPay = (data: FormValues) => {
     if (data.members.length === 0) {
-      toast.error(isCouple ? 'Add your partner to continue.' : 'Add at least one family member.');
+      toast.error(t(isCouple ? 'family.addPartnerToContinue' : 'family.addAtLeastOne'));
       return;
     }
     if (limits.adults != null && adultCount > limits.adults) {
-      toast.error(`This subscription allows ${limits.adults} other adult${limits.adults === 1 ? '' : 's'} besides you.`);
+      toast.error(t('family.adultsLimit', { count: limits.adults }));
       return;
     }
     if (limits.children != null && childCount > limits.children) {
-      toast.error(`This subscription allows up to ${limits.children} child member${limits.children === 1 ? '' : 's'}.`);
+      toast.error(t('family.childrenLimit', { count: limits.children }));
       return;
     }
     const emails = data.members.map((m) => m.email.trim().toLowerCase());
     if (new Set(emails).size !== emails.length) {
-      toast.error('Each family member needs a different email.');
+      toast.error(t('family.uniqueEmails'));
       return;
     }
     if (quoteError) {
@@ -175,7 +173,7 @@ export function FamilyPurchaseScreen() {
       return;
     }
     if (!quote) {
-      toast.error('Price is still loading — try again in a moment.');
+      toast.error(t('family.priceLoading'));
       return;
     }
     // One key per payment attempt: retries from the open sheet reuse it, so a
@@ -215,14 +213,14 @@ export function FamilyPurchaseScreen() {
 
           toast.success(
             isPlanChange
-              ? `You've switched to the ${selectedPlan.name} subscription!`
+              ? t('family.switched', { plan: selectedPlan.name })
               : result.approvalPending
-                ? `${selectedPlan.name} booked — the gym will confirm your payment before it's activated.`
-                : `You've purchased the ${selectedPlan.name} subscription!`,
+                ? t('family.bookedPendingApproval', { plan: selectedPlan.name })
+                : t('family.purchased', { plan: selectedPlan.name }),
           );
           if (result.invitedEmails.length > 0) {
             toast.info(
-              `Invitation sent to ${result.invitedEmails.join(', ')}. They get access by logging in to the app with that email.`,
+              t('family.invitationsSent', { emails: result.invitedEmails.join(', ') }),
             );
           }
           router.replace(isPlanChange ? '/(member)/membership' : '/(member)');
@@ -249,13 +247,16 @@ export function FamilyPurchaseScreen() {
   };
 
   const isLoading = isDetailsLoading || isPlansLoading;
-  const relationshipOptions = isCouple ? COUPLE_RELATIONSHIPS : FAMILY_RELATIONSHIPS;
+  const relationshipOptions = (isCouple ? COUPLE_RELATIONSHIPS : FAMILY_RELATIONSHIPS).map((value) => ({
+    label: t(`family.relationships.${value}`),
+    value,
+  }));
 
   return (
     <ScreenLayout>
       <AppHeader
-        title={isCouple ? 'Couple Membership' : 'Family Membership'}
-        subtitle={isCouple ? 'Add your partner' : 'Add your family members'}
+        title={t(isCouple ? 'family.coupleTitle' : 'family.familyTitle')}
+        subtitle={t(isCouple ? 'family.coupleSubtitle' : 'family.familySubtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={() => router.back()}
       />
@@ -266,7 +267,7 @@ export function FamilyPurchaseScreen() {
         </View>
       ) : !selectedPlan ? (
         <View style={styles.center}>
-          <Typography variant="body" color="error">Subscription not found.</Typography>
+          <Typography variant="body" color="error">{t('family.notFound')}</Typography>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -287,18 +288,18 @@ export function FamilyPurchaseScreen() {
               <Feather name="file-text" size={16} color={BrandColors.teal} />
               <Typography variant="bodySmall" color="textSecondary">
                 {selectedPlan.familyBillingMode === 'family_head'
-                  ? 'Everyone is billed together on one invoice to you'
+                  ? t('family.billedTogether')
                   : isCouple
-                    ? 'Your partner gets their own membership, billed separately'
-                    : 'Adults get their own membership; children are billed to you'}
+                    ? t('family.partnerBilledSeparately')
+                    : t('family.adultsOwnChildrenYou')}
               </Typography>
             </View>
           </View>
 
           <View style={styles.sectionHeader}>
-            <Typography variant="subtitle">{isCouple ? 'Your partner' : 'Family members'}</Typography>
+            <Typography variant="subtitle">{t(isCouple ? 'family.yourPartner' : 'family.familyMembers')}</Typography>
             <Typography variant="bodySmall" color="textSecondary">
-              Each member gets an email invite to use the app with this membership.
+              {t('family.inviteNote')}
             </Typography>
           </View>
 
@@ -309,7 +310,7 @@ export function FamilyPurchaseScreen() {
               <View key={item.id} style={styles.memberCard}>
                 <View style={styles.memberCardHeader}>
                   <Typography variant="subtitle" style={styles.bold}>
-                    {isCouple ? 'Partner' : `Member ${index + 1}`}
+                    {isCouple ? t('family.partner') : t('family.memberN', { n: index + 1 })}
                   </Typography>
                   <Pressable onPress={() => remove(index)} style={styles.removeBtn} hitSlop={8}>
                     <Feather name="trash-2" size={18} color="#ef4444" />
@@ -321,8 +322,8 @@ export function FamilyPurchaseScreen() {
                   name={`members.${index}.name`}
                   render={({ field: { onChange, value } }) => (
                     <Input
-                      label="Full name"
-                      placeholder="Enter name"
+                      label={t('family.fullName')}
+                      placeholder={t('family.enterName')}
                       value={value}
                       onChangeText={onChange}
                       error={errors.members?.[index]?.name?.message}
@@ -335,11 +336,11 @@ export function FamilyPurchaseScreen() {
                   name={`members.${index}.relationship`}
                   render={({ field: { onChange, value } }) => (
                     <Dropdown
-                      label="Relationship"
+                      label={t('family.relationship')}
                       options={relationshipOptions}
                       value={value}
                       onChange={onChange}
-                      placeholder="Select relationship"
+                      placeholder={t('family.selectRelationship')}
                       error={errors.members?.[index]?.relationship?.message}
                     />
                   )}
@@ -352,8 +353,8 @@ export function FamilyPurchaseScreen() {
                     render={({ field: { onChange, value } }) => (
                       <View style={styles.switchRow}>
                         <View>
-                          <Typography variant="body" style={styles.semibold}>Under 18</Typography>
-                          <Typography variant="bodySmall" color="textSecondary">Billed on your invoice</Typography>
+                          <Typography variant="body" style={styles.semibold}>{t('family.under18')}</Typography>
+                          <Typography variant="bodySmall" color="textSecondary">{t('family.billedOnInvoice')}</Typography>
                         </View>
                         <Switch
                           value={value}
@@ -371,11 +372,11 @@ export function FamilyPurchaseScreen() {
                     name={`members.${index}.membershipPlanId`}
                     render={({ field: { onChange, value } }) => (
                       <Dropdown
-                        label="Subscription (optional)"
+                        label={t('family.subscriptionOptional')}
                         options={ownPlanOptions}
                         value={value}
                         onChange={onChange}
-                        placeholder="Same as your subscription"
+                        placeholder={t('family.sameAsYours')}
                       />
                     )}
                   />
@@ -387,7 +388,7 @@ export function FamilyPurchaseScreen() {
                     name={`members.${index}.dateOfBirth`}
                     render={({ field: { onChange, value } }) => (
                       <DatePicker
-                        label="Date of birth (optional)"
+                        label={t('family.dateOfBirthOptional')}
                         value={value ?? null}
                         onChange={onChange}
                         initialView="year"
@@ -403,7 +404,7 @@ export function FamilyPurchaseScreen() {
                   name={`members.${index}.email`}
                   render={({ field: { onChange, value } }) => (
                     <Input
-                      label={isMinor ? 'Email' : 'Email (for their app invite)'}
+                      label={t(isMinor ? 'family.email' : 'family.emailForInvite')}
                       placeholder="name@example.com"
                       keyboardType="email-address"
                       autoCapitalize="none"
@@ -419,8 +420,8 @@ export function FamilyPurchaseScreen() {
                   name={`members.${index}.phone`}
                   render={({ field: { onChange, value } }) => (
                     <Input
-                      label="Phone (optional)"
-                      placeholder="Enter phone number"
+                      label={t('family.phoneOptional')}
+                      placeholder={t('family.enterPhone')}
                       keyboardType="phone-pad"
                       value={value}
                       onChangeText={onChange}
@@ -431,8 +432,8 @@ export function FamilyPurchaseScreen() {
                 {fee != null && (
                   <Typography variant="bodySmall" color="textSecondary" style={styles.memberFee}>
                     {isMinor
-                      ? 'Added to your invoice: '
-                      : `Their own membership (${quote?.memberPlanNames[index] ?? selectedPlan.name}): `}
+                      ? t('family.addedToInvoice')
+                      : t('family.ownMembership', { plan: quote?.memberPlanNames[index] ?? selectedPlan.name })}
                     <CurrencyValue amount={fee} />
                   </Typography>
                 )}
@@ -443,7 +444,7 @@ export function FamilyPurchaseScreen() {
           {canAddMember && (
             <Button
               variant="outline"
-              title={isCouple ? 'Add partner' : 'Add family member'}
+              title={t(isCouple ? 'family.addPartner' : 'family.addFamilyMember')}
               onPress={() =>
                 append({
                   name: '', email: '', phone: '', relationship: isCouple ? 'Spouse' : '',
@@ -456,38 +457,38 @@ export function FamilyPurchaseScreen() {
 
           <View style={styles.totalsCard}>
             <View style={styles.totalsHeader}>
-              <Typography variant="subtitle">Summary</Typography>
+              <Typography variant="subtitle">{t('family.summary')}</Typography>
               {isQuoteFetching && <ActivityIndicator size="small" color={BrandColors.teal} />}
             </View>
             {quoteError ? (
               <Typography variant="bodySmall" color="error" style={styles.totalRow}>
                 {(quoteError as any).status >= 400 && (quoteError as any).status < 500
                   ? quoteError.message
-                  : `Couldn't load the price: ${quoteError.message}`}
+                  : t('family.priceLoadError', { message: quoteError.message })}
               </Typography>
             ) : quote ? (
               <>
                 {quote.billingMode === 'individual' ? (
                   <>
                     <View style={styles.totalRow}>
-                      <Typography variant="body" color="textSecondary">Your membership</Typography>
+                      <Typography variant="body" color="textSecondary">{t('family.yourMembership')}</Typography>
                       <Typography variant="body"><CurrencyValue amount={quote.headFee} /></Typography>
                     </View>
                     <View style={styles.totalRow}>
-                      <Typography variant="body" color="textSecondary">Family members ({watchMembers.length})</Typography>
+                      <Typography variant="body" color="textSecondary">{t('family.familyMembersCount', { count: watchMembers.length })}</Typography>
                       <Typography variant="body"><CurrencyValue amount={quote.membersTotal} /></Typography>
                     </View>
                   </>
                 ) : (
                   <View style={styles.totalRow}>
                     <Typography variant="body" color="textSecondary">
-                      Family invoice ({watchMembers.length + 1} members)
+                      {t('family.familyInvoice', { count: watchMembers.length + 1 })}
                     </Typography>
                     <Typography variant="body"><CurrencyValue amount={quote.total} /></Typography>
                   </View>
                 )}
                 <View style={[styles.totalRow, styles.totalRowBold]}>
-                  <Typography variant="title">Total</Typography>
+                  <Typography variant="title">{t('family.total')}</Typography>
                   <Typography variant="title" color="primary"><CurrencyValue amount={quote.total} /></Typography>
                 </View>
               </>
@@ -495,7 +496,7 @@ export function FamilyPurchaseScreen() {
           </View>
 
           <Button
-            title="Review & Pay"
+            title={t('family.reviewAndPay')}
             onPress={handleSubmit(handleReviewAndPay)}
             disabled={!quote || !!quoteError || isQuoteFetching || watchMembers.length === 0}
             style={styles.submitBtn}
@@ -507,7 +508,7 @@ export function FamilyPurchaseScreen() {
         <PaymentBottomSheet
           visible={isPaymentVisible}
           amount={quote.total}
-          title={`Subscribe to ${selectedPlan.name}`}
+          title={t('family.subscribeTo', { plan: selectedPlan.name })}
           subtitle={details.centerName}
           allowDiscount={false}
           onClose={() => setIsPaymentVisible(false)}

@@ -1,14 +1,20 @@
 package com.company.project.dto.mobile.checkin;
 
+import com.company.project.json.UtcLocalDateTimeSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.time.LocalDateTime;
 
 public class MemberCheckOutResponseDTO {
 
     private boolean checkedIn;
     private Long attendanceId;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkOutTime;
     private Integer durationMinutes;
+    private Integer workoutMinutes;
 
     public MemberCheckOutResponseDTO() {}
 
@@ -58,5 +64,13 @@ public class MemberCheckOutResponseDTO {
 
     public void setDurationMinutes(Integer durationMinutes) {
         this.durationMinutes = durationMinutes;
+    }
+
+    public Integer getWorkoutMinutes() {
+        return workoutMinutes;
+    }
+
+    public void setWorkoutMinutes(Integer workoutMinutes) {
+        this.workoutMinutes = workoutMinutes;
     }
 }

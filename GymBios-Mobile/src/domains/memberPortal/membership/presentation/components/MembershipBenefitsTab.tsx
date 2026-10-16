@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
@@ -22,11 +23,12 @@ export function MembershipBenefitsTab({
   onClaimOffer,
   onOpenFreeze,
 }: MembershipBenefitsTabProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {/* Plan Benefits — white glass */}
       <GlassSurface radius={Radius.lg} style={styles.card}>
-        <Text style={styles.cardTitle}>Your Subscription Benefits</Text>
+        <Text style={styles.cardTitle}>{t('membership.benefits.title')}</Text>
         <View style={styles.benefitsGrid}>
           {membership.benefits && membership.benefits.length > 0 ? (
             membership.benefits.map((benefit, index) => (
@@ -39,7 +41,7 @@ export function MembershipBenefitsTab({
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>No specific benefits listed for your subscription.</Text>
+            <Text style={styles.emptyText}>{t('membership.benefits.empty')}</Text>
           )}
         </View>
       </GlassSurface>
@@ -52,12 +54,12 @@ export function MembershipBenefitsTab({
             <Feather name="pause-circle" size={18} color="#2563EB" />
           </View>
           <View style={styles.freezeInfo}>
-            <Text style={styles.freezeTitle}>Freeze Available</Text>
+            <Text style={styles.freezeTitle}>{t('membership.benefits.freezeTitle')}</Text>
             <Text style={styles.freezeDesc}>
-              You have {membership.freezeDaysAllowed} freeze days left this membership period. Pause your membership temporarily without losing active days.
+              {t('membership.benefits.freezeDescription', { count: membership.freezeDaysAllowed })}
             </Text>
             <Pressable hitSlop={8} onPress={onOpenFreeze} style={styles.freezeLink}>
-              <Text style={styles.freezeLinkText}>Request Subscription Freeze →</Text>
+              <Text style={styles.freezeLinkText}>{t('membership.benefits.freezeLink')}</Text>
             </Pressable>
           </View>
         </View>
@@ -79,18 +81,21 @@ export function MembershipBenefitsTab({
             <View style={styles.offerIconBox}>
               <Feather name="gift" size={15} color="#FFFFFF" />
             </View>
-            <Text style={styles.offerTitle}>Early Renewal Offer! 🎉</Text>
+            <Text style={styles.offerTitle}>{t('membership.benefits.offerTitle')}</Text>
           </View>
           <Text style={styles.offerDesc}>
-            Renew now and get 15% off + 1 month free personal training sessions worth <CurrencyValue amount={6000} />.
+            <Trans
+              i18nKey="membership.benefits.offerDescription"
+              components={{ amount: <CurrencyValue amount={6000} /> }}
+            />
           </Text>
           <Pressable
             style={({ pressed }) => [styles.claimButton, pressed && styles.claimButtonPressed]}
             onPress={onClaimOffer}
             accessibilityRole="button"
-            accessibilityLabel="Claim Renewal Offer"
+            accessibilityLabel={t('membership.benefits.offerA11y')}
           >
-            <Text style={styles.claimButtonText}>Claim Offer →</Text>
+            <Text style={styles.claimButtonText}>{t('membership.benefits.offerCta')}</Text>
           </Pressable>
         </View>
       )}

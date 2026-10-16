@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: 'Zurück',
+    confirm: 'Bestätigen',
+    cancel: 'Abbrechen',
+    done: 'Fertig',
+    previous: 'Zurück',
+    next: 'Weiter',
+    search: 'Suchen...',
+    notAdded: 'Nicht hinzugefügt',
+    selectOption: 'Option wählen',
+    dropdown: 'Auswahlliste',
+    selectDate: 'Datum wählen',
+    datePicker: 'Datumsauswahl',
+    previousMonth: 'Vorheriger Monat',
+    nextMonth: 'Nächster Monat',
+    selectMonth: 'Monat wählen',
+    selectYear: 'Jahr wählen',
+    confirmDate: 'Datum bestätigen',
+    dismissBackdrop: 'Schließen',
+    userAvatar: 'Nutzer-Avatar',
+    initialsAvatar: 'Avatar {{initials}}',
+
+    photo: {
+      changeA11y: 'Profilfoto ändern',
+      addA11y: 'Profilfoto hinzufügen',
+      selectA11y: 'Zum Auswählen eines Fotos tippen',
+      tapToChange: 'Zum Ändern des Fotos tippen',
+      tapToAdd: 'Zum Hinzufügen eines Fotos tippen',
+      title: 'Profilfoto',
+      subtitle: 'Wähle eine Option',
+      takePhoto: 'Foto aufnehmen',
+      chooseFromGallery: 'Aus Galerie wählen',
+      removePhoto: 'Foto entfernen',
+      permissionTitle: 'Berechtigung erforderlich',
+      cameraNeeded: 'Zum Aufnehmen eines Fotos ist Kamerazugriff nötig.',
+      cameraOff: 'Kamerazugriff ist deaktiviert. Aktiviere ihn in den Einstellungen, um ein Foto aufzunehmen.',
+      cameraUnavailable: 'Auf diesem Gerät ist keine Kamera verfügbar.',
+      galleryNeeded: 'Zum Auswählen eines Fotos ist Galeriezugriff nötig.',
+      galleryOff: 'Fotozugriff ist deaktiviert. Aktiviere ihn in den Einstellungen, um ein Foto auszuwählen.',
+      galleryFailed: 'Bildergalerie konnte nicht geöffnet werden.',
+      uploadFailedStatus: 'Foto-Upload fehlgeschlagen ({{status}})',
+      uploadFailedNetwork: 'Foto-Upload fehlgeschlagen (Netzwerkfehler)',
+      uploadTimeout: 'Foto-Upload-Zeitüberschreitung',
+    },
+
+    trafficLight: {
+      low: 'Niedrig',
+      medium: 'Mittel',
+      high: 'Hoch',
+    },
+
+    timePicker: {
+      selectTime: 'Uhrzeit auswählen',
+      now: 'Jetzt',
+      setTime: 'Uhrzeit festlegen · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: 'Änderungen speichern',
+      createStaff: 'Mitarbeiter erstellen',
+    },
+
+    roleMode: {
+      virtualStudio: 'Virtuelles Studio',
+      virtualStudioDesc: 'Erstelle und verwalte Online-Fitnessprogramme, Live-Sessions und digitale Mitgliedschaften.',
+      comingSoon: 'Demnächst',
+    },
+
+    charts: {
+      noData: 'Keine Daten verfügbar',
+      noDataDesc: 'Für die ausgewählten Kriterien liegen keine Diagrammdaten vor.',
+      loading: 'Diagramm wird geladen...',
+      unableToLoad: 'Diagramm konnte nicht geladen werden',
+      loadFailed: 'Fehler beim Laden der Diagrammdaten',
+      retry: 'Wiederholen',
+    },
+
+    noInternet: {
+      title: 'Keine Internetverbindung',
+      tryAgain: 'Erneut versuchen',
+      checkConnection: 'Bitte prüfe dein WLAN oder deine mobilen Daten und versuche es erneut.',
+      tipToggleWifi: 'WLAN aus- und wieder einschalten',
+      tipMobileData: 'Prüfen, ob mobile Daten aktiviert sind',
+      tipSignal: 'An einen Ort mit besserem Empfang gehen',
+      retryA11y: 'Verbindung erneut versuchen',
+    },
+
+    receipt: {
+      title: 'Belegdetails',
+      subtitle: 'Transaktionsbeleg',
+      loading: 'Belegdetails werden geladen...',
+      loadError: 'Belegdaten konnten nicht geladen werden.',
+      billedTo: 'Rechnungsempfänger',
+      memberName: 'Name des Mitglieds',
+      memberId: 'Mitglieds-ID',
+      phone: 'Telefon',
+      transactionInfo: 'Transaktionsinfo',
+      type: 'Art',
+      paymentMethod: 'Zahlungsmethode',
+      subscription: 'Abo / Leistung',
+      validity: 'Gültigkeit',
+      processedBy: 'Bearbeitet von',
+      paymentSummary: 'Zahlungsübersicht',
+      price: 'Preis',
+      discount: 'Rabatt',
+      totalAmount: 'Gesamtbetrag',
+      amountPaid: 'Bezahlter Betrag',
+      balanceDue: 'Offener Betrag',
+      download: 'Beleg herunterladen',
+      sharingUnavailableTitle: 'Teilen nicht verfügbar',
+      sharingUnavailable: 'PDF kann auf diesem Gerät nicht geteilt werden.',
+      errorTitle: 'Fehler',
+      pdfFailed: 'Beleg-PDF konnte nicht erstellt werden.',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

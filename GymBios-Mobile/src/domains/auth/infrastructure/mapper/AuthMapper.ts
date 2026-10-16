@@ -20,6 +20,7 @@ import type {
   SocialCompleteRequestApiModel,
   StoredSessionApiModel,
 } from '../api/AuthApiModels';
+import { i18n } from '@/core/i18n';
 
 const SPRING_ROLE_MAP: Record<string, AppRole> = {
   ROLE_ADMIN: 'admin',
@@ -88,7 +89,12 @@ export function mapLoginResponseToSession(
 
   // For mapped roles, ensure they don't cross boundaries
   if (!isCustomRole && selectedRole && appRole !== selectedRole) {
-    throw new Error(`Access denied. Your role cannot access the ${selectedRole} section.`);
+    throw new Error(
+      i18n.t('auth.errors.roleAccessDenied', {
+        role: selectedRole,
+        defaultValue: `Access denied. Your role cannot access the ${selectedRole} section.`,
+      })
+    );
   }
 
   // For custom roles, enforce strict permission boundaries based on the section they want to access
@@ -96,10 +102,18 @@ export function mapLoginResponseToSession(
     const perms = response.permissions || [];
     
     if (selectedRole === 'admin' && !perms.includes('ADMINISTRATION_VIEW') && !perms.includes('SETTINGS_VIEW')) {
-      throw new Error(`Access denied. Your custom role does not have admin privileges.`);
+      throw new Error(
+        i18n.t('auth.errors.customRoleNoAdmin', {
+          defaultValue: 'Access denied. Your custom role does not have admin privileges.',
+        })
+      );
     }
     if ((selectedRole === 'staff' || selectedRole === 'trainer') && !response.staff_name) {
-      throw new Error(`Access denied. You are not registered as a staff member.`);
+      throw new Error(
+        i18n.t('auth.errors.notRegisteredStaff', {
+          defaultValue: 'Access denied. You are not registered as a staff member.',
+        })
+      );
     }
   }
 

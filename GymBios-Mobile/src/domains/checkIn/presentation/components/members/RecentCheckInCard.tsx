@@ -1,9 +1,11 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
 import { Surface } from '@/shared/components/Surface';
 import { Radius, Spacing, BrandColors } from '@/core/theme';
+import { formatDate } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 
 export interface RecentCheckInCardProps {
@@ -12,13 +14,14 @@ export interface RecentCheckInCardProps {
 }
 
 export function RecentCheckInCard({ record, onCheckOut }: RecentCheckInCardProps) {
-  const name = record.memberName || record.walkInName || 'Unknown';
-  const id = record.memberBizId || record.membershipType || 'Walk-In';
+  const { t } = useTranslation();
+  const name = record.memberName || record.walkInName || t('checkIn.members.unknownMember');
+  const id = record.memberBizId || record.membershipType || t('checkIn.walkIn.walkInPassFallback');
   const type = record.membershipType || (record.type === 'Walk-In' ? 'Walk-In' : 'INDIVIDUAL');
   const avatarUrl = record.photoUrl;
   
-  const inTime = record.checkInTime ? new Date(record.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
-  const outTime = record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : null;
+  const inTime = record.checkInTime ? formatDate(record.checkInTime, 'p') : '--:--';
+  const outTime = record.checkOutTime ? formatDate(record.checkOutTime, 'p') : null;
   const isCompleted = !!record.checkOutTime || record.status === 'Completed';
   
   const method = record.checkInMethod || 'Manual';
@@ -35,24 +38,30 @@ export function RecentCheckInCard({ record, onCheckOut }: RecentCheckInCardProps
             {id} • {type}
           </Typography>
           <Typography variant="caption" color="textSecondary" style={styles.timeInfo}>
-            In: {inTime} {outTime ? `• Out: ${outTime}` : ''}
+            {outTime
+              ? t('checkIn.members.inTimeInfo', { inTime, outTime })
+              : t('checkIn.members.inTime', { time: inTime })}
           </Typography>
         </View>
         <View style={styles.statusSection}>
           {isCompleted ? (
             <>
-              <Typography variant="caption" style={styles.completedText}>Completed</Typography>
+              <Typography variant="caption" style={styles.completedText}>
+                {t('checkIn.members.completed')}
+              </Typography>
               <Typography variant="caption" color="textSecondary">{method}</Typography>
             </>
           ) : (
             <>
               <View style={styles.inGymBadge}>
                 <Feather name="check-circle" size={12} color={BrandColors.teal} style={styles.inGymIcon} />
-                <Typography variant="caption" style={styles.inGymText}>In Gym</Typography>
+                <Typography variant="caption" style={styles.inGymText}>
+                  {t('checkIn.members.inGym')}
+                </Typography>
               </View>
               {onCheckOut && (
                 <Button 
-                  label="Check Out" 
+                  label={t('checkIn.members.checkOut')} 
                   variant="ghost" 
                   onPress={() => onCheckOut(record)} 
                   style={styles.checkOutButton}
@@ -78,7 +87,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   avatar: {
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   info: {
     flex: 1,
@@ -102,7 +111,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   inGymIcon: {
-    marginRight: 4,
+    marginEnd: 4,
   },
   inGymText: {
     color: BrandColors.teal,

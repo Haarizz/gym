@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { formatDate, tOr } from '@/core/i18n';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -9,6 +11,7 @@ import { Loader } from '@/shared/components/Loader';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { GlassBlob, GlassHeader, GlassSurface } from '@/shared/components';
 
+import { useMemberTenantAccess } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
 import { useMyWallet } from './useMyWallet';
 import type { WalletTransaction } from './walletApi';
 
@@ -16,29 +19,25 @@ interface WalletScreenProps {
   onBack: () => void;
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  BOOKING_REFUND: 'Booking refund',
-  BOOKING: 'Session booking',
-  REFERRAL_REWARD: 'Referral reward',
-  BILLING_USE: 'Purchase',
-};
-
 function formatWhen(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatDate(d, 'PP');
 }
 
 /** The member's wallet: balance (refunds and rewards) and its history. */
 export function WalletScreen({ onBack }: WalletScreenProps) {
-  const { data: wallet, isLoading, refetch, isRefetching } = useMyWallet();
+  const { t } = useTranslation();
+  // 403'd while a purchase awaits approval (or was rejected) — show the empty wallet instead.
+  const hasTenantAccess = useMemberTenantAccess();
+  const { data: wallet, isLoading, refetch, isRefetching } = useMyWallet(hasTenantAccess);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <GlassBlob color={BrandColors.memberGold} size={320} opacity={0.34} top={-40} right={-70} />
       <GlassBlob color={BrandColors.teal} size={280} opacity={0.26} top={380} left={-80} />
-      <GlassHeader title="Wallet" subtitle="Refunds & reward credit" onBack={onBack} />
+      <GlassHeader title={t('wallet.title')} subtitle={t('wallet.subtitle')} onBack={onBack} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -49,21 +48,21 @@ export function WalletScreen({ onBack }: WalletScreenProps) {
           <View style={styles.balanceIcon}>
             <Feather name="credit-card" size={20} color="#16a34a" />
           </View>
-          <Typography variant="caption" color="textSecondary">Available balance</Typography>
+          <Typography variant="caption" color="textSecondary">{t('wallet.availableBalance')}</Typography>
           <Typography variant="title" style={styles.balanceValue}>
             <CurrencyValue amount={wallet?.balance ?? 0} decimals={2} />
           </Typography>
           <Typography variant="caption" color="textSecondary" style={styles.balanceHint}>
-            Use it when you book a session. Cancelled bookings are refunded here.
+            {t('wallet.balanceHint')}
           </Typography>
         </GlassSurface>
 
-        <Typography variant="subtitle" style={styles.listHeader}>History</Typography>
+        <Typography variant="subtitle" style={styles.listHeader}>{t('wallet.history')}</Typography>
 
         {isLoading ? (
           <Loader />
         ) : !wallet || wallet.transactions.length === 0 ? (
-          <EmptyState title="No wallet activity" description="Refunds and reward credits will show up here." />
+          <EmptyState title={t('wallet.emptyTitle')} description={t('wallet.emptyDescription')} />
         ) : (
           <GlassSurface radius={Radius.lg} style={styles.listCard}>
             {wallet.transactions.map((tx, index) => (
@@ -77,6 +76,7 @@ export function WalletScreen({ onBack }: WalletScreenProps) {
 }
 
 function WalletRow({ tx, divider }: { tx: WalletTransaction; divider: boolean }) {
+  const { t } = useTranslation();
   const credit = tx.type === 'CREDIT';
   return (
     <View style={[styles.row, divider && styles.rowDivider]}>
@@ -85,7 +85,7 @@ function WalletRow({ tx, divider }: { tx: WalletTransaction; divider: boolean })
       </View>
       <View style={styles.rowText}>
         <Typography variant="bodySmallBold" numberOfLines={1}>
-          {(tx.sourceType && SOURCE_LABELS[tx.sourceType]) || (credit ? 'Credit' : 'Spent')}
+          {(tx.sourceType && tOr(`wallet.sources.${tx.sourceType}`, '')) || t(credit ? 'wallet.credit' : 'wallet.spent')}
         </Typography>
         <Typography variant="caption" color="textSecondary" numberOfLines={2}>
           {[formatWhen(tx.createdAt), tx.remarks].filter(Boolean).join(' · ')}

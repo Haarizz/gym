@@ -1,0 +1,62 @@
+import type { LocaleResource } from '../en';
+
+const enquiries = {
+  enquiries: {
+    title: '帮助与咨询',
+    newEnquiryCta: '发起新咨询',
+    newEnquiryCtaSubtitle: '会员资格、账单、课程、场馆设施…',
+    tabs: {
+      ALL: '全部',
+      OPEN: '待回复',
+      REPLIED: '已回复',
+      CLOSED: '已关闭',
+    },
+    status: {
+      OPEN: '等待回复',
+      REPLIED: '已回复',
+      CLOSED: '已关闭',
+    },
+    empty: '暂无咨询记录',
+    emptySubtitle: '你向健身房提出的疑问和健身房的回复将显示在这里。',
+    nothingHere: '这里空空如也。',
+    loadFailed: '无法加载你的咨询记录。',
+    youPrefix: '你：',
+    gymFallback: '你的健身房',
+    reference: '#{{id}}',
+    newEnquiry: '发起咨询',
+    categoryPrompt: '咨询什么方面？',
+    subject: '主题',
+    subjectPlaceholder: '例如：申请暂停会员卡 2 周',
+    message: '详情',
+    messagePlaceholder: '详细说明你的诉求——提供具体日期、金额或课程名称有助于健身房更快回复。',
+    formHint: '健身房回复时你将收到通知。你最多可同时保留 {{count}} 个待回复的咨询。',
+    submit: '提交咨询',
+    submitting: '正在发送…',
+    submitted: '咨询已发送，健身房将在此处回复。',
+    submitFailed: '无法发送你的咨询，请重试。',
+    steps: {
+      submitted: '已提交',
+      replied: '已回复',
+      closed: '已关闭',
+    },
+    openedOn: '发起于 {{date}}',
+    gymBadge: '健身房',
+    received: '已收到 · 健身房将尽快回复',
+    closedOn: '健身房已关闭 · {{date}}',
+    closedFooter: '此咨询已关闭。',
+    followUpHint: '还需要其他帮助？',
+    raiseNew: '发起新的咨询',
+    categories: {
+      GENERAL: '常规',
+      MEMBERSHIP: '会员',
+      BILLING: '账单',
+      FACILITIES: '设施',
+      TRAINER: '教练',
+      CLASSES: '课程',
+      FEEDBACK: '反馈',
+      OTHER: '其他',
+    },
+  },
+} satisfies LocaleResource;
+
+export default enquiries;

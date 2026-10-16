@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { GlassSurface } from '@/shared/components';
@@ -10,6 +11,7 @@ interface TargetCardProps {
 }
 
 export function TargetCard({ target }: TargetCardProps) {
+  const { t } = useTranslation();
   const percentage = Math.min(100, Math.round((target.progress / target.target) * 100));
 
   const isCompleted = target.status === 'completed';
@@ -18,6 +20,12 @@ export function TargetCard({ target }: TargetCardProps) {
   const statusBg = isCompleted ? '#dcfce7' : isOverdue ? '#fee2e2' : '#e0f2fe';
   const statusColor = isCompleted ? '#166534' : isOverdue ? '#991b1b' : '#0369a1';
   const progressBarColor = isCompleted ? '#16a34a' : isOverdue ? '#dc2626' : BrandColors.teal;
+
+  const statusLabel = isCompleted
+    ? t('targets.statusCompleted')
+    : isOverdue
+    ? t('targets.statusOverdue')
+    : t('targets.statusActive');
 
   return (
     <GlassSurface radius={Radius.lg} style={styles.card}>
@@ -38,7 +46,7 @@ export function TargetCard({ target }: TargetCardProps) {
 
         <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
           <Typography variant="caption" style={[styles.statusText, { color: statusColor }]}>
-            {target.status.toUpperCase()}
+            {statusLabel}
           </Typography>
         </View>
       </View>
@@ -50,10 +58,14 @@ export function TargetCard({ target }: TargetCardProps) {
       <View style={styles.progressSection}>
         <View style={styles.progressLabels}>
           <Typography variant="bodySmall" style={styles.progressText}>
-            Progress: {target.progress} / {target.target} {target.unit}
+            {t('targets.progressWithUnit', {
+              progress: target.progress,
+              target: target.target,
+              unit: target.unit,
+            })}
           </Typography>
           <Typography variant="bodySmall" style={[styles.percentageText, { color: progressBarColor }]}>
-            {percentage}%
+            {`${percentage}%`}
           </Typography>
         </View>
 
@@ -65,7 +77,7 @@ export function TargetCard({ target }: TargetCardProps) {
         <View style={styles.footer}>
           <Feather name="calendar" size={13} color="#64748b" style={styles.calendarIcon} />
           <Typography variant="caption" color="textSecondary">
-            Deadline: {target.deadline}
+            {t('targets.deadline', { date: target.deadline })}
           </Typography>
         </View>
       </View>
@@ -88,7 +100,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   iconBadge: {
     width: 36,
@@ -97,7 +109,7 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.teal,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   titleWrapper: {
     flex: 1,
@@ -154,6 +166,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarIcon: {
-    marginRight: 4,
+    marginEnd: 4,
   },
 });

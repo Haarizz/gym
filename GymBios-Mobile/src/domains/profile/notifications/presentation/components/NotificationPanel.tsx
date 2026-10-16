@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import {
   Animated,
@@ -15,6 +16,8 @@ import { useRouter, useSegments, type Href } from 'expo-router';
 import type { NotificationItem } from '../../domain/notification.types';
 import { isInformationalNotification, resolveNotificationRoute } from '../../domain/notificationRoutes';
 import { toast } from '@/shared/components/Toasts';
+// Leaf import (not the module index) so this stays free of screen imports.
+import { GYM_REVIEW_REQUEST_NOTIFICATION_MODULE, openGymRatingSheet } from '@/domains/memberPortal/gymRating/gymRating';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
 import { useNotificationMutations } from '../../hooks/useNotificationMutations';
@@ -45,6 +48,7 @@ interface NotificationPanelProps {
 }
 
 export function NotificationPanel({ visible, onClose, module, title, onItemPress }: NotificationPanelProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
@@ -143,6 +147,14 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
       return;
     }
 
+    // "Rate us" from the gym: reopen the gym rate sheet, even after it was closed.
+    if (item.module === GYM_REVIEW_REQUEST_NOTIFICATION_MODULE) {
+      onClose();
+      // Let this Modal finish closing before the sheet's Modal opens (iOS shows one at a time).
+      setTimeout(openGymRatingSheet, 350);
+      return;
+    }
+
     // Purely informational — tapping only marks it read.
     if (isInformationalNotification(item)) return;
 
@@ -152,7 +164,7 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
     if (route) {
       router.push(route as Href);
     } else {
-      toast.info('This isn’t available in the mobile app yet. Please check the web app.');
+      toast.info(t('notifications.notInApp'));
     }
   };
 
@@ -231,7 +243,7 @@ export function NotificationPanel({ visible, onClose, module, title, onItemPress
             style={StyleSheet.absoluteFill}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Dismiss notifications"
+            accessibilityLabel={t('notifications.dismissA11y')}
           />
         </Animated.View>
 
@@ -275,7 +287,7 @@ const styles = StyleSheet.create({
   },
   sheetShadow: {
     position: 'absolute',
-    right: SHEET_RIGHT,
+    end: SHEET_RIGHT,
     borderRadius: SHEET_RADIUS,
     shadowColor: G.shadow,
     shadowOpacity: 0.4,
@@ -299,8 +311,8 @@ const styles = StyleSheet.create({
   sheen: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     height: 180,
   },
   listContainer: {

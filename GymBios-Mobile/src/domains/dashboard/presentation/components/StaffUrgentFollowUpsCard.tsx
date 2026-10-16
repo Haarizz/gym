@@ -1,4 +1,5 @@
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,7 @@ export function StaffUrgentFollowUpsCard({
   followUps,
   onViewAll,
 }: StaffUrgentFollowUpsCardProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const handleCall = (phone: string) => {
@@ -35,10 +37,10 @@ export function StaffUrgentFollowUpsCard({
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Feather name="alert-circle" size={18} color="#EF4444" />
-          <Text style={styles.title}>Urgent Follow-ups</Text>
+          <Text style={styles.title}>{t('dashboard.staff.urgentFollowUps.title')}</Text>
         </View>
         <Pressable onPress={handleViewAll} hitSlop={8}>
-          <Text style={styles.viewAllText}>View All</Text>
+          <Text style={styles.viewAllText}>{t('dashboard.staff.urgentFollowUps.viewAll')}</Text>
         </Pressable>
       </View>
 
@@ -69,21 +71,23 @@ export function StaffUrgentFollowUpsCard({
                       isHigh ? styles.priorityTextHigh : styles.priorityTextMed,
                     ]}
                   >
-                    {lead.priority.toUpperCase()}
+                    {isHigh ? t('dashboard.staff.urgentFollowUps.priorityHigh') : t('dashboard.staff.urgentFollowUps.priorityMed')}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.leadFooter}>
-                <Text style={styles.lastContactText}>Last: {lead.lastContact}</Text>
+                <Text style={styles.lastContactText}>
+                  {t('dashboard.staff.urgentFollowUps.lastContact', { contact: lead.lastContact })}
+                </Text>
                 <Pressable
                   style={styles.callButton}
                   onPress={() => handleCall(lead.phone)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Call ${lead.name}`}
+                  accessibilityLabel={t('dashboard.staff.urgentFollowUps.callA11y', { name: lead.name })}
                 >
                   <Feather name="phone" size={12} color="#FFFFFF" />
-                  <Text style={styles.callButtonText}>Call Now</Text>
+                  <Text style={styles.callButtonText}>{t('dashboard.staff.urgentFollowUps.callNow')}</Text>
                 </Pressable>
               </View>
             </GlassSurface>

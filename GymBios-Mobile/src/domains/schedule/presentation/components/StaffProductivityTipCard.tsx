@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface StaffProductivityTipCardProps {
@@ -8,6 +9,7 @@ interface StaffProductivityTipCardProps {
 }
 
 export function StaffProductivityTipCard({ tip }: StaffProductivityTipCardProps) {
+  const { t } = useTranslation();
   return (
     <LinearGradient
       colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -15,7 +17,7 @@ export function StaffProductivityTipCard({ tip }: StaffProductivityTipCardProps)
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Productivity Tip 💡</Text>
+      <Text style={styles.title}>{t('schedule.staff.productivityTipTitle')}</Text>
       <Text style={styles.tipText}>{tip}</Text>
     </LinearGradient>
   );

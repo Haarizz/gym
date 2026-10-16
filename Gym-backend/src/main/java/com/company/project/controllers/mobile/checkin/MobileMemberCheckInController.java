@@ -3,6 +3,7 @@ package com.company.project.controllers.mobile.checkin;
 import com.company.project.dto.mobile.checkin.MemberCheckInResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckInStatusResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckOutResponseDTO;
+import com.company.project.dto.mobile.checkin.MemberWorkoutResponseDTO;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.checkin.MobileMemberCheckInService;
 import org.springframework.http.ResponseEntity;
@@ -53,5 +54,27 @@ public class MobileMemberCheckInController {
     public ResponseEntity<MemberCheckOutResponseDTO> checkOut(
             @AuthenticationPrincipal UserDetailsImpl principal) {
         return ResponseEntity.ok(checkInService.checkOut(principal));
+    }
+
+    /**
+     * Start the workout timer on the member's current visit (one per visit).
+     *
+     * POST /api/mobile/member/workout/start
+     */
+    @PostMapping("/workout/start")
+    public ResponseEntity<MemberWorkoutResponseDTO> startWorkout(
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(checkInService.startWorkout(principal));
+    }
+
+    /**
+     * End the running workout. Checking out also ends it.
+     *
+     * POST /api/mobile/member/workout/end
+     */
+    @PostMapping("/workout/end")
+    public ResponseEntity<MemberWorkoutResponseDTO> endWorkout(
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(checkInService.endWorkout(principal));
     }
 }

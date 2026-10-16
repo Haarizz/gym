@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
@@ -11,6 +12,7 @@ interface TrainerWelcomeCardProps {
 }
 
 export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
+  const { t } = useTranslation();
   const firstName = trainerInfo.name.split(' ')[0] || trainerInfo.name;
   const greeting = getGreeting();
   const hasRating = trainerInfo.rating != null && trainerInfo.ratingCount > 0;
@@ -22,7 +24,9 @@ export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.greeting}>{greeting}, {firstName}! 👋</Text>
+      <Text style={styles.greeting}>
+        {t('dashboard.trainer.welcomeGreeting', { greeting, name: firstName })}
+      </Text>
       <Text style={styles.specialization}>{trainerInfo.specialization}</Text>
       <View style={styles.ratingRow}>
         <Feather name="star" size={14} color="#FFFFFF" />
@@ -30,11 +34,11 @@ export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
           <>
             <Text style={styles.ratingValue}>{trainerInfo.rating!.toFixed(1)}</Text>
             <Text style={styles.ratingLabel}>
-              Rating · {trainerInfo.ratingCount} {trainerInfo.ratingCount === 1 ? 'review' : 'reviews'}
+              {t('dashboard.trainer.ratingLabel')} · {t('dashboard.trainer.review', { count: trainerInfo.ratingCount })}
             </Text>
           </>
         ) : (
-          <Text style={styles.ratingLabel}>No ratings yet</Text>
+          <Text style={styles.ratingLabel}>{t('dashboard.trainer.noRatings')}</Text>
         )}
       </View>
     </LinearGradient>
@@ -75,6 +79,6 @@ const styles = StyleSheet.create({
   ratingLabel: {
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginLeft: 2,
+    marginStart: 2,
   },
 });

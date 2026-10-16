@@ -3,26 +3,28 @@ package com.company.project.services.mobile.checkin;
 import com.company.project.dto.mobile.checkin.MemberCheckInResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckInStatusResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckOutResponseDTO;
+import com.company.project.dto.mobile.checkin.MemberWorkoutResponseDTO;
 import com.company.project.entities.Attendance;
 import com.company.project.entities.Member;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
+import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.AttendanceSessionService;
 import com.company.project.services.CheckInPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,7 +44,9 @@ class MobileMemberCheckInServiceTest {
     @Mock
     private CheckInPolicyService checkInPolicyService;
 
-    @InjectMocks
+    @Mock
+    private StaffAttendanceRepository staffAttendanceRepository;
+
     private MobileMemberCheckInService checkInService;
 
     private UserDetailsImpl testPrincipal;
@@ -50,6 +54,9 @@ class MobileMemberCheckInServiceTest {
 
     @BeforeEach
     void setUp() {
+        checkInService = new MobileMemberCheckInService(memberRepository, attendanceRepository, checkInPolicyService,
+                new AttendanceSessionService(attendanceRepository, staffAttendanceRepository));
+
         testPrincipal = new UserDetailsImpl(
                 101L,
                 "sarah_johnson",
@@ -79,8 +86,6 @@ class MobileMemberCheckInServiceTest {
     @DisplayName("Should successfully check in eligible active member and increment total visits")
     void testCheckInSuccess() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        when(attendanceRepository.existsActiveSessionForMember(eq(50L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(false);
 
         MemberCheckInResponseDTO response = checkInService.checkIn(testPrincipal);
 
@@ -110,8 +115,7 @@ class MobileMemberCheckInServiceTest {
     @DisplayName("Should throw BusinessRuleViolationException on duplicate active check-in")
     void testDuplicateCheckInFails() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        when(attendanceRepository.existsActiveSessionForMember(eq(50L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(true);
+        stubOpenVisit(visit(LocalDateTime.now().minusMinutes(10)));
 
         BusinessRuleViolationException exception = assertThrows(
                 BusinessRuleViolationException.class,
@@ -164,8 +168,7 @@ class MobileMemberCheckInServiceTest {
         activeAttendance.setStatus("active");
         activeAttendance.setCheckInTime(LocalDateTime.now().minusMinutes(45));
 
-        when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
-                .thenReturn(List.of(activeAttendance));
+        stubOpenVisit(activeAttendance);
 
         MemberCheckOutResponseDTO response = checkInService.checkOut(testPrincipal);
 
@@ -193,8 +196,7 @@ class MobileMemberCheckInServiceTest {
         completedAttendance.setStatus("completed");
         completedAttendance.setCheckInTime(LocalDateTime.now().minusDays(1));
 
-        when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
-                .thenReturn(List.of(completedAttendance));
+        // Only "active" visits are looked up, so a completed one is never returned.
 
         BusinessRuleViolationException exception = assertThrows(
                 BusinessRuleViolationException.class,
@@ -216,8 +218,7 @@ class MobileMemberCheckInServiceTest {
         activeAttendance.setStatus("active");
         activeAttendance.setCheckInTime(LocalDateTime.now().minusMinutes(30));
 
-        when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
-                .thenReturn(List.of(activeAttendance));
+        stubOpenVisit(activeAttendance);
 
         MemberCheckInStatusResponseDTO status = checkInService.getCheckInStatus(testPrincipal);
 
@@ -231,8 +232,6 @@ class MobileMemberCheckInServiceTest {
     @DisplayName("Should return checkedIn = false when member has no active session")
     void testGetCheckInStatusNotActive() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
-                .thenReturn(Collections.emptyList());
 
         MemberCheckInStatusResponseDTO status = checkInService.getCheckInStatus(testPrincipal);
 
@@ -287,8 +286,6 @@ class MobileMemberCheckInServiceTest {
         bobAttendance.setCheckInTime(LocalDateTime.now().minusMinutes(20));
 
         // When searching attendance for Sarah (memberId 50L), Bob's attendance is NOT returned
-        when(attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(50L))
-                .thenReturn(Collections.emptyList());
 
         // When Sarah attempts to check out, she cannot close Bob's session — it must fail
         assertThrows(BusinessRuleViolationException.class, () -> checkInService.checkOut(testPrincipal));
@@ -298,21 +295,118 @@ class MobileMemberCheckInServiceTest {
         verify(attendanceRepository, never()).save(bobAttendance);
 
         // Verification query was scoped strictly to Sarah's member ID (50L), never Bob's (99L)
-        verify(attendanceRepository, times(1)).findByMember_IdOrderByCheckInTimeDesc(50L);
-        verify(attendanceRepository, never()).findByMember_IdOrderByCheckInTimeDesc(99L);
+        verify(attendanceRepository, times(1)).findFirstByMember_IdAndStatusOrderByCheckInTimeDesc(50L, "active");
+        verify(attendanceRepository, never()).findFirstByMember_IdAndStatusOrderByCheckInTimeDesc(eq(99L), anyString());
     }
 
     @Test
     @DisplayName("Should not create attendance when the check-in policy rejects the member")
     void testPolicyRejectionBlocksCheckIn() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        when(attendanceRepository.existsActiveSessionForMember(eq(50L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(false);
         doThrow(new BusinessRuleViolationException("Daily limit reached"))
                 .when(checkInPolicyService).enforce(testMember);
 
         assertThrows(BusinessRuleViolationException.class, () -> checkInService.checkIn(testPrincipal));
         verify(attendanceRepository, never()).saveAndFlush(any(Attendance.class));
         verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    // ── Unclosed visit from an earlier day ───────────────────────────────────
+
+    @Test
+    @DisplayName("Check-in closes a visit left open from yesterday at the capped length, then checks in")
+    void testCheckInAutoClosesStaleVisit() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        LocalDateTime yesterday = LocalDate.now().minusDays(1).atTime(9, 0);
+        Attendance stale = visit(yesterday);
+        stubOpenVisit(stale);
+
+        MemberCheckInResponseDTO response = checkInService.checkIn(testPrincipal);
+
+        assertTrue(response.isCheckedIn());
+        assertEquals("completed", stale.getStatus());
+        assertEquals(yesterday.plusMinutes(AttendanceSessionService.STALE_SESSION_MAX_MINUTES), stale.getCheckOutTime());
+        assertEquals(AttendanceSessionService.STALE_SESSION_MAX_MINUTES, stale.getTotalMinutes());
+        verify(attendanceRepository, times(2)).saveAndFlush(any(Attendance.class));
+        assertEquals(11, testMember.getTotalVisits());
+    }
+
+    @Test
+    @DisplayName("Status reports a stale visit as unclosed, not as checked in")
+    void testStatusReportsUnclosedVisit() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        LocalDateTime yesterday = LocalDate.now().minusDays(1).atTime(18, 0);
+        stubOpenVisit(visit(yesterday));
+
+        MemberCheckInStatusResponseDTO status = checkInService.getCheckInStatus(testPrincipal);
+
+        assertFalse(status.isCheckedIn());
+        assertNull(status.getAttendanceId());
+        assertEquals(901L, status.getUnclosedAttendanceId());
+        assertEquals(yesterday, status.getUnclosedCheckInTime());
+        assertEquals(yesterday.plusMinutes(AttendanceSessionService.STALE_SESSION_MAX_MINUTES), status.getUnclosedAutoCloseTime());
+    }
+
+    // ── Workout timer ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Workout starts once per visit and records its minutes when ended")
+    void testWorkoutStartAndEnd() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        Attendance current = visit(LocalDateTime.now().minusMinutes(5));
+        stubOpenVisit(current);
+
+        MemberWorkoutResponseDTO started = checkInService.startWorkout(testPrincipal);
+        assertNotNull(started.getWorkoutStartTime());
+        assertNull(started.getWorkoutEndTime());
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+
+        current.setWorkoutStartTime(LocalDateTime.now().minusMinutes(30));
+        MemberWorkoutResponseDTO ended = checkInService.endWorkout(testPrincipal);
+        assertNotNull(ended.getWorkoutEndTime());
+        assertTrue(ended.getWorkoutMinutes() >= 29 && ended.getWorkoutMinutes() <= 31);
+
+        BusinessRuleViolationException again = assertThrows(BusinessRuleViolationException.class,
+                () -> checkInService.startWorkout(testPrincipal));
+        assertTrue(again.getMessage().contains("already logged"));
+    }
+
+    @Test
+    @DisplayName("Workout can't start without a check-in today")
+    void testWorkoutRequiresCurrentVisit() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+
+        stubOpenVisit(visit(LocalDate.now().minusDays(1).atTime(9, 0)));
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+        verify(attendanceRepository, never()).saveAndFlush(any(Attendance.class));
+    }
+
+    @Test
+    @DisplayName("Checking out ends a running workout")
+    void testCheckOutEndsRunningWorkout() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        Attendance current = visit(LocalDateTime.now().minusMinutes(60));
+        current.setWorkoutStartTime(LocalDateTime.now().minusMinutes(40));
+        stubOpenVisit(current);
+
+        MemberCheckOutResponseDTO response = checkInService.checkOut(testPrincipal);
+
+        assertEquals(current.getCheckOutTime(), current.getWorkoutEndTime());
+        assertTrue(response.getWorkoutMinutes() >= 39 && response.getWorkoutMinutes() <= 41);
+    }
+
+    private Attendance visit(LocalDateTime checkInTime) {
+        Attendance a = new Attendance();
+        a.setId(901L);
+        a.setMember(testMember);
+        a.setStatus("active");
+        a.setCheckInTime(checkInTime);
+        return a;
+    }
+
+    private void stubOpenVisit(Attendance a) {
+        when(attendanceRepository.findFirstByMember_IdAndStatusOrderByCheckInTimeDesc(50L, "active"))
+                .thenReturn(Optional.of(a));
     }
 }

@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { BarChart } from '@/shared/components/charts';
+import { formatDate } from '@/core/i18n';
 import type { TrainerSessionTrendDTO } from '../../domain/TrainerPerformanceData';
 
 interface TrainerMonthlyTrendChartProps {
@@ -9,26 +11,28 @@ interface TrainerMonthlyTrendChartProps {
 }
 
 export function TrainerMonthlyTrendChart({ trend }: TrainerMonthlyTrendChartProps) {
-  // Format '2026-03' into 'Mar'
-  const formattedData = trend.map((t) => {
-    const [year, month] = t.month.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+  const { t } = useTranslation();
+
+  // Format '2026-03' into localized short month (e.g. 'Mar')
+  const formattedData = trend.map((tr) => {
+    const [year, month] = tr.month.split('-');
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
     return {
-      ...t,
-      displayMonth: date.toLocaleDateString('en-US', { month: 'short' }),
+      ...tr,
+      displayMonth: formatDate(date, 'MMM'),
     };
   }).reverse(); // Reverse to chronological order (oldest to newest)
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>6-Month Trend</Text>
+      <Text style={styles.title}>{t('trainerPerformance.sixMonthTrend')}</Text>
       <BarChart
         data={formattedData}
         xKey="displayMonth"
         series={[
           {
             key: 'sessions',
-            label: 'Sessions',
+            label: t('trainerPerformance.sessions'),
             color: BrandColors.trainerAmber,
           },
         ]}

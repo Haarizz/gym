@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 import { PAYMENT_METHODS, type PaymentMethodOption } from '@/shared/payment/constants';
 import type { PaymentMethod } from '@/shared/payment/types';
 import { PaymentMethodCard } from './PaymentMethodCard';
@@ -16,10 +17,11 @@ export function PaymentMethodGrid({
   selectedMethod,
   onSelectMethod,
 }: PaymentMethodGridProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-        Select Payment Method
+        {t('paymentSheet.selectMethod')}
       </Typography>
 
       <View style={styles.grid}>

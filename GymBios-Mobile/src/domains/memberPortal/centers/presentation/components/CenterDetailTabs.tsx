@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing } from '@/core/theme';
 
@@ -9,27 +10,23 @@ interface CenterDetailTabsProps {
   onSelect: (tab: CenterDetailTab) => void;
 }
 
-const TABS: { key: CenterDetailTab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'plans', label: 'Subscriptions' },
-  { key: 'trainers', label: 'Trainers' },
-  { key: 'info', label: 'Info' },
-];
+const TABS: CenterDetailTab[] = ['overview', 'plans', 'trainers', 'info'];
 
 export function CenterDetailTabs({ activeTab, onSelect }: CenterDetailTabsProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {TABS.map((tab) => {
-        const isActive = activeTab === tab.key;
+        const isActive = activeTab === tab;
         return (
           <Pressable
-            key={tab.key}
-            onPress={() => onSelect(tab.key)}
+            key={tab}
+            onPress={() => onSelect(tab)}
             style={[styles.tab, isActive && styles.activeTab]}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
           >
-            <Text style={[styles.label, isActive && styles.activeLabel]}>{tab.label}</Text>
+            <Text style={[styles.label, isActive && styles.activeLabel]}>{t(`centers.detail.tabs.${tab}`)}</Text>
           </Pressable>
         );
       })}

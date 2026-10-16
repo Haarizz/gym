@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Avatar } from '@/shared/components/Avatar';
 import { Radius, Spacing } from '@/core/theme';
 import { getCheckInEligibility } from '../../../domain/membershipEligibility';
@@ -14,7 +15,8 @@ export interface StaffCheckInCardProps {
 }
 
 export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: StaffCheckInCardProps) {
-  const name = person.name || 'Unknown';
+  const { t } = useTranslation();
+  const name = person.name || t('checkIn.members.unknownMember');
   // Fallbacks across Member and Staff domains
   const id = person.bizId || person.memberNumber || person.id;
   const role = person.membershipType || person.role || person.department || 'User';
@@ -24,6 +26,18 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
   const { eligible, label: statusLabel } = getCheckInEligibility(person);
   // Someone already in the gym can always be checked out, whatever their status.
   const hasMembership = isActive || eligible;
+
+  const getLocalizedStatusLabel = (label: string) => {
+    const lower = label.trim().toLowerCase();
+    if (lower === 'active') return t('checkIn.status.active');
+    if (lower === 'inactive') return t('checkIn.status.inactive');
+    if (lower === 'paid') return t('checkIn.status.paid');
+    if (lower === 'pending') return t('checkIn.status.pending');
+    if (lower === 'no membership') return t('checkIn.status.noMembership');
+    if (lower === 'expired') return t('checkIn.status.expired');
+    if (lower === 'frozen') return t('checkIn.status.frozen');
+    return label;
+  };
 
   return (
     <View style={[styles.card, isActive && styles.cardActive, !isActive && !hasMembership && styles.cardDisabled]}>
@@ -42,7 +56,7 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
             </View>
             <View style={[styles.tag, hasMembership ? styles.membershipOk : styles.membershipBad]}>
               <Text style={[styles.tagText, hasMembership ? styles.membershipOkText : styles.membershipBadText]}>
-                {statusLabel}
+                {getLocalizedStatusLabel(statusLabel)}
               </Text>
             </View>
           </View>
@@ -53,21 +67,21 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
         {isActive ? (
           <>
             <View style={[styles.statusPill, styles.statusIn]}>
-              <Feather name="check" size={10} color="#2f9e6e" style={{ marginRight: 3 }} />
-              <Text style={[styles.statusText, styles.statusTextIn]}>In Gym</Text>
+              <Feather name="check" size={10} color="#2f9e6e" style={{ marginEnd: 3 }} />
+              <Text style={[styles.statusText, styles.statusTextIn]}>{t('checkIn.members.inGym')}</Text>
             </View>
             <Pressable 
               style={[styles.actionBtn, styles.actionOut]} 
               onPress={() => onCheckOut(person)}
             >
               <Feather name="log-out" size={12} color="#e0574f" />
-              <Text style={[styles.actionText, styles.actionTextOut]}>Check Out</Text>
+              <Text style={[styles.actionText, styles.actionTextOut]}>{t('checkIn.members.checkOut')}</Text>
             </Pressable>
           </>
         ) : (
           <>
             <View style={[styles.statusPill, styles.statusOut]}>
-              <Text style={[styles.statusText, styles.statusTextOut]}>Not in</Text>
+              <Text style={[styles.statusText, styles.statusTextOut]}>{t('checkIn.staff.notIn')}</Text>
             </View>
             <Pressable 
               style={[styles.actionBtn, styles.actionIn, !hasMembership && styles.actionInDisabled]} 
@@ -76,7 +90,7 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
             >
               <Feather name="log-in" size={12} color={hasMembership ? "#ffffff" : "#a3b8b2"} />
               <Text style={[styles.actionText, styles.actionTextIn, !hasMembership && styles.actionTextInDisabled]}>
-                {hasMembership ? 'Check In' : 'Not Eligible'}
+                {hasMembership ? t('checkIn.members.checkIn') : t('checkIn.members.notEligible')}
               </Text>
             </Pressable>
           </>
@@ -115,7 +129,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   avatarContainer: {
-    marginRight: 11,
+    marginEnd: 11,
   },
   info: {
     flex: 1,
@@ -136,7 +150,7 @@ const styles = StyleSheet.create({
     color: '#8fa39d',
   },
   tag: {
-    marginLeft: 5,
+    marginStart: 5,
     paddingVertical: 1,
     paddingHorizontal: 6,
     borderRadius: 20,

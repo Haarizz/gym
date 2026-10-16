@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -9,6 +10,8 @@ interface TrainerKeyMetricsGridProps {
 }
 
 export function TrainerKeyMetricsGrid({ activeClients }: TrainerKeyMetricsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Active Clients */}
@@ -17,11 +20,13 @@ export function TrainerKeyMetricsGrid({ activeClients }: TrainerKeyMetricsGridPr
           <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
             <Feather name="users" size={16} color="#9333EA" />
           </View>
-          <Text style={styles.label}>Active Clients</Text>
+          <Text style={styles.label}>{t('trainerPerformance.activeClients')}</Text>
         </View>
         <Text style={styles.value}>{activeClients.count}</Text>
         <Text style={[styles.subtext, { color: activeClients.monthlyChange >= 0 ? '#16A34A' : '#DC2626' }]}>
-          {activeClients.monthlyChange >= 0 ? '+' : ''}{activeClients.monthlyChange} this month
+          {t('trainerPerformance.changeThisMonth', {
+            change: `${activeClients.monthlyChange >= 0 ? '+' : ''}${activeClients.monthlyChange}`,
+          })}
         </Text>
       </View>
     </View>

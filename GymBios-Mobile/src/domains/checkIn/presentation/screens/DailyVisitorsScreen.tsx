@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
@@ -18,6 +19,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  * Separated from Walk-In Registration to keep concerns distinct.
  */
 export function DailyVisitorsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { recentVisitors, isLoading, refetch, isRefetching } = useRecentCheckIns();
@@ -29,8 +31,8 @@ export function DailyVisitorsScreen() {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Today's Daily Visitors"
-        subtitle="Walk-in passes issued today"
+        title={t('checkIn.walkIn.todayVisitorsTitle')}
+        subtitle={t('checkIn.walkIn.passesIssuedToday')}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
       />
@@ -51,12 +53,12 @@ export function DailyVisitorsScreen() {
           <View style={styles.headerRowLeft}>
             <Feather name="user-plus" size={14} color={BrandColors.textSecondary} />
             <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-              Daily Visitors
+              {t('checkIn.walkIn.sectionTitle')}
             </Typography>
           </View>
           {!isLoading && (
             <Typography variant="caption" color="textSecondary">
-              {recentVisitors.length} today
+              {t('checkIn.walkIn.todayCount', { count: recentVisitors.length })}
             </Typography>
           )}
         </View>

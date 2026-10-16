@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { TrainerDaySchedule } from '../../domain/TrainerScheduleData';
 
@@ -73,6 +74,7 @@ export function TrainerWeekScheduleCard({
   weekSchedule,
   onSessionPress,
 }: TrainerWeekScheduleCardProps) {
+  const { t } = useTranslation();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   // Default to today's card, falling back to the first day that has sessions.
@@ -99,7 +101,7 @@ export function TrainerWeekScheduleCard({
               onPress={() => toggleDay(dayIdx)}
               accessibilityRole="button"
               accessibilityState={{ expanded: isExpanded }}
-              accessibilityLabel={`${day.dayName} ${day.date}, ${day.sessions.length} sessions`}
+              accessibilityLabel={`${day.dayName} ${day.date}, ${t('schedule.trainer.sessionsCount', { count: day.sessions.length })}`}
             >
               <View style={styles.dayInfoRow}>
                 <View style={styles.dayBadge}>
@@ -109,7 +111,7 @@ export function TrainerWeekScheduleCard({
                 <View>
                   <Text style={styles.dayName}>{day.dayName}</Text>
                   <Text style={styles.sessionCountText}>
-                    {day.sessions.length} {day.sessions.length === 1 ? 'session' : 'sessions'}
+                    {t('schedule.trainer.sessionsCount', { count: day.sessions.length })}
                   </Text>
                 </View>
               </View>
@@ -120,7 +122,7 @@ export function TrainerWeekScheduleCard({
             <Collapsible expanded={isExpanded}>
               <View style={styles.sessionsList}>
                 {day.sessions.length === 0 && (
-                  <Text style={styles.emptyText}>No sessions scheduled</Text>
+                  <Text style={styles.emptyText}>{t('schedule.trainer.noSessionsScheduled')}</Text>
                 )}
                 {day.sessions.map((session, sIdx) => (
                   <Pressable
@@ -136,7 +138,7 @@ export function TrainerWeekScheduleCard({
                     <View style={styles.sessionInfo}>
                       <Text style={styles.memberName}>{session.member}</Text>
                       <Text style={styles.sessionMeta}>
-                        {session.type} • {session.duration}
+                        {`${session.type} • ${session.duration}`}
                       </Text>
                     </View>
                     <Feather

@@ -7,10 +7,11 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
-import { useRouter } from 'expo-router';
+import { tOr } from '@/core/i18n';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { CurrencyValue } from '@/core/providers';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandColors, Glass, Radius, Spacing, TypographyScale, heroTint } from '@/core/theme';
 import { GlassBlob, GlassSurface } from '@/shared/components';
@@ -18,9 +19,17 @@ import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { CenterCard } from '../components/CenterCard';
 import { CenterFiltersModal, DEFAULT_CENTER_FILTERS, type CenterFilters } from '../components/CenterFiltersModal';
+import {
+  PRICE_SLIDER_MAX,
+  PRICE_SLIDER_MIN,
+  PriceRangeLabel,
+  isPriceRangeActive,
+  matchesPriceRange,
+} from '../components/PriceRangeSlider';
 import { useCenters, type CenterSummary } from '@/domains/discovery';
 import { useNearbyDistance } from '../hooks/useNearbyDistance';
 import { getDistanceKm } from '../../utils/distance';
+import { ClaimReferralSheet } from '@/domains/member-referrals/presentation/components/ClaimReferralSheet';
 
 export function MemberCentersScreen({
   initialDeepLink,
@@ -29,6 +38,10 @@ export function MemberCentersScreen({
 } = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  // Set by AuthBootstrap right after profile completion: ask for a referral code once.
+  const { claimReferral } = useLocalSearchParams<{ claimReferral?: string }>();
+  const [isReferralSheetOpen, setIsReferralSheetOpen] = useState(claimReferral === '1');
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<CenterFilters>(DEFAULT_CENTER_FILTERS);
   const [sortBy, setSortBy] = useState('Distance');
@@ -69,14 +82,7 @@ export function MemberCentersScreen({
 
       const matchesCategory = filters.category === 'All' || center.centerType === filters.category;
 
-      const matchesPrice =
-        !filters.priceRange ||
-        (center.startingPrice != null &&
-          (filters.priceRange === 'under2k'
-            ? center.startingPrice < 2000
-            : filters.priceRange === '2k-5k'
-            ? center.startingPrice >= 2000 && center.startingPrice <= 5000
-            : center.startingPrice > 5000));
+      const matchesPrice = matchesPriceRange(center.startingPrice, filters.priceMin, filters.priceMax);
 
       const matchesAccess = !filters.accessType || center.accessType === filters.accessType;
 
@@ -147,7 +153,7 @@ export function MemberCentersScreen({
     }
     requestLocation().then((result) => {
       if (!result) {
-        toast.warning('Enable location access to find centers near you.', { title: 'Location unavailable' });
+        toast.warning(t('centers.list.locationUnavailable'), { title: t('centers.list.locationUnavailableTitle') });
         return;
       }
       // Closest centers first once we know where the user is.
@@ -164,20 +170,13 @@ export function MemberCentersScreen({
     await refetch();
   };
 
+  const isPriceFilterActive = isPriceRangeActive(filters.priceMin, filters.priceMax);
   const activeFilterCount =
     (filters.category !== 'All' ? 1 : 0) +
-    (filters.priceRange ? 1 : 0) +
+    (isPriceFilterActive ? 1 : 0) +
     (filters.accessType ? 1 : 0) +
     (filters.paymentMode ? 1 : 0);
 
-  const priceRangeLabel =
-    filters.priceRange === 'under2k' ? (
-      <>Under <CurrencyValue amount={2000} compact /></>
-    ) : filters.priceRange === '2k-5k' ? (
-      <><CurrencyValue amount={2000} compact />–<CurrencyValue amount={5000} compact /></>
-    ) : (
-      <>Above <CurrencyValue amount={5000} compact /></>
-    );
 
   return (
     <View style={styles.container}>
@@ -193,7 +192,7 @@ export function MemberCentersScreen({
           <Feather name="search" size={18} color={BrandColors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name, area, or type..."
+            placeholder={t('centers.list.searchPlaceholder')}
             placeholderTextColor="#7A8684"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -229,7 +228,7 @@ export function MemberCentersScreen({
               style={[styles.locationButtonText, isLocationOn && styles.locationButtonTextActive]}
               numberOfLines={1}
             >
-              {isLocationOn ? locationLabel || 'Near Me' : 'Use My Location'}
+              {isLocationOn ? locationLabel || t('centers.list.nearMe') : t('centers.list.useMyLocation')}
             </Text>
             {isLocationOn && <Feather name="x" size={14} color={BrandColors.teal} />}
           </Pressable>
@@ -244,7 +243,7 @@ export function MemberCentersScreen({
           >
             <Feather name="sliders" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : BrandColors.tealDark} />
             <Text style={[styles.filterButtonText, activeFilterCount > 0 && styles.filterButtonTextActive]}>
-              Filters
+              {t('centers.list.filters')}
             </Text>
             {activeFilterCount > 0 && (
               <View style={styles.filterCountBadge}>
@@ -261,38 +260,38 @@ export function MemberCentersScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activeFiltersScroll}>
             {filters.category !== 'All' && (
               <View style={[styles.activeChip, styles.activeChipTeal]}>
-                <Text style={[styles.activeChipText, styles.activeChipTextTeal]}>{filters.category}</Text>
+                <Text style={[styles.activeChipText, styles.activeChipTextTeal]}>{tOr(`centers.categories.${filters.category}`, filters.category)}</Text>
                 <Pressable onPress={() => setFilters((f) => ({ ...f, category: 'All' }))} hitSlop={6}>
                   <Feather name="x" size={12} color={BrandColors.teal} />
                 </Pressable>
               </View>
             )}
-            {filters.accessType && (
+            {!!filters.accessType && (
               <View style={[styles.activeChip, styles.activeChipPink]}>
-                <Text style={[styles.activeChipText, styles.activeChipTextPink]}>{filters.accessType}</Text>
+                <Text style={[styles.activeChipText, styles.activeChipTextPink]}>{tOr(`centers.accessTypes.${filters.accessType}`, filters.accessType)}</Text>
                 <Pressable onPress={() => setFilters((f) => ({ ...f, accessType: '' }))} hitSlop={6}>
                   <Feather name="x" size={12} color="#BE185D" />
                 </Pressable>
               </View>
             )}
-            {filters.priceRange && (
+            {isPriceFilterActive && (
               <View style={[styles.activeChip, styles.activeChipGold]}>
-                <Text style={[styles.activeChipText, styles.activeChipTextGold]}>{priceRangeLabel}</Text>
-                <Pressable onPress={() => setFilters((f) => ({ ...f, priceRange: '' }))} hitSlop={6}>
+                <Text style={[styles.activeChipText, styles.activeChipTextGold]}><PriceRangeLabel min={filters.priceMin} max={filters.priceMax} compact /></Text>
+                <Pressable onPress={() => setFilters((f) => ({ ...f, priceMin: PRICE_SLIDER_MIN, priceMax: PRICE_SLIDER_MAX }))} hitSlop={6}>
                   <Feather name="x" size={12} color={BrandColors.trainerAmber} />
                 </Pressable>
               </View>
             )}
-            {filters.paymentMode && (
+            {!!filters.paymentMode && (
               <View style={[styles.activeChip, styles.activeChipNeutral]}>
-                <Text style={[styles.activeChipText, styles.activeChipTextNeutral]}>{filters.paymentMode}</Text>
+                <Text style={[styles.activeChipText, styles.activeChipTextNeutral]}>{tOr(`centers.paymentModes.${filters.paymentMode}`, filters.paymentMode)}</Text>
                 <Pressable onPress={() => setFilters((f) => ({ ...f, paymentMode: '' }))} hitSlop={6}>
                   <Feather name="x" size={12} color={BrandColors.textSecondary} />
                 </Pressable>
               </View>
             )}
             <Pressable onPress={handleResetFilters}>
-              <Text style={styles.clearAllText}>Clear all</Text>
+              <Text style={styles.clearAllText}>{t('centers.list.clearAll')}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -317,10 +316,10 @@ export function MemberCentersScreen({
       >
         <View style={styles.resultCountRow}>
           <Text style={styles.resultCountTitle} numberOfLines={1}>
-            {locationLabel ? `Centers near ${locationLabel}` : 'Wellness centers near you'}
+            {locationLabel ? t('centers.list.centersNear', { place: locationLabel }) : t('centers.list.nearYou')}
           </Text>
           <Text style={styles.resultCountText}>
-            {filteredCenters.length} available
+            {t('centers.list.available', { count: filteredCenters.length })}
           </Text>
         </View>
 
@@ -343,8 +342,8 @@ export function MemberCentersScreen({
         ) : (
           <View style={styles.emptyState}>
             <Feather name="map-pin" size={32} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>No centers found</Text>
-            <Text style={styles.emptyDesc}>Try adjusting your search query or filters.</Text>
+            <Text style={styles.emptyTitle}>{t('centers.list.emptyTitle')}</Text>
+            <Text style={styles.emptyDesc}>{t('centers.list.emptyDescription')}</Text>
           </View>
         )}
       </ScrollView>
@@ -358,6 +357,14 @@ export function MemberCentersScreen({
         onSelectSort={setSortBy}
         onReset={handleResetFilters}
         onClose={() => setIsFiltersOpen(false)}
+      />
+
+      <ClaimReferralSheet
+        visible={isReferralSheetOpen}
+        onClose={() => {
+          setIsReferralSheetOpen(false);
+          router.setParams({ claimReferral: undefined });
+        }}
       />
     </View>
   );

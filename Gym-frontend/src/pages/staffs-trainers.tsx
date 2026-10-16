@@ -77,6 +77,7 @@ import { PermissionGate, hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 import { EmployeeForm } from "../components/workforce/EmployeeForm";
+import { StaffRatingsPanel } from "../components/staff/staff-ratings-panel";
 
 
 interface StaffsTrainersProps {
@@ -716,12 +717,23 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 <Award className="h-4 w-4 mr-2" />
                 Certifications & Skills
               </Button>
+              <Button
+                variant={activeTab === 'ratings' ? 'default' : 'ghost'}
+                className="w-full justify-start"
+                onClick={() => setActiveTab('ratings')}
+              >
+                <Star className="h-4 w-4 mr-2" />
+                Ratings & Reviews
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Main Content Area */}
         <div className="lg:col-span-3">
+          {activeTab === 'ratings' ? (
+            <StaffRatingsPanel staff={filteredStaff} isLoading={isLoading} />
+          ) : (
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -866,6 +878,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
 

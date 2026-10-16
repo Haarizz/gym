@@ -1,0 +1,79 @@
+import type { LocaleResource } from '../en';
+
+const payments = {
+  approval: {
+    loading: 'جارٍ تحميل بوابة الأعضاء...',
+    approvedTitle: 'تمت الموافقة على الدفع',
+    approved: 'تمت الموافقة على دفعتك. اشتراكك نشط الآن.',
+    approvedForPlan: 'تمت الموافقة على دفعتك مقابل {{plan}}. اشتراكك نشط الآن.',
+    rejectedTitle: 'تم رفض الدفع',
+    rejected: 'تم رفض دفعتك.',
+    rejectedForPlan: 'تم رفض دفعتك مقابل {{plan}}.',
+    rejectedReason: 'السبب: {{reason}}',
+
+    pendingTitle: 'الدفع بانتظار الموافقة',
+    pendingAtGym: 'تم إرسال دفعتك في {{gym}} وهي بانتظار تأكيد موظفي الصالة لاستلامها.',
+    pending: 'تم إرسال دفعتك وهي بانتظار تأكيد موظفي الصالة لاستلامها.',
+    pendingInfo:
+      'اعرض تأكيد الدفع في الاستقبال إذا لم تفعل بعد. سيُفتح وصولك إلى التطبيق تلقائيًا بعد موافقة الموظفين — اسحب للأسفل للتحقق مرة أخرى.',
+
+    rejectedScreenTitle: 'تم رفض الدفع',
+    rejectedAtGymForPlan: 'لم يوافق موظفو {{gym}} على دفعتك مقابل {{plan}}، لذلك لم يتم تفعيل اشتراكك.',
+    rejectedAtGym: 'لم يوافق موظفو {{gym}} على دفعتك، لذلك لم يتم تفعيل اشتراكك.',
+    rejectedPlanOnly: 'لم يوافق موظفو الصالة على دفعتك مقابل {{plan}}، لذلك لم يتم تفعيل اشتراكك.',
+    rejectedGeneric: 'لم يوافق موظفو الصالة على دفعتك، لذلك لم يتم تفعيل اشتراكك.',
+    reason: 'السبب',
+    noReason: 'لم يُذكر سبب. يرجى التواصل مع الصالة لمعرفة التفاصيل.',
+    rejectedInfo: 'يرجى التواصل مع استقبال الصالة لحل مشكلة الدفع، أو شراء خطة مرة أخرى.',
+    browseGyms: 'تصفح الصالات',
+  },
+
+  outstanding: {
+    subscription: 'الاشتراك',
+    membership: 'العضوية',
+    statusValues: {
+      PAID: 'مدفوع',
+      PARTIALLY_PAID: 'مدفوع جزئيًا',
+      UNPAID: 'غير مدفوع',
+    },
+    membershipAmount: 'مبلغ العضوية',
+    paid: 'المدفوع',
+    remainingBalance: 'الرصيد المتبقي',
+    completePayment: 'إكمال الدفع',
+    blockedApprovalPending: 'دفعة عضويتك بانتظار موافقة الصالة.',
+    blockedNoBills: 'لا يمكن دفع هذا الرصيد عبر التطبيق. يرجى الدفع في الاستقبال.',
+    cantPayInApp: 'لا يمكن دفع هذا الرصيد عبر التطبيق.',
+
+    nothingToPayNow: 'لا يوجد ما يُدفع حاليًا.',
+    methodNotAllowed: 'لا يمكن استخدام {{method}} في التطبيق. اختر {{allowed}}، أو ادفع في الاستقبال.',
+    splitNotAllowed: 'يجب إجراء الدفعات المقسّمة في الاستقبال.',
+    payFull: 'يرجى دفع كامل الرصيد المستحق البالغ {{amount}}.',
+    conflict: 'تغيّر رصيدك. يرجى المراجعة والمحاولة مرة أخرى.',
+    rejected: 'تعذّر إكمال الدفع.',
+    network: 'تعذّر تأكيد دفعتك بسبب انقطاع الاتصال. إعادة المحاولة آمنة — لن يتم خصم المبلغ مرتين.',
+
+    screenTitle: 'دفع العضوية',
+    screenSubtitle: 'الرصيد المستحق',
+    notAcceptedTitle: 'لم يتم قبول الدفع',
+    notAvailableTitle: 'الدفع غير متاح',
+    notAvailable: 'هذه الدفعة غير مرتبطة بعضويتك. قد تكون لصالة أو حساب آخر.',
+    goToMembership: 'الذهاب إلى العضوية',
+    loadErrorTitle: 'تعذّر تحميل رصيدك',
+    loadError: 'تحقق من اتصالك وحاول مرة أخرى.',
+    retry: 'إعادة المحاولة',
+    recordedTitle: 'تم تسجيل الدفعة',
+    appliedWithReceipt: 'تم تطبيق {{amount}} على عضويتك (الإيصال {{receipt}}).',
+    applied: 'تم تطبيق {{amount}} على عضويتك.',
+    remainingAfter: 'الرصيد المتبقي: {{amount}}.',
+    fullyPaid: 'تم دفع عضويتك بالكامل.',
+    backToMembership: 'العودة إلى العضوية',
+    nothingToPayTitle: 'لا يوجد ما يُدفع',
+    unpaidBills: 'الفواتير غير المدفوعة',
+    billFallback: 'فاتورة {{id}}',
+    retryPayment: 'إعادة محاولة الدفع',
+    pay: 'ادفع <amount/>',
+    sheetSubtitle: 'ادفع رصيدك المتبقي البالغ {{amount}}',
+  },
+} satisfies LocaleResource;
+
+export default payments;

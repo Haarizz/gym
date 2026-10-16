@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +11,8 @@ interface StaffTargetProgressCardProps {
 }
 
 export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProps) {
+  const { t } = useTranslation();
+
   // No target set for the month (e.g. "New Clients Target" left blank on the web) — show the
   // count on its own instead of dividing by zero, which read as "1 / 0 · 100% achieved".
   const hasConversionsTarget = targets.conversionsTarget > 0;
@@ -26,12 +29,12 @@ export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProp
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Monthly Performance</Text>
+      <Text style={styles.title}>{t('staffPerformance.monthlyPerformance')}</Text>
 
       {/* Revenue Target */}
       <View style={styles.targetSection}>
         <View style={styles.targetHeader}>
-          <Text style={styles.targetLabel}>Revenue Target</Text>
+          <Text style={styles.targetLabel}>{t('staffPerformance.revenueTarget')}</Text>
           <Text style={styles.targetValues}>
             <CurrencyValue amount={targets.achieved} compact /> / <CurrencyValue amount={targets.monthlyTarget} compact />
           </Text>
@@ -40,14 +43,16 @@ export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProp
           <View style={[styles.progressBarFill, { width: `${revenueBarPct}%` }]} />
         </View>
         <Text style={styles.percentageAchieved}>
-          {hasRevenueTarget ? `${targets.percentage}% achieved` : 'No target set'}
+          {hasRevenueTarget
+            ? t('staffPerformance.percentAchieved', { percentage: targets.percentage })
+            : t('staffPerformance.noTargetSet')}
         </Text>
       </View>
 
       {/* Conversions Target */}
       <View style={styles.targetSection}>
         <View style={styles.targetHeader}>
-          <Text style={styles.targetLabel}>Conversions Target</Text>
+          <Text style={styles.targetLabel}>{t('staffPerformance.conversionsTarget')}</Text>
           <Text style={styles.targetValues}>
             {hasConversionsTarget
               ? `${targets.conversionsAchieved} / ${targets.conversionsTarget}`
@@ -58,7 +63,9 @@ export function StaffTargetProgressCard({ targets }: StaffTargetProgressCardProp
           <View style={[styles.progressBarFill, { width: `${convPct}%` }]} />
         </View>
         <Text style={styles.percentageAchieved}>
-          {hasConversionsTarget ? `${convPct}% achieved` : 'No target set'}
+          {hasConversionsTarget
+            ? t('staffPerformance.percentAchieved', { percentage: convPct })
+            : t('staffPerformance.noTargetSet')}
         </Text>
       </View>
     </LinearGradient>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
@@ -11,6 +12,7 @@ interface StaffCheckInTabsProps {
 }
 
 export function StaffCheckInTabs({ activeTab, onTabChange }: StaffCheckInTabsProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -23,7 +25,7 @@ export function StaffCheckInTabs({ activeTab, onTabChange }: StaffCheckInTabsPro
           color={activeTab === 'members' ? undefined : 'textSecondary'}
           style={activeTab === 'members' ? { color: 'white' } : undefined}
         >
-          Members & Staff
+          {t('checkIn.staff.tabMembersStaff')}
         </Typography>
       </TouchableOpacity>
       
@@ -37,7 +39,7 @@ export function StaffCheckInTabs({ activeTab, onTabChange }: StaffCheckInTabsPro
           color={activeTab === 'walkIn' ? undefined : 'textSecondary'}
           style={activeTab === 'walkIn' ? { color: 'white' } : undefined}
         >
-          Walk-In / Daily
+          {t('checkIn.staff.tabWalkInDaily')}
         </Typography>
       </TouchableOpacity>
     </View>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -21,6 +22,7 @@ export function NotificationFooter({
   isMarkingAllRead = false,
   onMarkAllRead,
 }: NotificationFooterProps) {
+  const { t } = useTranslation();
   const disabled = !hasUnread || isMarkingAllRead;
   const Container = glassAvailable ? GlassView : View;
 
@@ -30,7 +32,7 @@ export function NotificationFooter({
         {...(glassAvailable ? { glassEffectStyle: 'regular' as const, colorScheme: 'light' as const } : {})}
         style={[styles.pill, !glassAvailable && styles.pillFallback]}
       >
-        <Text style={styles.totalText}>{totalCount} total</Text>
+        <Text style={styles.totalText}>{t('notifications.totalCount', { count: totalCount })}</Text>
 
         <Pressable
           style={({ pressed }) => [
@@ -41,14 +43,14 @@ export function NotificationFooter({
           onPress={onMarkAllRead}
           disabled={disabled}
           accessibilityRole="button"
-          accessibilityLabel="Mark all as read"
+          accessibilityLabel={t('notifications.markAllRead')}
         >
           {isMarkingAllRead ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
               <Feather name="check-circle" size={15} color={hasUnread ? '#FFFFFF' : G.ink3} />
-              <Text style={[styles.markText, !hasUnread && styles.markTextDisabled]}>Mark all as read</Text>
+              <Text style={[styles.markText, !hasUnread && styles.markTextDisabled]}>{t('notifications.markAllRead')}</Text>
             </>
           )}
         </Pressable>
@@ -60,8 +62,8 @@ export function NotificationFooter({
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    start: 12,
+    end: 12,
     bottom: 12,
     borderRadius: 999,
     shadowColor: G.shadow,
@@ -76,8 +78,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     paddingVertical: 8,
-    paddingLeft: 18,
-    paddingRight: 8,
+    paddingStart: 18,
+    paddingEnd: 8,
     borderRadius: 999,
     overflow: 'hidden',
     borderWidth: 1,

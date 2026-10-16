@@ -1,5 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { GlassSurface } from '@/shared/components';
@@ -25,14 +27,14 @@ interface Kpi {
 
 const percent = (value: number | null) => (value == null ? '—' : `${value}%`);
 
-function growthKpi(label: string, growth: number | null): Kpi {
+function growthKpi(label: string, growth: number | null, t: TFunction): Kpi {
   if (growth == null) {
-    return { label, value: '—', subtitle: 'no data last month', trend: 'flat' };
+    return { label, value: '—', subtitle: t('performance.noDataLastMonth'), trend: 'flat' };
   }
   return {
     label,
     value: `${growth > 0 ? '+' : ''}${growth}%`,
-    subtitle: 'vs last month',
+    subtitle: t('performance.vsLastMonth'),
     trend: growth > 0 ? 'up' : growth < 0 ? 'down' : 'flat',
   };
 }
@@ -42,38 +44,44 @@ function rateKpi(label: string, value: number | null, subtitle: string): Kpi {
 }
 
 /** Trainers are measured on sessions delivered, staff on lead conversions. */
-function buildTiles(p: UserPerformance): Tile[] {
-  const score: Tile = { value: percent(p.performanceScore), label: 'Performance Score', icon: 'trending-up', dark: false };
-  const hours: Tile = { value: `${p.hoursWorked}`, label: 'Hours Worked', icon: 'clock', dark: true };
+function buildTiles(p: UserPerformance, t: TFunction): Tile[] {
+  const score: Tile = { value: percent(p.performanceScore), label: t('performance.score'), icon: 'trending-up', dark: false };
+  const hours: Tile = { value: `${p.hoursWorked}`, label: t('performance.hoursWorked'), icon: 'clock', dark: true };
 
   if (p.role === 'trainer') {
     return [
       score,
-      { value: `${p.classesCompleted ?? 0}`, label: 'Classes Completed', icon: 'activity', dark: true },
+      { value: `${p.classesCompleted ?? 0}`, label: t('performance.classesCompleted'), icon: 'activity', dark: true },
       hours,
-      { value: percent(p.sessionTargetPercentage), label: 'Session Target', icon: 'target', dark: false },
+      { value: percent(p.sessionTargetPercentage), label: t('performance.sessionTarget'), icon: 'target', dark: false },
     ];
   }
   return [
     score,
-    { value: `${p.leadsConverted ?? 0}`, label: 'Leads Converted', icon: 'user-check', dark: true },
+    { value: `${p.leadsConverted ?? 0}`, label: t('performance.leadsConverted'), icon: 'user-check', dark: true },
     hours,
-    { value: percent(p.conversionRate), label: 'Conversion Rate', icon: 'percent', dark: false },
+    { value: percent(p.conversionRate), label: t('performance.conversionRate'), icon: 'percent', dark: false },
   ];
 }
 
-function buildKpis(p: UserPerformance): Kpi[] {
+function buildKpis(p: UserPerformance, t: TFunction): Kpi[] {
   if (p.role === 'trainer') {
     return [
-      growthKpi('Session Growth', p.sessionGrowth),
-      growthKpi('Revenue Growth', p.revenueGrowth),
-      rateKpi('Attendance', p.attendanceRate, p.daysScheduled > 0 ? `${p.daysPresent} of ${p.daysScheduled} days` : 'no schedule set'),
+      growthKpi(t('performance.sessionGrowth'), p.sessionGrowth, t),
+      growthKpi(t('performance.revenueGrowth'), p.revenueGrowth, t),
+      rateKpi(
+        t('performance.attendance'),
+        p.attendanceRate,
+        p.daysScheduled > 0
+          ? t('performance.daysOfTotal', { present: p.daysPresent, total: p.daysScheduled })
+          : t('performance.noScheduleSet')
+      ),
     ];
   }
   return [
-    growthKpi('Conversion Growth', p.conversionGrowth),
-    growthKpi('Revenue Growth', p.revenueGrowth),
-    rateKpi('Follow-ups', p.followUpCompletion, 'completed'),
+    growthKpi(t('performance.conversionGrowth'), p.conversionGrowth, t),
+    growthKpi(t('performance.revenueGrowth'), p.revenueGrowth, t),
+    rateKpi(t('performance.followUps'), p.followUpCompletion, t('performance.completed')),
   ];
 }
 
@@ -90,8 +98,9 @@ const TREND_COLOR: Record<Kpi['trend'], string> = {
 };
 
 export function PerformanceOverviewCard({ performance }: PerformanceOverviewCardProps) {
-  const tiles = buildTiles(performance);
-  const kpis = buildKpis(performance);
+  const { t } = useTranslation();
+  const tiles = buildTiles(performance, t);
+  const kpis = buildKpis(performance, t);
 
   return (
     <View style={styles.container}>
@@ -115,7 +124,7 @@ export function PerformanceOverviewCard({ performance }: PerformanceOverviewCard
       {/* KPI Trends Section */}
       <GlassSurface radius={Radius.lg} style={styles.kpiContainer}>
         <Typography variant="subtitle" style={styles.kpiHeader}>
-          Key Performance Indicators
+          {t('performance.kpiHeader')}
         </Typography>
 
         <View style={styles.kpiList}>
@@ -209,7 +218,7 @@ const styles = StyleSheet.create({
   kpiValue: {
     fontWeight: '800',
     fontSize: 16,
-    marginLeft: 2,
+    marginStart: 2,
   },
   kpiLabel: {
     fontSize: 12,

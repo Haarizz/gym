@@ -25,6 +25,10 @@ export interface AttendanceListItemResponse {
   check_out_time?: string;
   total_minutes?: number;
   formatted_duration?: string;
+  workout_start_time?: string | null;
+  workout_end_time?: string | null;
+  workout_minutes?: number | null;
+  formatted_workout_duration?: string | null;
   activity_type?: string;
   status?: string;
   type?: string;

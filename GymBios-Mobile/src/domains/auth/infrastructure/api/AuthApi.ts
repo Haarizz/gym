@@ -17,7 +17,9 @@ import type {
 
 export class AuthApi {
   async login(payload: LoginRequestApiModel) {
-    const response = await httpClient.post<LoginResponseApiModel>('/auth/login', payload);
+    const response = await httpClient.post<LoginResponseApiModel>('/auth/login', payload, {
+      skipGlobalErrorToast: true,
+    });
     return response;
   }
 
@@ -26,7 +28,11 @@ export class AuthApi {
   }
 
   async registerMobileUser(payload: any) {
-    const response = await httpClient.post<MobileRegisterInitiatedApiModel>('/mobile/auth/register', payload);
+    const response = await httpClient.post<MobileRegisterInitiatedApiModel>(
+      '/mobile/auth/register',
+      payload,
+      { skipGlobalErrorToast: true },
+    );
     return response;
   }
 

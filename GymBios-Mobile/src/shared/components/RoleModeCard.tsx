@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -45,6 +46,8 @@ export function RoleModeCard({
 }
 
 export function ComingSoonCard() {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.comingSoon}>
       <View style={styles.comingSoonIcon}>
@@ -53,12 +56,12 @@ export function ComingSoonCard() {
       <View style={styles.content}>
         <View style={styles.comingSoonHeader}>
           <Typography variant="subtitle" style={styles.title}>
-            Virtual Studio
+            {t('shared.roleMode.virtualStudio')}
           </Typography>
-          <BadgeMuted label="Coming Soon" />
+          <BadgeMuted label={t('shared.roleMode.comingSoon')} />
         </View>
         <Typography variant="bodySmall" color="textSecondary" style={styles.description}>
-          Create and manage online fitness programs, live sessions, and digital memberships.
+          {t('shared.roleMode.virtualStudioDesc')}
         </Typography>
       </View>
     </View>

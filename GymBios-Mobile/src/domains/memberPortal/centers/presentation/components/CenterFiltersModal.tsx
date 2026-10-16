@@ -6,23 +6,35 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import {
+  PRICE_SLIDER_MAX,
+  PRICE_SLIDER_MIN,
+  PriceRangeLabel,
+  PriceRangeSlider,
+  isPriceRangeActive,
+} from './PriceRangeSlider';
 
 export interface CenterFilters {
   category: string;
-  priceRange: '' | 'under2k' | '2k-5k' | 'above5k';
+  /** Monthly price bounds; the slider ends (PRICE_SLIDER_MIN/MAX) mean unbounded. */
+  priceMin: number;
+  priceMax: number;
   accessType: string;
   paymentMode: string;
 }
 
 export const DEFAULT_CENTER_FILTERS: CenterFilters = {
   category: 'All',
-  priceRange: '',
+  priceMin: PRICE_SLIDER_MIN,
+  priceMax: PRICE_SLIDER_MAX,
   accessType: '',
   paymentMode: '',
 };
@@ -38,16 +50,11 @@ interface CenterFiltersModalProps {
 }
 
 const CATEGORIES = ['All', 'Gym', 'Fitness Center', 'Wellness Center', 'Studio'];
-const PRICE_RANGES: { value: CenterFilters['priceRange']; label: React.ReactNode }[] = [
-  { value: 'under2k', label: <>Under <CurrencyValue amount={2000} /></> },
-  { value: '2k-5k', label: <><CurrencyValue amount={2000} />–<CurrencyValue amount={5000} /></> },
-  { value: 'above5k', label: <>Above <CurrencyValue amount={5000} /></> },
-];
 const ACCESS_TYPES = ['Mixed', 'Ladies Only', 'Men Only'];
 const PAYMENT_MODES = [
-  { value: 'Cash', label: 'Cash', icon: 'dollar-sign' as const },
-  { value: 'Card', label: 'Card', icon: 'credit-card' as const },
-  { value: 'BNPL', label: 'BNPL', icon: 'zap' as const },
+  { value: 'Cash', icon: 'dollar-sign' as const },
+  { value: 'Card', icon: 'credit-card' as const },
+  { value: 'BNPL', icon: 'zap' as const },
 ];
 const SORTS = ['Distance', 'Price', 'Rating'];
 
@@ -60,7 +67,10 @@ export function CenterFiltersModal({
   onReset,
   onClose,
 }: CenterFiltersModalProps) {
+  const { t } = useTranslation();
   const [local, setLocal] = useState<CenterFilters>(filters);
+  const [isDraggingPrice, setIsDraggingPrice] = useState(false);
+  const isPriceActive = isPriceRangeActive(local.priceMin, local.priceMax);
 
   useEffect(() => {
     if (visible) setLocal(filters);
@@ -75,7 +85,7 @@ export function CenterFiltersModal({
 
   const activeCount =
     (local.category !== 'All' ? 1 : 0) +
-    (local.priceRange ? 1 : 0) +
+    (isPriceActive ? 1 : 0) +
     (local.accessType ? 1 : 0) +
     (local.paymentMode ? 1 : 0);
 
@@ -85,8 +95,8 @@ export function CenterFiltersModal({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Filter Centers</Text>
-              <Text style={styles.subtitle}>Refine your fitness center search</Text>
+              <Text style={styles.title}>{t('centers.filtersModal.title')}</Text>
+              <Text style={styles.subtitle}>{t('centers.filtersModal.subtitle')}</Text>
             </View>
             <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton}>
               <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -97,9 +107,10 @@ export function CenterFiltersModal({
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={!isDraggingPrice}
           >
             {/* Category */}
-            <Text style={styles.sectionTitle}>Center Type</Text>
+            <Text style={styles.sectionTitle}>{t('centers.filtersModal.centerType')}</Text>
             <View style={styles.chipGroup}>
               {CATEGORIES.map((cat) => {
                 const isSelected = local.category === cat;
@@ -109,31 +120,36 @@ export function CenterFiltersModal({
                     style={[styles.chip, isSelected && styles.chipSelected]}
                     onPress={() => setLocal((prev) => ({ ...prev, category: cat }))}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{cat}</Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{tOr(`centers.categories.${cat}`, cat)}</Text>
                   </Pressable>
                 );
               })}
             </View>
 
             {/* Price Range */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Monthly Price</Text>
-            <View style={styles.chipGroup}>
-              {PRICE_RANGES.map(({ value, label }) => {
-                const isSelected = local.priceRange === value;
-                return (
-                  <Pressable
-                    key={value}
-                    style={[styles.chip, isSelected && styles.chipSelectedGold]}
-                    onPress={() => toggle('priceRange', value)}
-                  >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelectedGold]}>{label}</Text>
-                  </Pressable>
-                );
-              })}
+            <View style={[styles.priceHeader, { marginTop: Spacing.four }]}>
+              <Text style={[styles.sectionTitle, styles.priceTitle]}>{t('centers.filtersModal.monthlyPrice')}</Text>
+              <Text style={[styles.priceValue, isPriceActive && styles.priceValueActive]} numberOfLines={1}>
+                {isPriceActive ? (
+                  <PriceRangeLabel min={local.priceMin} max={local.priceMax} />
+                ) : (
+                  t('centers.filtersModal.anyPrice')
+                )}
+              </Text>
+            </View>
+            <PriceRangeSlider
+              min={local.priceMin}
+              max={local.priceMax}
+              onChange={(priceMin, priceMax) => setLocal((prev) => ({ ...prev, priceMin, priceMax }))}
+              onDragStateChange={setIsDraggingPrice}
+            />
+            <View style={styles.priceBounds}>
+              <Text style={styles.priceBoundText}><CurrencyValue amount={PRICE_SLIDER_MIN} /></Text>
+              <Text style={styles.priceBoundText}><CurrencyValue amount={PRICE_SLIDER_MAX} />+</Text>
             </View>
 
             {/* Access Type */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Access Type</Text>
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>{t('centers.filtersModal.accessType')}</Text>
             <View style={styles.chipGroup}>
               {ACCESS_TYPES.map((type) => {
                 const isSelected = local.accessType === type;
@@ -143,16 +159,16 @@ export function CenterFiltersModal({
                     style={[styles.chip, isSelected && styles.chipSelectedPink]}
                     onPress={() => toggle('accessType', type)}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelectedPink]}>{type}</Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelectedPink]}>{tOr(`centers.accessTypes.${type}`, type)}</Text>
                   </Pressable>
                 );
               })}
             </View>
 
             {/* Payment Method */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Payment Options</Text>
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>{t('centers.filtersModal.paymentOptions')}</Text>
             <View style={styles.chipGroup}>
-              {PAYMENT_MODES.map(({ value, label, icon }) => {
+              {PAYMENT_MODES.map(({ value, icon }) => {
                 const isSelected = local.paymentMode === value;
                 return (
                   <Pressable
@@ -161,14 +177,14 @@ export function CenterFiltersModal({
                     onPress={() => toggle('paymentMode', value)}
                   >
                     <FeatherIcon name={icon} size={13} color={isSelected ? BrandColors.teal : BrandColors.textSecondary} />
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{label}</Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{tOr(`centers.paymentModes.${value}`, value)}</Text>
                   </Pressable>
                 );
               })}
             </View>
 
             {/* Sort By */}
-            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>Sort By</Text>
+            <Text style={[styles.sectionTitle, { marginTop: Spacing.four }]}>{t('centers.filtersModal.sortBy')}</Text>
             <View style={styles.chipGroup}>
               {SORTS.map((sort) => {
                 const isSelected = sortBy === sort;
@@ -178,7 +194,7 @@ export function CenterFiltersModal({
                     style={[styles.chip, isSelected && styles.chipSelected]}
                     onPress={() => onSelectSort(sort)}
                   >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{sort}</Text>
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{tOr(`centers.sorts.${sort}`, sort)}</Text>
                   </Pressable>
                 );
               })}
@@ -193,7 +209,7 @@ export function CenterFiltersModal({
                 onReset();
               }}
             >
-              <Text style={styles.resetButtonText}>Reset{activeCount > 0 ? ` (${activeCount})` : ''}</Text>
+              <Text style={styles.resetButtonText}>{activeCount > 0 ? t('centers.filtersModal.resetWithCount', { count: activeCount }) : t('centers.filtersModal.reset')}</Text>
             </Pressable>
             <Pressable
               style={styles.applyButtonWrapper}
@@ -208,7 +224,7 @@ export function CenterFiltersModal({
                 end={{ x: 1, y: 0 }}
                 style={styles.applyButton}
               >
-                <Text style={styles.applyButtonText}>Apply Filters</Text>
+                <Text style={styles.applyButtonText}>{t('centers.filtersModal.apply')}</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -271,6 +287,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: BrandColors.textPrimary,
     marginBottom: Spacing.two,
+  },
+  priceHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  priceTitle: {
+    flexShrink: 1,
+  },
+  priceValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: BrandColors.textSecondary,
+  },
+  priceValueActive: {
+    color: BrandColors.trainerAmber,
+  },
+  priceBounds: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  priceBoundText: {
+    fontSize: 11,
+    color: BrandColors.textSecondary,
   },
   chipGroup: {
     flexDirection: 'row',

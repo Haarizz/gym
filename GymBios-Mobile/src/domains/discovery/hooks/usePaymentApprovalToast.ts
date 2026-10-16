@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { toast } from '@/shared/components/Toasts';
+import { i18n } from '@/core/i18n';
 import { useAuthStore } from '@/domains/auth/store/authStore';
 import { useMembershipApprovalStatus } from './useMembershipApprovalStatus';
 
@@ -24,16 +25,20 @@ export function usePaymentApprovalToast() {
     const prev = previous.current;
     if (prev.tenant === activeTenant && prev.status === 'PENDING' && status === 'APPROVED') {
       toast.success(
-        `Your payment${data?.membershipPlan ? ` for ${data.membershipPlan}` : ''} has been approved. Your membership is now active.`,
-        { title: 'Payment Approved' },
+        data?.membershipPlan
+          ? i18n.t('approval.approvedForPlan', { plan: data.membershipPlan })
+          : i18n.t('approval.approved'),
+        { title: i18n.t('approval.approvedTitle') },
       );
     }
     if (prev.tenant === activeTenant && prev.status === 'PENDING' && status === 'REJECTED') {
       const reason = data?.rejectionReason?.trim();
-      toast.error(
-        `Your payment${data?.membershipPlan ? ` for ${data.membershipPlan}` : ''} was rejected.${reason ? ` Reason: ${reason}` : ''}`,
-        { title: 'Payment Rejected' },
-      );
+      const rejected = data?.membershipPlan
+        ? i18n.t('approval.rejectedForPlan', { plan: data.membershipPlan })
+        : i18n.t('approval.rejected');
+      toast.error(reason ? `${rejected} ${i18n.t('approval.rejectedReason', { reason })}` : rejected, {
+        title: i18n.t('approval.rejectedTitle'),
+      });
     }
     previous.current = { tenant: activeTenant, status };
   }, [activeTenant, status, data?.membershipPlan, data?.rejectionReason]);

@@ -1,5 +1,7 @@
 import { differenceInYears, parseISO, subYears } from 'date-fns';
 
+import { i18n } from '@/core/i18n';
+
 /**
  * Allowed age range for a member's date of birth.
  * Keep in sync with MIN_AGE_YEARS / MAX_AGE_YEARS in the backend's
@@ -17,8 +19,8 @@ export const getMinBirthDate = () => subYears(new Date(), MAX_AGE_YEARS);
 /** Validates a YYYY-MM-DD birth date; returns an error message or null. */
 export function validateDateOfBirth(value: string): string | null {
   const age = differenceInYears(new Date(), parseISO(value));
-  if (Number.isNaN(age)) return 'Enter a valid date of birth';
-  if (age < MIN_AGE_YEARS) return `You must be at least ${MIN_AGE_YEARS} years old`;
-  if (age > MAX_AGE_YEARS) return `Age cannot be more than ${MAX_AGE_YEARS} years`;
+  if (Number.isNaN(age)) return i18n.t('validation.invalidDateOfBirth');
+  if (age < MIN_AGE_YEARS) return i18n.t('validation.minAge', { min: MIN_AGE_YEARS });
+  if (age > MAX_AGE_YEARS) return i18n.t('validation.maxAge', { max: MAX_AGE_YEARS });
   return null;
 }

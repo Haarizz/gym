@@ -34,8 +34,9 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     @Query("SELECT COALESCE(SUM(r.amount - COALESCE(r.totalPaidToDate, r.paidAmount, 0)), 0) FROM Receipt r WHERE r.status IN ('Pending', 'Overdue', 'Partial') AND r.transactionDate >= :start AND r.transactionDate < :end")
     BigDecimal sumPendingInPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
-    // Receipts with real money received in [start, end) — web Revenue Dashboard
-    @Query("SELECT r FROM Receipt r WHERE r.paidAmount > 0 AND r.transactionDate >= :start AND r.transactionDate < :end ORDER BY r.transactionDate")
+    // Receipts with real money received in [start, end) — web Revenue Dashboard.
+    // Rejected mobile purchases never became a sale (same rule as findSalesOfTypesBetween).
+    @Query("SELECT r FROM Receipt r WHERE r.paidAmount > 0 AND r.transactionDate >= :start AND r.transactionDate < :end AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') ORDER BY r.transactionDate")
     List<Receipt> findPaidBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     // Sales of the given types raised in [start, end), paid or not — web dashboard

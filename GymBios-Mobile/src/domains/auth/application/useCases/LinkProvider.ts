@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import type { Result } from '@/core/types';
 import type { SocialProvider } from '../../domain/entities/SocialAuthOutcome';
 import type { AuthRepository } from '../../domain/repositories/AuthRepository';
@@ -20,7 +21,7 @@ export class LinkProvider {
 
   execute(input: LinkProviderDto): Promise<Result<void, string>> {
     if (!input.providerToken) {
-      return Promise.resolve({ success: false, error: 'Missing provider credential.' });
+      return Promise.resolve({ success: false, error: i18n.t('auth.errors.missingCredential') });
     }
     return this.authRepository.linkProvider(input.provider, input.providerToken);
   }

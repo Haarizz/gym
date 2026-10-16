@@ -8,6 +8,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import { CARD_TYPE_OPTIONS } from '@/shared/payment/constants';
 
 interface CardPaymentFormProps {
@@ -36,6 +37,7 @@ export function CardPaymentForm({
   onDueDateChange,
 }: CardPaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const numPaid = parseFloat(paidAmount || '0');
   const remaining = Math.max(0, finalAmount - numPaid);
 
@@ -55,13 +57,13 @@ export function CardPaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#1D4ED8' }}>
-        Card Payment Details
+        {t('paymentSheet.form.cardDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Dropdown
-            label="Card Type *"
+            label={t('paymentSheet.form.cardType')}
             value={cardType}
             options={cardDropdownOptions}
             onChange={onCardTypeChange}
@@ -71,7 +73,7 @@ export function CardPaymentForm({
 
         <View style={styles.flex1}>
           <Input
-            label={<>Paid Amount (<CurrencyGlyph />) *</>}
+            label={<Trans i18nKey="paymentSheet.form.paidAmount" components={{ currency: <CurrencyGlyph /> }} />}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -82,16 +84,16 @@ export function CardPaymentForm({
       </View>
 
       <Input
-        label="Reference / Transaction Number (Optional)"
+        label={t('paymentSheet.form.referenceNumberOptional')}
         value={reference}
         onChangeText={onReferenceChange}
-        placeholder="e.g. TXN-987654"
+        placeholder={t('paymentSheet.form.example', { value: 'TXN-987654' })}
       />
 
       {remaining > 0 ? (
         <DatePicker
-          label="Payment Due Date *"
-          placeholder="Select due date"
+          label={t('paymentSheet.form.dueDate')}
+          placeholder={t('paymentSheet.form.selectDueDate')}
           value={paymentDueDate ?? null}
           onChange={onDueDateChange}
           minimumDate={new Date()}
@@ -110,7 +112,7 @@ export function CardPaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -118,7 +120,7 @@ export function CardPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Paid Amount:
+            {t('paymentSheet.form.paidAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
             <CurrencyValue amount={(numPaid || 0)} decimals={2} />
@@ -126,7 +128,7 @@ export function CardPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Remaining/Due:
+            {t('paymentSheet.form.remainingOrDue')}
           </Typography>
           <Typography
             variant="bodySmallBold"
@@ -140,9 +142,12 @@ export function CardPaymentForm({
           <View style={[styles.noteBox, { backgroundColor: '#F59E0B15' }]}>
             <Typography variant="caption" style={{ color: '#B45309' }}>
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
-                Partial Payment:{' '}
+                {t('paymentSheet.form.partialPayment')}{' '}
               </Typography>
-              <CurrencyValue amount={remaining} decimals={2} /> will be added to member's outstanding balance.
+              <Trans
+                i18nKey="paymentSheet.form.addedToMemberOutstanding"
+                components={{ amount: <CurrencyValue amount={remaining} decimals={2} /> }}
+              />
             </Typography>
           </View>
         ) : null}

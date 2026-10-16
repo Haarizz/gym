@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enquiries – Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F4F0; --ink:#2A2418; --muted:#6B6250; --line:rgba(42,36,24,.08);
+  --amber:#F6B73C; --amber-2:#F9C866; --amber-soft:#FDF0CF; --amber-ink:#5A3E00;
+  --teal:#3F6E62; --teal-2:#335C52; --teal-soft:#DDEBE6;
+  --blue:#2F62C9; --blue-soft:#E1EAFB; --grey-soft:#ECE9E2;
+  --glass:rgba(255,255,255,.72); --glass-b:rgba(255,255,255,.95);
+  --shadow:0 10px 30px rgba(70,50,0,.08), 0 2px 6px rgba(70,50,0,.05);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#E9E7E1;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--ink)}
+.page-head{max-width:1400px;margin:0 auto;padding:40px 24px 8px}
+.page-head h1{margin:0;font-size:26px;font-weight:800}
+.page-head p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.board{display:flex;flex-wrap:wrap;gap:48px;justify-content:center;padding:32px 24px 64px;max-width:1400px;margin:0 auto}
+.frame-wrap{display:flex;flex-direction:column;gap:12px}
+.frame-label{font-size:13px;font-weight:700;color:var(--muted)}
+.phone{width:390px;height:844px;border-radius:40px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 30px 60px rgba(40,30,0,.18);border:6px solid #1d1a14}
+.screen{height:100%;overflow-y:auto;position:relative;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.blob{position:absolute;top:70px;right:-120px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(246,183,60,.28),rgba(246,183,60,.08) 60%,transparent 70%);pointer-events:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.glass{background:var(--glass);border:1px solid var(--glass-b);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow);border-radius:22px}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.top{margin:12px 12px 0;border-radius:26px;padding:14px 14px 14px 18px;background:linear-gradient(135deg,var(--amber-2),var(--amber));display:flex;align-items:center;gap:12px;box-shadow:0 10px 24px rgba(246,183,60,.35);position:relative;z-index:1}
+.top h2{margin:0;font-size:20px;font-weight:800}
+.top small{display:block;font-size:12px;font-weight:600;color:var(--amber-ink)}
+.round{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.4);flex:none}
+.round:hover{background:rgba(255,255,255,.6)}
+.round.w{background:rgba(255,255,255,.8);border:1px solid #fff;box-shadow:var(--shadow)}
+
+/* new enquiry CTA */
+.cta{margin:16px 16px 0;padding:18px;border-radius:24px;background:linear-gradient(135deg,#4A7D70,var(--teal));color:#fff;display:flex;align-items:center;gap:14px;box-shadow:0 12px 26px rgba(63,110,98,.3);width:calc(100% - 32px);text-align:left;position:relative;z-index:1}
+.cta .ic{width:48px;height:48px;border-radius:16px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.cta b{display:block;font-size:16px}
+.cta span{font-size:12px;opacity:.85}
+
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px 16px 0}
+.summary div{padding:12px;text-align:center;border-radius:18px}
+.summary b{display:block;font-size:20px;font-weight:800}
+.summary span{font-size:11px;font-weight:700;color:var(--muted)}
+
+.tabs{display:flex;gap:6px;margin:16px 16px 4px;padding:4px;border-radius:16px;background:rgba(42,36,24,.06)}
+.tabs button{flex:1;height:40px;border-radius:12px;font-size:13px;font-weight:700;color:var(--muted)}
+.tabs button.on{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(40,30,0,.08)}
+
+.list{display:flex;flex-direction:column;gap:10px;padding:12px 16px 130px}
+.enq{padding:14px;width:100%;text-align:left;display:flex;flex-direction:column;gap:8px;transition:transform .15s}
+.enq:hover{transform:translateY(-1px)}
+.enq.sel{outline:2px solid var(--amber)}
+.enq .row1{display:flex;align-items:center;gap:8px}
+.enq .cat{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none}
+.enq h4{margin:0;font-size:14px;font-weight:800;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.enq .unread{width:9px;height:9px;border-radius:50%;background:#E0533D;flex:none}
+.enq .prev{font-size:13px;color:#4a4230;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.enq .prev b{color:var(--teal);font-weight:700}
+.enq .meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);font-weight:600}
+.pill{font-size:10px;font-weight:800;letter-spacing:.05em;padding:4px 9px;border-radius:999px;text-transform:uppercase}
+.st-open{background:var(--amber-soft);color:#7A5200}
+.st-replied{background:var(--teal-soft);color:#24564A}
+.st-closed{background:var(--grey-soft);color:#5d5646}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 0}
+
+.nav{position:absolute;left:16px;right:16px;bottom:18px;height:68px;border-radius:26px;display:flex;justify-content:space-around;align-items:center;z-index:5;background:rgba(255,255,255,.7);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid #fff;box-shadow:0 12px 30px rgba(40,30,0,.12)}
+.nav button{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#6f6858}
+.nav button.on{background:var(--amber);color:var(--ink);box-shadow:0 6px 14px rgba(246,183,60,.5)}
+
+/* form */
+.bar{display:flex;align-items:center;gap:12px;padding:14px 16px;position:relative;z-index:1}
+.bar h2{margin:0;font-size:18px;font-weight:800;flex:1}
+.form{padding:0 16px 120px;position:relative;z-index:1}
+.lbl{display:block;font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:18px 0 8px}
+.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.catb{padding:12px 6px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700;background:rgba(255,255,255,.75);border:1.5px solid #fff;box-shadow:0 2px 8px rgba(40,30,0,.05)}
+.catb .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center}
+.catb.on{border-color:var(--amber);background:#FFFBF0}
+.field{width:100%;border-radius:16px;border:1px solid var(--line);background:#fff;padding:0 14px;height:50px;font:inherit;font-size:14px;color:var(--ink);outline:none}
+textarea.field{height:120px;padding:12px 14px;resize:none;line-height:1.45}
+.field:focus{border-color:var(--amber)}
+.count{text-align:right;font-size:11px;color:var(--muted);margin-top:4px;font-weight:600}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;height:44px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:13px;font-weight:700}
+.seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.upload{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1.5px dashed #D3CAB4;background:rgba(255,255,255,.5);font-size:13px;font-weight:600;color:var(--muted);width:100%;text-align:left}
+.upload .ic{width:40px;height:40px;border-radius:12px;background:var(--amber-soft);color:#8A5A00;display:grid;place-items:center}
+.files{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.file{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:6px 6px 6px 10px;background:#fff;border-radius:10px;border:1px solid var(--line)}
+.file button{width:24px;height:24px;border-radius:8px;display:grid;place-items:center}
+.file button:hover{background:var(--grey-soft)}
+.hint{display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px 14px;border-radius:16px;background:var(--blue-soft);color:#1F3F80;font-size:12px;line-height:1.45;font-weight:600}
+.actionbar{position:absolute;left:12px;right:12px;bottom:14px;padding:10px;border-radius:26px;z-index:5;background:rgba(255,255,255,.78);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid #fff;box-shadow:0 12px 30px rgba(40,30,0,.14)}
+.btn{width:100%;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800;font-size:15px}
+.btn.dark{background:var(--ink);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.err{font-size:12px;color:#B3261E;font-weight:600;margin-top:6px;display:none}
+.err.show{display:block}
+
+/* thread */
+.thread{display:flex;flex-direction:column;height:100%}
+.thead{margin:12px 12px 0;padding:12px 14px;border-radius:24px}
+.thead .r1{display:flex;align-items:center;gap:10px}
+.thead h3{margin:0;font-size:15px;font-weight:800;flex:1;min-width:0}
+.thead .r2{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:11px;color:var(--muted);font-weight:600;flex-wrap:wrap}
+.steps{display:flex;align-items:center;gap:6px;margin:12px 16px 0;padding:12px 14px;border-radius:18px}
+.step{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#a49a85}
+.step i{width:20px;height:20px;border-radius:50%;background:#E3DCCB;display:grid;place-items:center;font-style:normal;color:#fff}
+.step.done{color:var(--ink)}
+.step.done i{background:var(--teal)}
+.line{flex:1;height:2px;background:#E3DCCB;border-radius:2px}
+.line.done{background:var(--teal)}
+.msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;scrollbar-width:none}
+.day{align-self:center;font-size:11px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.7);padding:5px 10px;border-radius:999px}
+.m{max-width:84%;display:flex;flex-direction:column;gap:4px}
+.m .who{font-size:11px;font-weight:700;color:var(--muted);display:flex;gap:6px;align-items:center}
+.m .who .badge{font-size:9px;padding:2px 6px;border-radius:6px;background:var(--teal-soft);color:#24564A;letter-spacing:.04em}
+.m .bub{padding:11px 14px;font-size:14px;line-height:1.5;border-radius:20px}
+.m time{font-size:10px;color:var(--muted);font-weight:600}
+.m.me{align-self:flex-end;align-items:flex-end}
+.m.me .bub{background:var(--ink);color:#fff;border-bottom-right-radius:6px}
+.m.staff{align-self:flex-start}
+.m.staff .bub{background:#fff;border:1px solid var(--glass-b);border-bottom-left-radius:6px;box-shadow:0 2px 8px rgba(40,30,0,.05)}
+.att{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.14);font-size:12px;font-weight:700;margin-top:8px}
+.m.staff .att{background:var(--grey-soft)}
+.sys{align-self:center;font-size:12px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;text-align:center}
+.resolve{align-self:stretch;padding:14px;border-radius:20px;background:var(--amber-soft);border:1px solid #F6D58A}
+.resolve b{font-size:14px}
+.resolve p{margin:4px 0 10px;font-size:12px;color:#6B4700;font-weight:600}
+.resolve .row{display:flex;gap:8px}
+.resolve button{flex:1;height:42px;border-radius:14px;font-size:13px;font-weight:800;background:#fff}
+.resolve button.yes{background:var(--teal);color:#fff}
+.closedbar{margin:0 12px 16px;padding:14px;border-radius:22px;text-align:center;font-size:13px;font-weight:600;color:var(--muted)}
+.closedbar button{color:var(--teal);font-weight:800;text-decoration:underline;margin-left:4px}
+.composer{display:flex;gap:8px;align-items:center;margin:0 12px 16px;padding:6px 6px 6px 8px;border-radius:26px}
+.composer input{flex:1;border:0;background:none;outline:none;font:inherit;font-size:14px;color:var(--ink);min-width:0}
+.send{width:46px;height:46px;border-radius:18px;background:var(--ink);color:#fff;display:grid;place-items:center}
+.send:disabled{background:#c9c2b2}
+.attach{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;color:var(--muted)}
+.toast{position:absolute;left:20px;right:20px;top:24px;padding:14px 16px;border-radius:18px;background:var(--teal);color:#fff;font-weight:700;font-size:14px;display:flex;gap:10px;align-items:center;opacity:0;transform:translateY(-12px);transition:.25s;z-index:20;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+@media (max-width:440px){.phone{width:calc(100vw - 32px)}}
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>Enquiries</h1>
+  <p>Member app · list of enquiries → open a new one → read replies & respond. All clickable; a submitted enquiry shows up in the list and opens in the thread.</p>
+</header>
+
+<main class="board">
+
+<!-- ========== 1. LIST ========== -->
+<section class="frame-wrap" id="f1">
+  <div class="frame-label">1 · My enquiries</div>
+  <div class="phone">
+    <div class="screen">
+      <div class="blob"></div>
+      <div class="top">
+        <div style="flex:1"><small>Main Branch</small><h2>Help & Enquiries</h2></div>
+        <button class="round" aria-label="Notifications"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button>
+      </div>
+
+      <button class="cta" onclick="go('f2')">
+        <span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span style="flex:1"><b>Open a new enquiry</b><span>Membership, billing, classes, facilities…</span></span>
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="tabs" id="tabs" role="tablist">
+        <button class="on" data-f="all" role="tab">All</button>
+        <button data-f="open" role="tab">Open</button>
+        <button data-f="replied" role="tab">Replied</button>
+        <button data-f="closed" role="tab">Closed</button>
+      </div>
+
+      <div class="list" id="list"></div>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <button aria-label="Home"><svg class="i" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></button>
+      <button aria-label="Schedule"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></button>
+      <button aria-label="Team"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg></button>
+      <button class="on" aria-label="Enquiries" aria-current="page"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16h.01"/></svg></button>
+      <button aria-label="Membership"><svg class="i" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></button>
+    </nav>
+  </div>
+</section>
+
+<!-- ========== 2. NEW ENQUIRY ========== -->
+<section class="frame-wrap" id="f2">
+  <div class="frame-label">2 · New enquiry</div>
+  <div class="phone">
+    <div class="screen">
+      <div class="blob" style="top:-80px"></div>
+      <div class="bar">
+        <button class="round w" aria-label="Back" onclick="go('f1')"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <h2>New enquiry</h2>
+      </div>
+      <form class="form" id="newForm" onsubmit="submitEnq(event)">
+        <span class="lbl" id="catLbl">What's it about?</span>
+        <div class="cats" id="cats" role="radiogroup" aria-labelledby="catLbl"></div>
+
+        <label class="lbl" for="subj">Subject</label>
+        <input class="field" id="subj" maxlength="60" placeholder="e.g. Freeze membership for 2 weeks">
+
+        <label class="lbl" for="desc">Details</label>
+        <textarea class="field" id="desc" maxlength="500" placeholder="Tell us what you need — dates, amounts or class names help us reply faster."></textarea>
+        <div class="count"><span id="chars">0</span>/500</div>
+
+        <span class="lbl">How should we reply?</span>
+        <div class="seg" id="seg">
+          <button type="button" class="on">In app</button>
+          <button type="button">Call me</button>
+          <button type="button">Email</button>
+        </div>
+
+        <span class="lbl">Attachments <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></span>
+        <button type="button" class="upload" id="upload">
+          <span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></span>
+          <span>Add a photo, receipt or screenshot<br><span style="font-size:11px;font-weight:500">JPG, PNG or PDF · up to 5 MB</span></span>
+        </button>
+        <div class="files" id="files"></div>
+
+        <div class="hint">
+          <svg class="i" viewBox="0 0 24 24" style="width:18px;height:18px"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span>Our front desk usually replies within 4 working hours (7 AM – 9 PM). You'll get a notification when they do.</span>
+        </div>
+        <div class="err" id="err">Pick a topic and add a subject to continue.</div>
+      </form>
+    </div>
+    <div class="actionbar">
+      <button class="btn dark" id="submitBtn" type="submit" form="newForm" disabled>Submit enquiry</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 3. THREAD ========== -->
+<section class="frame-wrap" id="f3">
+  <div class="frame-label">3 · Enquiry thread & replies</div>
+  <div class="phone">
+    <div class="thread">
+      <div class="thead glass" id="thead"></div>
+      <div class="steps glass" id="steps"></div>
+      <div class="msgs" id="msgs"></div>
+      <div id="foot"></div>
+    </div>
+    <div class="toast" id="toast"><svg class="i" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span id="toastTxt"></span></div>
+  </div>
+</section>
+</main>
+
+<script>
+const CATS = {
+  membership:{label:'Membership', bg:'#FDF0CF', fg:'#8A5A00', d:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'},
+  billing:   {label:'Billing',    bg:'#E1EAFB', fg:'#2F62C9', d:'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
+  classes:   {label:'Classes',    bg:'#EDE6FE', fg:'#6A47E8', d:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>'},
+  trainer:   {label:'Trainers',   bg:'#DDEBE6', fg:'#2E5E52', d:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'},
+  facility:  {label:'Facilities', bg:'#FCE4DA', fg:'#B4532B', d:'<path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/>'},
+  other:     {label:'Other',      bg:'#ECE9E2', fg:'#5d5646', d:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16h.01"/>'}
+};
+const icon = (k, size=18) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${CATS[k].d}</svg>`;
+
+let ENQ = [
+  {id:'EQ-1042', cat:'membership', subject:'Freeze membership for 2 weeks', status:'replied', unread:true, created:'Oct 13', msgs:[
+    {day:'Mon, Oct 13'},
+    {me:true, t:'Hi, I\'m travelling from Oct 20 to Nov 3. Can I freeze my membership for those two weeks?', at:'9:12 AM'},
+    {sys:'Assigned to Anil Kumar · Front Desk'},
+    {me:false, who:'Anil Kumar', role:'Front desk', t:'Hi Eum! Yes — your plan allows up to 30 freeze days a year. I\'ve scheduled a freeze from Oct 20 to Nov 3, and your expiry moves to Jun 29, 2031.', at:'11:40 AM'},
+    {day:'Today'},
+    {me:false, who:'Anil Kumar', role:'Front desk', t:'Here\'s the confirmation for your records. Let me know if the dates change.', at:'10:05 AM', file:'Freeze_confirmation.pdf'},
+    {resolve:true}
+  ]},
+  {id:'EQ-1038', cat:'billing', subject:'Charged twice for October', status:'open', unread:false, created:'Oct 11', msgs:[
+    {day:'Sat, Oct 11'},
+    {me:true, t:'I see two debits of ₹2,499 on Oct 1 for the same membership. Can you check?', at:'8:30 PM', file:'Bank_statement.png'},
+    {sys:'Received · a team member will reply soon'}
+  ]},
+  {id:'EQ-1021', cat:'classes', subject:'Can I add a friend to Saturday Zumba?', status:'closed', unread:false, created:'Sep 28', msgs:[
+    {day:'Sun, Sep 28'},
+    {me:true, t:'Is there a guest pass for Saturday Zumba? My friend wants to try it.', at:'7:02 PM'},
+    {me:false, who:'Meera Pillai', role:'Classes', t:'Yes! Each member gets 2 free guest passes a month. Book from Schedule → Saturday Zumba → "Add guest".', at:'7:30 PM'},
+    {me:true, t:'Perfect, thank you!', at:'7:34 PM'},
+    {sys:'Marked as resolved by you · Sep 28'}
+  ]},
+  {id:'EQ-1009', cat:'facility', subject:'Locker 42 lock is jammed', status:'closed', unread:false, created:'Sep 14', msgs:[
+    {day:'Sun, Sep 14'},
+    {me:true, t:'Locker 42 in the men\'s changing room won\'t open with my code.', at:'6:15 AM'},
+    {me:false, who:'Anil Kumar', role:'Front desk', t:'Sorry about that! Maintenance replaced the lock this morning — it should work now with your code.', at:'9:20 AM'},
+    {sys:'Closed automatically after 3 days with no reply'}
+  ]}
+];
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let filter = 'all', cur = ENQ[0];
+const STATUS = {open:'Awaiting reply', replied:'Replied', closed:'Closed'};
+
+function go(id){ $(id).scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'}); }
+function toast(t){ $('toastTxt').textContent = t; $('toast').classList.add('show'); setTimeout(()=>$('toast').classList.remove('show'), 2400); }
+function nowT(){ return new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+
+/* ---- list ---- */
+function lastReal(e){ return [...e.msgs].reverse().find(m => m.t); }
+function renderList(){
+  const c = s => ENQ.filter(e => e.status === s).length;
+  $('summary').innerHTML = `
+    <div class="glass"><b>${c('open')}</b><span>Awaiting reply</span></div>
+    <div class="glass"><b style="color:var(--teal)">${c('replied')}</b><span>New replies</span></div>
+    <div class="glass"><b>${c('closed')}</b><span>Resolved</span></div>`;
+  const rows = ENQ.filter(e => filter === 'all' || e.status === filter);
+  $('list').innerHTML = rows.length ? rows.map(e => {
+    const l = lastReal(e), k = CATS[e.cat];
+    return `<button class="enq glass ${e.id===cur.id?'sel':''}" data-id="${e.id}">
+      <div class="row1"><span class="cat" style="background:${k.bg};color:${k.fg}">${icon(e.cat)}</span>
+        <h4>${esc(e.subject)}</h4>${e.unread?'<span class="unread" title="New reply"></span>':''}</div>
+      <div class="prev">${l.me ? 'You: ' : `<b>${l.who.split(' ')[0]}:</b> `}${esc(l.t)}</div>
+      <div class="meta"><span>${e.id} · ${k.label} · ${e.created}</span><span class="pill st-${e.status}">${STATUS[e.status]}</span></div>
+    </button>`;}).join('') : '<div class="empty">Nothing here yet.</div>';
+}
+$('list').addEventListener('click', ev => {
+  const b = ev.target.closest('.enq'); if (!b) return;
+  open(ENQ.find(e => e.id === b.dataset.id));
+});
+$('tabs').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  filter = b.dataset.f; [...$('tabs').children].forEach(x => x.classList.toggle('on', x===b)); renderList();
+});
+function open(e){ cur = e; e.unread = false; renderList(); renderThread(); go('f3'); }
+
+/* ---- form ---- */
+let fCat = null, files = [];
+function renderCats(){
+  $('cats').innerHTML = Object.entries(CATS).map(([k,v]) =>
+    `<button type="button" role="radio" aria-checked="${fCat===k}" class="catb ${fCat===k?'on':''}" data-k="${k}">
+      <span class="ic" style="background:${v.bg};color:${v.fg}">${icon(k)}</span>${v.label}</button>`).join('');
+}
+function validate(){ $('submitBtn').disabled = !(fCat && $('subj').value.trim()); }
+$('cats').addEventListener('click', ev => { const b = ev.target.closest('.catb'); if (!b) return; fCat = b.dataset.k; renderCats(); validate(); });
+$('subj').addEventListener('input', validate);
+$('desc').addEventListener('input', e => $('chars').textContent = e.target.value.length);
+$('seg').addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b) return; [...$('seg').children].forEach(x => x.classList.toggle('on', x===b)); });
+$('upload').addEventListener('click', () => { files.push(['Photo_' + (files.length+1) + '.jpg']); renderFiles(); });
+function renderFiles(){
+  $('files').innerHTML = files.map((f,i) => `<span class="file"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>${f}<button type="button" aria-label="Remove ${f}" data-i="${i}"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M18 6L6 18M6 6l12 12"/></svg></button></span>`).join('');
+}
+$('files').addEventListener('click', ev => { const b = ev.target.closest('[data-i]'); if (!b) return; files.splice(+b.dataset.i,1); renderFiles(); });
+function submitEnq(ev){
+  ev.preventDefault();
+  if (!fCat || !$('subj').value.trim()){ $('err').classList.add('show'); return; }
+  const n = 1043 + ENQ.length - 4;
+  const text = $('desc').value.trim() || $('subj').value.trim();
+  const e = {id:'EQ-'+n, cat:fCat, subject:$('subj').value.trim(), status:'open', unread:false, created:'Today', msgs:[
+    {day:'Today'}, {me:true, t:text, at:nowT(), file:files[0]?.[0]}, {sys:'Received · a team member will reply soon'}]};
+  ENQ.unshift(e);
+  fCat = null; files = []; $('newForm').reset(); $('chars').textContent = 0; $('err').classList.remove('show');
+  renderCats(); renderFiles(); validate();
+  filter = 'all'; [...$('tabs').children].forEach((x,i) => x.classList.toggle('on', i===0));
+  open(e); toast(`Enquiry ${e.id} submitted`);
+  // simulate a staff reply
+  setTimeout(() => {
+    e.msgs.push({me:false, who:'Anil Kumar', role:'Front desk', t:'Thanks for reaching out, Eum! I\'m looking into this and will update you shortly.', at:nowT()});
+    e.status = 'replied'; if (cur !== e) e.unread = true;
+    renderList(); if (cur === e) renderThread();
+  }, 3500);
+}
+
+/* ---- thread ---- */
+function renderThread(){
+  const e = cur, k = CATS[e.cat];
+  $('thead').innerHTML = `<div class="r1">
+      <button class="round" style="background:none;width:40px;height:40px" aria-label="Back" onclick="go('f1')"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <span class="cat" style="width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:${k.bg};color:${k.fg}">${icon(e.cat)}</span>
+      <h3>${esc(e.subject)}</h3></div>
+    <div class="r2"><span class="pill st-${e.status}">${STATUS[e.status]}</span><span>${e.id} · ${k.label} · Opened ${e.created}</span></div>`;
+  const hasReply = e.msgs.some(m => m.t && !m.me);
+  const st = [['Submitted', true], ['Replied', hasReply || e.status==='closed'], ['Resolved', e.status==='closed']];
+  $('steps').innerHTML = st.map(([l,d],i) => `${i?`<span class="line ${d?'done':''}"></span>`:''}<span class="step ${d?'done':''}"><i>${d?'✓':i+1}</i>${l}</span>`).join('');
+  $('msgs').innerHTML = e.msgs.map(m => {
+    if (m.day) return `<div class="day">${m.day}</div>`;
+    if (m.sys) return `<div class="sys"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${m.sys}</div>`;
+    if (m.resolve) return e.status === 'closed' ? '' : `<div class="resolve"><b>Did this solve your enquiry?</b><p>Mark it resolved, or reply below if you still need help.</p>
+      <div class="row"><button class="yes" onclick="resolve()">Yes, resolved</button><button onclick="$('msgIn').focus()">I need more help</button></div></div>`;
+    const att = m.file ? `<div class="att"><svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>${m.file}</div>` : '';
+    return `<div class="m ${m.me?'me':'staff'}">
+      ${m.me ? '' : `<span class="who">${m.who}<span class="badge">${m.role.toUpperCase()}</span></span>`}
+      <div class="bub">${esc(m.t)}${att}</div><time>${m.at}${m.me?' · Delivered':''}</time></div>`;
+  }).join('');
+  $('foot').innerHTML = e.status === 'closed'
+    ? `<div class="closedbar glass">This enquiry is closed.<button onclick="reopen()">Reopen</button></div>`
+    : `<form class="composer glass" onsubmit="reply(event)">
+        <button type="button" class="attach" aria-label="Attach file"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button>
+        <label class="sr" for="msgIn">Reply</label>
+        <input id="msgIn" placeholder="Reply to this enquiry…" autocomplete="off" oninput="$('sendBtn').disabled=!this.value.trim()">
+        <button class="send" id="sendBtn" aria-label="Send" disabled><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+      </form>`;
+  $('msgs').scrollTop = 1e6;
+}
+function reply(ev){
+  ev.preventDefault(); const v = $('msgIn').value.trim(); if (!v) return;
+  cur.msgs = cur.msgs.filter(m => !m.resolve);
+  cur.msgs.push({me:true, t:v, at:nowT()}); cur.status = 'open';
+  renderThread(); renderList();
+}
+function resolve(){
+  cur.msgs = cur.msgs.filter(m => !m.resolve);
+  cur.msgs.push({sys:'Marked as resolved by you · just now'}); cur.status = 'closed';
+  renderThread(); renderList(); toast('Thanks! Enquiry marked as resolved');
+}
+function reopen(){
+  cur.msgs.push({sys:'Reopened by you · just now'}); cur.status = 'open';
+  renderThread(); renderList(); $('msgIn').focus();
+}
+
+renderCats(); renderList(); renderThread();
+</script>
+</body>
+</html>

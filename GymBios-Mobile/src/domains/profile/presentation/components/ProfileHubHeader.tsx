@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
@@ -9,6 +10,7 @@ interface ProfileHubHeaderProps {
 }
 
 export function ProfileHubHeader({ title, onClose }: ProfileHubHeaderProps) {
+  const { t } = useTranslation();
   if (!title) {
     // No title — just float the close button absolutely, zero-height row
     return (
@@ -18,7 +20,7 @@ export function ProfileHubHeader({ title, onClose }: ProfileHubHeaderProps) {
           onPress={onClose}
           style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
           accessibilityRole="button"
-          accessibilityLabel="Close profile hub"
+          accessibilityLabel={t('profileHub.closeA11y')}
         >
           <Feather name="x" size={20} color={BrandColors.textPrimary} />
         </Pressable>
@@ -38,7 +40,7 @@ export function ProfileHubHeader({ title, onClose }: ProfileHubHeaderProps) {
         onPress={onClose}
         style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
         accessibilityRole="button"
-        accessibilityLabel="Close profile hub"
+        accessibilityLabel={t('profileHub.closeA11y')}
       >
         <Feather name="x" size={20} color={BrandColors.textPrimary} />
       </Pressable>

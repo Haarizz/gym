@@ -5,7 +5,6 @@ import {
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
-  format,
   isAfter,
   isBefore,
   isSameDay,
@@ -13,6 +12,8 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
+
+import { formatDate as formatAppDate } from '@/core/i18n';
 
 /**
  * Default display format.
@@ -30,7 +31,7 @@ export function formatDate(
     return '';
   }
 
-  return format(date, dateFormat);
+  return formatAppDate(date, dateFormat);
 }
 
 /**
@@ -96,9 +97,18 @@ export function isSelectedDate(
   return isSameDay(date, selectedDate);
 }
 
-/**
- * Month names used by MonthSelector.
- */
+/** Month names in the app language, for MonthSelector. */
+export function getMonthNames(): string[] {
+  return MONTHS.map((_, i) => formatAppDate(new Date(2021, i, 1), 'LLLL'));
+}
+
+/** Short weekday labels in the app language, Sunday first. */
+export function getWeekDayNames(): string[] {
+  // 2021-01-03 was a Sunday.
+  return WEEK_DAYS.map((_, i) => formatAppDate(new Date(2021, 0, 3 + i), 'EEEEEE'));
+}
+
+/** English month names (see getMonthNames for the app language). */
 export const MONTHS = [
   'January',
   'February',

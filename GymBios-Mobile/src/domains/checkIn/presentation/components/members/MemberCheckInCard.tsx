@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
@@ -14,7 +15,8 @@ export interface MemberCheckInCardProps {
 }
 
 export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckInCardProps) {
-  const name = member.name || 'Unknown Member';
+  const { t } = useTranslation();
+  const name = member.name || t('checkIn.members.unknownMember');
   const id = member.bizId || member.memberNumber || member.id;
   const type = member.membershipType || 'INDIVIDUAL';
   const avatarUrl = member.photoUrl;
@@ -34,10 +36,10 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
       
       <View style={styles.actions}>
         {isActive
-          ? <MemberStatusBadge isActive={true} statusText="Checked In" />
+          ? <MemberStatusBadge isActive={true} statusText={t('checkIn.members.checkedIn')} />
           : <MemberStatusBadge isActive={eligible} statusText={label} />}
         <Button 
-          label={isActive ? "Checked In" : eligible ? "Check In" : "Not Eligible"} 
+          label={isActive ? t('checkIn.members.checkedIn') : eligible ? t('checkIn.members.checkIn') : t('checkIn.members.notEligible')} 
           onPress={() => !isActive && eligible && onCheckIn(member)}
           disabled={isActive || !eligible}
           variant={isActive || !eligible ? "ghost" : "primary"}
@@ -63,7 +65,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   info: {
     flex: 1,

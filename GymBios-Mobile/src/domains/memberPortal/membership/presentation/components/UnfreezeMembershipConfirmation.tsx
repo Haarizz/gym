@@ -1,4 +1,5 @@
 import { Alert, Modal, Pressable, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -16,13 +17,14 @@ export function UnfreezeMembershipConfirmation({
   onConfirm,
   isLoading,
 }: UnfreezeMembershipConfirmationProps) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Unfreeze Subscription</Text>
+              <Text style={styles.title}>{t('membership.unfreezeModal.title')}</Text>
             </View>
             <Pressable hitSlop={12} onPress={onClose} style={styles.closeButton} disabled={isLoading}>
               <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -33,7 +35,7 @@ export function UnfreezeMembershipConfirmation({
             <View style={styles.infoBox}>
               <Feather name="info" size={24} color={BrandColors.teal} />
               <Text style={styles.infoText}>
-                Your subscription is currently frozen. By unfreezing, your subscription will become active immediately, and your expiry date will be extended by the number of days your account was frozen.
+                {t('membership.unfreezeModal.body')}
               </Text>
             </View>
           </View>
@@ -47,7 +49,7 @@ export function UnfreezeMembershipConfirmation({
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.confirmButtonText}>Confirm Unfreeze</Text>
+                <Text style={styles.confirmButtonText}>{t('membership.unfreezeModal.confirm')}</Text>
               )}
             </Pressable>
           </View>

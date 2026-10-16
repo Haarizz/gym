@@ -3,6 +3,7 @@ import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
 import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useStaffDashboard } from '../../hooks/useStaffDashboard';
 import { StaffWelcomeCard } from '../components/StaffWelcomeCard';
 import { StaffStatsGrid } from '../components/StaffStatsGrid';
@@ -12,13 +13,14 @@ import { StaffRecentConversionsCard } from '../components/StaffRecentConversions
 import { StaffMonthSummaryCard } from '../components/StaffMonthSummaryCard';
 
 export function StaffDashboardScreen() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isRefetching } = useStaffDashboard();
   const insets = useSafeAreaInsets();
 
   if (isLoading && !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading dashboard..." />
+        <Loader message={t('dashboard.staff.loading')} />
       </View>
     );
   }
@@ -26,7 +28,7 @@ export function StaffDashboardScreen() {
   return (
     <View style={styles.root}>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280, overflow: 'hidden' }} pointerEvents="none">
-        <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} right={-80} />
+        <GlassBlob color={BrandColors.teal} size={260} opacity={0.22} top={-70} end={-80} />
       </View>
       <ScrollView
         style={styles.container}

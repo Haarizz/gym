@@ -61,6 +61,23 @@ public class MobileReferralResolutionService {
     }
 
     /**
+     * The referrer's Member row in the current tenant. referrerMemberId is the owner of
+     * the code; the global id is only a fallback for an app-registered referrer whose
+     * members row was replaced since (a rejected purchase released, then bought again).
+     * findById isn't subject to the Hibernate branch filter, so no branch juggling here.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Member findReferrer(Long referrerMemberId, Long referrerGlobalUserId) {
+        if (referrerMemberId != null) {
+            Member member = memberRepository.findById(referrerMemberId).orElse(null);
+            if (member != null) {
+                return member;
+            }
+        }
+        return referrerGlobalUserId != null ? findMemberByGlobalUserId(referrerGlobalUserId) : null;
+    }
+
+    /**
      * Best-effort: creates the legacy Referral (status "pending") right when the referee claims
      * the referrer's code, and immediately fires any SIGNUP-triggered rule for it — so a
      * referrer-eligible, "On Signup" rule pays out without waiting for the referee to ever
@@ -71,9 +88,9 @@ public class MobileReferralResolutionService {
      * this can't safely share a transaction with the attribution save.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Long createSignupReferral(Long referrerGlobalUserId, Long refereeGlobalUserId) {
+    public Long createSignupReferral(Long referrerMemberId, Long referrerGlobalUserId, Long refereeGlobalUserId) {
         try {
-            Member referrerMember = findMemberByGlobalUserId(referrerGlobalUserId);
+            Member referrerMember = findReferrer(referrerMemberId, referrerGlobalUserId);
             if (referrerMember == null) {
                 return null; // referrer isn't a Member anywhere yet — nothing to reward against
             }
@@ -100,8 +117,8 @@ public class MobileReferralResolutionService {
                 }
             }
         } catch (Exception e) {
-            log.warn("Signup-time referral creation failed for referrer {} / referee {}: {}",
-                    referrerGlobalUserId, refereeGlobalUserId, e.getMessage());
+            log.warn("Signup-time referral creation failed for referrer member {} / referee {}: {}",
+                    referrerMemberId, refereeGlobalUserId, e.getMessage());
             return null;
         }
     }
@@ -202,9 +219,7 @@ public class MobileReferralResolutionService {
     }
 
     private void convertAttribution(MobileReferralAttribution attribution, Member refereeMember) {
-        Long referrerGlobalUserId = attribution.getReferrerGlobalUserId();
-
-        Member referrerMember = findMemberByGlobalUserId(referrerGlobalUserId);
+        Member referrerMember = findReferrer(attribution.getReferrerMemberId(), attribution.getReferrerGlobalUserId());
 
         if (referrerMember == null) {
             // Cannot resolve referrer, mark INVALID or just abort and leave PENDING for retry?

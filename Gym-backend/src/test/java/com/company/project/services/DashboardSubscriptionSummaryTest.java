@@ -137,6 +137,21 @@ class DashboardSubscriptionSummaryTest {
     }
 
     @Test
+    void otherIncomeIsTotalCollectionLessWhatTheCardsCollected() {
+        Receipt renewal = receipt(60, 8L, "Renewal", "Gold Monthly", "300", NOW);
+        Receipt dayPass = receipt(61, null, "Daily Entry", "Day Pass", "40", NOW);
+        when(receiptRepository.findSalesOfTypesBetween(anyList(), any(), any())).thenReturn(List.of(renewal, dayPass));
+        when(receiptRepository.findMembershipReceiptsBefore(anyList(), any())).thenReturn(List.of(renewal));
+        // e.g. a 100 balance settlement and a 60 POS sale on top of the two sales
+        when(revenueDashboardService.totalCollection(any(), any())).thenReturn(new BigDecimal("500"));
+
+        Map<String, Object> summary = dashboardService.getSubscriptionSummary("today");
+
+        assertEquals(new BigDecimal("500.00"), summary.get("totalCollection"));
+        assertEquals(new BigDecimal("160.00"), summary.get("otherIncome"));
+    }
+
+    @Test
     void renewalWithNoEarlierReceiptCountsAsRenew() {
         Receipt renewal = receipt(20, 5L, "Renewal", "Gold Monthly", "300", NOW);
         when(receiptRepository.findSalesOfTypesBetween(anyList(), any(), any())).thenReturn(List.of(renewal));

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
   Alert,
+  I18nManager,
 } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +15,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -33,37 +36,40 @@ import {
 import { useAuthStore } from '@/domains/auth/store/authStore';
 import { uploadPhoto } from '@/shared/utils/uploadPhoto';
 import { getMaxBirthDate, getMinBirthDate } from '../../domain/dateOfBirthRules';
+import {
+  BODY_METRIC_MAX_LENGTH,
+  sanitizeBodyMetricInput,
+  validateHeight,
+  validateWeight,
+} from '../../domain/bodyMetricsRules';
+import { validateEmergencyPhone } from '../../domain/contactRules';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TOTAL_STEPS = 3;
 
-const STEP_META = {
-  1: { title: 'Personal details', sub: 'Tell us a bit about yourself' },
-  2: { title: 'Health information', sub: 'For your safety during training' },
-  3: { title: 'Emergency contact', sub: 'In case we need to reach someone' },
-} as const;
+const STEP_KEYS = { 1: 'personal', 2: 'health', 3: 'emergency' } as const;
 
-const STEP_LABELS = ['Personal', 'Health', 'Emergency'];
-
+// Values are what the API stores (English); only the labels are translated.
 const GENDER_OPTIONS = [
-  { label: 'Male', value: 'Male' },
-  { label: 'Female', value: 'Female' },
-  { label: 'Other', value: 'Other' },
-  { label: 'Prefer not to say', value: 'Prefer not to say' },
-];
+  { key: 'male', value: 'Male' },
+  { key: 'female', value: 'Female' },
+  { key: 'other', value: 'Other' },
+  { key: 'preferNotToSay', value: 'Prefer not to say' },
+] as const;
 
 const NATIONALITY_OPTIONS = [
-  { label: 'Indian', value: 'Indian' },
-  { label: 'Emirati', value: 'Emirati' },
-  { label: 'British', value: 'British' },
-  { label: 'American', value: 'American' },
-  { label: 'Pakistani', value: 'Pakistani' },
-  { label: 'Bangladeshi', value: 'Bangladeshi' },
-  { label: 'Filipino', value: 'Filipino' },
-  { label: 'Egyptian', value: 'Egyptian' },
-  { label: 'Other', value: 'Other' },
-];
+  { key: 'indian', value: 'Indian' },
+  { key: 'emirati', value: 'Emirati' },
+  { key: 'british', value: 'British' },
+  { key: 'american', value: 'American' },
+  { key: 'pakistani', value: 'Pakistani' },
+  { key: 'bangladeshi', value: 'Bangladeshi' },
+  { key: 'filipino', value: 'Filipino' },
+  { key: 'egyptian', value: 'Egyptian' },
+  { key: 'other', value: 'Other' },
+] as const;
 
 const BLOOD_TYPE_OPTIONS = [
   { label: 'O+', value: 'O+' },
@@ -139,13 +145,14 @@ function CharTextInput({
   maxLength = 500,
 }: CharTextInputProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <View style={styles.field}>
       <Typography variant="bodySmallBold" style={styles.fieldLabel}>
         {label}{' '}
         {optional && (
           <Typography variant="bodySmall" color="textSecondary">
-            (optional)
+            {t('common.optional')}
           </Typography>
         )}
       </Typography>
@@ -183,6 +190,7 @@ export function ProfileCompletionScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [dateValue, setDateValue] = useState<Date | undefined>(undefined);
   const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
@@ -222,6 +230,24 @@ export function ProfileCompletionScreen() {
 
   const fullNameValue = watch('fullName');
 
+  // Height/weight and emergency-phone rules are surfaced as toasts (on leaving
+  // the field) and by disabling the step's button, not as inline field errors.
+  const [heightValue, weightValue, phoneValue, emergencyPhoneValue] = watch([
+    'height',
+    'weight',
+    'phone',
+    'emergencyPhone',
+  ]);
+  const healthStepError =
+    validateHeight(heightValue ?? '') ?? validateWeight(weightValue ?? '');
+  const emergencyStepError = validateEmergencyPhone(emergencyPhoneValue, phoneValue);
+  const isStepBlocked =
+    (step === 2 && !!healthStepError) || (step === 3 && !!emergencyStepError);
+
+  const warnIfInvalid = (error: string | null) => {
+    if (error) toast.error(error, { title: t('profileCompletion.checkValue') });
+  };
+
   const onChangePhoto = async (uri?: string) => {
     setPhotoUri(uri);
     if (!uri) {
@@ -233,7 +259,7 @@ export function ProfileCompletionScreen() {
       const url = await uploadPhoto(uri);
       setValue('photoUrl', url);
     } catch {
-      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+      Alert.alert(t('common.error'), t('profileCompletion.photoUploadFailed'));
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -253,7 +279,8 @@ export function ProfileCompletionScreen() {
         'address',
       ]);
     } else if (step === 2) {
-      isValid = true; // health fields are optional
+      // Health fields are optional; only height/weight have format/range rules.
+      isValid = await trigger(['height', 'weight']);
     }
     if (isValid) setStep((s) => s + 1);
   };
@@ -262,7 +289,7 @@ export function ProfileCompletionScreen() {
 
   const onSubmit = (data: ProfileCompletionValues) => {
     if (isUploadingPhoto) {
-      Alert.alert('Please wait', 'Your photo is still uploading.');
+      Alert.alert(t('common.pleaseWait'), t('profileCompletion.photoStillUploading'));
       return;
     }
     updateProfile({
@@ -273,13 +300,23 @@ export function ProfileCompletionScreen() {
       // No manual navigation here — AuthBootstrap's useEffect reactively
       // detects session.profileCompleted = true and navigates to /(member).
       // Manually calling router.replace here caused a black-screen race condition.
-      onError: (err: Error) => Alert.alert('Error', err.message),
+      onError: (err: Error) => Alert.alert(t('common.error'), err.message),
     });
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   const isLastStep = step === TOTAL_STEPS;
+  const stepKey = STEP_KEYS[step as keyof typeof STEP_KEYS];
+  const stepLabels = Object.values(STEP_KEYS).map((key) => t(`profileCompletion.steps.${key}.label`));
+  const genderOptions = GENDER_OPTIONS.map(({ key, value }) => ({
+    label: t(`profileCompletion.genders.${key}`),
+    value,
+  }));
+  const nationalityOptions = NATIONALITY_OPTIONS.map(({ key, value }) => ({
+    label: t(`profileCompletion.nationalities.${key}`),
+    value,
+  }));
 
   return (
     <SafeAreaView
@@ -298,15 +335,15 @@ export function ProfileCompletionScreen() {
           style={[styles.backBtn, { borderColor: theme.border }]}
           hitSlop={8}
         >
-          <Feather name="chevron-left" size={18} color={theme.text} />
+          <Feather name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'} size={18} color={theme.text} />
         </Pressable>
 
         <View style={styles.topbarTitles}>
           <Typography variant="subtitle" style={styles.topbarTitle}>
-            {STEP_META[step as keyof typeof STEP_META].title}
+            {t(`profileCompletion.steps.${stepKey}.title`)}
           </Typography>
           <Typography variant="caption" color="textSecondary">
-            {STEP_META[step as keyof typeof STEP_META].sub}
+            {t(`profileCompletion.steps.${stepKey}.sub`)}
           </Typography>
         </View>
 
@@ -320,7 +357,7 @@ export function ProfileCompletionScreen() {
             variant="caption"
             style={{ color: BrandColors.teal, fontWeight: '700' }}
           >
-            Step {step} of {TOTAL_STEPS}
+            {t('profileCompletion.stepOf', { step, total: TOTAL_STEPS })}
           </Typography>
         </View>
       </View>
@@ -357,7 +394,7 @@ export function ProfileCompletionScreen() {
           })}
         </View>
         <View style={styles.progressLabels}>
-          {STEP_LABELS.map((label, i) => {
+          {stepLabels.map((label, i) => {
             const active = i + 1 <= step;
             return (
               <Typography
@@ -375,438 +412,455 @@ export function ProfileCompletionScreen() {
         </View>
       </View>
 
-      {/* ── Scrollable content ── */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ════════════ STEP 1 — PERSONAL ════════════ */}
-        {step === 1 && (
-          <View style={styles.screenContent}>
-            <View style={styles.intro}>
-              <Typography variant="title" style={styles.introTitle}>
-                Let's set up your profile
-              </Typography>
-              <Typography
-                variant="bodySmall"
-                color="textSecondary"
-                style={styles.introBody}
-              >
-                A complete profile helps gyms verify your identity and keep you
-                safe during training. It only takes a few minutes.
-              </Typography>
-            </View>
-
-            {/* Photo card */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: theme.background, borderColor: theme.border },
-              ]}
-            >
-              <AvatarPicker
-                name={fullNameValue || ''}
-                photoUri={photoUri}
-                onChangePhoto={onChangePhoto}
-              />
-            </View>
-
-            {/* Basic info card */}
-            <SectionCard
-              iconName="user"
-              iconBg={BrandColors.screenBackgroundAlt}
-              iconColor={BrandColors.teal}
-              title="Basic information"
-              subtitle="Your name and contact details"
-            >
-              <Controller
-                control={control}
-                name="fullName"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    label="Full name *"
-                    placeholder="e.g. John Doe"
-                    value={value}
-                    onChangeText={onChange}
-                    error={errors.fullName?.message}
-                    containerStyle={styles.field}
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="phone"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    label="Phone number *"
-                    placeholder="+91 XXXXX XXXXX"
-                    value={value}
-                    onChangeText={onChange}
-                    keyboardType="phone-pad"
-                    error={errors.phone?.message}
-                    containerStyle={styles.field}
-                  />
-                )}
-              />
-
-              {/* Date of Birth — uses DatePicker → formats to YYYY-MM-DD */}
-              <View style={styles.field}>
-                <DatePicker
-                  label="Date of birth (optional)"
-                  placeholder="Select date"
-                  value={dateValue}
-                  onChange={(date: Date | null) => {
-                    if (!date) return;
-                    setDateValue(date);
-                    // Store as YYYY-MM-DD string for the API
-                    setValue('dateOfBirth', format(date, 'yyyy-MM-dd'), {
-                      shouldValidate: true,
-                    });
-                  }}
-                  initialView="year"
-                  minimumDate={getMinBirthDate()}
-                  maximumDate={getMaxBirthDate()}
-                  error={errors.dateOfBirth?.message}
-                />
-              </View>
-
-              <View style={styles.row2}>
-                <Controller
-                  control={control}
-                  name="gender"
-                  render={({ field: { onChange, value } }) => (
-                    <View style={{ flex: 1 }}>
-                      <Dropdown
-                        label="Gender (optional)"
-                        placeholder="Select gender"
-                        value={value}
-                        options={GENDER_OPTIONS}
-                        onChange={onChange}
-                        error={errors.gender?.message}
-                      />
-                    </View>
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="nationality"
-                  render={({ field: { onChange, value } }) => (
-                    <View style={{ flex: 1 }}>
-                      <Dropdown
-                        label="Nationality (optional)"
-                        placeholder="Select nationality"
-                        value={value}
-                        options={NATIONALITY_OPTIONS}
-                        onChange={onChange}
-                        error={errors.nationality?.message}
-                      />
-                    </View>
-                  )}
-                />
-              </View>
-
-              <Controller
-                control={control}
-                name="address"
-                render={({ field: { onChange, value } }) => (
-                  <AddressAutocomplete
-                    label="Address (optional)"
-                    value={value || ''}
-                    onChange={onChange}
-                    error={errors.address?.message}
-                  />
-                )}
-              />
-            </SectionCard>
-          </View>
-        )}
-
-        {/* ════════════ STEP 2 — HEALTH ════════════ */}
-        {step === 2 && (
-          <View style={styles.screenContent}>
-            <View style={styles.intro}>
-              <Typography variant="title" style={styles.introTitle}>
-                Health information
-              </Typography>
-              <Typography
-                variant="bodySmall"
-                color="textSecondary"
-                style={styles.introBody}
-              >
-                This helps trainers respond quickly and safely if something comes
-                up during a session. All fields are optional but recommended.
-              </Typography>
-            </View>
-
-            <SectionCard
-              iconName="heart"
-              iconBg="#fdf3dd"
-              iconColor="#d99310"
-              title="Medical background"
-              subtitle="Optional, helps in an emergency"
-            >
-              <Controller
-                control={control}
-                name="medicalConditions"
-                render={({ field: { onChange, value } }) => (
-                  <CharTextInput
-                    label="Medical conditions"
-                    optional
-                    value={value ?? ''}
-                    onChangeText={onChange}
-                    placeholder="e.g. Asthma, Diabetes, High Blood Pressure"
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="allergies"
-                render={({ field: { onChange, value } }) => (
-                  <CharTextInput
-                    label="Allergies"
-                    optional
-                    value={value ?? ''}
-                    onChangeText={onChange}
-                    placeholder="e.g. Peanuts, Penicillin, Dust, Latex"
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="currentMedications"
-                render={({ field: { onChange, value } }) => (
-                  <CharTextInput
-                    label="Current medications"
-                    optional
-                    value={value ?? ''}
-                    onChangeText={onChange}
-                    placeholder="e.g. Metformin 500mg, Vitamin D 1000IU"
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="chronicIllnesses"
-                render={({ field: { onChange, value } }) => (
-                  <CharTextInput
-                    label="Chronic illnesses"
-                    optional
-                    value={value ?? ''}
-                    onChangeText={onChange}
-                    placeholder="e.g. Heart Disease, Arthritis, COPD"
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="bloodType"
-                render={({ field: { onChange, value } }) => (
-                  <View style={styles.field}>
-                    <Dropdown
-                      label="Blood type"
-                      placeholder="Select blood type"
-                      value={value ?? ''}
-                      options={BLOOD_TYPE_OPTIONS}
-                      onChange={onChange}
-                    />
-                  </View>
-                )}
-              />
-
-              <View style={[styles.row2, { marginTop: 0 }]}>
-                <Controller
-                  control={control}
-                  name="height"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      label="Height (cm)"
-                      placeholder="170"
-                      value={value ?? ''}
-                      onChangeText={onChange}
-                      keyboardType="numeric"
-                      containerStyle={{ flex: 1 }}
-                    />
-                  )}
-                />
-                <Controller
-                  control={control}
-                  name="weight"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      label="Weight (kg)"
-                      placeholder="70"
-                      value={value ?? ''}
-                      onChangeText={onChange}
-                      keyboardType="numeric"
-                      containerStyle={{ flex: 1 }}
-                    />
-                  )}
-                />
-              </View>
-            </SectionCard>
-          </View>
-        )}
-
-        {/* ════════════ STEP 3 — EMERGENCY ════════════ */}
-        {step === 3 && (
-          <View style={styles.screenContent}>
-            <View style={styles.intro}>
-              <Typography variant="title" style={styles.introTitle}>
-                Emergency contact
-              </Typography>
-              <Typography
-                variant="bodySmall"
-                color="textSecondary"
-                style={styles.introBody}
-              >
-                Who should we reach out to if something happens while you're
-                training?
-              </Typography>
-            </View>
-
-            {/* Red-tinted emergency card */}
-            <View
-              style={[
-                styles.card,
-                styles.emgCard,
-                { borderColor: '#f3d3ce' },
-              ]}
-            >
-              <View style={styles.cardHead}>
-                <View
-                  style={[
-                    styles.iconBadge,
-                    { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f3d3ce' },
-                  ]}
+      {/* iOS and Android (edge-to-edge, so no adjustResize) both need padding to
+          lift the footer and the last fields above the keyboard. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        {/* ── Scrollable content ── */}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {/* ════════════ STEP 1 — PERSONAL ════════════ */}
+          {step === 1 && (
+            <View style={styles.screenContent}>
+              <View style={styles.intro}>
+                <Typography variant="title" style={styles.introTitle}>
+                  {t('profileCompletion.personalIntroTitle')}
+                </Typography>
+                <Typography
+                  variant="bodySmall"
+                  color="textSecondary"
+                  style={styles.introBody}
                 >
-                  <Feather name="shield" size={18} color="#c2483c" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Typography variant="subtitle" style={styles.cardTitle}>
-                    Emergency contact information
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    Person to contact in case of emergency
-                  </Typography>
-                </View>
+                  {t('profileCompletion.personalIntroBody')}
+                </Typography>
               </View>
 
-              <Controller
-                control={control}
-                name="emergencyContact"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    label="Contact name *"
-                    placeholder="Enter full name"
-                    value={value}
-                    onChangeText={onChange}
-                    error={errors.emergencyContact?.message}
-                    containerStyle={styles.field}
-                  />
-                )}
-              />
-
-              <Controller
-                control={control}
-                name="emergencyPhone"
-                render={({ field: { onChange, value } }) => (
-                  <Input
-                    label="Contact number *"
-                    placeholder="+91 XXXXX XXXXX"
-                    value={value}
-                    onChangeText={onChange}
-                    keyboardType="phone-pad"
-                    error={errors.emergencyPhone?.message}
-                    containerStyle={styles.field}
-                  />
-                )}
-              />
-
-              {/* Info note */}
+              {/* Photo card */}
               <View
                 style={[
-                  styles.emgNote,
-                  { backgroundColor: theme.background },
+                  styles.card,
+                  { backgroundColor: theme.background, borderColor: theme.border },
                 ]}
               >
-                <Feather
-                  name="info"
-                  size={16}
-                  color="#c2483c"
-                  style={{ marginTop: 1, flexShrink: 0 }}
+                <AvatarPicker
+                  name={fullNameValue || ''}
+                  photoUri={photoUri}
+                  onChangePhoto={onChangePhoto}
                 />
-                <View style={{ flex: 1 }}>
-                  <Typography variant="bodySmallBold" style={{ marginBottom: 2 }}>
-                    Why we ask
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    This person will be contacted immediately in case of a medical
-                    emergency during training. Please make sure the details are
-                    accurate and up to date.
-                  </Typography>
+              </View>
+
+              {/* Basic info card */}
+              <SectionCard
+                iconName="user"
+                iconBg={BrandColors.screenBackgroundAlt}
+                iconColor={BrandColors.teal}
+                title={t('profileCompletion.basicInfoTitle')}
+                subtitle={t('profileCompletion.basicInfoSubtitle')}
+              >
+                <Controller
+                  control={control}
+                  name="fullName"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      label={t('profileCompletion.fullName')}
+                      placeholder={t('profileCompletion.fullNamePlaceholder')}
+                      value={value}
+                      onChangeText={onChange}
+                      error={errors.fullName?.message}
+                      containerStyle={styles.field}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="phone"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      label={t('profileCompletion.phone')}
+                      placeholder="+91 XXXXX XXXXX"
+                      value={value}
+                      onChangeText={onChange}
+                      keyboardType="phone-pad"
+                      error={errors.phone?.message}
+                      containerStyle={styles.field}
+                    />
+                  )}
+                />
+
+                {/* Date of Birth — uses DatePicker → formats to YYYY-MM-DD */}
+                <View style={styles.field}>
+                  <DatePicker
+                    label={t('profileCompletion.dateOfBirth')}
+                    placeholder={t('profileCompletion.selectDate')}
+                    value={dateValue}
+                    onChange={(date: Date | null) => {
+                      if (!date) return;
+                      setDateValue(date);
+                      // Store as YYYY-MM-DD string for the API
+                      setValue('dateOfBirth', format(date, 'yyyy-MM-dd'), {
+                        shouldValidate: true,
+                      });
+                    }}
+                    initialView="year"
+                    minimumDate={getMinBirthDate()}
+                    maximumDate={getMaxBirthDate()}
+                    error={errors.dateOfBirth?.message}
+                  />
+                </View>
+
+                <View style={styles.row2}>
+                  <Controller
+                    control={control}
+                    name="gender"
+                    render={({ field: { onChange, value } }) => (
+                      <View style={{ flex: 1 }}>
+                        <Dropdown
+                          label={t('profileCompletion.gender')}
+                          placeholder={t('profileCompletion.selectGender')}
+                          value={value}
+                          options={genderOptions}
+                          onChange={onChange}
+                          error={errors.gender?.message}
+                        />
+                      </View>
+                    )}
+                  />
+                  <Controller
+                    control={control}
+                    name="nationality"
+                    render={({ field: { onChange, value } }) => (
+                      <View style={{ flex: 1 }}>
+                        <Dropdown
+                          label={t('profileCompletion.nationality')}
+                          placeholder={t('profileCompletion.selectNationality')}
+                          value={value}
+                          options={nationalityOptions}
+                          onChange={onChange}
+                          error={errors.nationality?.message}
+                        />
+                      </View>
+                    )}
+                  />
+                </View>
+
+                <Controller
+                  control={control}
+                  name="address"
+                  render={({ field: { onChange, value } }) => (
+                    <AddressAutocomplete
+                      label={t('profileCompletion.address')}
+                      value={value || ''}
+                      onChange={onChange}
+                      error={errors.address?.message}
+                    />
+                  )}
+                />
+              </SectionCard>
+            </View>
+          )}
+
+          {/* ════════════ STEP 2 — HEALTH ════════════ */}
+          {step === 2 && (
+            <View style={styles.screenContent}>
+              <View style={styles.intro}>
+                <Typography variant="title" style={styles.introTitle}>
+                  {t('profileCompletion.healthIntroTitle')}
+                </Typography>
+                <Typography
+                  variant="bodySmall"
+                  color="textSecondary"
+                  style={styles.introBody}
+                >
+                  {t('profileCompletion.healthIntroBody')}
+                </Typography>
+              </View>
+
+              <SectionCard
+                iconName="heart"
+                iconBg="#fdf3dd"
+                iconColor="#d99310"
+                title={t('profileCompletion.medicalTitle')}
+                subtitle={t('profileCompletion.medicalSubtitle')}
+              >
+                <Controller
+                  control={control}
+                  name="medicalConditions"
+                  render={({ field: { onChange, value } }) => (
+                    <CharTextInput
+                      label={t('profileCompletion.medicalConditions')}
+                      optional
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      placeholder={t('profileCompletion.medicalConditionsPlaceholder')}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="allergies"
+                  render={({ field: { onChange, value } }) => (
+                    <CharTextInput
+                      label={t('profileCompletion.allergies')}
+                      optional
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      placeholder={t('profileCompletion.allergiesPlaceholder')}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="currentMedications"
+                  render={({ field: { onChange, value } }) => (
+                    <CharTextInput
+                      label={t('profileCompletion.currentMedications')}
+                      optional
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      placeholder={t('profileCompletion.currentMedicationsPlaceholder')}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="chronicIllnesses"
+                  render={({ field: { onChange, value } }) => (
+                    <CharTextInput
+                      label={t('profileCompletion.chronicIllnesses')}
+                      optional
+                      value={value ?? ''}
+                      onChangeText={onChange}
+                      placeholder={t('profileCompletion.chronicIllnessesPlaceholder')}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="bloodType"
+                  render={({ field: { onChange, value } }) => (
+                    <View style={styles.field}>
+                      <Dropdown
+                        label={t('profileCompletion.bloodType')}
+                        placeholder={t('profileCompletion.selectBloodType')}
+                        value={value ?? ''}
+                        options={BLOOD_TYPE_OPTIONS}
+                        onChange={onChange}
+                      />
+                    </View>
+                  )}
+                />
+
+                <View style={[styles.row2, { marginTop: 0 }]}>
+                  <Controller
+                    control={control}
+                    name="height"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        label={t('profileCompletion.height')}
+                        placeholder="170"
+                        value={value ?? ''}
+                        onChangeText={(text) => onChange(sanitizeBodyMetricInput(text))}
+                        onBlur={() => {
+                          onBlur();
+                          warnIfInvalid(validateHeight(value ?? ''));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={BODY_METRIC_MAX_LENGTH}
+                        containerStyle={{ flex: 1 }}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={control}
+                    name="weight"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        label={t('profileCompletion.weight')}
+                        placeholder="70"
+                        value={value ?? ''}
+                        onChangeText={(text) => onChange(sanitizeBodyMetricInput(text))}
+                        onBlur={() => {
+                          onBlur();
+                          warnIfInvalid(validateWeight(value ?? ''));
+                        }}
+                        keyboardType="decimal-pad"
+                        maxLength={BODY_METRIC_MAX_LENGTH}
+                        containerStyle={{ flex: 1 }}
+                      />
+                    )}
+                  />
+                </View>
+              </SectionCard>
+            </View>
+          )}
+
+          {/* ════════════ STEP 3 — EMERGENCY ════════════ */}
+          {step === 3 && (
+            <View style={styles.screenContent}>
+              <View style={styles.intro}>
+                <Typography variant="title" style={styles.introTitle}>
+                  {t('profileCompletion.emergencyIntroTitle')}
+                </Typography>
+                <Typography
+                  variant="bodySmall"
+                  color="textSecondary"
+                  style={styles.introBody}
+                >
+                  {t('profileCompletion.emergencyIntroBody')}
+                </Typography>
+              </View>
+
+              {/* Red-tinted emergency card */}
+              <View
+                style={[
+                  styles.card,
+                  styles.emgCard,
+                  { borderColor: '#f3d3ce' },
+                ]}
+              >
+                <View style={styles.cardHead}>
+                  <View
+                    style={[
+                      styles.iconBadge,
+                      { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f3d3ce' },
+                    ]}
+                  >
+                    <Feather name="shield" size={18} color="#c2483c" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Typography variant="subtitle" style={styles.cardTitle}>
+                      {t('profileCompletion.emergencyCardTitle')}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {t('profileCompletion.emergencyCardSubtitle')}
+                    </Typography>
+                  </View>
+                </View>
+
+                <Controller
+                  control={control}
+                  name="emergencyContact"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      label={t('profileCompletion.contactName')}
+                      placeholder={t('profileCompletion.contactNamePlaceholder')}
+                      value={value}
+                      onChangeText={onChange}
+                      error={errors.emergencyContact?.message}
+                      containerStyle={styles.field}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="emergencyPhone"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <Input
+                      label={t('profileCompletion.contactNumber')}
+                      placeholder="+91 XXXXX XXXXX"
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={() => {
+                        onBlur();
+                        warnIfInvalid(validateEmergencyPhone(value, phoneValue));
+                      }}
+                      keyboardType="phone-pad"
+                      error={errors.emergencyPhone?.message}
+                      containerStyle={styles.field}
+                    />
+                  )}
+                />
+
+                {/* Info note */}
+                <View
+                  style={[
+                    styles.emgNote,
+                    { backgroundColor: theme.background },
+                  ]}
+                >
+                  <Feather
+                    name="info"
+                    size={16}
+                    color="#c2483c"
+                    style={{ marginTop: 1, flexShrink: 0 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Typography variant="bodySmallBold" style={{ marginBottom: 2 }}>
+                      {t('profileCompletion.whyWeAsk')}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {t('profileCompletion.whyWeAskBody')}
+                    </Typography>
+                  </View>
                 </View>
               </View>
+
+              <View style={styles.skipNote}>
+                <Feather
+                  name="info"
+                  size={13}
+                  color={theme.textSecondary}
+                />
+                <Typography variant="caption" color="textSecondary">
+                  {t('profileCompletion.lastStepNote')}
+                </Typography>
+              </View>
             </View>
+          )}
 
-            <View style={styles.skipNote}>
-              <Feather
-                name="info"
-                size={13}
-                color={theme.textSecondary}
-              />
-              <Typography variant="caption" color="textSecondary">
-                This is the last step before your profile is complete
-              </Typography>
-            </View>
-          </View>
-        )}
+          {/* Bottom padding so content clears the footer */}
+          <View style={{ height: 16 }} />
+        </ScrollView>
 
-        {/* Bottom padding so content clears the footer */}
-        <View style={{ height: 16 }} />
-      </ScrollView>
+        {/* ── Sticky footer nav ── */}
+        <View
+          style={[
+            styles.footerNav,
+            {
+              backgroundColor: theme.background,
+              borderTopColor: theme.border,
+              paddingBottom: Spacing.two + insets.bottom,
+            },
+          ]}
+        >
+          {step > 1 && (
+            <Pressable
+              onPress={onBack}
+              style={[styles.ghostBtn, { borderColor: theme.border }]}
+              hitSlop={8}
+            >
+              <Feather name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'} size={18} color={theme.text} />
+            </Pressable>
+          )}
 
-      {/* ── Sticky footer nav ── */}
-      <View
-        style={[
-          styles.footerNav,
-          {
-            backgroundColor: theme.background,
-            borderTopColor: theme.border,
-            paddingBottom: Spacing.two + insets.bottom,
-          },
-        ]}
-      >
-        {step > 1 && (
-          <Pressable
-            onPress={onBack}
-            style={[styles.ghostBtn, { borderColor: theme.border }]}
-            hitSlop={8}
-          >
-            <Feather name="chevron-left" size={18} color={theme.text} />
-          </Pressable>
-        )}
-
-        {isLastStep ? (
-          <Button
-            label="Complete profile"
-            loading={isUpdating}
-            onPress={handleSubmit(onSubmit)}
-            style={styles.nextBtn}
-          />
-        ) : (
-          <Button
-            label="Continue"
-            onPress={onNext}
-            style={styles.nextBtn}
-          />
-        )}
-      </View>
+          {isLastStep ? (
+            <Button
+              label={t('profileCompletion.completeProfile')}
+              loading={isUpdating}
+              disabled={isStepBlocked}
+              onPress={handleSubmit(onSubmit)}
+              style={styles.nextBtn}
+            />
+          ) : (
+            <Button
+              label={t('common.continue')}
+              disabled={isStepBlocked}
+              onPress={onNext}
+              style={styles.nextBtn}
+            />
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -815,6 +869,7 @@ export function ProfileCompletionScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
 
   // Top bar
   topbar: {

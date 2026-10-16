@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { AppBottomSheet, Button } from '@/shared/components';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -16,19 +17,13 @@ export interface SessionDetailsSheetProps {
 }
 
 export function SessionDetailsSheet({ visible, session, onClose, onEdit, onDelete }: SessionDetailsSheetProps) {
+  const { t } = useTranslation();
   if (!session) return null;
-
-  // The actual UI should match the existing style language. The prompt gives an example structure:
-  // Session Details
-  // Sarah Johnson
-  // Monday, August 17
-  // 09:00 AM
-  // PT • 60 min
 
   return (
     <AppBottomSheet
       visible={visible}
-      title="Session Details"
+      title={t('schedule.sessionDetails.title')}
       onClose={onClose}
     >
       <View style={styles.container}>
@@ -42,7 +37,7 @@ export function SessionDetailsSheet({ visible, session, onClose, onEdit, onDelet
         <View style={styles.detailsList}>
           <View style={styles.detailItem}>
             <Feather name="calendar" size={18} color="#64748B" />
-            <Text style={styles.detailText}>{session.date ? session.date : 'Unknown Date'}</Text>
+            <Text style={styles.detailText}>{session.date ? session.date : t('schedule.sessionDetails.unknownDate')}</Text>
           </View>
           
           <View style={styles.detailItem}>
@@ -65,20 +60,20 @@ export function SessionDetailsSheet({ visible, session, onClose, onEdit, onDelet
           {!!session.capacity && session.capacity > 0 && (
             <View style={styles.detailItem}>
               <Feather name="users" size={18} color="#64748B" />
-              <Text style={styles.detailText}>Capacity: {session.capacity}</Text>
+              <Text style={styles.detailText}>{t('schedule.sessionDetails.capacity', { count: session.capacity })}</Text>
             </View>
           )}
         </View>
 
         <View style={styles.actions}>
           <Button
-            title="Edit Session"
+            title={t('schedule.sessionDetails.editSession')}
             variant="outline"
             onPress={onEdit}
             style={styles.actionButton}
           />
           <Button
-            title="Delete Session"
+            title={t('schedule.sessionDetails.deleteSession')}
             variant="ghost"
             onPress={onDelete}
             style={[styles.actionButton, styles.deleteButton]}

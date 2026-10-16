@@ -13,8 +13,13 @@ public class MobileReferralAttribution extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "referrer_global_user_id", nullable = false)
+    // Set for app-registered (global) referrers only; a gym-created login has none.
+    @Column(name = "referrer_global_user_id")
     private Long referrerGlobalUserId;
+
+    // The referrer's members row in this gym — who the reward goes to.
+    @Column(name = "referrer_member_id")
+    private Long referrerMemberId;
 
     @Column(name = "referee_global_user_id", nullable = false, unique = true)
     private Long refereeGlobalUserId;
@@ -28,7 +33,9 @@ public class MobileReferralAttribution extends BaseEntity {
 
     public MobileReferralAttribution() {}
 
-    public MobileReferralAttribution(Long referrerGlobalUserId, Long refereeGlobalUserId, MobileReferralStatus status) {
+    public MobileReferralAttribution(Long referrerMemberId, Long referrerGlobalUserId, Long refereeGlobalUserId,
+                                     MobileReferralStatus status) {
+        this.referrerMemberId = referrerMemberId;
         this.referrerGlobalUserId = referrerGlobalUserId;
         this.refereeGlobalUserId = refereeGlobalUserId;
         this.status = status;
@@ -40,6 +47,10 @@ public class MobileReferralAttribution extends BaseEntity {
     @JsonProperty("referrerGlobalUserId")
     public Long getReferrerGlobalUserId() { return referrerGlobalUserId; }
     public void setReferrerGlobalUserId(Long referrerGlobalUserId) { this.referrerGlobalUserId = referrerGlobalUserId; }
+
+    @JsonProperty("referrerMemberId")
+    public Long getReferrerMemberId() { return referrerMemberId; }
+    public void setReferrerMemberId(Long referrerMemberId) { this.referrerMemberId = referrerMemberId; }
 
     @JsonProperty("refereeGlobalUserId")
     public Long getRefereeGlobalUserId() { return refereeGlobalUserId; }

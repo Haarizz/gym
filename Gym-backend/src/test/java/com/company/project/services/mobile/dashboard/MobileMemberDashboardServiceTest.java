@@ -2,6 +2,7 @@ package com.company.project.services.mobile.dashboard;
 
 import com.company.project.dto.mobile.dashboard.MemberDashboardResponseDTO;
 import com.company.project.entities.*;
+import com.company.project.services.AttendanceSessionService;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
@@ -44,6 +45,9 @@ class MobileMemberDashboardServiceTest {
     @Mock
     private PromotionCampaignRepository promotionCampaignRepository;
 
+    @Mock
+    private AttendanceSessionService attendanceSessionService;
+
     @InjectMocks
     private MobileMemberDashboardService dashboardService;
 
@@ -84,15 +88,12 @@ class MobileMemberDashboardServiceTest {
     void testGetMemberDashboardSuccess() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
 
-        // Active check-in mock
-        when(attendanceRepository.existsActiveSessionForMember(eq(50L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(true);
-
         Attendance activeAtt = new Attendance();
         activeAtt.setId(901L);
         activeAtt.setMember(testMember);
         activeAtt.setStatus("active");
         activeAtt.setCheckInTime(LocalDateTime.now().minusHours(1));
+        when(attendanceSessionService.findActiveSession(50L)).thenReturn(Optional.of(activeAtt));
 
         Attendance pastAtt1 = new Attendance();
         pastAtt1.setId(900L);

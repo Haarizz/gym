@@ -215,11 +215,11 @@ class LegacyAdapterGoldenIT {
     // ── Semantics old clients rely on ───────────────────────────────────────
 
     @Test
-    void oldClientsSeeOnlyTheirGymAndPostsTheyWriteStayGymOnly() {
+    void oldClientsSeeOnlyTheirGymButPostsTheyWriteArePublic() {
         h.asJessica();
         h.header("X-Tenant-ID", "gym-b");
         long bPost = h.adapter.createPost(post("B only", null)).getId();
-        assertEquals("GYM", h.controlJdbc.queryForObject("SELECT visibility FROM global_community_posts WHERE id = ?", String.class, bPost));
+        assertEquals("PUBLIC", h.controlJdbc.queryForObject("SELECT visibility FROM global_community_posts WHERE id = ?", String.class, bPost));
 
         h.asGymAAdmin();
         CommunityPostsPageResponseDTO feed = h.adapter.getFeed(null, null, 1, 50, false);
@@ -228,7 +228,7 @@ class LegacyAdapterGoldenIT {
 
         h.asOutsider();
         assertTrue(h.community.feed(com.company.project.community.support.CommunityHarness.MOBILE, null, 50, null, null)
-                .posts().stream().noneMatch(p -> p.id() == bPost), "gym-only post isn't in the public feed");
+                .posts().stream().anyMatch(p -> p.id() == bPost), "posts from old clients reach the public feed");
     }
 
     @Test

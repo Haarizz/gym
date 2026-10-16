@@ -1,4 +1,5 @@
 import { FlatList, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MemberCheckInCard } from './MemberCheckInCard';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
@@ -13,6 +14,7 @@ interface MemberListProps {
 }
 
 export function MemberList({ members, isLoading, onCheckIn, activeIds }: MemberListProps) {
+  const { t } = useTranslation();
   if (isLoading) {
     return (
       <FlatList
@@ -25,7 +27,12 @@ export function MemberList({ members, isLoading, onCheckIn, activeIds }: MemberL
   }
 
   if (members.length === 0) {
-    return <EmptyState title="No members found" description="Try a different search term or ID." />;
+    return (
+      <EmptyState
+        title={t('checkIn.members.noMembersFound')}
+        description={t('checkIn.members.noMembersFoundDesc')}
+      />
+    );
   }
 
   return (

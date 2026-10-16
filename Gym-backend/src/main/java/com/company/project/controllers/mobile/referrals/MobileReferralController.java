@@ -24,6 +24,9 @@ import jakarta.persistence.EntityManagerFactory;
 @RequestMapping("/api/mobile/referrals")
 public class MobileReferralController {
 
+    static final String GYM_LOGIN_REFEREE_MESSAGE =
+            "Referral codes are for new members joining through the app. You're already a member of your gym.";
+
     private final MobileReferralService referralService;
     private final MobileReferralResolutionService resolutionService;
     private final RewardService rewardService;
@@ -58,7 +61,8 @@ public class MobileReferralController {
                             : "Renew your membership to share your referral code."
             ));
         }
-        MobileReferralProfile profile = referralService.getOrCreateProfile(principal.getId());
+        Member member = referralService.findCallerMember(principal.getId(), principal.isGlobal());
+        MobileReferralProfile profile = referralService.getOrCreateProfile(member, globalIdOf(principal));
         return ResponseEntity.ok(Map.of(
                 "eligible", true,
                 "referralCode", profile.getReferralCode(),
@@ -73,7 +77,13 @@ public class MobileReferralController {
             return ResponseEntity.badRequest().body(Map.of("error", "Code is required"));
         }
         
-        Long userId = getCurrentUserId();
+        UserDetailsImpl principal = getCurrentPrincipal();
+        if (!principal.isGlobal()) {
+            // Codes are for people joining through the app. A gym-created login is already
+            // a member, and its id isn't a global user id an attribution could key on.
+            return ResponseEntity.badRequest().body(Map.of("error", GYM_LOGIN_REFEREE_MESSAGE));
+        }
+        Long userId = principal.getId();
         try {
             // Find tenant via new service method
             String tenantSlug = referralService.findTenantForReferralCode(code.trim());
@@ -109,15 +119,19 @@ public class MobileReferralController {
 
     @GetMapping("/history")
     public ResponseEntity<List<MobileReferralAttribution>> getHistory() {
-        Long userId = getCurrentUserId();
-        return ResponseEntity.ok(referralService.getHistory(userId));
+        UserDetailsImpl principal = getCurrentPrincipal();
+        Member member = referralService.findCallerMember(principal.getId(), principal.isGlobal());
+        if (member == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(referralService.getHistory(member, globalIdOf(principal)));
     }
 
     /** GET /api/mobile/referrals/my-rewards — the current user's own referral rewards (as referrer or referee). */
     @GetMapping("/my-rewards")
     public ResponseEntity<List<ReferralRewardResponseDTO>> getMyRewards() {
-        Long userId = getCurrentUserId();
-        Member member = resolutionService.findMemberByGlobalUserId(userId);
+        UserDetailsImpl principal = getCurrentPrincipal();
+        Member member = referralService.findCallerMember(principal.getId(), principal.isGlobal());
         if (member == null) {
             return ResponseEntity.ok(List.of());
         }
@@ -127,8 +141,8 @@ public class MobileReferralController {
     /** GET /api/mobile/referrals/my-passes?context=MEMBERSHIP|PT|CLASS — the current user's spendable Reward Passes. */
     @GetMapping("/my-passes")
     public ResponseEntity<List<ReferralRewardResponseDTO>> getMyPasses(@RequestParam PassContext context) {
-        Long userId = getCurrentUserId();
-        Member member = resolutionService.findMemberByGlobalUserId(userId);
+        UserDetailsImpl principal = getCurrentPrincipal();
+        Member member = referralService.findCallerMember(principal.getId(), principal.isGlobal());
         if (member == null) {
             return ResponseEntity.ok(List.of());
         }
@@ -138,7 +152,11 @@ public class MobileReferralController {
     /** GET /api/mobile/referrals/my-claim — the code the current user claimed as a referee, if any. */
     @GetMapping("/my-claim")
     public ResponseEntity<MyReferralClaimDTO> getMyClaim() {
-        Long userId = getCurrentUserId();
+        UserDetailsImpl principal = getCurrentPrincipal();
+        if (!principal.isGlobal()) {
+            return ResponseEntity.noContent().build(); // see claimCode — never a referee
+        }
+        Long userId = principal.getId();
         return referralService.getMyClaim(userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
@@ -147,7 +165,11 @@ public class MobileReferralController {
     /** POST /api/mobile/referrals/my-claim/retry — re-attempt conversion of the user's own stuck PENDING claim. */
     @PostMapping("/my-claim/retry")
     public ResponseEntity<?> retryMyClaim() {
-        Long userId = getCurrentUserId();
+        UserDetailsImpl principal = getCurrentPrincipal();
+        if (!principal.isGlobal()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "You haven't claimed a referral code"));
+        }
+        Long userId = principal.getId();
         try {
             MobileReferralStatus status = resolutionService.retryForReferee(userId);
             return ResponseEntity.ok(Map.of("status", status));
@@ -158,8 +180,9 @@ public class MobileReferralController {
         }
     }
 
-    private Long getCurrentUserId() {
-        return getCurrentPrincipal().getId();
+    // The caller's global user id, or null for a gym-created login (whose id is the gym's users.id).
+    private static Long globalIdOf(UserDetailsImpl principal) {
+        return principal.isGlobal() ? principal.getId() : null;
     }
 
     private UserDetailsImpl getCurrentPrincipal() {

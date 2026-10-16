@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -9,16 +10,18 @@ interface StaffMonthlyTrendChartProps {
 }
 
 export function StaffMonthlyTrendChart({ data }: StaffMonthlyTrendChartProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>6-Month Trend</Text>
+      <Text style={styles.title}>{t('staffPerformance.sixMonthTrend')}</Text>
       <BarChart
         data={data}
         xKey="month"
         series={[
           {
             key: 'conversions',
-            label: 'Conversions',
+            label: t('staffPerformance.conversions'),
             color: BrandColors.teal,
           },
         ]}

@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, I18nManager } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -35,7 +36,11 @@ export function AppHeader({ title, subtitle, colors, onBack, rightAction }: AppH
           hitSlop={8}
           style={styles.backButton}
         >
-          <Feather name="chevron-left" size={24} color="#ffffff" />
+          <Feather
+            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
+            size={24}
+            color="#ffffff"
+          />
         </Pressable>
       ) : (
         <View style={styles.backPlaceholder} />
@@ -58,6 +63,8 @@ export function AppHeader({ title, subtitle, colors, onBack, rightAction }: AppH
 }
 
 export function BrandHeader() {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.brandHeader}>
       <View style={styles.brandRow}>
@@ -70,12 +77,12 @@ export function BrandHeader() {
             GymBios
           </Typography>
           <Typography variant="caption" style={styles.brandTagline}>
-            Fitness Business OS
+            {t('auth.roleSelection.brandTagline')}
           </Typography>
         </View>
       </View>
       <Typography variant="bodySmall" color="textSecondary" style={styles.brandDescription}>
-        Choose your experience to get started
+        {t('auth.roleSelection.chooseExperience')}
       </Typography>
     </View>
   );
@@ -106,8 +113,8 @@ const styles = StyleSheet.create({
   bottomHighlight: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.35)',
   },

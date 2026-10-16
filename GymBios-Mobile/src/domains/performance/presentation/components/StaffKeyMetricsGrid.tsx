@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -9,13 +10,15 @@ interface StaffKeyMetricsGridProps {
 }
 
 export function StaffKeyMetricsGrid({ targets }: StaffKeyMetricsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Rating */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Feather name="star" size={14} color="#EAB308" />
-          <Text style={styles.label}>Rating</Text>
+          <Text style={styles.label}>{t('staffPerformance.rating')}</Text>
         </View>
         <Text style={styles.value}>{targets.rating}</Text>
       </View>
@@ -24,7 +27,7 @@ export function StaffKeyMetricsGrid({ targets }: StaffKeyMetricsGridProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Feather name="trending-up" size={14} color="#16A34A" />
-          <Text style={styles.label}>Growth</Text>
+          <Text style={styles.label}>{t('staffPerformance.growth')}</Text>
         </View>
         <Text style={[styles.value, { color: '#16A34A' }]}>{targets.growth}</Text>
       </View>
@@ -33,7 +36,7 @@ export function StaffKeyMetricsGrid({ targets }: StaffKeyMetricsGridProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Feather name="users" size={14} color="#9333EA" />
-          <Text style={styles.label}>Leads</Text>
+          <Text style={styles.label}>{t('staffPerformance.leads')}</Text>
         </View>
         <Text style={styles.value}>{targets.leads}</Text>
       </View>

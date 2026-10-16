@@ -8,6 +8,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -38,6 +39,7 @@ export function RenewMembershipModal({
   onSuccess,
 }: RenewMembershipModalProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const activeTenant = useAuthStore((state) => state.activeTenant);
   const { selectedBranchId } = useBranchContext();
   const { data: memberState, isLoading: isMemberLoading } = useMemberMembership();
@@ -65,7 +67,7 @@ export function RenewMembershipModal({
 
   // A pass/coupon the server rejects (e.g. it just expired) — shown inline; paying is
   // blocked until the member deselects it.
-  const rewardError = rewardSel && previewError ? previewError.message || 'This reward can no longer be used.' : null;
+  const rewardError = rewardSel && previewError ? previewError.message || t('membership.renew.rewardUnusable') : null;
   const changePlanMutation = useChangeMembershipPlan();
 
   const handlePaymentComplete = async (result: PaymentResult) => {
@@ -81,11 +83,11 @@ export function RenewMembershipModal({
 
       setShowPayment(false);
       Alert.alert(
-        'Success! 🎉',
-        'Your subscription has been updated successfully.',
+        t('membership.renew.successTitle'),
+        t('membership.renew.successMessage'),
         [
           {
-            text: 'Awesome!',
+            text: t('membership.renew.successButton'),
             onPress: () => {
               onSuccess();
               onClose();
@@ -94,15 +96,20 @@ export function RenewMembershipModal({
         ]
       );
     } catch (error) {
-      toast.error('Failed to update subscription. Please try again.');
+      toast.error(t('membership.renew.updateFailed'));
     }
   };
 
   const getCtaLabel = () => {
-    if (!preview) return 'Select Subscription';
-    if (isPreviewLoading) return 'Calculating...';
-    const action = preview.operation === 'RENEWAL' ? 'Renew' : preview.operation === 'UPGRADE' ? 'Upgrade' : 'Continue';
-    return <>Pay <CurrencyValue amount={preview.finalAmount} /> & {action}</>;
+    if (!preview) return t('membership.renew.selectSubscription');
+    if (isPreviewLoading) return t('membership.renew.calculating');
+    const key =
+      preview.operation === 'RENEWAL'
+        ? 'membership.renew.payAndRenew'
+        : preview.operation === 'UPGRADE'
+          ? 'membership.renew.payAndUpgrade'
+          : 'membership.renew.payAndContinue';
+    return <Trans i18nKey={key} components={{ amount: <CurrencyValue amount={preview.finalAmount} /> }} />;
   };
 
   const isReady = !isMemberLoading && !!preview && !!currentPlan;
@@ -125,7 +132,7 @@ export function RenewMembershipModal({
       const branchId = memberState?.membership?.branch_id
         ?? (typeof selectedBranchId === 'number' ? selectedBranchId : null);
       if (!activeTenant || !branchId) {
-        toast.error('Could not open the family subscription — please try again.');
+        toast.error(t('membership.renew.familyOpenFailed'));
         return;
       }
       setShowPicker(false);
@@ -150,9 +157,9 @@ export function RenewMembershipModal({
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <View style={styles.header}>
-              <View>
-                <Text style={styles.title}>Subscription</Text>
-                <Text style={styles.subtitle}>Select a subscription to continue</Text>
+              <View style={styles.headerInfo}>
+                <Text style={styles.title}>{t('membership.renew.title')}</Text>
+                <Text style={styles.subtitle}>{t('membership.renew.subtitle')}</Text>
               </View>
               <Pressable hitSlop={12} onPress={handleClose} style={styles.closeButton}>
                 <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -166,7 +173,7 @@ export function RenewMembershipModal({
             ) : (
               <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
                 
-                <Text style={styles.sectionTitle}>Current Subscription</Text>
+                <Text style={styles.sectionTitle}>{t('membership.renew.currentSubscription')}</Text>
                 <View style={styles.plansContainer}>
                   <MembershipPlanCard
                     name={currentPlan.name}
@@ -179,9 +186,9 @@ export function RenewMembershipModal({
                 </View>
 
                 <View style={styles.changePlanHeader}>
-                  <Text style={styles.sectionTitle}>Change Subscription</Text>
-                  <Pressable onPress={() => setShowPicker(true)}>
-                    <Text style={styles.changePlanLink}>Choose another subscription ›</Text>
+                  <Text style={[styles.sectionTitle, styles.changePlanTitle]}>{t('membership.renew.changeSubscription')}</Text>
+                  <Pressable onPress={() => setShowPicker(true)} hitSlop={8}>
+                    <Text style={styles.changePlanLink}>{t('membership.renew.chooseAnother')}</Text>
                   </Pressable>
                 </View>
                 
@@ -206,10 +213,14 @@ export function RenewMembershipModal({
                     {/* Detected Operation Section */}
                     <View style={styles.operationCard}>
                       <Text style={styles.operationTitle}>
-                        Detected as {preview.operation.charAt(0) + preview.operation.slice(1).toLowerCase()}
+                        {preview.operation === 'RENEWAL'
+                          ? t('membership.renew.detectedRenewal')
+                          : preview.operation === 'UPGRADE'
+                            ? t('membership.renew.detectedUpgrade')
+                            : t('membership.renew.detectedDowngrade')}
                       </Text>
                       {preview.operation === 'RENEWAL' ? (
-                        <Text style={styles.operationText}>Continuing {preview.selectedPlan.name}</Text>
+                        <Text style={styles.operationText}>{t('membership.renew.continuing', { name: preview.selectedPlan.name })}</Text>
                       ) : (
                         <Text style={styles.operationText}>
                           {currentPlan.name} → {preview.selectedPlan.name}
@@ -220,7 +231,7 @@ export function RenewMembershipModal({
                     {/* Features Section */}
                     {preview.features && preview.features.length > 0 && (
                       <View style={styles.offerCard}>
-                        <Text style={styles.offerTitle}>Subscription Features</Text>
+                        <Text style={styles.offerTitle}>{t('membership.renew.features')}</Text>
                         <View style={styles.perksList}>
                           {preview.features.map((feature, index) => (
                             <View key={index} style={styles.perkRow}>
@@ -243,26 +254,26 @@ export function RenewMembershipModal({
                     {/* Price Breakdown */}
                     <View style={styles.priceCard}>
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceLabel}>Regular Price</Text>
+                        <Text style={styles.priceLabel}>{t('membership.renew.regularPrice')}</Text>
                         <Text style={styles.originalPriceText}><CurrencyValue amount={preview.regularAmount} /></Text>
                       </View>
                       {preview.discountAmount > 0 && (
                         <View style={styles.priceRow}>
-                          <Text style={styles.priceLabel}>{preview.offerLabel || 'Offer'}</Text>
+                          <Text style={styles.priceLabel}>{preview.offerLabel || t('membership.renew.offer')}</Text>
                           <Text style={styles.discountText}>-<CurrencyValue amount={preview.discountAmount} /></Text>
                         </View>
                       )}
                       {preview.rewardDiscountAmount > 0 && (
                         <View style={styles.priceRow}>
                           <Text style={styles.priceLabel}>
-                            {rewardSel?.kind === 'coupon' ? 'Coupon' : 'Reward Pass'}
+                            {t(rewardSel?.kind === 'coupon' ? 'membership.renew.coupon' : 'membership.renew.rewardPass')}
                           </Text>
                           <Text style={styles.discountText}>-<CurrencyValue amount={preview.rewardDiscountAmount} /></Text>
                         </View>
                       )}
                       <View style={styles.divider} />
                       <View style={styles.priceRow}>
-                        <Text style={styles.totalLabel}>Total Payable</Text>
+                        <Text style={styles.totalLabel}>{t('membership.renew.totalPayable')}</Text>
                         <Text style={styles.totalValue}><CurrencyValue amount={preview.finalAmount} /></Text>
                       </View>
                     </View>
@@ -300,7 +311,8 @@ export function RenewMembershipModal({
         <PaymentBottomSheet
           visible={showPayment}
           amount={preview.finalAmount}
-          title={`Payment for ${preview.selectedPlan.name}`}
+          title={t('membership.renew.paymentFor', { name: preview.selectedPlan.name })}
+          allowDiscount={false}
           onClose={() => setShowPayment(false)}
           onComplete={handlePaymentComplete}
         />
@@ -330,6 +342,11 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.three,
     borderBottomWidth: 1,
     borderColor: '#E2E8F0',
+    gap: Spacing.three,
+  },
+  headerInfo: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: TypographyScale.title,
@@ -360,17 +377,24 @@ const styles = StyleSheet.create({
     color: BrandColors.textPrimary,
     marginBottom: Spacing.three,
   },
+  // Wraps the link under the title when both don't fit (narrow screens, large font scale).
   changePlanHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    columnGap: Spacing.three,
+    rowGap: Spacing.one,
     marginBottom: Spacing.three,
+  },
+  changePlanTitle: {
+    marginBottom: 0,
+    flexShrink: 1,
   },
   changePlanLink: {
     color: BrandColors.memberGold,
     fontWeight: '600',
     fontSize: 14,
-    marginBottom: Spacing.three,
   },
   plansContainer: {
     marginBottom: Spacing.four,
@@ -434,8 +458,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.three,
   },
   priceLabel: {
+    flex: 1,
     fontSize: 13,
     color: BrandColors.textSecondary,
   },

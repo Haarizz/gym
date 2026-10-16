@@ -5,3 +5,4 @@ export * from './MyTargetsScreen';
 export * from './MyPerformanceScreen';
 export * from './TransactionsScreen';
 export * from './SettingsScreen';
+export * from './LanguageSelectScreen';

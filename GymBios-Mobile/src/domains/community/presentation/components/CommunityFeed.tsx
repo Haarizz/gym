@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
@@ -31,13 +32,14 @@ export function CommunityFeed({
   onRefresh,
   onCommentsPress,
 }: CommunityFeedProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
 
   if (isLoading && posts.length === 0) {
     return (
       <View style={styles.centered}>
-        <Loader message="Loading community posts…" />
+        <Loader message={t('community.feed.loading')} />
       </View>
     );
   }
@@ -47,9 +49,9 @@ export function CommunityFeed({
       <View style={styles.centered}>
         <EmptyState
           icon="wifi-off"
-          title="Could not load posts"
-          description="Check your connection and try again."
-          buttonLabel="Retry"
+          title={t('community.feed.loadError')}
+          description={t('community.feed.checkConnection')}
+          buttonLabel={t('community.feed.retry')}
           onPress={onRefresh}
         />
       </View>
@@ -71,8 +73,8 @@ export function CommunityFeed({
       ListEmptyComponent={
         <EmptyState
           icon="message-square"
-          title="No posts yet"
-          description="Be the first to share something with the community!"
+          title={t('community.feed.emptyTitle')}
+          description={t('community.feed.emptyDescription')}
         />
       }
       ListFooterComponent={

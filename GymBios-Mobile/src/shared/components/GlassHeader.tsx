@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -27,6 +28,7 @@ export function GlassHeader({
   onBack,
   rightAction,
 }: GlassHeaderProps) {
+  const { t } = useTranslation();
   return (
     <GlassSurface tint={tint} strong radius={Radius.xl} style={styles.header}>
       {onBack ? (
@@ -35,7 +37,7 @@ export function GlassHeader({
           hitSlop={12}
           style={styles.backButton}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('shared.goBack')}
         >
           <Feather name="chevron-left" size={20} color="#ffffff" />
         </Pressable>

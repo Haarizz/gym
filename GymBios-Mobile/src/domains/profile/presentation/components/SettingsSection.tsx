@@ -1,5 +1,6 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { I18nManager, Pressable, StyleSheet, Switch, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { GlassSurface } from '@/shared/components';
@@ -45,6 +46,47 @@ export function SettingSwitchRow({
   );
 }
 
+interface SettingNavRowProps {
+  label: string;
+  description?: string;
+  /** Current value shown before the chevron, e.g. the selected language. */
+  value?: string;
+  onPress: () => void;
+  /** Top hairline separating this row from the one above it — pass false on the first row in a card. */
+  divider?: boolean;
+}
+
+export function SettingNavRow({ label, description, value, onPress, divider = true }: SettingNavRowProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.switchRow, divider && styles.divider, pressed && styles.pressed]}
+    >
+      <View style={styles.switchTextWrapper}>
+        <Typography variant="body" style={styles.switchLabel}>
+          {label}
+        </Typography>
+        {description && (
+          <Typography variant="caption" color="textSecondary" style={styles.switchDescription}>
+            {description}
+          </Typography>
+        )}
+      </View>
+      {value && (
+        <Typography variant="body" style={styles.navValue}>
+          {value}
+        </Typography>
+      )}
+      <Feather
+        name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+        size={18}
+        color={BrandColors.textSecondary}
+      />
+    </Pressable>
+  );
+}
+
 interface LinkedAccountRowProps {
   account: LinkedAccount;
   /** Top hairline separating this row from the one above it — pass false on the first row in a card. */
@@ -52,6 +94,7 @@ interface LinkedAccountRowProps {
 }
 
 export function LinkedAccountRow({ account, divider = true }: LinkedAccountRowProps) {
+  const { t } = useTranslation();
   const iconName =
     account.type === 'email'
       ? 'mail'
@@ -74,7 +117,7 @@ export function LinkedAccountRow({ account, divider = true }: LinkedAccountRowPr
       </View>
       <View style={styles.connectedBadge}>
         <Typography variant="caption" style={styles.connectedText}>
-          Connected
+          {t('settings.connected')}
         </Typography>
       </View>
     </View>
@@ -112,7 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   cardHeaderIcon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   cardTitle: {
     fontSize: 16,
@@ -131,7 +174,7 @@ const styles = StyleSheet.create({
   },
   switchTextWrapper: {
     flex: 1,
-    paddingRight: Spacing.three,
+    paddingEnd: Spacing.three,
   },
   switchLabel: {
     fontSize: 14,
@@ -140,6 +183,15 @@ const styles = StyleSheet.create({
   },
   switchDescription: {
     marginTop: 2,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  navValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BrandColors.teal,
+    marginEnd: Spacing.one,
   },
   accountRow: {
     flexDirection: 'row',
@@ -153,7 +205,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#eef7f6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   accountDetails: {
     flex: 1,

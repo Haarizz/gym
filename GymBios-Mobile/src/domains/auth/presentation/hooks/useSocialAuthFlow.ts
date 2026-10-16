@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -87,10 +88,11 @@ async function handleSocialOutcome(
       properties: { provider },
     });
     toast.info(
-      `An account already exists for ${outcome.maskedEmail}. Sign in with your existing method, then link ${
-        provider === 'GOOGLE' ? 'Google' : 'Apple'
-      } from there.`,
-      { title: 'Account already exists', duration: 9000 }
+      i18n.t('auth.errors.accountExists', {
+        email: outcome.maskedEmail,
+        provider: provider === 'GOOGLE' ? 'Google' : 'Apple',
+      }),
+      { title: i18n.t('auth.errors.accountExistsTitle'), duration: 9000 }
     );
     deps.router.replace(MEMBER_AUTH_HREF);
     return;
@@ -112,7 +114,7 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
     const mutation = useMutation({
       mutationFn: async (): Promise<SocialAuthOutcome> => {
         if (!googleSignin || !isGoogleAvailable) {
-          throw new Error('Google sign-in is not available in this build.');
+          throw new Error(i18n.t('auth.errors.googleUnavailable'));
         }
         const { GoogleSignin, isCancelledResponse, isSuccessResponse } = googleSignin;
         ensureGoogleConfigured(googleSignin);
@@ -125,7 +127,7 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
           throw new SocialSignInCancelledError();
         }
         if (!isSuccessResponse(response) || !response.data.idToken) {
-          throw new Error('Google did not return a valid credential.');
+          throw new Error(i18n.t('auth.errors.googleCredential'));
         }
 
         const result = await authOrchestrator.signInWithGoogle(response.data.idToken);
@@ -146,7 +148,7 @@ export function createUseGoogleSignIn(authOrchestrator: AuthOrchestrator) {
           name: 'auth_social_signin_failed',
           properties: { provider: 'GOOGLE' },
         });
-        toast.error(error instanceof Error ? error.message : 'Unable to continue with Google. Please try again.');
+        toast.error(error instanceof Error ? error.message : i18n.t('auth.errors.googleFailed'));
       },
     });
 
@@ -187,7 +189,7 @@ export function createUseAppleSignIn(authOrchestrator: AuthOrchestrator) {
         });
 
         if (!credential.identityToken) {
-          throw new Error('Apple did not return a valid credential.');
+          throw new Error(i18n.t('auth.errors.appleCredential'));
         }
 
         // Advisory only, and only present at all on the user's very first
@@ -213,7 +215,7 @@ export function createUseAppleSignIn(authOrchestrator: AuthOrchestrator) {
           name: 'auth_social_signin_failed',
           properties: { provider: 'APPLE' },
         });
-        toast.error(error instanceof Error ? error.message : 'Unable to continue with Apple. Please try again.');
+        toast.error(error instanceof Error ? error.message : i18n.t('auth.errors.appleFailed'));
       },
     });
 
@@ -281,7 +283,7 @@ export function createUseLinkProvider(authOrchestrator: AuthOrchestrator) {
           return;
         }
         setErrorMessage(undefined);
-        toast.success('Account linked.');
+        toast.success(i18n.t('auth.errors.accountLinked'));
       },
     });
 

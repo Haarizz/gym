@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -25,6 +26,7 @@ interface NoInternetScreenProps {
  * rendering in the background.
  */
 export function NoInternetScreen({ onRetry }: NoInternetScreenProps) {
+  const { t } = useTranslation();
   // Floating animation for the wifi-off icon
   const floatAnim = useRef(new Animated.Value(0)).current;
   // Pulse ring opacity
@@ -154,18 +156,18 @@ export function NoInternetScreen({ onRetry }: NoInternetScreenProps) {
 
           {/* Text content */}
           <View style={styles.textBlock}>
-            <Text style={styles.title}>No Internet Connection</Text>
+            <Text style={styles.title}>{t('shared.noInternet.title')}</Text>
             <Text style={styles.subtitle}>
               Your device isn't connected to the internet.{'\n'}
-              Please check your Wi-Fi or mobile data and try again.
+              {t('shared.noInternet.checkConnection')}
             </Text>
           </View>
 
           {/* Tips */}
           <View style={styles.tipsCard}>
-            <TipRow icon="wifi" text="Toggle Wi-Fi off and on again" />
-            <TipRow icon="smartphone" text="Check mobile data is enabled" />
-            <TipRow icon="radio" text="Move to an area with better signal" />
+            <TipRow icon="wifi" text={t('shared.noInternet.tipToggleWifi')} />
+            <TipRow icon="smartphone" text={t('shared.noInternet.tipMobileData')} />
+            <TipRow icon="radio" text={t('shared.noInternet.tipSignal')} />
           </View>
 
           {/* Retry button */}
@@ -176,7 +178,7 @@ export function NoInternetScreen({ onRetry }: NoInternetScreenProps) {
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
               accessibilityRole="button"
-              accessibilityLabel="Retry connection"
+              accessibilityLabel={t('shared.noInternet.retryA11y')}
             >
               <LinearGradient
                 colors={[BrandColors.teal, BrandColors.tealDark]}
@@ -185,7 +187,7 @@ export function NoInternetScreen({ onRetry }: NoInternetScreenProps) {
                 style={styles.retryGradient}
               >
                 <Feather name="refresh-cw" size={18} color="#FFF" style={styles.retryIcon} />
-                <Text style={styles.retryText}>Try Again</Text>
+                <Text style={styles.retryText}>{t('shared.noInternet.tryAgain')}</Text>
               </LinearGradient>
             </Pressable>
           </Animated.View>
@@ -230,14 +232,14 @@ const styles = StyleSheet.create({
     height: 280,
     backgroundColor: BrandColors.teal,
     top: -80,
-    left: -80,
+    start: -80,
   },
   blobBottomRight: {
     width: 240,
     height: 240,
     backgroundColor: '#1e40af',
     bottom: -60,
-    right: -60,
+    end: -60,
   },
 
   content: {
@@ -257,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: BrandColors.teal,
     alignSelf: 'center',
     top: -(PULSE_SIZE - ICON_SIZE) / 2,
-    left: -(PULSE_SIZE - ICON_SIZE) / 2,
+    start: -(PULSE_SIZE - ICON_SIZE) / 2,
   },
 
   iconContainer: {
@@ -371,7 +373,7 @@ const styles = StyleSheet.create({
   },
 
   retryIcon: {
-    marginRight: 2,
+    marginEnd: 2,
   },
 
   retryText: {

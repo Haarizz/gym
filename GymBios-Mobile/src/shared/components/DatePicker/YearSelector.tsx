@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
   },
   centerBand: {
     position: 'absolute',
-    left: Spacing.two,
-    right: Spacing.two,
+    start: Spacing.two,
+    end: Spacing.two,
   },
   cell: {
     height: ITEM_HEIGHT,

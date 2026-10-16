@@ -139,6 +139,10 @@ public class DashboardService {
      * Upgrades are saved as "Renewal" receipts, so a renewal onto a different, pricier
      * plan than that subscriber's previous New/Renewal receipt is counted as an upgrade
      * instead — its money goes only to the Upgrades card, never to Renew.
+     *
+     * Also returns the period's totalCollection (the KPI "Total Revenue") and
+     * otherIncome — the part of it no card covers (balance settlements, POS, class
+     * bookings, freeze charges) — so the cards plus otherIncome reconcile to it.
      */
     public Map<String, Object> getSubscriptionSummary(String period) {
         Period pr = resolvePeriod(period, LocalDate.now());
@@ -196,11 +200,17 @@ public class DashboardService {
             cards.add(card);
         });
 
+        BigDecimal cardsTotal = collected.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalCollection = revenueDashboardService.totalCollection(pr.from(), pr.to());
+        if (totalCollection == null) totalCollection = BigDecimal.ZERO;
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("period", pr.key());
         result.put("from", pr.from().toString());
         result.put("to", pr.to().toString());
         result.put("cards", cards);
+        result.put("totalCollection", totalCollection.setScale(2, RoundingMode.HALF_UP));
+        result.put("otherIncome", totalCollection.subtract(cardsTotal).setScale(2, RoundingMode.HALF_UP));
         return result;
     }
 

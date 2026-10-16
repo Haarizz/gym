@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { BrandColors } from '@/core/theme';
 import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
@@ -15,6 +16,7 @@ export function TrainerQuickActions({
   onTrackProgress,
   onViewLedger,
 }: TrainerQuickActionsProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const handleMessage = () => {
@@ -38,10 +40,10 @@ export function TrainerQuickActions({
   };
 
   const actions: QuickAction[] = [
-    { label: 'Message Member', icon: 'message-circle', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleMessage },
-    { label: 'Create Workout', icon: 'activity', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCreateWorkout },
-    { label: 'Track Progress', icon: 'trending-up', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleTrackProgress },
-    { label: 'View Ledger', icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
+    { label: t('dashboard.trainer.quickActions.messageMember'), icon: 'message-circle', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleMessage },
+    { label: t('dashboard.trainer.quickActions.createWorkout'), icon: 'activity', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCreateWorkout },
+    { label: t('dashboard.trainer.quickActions.trackProgress'), icon: 'trending-up', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleTrackProgress },
+    { label: t('dashboard.trainer.quickActions.viewLedger'), icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
   ];
 
   return <QuickActionsGrid actions={actions} />;

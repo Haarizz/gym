@@ -9,6 +9,8 @@ export interface GlassBlobProps {
   left?: number;
   right?: number;
   bottom?: number;
+  start?: number;
+  end?: number;
 }
 
 // Same colour at zero alpha. Naively appending `00` breaks shorthand hex
@@ -26,7 +28,17 @@ function toTransparent(color: string): string {
 // since there's no cross-platform CSS-blur equivalent without a new native
 // dependency. Sits behind glass surfaces so their translucent fill has
 // colour to read against.
-export function GlassBlob({ color, size = 220, opacity = 0.45, top, left, right, bottom }: GlassBlobProps) {
+export function GlassBlob({
+  color,
+  size = 220,
+  opacity = 0.45,
+  top,
+  left,
+  right,
+  bottom,
+  start,
+  end,
+}: GlassBlobProps) {
   return (
     <View
       pointerEvents="none"
@@ -41,6 +53,8 @@ export function GlassBlob({ color, size = 220, opacity = 0.45, top, left, right,
           left,
           right,
           bottom,
+          start,
+          end,
         },
       ]}
     >

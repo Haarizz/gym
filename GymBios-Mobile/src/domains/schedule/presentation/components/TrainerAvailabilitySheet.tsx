@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { AppBottomSheet, Button, Loader } from '@/shared/components';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { useTrainerAvailability, useUpdateTrainerAvailability } from '../../hooks/useTrainerSchedule';
@@ -12,14 +13,14 @@ export interface TrainerAvailabilitySheetProps {
   onClose: () => void;
 }
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 // `value` is the slot string stored in the backend; it must match the web admin and HR
 // onboarding (e.g. "Morning (6am–12pm)") so every screen reads the same schedule.
 const SLOTS = [
-  { key: "morning", value: "Morning (6am–12pm)", label: "Morning", range: "6am – 12pm", icon: "sunrise" },
-  { key: "afternoon", value: "Afternoon (12pm–5pm)", label: "Afternoon", range: "12pm – 5pm", icon: "sun" },
-  { key: "evening", value: "Evening (5pm–10pm)", label: "Evening", range: "5pm – 10pm", icon: "moon" },
+  { key: "morning", value: "Morning (6am–12pm)", icon: "sunrise" },
+  { key: "afternoon", value: "Afternoon (12pm–5pm)", icon: "sun" },
+  { key: "evening", value: "Evening (5pm–10pm)", icon: "moon" },
 ] as const;
 
 // Matches both the canonical value and older lowercase keys ("morning") saved by this sheet.
@@ -38,19 +39,24 @@ const DEFAULT_SCHEDULE: Record<string, any> = {
   Sunday: { morning: false, afternoon: false, evening: false },
 };
 
-function summarize(daySchedule: any) {
-  const on = SLOTS.filter((s) => daySchedule[s.key]);
-  if (on.length === 0) return "Not working";
-  if (on.length === 3) return "All day";
-  return on.map((s) => s.label).join(", ");
-}
-
 export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabilitySheetProps) {
+  const { t } = useTranslation();
   const { data: availabilityData, isLoading } = useTrainerAvailability();
   const updateMutation = useUpdateTrainerAvailability();
   
   const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
   const [expanded, setExpanded] = useState<string | null>("Monday");
+
+  const getSlotLabel = (key: 'morning' | 'afternoon' | 'evening') => t(`schedule.slots.${key}` as any);
+  const getSlotRange = (key: 'morning' | 'afternoon' | 'evening') => t(`schedule.slots.${key}Range` as any);
+  const getDayLabel = (day: string) => t(`schedule.days.${day.toLowerCase()}` as any);
+
+  const summarize = (daySchedule: any) => {
+    const on = SLOTS.filter((s) => daySchedule[s.key]);
+    if (on.length === 0) return t('schedule.trainer.notWorking');
+    if (on.length === 3) return t('schedule.trainer.allDay');
+    return on.map((s) => getSlotLabel(s.key)).join(", ");
+  };
 
   // Sync server data to local state (also on reopen, discarding unsaved edits)
   useEffect(() => {
@@ -110,16 +116,16 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
         onClose();
       },
       onError: (err) => {
-        alert(`Failed to save availability: ${err.message}`);
+        alert(t('schedule.trainer.failedToSaveAvailability', { message: err.message }));
       },
     });
   };
 
   if (isLoading) {
     return (
-      <AppBottomSheet visible={visible} title="Working days & time slots" onClose={onClose}>
+      <AppBottomSheet visible={visible} title={t('schedule.trainer.workingDaysAndSlots')} onClose={onClose}>
         <View style={{ height: 200, justifyContent: 'center' }}>
-          <Loader message="Loading availability..." />
+          <Loader message={t('schedule.trainer.loadingAvailability')} />
         </View>
       </AppBottomSheet>
     );
@@ -128,11 +134,11 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
   return (
     <AppBottomSheet
       visible={visible}
-      title="Working days & time slots"
+      title={t('schedule.trainer.workingDaysAndSlots')}
       onClose={onClose}
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.subtitle}>Tap a day to choose when you're available</Text>
+        <Text style={styles.subtitle}>{t('schedule.trainer.tapDayPrompt')}</Text>
 
         <View style={styles.daysList}>
           {DAYS.map((day) => {
@@ -154,7 +160,7 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
                 >
                   <View style={styles.dayHeaderLeft}>
                     <View style={[styles.dot, { backgroundColor: isWorking ? BrandColors.teal : '#D1D5DB' }]} />
-                    <Text style={styles.dayText}>{day}</Text>
+                    <Text style={styles.dayText}>{getDayLabel(day)}</Text>
                   </View>
                   <View style={styles.dayHeaderRight}>
                     <Text style={[styles.summaryText, { color: isWorking ? BrandColors.teal : '#6B7280' }]}>
@@ -188,8 +194,8 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
                           <View style={styles.slotLeft}>
                             <Feather name={slot.icon} size={20} color={active ? BrandColors.teal : '#6B7280'} />
                             <View style={styles.slotTextCol}>
-                              <Text style={styles.slotLabel}>{slot.label}</Text>
-                              <Text style={styles.slotRange}>{slot.range}</Text>
+                              <Text style={styles.slotLabel}>{getSlotLabel(slot.key)}</Text>
+                              <Text style={styles.slotRange}>{getSlotRange(slot.key)}</Text>
                             </View>
                           </View>
                           <View style={[
@@ -206,7 +212,7 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
                     })}
                     {day === "Monday" && (
                       <Pressable style={styles.applyBtn} onPress={applyMondayToWeekdays}>
-                        <Text style={styles.applyBtnText}>Apply to Tue–Fri →</Text>
+                        <Text style={styles.applyBtnText}>{t('schedule.trainer.applyMondayToWeekdays')}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -218,7 +224,7 @@ export function TrainerAvailabilitySheet({ visible, onClose }: TrainerAvailabili
 
         <View style={styles.actions}>
           <Button 
-            title={updateMutation.isPending ? "Saving..." : "Save Schedule"} 
+            title={updateMutation.isPending ? t('schedule.trainer.savingSchedule') : t('schedule.trainer.saveSchedule')} 
             onPress={handleSave} 
             style={styles.saveBtn} 
             disabled={updateMutation.isPending}

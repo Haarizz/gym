@@ -24,4 +24,14 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     @Query("SELECT COALESCE(AVG(r.rating), 0) FROM Review r")
     Double findAverageRating();
+
+    /** [rating, count] — one row per star value present in the branch. */
+    @Query("SELECT r.rating, COUNT(r) FROM Review r WHERE r.branchId = :branchId GROUP BY r.rating")
+    List<Object[]> countByRatingForBranch(Long branchId);
+
+    @Query("SELECT MAX(COALESCE(r.updatedAt, r.createdAt)) FROM Review r WHERE r.branchId = :branchId")
+    java.time.LocalDateTime findLastReviewAt(Long branchId);
+
+    @Query("SELECT r.memberId FROM Review r WHERE r.branchId = :branchId")
+    List<Long> findMemberIdsByBranchId(Long branchId);
 }

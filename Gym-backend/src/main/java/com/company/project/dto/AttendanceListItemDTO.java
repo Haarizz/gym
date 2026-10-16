@@ -26,6 +26,13 @@ public class AttendanceListItemDTO {
     private LocalDateTime checkOutTime;
     private Integer totalMinutes;
     private String formattedDuration;   // "1h 30m"
+    // Workout timer (member app) — start set while running, minutes once ended
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime workoutStartTime;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime workoutEndTime;
+    private Integer workoutMinutes;
+    private String formattedWorkoutDuration;
     private String activityType;
     private String status;              // active | completed
     private String type;                // member | walk_in
@@ -73,6 +80,18 @@ public class AttendanceListItemDTO {
 
     public String getFormattedDuration() { return formattedDuration; }
     public void setFormattedDuration(String formattedDuration) { this.formattedDuration = formattedDuration; }
+
+    public LocalDateTime getWorkoutStartTime() { return workoutStartTime; }
+    public void setWorkoutStartTime(LocalDateTime workoutStartTime) { this.workoutStartTime = workoutStartTime; }
+
+    public LocalDateTime getWorkoutEndTime() { return workoutEndTime; }
+    public void setWorkoutEndTime(LocalDateTime workoutEndTime) { this.workoutEndTime = workoutEndTime; }
+
+    public Integer getWorkoutMinutes() { return workoutMinutes; }
+    public void setWorkoutMinutes(Integer workoutMinutes) { this.workoutMinutes = workoutMinutes; }
+
+    public String getFormattedWorkoutDuration() { return formattedWorkoutDuration; }
+    public void setFormattedWorkoutDuration(String formattedWorkoutDuration) { this.formattedWorkoutDuration = formattedWorkoutDuration; }
 
     public String getActivityType() { return activityType; }
     public void setActivityType(String activityType) { this.activityType = activityType; }

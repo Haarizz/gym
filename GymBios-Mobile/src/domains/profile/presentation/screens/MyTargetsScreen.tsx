@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -16,6 +17,7 @@ interface MyTargetsScreenProps {
 }
 
 export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
+  const { t } = useTranslation();
   const { targets, activeTargets, completedTargets, isLoading } = useMyTargets();
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
@@ -37,8 +39,8 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <GlassHeader
-        title="My Targets"
-        subtitle="Track personal goals & progress metrics"
+        title={t('targets.title')}
+        subtitle={t('targets.subtitle')}
         onBack={onBack}
       />
 
@@ -50,7 +52,7 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
               {activeTargets.length}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              Active Goals
+              {t('targets.activeGoals')}
             </Typography>
           </View>
 
@@ -61,7 +63,7 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
               {completedTargets.length}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              Completed
+              {t('targets.completed')}
             </Typography>
           </View>
 
@@ -69,10 +71,10 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
 
           <View style={styles.summaryBox}>
             <Typography variant="title" style={[styles.summaryValue, styles.rateValue]}>
-              {successRate}%
+              {`${successRate}%`}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              Success Rate
+              {t('targets.successRate')}
             </Typography>
           </View>
         </GlassSurface>
@@ -81,7 +83,12 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
         <GlassSurface radius={Radius.full} style={styles.filterBar}>
           {(['all', 'active', 'completed'] as const).map((tab) => {
             const isSelected = filter === tab;
-            const label = tab === 'all' ? `All (${targets.length})` : tab === 'active' ? `Active (${activeTargets.length})` : `Completed (${completedTargets.length})`;
+            const label =
+              tab === 'all'
+                ? t('targets.filterAll', { count: targets.length })
+                : tab === 'active'
+                  ? t('targets.filterActive', { count: activeTargets.length })
+                  : t('targets.filterCompleted', { count: completedTargets.length });
             return (
               <Pressable
                 key={tab}
@@ -104,8 +111,8 @@ export function MyTargetsScreen({ onBack }: MyTargetsScreenProps) {
           <Loader />
         ) : filteredTargets.length === 0 ? (
           <EmptyState
-            title="No Targets Found"
-            description={`You currently have no ${filter} targets.`}
+            title={t('targets.emptyTitle')}
+            description={t('targets.emptyDesc')}
           />
         ) : (
           filteredTargets.map((target) => <TargetCard key={target.id} target={target} />)

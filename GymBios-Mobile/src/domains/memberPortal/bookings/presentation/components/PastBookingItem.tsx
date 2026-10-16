@@ -1,5 +1,7 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate } from '@/core/i18n';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
 export interface PastBookingData {
@@ -19,10 +21,8 @@ interface PastBookingItemProps {
 }
 
 export function PastBookingItem({ booking }: PastBookingItemProps) {
-  const formattedDate = new Date(booking.date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+  const { t } = useTranslation();
+  const formattedDate = formatDate(booking.date, 'MMM d');
 
   return (
     <View style={styles.container}>
@@ -39,13 +39,13 @@ export function PastBookingItem({ booking }: PastBookingItemProps) {
 
       {booking.attended && (
         <View style={styles.attendedBadge}>
-          <Text style={styles.attendedText}>✓ Attended</Text>
+          <Text style={styles.attendedText}>✓ {t('bookings.stats.attended')}</Text>
         </View>
       )}
       {!booking.attended && booking.cancelled && (
         <View style={styles.cancelledGroup}>
           <View style={styles.cancelledBadge}>
-            <Text style={styles.cancelledText}>Cancelled</Text>
+            <Text style={styles.cancelledText}>{t('bookings.status.cancelled')}</Text>
           </View>
           {booking.refundNote ? <Text style={styles.refundNote}>{booking.refundNote}</Text> : null}
         </View>
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    paddingRight: Spacing.two,
+    paddingEnd: Spacing.two,
   },
   className: {
     fontSize: 15,

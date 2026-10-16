@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { membershipApi } from '../infrastructure/membership.api';
 import { invalidateMembershipQueries } from './invalidateMembershipQueries';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { formatDate, i18n } from '@/core/i18n';
 import { formatAmount } from '@/domains/membershipPayment/domain/settlementRules';
 
 interface FreezeMembershipParams {
@@ -17,18 +18,23 @@ export function useFreezeMembership() {
       membershipApi.freezeMembership(params.durationDays, params.reason),
     onSuccess: (result) => {
       void invalidateMembershipQueries(queryClient);
-      const until = result.freezeEnd ? new Date(result.freezeEnd).toLocaleDateString() : null;
-      const frozen = `Subscription frozen for ${result.days} days${until ? ` (until ${until})` : ''}.`;
+      const until = result.freezeEnd ? formatDate(result.freezeEnd, 'PP') : null;
+      const frozen = until
+        ? i18n.t('membership.freezeModal.frozenForUntil', { count: result.days, date: until })
+        : i18n.t('membership.freezeModal.frozenFor', { count: result.days });
       toast.success(
         result.chargeAmount > 0
-          ? `${frozen} Up to ${formatAmount(result.chargeAmount)} for ${result.chargedDays} extra freeze days will be added to your outstanding balance when the freeze ends.`
+          ? `${frozen} ${i18n.t('membership.freezeModal.frozenCharge', {
+              amount: formatAmount(result.chargeAmount),
+              days: result.chargedDays,
+            })}`
           : frozen,
-        { title: 'Subscription Frozen' },
+        { title: i18n.t('membership.freezeModal.frozenTitle') },
       );
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to freeze subscription.';
-      toast.error(message, { title: 'Freeze Failed' });
+      const message = error?.response?.data?.message || i18n.t('membership.freezeModal.freezeFailed');
+      toast.error(message, { title: i18n.t('membership.freezeModal.freezeFailedTitle') });
     },
   });
 }

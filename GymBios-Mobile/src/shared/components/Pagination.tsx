@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 
@@ -13,6 +14,7 @@ export interface PaginationProps {
 }
 
 export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (totalPages <= 1) {
@@ -34,7 +36,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
   return (
     <View style={styles.container}>
       <Button
-        title="Previous"
+        title={t('shared.previous')}
         variant="outline"
         size="md"
         disabled={currentPage <= 1}
@@ -47,7 +49,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         </Typography>
       </View>
       <Button
-        title="Next"
+        title={t('shared.next')}
         variant="outline"
         size="md"
         disabled={currentPage >= totalPages}

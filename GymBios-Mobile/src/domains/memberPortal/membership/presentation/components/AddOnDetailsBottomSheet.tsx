@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 
 import { CurrencyValue } from '@/core/providers';
@@ -20,6 +21,7 @@ export function AddOnDetailsBottomSheet({
   onClose,
   onBuyNow,
 }: AddOnDetailsBottomSheetProps) {
+  const { t } = useTranslation();
   if (!addOn) {
     return null;
   }
@@ -27,7 +29,7 @@ export function AddOnDetailsBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Add-On Details"
+      title={t('membership.addons.detailsTitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
@@ -38,14 +40,14 @@ export function AddOnDetailsBottomSheet({
 
         {!!addOn.description && (
           <View style={styles.descriptionSection}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>{t('membership.addons.description')}</Text>
             <Text style={styles.descriptionText}>{addOn.description}</Text>
           </View>
         )}
 
         <View style={styles.actions}>
           <Button
-            title="Buy Now"
+            title={t('membership.addons.buyNow')}
             onPress={() => onBuyNow(addOn)}
             size="lg"
             style={styles.buyButton}

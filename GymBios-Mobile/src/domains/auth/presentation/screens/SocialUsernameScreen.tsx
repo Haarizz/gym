@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
@@ -21,6 +22,7 @@ export function SocialUsernameScreen({
   useCompleteSocialRegistration,
   usePendingSocialRegistration,
 }: SocialUsernameScreenProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   // The pending handle was persisted by AuthRepositoryImpl the moment the
@@ -79,17 +81,17 @@ export function SocialUsernameScreen({
         </View>
 
         <View style={styles.sheet}>
-          <Typography style={styles.panelTitle}>Choose a username</Typography>
+          <Typography style={styles.panelTitle}>{t('auth.chooseUsernameTitle')}</Typography>
           <Typography style={styles.panelSub}>
-            {pending ? `Almost done, ${pending.maskedEmail}.` : 'Finish setting up your account.'}
+            {pending ? t('auth.almostDone', { email: pending.maskedEmail }) : t('auth.finishSetup')}
           </Typography>
 
           {hasNoPending ? (
             <View style={styles.banner}>
               <Typography style={styles.bannerText}>
-                We couldn&apos;t find an in-progress sign-in on this device. Please sign in again.
+                {t('auth.noPendingSignIn')}
               </Typography>
-              <Button label="Back to sign in" size="lg" onPress={() => router.replace(MEMBER_AUTH_HREF)} style={styles.btnPrimary} />
+              <Button label={t('auth.backToSignIn')} size="lg" onPress={() => router.replace(MEMBER_AUTH_HREF)} style={styles.btnPrimary} />
             </View>
           ) : (
             <>
@@ -100,8 +102,8 @@ export function SocialUsernameScreen({
                   render={({ field: { onChange, onBlur, value } }) => (
                     <Input
                       variant="glass"
-                      label="Full name"
-                      placeholder="Your full name"
+                      label={t('auth.fullName')}
+                      placeholder={t('auth.yourFullName')}
                       autoCapitalize="words"
                       autoComplete="name"
                       returnKeyType="next"
@@ -119,8 +121,8 @@ export function SocialUsernameScreen({
                   render={({ field: { onChange, onBlur, value } }) => (
                     <Input
                       variant="glass"
-                      label="Username"
-                      placeholder="Choose a username"
+                      label={t('auth.username')}
+                      placeholder={t('auth.chooseUsername')}
                       autoCapitalize="none"
                       autoComplete="username"
                       returnKeyType="done"
@@ -140,7 +142,7 @@ export function SocialUsernameScreen({
               ) : null}
 
               <Button
-                label="Finish creating account"
+                label={t('auth.finishCreating')}
                 size="lg"
                 loading={isCompleting}
                 disabled={!pending}

@@ -57,6 +57,17 @@ public class Attendance extends BaseEntity implements BranchAware {
     @Column(name = "total_minutes")
     private Integer totalMinutes;
 
+    // Workout timer — one per visit, started/ended by the member from the app
+    @Column(name = "workout_start_time")
+    private LocalDateTime workoutStartTime;
+
+    @Column(name = "workout_end_time")
+    private LocalDateTime workoutEndTime;
+
+    // Calculated when the workout ends: workoutEndTime − workoutStartTime in minutes
+    @Column(name = "workout_minutes")
+    private Integer workoutMinutes;
+
     // Walk-in visitor fields (null for regular members)
     @Column(name = "walk_in_name")
     private String walkInName;
@@ -119,6 +130,15 @@ public class Attendance extends BaseEntity implements BranchAware {
 
     public Integer getTotalMinutes() { return totalMinutes; }
     public void setTotalMinutes(Integer totalMinutes) { this.totalMinutes = totalMinutes; }
+
+    public LocalDateTime getWorkoutStartTime() { return workoutStartTime; }
+    public void setWorkoutStartTime(LocalDateTime workoutStartTime) { this.workoutStartTime = workoutStartTime; }
+
+    public LocalDateTime getWorkoutEndTime() { return workoutEndTime; }
+    public void setWorkoutEndTime(LocalDateTime workoutEndTime) { this.workoutEndTime = workoutEndTime; }
+
+    public Integer getWorkoutMinutes() { return workoutMinutes; }
+    public void setWorkoutMinutes(Integer workoutMinutes) { this.workoutMinutes = workoutMinutes; }
 
     public String getWalkInName() { return walkInName; }
     public void setWalkInName(String walkInName) { this.walkInName = walkInName; }

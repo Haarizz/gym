@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/core/hooks';
@@ -20,11 +21,12 @@ export function TrafficLightSelector({
   required,
 }: TrafficLightSelectorProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const options = [
-    { value: 'low' as const, label: 'Low', color: '#2f9e6e', bg: '#e7f6ef' },
-    { value: 'medium' as const, label: 'Med', color: '#e0a530', bg: '#fdf3e0' },
-    { value: 'high' as const, label: 'High', color: '#e0574f', bg: '#fbeceb' },
+    { value: 'low' as const, label: t('shared.trafficLight.low'), color: '#2f9e6e', bg: '#e7f6ef' },
+    { value: 'medium' as const, label: t('shared.trafficLight.medium'), color: '#e0a530', bg: '#fdf3e0' },
+    { value: 'high' as const, label: t('shared.trafficLight.high'), color: '#e0574f', bg: '#fbeceb' },
   ];
 
   return (

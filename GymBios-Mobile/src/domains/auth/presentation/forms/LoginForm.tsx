@@ -1,5 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
@@ -8,12 +10,12 @@ import { Button, GlassSurface, Input, Typography } from '@/shared/components';
 
 import type { RoleLoginConfig } from '../config/roleConfig';
 
-const loginSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+const baseLoginSchema = z.object({
+  username: z.string(),
+  password: z.string(),
 });
 
-export type LoginFormValues = z.infer<typeof loginSchema>;
+export type LoginFormValues = z.infer<typeof baseLoginSchema>;
 
 interface LoginFormProps {
   config: RoleLoginConfig;
@@ -22,6 +24,17 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ config, onSubmit, loading = false }: LoginFormProps) {
+  const { t } = useTranslation();
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        username: z.string().min(3, t('auth.errors.usernameMin')),
+        password: z.string().min(6, t('auth.validation.passwordMin')),
+      }),
+    [t]
+  );
+
   const {
     control,
     handleSubmit,
@@ -70,8 +83,8 @@ export function LoginForm({ config, onSubmit, loading = false }: LoginFormProps)
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Username"
-              placeholder="Enter your username"
+              label={t('auth.username')}
+              placeholder={t('auth.enterUsername')}
               autoCapitalize="none"
               autoComplete="username"
               keyboardType="default"
@@ -90,8 +103,8 @@ export function LoginForm({ config, onSubmit, loading = false }: LoginFormProps)
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Password"
-              placeholder="Enter your password"
+              label={t('auth.password')}
+              placeholder={t('auth.enterPassword')}
               secureTextEntry
               autoComplete="password"
               returnKeyType="done"
@@ -106,7 +119,7 @@ export function LoginForm({ config, onSubmit, loading = false }: LoginFormProps)
 
       {/* CTA */}
       <Button
-        label="Sign In"
+        label={t('auth.signInTab')}
         size="lg"
         loading={loading}
         onPress={handleSubmit(onSubmit)}

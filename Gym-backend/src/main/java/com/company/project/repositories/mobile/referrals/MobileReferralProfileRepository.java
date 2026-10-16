@@ -6,6 +6,7 @@ import java.util.Optional;
 
 public interface MobileReferralProfileRepository extends JpaRepository<MobileReferralProfile, Long> {
     Optional<MobileReferralProfile> findByGlobalUserId(Long globalUserId);
+    Optional<MobileReferralProfile> findByMemberId(Long memberId);
     boolean existsByReferralCode(String referralCode);
     Optional<MobileReferralProfile> findByReferralCode(String referralCode);
 }

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface TrainerAddSessionButtonProps {
@@ -9,11 +10,13 @@ interface TrainerAddSessionButtonProps {
 }
 
 export function TrainerAddSessionButton({ onPress }: TrainerAddSessionButtonProps) {
+  const { t } = useTranslation();
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Add New Session"
+      accessibilityLabel={t('schedule.trainer.addNewSession')}
     >
       <LinearGradient
         colors={[BrandColors.trainerAmber, '#D97706']}
@@ -22,7 +25,7 @@ export function TrainerAddSessionButton({ onPress }: TrainerAddSessionButtonProp
         style={styles.container}
       >
         <Feather name="plus" size={20} color="#FFFFFF" />
-        <Text style={styles.text}>Add New Session</Text>
+        <Text style={styles.text}>{t('schedule.trainer.addNewSession')}</Text>
       </LinearGradient>
     </Pressable>
   );

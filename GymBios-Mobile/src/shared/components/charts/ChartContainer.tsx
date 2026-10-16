@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -17,8 +18,8 @@ export function ChartContainer({
   loading = false,
   empty = false,
   error = null,
-  emptyTitle = 'No data available',
-  emptyDescription = 'There is no chart data to display for the selected criteria.',
+  emptyTitle,
+  emptyDescription,
   errorMessage,
   onRetry,
   height,
@@ -27,6 +28,11 @@ export function ChartContainer({
   children,
 }: ChartContainerProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+
+  const finalEmptyTitle = emptyTitle ?? t('shared.charts.noData');
+  const finalEmptyDescription =
+    emptyDescription ?? t('shared.charts.noDataDesc');
 
   const errText =
     errorMessage ??
@@ -34,13 +40,13 @@ export function ChartContainer({
       ? error
       : error && typeof error === 'object' && 'message' in error
         ? String(error.message)
-        : 'Failed to load chart data');
+        : t('shared.charts.loadFailed'));
 
   const renderContent = () => {
     if (loading) {
       return (
         <View style={[styles.stateContainer, height ? { height } : styles.defaultHeight]}>
-          <Loader message="Loading chart..." />
+          <Loader message={t('shared.charts.loading')} />
         </View>
       );
     }
@@ -50,7 +56,7 @@ export function ChartContainer({
         <View style={[styles.stateContainer, height ? { height } : styles.defaultHeight]}>
           <Feather name="alert-circle" size={36} color={theme.error} style={styles.stateIcon} />
           <Typography variant="subtitle" style={{ color: theme.error, textAlign: 'center' }}>
-            Unable to Load Chart
+            {t('shared.charts.unableToLoad')}
           </Typography>
           <Typography
             variant="bodySmall"
@@ -60,7 +66,12 @@ export function ChartContainer({
             {errText}
           </Typography>
           {onRetry ? (
-            <Button label="Retry" onPress={onRetry} variant="secondary" style={{ minWidth: 120 }} />
+            <Button
+              label={t('shared.charts.retry')}
+              onPress={onRetry}
+              variant="secondary"
+              style={{ minWidth: 120 }}
+            />
           ) : null}
         </View>
       );
@@ -69,7 +80,7 @@ export function ChartContainer({
     if (empty) {
       return (
         <View style={[styles.stateContainer, height ? { height } : styles.defaultHeight]}>
-          <EmptyState title={emptyTitle} description={emptyDescription} icon="bar-chart-2" />
+          <EmptyState title={finalEmptyTitle} description={finalEmptyDescription} icon="bar-chart-2" />
         </View>
       );
     }

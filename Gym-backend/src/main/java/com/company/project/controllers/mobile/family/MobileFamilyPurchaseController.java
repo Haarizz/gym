@@ -6,6 +6,7 @@ import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.mobile.family.MobileFamilyQuoteRequestDTO;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.controllers.mobile.discovery.MobileDiscoveryController;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.entities.UserProfile;
@@ -105,6 +106,10 @@ public class MobileFamilyPurchaseController {
         // Global profile first, in its own transaction, then drop the OSIV
         // EntityManager so the purchase gets a fresh one on the tenant's connection
         // (same sequence as MobileDiscoveryController.purchaseMembership).
+        // Same id-space guard as MobileDiscoveryController.purchaseMembership.
+        if (!user.isGlobal()) {
+            throw new IllegalArgumentException(MobileDiscoveryController.GYM_LOGIN_PURCHASE_MESSAGE);
+        }
         UserProfile profile = globalUserService.getUserProfileRequiresNew(user.getId());
         String gymName = globalDiscoveryRepository.findByTenantSlugAndBranchId(tenantSlug, branchId)
                 .map(GlobalBranchDiscovery::getGymName).orElse(null);

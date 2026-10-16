@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -26,6 +27,7 @@ export function MembershipPlanPickerBottomSheet({
   onClose,
   onSelectPlan,
 }: MembershipPlanPickerBottomSheetProps) {
+  const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -58,7 +60,7 @@ export function MembershipPlanPickerBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Select Subscription"
+      title={t('membership.planPicker.title')}
       onClose={onClose}
     >
       <View style={styles.container}>
@@ -66,7 +68,7 @@ export function MembershipPlanPickerBottomSheet({
           <Feather name="search" size={20} color={BrandColors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search subscriptions..."
+            placeholder={t('membership.planPicker.searchPlaceholder')}
             placeholderTextColor={BrandColors.textSecondary}
             value={searchText}
             onChangeText={setSearchText}
@@ -88,7 +90,7 @@ export function MembershipPlanPickerBottomSheet({
           </View>
         ) : plans.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No subscriptions found.</Text>
+            <Text style={styles.emptyText}>{t('membership.planPicker.empty')}</Text>
           </View>
         ) : (
           <View style={styles.listContainer}>
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    marginLeft: Spacing.two,
+    marginStart: Spacing.two,
     fontSize: 15,
     color: BrandColors.textPrimary,
   },

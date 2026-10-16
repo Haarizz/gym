@@ -186,9 +186,7 @@ public class AuthService {
                     .map(com.company.project.entities.Staff::getName)
                     .orElse(null);
             
-            String fullName = userProfileRepository.findByUserId(userDetails.getId())
-                    .map(com.company.project.entities.UserProfile::getFullName)
-                    .orElse(null);
+            String fullName = resolveFullName(userDetails);
             
             if (fullName == null && staffName != null) {
                 fullName = staffName;
@@ -207,7 +205,7 @@ public class AuthService {
                     .permissions(extractPermissions(userDetails))
                     .accessibleBranches(accessibleBranches)
                     .defaultBranchId(defaultBranchId)
-                    .profileCompleted(deriveProfileCompleted(userDetails.getId()))
+                    .profileCompleted(deriveProfileCompleted(userDetails))
                     .build();
         } finally {
             // Only ever set above when loginTenantSlug != null — always safe to clear
@@ -245,9 +243,7 @@ public class AuthService {
                 .map(com.company.project.entities.Staff::getName)
                 .orElse(null);
         
-        String fullName = userProfileRepository.findByUserId(userDetails.getId())
-                .map(com.company.project.entities.UserProfile::getFullName)
-                .orElse(null);
+        String fullName = resolveFullName(userDetails);
         
         if (fullName == null && staffName != null) {
             fullName = staffName;
@@ -265,7 +261,7 @@ public class AuthService {
                 .permissions(extractPermissions(userDetails))
                 .accessibleBranches(accessibleBranches)
                 .defaultBranchId(defaultBranchId)
-                .profileCompleted(deriveProfileCompleted(userDetails.getId()))
+                .profileCompleted(deriveProfileCompleted(userDetails))
                 .build();
     }
 
@@ -305,10 +301,41 @@ public class AuthService {
         }
     }
 
-    private Boolean deriveProfileCompleted(Long userId) {
-        return userProfileRepository.findByUserId(userId)
+    private Boolean deriveProfileCompleted(UserDetailsImpl userDetails) {
+        // A gym-created login already has the gym's details on its members row (the app
+        // profile is filled from it), so it never needs the profile-completion screen.
+        com.company.project.entities.Member member = gymMember(userDetails);
+        if (member != null && hasText(member.getName()) && hasText(member.getPhone())) {
+            return true;
+        }
+        return userProfileRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.UserProfile::isProfileCompleted)
                 .orElse(true);
+    }
+
+    // The members row is the web panel's record of a gym-created login, so its name wins.
+    private String resolveFullName(UserDetailsImpl userDetails) {
+        com.company.project.entities.Member member = gymMember(userDetails);
+        if (member != null && hasText(member.getName())) {
+            return member.getName();
+        }
+        return userProfileRepository.findByUserId(userDetails.getId())
+                .map(com.company.project.entities.UserProfile::getFullName)
+                .orElse(null);
+    }
+
+    /** The members row of a gym-created (non-global) member login, else null. */
+    private com.company.project.entities.Member gymMember(UserDetailsImpl userDetails) {
+        boolean isMember = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"));
+        if (userDetails.isGlobal() || !isMember) {
+            return null;
+        }
+        return memberRepository.findByUserId(userDetails.getId()).orElse(null);
+    }
+
+    private static boolean hasText(String s) {
+        return s != null && !s.isBlank();
     }
 
     private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {

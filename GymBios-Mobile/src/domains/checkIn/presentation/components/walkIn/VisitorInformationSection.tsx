@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/shared/components/Input';
 import { Spacing } from '@/core/theme';
 import { VisitorPhotoPicker } from './VisitorPhotoPicker';
@@ -21,23 +22,24 @@ export function VisitorInformationSection({
   photoUri,
   onPhotoChange
 }: VisitorInformationSectionProps) {
+  const { t } = useTranslation();
   return (
-    <FormSection title="Visitor Information">
+    <FormSection title={t('checkIn.walkIn.visitorInfoTitle')}>
       <View style={styles.row}>
         <View style={styles.inputContainer}>
           <Input 
-            label="Full Name *" 
+            label={t('checkIn.walkIn.fullNameLabel')} 
             value={fullName} 
             onChangeText={onChangeFullName} 
-            placeholder="e.g. John Doe"
+            placeholder={t('checkIn.walkIn.fullNamePlaceholder')}
           />
         </View>
         <View style={styles.inputContainer}>
           <Input 
-            label="Mobile Number *" 
+            label={t('checkIn.walkIn.mobileNumberLabel')} 
             value={phone} 
             onChangeText={onChangePhone} 
-            placeholder="+1 (000) 000-0000"
+            placeholder={t('checkIn.walkIn.mobileNumberPlaceholder')}
             keyboardType="phone-pad"
           />
         </View>

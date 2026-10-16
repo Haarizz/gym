@@ -1,11 +1,16 @@
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors } from '@/core/theme';
+import type en from '@/core/i18n/locales/en';
 
 export type TabIcon = keyof typeof Feather.glyphMap;
 
+export type TabTitleKey = `tabs.${keyof typeof en.tabs}`;
+
 export interface TabConfig {
   name: string;
+  /** English fallback; the tab bar shows `titleKey` translated. */
   title: string;
+  titleKey: TabTitleKey;
   icon: TabIcon;
 }
 
@@ -17,36 +22,36 @@ export interface HeaderConfig {
 }
 
 export const ADMIN_TABS: TabConfig[] = [
-  { name: 'index', title: 'Dashboard', icon: 'home' },
-  { name: 'staff', title: 'Staff', icon: 'users' },
-  { name: 'deals', title: 'Deals', icon: 'tag' },
-  { name: 'analytics', title: 'Analytics', icon: 'bar-chart-2' },
+  { name: 'index', title: 'Dashboard', titleKey: 'tabs.dashboard', icon: 'home' },
+  { name: 'staff', title: 'Staff', titleKey: 'tabs.staff', icon: 'users' },
+  { name: 'deals', title: 'Deals', titleKey: 'tabs.deals', icon: 'tag' },
+  { name: 'analytics', title: 'Analytics', titleKey: 'tabs.analytics', icon: 'bar-chart-2' },
 ];
 
 export const MEMBER_TABS: TabConfig[] = [
-  { name: 'index', title: 'Home', icon: 'home' },
-  { name: 'bookings', title: 'Bookings', icon: 'calendar' },
-  { name: 'community', title: 'Community', icon: 'users' },
-  { name: 'centers', title: 'Centers', icon: 'map-pin' },
-  { name: 'membership', title: 'Subscription', icon: 'credit-card' },
+  { name: 'index', title: 'Home', titleKey: 'tabs.home', icon: 'home' },
+  { name: 'bookings', title: 'Bookings', titleKey: 'tabs.bookings', icon: 'calendar' },
+  { name: 'community', title: 'Community', titleKey: 'tabs.community', icon: 'users' },
+  { name: 'centers', title: 'Centers', titleKey: 'tabs.centers', icon: 'map-pin' },
+  { name: 'membership', title: 'Subscription', titleKey: 'tabs.subscription', icon: 'credit-card' },
 ];
 
 export const TRAINER_TABS: TabConfig[] = [
-  { name: 'index', title: 'Home', icon: 'home' },
-  { name: 'schedule', title: 'Schedule', icon: 'calendar' },
-  { name: 'community', title: 'Community', icon: 'users' },
-  { name: 'performance', title: 'Performance', icon: 'trending-up' },
-  { name: 'ledger', title: 'Ledger', icon: 'book-open' },
-  { name: 'messaging', title: 'Messages', icon: 'message-square' },
+  { name: 'index', title: 'Home', titleKey: 'tabs.home', icon: 'home' },
+  { name: 'schedule', title: 'Schedule', titleKey: 'tabs.schedule', icon: 'calendar' },
+  { name: 'community', title: 'Community', titleKey: 'tabs.community', icon: 'users' },
+  { name: 'performance', title: 'Performance', titleKey: 'tabs.performance', icon: 'trending-up' },
+  { name: 'ledger', title: 'Ledger', titleKey: 'tabs.ledger', icon: 'book-open' },
+  { name: 'messaging', title: 'Messages', titleKey: 'tabs.messages', icon: 'message-square' },
 ];
 
 export const STAFF_TABS: TabConfig[] = [
-  { name: 'index', title: 'Home', icon: 'home' },
-  { name: 'performance', title: 'Performance', icon: 'trending-up' },
-  { name: 'community', title: 'Community', icon: 'users' },
-  { name: 'schedule', title: 'Schedule', icon: 'calendar' },
-  { name: 'ledger', title: 'Ledger', icon: 'book-open' },
-  { name: 'messaging', title: 'Messages', icon: 'message-square' },
+  { name: 'index', title: 'Home', titleKey: 'tabs.home', icon: 'home' },
+  { name: 'performance', title: 'Performance', titleKey: 'tabs.performance', icon: 'trending-up' },
+  { name: 'community', title: 'Community', titleKey: 'tabs.community', icon: 'users' },
+  { name: 'schedule', title: 'Schedule', titleKey: 'tabs.schedule', icon: 'calendar' },
+  { name: 'ledger', title: 'Ledger', titleKey: 'tabs.ledger', icon: 'book-open' },
+  { name: 'messaging', title: 'Messages', titleKey: 'tabs.messages', icon: 'message-square' },
 ];
 
 export const ADMIN_HEADER: HeaderConfig = {

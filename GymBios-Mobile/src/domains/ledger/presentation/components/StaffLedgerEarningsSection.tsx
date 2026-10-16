@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { formatDate } from '@/core/i18n';
 import type { RecentEarningTransaction } from '../../domain/StaffLedgerData';
 
 interface StaffLedgerEarningsSectionProps {
@@ -14,13 +16,11 @@ export function StaffLedgerEarningsSection({
   recentEarnings,
   onDownloadSalarySlip,
 }: StaffLedgerEarningsSectionProps) {
-  const formatDate = (dateStr: string) => {
+  const { t } = useTranslation();
+
+  const formatTxDate = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: 'numeric',
-      });
+      return formatDate(dateStr, 'P');
     } catch {
       return dateStr;
     }
@@ -31,16 +31,16 @@ export function StaffLedgerEarningsSection({
       {/* Recent Earnings List */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Recent Earnings</Text>
+          <Text style={styles.cardTitle}>{t('ledger.earnings.recentEarningsTitle')}</Text>
           <Pressable hitSlop={8}>
-            <Text style={styles.viewAllText}>View All</Text>
+            <Text style={styles.viewAllText}>{t('ledger.earnings.viewAll')}</Text>
           </Pressable>
         </View>
 
         <View style={styles.earningsList}>
           {recentEarnings.length === 0 && (
             <Text style={styles.emptyText}>
-              No earnings yet. Salary payments and commission from your sales will appear here.
+              {t('ledger.earnings.noEarningsEmpty')}
             </Text>
           )}
           {recentEarnings.map((item) => {
@@ -64,13 +64,13 @@ export function StaffLedgerEarningsSection({
                         isPaid ? styles.textPaid : styles.textPending,
                       ]}
                     >
-                      {item.status.toUpperCase()}
+                      {isPaid ? t('ledger.earnings.statusPaid') : t('ledger.earnings.statusPending')}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.itemBottomRow}>
-                  <Text style={styles.dateText}>{formatDate(item.date)}</Text>
+                  <Text style={styles.dateText}>{formatTxDate(item.date)}</Text>
                   <Text style={styles.amountText}><CurrencyValue amount={item.amount} /></Text>
                 </View>
               </View>
@@ -84,10 +84,10 @@ export function StaffLedgerEarningsSection({
         style={styles.downloadButton}
         onPress={onDownloadSalarySlip}
         accessibilityRole="button"
-        accessibilityLabel="Download Salary Slip"
+        accessibilityLabel={t('ledger.earnings.downloadSalarySlip')}
       >
         <Feather name="download" size={18} color={BrandColors.teal} />
-        <Text style={styles.downloadButtonText}>Download Salary Slip</Text>
+        <Text style={styles.downloadButtonText}>{t('ledger.earnings.downloadSalarySlip')}</Text>
       </Pressable>
     </View>
   );

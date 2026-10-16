@@ -68,7 +68,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   }, [effectiveBranchId]);
 
   // Display currency is branch-scoped (web Settings page) — follow the active branch.
-  useDisplayCurrencySync(effectiveBranchId);
+  // /financial-settings is 403'd the same way while member access is locked.
+  useDisplayCurrencySync(effectiveBranchId, appRole !== 'member' || (!approval.isLoading && !isApprovalLocked));
 
   const handleSetSelectedBranch = (id: BranchId) => {
     setUserSelectedBranchId(id);

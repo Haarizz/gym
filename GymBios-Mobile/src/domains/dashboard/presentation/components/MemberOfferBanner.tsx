@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +12,7 @@ const PURPLE_END   = 'rgba(109,40,217,0.68)';
 
 export function MemberOfferBanner() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.banner}>
@@ -29,18 +31,18 @@ export function MemberOfferBanner() {
         <View style={styles.iconBox}>
           <Feather name="gift" size={16} color="#FFFFFF" />
         </View>
-        <Text style={styles.title}>Special Offer! 🎉</Text>
+        <Text style={styles.title}>{t('memberHome.offer.title')}</Text>
       </View>
       <Text style={styles.description}>
-        Renew your subscription now and get 15% off + 1 month free PT sessions.
+        {t('memberHome.offer.description')}
       </Text>
       <Pressable
         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         onPress={() => router.push('/(member)/membership' as any)}
         accessibilityRole="button"
-        accessibilityLabel="Claim Offer"
+        accessibilityLabel={t('memberHome.offer.ctaA11y')}
       >
-        <Text style={styles.buttonText}>Claim Offer →</Text>
+        <Text style={styles.buttonText}>{t('memberHome.offer.cta')}</Text>
       </Pressable>
     </View>
   );

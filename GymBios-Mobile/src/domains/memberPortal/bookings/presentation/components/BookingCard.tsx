@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate, tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { CurrencyValue } from '@/core/providers';
@@ -38,15 +40,9 @@ interface BookingCardProps {
   onViewDetails: (booking: BookingItemData) => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending_approval: 'AWAITING APPROVAL',
-};
-
 export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardProps) {
-  const formattedDate = new Date(booking.date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+  const { t } = useTranslation();
+  const formattedDate = formatDate(booking.date, 'MMM d');
   const awaitingApproval = booking.status === 'pending_approval';
   const deadline = formatRefundDeadline(booking.refundDeadline);
   const isPaid = booking.price > 0 || booking.paidWithPass;
@@ -56,11 +52,13 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
       <View style={styles.header}>
         <View style={styles.titleInfo}>
           <Text style={styles.className}>{booking.class}</Text>
-          <Text style={styles.trainerName}>with {booking.trainer}</Text>
+          <Text style={styles.trainerName}>{t('bookings.withTrainer', { name: booking.trainer })}</Text>
         </View>
         <View style={[styles.statusBadge, awaitingApproval && styles.statusBadgePending]}>
           <Text style={[styles.statusText, awaitingApproval && styles.statusTextPending]}>
-            {STATUS_LABELS[booking.status] ?? booking.status.toUpperCase()}
+            {awaitingApproval
+              ? t('bookings.card.awaitingApprovalBadge')
+              : tOr(`bookings.status.${booking.status}`, booking.status).toUpperCase()}
           </Text>
         </View>
       </View>
@@ -71,7 +69,7 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
             <Feather name="calendar" size={14} color={BrandColors.trainerAmber} />
           </View>
           <View>
-            <Text style={styles.metaLabel}>Date</Text>
+            <Text style={styles.metaLabel}>{t('bookings.card.date')}</Text>
             <Text style={styles.metaValue}>{formattedDate}</Text>
           </View>
         </View>
@@ -81,7 +79,7 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
             <Feather name="clock" size={14} color={BrandColors.teal} />
           </View>
           <View>
-            <Text style={styles.metaLabel}>Time</Text>
+            <Text style={styles.metaLabel}>{t('bookings.card.time')}</Text>
             <Text style={styles.metaValue}>{booking.time}</Text>
           </View>
         </View>
@@ -101,7 +99,9 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
                 booking.spotsLeft === 0 && styles.spotsTextFull,
               ]}
             >
-              {booking.spotsLeft > 0 ? `${booking.spotsLeft} spots left` : 'Full'}
+              {booking.spotsLeft > 0
+                ? t('bookings.card.spotsLeft', { count: booking.spotsLeft })
+                : t('bookings.card.full')}
             </Text>
           </View>
         )}
@@ -111,18 +111,25 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
         <View style={styles.paymentRow}>
           <Text style={styles.paymentText}>
             {booking.paidWithPass && booking.price === 0 ? (
-              'Paid with Reward Pass'
-            ) : awaitingApproval ? (
-              <>Payment of <CurrencyValue amount={booking.price} /> awaiting gym approval</>
-            ) : booking.partlyPaid ? (
-              <>Part-paid · <CurrencyValue amount={booking.price} /> total</>
+              t('bookings.card.paidWithPass')
             ) : (
-              <>Paid <CurrencyValue amount={booking.price} /></>
+              <Trans
+                i18nKey={
+                  awaitingApproval
+                    ? 'bookings.card.paymentAwaiting'
+                    : booking.partlyPaid
+                      ? 'bookings.card.partPaidTotal'
+                      : 'bookings.card.paid'
+                }
+                components={{ amount: <CurrencyValue amount={booking.price} /> }}
+              />
             )}
           </Text>
           {!awaitingApproval && deadline && (
             <Text style={[styles.refundText, !booking.refundableIfCancelledNow && styles.refundTextClosed]}>
-              {booking.refundableIfCancelledNow ? `Refundable until ${deadline}` : 'No longer refundable'}
+              {booking.refundableIfCancelledNow
+                ? t('bookings.card.refundableUntil', { deadline })
+                : t('bookings.card.noLongerRefundable')}
             </Text>
           )}
         </View>
@@ -133,14 +140,14 @@ export function BookingCard({ booking, onCancel, onViewDetails }: BookingCardPro
           style={({ pressed }) => [styles.detailsButton, pressed && styles.pressed]}
           onPress={() => onViewDetails(booking)}
         >
-          <Text style={styles.detailsButtonText}>View Details</Text>
+          <Text style={styles.detailsButtonText}>{t('bookings.card.viewDetails')}</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
           onPress={() => onCancel(booking)}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+          <Text style={styles.cancelButtonText}>{t('bookings.card.cancel')}</Text>
         </Pressable>
       </View>
     </GlassSurface>
@@ -159,7 +166,7 @@ const styles = StyleSheet.create({
   },
   titleInfo: {
     flex: 1,
-    paddingRight: Spacing.two,
+    paddingEnd: Spacing.two,
   },
   className: {
     fontSize: TypographyScale.subtitle,

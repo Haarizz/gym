@@ -1,6 +1,7 @@
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { ScheduleTask } from '../../domain/StaffScheduleData';
 
@@ -10,6 +11,7 @@ interface StaffTaskItemCardProps {
 }
 
 export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardProps) {
+  const { t } = useTranslation();
   const isHigh = task.priority === 'high';
 
   const getTypeBadgeStyle = (type: string) => {
@@ -22,6 +24,21 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
         return { bg: '#DCFCE7', text: '#15803D' };
       default:
         return { bg: '#F1F5F9', text: '#475569' };
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'follow-up':
+        return t('schedule.staff.types.followUp');
+      case 'meeting':
+        return t('schedule.staff.types.meeting');
+      case 'tour':
+        return t('schedule.staff.types.tour');
+      case 'class':
+        return t('schedule.staff.types.class');
+      default:
+        return type.toUpperCase();
     }
   };
 
@@ -58,19 +75,19 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
           <View style={styles.tagsRow}>
             <View style={[styles.typeBadge, { backgroundColor: badgeStyle.bg }]}>
               <Text style={[styles.typeText, { color: badgeStyle.text }]}>
-                {task.type.toUpperCase()}
+                {getTypeLabel(task.type)}
               </Text>
             </View>
 
             {isHigh && (
               <View style={styles.urgentBadge}>
-                <Text style={styles.urgentText}>URGENT</Text>
+                <Text style={styles.urgentText}>{t('schedule.staff.urgentBadge')}</Text>
               </View>
             )}
 
             {task.completed && (
               <View style={styles.completedBadge}>
-                <Text style={styles.completedText}>DONE</Text>
+                <Text style={styles.completedText}>{t('schedule.staff.doneBadge')}</Text>
               </View>
             )}
           </View>
@@ -90,10 +107,10 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
                 style={styles.callButton}
                 onPress={handleCall}
                 accessibilityRole="button"
-                accessibilityLabel={`Call ${task.name}`}
+                accessibilityLabel={t('schedule.staff.callAccessibility', { name: task.name })}
               >
                 <Feather name="phone" size={12} color="#FFFFFF" />
-                <Text style={styles.callButtonText}>Call Now</Text>
+                <Text style={styles.callButtonText}>{t('schedule.staff.callNow')}</Text>
               </Pressable>
             )}
 
@@ -107,7 +124,7 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
               onPress={() => onToggleComplete?.(task.id)}
               disabled={task.completed}
               accessibilityRole="button"
-              accessibilityLabel={task.completed ? 'Completed' : 'Mark done'}
+              accessibilityLabel={task.completed ? t('schedule.staff.completedCheck') : t('schedule.staff.markDone')}
             >
               <Text
                 style={[
@@ -115,7 +132,7 @@ export function StaffTaskItemCard({ task, onToggleComplete }: StaffTaskItemCardP
                   task.completed && styles.doneButtonTextActive,
                 ]}
               >
-                {task.completed ? 'Completed ✓' : 'Mark Done'}
+                {task.completed ? t('schedule.staff.completedCheck') : t('schedule.staff.markDone')}
               </Text>
             </Pressable>
             )}

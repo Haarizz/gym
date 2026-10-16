@@ -17,6 +17,8 @@ public interface MobileReferralAttributionRepository extends JpaRepository<Mobil
     
     List<MobileReferralAttribution> findByReferrerGlobalUserId(Long referrerGlobalUserId);
 
+    List<MobileReferralAttribution> findByReferrerMemberId(Long referrerMemberId);
+
     List<MobileReferralAttribution> findByStatus(MobileReferralStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

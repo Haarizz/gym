@@ -19,6 +19,24 @@ export interface MemberCheckInStatus {
   canCheckIn?: boolean;
   /** Why a check-in would be refused right now (quota, daily cap or cooldown). */
   blockedReason?: string | null;
+  /** Workout timer on the current visit — start while running, minutes once ended. */
+  workoutStartTime?: string | null;
+  workoutEndTime?: string | null;
+  workoutMinutes?: number | null;
+  /**
+   * A visit from an earlier day that was never checked out. The member isn't
+   * checked in; the next check-in closes it at unclosedAutoCloseTime.
+   */
+  unclosedAttendanceId?: number | null;
+  unclosedCheckInTime?: string | null;
+  unclosedAutoCloseTime?: string | null;
+}
+
+export interface MemberWorkoutResponse {
+  attendanceId?: number;
+  workoutStartTime?: string | null;
+  workoutEndTime?: string | null;
+  workoutMinutes?: number | null;
 }
 
 export interface MemberCheckInResponse {
@@ -42,6 +60,7 @@ export interface MemberCheckOutResponse {
   check_out_time?: string;
   durationMinutes?: number;
   duration_minutes?: number;
+  workoutMinutes?: number | null;
   message?: string;
 }
 

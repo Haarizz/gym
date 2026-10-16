@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -10,27 +11,29 @@ interface StaffMonthSummaryCardProps {
 }
 
 export function StaffMonthSummaryCard({ summary }: StaffMonthSummaryCardProps) {
+  const { t } = useTranslation();
+
   return (
     <GlassSurface radius={Radius.lg} style={styles.container}>
-      <Text style={styles.title}>This Month</Text>
+      <Text style={styles.title}>{t('dashboard.staff.monthlySummary.title')}</Text>
 
       <View style={styles.row}>
-        <Text style={styles.label}>Target Achievement</Text>
+        <Text style={styles.label}>{t('dashboard.staff.monthlySummary.targetAchievement')}</Text>
         <Text style={[styles.value, { color: '#16A34A' }]}>{summary.targetAchievement}%</Text>
       </View>
 
       <View style={styles.row}>
-        <Text style={styles.label}>Total Conversions</Text>
+        <Text style={styles.label}>{t('dashboard.staff.monthlySummary.totalConversions')}</Text>
         <Text style={styles.value}>{summary.totalConversions}</Text>
       </View>
 
       <View style={styles.row}>
-        <Text style={styles.label}>Revenue Generated</Text>
+        <Text style={styles.label}>{t('dashboard.staff.monthlySummary.revenueGenerated')}</Text>
         <CurrencyValue style={[styles.value, { color: BrandColors.memberGold }]} amount={summary.revenueGenerated} compact />
       </View>
 
       <View style={[styles.row, styles.lastRow]}>
-        <Text style={styles.label}>Conversion Rate</Text>
+        <Text style={styles.label}>{t('dashboard.staff.monthlySummary.conversionRate')}</Text>
         <Text style={styles.value}>{summary.conversionRate}%</Text>
       </View>
     </GlassSurface>

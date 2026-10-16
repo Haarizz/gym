@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -15,6 +16,7 @@ interface DailyPlanSelectorProps {
 }
 
 export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }: DailyPlanSelectorProps) {
+  const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
   const { plans, isLoading } = useWalkInPlans();
 
@@ -24,10 +26,10 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
   };
 
   const placeholder = isLoading
-    ? 'Loading passes...'
+    ? t('checkIn.walkIn.loadingPasses')
     : plans.length === 0
-      ? 'No walk-in passes configured'
-      : 'Select a pass';
+      ? t('checkIn.walkIn.noPassesConfigured')
+      : t('checkIn.walkIn.selectPass');
 
   return (
     <>
@@ -35,7 +37,7 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
         style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
         onPress={() => !isLoading && plans.length > 0 && setModalVisible(true)}
         accessibilityRole="button"
-        accessibilityLabel="Select daily pass"
+        accessibilityLabel={t('checkIn.walkIn.selectDailyPassA11y')}
       >
         <View style={styles.triggerContent}>
           <Typography
@@ -61,10 +63,10 @@ export function DailyPlanSelector({ selectedPlanId, selectedPlanName, onSelect }
               <View style={styles.sheet}>
                 <View style={styles.sheetHandle} />
                 <Typography variant="subtitle" style={styles.sheetTitle}>
-                  Select Daily Pass
+                  {t('checkIn.walkIn.selectDailyPassTitle')}
                 </Typography>
                 <Typography variant="bodySmall" color="textSecondary" style={styles.sheetSubtitle}>
-                  Choose a walk-in / daily visitor pass
+                  {t('checkIn.walkIn.selectDailyPassSubtitle')}
                 </Typography>
 
                 <ScrollView

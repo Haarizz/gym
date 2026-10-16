@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Radius, Spacing } from '@/core/theme';
 
 import { Dropdown } from '@/shared/components';
@@ -13,12 +15,6 @@ interface TrainerScheduleHeaderCardProps {
   onFilterPress?: () => void;
 }
 
-const FILTER_OPTIONS = [
-  { label: 'This Week', value: 'this_week' },
-  { label: 'Next Week', value: 'next_week' },
-  { label: 'Custom Range', value: 'custom' },
-];
-
 export function TrainerScheduleHeaderCard({
   dateRange,
   totalSessions,
@@ -26,15 +22,23 @@ export function TrainerScheduleHeaderCard({
   onFilterChange,
   onFilterPress,
 }: TrainerScheduleHeaderCardProps) {
+  const { t } = useTranslation();
+
+  const filterOptions = useMemo(() => [
+    { label: t('schedule.trainer.filterThisWeek'), value: 'this_week' },
+    { label: t('schedule.trainer.filterNextWeek'), value: 'next_week' },
+    { label: t('schedule.trainer.filterCustomRange'), value: 'custom' },
+  ], [t]);
+
   return (
     <View style={styles.container}>
       <View style={styles.filterRow}>
         <View style={styles.dropdownContainer}>
           <Dropdown
             value={filterValue}
-            options={FILTER_OPTIONS}
+            options={filterOptions}
             onChange={onFilterChange}
-            placeholder="Select range"
+            placeholder={t('schedule.trainer.selectRangePlaceholder')}
           />
         </View>
 
@@ -42,7 +46,7 @@ export function TrainerScheduleHeaderCard({
           style={styles.filterBtn}
           onPress={onFilterPress}
           accessibilityRole="button"
-          accessibilityLabel="Filter schedule"
+          accessibilityLabel={t('schedule.trainer.filterScheduleAccessibility')}
         >
           <Feather name="filter" size={18} color="#475569" />
         </Pressable>
@@ -50,7 +54,9 @@ export function TrainerScheduleHeaderCard({
 
       <View style={styles.footerRow}>
         <Text style={styles.dateRangeText}>{dateRange}</Text>
-        <Text style={styles.totalSessionsText}>{totalSessions} Sessions</Text>
+        <Text style={styles.totalSessionsText}>
+          {t('schedule.trainer.sessionsCount', { count: totalSessions })}
+        </Text>
       </View>
     </View>
   );

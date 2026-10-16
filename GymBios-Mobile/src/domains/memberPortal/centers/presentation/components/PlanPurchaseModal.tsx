@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -31,6 +32,7 @@ export function PlanPurchaseModal({
   onClose,
   onSuccess,
 }: PlanPurchaseModalProps) {
+  const { t } = useTranslation();
   const purchaseMutation = usePurchaseMembership();
   // Step 1 offers a promotion or referral coupon code; step 2 is the payment sheet at the net price.
   // 'already-member' is shown when the server rejects the purchase with 409 because
@@ -78,12 +80,12 @@ export function PlanPurchaseModal({
 
           if (approvalStatus === 'PENDING') {
             toast.success(
-              `Your payment for ${plan.name} at ${center.centerName} is submitted and awaiting approval from gym staff.`,
-              { title: 'Payment Submitted', duration: 5000 }
+              t('centers.purchase.submitted', { plan: plan.name, center: center.centerName }),
+              { title: t('centers.purchase.submittedTitle'), duration: 5000 }
             );
           } else {
-            toast.success(`You have successfully subscribed to ${plan.name} at ${center.centerName}. Your subscription is now active!`, {
-              title: 'Purchase Successful! 🎉',
+            toast.success(t('centers.purchase.success', { plan: plan.name, center: center.centerName }), {
+              title: t('centers.purchase.successTitle'),
               duration: 4000,
             });
           }
@@ -96,7 +98,7 @@ export function PlanPurchaseModal({
             setStep('already-member');
             return;
           }
-          toast.error(err?.message || 'Could not process the purchase.', { title: 'Purchase Failed' });
+          toast.error(err?.message || t('centers.purchase.failed'), { title: t('centers.purchase.failedTitle') });
         }
       }
     );
@@ -109,7 +111,7 @@ export function PlanPurchaseModal({
           <View style={styles.sheet}>
             <View style={styles.header}>
               <View style={styles.headerText}>
-                <Text style={styles.title}>Subscribe to {plan.name}</Text>
+                <Text style={styles.title}>{t('centers.purchase.title', { name: plan.name })}</Text>
                 <Text style={styles.subtitle}>{center.centerName}</Text>
               </View>
               <Pressable hitSlop={12} onPress={close} style={styles.closeButton}>
@@ -129,12 +131,12 @@ export function PlanPurchaseModal({
 
               <View style={styles.priceCard}>
                 <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Price</Text>
+                  <Text style={styles.priceLabel}>{t('centers.purchase.price')}</Text>
                   <CurrencyValue style={styles.priceValue} amount={plan.price} />
                 </View>
                 {offerDiscount > 0 && (
                   <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>{plan.offerLabel || 'Offer'}</Text>
+                    <Text style={styles.priceLabel}>{plan.offerLabel || t('centers.purchase.offer')}</Text>
                     <CurrencyValue style={styles.discountText} amount={-offerDiscount} />
                   </View>
                 )}
@@ -142,15 +144,15 @@ export function PlanPurchaseModal({
                   <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>
                       {couponSel?.kind === 'coupon' && couponSel.coupon.source === 'PROMOTION'
-                        ? couponSel.coupon.name || 'Promotion'
-                        : 'Coupon'}
+                        ? couponSel.coupon.name || t('centers.purchase.promotion')
+                        : t('centers.purchase.coupon')}
                     </Text>
                     <CurrencyValue style={styles.discountText} amount={-couponDiscount} />
                   </View>
                 )}
                 <View style={styles.divider} />
                 <View style={styles.priceRow}>
-                  <Text style={styles.totalLabel}>Total Payable</Text>
+                  <Text style={styles.totalLabel}>{t('centers.purchase.totalPayable')}</Text>
                   <CurrencyValue style={styles.totalValue} amount={totalAmount} />
                 </View>
               </View>
@@ -158,7 +160,7 @@ export function PlanPurchaseModal({
 
             <View style={styles.footer}>
               <Pressable style={styles.continueButton} onPress={() => setStep('pay')}>
-                <Text style={styles.continueText}>Continue to Payment</Text>
+                <Text style={styles.continueText}>{t('centers.purchase.continueToPayment')}</Text>
               </Pressable>
             </View>
           </View>
@@ -168,7 +170,7 @@ export function PlanPurchaseModal({
       <PaymentBottomSheet
         visible={visible && step === 'pay'}
         amount={totalAmount}
-        title={`Subscribe to ${plan.name}`}
+        title={t('centers.purchase.title', { name: plan.name })}
         subtitle={center.centerName}
         allowDiscount={false}
         onClose={close}
@@ -183,16 +185,15 @@ export function PlanPurchaseModal({
               <View style={styles.noticeIcon}>
                 <Feather name="user-check" size={28} color={BrandColors.memberGold} />
               </View>
-              <Text style={styles.noticeTitle}>You're already subscribed</Text>
+              <Text style={styles.noticeTitle}>{t('centers.purchase.alreadyTitle')}</Text>
               <Text style={styles.noticeText}>
-                You already have a subscription at {center.centerName}, so you can't purchase
-                another one here.
+                {t('centers.purchase.alreadyBody', { center: center.centerName })}
               </Text>
             </View>
 
             <View style={styles.footer}>
               <Pressable style={styles.continueButton} onPress={close}>
-                <Text style={styles.continueText}>Got it</Text>
+                <Text style={styles.continueText}>{t('centers.purchase.gotIt')}</Text>
               </Pressable>
             </View>
           </View>

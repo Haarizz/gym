@@ -79,6 +79,9 @@ public class MemberResponseDTO {
     private String approvedBy;
     private String approvedAt;
     private String rejectionReason;
+    // Approval History only: a rejected purchase the member has since replaced with a new
+    // one (here or at another gym), so it can no longer be approved.
+    private Boolean superseded;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -218,6 +221,8 @@ public class MemberResponseDTO {
     public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
     public String getApprovedAt() { return approvedAt; }
     public void setApprovedAt(String approvedAt) { this.approvedAt = approvedAt; }
+    public Boolean getSuperseded() { return superseded; }
+    public void setSuperseded(Boolean superseded) { this.superseded = superseded; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 }

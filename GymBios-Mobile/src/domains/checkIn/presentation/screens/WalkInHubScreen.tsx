@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -20,6 +21,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  * paths: visitor registration and today's visitor listing.
  */
 export function WalkInHubScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { recentVisitors } = useRecentCheckIns();
@@ -28,22 +30,22 @@ export function WalkInHubScreen() {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Walk-In / Daily Visitor"
-        subtitle="Register visitors and grant temporary access"
+        title={t('checkIn.walkIn.title')}
+        subtitle={t('checkIn.walkIn.subtitle')}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
       />
 
       <View style={[styles.content, { paddingBottom: bottomInset }]}>
         <HubFeatureCard
-          title="Register Visitor"
-          subtitle="Fill visitor details, select a daily pass, and process payment."
+          title={t('checkIn.walkIn.registerTitle')}
+          subtitle={t('checkIn.walkIn.registerSubtitle')}
           iconName="user-plus"
           iconBg="#dcfce7"
           iconColor="#16a34a"
           onPress={() => {
             if (selectedBranchId === 'ALL') {
-              toast.error('Please select a specific branch from the header menu before registering a visitor.', { title: 'Branch Required' });
+              toast.error(t('checkIn.walkIn.branchRequiredMsg'), { title: t('checkIn.walkIn.branchRequiredTitle') });
               return;
             }
             router.push('/(admin)/check-in/walk-in/register');
@@ -51,13 +53,13 @@ export function WalkInHubScreen() {
         />
 
         <HubFeatureCard
-          title="Today's Daily Visitors"
-          subtitle="View all walk-in passes issued today."
+          title={t('checkIn.walkIn.todayVisitorsTitle')}
+          subtitle={t('checkIn.walkIn.todayVisitorsSub')}
           iconName="list"
           iconBg="#dbeafe"
           iconColor="#2563eb"
           onPress={() => router.push('/(admin)/check-in/walk-in/visitors')}
-          countLabel={recentVisitors.length > 0 ? `${recentVisitors.length} today` : 'Open'}
+          countLabel={recentVisitors.length > 0 ? t('checkIn.walkIn.todayCount', { count: recentVisitors.length }) : t('checkIn.walkIn.open')}
         />
       </View>
     </ScreenLayout>

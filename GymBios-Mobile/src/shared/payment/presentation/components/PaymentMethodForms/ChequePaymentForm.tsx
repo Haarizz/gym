@@ -7,6 +7,7 @@ import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 
 interface ChequePaymentFormProps {
   finalAmount: number;
@@ -38,6 +39,7 @@ export function ChequePaymentForm({
   onDueDateChange,
 }: ChequePaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const numPaid = parseFloat(paidAmount || '0');
   const remaining = Math.max(0, finalAmount - numPaid);
 
@@ -52,26 +54,26 @@ export function ChequePaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#334155' }}>
-        Cheque Payment Details
+        {t('paymentSheet.form.chequeDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label="Cheque Number *"
+            label={t('paymentSheet.form.chequeNumber')}
             value={chequeNumber}
             onChangeText={onChequeNumberChange}
-            placeholder="e.g. CHQ-001234"
+            placeholder={t('paymentSheet.form.example', { value: 'CHQ-001234' })}
             error={errors?.chequeNumber}
           />
         </View>
 
         <View style={styles.flex1}>
           <Input
-            label="Bank Name (Optional)"
+            label={t('paymentSheet.form.bankNameOptional')}
             value={bankName}
             onChangeText={onBankNameChange}
-            placeholder="e.g. SBI"
+            placeholder={t('paymentSheet.form.example', { value: 'SBI' })}
           />
         </View>
       </View>
@@ -79,7 +81,7 @@ export function ChequePaymentForm({
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={<>Amount (<CurrencyGlyph />) *</>}
+            label={<Trans i18nKey="paymentSheet.form.amount" components={{ currency: <CurrencyGlyph /> }} />}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -90,8 +92,8 @@ export function ChequePaymentForm({
 
         <View style={styles.flex1}>
           <DatePicker
-            label="Cheque Date (Optional)"
-            placeholder="Select date"
+            label={t('paymentSheet.form.chequeDateOptional')}
+            placeholder={t('paymentSheet.form.selectDate')}
             value={chequeDate ?? null}
             onChange={onChequeDateChange}
           />
@@ -100,8 +102,8 @@ export function ChequePaymentForm({
 
       {remaining > 0 ? (
         <DatePicker
-          label="Payment Due Date *"
-          placeholder="Select due date"
+          label={t('paymentSheet.form.dueDate')}
+          placeholder={t('paymentSheet.form.selectDueDate')}
           value={paymentDueDate ?? null}
           onChange={onDueDateChange}
           minimumDate={new Date()}
@@ -120,7 +122,7 @@ export function ChequePaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -128,7 +130,7 @@ export function ChequePaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Paid Amount:
+            {t('paymentSheet.form.paidAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
             <CurrencyValue amount={(numPaid || 0)} decimals={2} />
@@ -136,7 +138,7 @@ export function ChequePaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Remaining/Due:
+            {t('paymentSheet.form.remainingOrDue')}
           </Typography>
           <Typography
             variant="bodySmallBold"

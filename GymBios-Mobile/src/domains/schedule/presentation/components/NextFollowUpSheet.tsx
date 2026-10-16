@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Modal,
   Pressable,
@@ -10,20 +10,12 @@ import {
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { addDays, format, startOfDay } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { DatePicker, Dropdown, TimePicker } from '@/shared/components';
 import type { NextFollowUpRequest } from '../../infrastructure/ApiStaffScheduleRepository';
-
-const TYPE_OPTIONS = [
-  { label: 'Call', value: 'call' },
-  { label: 'WhatsApp', value: 'whatsapp' },
-  { label: 'SMS', value: 'sms' },
-  { label: 'Email', value: 'email' },
-  { label: 'Meeting', value: 'meeting' },
-  { label: 'Visit', value: 'visit' },
-];
 
 interface NextFollowUpSheetProps {
   visible: boolean;
@@ -44,11 +36,21 @@ export function NextFollowUpSheet({
   onSubmit,
   submitting = false,
 }: NextFollowUpSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [date, setDate] = useState<Date | null>(() => addDays(startOfDay(new Date()), 1));
   const [time, setTime] = useState('10:00');
   const [type, setType] = useState('call');
   const [notes, setNotes] = useState('');
+
+  const typeOptions = useMemo(() => [
+    { label: t('schedule.followUp.types.call'), value: 'call' },
+    { label: t('schedule.followUp.types.whatsapp'), value: 'whatsapp' },
+    { label: t('schedule.followUp.types.sms'), value: 'sms' },
+    { label: t('schedule.followUp.types.email'), value: 'email' },
+    { label: t('schedule.followUp.types.meeting'), value: 'meeting' },
+    { label: t('schedule.followUp.types.visit'), value: 'visit' },
+  ], [t]);
 
   const handleSubmit = () => {
     if (!date) return;
@@ -69,7 +71,9 @@ export function NextFollowUpSheet({
           onPress={e => e.stopPropagation()}
         >
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Schedule Next Follow-up</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              {t('schedule.followUp.scheduleNextTitle')}
+            </Text>
             <TouchableOpacity onPress={onSkip}>
               <Feather name="x" size={22} color={theme.text} />
             </TouchableOpacity>
@@ -77,30 +81,31 @@ export function NextFollowUpSheet({
 
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
-              When should you next contact{' '}
-              <Text style={{ color: theme.text, fontWeight: '700' }}>{leadName}</Text>?
+              {t('schedule.followUp.contactQuestion', { name: leadName })}
             </Text>
 
             <View style={styles.fields}>
               <DatePicker
-                label="Date"
+                label={t('schedule.followUp.date')}
                 value={date}
                 onChange={setDate}
                 minimumDate={startOfDay(new Date())}
                 required
               />
-              <TimePicker label="Time" value={time} onChange={setTime} />
-              <Dropdown label="Type" value={type} options={TYPE_OPTIONS} onChange={setType} />
+              <TimePicker label={t('schedule.followUp.time')} value={time} onChange={setTime} />
+              <Dropdown label={t('schedule.followUp.type')} value={type} options={typeOptions} onChange={setType} />
 
               <View>
-                <Text style={[styles.fieldLabel, { color: theme.text }]}>Notes</Text>
+                <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                  {t('schedule.followUp.notes')}
+                </Text>
                 <TextInput
                   style={[styles.input, styles.multilineInput, { color: theme.text, borderColor: theme.border }]}
                   value={notes}
                   onChangeText={setNotes}
                   multiline
                   numberOfLines={3}
-                  placeholder="What to discuss next time..."
+                  placeholder={t('schedule.followUp.notesPlaceholder')}
                   placeholderTextColor={theme.textSecondary}
                 />
               </View>
@@ -113,14 +118,18 @@ export function NextFollowUpSheet({
               onPress={onSkip}
               disabled={submitting}
             >
-              <Text style={[styles.skipBtnText, { color: theme.textSecondary }]}>Skip</Text>
+              <Text style={[styles.skipBtnText, { color: theme.textSecondary }]}>
+                {t('schedule.followUp.skip')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.submitBtn, (!date || submitting) && styles.submitBtnDisabled]}
               onPress={handleSubmit}
               disabled={!date || submitting}
             >
-              <Text style={styles.submitBtnText}>{submitting ? 'Scheduling...' : 'Schedule'}</Text>
+              <Text style={styles.submitBtnText}>
+                {submitting ? t('schedule.followUp.scheduling') : t('schedule.followUp.schedule')}
+              </Text>
             </TouchableOpacity>
           </View>
         </Pressable>

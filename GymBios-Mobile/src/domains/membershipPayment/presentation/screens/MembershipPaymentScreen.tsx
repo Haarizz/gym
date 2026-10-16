@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
@@ -33,6 +34,7 @@ interface MembershipPaymentScreenProps {
  */
 export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScreenProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const validId = Number.isInteger(membershipId) && membershipId > 0;
   const balanceQuery = useOutstandingBalance(validId ? membershipId : undefined);
   const settlement = useSettleOutstandingBalance(membershipId);
@@ -52,7 +54,7 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
     if (!balance) return;
     const built = buildSettlementRequest(balance, payment);
     if (!built.ok) {
-      toast.error(built.error, { title: 'Payment not accepted' });
+      toast.error(built.error, { title: t('outstanding.notAcceptedTitle') });
       return;
     }
     settlement.settle(built.request);
@@ -64,8 +66,8 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
 
   const header = (
     <AppHeader
-      title="Membership Payment"
-      subtitle="Outstanding balance"
+      title={t('outstanding.screenTitle')}
+      subtitle={t('outstanding.screenSubtitle')}
       colors={[BrandColors.teal, BrandColors.tealDark]}
       onBack={() => (router.canGoBack() ? router.back() : goToMembership())}
     />
@@ -77,9 +79,9 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
         {header}
         <StatusPanel
           icon="slash"
-          title="Payment not available"
-          message="This payment isn't linked to your membership. It may belong to a different gym or account."
-          actionLabel="Go to Membership"
+          title={t('outstanding.notAvailableTitle')}
+          message={t('outstanding.notAvailable')}
+          actionLabel={t('outstanding.goToMembership')}
           onAction={goToMembership}
         />
       </ScreenLayout>
@@ -103,9 +105,9 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
         {header}
         <StatusPanel
           icon="alert-triangle"
-          title="Couldn't load your balance"
-          message="Check your connection and try again."
-          actionLabel="Retry"
+          title={t('outstanding.loadErrorTitle')}
+          message={t('outstanding.loadError')}
+          actionLabel={t('outstanding.retry')}
           onAction={() => void balanceQuery.refetch()}
         />
       </ScreenLayout>
@@ -130,43 +132,48 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
           <StatusPanel
             icon="check-circle"
             tone="success"
-            title="Payment recorded"
+            title={t('outstanding.recordedTitle')}
             message={
-              `${formatAmount(settlement.result.amountPaid)} was applied to your membership` +
-              (settlement.result.receiptNo ? ` (receipt ${settlement.result.receiptNo}).` : '.') +
+              (settlement.result.receiptNo
+                ? t('outstanding.appliedWithReceipt', {
+                    amount: formatAmount(settlement.result.amountPaid),
+                    receipt: settlement.result.receiptNo,
+                  })
+                : t('outstanding.applied', { amount: formatAmount(settlement.result.amountPaid) })) +
+              ' ' +
               (settlement.result.outstandingAmount > 0
-                ? ` Remaining balance: ${formatAmount(settlement.result.outstandingAmount)}.`
-                : ' Your membership is fully paid.')
+                ? t('outstanding.remainingAfter', { amount: formatAmount(settlement.result.outstandingAmount) })
+                : t('outstanding.fullyPaid'))
             }
-            actionLabel="Back to Membership"
+            actionLabel={t('outstanding.backToMembership')}
             onAction={goToMembership}
           />
         ) : balance.outstandingAmount <= 0 ? (
           <StatusPanel
             icon="check-circle"
             tone="success"
-            title="Nothing to pay"
-            message="Your membership is fully paid."
-            actionLabel="Back to Membership"
+            title={t('outstanding.nothingToPayTitle')}
+            message={t('outstanding.fullyPaid')}
+            actionLabel={t('outstanding.backToMembership')}
             onAction={goToMembership}
           />
         ) : (
           <>
             <GlassSurface radius={Radius.lg} style={styles.summary}>
-              <Text style={styles.planName}>{balance.planName || 'Membership'}</Text>
-              <SummaryRow label="Membership amount" value={<CurrencyValue amount={balance.totalAmount} options={MAX_2DP} />} />
-              <SummaryRow label="Paid" value={<CurrencyValue amount={balance.paidAmount} options={MAX_2DP} />} />
+              <Text style={styles.planName}>{balance.planName || t('outstanding.membership')}</Text>
+              <SummaryRow label={t('outstanding.membershipAmount')} value={<CurrencyValue amount={balance.totalAmount} options={MAX_2DP} />} />
+              <SummaryRow label={t('outstanding.paid')} value={<CurrencyValue amount={balance.paidAmount} options={MAX_2DP} />} />
               <View style={styles.divider} />
-              <SummaryRow label="Remaining balance" value={<CurrencyValue amount={balance.outstandingAmount} options={MAX_2DP} />} emphasis />
+              <SummaryRow label={t('outstanding.remainingBalance')} value={<CurrencyValue amount={balance.outstandingAmount} options={MAX_2DP} />} emphasis />
             </GlassSurface>
 
             {balance.bills.length > 1 ? (
               <GlassSurface radius={Radius.lg} style={styles.summary}>
-                <Text style={styles.sectionTitle}>Unpaid bills</Text>
+                <Text style={styles.sectionTitle}>{t('outstanding.unpaidBills')}</Text>
                 {balance.bills.map((bill) => (
                   <SummaryRow
                     key={bill.receiptId}
-                    label={bill.invoiceNo || bill.planName || bill.transactionType || `Bill ${bill.receiptId}`}
+                    label={bill.invoiceNo || bill.planName || bill.transactionType || t('outstanding.billFallback', { id: bill.receiptId })}
                     value={<CurrencyValue amount={bill.outstandingAmount} options={MAX_2DP} />}
                   />
                 ))}
@@ -182,13 +189,18 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
 
             {!balance.canPay ? (
               <Text style={styles.blockedText}>
-                {payBlockedMessage(balance.payBlockedReason) ?? 'This balance can’t be paid in the app.'}
+                {payBlockedMessage(balance.payBlockedReason) ?? t('outstanding.cantPayInApp')}
               </Text>
             ) : settleError?.kind === 'network' ? (
-              <Button title="Retry payment" loading={settlement.isPending} onPress={settlement.retry} />
+              <Button title={t('outstanding.retryPayment')} loading={settlement.isPending} onPress={settlement.retry} />
             ) : (
               <Button
-                title={<>Pay <CurrencyValue amount={balance.payableAmount} options={MAX_2DP} /></>}
+                title={
+                  <Trans
+                    i18nKey="outstanding.pay"
+                    components={{ amount: <CurrencyValue amount={balance.payableAmount} options={MAX_2DP} /> }}
+                  />
+                }
                 loading={settlement.isPending}
                 disabled={balanceQuery.isFetching}
                 onPress={openSheet}
@@ -202,8 +214,8 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
         <PaymentBottomSheet
           visible={sheetVisible}
           amount={balance.payableAmount}
-          title="Complete Payment"
-          subtitle={`Pay your remaining balance of ${formatAmount(balance.payableAmount)}`}
+          title={t('outstanding.completePayment')}
+          subtitle={t('outstanding.sheetSubtitle', { amount: formatAmount(balance.payableAmount) })}
           allowDiscount={false}
           isProcessing={settlement.isPending}
           onClose={() => setIsSheetOpen(false)}

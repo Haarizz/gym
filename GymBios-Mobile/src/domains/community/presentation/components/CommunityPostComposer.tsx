@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { tOr } from '@/core/i18n';
 import { useCallback } from 'react';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
@@ -23,14 +25,6 @@ import type { CropRatio } from '../hooks/useCommunityPostComposer';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
-/** Why a member can't post at their selected gym (codes from the server). */
-const POSTING_BLOCKED: Record<string, string> = {
-  NOT_A_MEMBER: 'Only members of your selected gym can post. Switch to one of your gyms to post.',
-  APP_ACCESS_PENDING: 'You can post once your membership is approved.',
-  GYM_CONTEXT_REQUIRED: 'Select one of your gyms to post.',
-  MEMBERSHIP_UNDETERMINED: 'Your membership couldn\'t be confirmed.',
-  PLATFORM_CANNOT_POST: 'Platform accounts can\'t post in the Community.',
-};
 
 const POST_TYPES = [
   { value: 'achievement', label: '🏆 Achievement' },
@@ -38,10 +32,10 @@ const POST_TYPES = [
   { value: 'tip', label: '💡 Tip' },
 ] as const;
 
-const CROP_RATIOS: { value: CropRatio; label: string; sub: string }[] = [
-  { value: '1:1', label: '1:1', sub: 'Square' },
-  { value: '4:5', label: '4:5', sub: 'Portrait' },
-  { value: '9:16', label: '9:16', sub: 'Story' },
+const CROP_RATIOS: { value: CropRatio; label: string; sub: 'square' | 'portrait' | 'story' }[] = [
+  { value: '1:1', label: '1:1', sub: 'square' },
+  { value: '4:5', label: '4:5', sub: 'portrait' },
+  { value: '9:16', label: '9:16', sub: 'story' },
 ];
 
 function getAspectRatioNumeric(ratio: CropRatio): number {
@@ -89,6 +83,7 @@ export function CommunityPostComposer({
   setCropZoom,
   onSuccess,
 }: CommunityPostComposerProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
   const createPost = useCreateCommunityPost();
@@ -96,15 +91,16 @@ export function CommunityPostComposer({
   const isGlobal = mode === 'global' && config != null;
   const postingBlocked = isGlobal && !config.canPost;
   const blockedMessage = config?.readOnly
-    ? 'The Community is read-only right now.'
-    : POSTING_BLOCKED[config?.postingBlockedReason ?? ''] ?? 'Posting isn\'t available right now.';
+    ? t('community.composer.readOnly')
+    : // Why a member can't post at their selected gym (codes from the server).
+      tOr(`community.composer.blocked.${config?.postingBlockedReason ?? ''}`, t('community.composer.unavailable'));
 
   const handlePickImage = useCallback(async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        toast.warning('Gallery access is needed to attach a photo.', {
-          title: 'Permission Required'
+        toast.warning(t('community.composer.galleryPermission'), {
+          title: t('community.composer.permissionTitle'),
         });
         return;
       }
@@ -119,8 +115,8 @@ export function CommunityPostComposer({
       if (!result.canceled && result.assets.length > 0) {
         const asset = result.assets[0];
         if (!asset.base64) {
-          toast.error('Could not read image data.', {
-            title: 'Error'
+          toast.error(t('community.composer.readImageFailed'), {
+            title: t('community.composer.errorTitle'),
           });
           return;
         }
@@ -131,18 +127,18 @@ export function CommunityPostComposer({
           const limits = config.limits;
           const bytes = asset.fileSize ?? Math.floor((asset.base64.length * 3) / 4);
           if (limits.imageTypes.length > 0 && !limits.imageTypes.includes(mimeType)) {
-            toast.warning('Please choose a JPEG or PNG photo.', { title: 'Unsupported image' });
+            toast.warning(t('community.composer.unsupportedImage'), { title: t('community.composer.unsupportedTitle') });
             return;
           }
           if (bytes > limits.imageBytes) {
-            toast.warning(`Please choose a photo under ${(limits.imageBytes / (1024 * 1024)).toFixed(1)} MB.`, {
-              title: 'Image too large',
+            toast.warning(t('community.composer.tooLargeBytes', { size: (limits.imageBytes / (1024 * 1024)).toFixed(1) }), {
+              title: t('community.composer.tooLargeTitle'),
             });
             return;
           }
           if (asset.width > limits.imageDimension || asset.height > limits.imageDimension) {
-            toast.warning(`Please choose a photo no larger than ${limits.imageDimension}×${limits.imageDimension}.`, {
-              title: 'Image too large',
+            toast.warning(t('community.composer.tooLargeDimension', { size: limits.imageDimension }), {
+              title: t('community.composer.tooLargeTitle'),
             });
             return;
           }
@@ -153,8 +149,8 @@ export function CommunityPostComposer({
         setCropZoom(100);
       }
     } catch {
-      toast.error('Unable to open image gallery.', {
-        title: 'Error'
+      toast.error(t('community.composer.galleryFailed'), {
+        title: t('community.composer.errorTitle'),
       });
     }
   }, [setImage, setCropPosition, setCropZoom, isGlobal, config]);
@@ -165,14 +161,14 @@ export function CommunityPostComposer({
 
   const handleSubmit = useCallback(() => {
     if (!topic.trim()) {
-      toast.info('Topic is required.', {
-        title: 'Validation'
+      toast.info(t('community.composer.topicRequired'), {
+        title: t('community.composer.validationTitle'),
       });
       return;
     }
     if (!content.trim()) {
-      toast.info('Post content is required.', {
-        title: 'Validation'
+      toast.info(t('community.composer.contentRequired'), {
+        title: t('community.composer.validationTitle'),
       });
       return;
     }
@@ -192,8 +188,8 @@ export function CommunityPostComposer({
       {
         onSuccess,
         onError: (err) => {
-          toast.error((err as Error)?.message ?? 'Could not create post. Please try again.', {
-            title: 'Error'
+          toast.error((err as Error)?.message ?? t('community.composer.createFailed'), {
+            title: t('community.composer.errorTitle'),
           });
         },
       },
@@ -216,7 +212,7 @@ export function CommunityPostComposer({
         {/* Post Type */}
         <View style={styles.section}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Post Type
+            {t('community.composer.postType')}
           </Typography>
           <View style={styles.typeRow}>
             {POST_TYPES.map((pt) => {
@@ -245,7 +241,7 @@ export function CommunityPostComposer({
                     variant="caption"
                     style={[styles.typeBtnLabel, { color: isActive ? typeClass.fg : theme.textSecondary }]}
                   >
-                    {pt.label.split(' ')[1]}
+                    {t(`community.typeNames.${pt.value}`)}
                   </Typography>
                 </Pressable>
               );
@@ -256,14 +252,14 @@ export function CommunityPostComposer({
         {/* Topic */}
         <View style={styles.section}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Topic *
+            {t('community.composer.topic')}
           </Typography>
           <TextInput
             style={[
               styles.input,
               { backgroundColor: theme.muted, color: theme.text, borderColor: theme.border },
             ]}
-            placeholder="Workout recap, sprint finisher, recovery win…"
+            placeholder={t('community.composer.topicPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             value={topic}
             onChangeText={setTopic}
@@ -275,14 +271,14 @@ export function CommunityPostComposer({
         {/* Content */}
         <View style={styles.section}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Post Content *
+            {t('community.composer.content')}
           </Typography>
           <TextInput
             style={[
               styles.textArea,
               { backgroundColor: theme.muted, color: theme.text, borderColor: theme.border },
             ]}
-            placeholder="Share your progress, ask a question, or post a coaching tip…"
+            placeholder={t('community.composer.contentPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             value={content}
             onChangeText={setContent}
@@ -298,7 +294,7 @@ export function CommunityPostComposer({
         {/* Photo */}
         <View style={styles.section}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Workout Photo (optional)
+            {t('community.composer.photo')}
           </Typography>
 
           {!image ? (
@@ -309,16 +305,16 @@ export function CommunityPostComposer({
                 pressed && { opacity: 0.75 },
               ]}
               onPress={handlePickImage}
-              accessibilityLabel="Add photo"
+              accessibilityLabel={t('community.composer.addPhotoA11y')}
             >
               <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: theme.backgroundElement, alignItems: 'center', justifyContent: 'center' }}>
                 <Feather name="camera" size={16} color={primaryColor} />
               </View>
               <Typography variant="bodySmall" style={{ color: primaryColor, fontWeight: '700', fontSize: 12.5 }}>
-                Add Photo
+                {t('community.composer.addPhoto')}
               </Typography>
               <Typography variant="caption" style={{ color: '#A7AAB6', fontSize: 11 }}>
-                JPG or PNG, up to 10MB
+                {t('community.composer.photoHint')}
               </Typography>
             </Pressable>
           ) : (
@@ -335,7 +331,7 @@ export function CommunityPostComposer({
                   onPress={handlePickImage}
                 >
                   <Typography variant="caption" style={{ fontWeight: '600' }}>
-                    Change
+                    {t('community.composer.change')}
                   </Typography>
                 </Pressable>
                 <Pressable
@@ -343,7 +339,7 @@ export function CommunityPostComposer({
                   onPress={handleRemoveImage}
                 >
                   <Typography variant="caption" style={{ fontWeight: '600', color: '#ef4444' }}>
-                    Remove
+                    {t('community.composer.remove')}
                   </Typography>
                 </Pressable>
               </View>
@@ -351,7 +347,7 @@ export function CommunityPostComposer({
               {/* Crop Ratio */}
               <View style={styles.cropSection}>
                 <Typography variant="caption" color="textSecondary" style={styles.cropLabel}>
-                  Aspect Ratio
+                  {t('community.composer.aspectRatio')}
                 </Typography>
                 <View style={styles.ratioRow}>
                   {CROP_RATIOS.map((r) => {
@@ -372,7 +368,7 @@ export function CommunityPostComposer({
                           {r.label}
                         </Typography>
                         <Typography variant="caption" style={{ color: isActive ? 'rgba(255,255,255,0.75)' : theme.textSecondary, fontSize: 9 }}>
-                          {r.sub}
+                          {t(`community.composer.crop.${r.sub}`)}
                         </Typography>
                       </Pressable>
                     );
@@ -384,7 +380,7 @@ export function CommunityPostComposer({
               <View style={styles.sliderSection}>
                 <View style={styles.sliderHeader}>
                   <Typography variant="caption" color="textSecondary">
-                    Crop Position
+                    {t('community.composer.cropPosition')}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
                     {cropPosition}%
@@ -420,7 +416,7 @@ export function CommunityPostComposer({
               <View style={styles.sliderSection}>
                 <View style={styles.sliderHeader}>
                   <Typography variant="caption" color="textSecondary">
-                    Zoom
+                    {t('community.composer.zoom')}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
                     {cropZoom}%
@@ -462,7 +458,7 @@ export function CommunityPostComposer({
       {/* Submit */}
       <View style={[styles.footer, { backgroundColor: theme.background }]}>
         <Button
-          label={isSubmitting ? 'Posting…' : 'Post to Community'}
+          label={t(isSubmitting ? 'community.composer.posting' : 'community.composer.submit')}
           variant="primary"
           size="lg"
           disabled={!canSubmit}
@@ -472,10 +468,10 @@ export function CommunityPostComposer({
         />
         <Typography variant="caption" style={styles.helperText}>
           {!isGlobal
-            ? 'Visible to everyone in your branch'
+            ? t('community.composer.visibleBranch')
             : postingBlocked
               ? blockedMessage
-              : `Posting as a member of ${config.postingGymName ?? 'your gym'} · visible to everyone in the GymBios Community`}
+              : t('community.composer.postingAs', { gym: config.postingGymName ?? t('community.composer.yourGym') })}
         </Typography>
       </View>
     </KeyboardAvoidingView>

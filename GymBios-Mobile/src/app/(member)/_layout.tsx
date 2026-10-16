@@ -6,6 +6,7 @@ import {
 
 import { BranchProvider } from '@/shared/providers/BranchProvider';
 import { MemberPushNotifications } from '@/domains/notifications';
+import { GymRatingHost } from '@/domains/memberPortal/gymRating';
 import { usePaymentApprovalToast } from '@/domains/discovery/hooks/usePaymentApprovalToast';
 
 export default function MemberLayout() {
@@ -14,6 +15,7 @@ export default function MemberLayout() {
   return (
     <BranchProvider>
       <MemberPushNotifications />
+      <GymRatingHost />
       <RoleTabsLayout
         title={MEMBER_HEADER.title}
         subtitle={MEMBER_HEADER.subtitle}

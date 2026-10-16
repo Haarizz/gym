@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/shared/components/Input'; 
 
 interface PaymentMethodSelectorProps {
@@ -7,13 +8,14 @@ interface PaymentMethodSelectorProps {
 }
 
 export function PaymentMethodSelector({ method, onSelect }: PaymentMethodSelectorProps) {
+  const { t } = useTranslation();
   // Mock dropdown
   return (
     <View style={styles.container}>
       <Input
-        label="Payment Method *"
+        label={t('checkIn.walkIn.paymentMethodLabel')}
         value={method}
-        placeholder="Select method"
+        placeholder={t('checkIn.walkIn.selectMethodPlaceholder')}
         onChangeText={() => {}} // Disabled for mock
       />
     </View>

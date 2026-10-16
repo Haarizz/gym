@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
@@ -17,6 +18,7 @@ interface CommunityFabProps {
  * Positioned above the Community bottom navigation bar.
  */
 export function CommunityFab({ onPress }: CommunityFabProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const insets = useSafeAreaInsets();
   const bottomOffset =
@@ -33,7 +35,7 @@ export function CommunityFab({ onPress }: CommunityFabProps) {
       ]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Create community post"
+      accessibilityLabel={t('community.createPostA11y')}
     >
       <LinearGradient
         colors={headerColors as unknown as readonly [string, string, ...string[]]}
@@ -48,7 +50,7 @@ export function CommunityFab({ onPress }: CommunityFabProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    right: 20,
+    end: 20,
     zIndex: 100,
   },
 

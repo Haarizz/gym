@@ -13,6 +13,7 @@ import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.AttendanceSessionService;
 import com.company.project.services.MembershipFreezeService;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,16 +33,19 @@ public class MobileMemberDashboardService {
     private final AttendanceRepository attendanceRepository;
     private final BookingRepository bookingRepository;
     private final PromotionCampaignRepository promotionCampaignRepository;
+    private final AttendanceSessionService attendanceSessionService;
 
     public MobileMemberDashboardService(
             MemberRepository memberRepository,
             AttendanceRepository attendanceRepository,
             BookingRepository bookingRepository,
-            PromotionCampaignRepository promotionCampaignRepository) {
+            PromotionCampaignRepository promotionCampaignRepository,
+            AttendanceSessionService attendanceSessionService) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
         this.bookingRepository = bookingRepository;
         this.promotionCampaignRepository = promotionCampaignRepository;
+        this.attendanceSessionService = attendanceSessionService;
     }
 
     public MemberDashboardResponseDTO getMemberDashboard(UserDetailsImpl principal) {
@@ -95,8 +98,6 @@ public class MobileMemberDashboardService {
         Member member = memberOpt.get();
 
         LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
         // 1. Identity
         String role = principal.getAuthorities().stream()
@@ -134,24 +135,14 @@ public class MobileMemberDashboardService {
         // 3. Attendance History & Check-In Status
         List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
 
-        boolean isCheckedIn = attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDay, endOfDay);
-        Long activeAttendanceId = null;
-        LocalDateTime activeCheckInTime = null;
-
-        if (isCheckedIn && attendances != null) {
-            Attendance activeAttendance = attendances.stream()
-                    .filter(a -> "active".equalsIgnoreCase(a.getStatus())
-                            && a.getCheckInTime() != null
-                            && !a.getCheckInTime().isBefore(startOfDay)
-                            && !a.getCheckInTime().isAfter(endOfDay))
-                    .findFirst()
-                    .orElse(null);
-
-            if (activeAttendance != null) {
-                activeAttendanceId = activeAttendance.getId();
-                activeCheckInTime = activeAttendance.getCheckInTime();
-            }
-        }
+        // A visit left open from an earlier day doesn't count as checked in (see
+        // MobileMemberCheckInService.getCheckInStatus for the unclosed-visit warning).
+        Attendance activeAttendance = attendanceSessionService.findActiveSession(member.getId())
+                .filter(a -> !AttendanceSessionService.isStale(a))
+                .orElse(null);
+        boolean isCheckedIn = activeAttendance != null;
+        Long activeAttendanceId = isCheckedIn ? activeAttendance.getId() : null;
+        LocalDateTime activeCheckInTime = isCheckedIn ? activeAttendance.getCheckInTime() : null;
 
         CheckInStatusDTO checkInStatus = new CheckInStatusDTO(
                 isCheckedIn,

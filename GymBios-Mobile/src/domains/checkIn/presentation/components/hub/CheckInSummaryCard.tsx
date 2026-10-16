@@ -1,9 +1,11 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Spacing } from '@/core/theme';
 import { CheckInStatCard } from '../shared/CheckInStatCard';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 
 export function CheckInSummaryCard() {
+  const { t } = useTranslation();
   const { summary, isLoading } = useRecentCheckIns();
 
   return (
@@ -11,7 +13,7 @@ export function CheckInSummaryCard() {
       <View style={styles.row}>
         <View style={styles.item}>
           <CheckInStatCard
-            label="Total visits today"
+            label={t('checkIn.hub.stats.totalVisitsToday')}
             value={summary.total}
             iconName="log-in"
             color={BrandColors.teal}
@@ -20,7 +22,7 @@ export function CheckInSummaryCard() {
         </View>
         <View style={styles.item}>
           <CheckInStatCard
-            label="Members in gym"
+            label={t('checkIn.hub.stats.membersInGym')}
             value={summary.active}
             iconName="activity"
             color={BrandColors.teal}
@@ -31,7 +33,7 @@ export function CheckInSummaryCard() {
       <View style={styles.row}>
         <View style={styles.item}>
           <CheckInStatCard
-            label="of 150 capacity" // Usually comes from a config or domain
+            label={t('checkIn.hub.stats.capacitySubtitle', { count: 150 })}
             value="1%" // Hardcoded based on mockup/prompt for UI focus
             iconName="users"
             color={BrandColors.textSecondary}
@@ -40,7 +42,7 @@ export function CheckInSummaryCard() {
         </View>
         <View style={styles.item}>
           <CheckInStatCard
-            label="Walk-in passes today"
+            label={t('checkIn.hub.stats.walkInPassesToday')}
             value={summary.walkIns}
             iconName="user-plus"
             color={"#3b82f6"}

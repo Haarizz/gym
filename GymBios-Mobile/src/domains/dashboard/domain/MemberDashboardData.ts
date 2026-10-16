@@ -16,11 +16,12 @@ export interface MemberTodayScheduleItem {
   time: string;
   class: string;
   trainer: string;
-  spots: string;
+  spotsLeft: number;
   location?: string;
 }
 
 export interface MemberQuickStatItem {
+  kind: 'checkIns' | 'classes' | 'calories' | 'streak';
   label: string;
   value: string;
   icon: string;

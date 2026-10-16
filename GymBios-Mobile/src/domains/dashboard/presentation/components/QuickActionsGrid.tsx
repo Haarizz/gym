@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -23,13 +24,15 @@ interface QuickActionsGridProps {
 // with flex: 1 cells (not percentage widths + gap, which overflow and wrap
 // unevenly on narrow screens or large font scales), and the icon sits above
 // the label so long labels never squeeze into a broken wrap.
-export function QuickActionsGrid({ actions, title = 'Quick Actions' }: QuickActionsGridProps) {
+export function QuickActionsGrid({ actions, title }: QuickActionsGridProps) {
+  const { t } = useTranslation();
+  const displayTitle = title ?? t('dashboard.quickActionsTitle');
   const rows: QuickAction[][] = [];
   for (let i = 0; i < actions.length; i += 2) rows.push(actions.slice(i, i + 2));
 
   return (
     <GlassSurface radius={18} style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{displayTitle}</Text>
       <View style={styles.grid}>
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.row}>

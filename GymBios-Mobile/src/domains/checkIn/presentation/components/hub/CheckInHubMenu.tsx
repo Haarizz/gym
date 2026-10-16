@@ -1,22 +1,24 @@
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { CheckInHubCard } from './CheckInHubCard';
 
 export function CheckInHubMenu() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   return (
     <View style={styles.container}>
       <CheckInHubCard
-        title="Members & Staff"
-        description="Search members and perform manual check-ins."
+        title={t('checkIn.hub.cards.membersStaffTitle')}
+        description={t('checkIn.hub.cards.membersStaffSub')}
         iconName="users"
         onPress={() => router.push('/(admin)/check-in/members-staff')}
       />
       <CheckInHubCard
-        title="Walk-In / Daily Visitor"
-        description="Register visitors and grant temporary access."
+        title={t('checkIn.hub.cards.walkInTitle')}
+        description={t('checkIn.hub.cards.walkInSub')}
         iconName="user-plus"
         onPress={() => router.push('/(admin)/check-in/walk-in')}
       />

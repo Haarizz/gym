@@ -1,4 +1,5 @@
 import { formatCurrency } from '@/core/providers/currencyDefinitions';
+import { i18n } from '@/core/i18n';
 import type { PaymentResult } from '@/shared/payment/types';
 import type { OutstandingBalance, PayBlockedReason, SettleOutstandingBalanceRequest } from './types';
 
@@ -17,21 +18,24 @@ export function buildSettlementRequest(
   payment: PaymentResult,
 ): SettlementRequestResult {
   if (!balance.canPay || balance.payableAmount <= 0) {
-    return { ok: false, error: 'There is nothing to pay right now.' };
+    return { ok: false, error: i18n.t('outstanding.nothingToPayNow') };
   }
   if (!balance.allowedPaymentMethods.includes(payment.paymentMethodUsed)) {
     return {
       ok: false,
-      error: `${payment.paymentMethodUsed} can't be used in the app. Choose ${balance.allowedPaymentMethods.join(', ')}, or pay at reception.`,
+      error: i18n.t('outstanding.methodNotAllowed', {
+        method: payment.paymentMethodUsed,
+        allowed: balance.allowedPaymentMethods.join(', '),
+      }),
     };
   }
   if (payment.paymentBreakdown.length !== 1) {
-    return { ok: false, error: 'Split payments must be made at reception.' };
+    return { ok: false, error: i18n.t('outstanding.splitNotAllowed') };
   }
   if (Math.abs(payment.summary.paidAmount - balance.payableAmount) > 0.005) {
     return {
       ok: false,
-      error: `Please pay the full outstanding balance of ${formatAmount(balance.payableAmount)}.`,
+      error: i18n.t('outstanding.payFull', { amount: formatAmount(balance.payableAmount) }),
     };
   }
   return {
@@ -52,9 +56,9 @@ export function hasOutstandingBalance(balance: OutstandingBalance | undefined): 
 export function payBlockedMessage(reason: PayBlockedReason | null): string | null {
   switch (reason) {
     case 'APPROVAL_PENDING':
-      return 'Your membership payment is awaiting approval by the gym.';
+      return i18n.t('outstanding.blockedApprovalPending');
     case 'NO_PAYABLE_BILLS':
-      return 'This balance can’t be paid in the app. Please pay at reception.';
+      return i18n.t('outstanding.blockedNoBills');
     default:
       return null;
   }

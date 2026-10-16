@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: 'رجوع',
+    confirm: 'تأكيد',
+    cancel: 'إلغاء',
+    done: 'تم',
+    previous: 'السابق',
+    next: 'التالي',
+    search: 'بحث...',
+    notAdded: 'غير مضاف',
+    selectOption: 'اختر خيارًا',
+    dropdown: 'قائمة منسدلة',
+    selectDate: 'اختر التاريخ',
+    datePicker: 'منتقي التاريخ',
+    previousMonth: 'الشهر السابق',
+    nextMonth: 'الشهر التالي',
+    selectMonth: 'اختر الشهر',
+    selectYear: 'اختر السنة',
+    confirmDate: 'تأكيد التاريخ',
+    dismissBackdrop: 'إغلاق',
+    userAvatar: 'صورة المستخدم',
+    initialsAvatar: 'صورة {{initials}}',
+
+    photo: {
+      changeA11y: 'تغيير صورة الملف الشخصي',
+      addA11y: 'إضافة صورة الملف الشخصي',
+      selectA11y: 'اضغط لاختيار صورة',
+      tapToChange: 'اضغط لتغيير الصورة',
+      tapToAdd: 'اضغط لإضافة صورة',
+      title: 'صورة الملف الشخصي',
+      subtitle: 'اختر خيارًا',
+      takePhoto: 'التقاط صورة',
+      chooseFromGallery: 'اختيار من المعرض',
+      removePhoto: 'إزالة الصورة',
+      permissionTitle: 'إذن مطلوب',
+      cameraNeeded: 'يلزم الوصول إلى الكاميرا لالتقاط صورة.',
+      cameraOff: 'الوصول إلى الكاميرا متوقف. فعّله من الإعدادات لالتقاط صورة.',
+      cameraUnavailable: 'الكاميرا غير متاحة على هذا الجهاز.',
+      galleryNeeded: 'يلزم الوصول إلى المعرض لاختيار صورة.',
+      galleryOff: 'الوصول إلى الصور متوقف. فعّله من الإعدادات لاختيار صورة.',
+      galleryFailed: 'تعذّر فتح معرض الصور.',
+      uploadFailedStatus: 'فشل تحميل الصورة ({{status}})',
+      uploadFailedNetwork: 'فشل تحميل الصورة (خطأ في الشبكة)',
+      uploadTimeout: 'انتهت مهلة تحميل الصورة',
+    },
+
+    trafficLight: {
+      low: 'منخفض',
+      medium: 'متوسط',
+      high: 'عالي',
+    },
+
+    timePicker: {
+      selectTime: 'اختر الوقت',
+      now: 'الآن',
+      setTime: 'تحديد الوقت · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: 'حفظ التغييرات',
+      createStaff: 'إنشاء موظف',
+    },
+
+    roleMode: {
+      virtualStudio: 'استوديو افتراضي',
+      virtualStudioDesc: 'أنشئ برامج لياقة بدنية عبر الإنترنت وحصص مباشرة وعضويات رقمية وأدرها.',
+      comingSoon: 'قريبًا',
+    },
+
+    charts: {
+      noData: 'لا تتوفر بيانات',
+      noDataDesc: 'لا توجد بيانات مخطط لعرضها للمعايير المحددة.',
+      loading: 'جارٍ تحميل المخطط...',
+      unableToLoad: 'تعذر تحميل المخطط',
+      loadFailed: 'فشل تحميل بيانات المخطط',
+      retry: 'إعادة المحاولة',
+    },
+
+    noInternet: {
+      title: 'لا يوجد اتصال بالإنترنت',
+      tryAgain: 'حاول مرة أخرى',
+      checkConnection: 'يرجى التحقق من Wi-Fi أو بيانات الجوال والمحاولة مرة أخرى.',
+      tipToggleWifi: 'أوقف Wi-Fi ثم شغّله مرة أخرى',
+      tipMobileData: 'تحقق من تفعيل بيانات الجوال',
+      tipSignal: 'انتقل إلى مكان بإشارة أفضل',
+      retryA11y: 'إعادة محاولة الاتصال',
+    },
+
+    receipt: {
+      title: 'تفاصيل الإيصال',
+      subtitle: 'سجل المعاملة',
+      loading: 'جارٍ تحميل تفاصيل الإيصال...',
+      loadError: 'تعذّر تحميل بيانات الإيصال.',
+      billedTo: 'الفاتورة باسم',
+      memberName: 'اسم العضو',
+      memberId: 'رقم العضو',
+      phone: 'الهاتف',
+      transactionInfo: 'معلومات المعاملة',
+      type: 'النوع',
+      paymentMethod: 'طريقة الدفع',
+      subscription: 'الاشتراك / الخدمة',
+      validity: 'الصلاحية',
+      processedBy: 'عالجها',
+      paymentSummary: 'ملخص الدفع',
+      price: 'السعر',
+      discount: 'الخصم',
+      totalAmount: 'المبلغ الإجمالي',
+      amountPaid: 'المبلغ المدفوع',
+      balanceDue: 'الرصيد المستحق',
+      download: 'تنزيل الإيصال',
+      sharingUnavailableTitle: 'المشاركة غير متاحة',
+      sharingUnavailable: 'لا يمكن مشاركة ملف PDF على هذا الجهاز.',
+      errorTitle: 'خطأ',
+      pdfFailed: 'تعذّر إنشاء ملف PDF للإيصال.',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

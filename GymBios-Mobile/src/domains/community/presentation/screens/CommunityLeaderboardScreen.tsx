@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { RefreshControl } from 'react-native';
@@ -9,13 +10,14 @@ import { useCommunityLeaderboard } from '../../hooks/useCommunity';
 import { CommunityLeaderboard } from '../components/CommunityLeaderboard';
 
 export function CommunityLeaderboardScreen() {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const { data, isLoading, isError, refetch, isRefetching } = useCommunityLeaderboard();
 
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <Loader message="Loading leaderboard…" />
+        <Loader message={t('community.leaderboard.loading')} />
       </View>
     );
   }
@@ -25,9 +27,9 @@ export function CommunityLeaderboardScreen() {
       <View style={styles.centered}>
         <EmptyState
           icon="wifi-off"
-          title="Could not load leaderboard"
-          description="Check your connection and try again."
-          buttonLabel="Retry"
+          title={t('community.leaderboard.loadError')}
+          description={t('community.feed.checkConnection')}
+          buttonLabel={t('community.feed.retry')}
           onPress={() => refetch()}
         />
       </View>
@@ -39,8 +41,8 @@ export function CommunityLeaderboardScreen() {
       <View style={styles.centered}>
         <EmptyState
           icon="bar-chart-2"
-          title="No leaderboard data yet"
-          description="The leaderboard will populate once members start posting and engaging."
+          title={t('community.leaderboard.emptyTitle')}
+          description={t('community.leaderboard.emptyDescription')}
         />
       </View>
     );
@@ -60,7 +62,7 @@ export function CommunityLeaderboardScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-        Top Contributors
+        {t('community.leaderboard.topContributors')}
       </Typography>
       <CommunityLeaderboard entries={data} />
     </ScrollView>

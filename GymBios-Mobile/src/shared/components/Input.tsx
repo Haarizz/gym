@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
 
   leftIconContainer: {
     position: 'absolute',
-    left: Spacing.three,
+    start: Spacing.three,
     zIndex: 1,
   },
 
@@ -176,8 +176,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 14,
-    paddingLeft: 16,
-    paddingRight: 52,
+    paddingStart: 16,
+    paddingEnd: 52,
     fontSize: 16,
     color: '#1e293b',
 
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
 
   togglePassword: {
     position: 'absolute',
-    right: 16,
+    end: 16,
     top: 0,
     bottom: 0,
     justifyContent: 'center',

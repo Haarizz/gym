@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors } from '@/core/theme';
@@ -10,6 +11,7 @@ import { useCreateStaffClass } from '../hooks/useStaffClasses';
 import type { MobileStaffSessionRequestDTO } from '../../domain/StaffClassTypes';
 
 export function AddClassScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   
@@ -21,7 +23,7 @@ export function AddClassScreen() {
         router.back();
       },
       onError: (error) => {
-        Alert.alert('Error', 'Failed to create class. Please try again.');
+        Alert.alert(t('schedule.errorTitle'), t('schedule.staffClassForm.failedToCreateClass'));
         console.error('Failed to create staff class:', error);
       }
     });
@@ -30,7 +32,7 @@ export function AddClassScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <AppHeader
-        title="Add New Class"
+        title={t('schedule.staffClassForm.headerTitle')}
         colors={[BrandColors.teal, BrandColors.teal]}
         onBack={() => router.back()}
       />

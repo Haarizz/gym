@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,6 +34,7 @@ export function SignInForm({
   isAppleLoading,
   isAppleAvailable,
 }: SignInFormProps) {
+  const { t } = useTranslation();
   const {
     control,
     handleSubmit,
@@ -51,13 +53,13 @@ export function SignInForm({
   };
 
   const onForgotPassword = () => {
-    Alert.alert('Coming Soon', 'Forgot password flow will be available soon.');
+    Alert.alert(t('auth.comingSoonTitle'), t('auth.forgotPasswordSoon'));
   };
 
   return (
     <View style={styles.panel}>
-      <Typography style={styles.panelTitle}>Welcome back</Typography>
-      <Typography style={styles.panelSub}>Sign in to pick up where you left off.</Typography>
+      <Typography style={styles.panelTitle}>{t('auth.welcomeBack')}</Typography>
+      <Typography style={styles.panelSub}>{t('auth.signInSubtitle')}</Typography>
 
       <View style={styles.fields}>
         <Controller
@@ -66,7 +68,7 @@ export function SignInForm({
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Username or email"
+              label={t('auth.usernameOrEmail')}
               placeholder="e.g. arjun.k"
               autoCapitalize="none"
               autoComplete="username"
@@ -86,8 +88,8 @@ export function SignInForm({
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
               variant="glass"
-              label="Password"
-              placeholder="Enter your password"
+              label={t('auth.password')}
+              placeholder={t('auth.enterPassword')}
               secureTextEntry
               autoComplete="password"
               returnKeyType="done"
@@ -104,20 +106,20 @@ export function SignInForm({
       <View style={styles.rowBetween}>
         <Pressable style={styles.remember}>
           <View style={styles.checkbox} />
-          <Typography style={styles.rememberText}>Remember me</Typography>
+          <Typography style={styles.rememberText}>{t('auth.rememberMe')}</Typography>
         </Pressable>
         <Pressable onPress={onForgotPassword}>
-          <Typography style={styles.link}>Forgot password?</Typography>
+          <Typography style={styles.link}>{t('auth.forgotPassword')}</Typography>
         </Pressable>
       </View>
 
-      <Button label="Sign in" size="lg" loading={isLoading} onPress={handleSubmit(onLogin, onInvalid)} style={styles.btnPrimary} />
+      <Button label={t('auth.signIn')} size="lg" loading={isLoading} onPress={handleSubmit(onLogin, onInvalid)} style={styles.btnPrimary} />
 
       {onGoogleSignIn && onAppleSignIn && (isGoogleAvailable || isAppleAvailable) ? (
         <>
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Typography style={styles.dividerText}>or</Typography>
+            <Typography style={styles.dividerText}>{t('auth.or')}</Typography>
             <View style={styles.dividerLine} />
           </View>
 
@@ -134,7 +136,7 @@ export function SignInForm({
 
       <Pressable style={styles.switchLine} onPress={onSwitchToSignup}>
         <Typography style={styles.switchText}>
-          New to GymBios? <Typography style={styles.switchLink}>Create an account</Typography>
+          <Trans i18nKey="auth.newToGymBios" components={{ link: <Typography style={styles.switchLink} /> }} />
         </Typography>
       </Pressable>
     </View>

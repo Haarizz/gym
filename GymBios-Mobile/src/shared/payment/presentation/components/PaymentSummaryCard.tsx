@@ -6,6 +6,7 @@ import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface PaymentSummaryCardProps {
   title: string;
@@ -19,6 +20,7 @@ export function PaymentSummaryCard({
   amount,
 }: PaymentSummaryCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -60,7 +62,7 @@ export function PaymentSummaryCard({
             variant="caption"
             style={{ color: theme.textSecondary, textAlign: 'right' }}
           >
-            Total Amount
+            {t('paymentSheet.totalAmount')}
           </Typography>
           <Typography
             variant="subtitle"
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   },
   iconBadge: {
     width: 40,
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
   textGroup: {
     flex: 1,

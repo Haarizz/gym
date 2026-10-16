@@ -9,14 +9,16 @@ import {
   StatusBar,
   StyleSheet,
   View,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Typography } from '@/shared/components';
 
-import { ROLE_LOGIN_CONFIG } from '../config/roleConfig';
+import { getRoleLoginConfig } from '../config/roleConfig';
 import { LoginForm } from '../forms/LoginForm';
 import type { createUseLogin } from '../hooks/useAuthFlow';
 import { ROLE_SELECTION_HREF } from '../navigation/routes';
@@ -31,7 +33,8 @@ interface RoleLoginScreenProps {
 
 export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
   const router = useRouter();
-  const config = ROLE_LOGIN_CONFIG[role];
+  const { t } = useTranslation();
+  const config = getRoleLoginConfig(role, t);
   const { login, isLoading } = useLogin(role);
 
   return (
@@ -43,8 +46,8 @@ export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <GlassBlob color={config.accentColor} size={280} opacity={0.3} top={-90} left={-70} />
-      <GlassBlob color={BrandColors.teal} size={240} opacity={0.22} bottom={40} right={-80} />
+      <GlassBlob color={config.accentColor} size={280} opacity={0.3} top={-90} start={-70} />
+      <GlassBlob color={BrandColors.teal} size={240} opacity={0.22} bottom={40} end={-80} />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView
@@ -56,11 +59,17 @@ export function RoleLoginScreen({ role, useLogin }: RoleLoginScreenProps) {
           <View style={styles.topBar}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back to role selection"
+              accessibilityLabel={t('auth.roleSelection.backA11y')}
               onPress={() => router.replace(ROLE_SELECTION_HREF)}
               style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}>
-              <Feather name="chevron-left" size={22} color={BrandColors.textPrimary} />
-              <Typography variant="bodySmall" style={styles.backText}>Back</Typography>
+              <Feather
+                name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
+                size={22}
+                color={BrandColors.textPrimary}
+              />
+              <Typography variant="bodySmall" style={styles.backText}>
+                {t('shared.goBack')}
+              </Typography>
             </Pressable>
           </View>
 
@@ -121,7 +130,7 @@ const styles = StyleSheet.create({
     gap: 4,
     alignSelf: 'flex-start',
     paddingVertical: 6,
-    paddingRight: 12,
+    paddingEnd: 12,
     borderRadius: 8,
   },
   backButtonPressed: {

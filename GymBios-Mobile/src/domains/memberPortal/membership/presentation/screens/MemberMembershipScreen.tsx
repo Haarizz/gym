@@ -7,6 +7,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useRouter } from 'expo-router';
@@ -35,6 +36,7 @@ type MembershipTabType = 'benefits' | 'payments' | 'addons';
 
 export function MemberMembershipScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data: memberState, isLoading: isMembershipLoading, isError: isMembershipError, refetch: refetchMembership, isRefetching: isMembershipRefetching } = useMemberMembership();
   
   const [addonsPage, setAddonsPage] = useState(1);
@@ -64,8 +66,8 @@ export function MemberMembershipScreen() {
 
   const openFreeze = () => {
     if (!freezeInfo?.available) {
-      toast.info(freezeInfo?.unavailable_message || 'Your subscription does not allow freezing.', {
-        title: 'Freeze Unavailable',
+      toast.info(freezeInfo?.unavailable_message || t('membership.freezeUnavailableMessage'), {
+        title: t('membership.freezeUnavailableTitle'),
       });
       return;
     }
@@ -82,7 +84,7 @@ export function MemberMembershipScreen() {
   };
 
   const handleRenewSuccess = () => {
-    toast.info('Renew mutation will be implemented soon.', { title: 'Coming Soon' });
+    toast.info(t('membership.renewComingSoon'), { title: t('membership.comingSoonTitle') });
   };
 
   const onRefresh = () => {
@@ -96,7 +98,7 @@ export function MemberMembershipScreen() {
     
     const { membership: ms, benefits, freeze, renewal_offer: renewalOffer } = memberState;
     return {
-      type: ms?.plan?.name || 'Unknown Plan',
+      type: ms?.plan?.name || t('membership.unknownPlan'),
       status: ms?.status || 'UNKNOWN',
       startDate: ms?.start_date || '',
       endDate: ms?.expiry_date || '',
@@ -111,7 +113,7 @@ export function MemberMembershipScreen() {
       isFrozen: freeze?.is_frozen || false,
       renewalOfferAvailable: renewalOffer?.available || false,
     };
-  }, [memberState]);
+  }, [memberState, t]);
 
   const isLoading = isMembershipLoading;
   const isError = isMembershipError;
@@ -136,9 +138,9 @@ export function MemberMembershipScreen() {
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
         >
           <Feather name="alert-triangle" size={48} color={BrandColors.trainerAmber} />
-          <Text style={styles.errorText}>Failed to load subscription data.</Text>
+          <Text style={styles.errorText}>{t('membership.loadError')}</Text>
           <Pressable style={styles.retryButton} onPress={onRefresh}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t('membership.retry')}</Text>
           </Pressable>
         </ScrollView>
       </View>
@@ -182,10 +184,10 @@ export function MemberMembershipScreen() {
               style={({ pressed }) => [styles.actionButtonGold, pressed && styles.pressed]}
           onPress={() => setIsRenewModalOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Renew Subscription"
+          accessibilityLabel={t('membership.renewA11y')}
         >
           <Feather name="refresh-cw" size={20} color={BrandColors.memberGold} />
-          <Text style={styles.actionButtonGoldText}>Renew Now</Text>
+          <Text style={styles.actionButtonGoldText}>{t('membership.renewNow')}</Text>
         </Pressable>
 
         {membership.isFrozen ? (
@@ -193,10 +195,10 @@ export function MemberMembershipScreen() {
             style={({ pressed }) => [styles.actionButtonAmber, pressed && styles.pressed]}
             onPress={() => setIsUnfreezeModalOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="Unfreeze Subscription"
+            accessibilityLabel={t('membership.unfreezeA11y')}
           >
             <Feather name="play-circle" size={20} color={BrandColors.trainerAmber} />
-            <Text style={styles.actionButtonAmberText}>Unfreeze</Text>
+            <Text style={styles.actionButtonAmberText}>{t('membership.unfreeze')}</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -207,10 +209,10 @@ export function MemberMembershipScreen() {
             ]}
             onPress={openFreeze}
             accessibilityRole="button"
-            accessibilityLabel="Freeze Subscription"
+            accessibilityLabel={t('membership.freezeA11y')}
           >
             <Feather name="pause-circle" size={20} color={BrandColors.trainerAmber} />
-            <Text style={styles.actionButtonAmberText}>Freeze</Text>
+            <Text style={styles.actionButtonAmberText}>{t('membership.freeze')}</Text>
           </Pressable>
         )}
       </View>
@@ -224,7 +226,7 @@ export function MemberMembershipScreen() {
           <Text
             style={[styles.tabText, activeTab === 'benefits' && styles.tabTextActive]}
           >
-            Benefits
+            {t('membership.tabs.benefits')}
           </Text>
         </Pressable>
 
@@ -235,7 +237,7 @@ export function MemberMembershipScreen() {
           <Text
             style={[styles.tabText, activeTab === 'payments' && styles.tabTextActive]}
           >
-            Payments
+            {t('membership.tabs.payments')}
           </Text>
         </Pressable>
 
@@ -246,7 +248,7 @@ export function MemberMembershipScreen() {
           <Text
             style={[styles.tabText, activeTab === 'addons' && styles.tabTextActive]}
           >
-            Add-ons
+            {t('membership.tabs.addons')}
           </Text>
         </Pressable>
       </GlassSurface>

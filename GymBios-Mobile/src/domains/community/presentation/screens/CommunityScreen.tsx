@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
@@ -33,6 +34,7 @@ import { CommunityAnalyticsScreen } from '@/domains/analytics/community';
  * post's comments.
  */
 export function CommunityScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const { activeTab, setActiveTab } = useCommunityNavigation();
@@ -82,7 +84,7 @@ export function CommunityScreen() {
         visible={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         module={COMMUNITY_NOTIFICATION_MODULE}
-        title="Community"
+        title={t('community.title')}
         onItemPress={handleNotificationPress}
       />
 

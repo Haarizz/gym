@@ -1,5 +1,6 @@
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Typography } from '@/shared/components/Typography';
 import { usePhotoPicker } from '@/shared/components/AvatarPicker';
 import { Radius, Spacing, BrandColors } from '@/core/theme';
@@ -10,6 +11,7 @@ interface VisitorPhotoPickerProps {
 }
 
 export function VisitorPhotoPicker({ photoUri, onPhotoChange }: VisitorPhotoPickerProps) {
+  const { t } = useTranslation();
   const { takePhoto, chooseFromGallery } = usePhotoPicker();
 
   const handleUseCamera = async () => {
@@ -25,7 +27,7 @@ export function VisitorPhotoPicker({ photoUri, onPhotoChange }: VisitorPhotoPick
   return (
     <View style={styles.container}>
       <Typography variant="bodySmall" color="textSecondary" style={styles.label}>
-        Photo (Optional)
+        {t('checkIn.walkIn.photoOptional')}
       </Typography>
 
       {photoUri ? (
@@ -35,7 +37,7 @@ export function VisitorPhotoPicker({ photoUri, onPhotoChange }: VisitorPhotoPick
             style={styles.removeBtn}
             onPress={() => onPhotoChange(null)}
             accessibilityRole="button"
-            accessibilityLabel="Remove photo"
+            accessibilityLabel={t('checkIn.walkIn.removePhotoA11y')}
           >
             <Feather name="x" size={14} color={BrandColors.white} />
           </TouchableOpacity>
@@ -46,14 +48,14 @@ export function VisitorPhotoPicker({ photoUri, onPhotoChange }: VisitorPhotoPick
         <TouchableOpacity style={styles.actionBtn} onPress={handleUseCamera}>
           <Feather name="camera" size={16} color={BrandColors.textSecondary} style={styles.icon} />
           <Typography variant="bodySmall" color="textSecondary">
-            {photoUri ? 'Retake' : 'Use Camera'}
+            {photoUri ? t('checkIn.walkIn.retake') : t('checkIn.walkIn.useCamera')}
           </Typography>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn} onPress={handleUploadPhoto}>
           <Feather name="upload" size={16} color={BrandColors.textSecondary} style={styles.icon} />
           <Typography variant="bodySmall" color="textSecondary">
-            {photoUri ? 'Choose Another' : 'Upload Photo'}
+            {photoUri ? t('checkIn.walkIn.chooseAnother') : t('checkIn.walkIn.uploadPhoto')}
           </Typography>
         </TouchableOpacity>
       </View>
@@ -81,7 +83,7 @@ const styles = StyleSheet.create({
   removeBtn: {
     position: 'absolute',
     top: 0,
-    right: 0,
+    end: 0,
     width: 26,
     height: 26,
     borderRadius: 13,
@@ -104,6 +106,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   icon: {
-    marginRight: Spacing.two,
+    marginEnd: Spacing.two,
   }
 });

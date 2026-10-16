@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Pressable, View, ScrollView, NativeSyntheticEvent, NativeScrollEvent, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -95,15 +96,17 @@ export interface TimePickerProps {
 
 export function TimePicker({
   label,
-  placeholder = 'Select time',
+  placeholder,
   value,
   onChange,
   required = false,
   disabled = false,
   error,
 }: TimePickerProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
+  const resolvedPlaceholder = placeholder ?? t('shared.timePicker.selectTime');
 
   // Parse initial value or use current time
   const parseValue = useCallback((val?: string) => {
@@ -164,12 +167,12 @@ export function TimePicker({
     const displayH = currentH % 12 || 12;
 
     return [
-      { label: "Now", h: displayH, m: finalM, p: currentP },
+      { label: t('shared.timePicker.now'), h: displayH, m: finalM, p: currentP },
       { label: "9:00 AM", h: 9, m: 0, p: "AM" },
       { label: "1:00 PM", h: 1, m: 0, p: "PM" },
       { label: "5:00 PM", h: 5, m: 0, p: "PM" },
     ];
-  }, []);
+  }, [t]);
 
   const handleConfirm = () => {
     let finalHH = hour;
@@ -223,7 +226,7 @@ export function TimePicker({
             { color: hasValue ? theme.text : theme.textSecondary },
           ]}
         >
-          {hasValue ? displayString : placeholder}
+          {hasValue ? displayString : resolvedPlaceholder}
         </Typography>
         <Feather name="chevron-down" size={18} color={theme.textSecondary} />
       </Pressable>
@@ -236,7 +239,7 @@ export function TimePicker({
 
       <AppBottomSheet
         visible={sheetVisible}
-        title={label ?? "Select time"}
+        title={label ?? t('shared.timePicker.selectTime')}
         onClose={() => setSheetVisible(false)}
       >
         <View style={styles.sheetContent}>
@@ -316,14 +319,16 @@ export function TimePicker({
               style={styles.cancelButton}
               onPress={() => setSheetVisible(false)}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('shared.cancel')}</Text>
             </Pressable>
             
             <Pressable
               style={styles.confirmButton}
               onPress={handleConfirm}
             >
-              <Text style={styles.confirmText}>Set time · {currentSelectionLabel}</Text>
+              <Text style={styles.confirmText}>
+                {t('shared.timePicker.setTime', { time: currentSelectionLabel })}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -361,8 +366,8 @@ const styles = StyleSheet.create({
   highlightBand: {
     position: 'absolute',
     top: '50%',
-    left: Spacing.six,
-    right: Spacing.six,
+    start: Spacing.six,
+    end: Spacing.six,
     height: ITEM_H,
     marginTop: -ITEM_H / 2,
     backgroundColor: '#F0FDFA',
@@ -380,15 +385,15 @@ const styles = StyleSheet.create({
   gradientTop: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     height: PAD,
   },
   gradientBottom: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     height: PAD,
   },
   footer: {

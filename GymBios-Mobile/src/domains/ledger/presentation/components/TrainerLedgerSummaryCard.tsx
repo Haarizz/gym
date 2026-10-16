@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +11,8 @@ interface TrainerLedgerSummaryCardProps {
 }
 
 export function TrainerLedgerSummaryCard({ summary }: TrainerLedgerSummaryCardProps) {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient
       colors={[BrandColors.trainerAmber, '#D97706']}
@@ -17,16 +20,16 @@ export function TrainerLedgerSummaryCard({ summary }: TrainerLedgerSummaryCardPr
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.title}>Earnings Summary</Text>
+      <Text style={styles.title}>{t('ledger.summary.title')}</Text>
 
       <View style={styles.gridRow}>
         <View style={styles.gridCol}>
-          <Text style={styles.label}>This Month</Text>
+          <Text style={styles.label}>{t('ledger.summary.thisMonth')}</Text>
           <Text style={styles.largeValue}><CurrencyValue amount={summary.thisMonth} compact /></Text>
         </View>
 
         <View style={styles.gridCol}>
-          <Text style={styles.label}>Last Month</Text>
+          <Text style={styles.label}>{t('ledger.summary.lastMonth')}</Text>
           <Text style={styles.mediumValue}><CurrencyValue amount={summary.lastMonth} compact /></Text>
         </View>
       </View>
@@ -35,14 +38,14 @@ export function TrainerLedgerSummaryCard({ summary }: TrainerLedgerSummaryCardPr
 
       <View style={styles.gridRow}>
         <View style={styles.gridCol}>
-          <Text style={styles.label}>Paid</Text>
+          <Text style={styles.label}>{t('ledger.summary.paid')}</Text>
           <Text style={[styles.smallValue, styles.paidValue]}>
             <CurrencyValue amount={summary.paid} compact />
           </Text>
         </View>
 
         <View style={styles.gridCol}>
-          <Text style={styles.label}>Pending</Text>
+          <Text style={styles.label}>{t('ledger.summary.pending')}</Text>
           <Text style={[styles.smallValue, styles.pendingValue]}>
             <CurrencyValue amount={summary.pending} compact />
           </Text>

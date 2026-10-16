@@ -1,5 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, I18nManager } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
@@ -60,6 +61,7 @@ function formatModuleLabel(module: string): string {
 }
 
 export function NotificationItemRow({ notification, onPress, index = 0 }: NotificationItemRowProps) {
+  const { t } = useTranslation();
   const icon = getIconForNotification(notification.module, notification.type);
   const time = formatShortTime(notification.createdAt);
   const unread = !notification.isRead;
@@ -74,7 +76,7 @@ export function NotificationItemRow({ notification, onPress, index = 0 }: Notifi
         ]}
         onPress={() => onPress(notification)}
         accessibilityRole="button"
-        accessibilityLabel={`${notification.title}, ${unread ? 'unread' : 'read'}`}
+        accessibilityLabel={t(unread ? 'notifications.itemA11yUnread' : 'notifications.itemA11yRead', { title: notification.title })}
       >
         <View style={[styles.iconContainer, { backgroundColor: icon.background }]}>
           <Feather name={icon.name} size={19} color={icon.color} />
@@ -104,14 +106,18 @@ export function NotificationItemRow({ notification, onPress, index = 0 }: Notifi
             )}
             {!isInformationalNotification(notification) && (
               <View style={styles.viewAction}>
-                <Text style={styles.viewActionText}>View</Text>
-                <Feather name="chevron-right" size={14} color={G.teal} />
+                <Text style={styles.viewActionText}>{t('notifications.view')}</Text>
+                <Feather
+                  name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+                  size={14}
+                  color={G.teal}
+                />
               </View>
             )}
           </View>
         </View>
 
-        {unread && <View style={styles.unreadDot} accessibilityLabel="Unread" />}
+        {unread && <View style={styles.unreadDot} accessibilityLabel={t('notifications.unread')} />}
       </Pressable>
     </Animated.View>
   );
@@ -123,8 +129,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
     paddingVertical: 14,
-    paddingLeft: 12,
-    paddingRight: 14,
+    paddingStart: 12,
+    paddingEnd: 14,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: 'transparent',

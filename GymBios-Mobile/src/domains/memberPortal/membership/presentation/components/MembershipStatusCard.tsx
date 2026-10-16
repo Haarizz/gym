@@ -1,9 +1,12 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate, tOr } from '@/core/i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { parsePlanTerm } from '../../domain/planTerm';
 
 // Deep-green gradient glass — matches reference `.plan-card`
 const GREEN_START = 'rgba(27,90,76,0.82)';
@@ -19,7 +22,7 @@ export interface MembershipDetails {
   autoRenew: boolean;
   /** Plan price in the gym's display currency; null when there is no plan. */
   price: number | null;
-  /** Billing period shown after the price, e.g. "1 Month". */
+  /** Plan length from the backend, e.g. "1 month", "56 monthly", "8 sessions". */
   pricePeriod?: string;
   benefits: string[];
   freezeAvailable: boolean;
@@ -33,21 +36,22 @@ interface MembershipStatusCardProps {
 }
 
 export function MembershipStatusCard({ membership }: MembershipStatusCardProps) {
+  const { t } = useTranslation();
   if (membership.status === 'No Active Plan') {
     return (
       <View style={[styles.card, styles.inactiveCard]}>
         <View style={styles.header}>
           <View>
-            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Current Subscription</Text>
-            <Text style={[styles.planTitle, styles.inactiveTextDark]}>No Active Subscription</Text>
-            <Text style={[styles.priceText, styles.inactiveTextLight]}>N/A</Text>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>{t('membership.status.currentSubscription')}</Text>
+            <Text style={[styles.planTitle, styles.inactiveTextDark]}>{t('membership.status.noActiveSubscription')}</Text>
+            <Text style={[styles.priceText, styles.inactiveTextLight]}>{t('membership.status.notAvailable')}</Text>
           </View>
           <View style={[styles.activeBadge, styles.activeBadgeInactive]}>
-            <Text style={[styles.activeBadgeText, styles.activeBadgeTextInactive]}>INACTIVE</Text>
+            <Text style={[styles.activeBadgeText, styles.activeBadgeTextInactive]}>{t('membership.status.inactiveBadge')}</Text>
           </View>
         </View>
         <Text style={styles.inactivePrompt}>
-          You don't have an active subscription. Join a gym to unlock benefits and add-ons.
+          {t('membership.status.inactivePrompt')}
         </Text>
       </View>
     );
@@ -58,21 +62,15 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
     Math.min(100, Math.round((membership.daysRemaining / (membership.totalDays || 365)) * 100))
   );
 
-  const formattedStart = membership.startDate
-    ? new Date(membership.startDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : 'N/A';
-
-  const formattedEnd = membership.endDate
-    ? new Date(membership.endDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : 'N/A';
+  const notAvailable = t('membership.status.notAvailable');
+  const formattedStart = membership.startDate ? formatDate(membership.startDate, 'PP') : notAvailable;
+  const formattedEnd = membership.endDate ? formatDate(membership.endDate, 'PP') : notAvailable;
+  const term = parsePlanTerm(membership.pricePeriod);
+  const priceSuffix = term
+    ? ` ${t(`membership.status.term.${term.unit}`, { count: term.count })}`
+    : membership.pricePeriod
+      ? ` · ${membership.pricePeriod}`
+      : undefined;
 
   return (
     <View style={styles.card}>
@@ -89,29 +87,29 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
       <View pointerEvents="none" style={styles.topHighlight} />
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.badgeLabel}>Current Subscription</Text>
-          <Text style={styles.planTitle}>{membership.type || 'Unknown Subscription'}</Text>
+        <View style={styles.headerInfo}>
+          <Text style={styles.badgeLabel}>{t('membership.status.currentSubscription')}</Text>
+          <Text style={styles.planTitle} numberOfLines={2}>{membership.type || t('membership.status.unknownSubscription')}</Text>
           {membership.price != null && (
             <CurrencyValue
               style={styles.priceText}
               amount={membership.price}
-              suffix={membership.pricePeriod ? ` / ${membership.pricePeriod}` : undefined}
+              suffix={priceSuffix}
             />
           )}
         </View>
         {/* White-glass active pill — matching reference `.active-pill` */}
         <View style={styles.activeBadge}>
           <Feather name="check-circle" size={11} color="#FFFFFF" />
-          <Text style={styles.activeBadgeText}>{membership.status.toUpperCase()}</Text>
+          <Text style={styles.activeBadgeText}>{tOr(`membership.status.values.${membership.status.toUpperCase()}`, membership.status.toUpperCase())}</Text>
         </View>
       </View>
 
       {/* Progress Bar */}
       <View style={styles.progressSection}>
         <View style={styles.progressLabelRow}>
-          <Text style={styles.progressLabel}>Subscription Progress</Text>
-          <Text style={styles.daysRemainingText}>{membership.daysRemaining || 0} days left</Text>
+          <Text style={styles.progressLabel}>{t('membership.status.progress')}</Text>
+          <Text style={styles.daysRemainingText}>{t('membership.status.daysLeft', { count: membership.daysRemaining || 0 })}</Text>
         </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${percentRemaining}%` as any }]} />
@@ -121,15 +119,15 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
       {/* Dates & Auto Renew */}
       <View style={styles.footerRow}>
         <View>
-          <Text style={styles.footerLabel}>Started</Text>
+          <Text style={styles.footerLabel}>{t('membership.status.started')}</Text>
           <Text style={styles.footerValue}>{formattedStart}</Text>
         </View>
         <View style={styles.centerCol}>
-          <Text style={styles.footerLabel}>Auto Renew</Text>
-          <Text style={styles.footerValue}>{membership.autoRenew ? 'ON' : 'OFF'}</Text>
+          <Text style={styles.footerLabel}>{t('membership.status.autoRenew')}</Text>
+          <Text style={styles.footerValue}>{t(membership.autoRenew ? 'membership.status.on' : 'membership.status.off')}</Text>
         </View>
         <View style={styles.rightCol}>
-          <Text style={styles.footerLabel}>Expires</Text>
+          <Text style={styles.footerLabel}>{t('membership.status.expires')}</Text>
           <Text style={styles.footerValue}>{formattedEnd}</Text>
         </View>
       </View>
@@ -155,7 +153,7 @@ const styles = StyleSheet.create({
   blobDecor: {
     position: 'absolute',
     top: -60,
-    right: -40,
+    end: -40,
     width: 160,
     height: 160,
     borderRadius: 80,
@@ -164,8 +162,8 @@ const styles = StyleSheet.create({
   topHighlight: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.4)',
   },
@@ -173,6 +171,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  // Takes the leftover width so a long plan name wraps instead of pushing the pill off-card.
+  headerInfo: {
+    flex: 1,
+    minWidth: 0,
   },
   badgeLabel: {
     fontSize: 11,
@@ -203,6 +207,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: 5,
     borderRadius: Radius.full,
+    flexShrink: 0,
   },
   activeBadgeText: {
     fontSize: 10,

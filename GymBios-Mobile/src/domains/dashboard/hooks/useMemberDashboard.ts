@@ -21,10 +21,10 @@ export const DEFAULT_MEMBER_DASHBOARD: MemberDashboardData = {
   },
   todaysSchedule: [],
   quickStats: [
-    { label: 'Check-ins', value: '0', icon: 'check-circle', color: '#327f74' },
-    { label: 'Classes', value: '0', icon: 'calendar', color: '#F5C742' },
-    { label: 'Calories', value: '0', icon: 'zap', color: '#F59E0B' },
-    { label: 'Streak', value: '0 days', icon: 'award', color: '#8b5cf6' },
+    { kind: 'checkIns', label: 'Check-ins', value: '0', icon: 'check-circle', color: '#327f74' },
+    { kind: 'classes', label: 'Classes', value: '0', icon: 'calendar', color: '#F5C742' },
+    { kind: 'calories', label: 'Calories', value: '0', icon: 'zap', color: '#F59E0B' },
+    { kind: 'streak', label: 'Streak', value: '0', icon: 'award', color: '#8b5cf6' },
   ],
 };
 

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -17,8 +18,8 @@ export function ConfirmationModal({
   visible,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText: confirmTextProp,
+  cancelText: cancelTextProp,
   variant = 'danger',
   icon,
   loading = false,
@@ -26,6 +27,9 @@ export function ConfirmationModal({
   onClose,
   children,
 }: ConfirmationModalProps) {
+  const { t } = useTranslation();
+  const confirmText = confirmTextProp ?? t('shared.confirm');
+  const cancelText = cancelTextProp ?? t('shared.cancel');
   if (!visible) {
     return null;
   }
@@ -72,7 +76,7 @@ export function ConfirmationModal({
         <Pressable
           style={styles.backdropDismissArea}
           onPress={loading ? undefined : onClose}
-          accessibilityLabel="Dismiss modal backdrop"
+          accessibilityLabel={t('shared.dismissBackdrop')}
         />
 
         <View style={styles.dialogContainer}>

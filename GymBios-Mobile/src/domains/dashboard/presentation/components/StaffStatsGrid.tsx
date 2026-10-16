@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -10,6 +11,8 @@ interface StaffStatsGridProps {
 }
 
 export function StaffStatsGrid({ stats }: StaffStatsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.grid}>
       {/* Leads Added */}
@@ -18,7 +21,7 @@ export function StaffStatsGrid({ stats }: StaffStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 199, 66, 0.15)' }]}>
             <Feather name="user-plus" size={16} color={BrandColors.memberGold} />
           </View>
-          <Text style={styles.cardLabel}>Leads Added</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.staff.stats.leadsAdded')}</Text>
         </View>
         <Text style={styles.cardValue}>{stats.leadsAdded}</Text>
       </GlassSurface>
@@ -29,7 +32,7 @@ export function StaffStatsGrid({ stats }: StaffStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: 'rgba(50, 127, 116, 0.15)' }]}>
             <Feather name="phone" size={16} color={BrandColors.teal} />
           </View>
-          <Text style={styles.cardLabel}>Follow-ups</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.staff.stats.followUps')}</Text>
         </View>
         <Text style={styles.cardValue}>{stats.followUpsCompleted}</Text>
       </GlassSurface>
@@ -40,7 +43,7 @@ export function StaffStatsGrid({ stats }: StaffStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#DCFCE7' }]}>
             <Feather name="check-circle" size={16} color="#16A34A" />
           </View>
-          <Text style={styles.cardLabel}>Conversions</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.staff.stats.conversions')}</Text>
         </View>
         <Text style={[styles.cardValue, { color: '#16A34A' }]}>{stats.conversions}</Text>
       </GlassSurface>
@@ -51,7 +54,7 @@ export function StaffStatsGrid({ stats }: StaffStatsGridProps) {
           <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
             <Feather name="users" size={16} color="#9333EA" />
           </View>
-          <Text style={styles.cardLabel}>Check-ins</Text>
+          <Text style={styles.cardLabel}>{t('dashboard.staff.stats.checkIns')}</Text>
         </View>
         <Text style={styles.cardValue}>{stats.checkins}</Text>
       </GlassSurface>

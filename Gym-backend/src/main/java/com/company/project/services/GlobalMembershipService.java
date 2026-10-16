@@ -46,6 +46,14 @@ public class GlobalMembershipService {
                     + "      OR COALESCE(expiry_date, membership_end_date) >= ?)"
                     + " LIMIT 1";
 
+    // A purchase made at some point (pending or approved, not itself rejected) — used to
+    // tell whether a rejected purchase elsewhere has been superseded by this one.
+    private static final String PURCHASE_SINCE_SQL =
+            "SELECT 1 FROM members WHERE global_user_id = ?"
+                    + " AND (approval_status IS NULL OR approval_status <> 'REJECTED')"
+                    + " AND join_date >= ?"
+                    + " LIMIT 1";
+
     private final UserMembershipRepository userMembershipRepository;
     private final TenantDataSourceRegistry tenantDataSourceRegistry;
     private final DataSource primaryDataSource;
@@ -117,6 +125,46 @@ public class GlobalMembershipService {
             log.warn("Could not read membership index for global user {}: {}", globalUserId, e.getMessage());
         }
         return false;
+    }
+
+    /**
+     * True if this account bought a membership in a gym other than the current one at
+     * or after {@code since} — a rejected purchase here is then superseded and must not
+     * be approved after all (see MemberService.approveRejectedPayment).
+     */
+    public boolean hasPurchaseInAnotherGymSince(Long globalUserId, LocalDateTime since) {
+        if (globalUserId == null || since == null) {
+            return false;
+        }
+        String currentTenant = currentTenantSlug();
+        try {
+            for (UserMembershipEntry entry : userMembershipRepository.findByGlobalUserId(globalUserId)) {
+                if (entry.getTenantSlug().equals(currentTenant)) {
+                    continue;
+                }
+                if (hasPurchaseSince(entry.getTenantSlug(), globalUserId, since)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read membership index for global user {}: {}", globalUserId, e.getMessage());
+        }
+        return false;
+    }
+
+    private boolean hasPurchaseSince(String tenantSlug, Long globalUserId, LocalDateTime since) {
+        try (Connection conn = dataSourceFor(tenantSlug).getConnection();
+             PreparedStatement stmt = conn.prepareStatement(PURCHASE_SINCE_SQL)) {
+            stmt.setLong(1, globalUserId);
+            stmt.setTimestamp(2, Timestamp.valueOf(since));
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (Exception e) {
+            log.warn("Could not check purchases of global user {} in tenant '{}': {}",
+                    globalUserId, tenantSlug, e.getMessage());
+            return false;
+        }
     }
 
     /**

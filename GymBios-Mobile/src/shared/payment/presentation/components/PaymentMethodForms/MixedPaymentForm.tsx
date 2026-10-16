@@ -9,6 +9,7 @@ import { Button } from '@/shared/components/Button';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   CARD_TYPE_OPTIONS,
   DEFAULT_BANK_ACCOUNTS,
@@ -25,13 +26,7 @@ interface MixedPaymentFormProps {
   onRowsChange: (rows: PaymentSplitRow[]) => void;
 }
 
-const SPLIT_METHOD_OPTIONS = [
-  { label: 'Cash', value: 'cash' },
-  { label: 'Card', value: 'card' },
-  { label: 'Cheque', value: 'cheque' },
-  { label: 'Bank Transfer', value: 'bank_transfer' },
-  { label: 'Online Payment', value: 'online' },
-];
+const SPLIT_METHODS = ['cash', 'card', 'cheque', 'bank_transfer', 'online'] as const;
 
 export function MixedPaymentForm({
   finalAmount,
@@ -40,6 +35,11 @@ export function MixedPaymentForm({
   onRowsChange,
 }: MixedPaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const splitMethodOptions = SPLIT_METHODS.map((value) => ({
+    label: t(`paymentSheet.methods.${value}.title`),
+    value,
+  }));
   const splitTotal = calculateSplitTotal(rows);
   const { isValid, difference } = validateSplitPayment(rows, finalAmount);
 
@@ -75,10 +75,10 @@ export function MixedPaymentForm({
     >
       <View style={styles.header}>
         <Typography variant="bodySmallBold" style={{ color: '#6D28D9' }}>
-          Mixed / Split Payment Details
+          {t('paymentSheet.form.mixedDetails')}
         </Typography>
         <Typography variant="caption" style={{ color: theme.textSecondary }}>
-          Split total across multiple methods
+          {t('paymentSheet.form.mixedSubtitle')}
         </Typography>
       </View>
 
@@ -95,7 +95,7 @@ export function MixedPaymentForm({
         >
           <View style={styles.rowCardHeader}>
             <Typography variant="bodySmallBold" style={{ color: theme.text }}>
-              Leg #{index + 1}
+              {t('paymentSheet.form.leg', { n: index + 1 })}
             </Typography>
             {rows.length > 1 ? (
               <Pressable
@@ -111,9 +111,9 @@ export function MixedPaymentForm({
           <View style={styles.flexRow}>
             <View style={styles.flex1}>
               <Dropdown
-                label="Method *"
+                label={t('paymentSheet.form.method')}
                 value={row.method}
-                options={SPLIT_METHOD_OPTIONS}
+                options={splitMethodOptions}
                 onChange={(val) =>
                   handleUpdateRow(row.id, { method: val as PaymentMethod })
                 }
@@ -122,7 +122,7 @@ export function MixedPaymentForm({
 
             <View style={styles.flex1}>
               <Input
-                label={<>Amount (<CurrencyGlyph />) *</>}
+                label={<Trans i18nKey="paymentSheet.form.amount" components={{ currency: <CurrencyGlyph /> }} />}
                 value={row.amount > 0 ? String(row.amount) : ''}
                 onChangeText={(txt) => {
                   const num = parseFloat(txt);
@@ -138,7 +138,7 @@ export function MixedPaymentForm({
           {row.method === 'card' ? (
             <View style={styles.subFields}>
               <Dropdown
-                label="Card Type *"
+                label={t('paymentSheet.form.cardType')}
                 value={row.cardType ?? ''}
                 options={CARD_TYPE_OPTIONS.map((o: string) => ({
                   label: o,
@@ -147,10 +147,10 @@ export function MixedPaymentForm({
                 onChange={(val) => handleUpdateRow(row.id, { cardType: val })}
               />
               <Input
-                label="Reference (Optional)"
+                label={t('paymentSheet.form.referenceOptional')}
                 value={row.reference ?? ''}
                 onChangeText={(txt) => handleUpdateRow(row.id, { reference: txt })}
-                placeholder="Transaction ID"
+                placeholder={t('paymentSheet.form.transactionIdPlaceholder')}
               />
             </View>
           ) : null}
@@ -158,18 +158,18 @@ export function MixedPaymentForm({
           {row.method === 'cheque' ? (
             <View style={styles.subFields}>
               <Input
-                label="Cheque Number *"
+                label={t('paymentSheet.form.chequeNumber')}
                 value={row.chequeNumber ?? ''}
                 onChangeText={(txt) =>
                   handleUpdateRow(row.id, { chequeNumber: txt })
                 }
-                placeholder="Cheque number"
+                placeholder={t('paymentSheet.form.chequeNumberPlaceholder')}
               />
               <Input
-                label="Bank Name (Optional)"
+                label={t('paymentSheet.form.bankNameOptional')}
                 value={row.bankName ?? ''}
                 onChangeText={(txt) => handleUpdateRow(row.id, { bankName: txt })}
-                placeholder="e.g. SBI"
+                placeholder={t('paymentSheet.form.example', { value: 'SBI' })}
               />
             </View>
           ) : null}
@@ -177,13 +177,13 @@ export function MixedPaymentForm({
           {row.method === 'bank_transfer' ? (
             <View style={styles.subFields}>
               <Input
-                label="Transaction Reference *"
+                label={t('paymentSheet.form.transactionReferenceRequired')}
                 value={row.reference ?? ''}
                 onChangeText={(txt) => handleUpdateRow(row.id, { reference: txt })}
-                placeholder="Reference ID"
+                placeholder={t('paymentSheet.form.referenceIdPlaceholder')}
               />
               <Dropdown
-                label="Bank Account (Ledger)"
+                label={t('paymentSheet.form.bankAccountLedger')}
                 value={row.bankAccountId ?? ''}
                 options={DEFAULT_BANK_ACCOUNTS.map((a: LedgerBankAccount) => ({
                   label: `${a.code} — ${a.name}`,
@@ -199,7 +199,7 @@ export function MixedPaymentForm({
           {row.method === 'online' ? (
             <View style={styles.subFields}>
               <Dropdown
-                label="Payment Type *"
+                label={t('paymentSheet.form.paymentType')}
                 value={row.onlinePaymentType ?? ''}
                 options={ONLINE_PAYMENT_TYPE_OPTIONS.map((o: string) => ({
                   label: o,
@@ -211,19 +211,19 @@ export function MixedPaymentForm({
               />
               {row.onlinePaymentType === 'Other' ? (
                 <Input
-                  label="Provider Name *"
+                  label={t('paymentSheet.form.providerName')}
                   value={row.providerName ?? ''}
                   onChangeText={(txt) =>
                     handleUpdateRow(row.id, { providerName: txt })
                   }
-                  placeholder="Provider name"
+                  placeholder={t('paymentSheet.form.providerNamePlaceholder')}
                 />
               ) : null}
               <Input
-                label="Transaction Reference *"
+                label={t('paymentSheet.form.transactionReferenceRequired')}
                 value={row.reference ?? ''}
                 onChangeText={(txt) => handleUpdateRow(row.id, { reference: txt })}
-                placeholder="Transaction ID"
+                placeholder={t('paymentSheet.form.transactionIdPlaceholder')}
               />
             </View>
           ) : null}
@@ -231,7 +231,7 @@ export function MixedPaymentForm({
       ))}
 
       <Button
-        label="+ Add Payment Leg"
+        label={t('paymentSheet.form.addLeg')}
         variant="secondary"
         onPress={handleAddRow}
         size="md"
@@ -249,7 +249,7 @@ export function MixedPaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="bodySmallBold" style={{ color: theme.text }}>
-            Total Split Amount:
+            {t('paymentSheet.form.totalSplit')}
           </Typography>
           <Typography
             variant="bodySmallBold"
@@ -264,15 +264,17 @@ export function MixedPaymentForm({
             variant="caption"
             style={{ color: theme.error, marginTop: 4 }}
           >
-            {difference > 0 ? 'Split amounts exceed final amount by ' : 'Split amounts fall short by '}
-            <CurrencyValue amount={Math.abs(difference)} decimals={2} />
+            <Trans
+              i18nKey={difference > 0 ? 'paymentSheet.form.exceedBy' : 'paymentSheet.form.shortBy'}
+              components={{ amount: <CurrencyValue amount={Math.abs(difference)} decimals={2} /> }}
+            />
           </Typography>
         ) : (
           <Typography
             variant="caption"
             style={{ color: '#047857', marginTop: 4 }}
           >
-            Split total matches final amount perfectly.
+            {t('paymentSheet.form.splitMatches')}
           </Typography>
         )}
       </View>

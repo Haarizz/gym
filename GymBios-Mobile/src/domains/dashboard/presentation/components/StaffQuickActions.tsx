@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { BrandColors } from '@/core/theme';
 import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
@@ -8,6 +9,7 @@ interface StaffQuickActionsProps {
 }
 
 export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const handleAddLead = () => {
@@ -27,8 +29,8 @@ export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsPro
   };
 
   const actions: QuickAction[] = [
-    { label: 'Add New Lead', icon: 'user-plus', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleAddLead },
-    { label: 'Member Check-in', icon: 'check-circle', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCheckIn },
+    { label: t('dashboard.staff.quickActions.addNewLead'), icon: 'user-plus', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleAddLead },
+    { label: t('dashboard.staff.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCheckIn },
   ];
 
   return <QuickActionsGrid actions={actions} />;

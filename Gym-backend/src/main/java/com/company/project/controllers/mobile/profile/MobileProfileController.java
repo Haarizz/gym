@@ -40,7 +40,7 @@ public class MobileProfileController {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        MobileProfileDTO profile = mobileProfileService.getProfileByUserId(principal.getId());
+        MobileProfileDTO profile = mobileProfileService.getProfileByUserId(principal.getId(), principal.isGlobal());
         // BG_82: heal members created before the photo was copied at purchase time —
         // fills the selected gym's photo only when it has none.
         if (principal.isGlobal()) {
@@ -74,7 +74,7 @@ public class MobileProfileController {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        MobileProfileDTO updated = mobileProfileService.updateProfile(principal.getId(), request);
+        MobileProfileDTO updated = mobileProfileService.updateProfile(principal.getId(), request, principal.isGlobal());
         // BG_82: a new photo also shows in the Member Directory of every gym they belong to.
         if (principal.isGlobal() && request.getPhotoUrl() != null) {
             memberPhotoSyncService.syncToAllGyms(principal.getId(), tenantSlug, updated.getPhotoUrl());

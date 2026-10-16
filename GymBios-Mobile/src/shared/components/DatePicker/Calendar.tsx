@@ -11,7 +11,7 @@ import {
   isDateDisabled,
   isOutsideMonth,
   isSelectedDate,
-  WEEK_DAYS,
+  getWeekDayNames,
 } from './utils';
 
 export function Calendar({
@@ -28,7 +28,7 @@ export function Calendar({
   return (
     <View>
       <View style={styles.weekHeader}>
-        {WEEK_DAYS.map((day) => (
+        {getWeekDayNames().map((day) => (
           <View key={day} style={styles.weekDay}>
             <Typography
               variant="caption"

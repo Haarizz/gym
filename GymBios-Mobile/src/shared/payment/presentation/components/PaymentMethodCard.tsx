@@ -6,6 +6,7 @@ import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 import type { PaymentMethodOption } from '@/shared/payment/constants';
 
 interface PaymentMethodCardProps {
@@ -20,13 +21,15 @@ export function PaymentMethodCard({
   onSelect,
 }: PaymentMethodCardProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const title = t(`paymentSheet.methods.${option.id}.title`);
 
   return (
     <Pressable
       onPress={onSelect}
       accessibilityRole="button"
       accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={option.title}
+      accessibilityLabel={title}
       style={({ pressed }) => [
         styles.card,
         {
@@ -77,7 +80,7 @@ export function PaymentMethodCard({
         ]}
         numberOfLines={1}
       >
-        {option.title}
+        {title}
       </Typography>
 
       <Typography
@@ -85,7 +88,7 @@ export function PaymentMethodCard({
         style={{ color: theme.textSecondary, marginTop: 2 }}
         numberOfLines={1}
       >
-        {option.subtitle}
+        {t(`paymentSheet.methods.${option.id}.subtitle`)}
       </Typography>
     </Pressable>
   );

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -13,12 +14,13 @@ interface NotificationHeaderProps {
 }
 
 export function NotificationHeader({
-  title = 'Notifications',
+  title,
   unreadCount,
   isRefreshing = false,
   onClose,
   onRefresh,
 }: NotificationHeaderProps) {
+  const { t } = useTranslation();
   const spin = useState(() => new Animated.Value(0))[0];
 
   // Keep the refresh icon turning while a refresh is in flight.
@@ -44,15 +46,15 @@ export function NotificationHeader({
         style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
         onPress={onClose}
         accessibilityRole="button"
-        accessibilityLabel="Close notifications"
+        accessibilityLabel={t('notifications.closeA11y')}
       >
         <Feather name="x" size={18} color={G.ink} />
       </Pressable>
 
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        <Text style={styles.title} numberOfLines={1}>{title ?? t('notifications.title')}</Text>
         <Text style={styles.subtitle}>
-          {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+          {unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.allCaughtUp')}
         </Text>
       </View>
 
@@ -62,7 +64,7 @@ export function NotificationHeader({
         onPress={onRefresh}
         disabled={isRefreshing}
         accessibilityRole="button"
-        accessibilityLabel="Refresh notifications"
+        accessibilityLabel={t('notifications.refreshA11y')}
       >
         <Animated.View style={{ transform: [{ rotate }] }}>
           <Feather name="rotate-cw" size={18} color={G.ink} />

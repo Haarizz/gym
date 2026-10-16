@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
+import { tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MemberFeedbackPayload } from '../../../domain/MemberFeedback';
@@ -23,36 +25,11 @@ interface PostWorkoutFeedbackSheetProps {
 
 const TOTAL_STEPS = 6;
 
-const STEP_TITLES = [
-  "How was today's workout? ⭐",
-  "Let's rate the equipment & facility",
-  'How did the fit and pace feel?',
-  'What stood out today?',
-  'Energy after the session',
-  'Any final notes?',
-];
-
-const OVERALL_CAPTIONS: Record<number, string> = {
-  1: 'Not great',
-  2: 'Could be better',
-  3: 'Pretty good',
-  4: 'Really enjoyed it',
-  5: 'Loved it!',
-};
-
-const INTENSITY_LABELS: Record<number, string> = {
-  1: 'Too easy',
-  2: 'Easy',
-  3: 'Perfect',
-  4: 'Hard',
-  5: 'Very hard',
-};
-
 const ENERGY_OPTIONS = [
-  { value: 'low', emoji: '😮‍💨', label: 'Low' },
-  { value: 'medium', emoji: '🙂', label: 'Good' },
-  { value: 'high', emoji: '⚡️', label: 'Energized' },
-];
+  { value: 'low', emoji: '😮‍💨' },
+  { value: 'medium', emoji: '🙂' },
+  { value: 'high', emoji: '⚡️' },
+] as const;
 
 const BEST_ASPECTS = [
   'Music',
@@ -80,6 +57,7 @@ export function PostWorkoutFeedbackSheet({
   onClose,
 }: PostWorkoutFeedbackSheetProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(1);
   const [showToast, setShowToast] = useState(false);
 
@@ -179,7 +157,7 @@ export function PostWorkoutFeedbackSheet({
           {/* Toast Notification */}
           {showToast && (
             <View style={styles.toast}>
-              <Text style={styles.toastText}>✓ Saved</Text>
+              <Text style={styles.toastText}>{t('feedback.saved')}</Text>
             </View>
           )}
 
@@ -192,14 +170,14 @@ export function PostWorkoutFeedbackSheet({
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
               <Text style={styles.stepIndicator}>
-                STEP {currentStep} OF {TOTAL_STEPS}
+                {t('feedback.stepOf', { step: currentStep, total: TOTAL_STEPS })}
               </Text>
-              <Pressable onPress={onClose} style={styles.closeButton} accessibilityLabel="Close feedback form" accessibilityRole="button">
+              <Pressable onPress={onClose} style={styles.closeButton} accessibilityLabel={t('feedback.closeA11y')} accessibilityRole="button">
                 <Feather name="x" size={24} color="#6B6660" />
               </Pressable>
             </View>
-            <Text style={styles.title}>{STEP_TITLES[currentStep - 1]}</Text>
-            <Text style={styles.subtitle}>Tap to continue your feedback</Text>
+            <Text style={styles.title}>{t(`feedback.stepTitles.s${currentStep as 1 | 2 | 3 | 4 | 5 | 6}`)}</Text>
+            <Text style={styles.subtitle}>{t('feedback.subtitle')}</Text>
           </View>
 
           {/* Progress Indicator */}
@@ -230,8 +208,8 @@ export function PostWorkoutFeedbackSheet({
             {/* STEP 1: Overall Rating & Intensity */}
             {currentStep === 1 && (
               <View style={styles.stepContainer}>
-                <Text style={styles.stepHeading}>How was today's workout?</Text>
-                <Text style={styles.hint}>Your overall take on the session.</Text>
+                <Text style={styles.stepHeading}>{t('feedback.overallHeading')}</Text>
+                <Text style={styles.hint}>{t('feedback.overallHint')}</Text>
 
                 {/* Big Stars */}
                 <View style={styles.starsBigRow}>
@@ -241,7 +219,7 @@ export function PostWorkoutFeedbackSheet({
                       onPress={() => setOverallSatisfaction(star)}
                       style={styles.starButton}
                       accessibilityRole="button"
-                      accessibilityLabel={`Rate ${star} star`}
+                      accessibilityLabel={t('feedback.rateStar', { count: star })}
                     >
                       <Feather
                         name="star"
@@ -252,11 +230,13 @@ export function PostWorkoutFeedbackSheet({
                   ))}
                 </View>
                 <Text style={styles.caption}>
-                  {overallSatisfaction > 0 ? OVERALL_CAPTIONS[overallSatisfaction] : ' '}
+                  {overallSatisfaction > 0
+                    ? t(`feedback.overallCaptions.s${overallSatisfaction as 1 | 2 | 3 | 4 | 5}`)
+                    : ' '}
                 </Text>
 
                 {/* Intensity */}
-                <Text style={[styles.groupLabel, { marginTop: 24 }]}>INTENSITY</Text>
+                <Text style={[styles.groupLabel, { marginTop: 24 }]}>{t('feedback.intensity')}</Text>
                 <View style={styles.steppedSelector}>
                   {[1, 2, 3, 4, 5].map((level) => {
                     const isSelected = workoutIntensity === level;
@@ -282,11 +262,13 @@ export function PostWorkoutFeedbackSheet({
                   })}
                 </View>
                 <View style={styles.rangeLabels}>
-                  <Text style={styles.rangeEnd}>Too easy</Text>
+                  <Text style={styles.rangeEnd}>{t('feedback.tooEasy')}</Text>
                   <Text style={styles.rangeCurrent}>
-                    {INTENSITY_LABELS[workoutIntensity] || 'Perfect'}
+                    {workoutIntensity >= 1 && workoutIntensity <= 5
+                      ? t(`feedback.intensityLabels.s${workoutIntensity as 1 | 2 | 3 | 4 | 5}`)
+                      : t('feedback.perfect')}
                   </Text>
-                  <Text style={styles.rangeEnd}>Very hard</Text>
+                  <Text style={styles.rangeEnd}>{t('feedback.veryHard')}</Text>
                 </View>
               </View>
             )}
@@ -294,14 +276,14 @@ export function PostWorkoutFeedbackSheet({
             {/* STEP 2: Equipment & Facility */}
             {currentStep === 2 && (
               <View style={styles.stepContainer}>
-                <Text style={styles.stepHeading}>Equipment & facility</Text>
-                <Text style={styles.hint}>Rate the condition of what you used today.</Text>
+                <Text style={styles.stepHeading}>{t('feedback.equipmentHeading')}</Text>
+                <Text style={styles.hint}>{t('feedback.equipmentHint')}</Text>
 
                 {/* Equipment Card */}
                 <View style={styles.miniRateCard}>
                   <View style={styles.miniRateInfo}>
-                    <Text style={styles.miniRateName}>Equipment</Text>
-                    <Text style={styles.miniRateSub}>Condition & availability</Text>
+                    <Text style={styles.miniRateName}>{t('feedback.equipment')}</Text>
+                    <Text style={styles.miniRateSub}>{t('feedback.equipmentSub')}</Text>
                   </View>
                   <View style={styles.starsMiniRow}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -323,8 +305,8 @@ export function PostWorkoutFeedbackSheet({
                 {/* Facility Card */}
                 <View style={styles.miniRateCard}>
                   <View style={styles.miniRateInfo}>
-                    <Text style={styles.miniRateName}>Facility</Text>
-                    <Text style={styles.miniRateSub}>Cleanliness & environment</Text>
+                    <Text style={styles.miniRateName}>{t('feedback.facility')}</Text>
+                    <Text style={styles.miniRateSub}>{t('feedback.facilitySub')}</Text>
                   </View>
                   <View style={styles.starsMiniRow}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -348,19 +330,19 @@ export function PostWorkoutFeedbackSheet({
             {/* STEP 3: Fit & Pacing */}
             {currentStep === 3 && (
               <View style={styles.stepContainer}>
-                <Text style={styles.stepHeading}>Fit & pacing</Text>
+                <Text style={styles.stepHeading}>{t('feedback.fitHeading')}</Text>
                 <Text style={styles.hint}>
-                  Would you recommend this, and how did it feel?
+                  {t('feedback.fitHint')}
                 </Text>
 
-                <Text style={styles.groupLabel}>RECOMMEND THIS WORKOUT?</Text>
+                <Text style={styles.groupLabel}>{t('feedback.recommend')}</Text>
                 <View style={styles.chipRow}>
                   {['Yes, definitely', 'Maybe', 'No'].map((opt) => {
                     const isSelected = recommendWorkout === opt;
                     const isWarn = isSelected && opt === 'No';
                     return (
                       <Pressable
-                        key={opt}
+                        key={tOr(`feedback.options.${opt}`, opt)}
                         onPress={() => setRecommendWorkout(opt)}
                         style={[
                           styles.chip,
@@ -374,20 +356,20 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.chipTextSelected,
                           ]}
                         >
-                          {opt}
+                          {tOr(`feedback.options.${opt}`, opt)}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
-                <Text style={styles.groupLabel}>DIFFICULTY</Text>
+                <Text style={styles.groupLabel}>{t('feedback.difficulty')}</Text>
                 <View style={styles.segmentedContainer}>
                   {['Too easy', 'Just right', 'Too hard'].map((opt) => {
                     const isSelected = difficultyLevel === opt;
                     return (
                       <Pressable
-                        key={opt}
+                        key={tOr(`feedback.options.${opt}`, opt)}
                         onPress={() => setDifficultyLevel(opt)}
                         style={[
                           styles.segmentItem,
@@ -400,20 +382,20 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.segmentTextSelected,
                           ]}
                         >
-                          {opt}
+                          {tOr(`feedback.options.${opt}`, opt)}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
-                <Text style={styles.groupLabel}>PACE</Text>
+                <Text style={styles.groupLabel}>{t('feedback.pace')}</Text>
                 <View style={styles.segmentedContainer}>
                   {['Too slow', 'Just right', 'Too fast'].map((opt) => {
                     const isSelected = paceRating === opt;
                     return (
                       <Pressable
-                        key={opt}
+                        key={tOr(`feedback.options.${opt}`, opt)}
                         onPress={() => setPaceRating(opt)}
                         style={[
                           styles.segmentItem,
@@ -426,7 +408,7 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.segmentTextSelected,
                           ]}
                         >
-                          {opt}
+                          {tOr(`feedback.options.${opt}`, opt)}
                         </Text>
                       </Pressable>
                     );
@@ -438,18 +420,18 @@ export function PostWorkoutFeedbackSheet({
             {/* STEP 4: What Stood Out */}
             {currentStep === 4 && (
               <View style={styles.stepContainer}>
-                <Text style={styles.stepHeading}>What stood out?</Text>
+                <Text style={styles.stepHeading}>{t('feedback.standoutHeading')}</Text>
                 <Text style={styles.hint}>
-                  Tap all that apply — good and needs-work.
+                  {t('feedback.standoutHint')}
                 </Text>
 
-                <Text style={styles.groupLabel}>BEST ASPECTS</Text>
+                <Text style={styles.groupLabel}>{t('feedback.bestAspects')}</Text>
                 <View style={styles.chipRow}>
                   {BEST_ASPECTS.map((opt) => {
                     const isSelected = bestAspects.includes(opt);
                     return (
                       <Pressable
-                        key={opt}
+                        key={tOr(`feedback.options.${opt}`, opt)}
                         onPress={() =>
                           toggleMultiSelect(bestAspects, setBestAspects, opt)
                         }
@@ -461,20 +443,20 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.chipTextSelected,
                           ]}
                         >
-                          {opt}
+                          {tOr(`feedback.options.${opt}`, opt)}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
-                <Text style={styles.groupLabel}>COULD IMPROVE</Text>
+                <Text style={styles.groupLabel}>{t('feedback.couldImprove')}</Text>
                 <View style={styles.chipRow}>
                   {IMPROVE_AREAS.map((opt) => {
                     const isSelected = areasForImprovement.includes(opt);
                     return (
                       <Pressable
-                        key={opt}
+                        key={tOr(`feedback.options.${opt}`, opt)}
                         onPress={() =>
                           toggleMultiSelect(
                             areasForImprovement,
@@ -490,7 +472,7 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.chipTextSelected,
                           ]}
                         >
-                          {opt}
+                          {tOr(`feedback.options.${opt}`, opt)}
                         </Text>
                       </Pressable>
                     );
@@ -502,8 +484,8 @@ export function PostWorkoutFeedbackSheet({
             {/* STEP 5: Energy & Return */}
             {currentStep === 5 && (
               <View style={styles.stepContainer}>
-                <Text style={styles.stepHeading}>Energy & return</Text>
-                <Text style={styles.hint}>How did you leave feeling?</Text>
+                <Text style={styles.stepHeading}>{t('feedback.energyHeading')}</Text>
+                <Text style={styles.hint}>{t('feedback.energyHint')}</Text>
 
                 <View style={styles.emojiRow}>
                   {ENERGY_OPTIONS.map((item) => {
@@ -524,14 +506,14 @@ export function PostWorkoutFeedbackSheet({
                             isSelected && styles.emojiLabelSelected,
                           ]}
                         >
-                          {item.label}
+                          {t(`feedback.energy.${item.value}`)}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
 
-                <Text style={styles.groupLabel}>LIKELIHOOD TO BOOK AGAIN</Text>
+                <Text style={styles.groupLabel}>{t('feedback.likelihood')}</Text>
                 <View style={styles.steppedSelector}>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
                     const isSelected = likelyToReturn === score;
@@ -557,9 +539,9 @@ export function PostWorkoutFeedbackSheet({
                   })}
                 </View>
                 <View style={styles.rangeLabels}>
-                  <Text style={styles.rangeEnd}>Unlikely</Text>
+                  <Text style={styles.rangeEnd}>{t('feedback.unlikely')}</Text>
                   <Text style={styles.rangeCurrent}>{likelyToReturn} / 10</Text>
-                  <Text style={styles.rangeEnd}>Very likely</Text>
+                  <Text style={styles.rangeEnd}>{t('feedback.veryLikely')}</Text>
                 </View>
               </View>
             )}
@@ -568,29 +550,29 @@ export function PostWorkoutFeedbackSheet({
             {currentStep === 6 && (
               <View style={styles.stepContainer}>
                 <View style={styles.optionalHeaderRow}>
-                  <Text style={styles.stepHeading}>Anything else?</Text>
+                  <Text style={styles.stepHeading}>{t('feedback.notesHeading')}</Text>
                   <View style={styles.optionalBadge}>
-                    <Text style={styles.optionalBadgeText}>Optional</Text>
+                    <Text style={styles.optionalBadgeText}>{t('feedback.optional')}</Text>
                   </View>
                 </View>
-                <Text style={styles.hint}>Skip this if there's nothing to add.</Text>
+                <Text style={styles.hint}>{t('feedback.notesHint')}</Text>
 
-                <Text style={styles.groupLabel}>COMMENTS</Text>
+                <Text style={styles.groupLabel}>{t('feedback.comments')}</Text>
                 <TextInput
                   value={comments}
                   onChangeText={setComments}
-                  placeholder="Tell us about the experience..."
+                  placeholder={t('feedback.commentsPlaceholder')}
                   placeholderTextColor="#9C978D"
                   multiline
                   style={styles.textArea}
                   textAlignVertical="top"
                 />
 
-                <Text style={styles.groupLabel}>SUGGESTIONS</Text>
+                <Text style={styles.groupLabel}>{t('feedback.suggestions')}</Text>
                 <TextInput
                   value={suggestions}
                   onChangeText={setSuggestions}
-                  placeholder="How can we make this better?"
+                  placeholder={t('feedback.suggestionsPlaceholder')}
                   placeholderTextColor="#9C978D"
                   multiline
                   style={styles.textArea}
@@ -608,7 +590,7 @@ export function PostWorkoutFeedbackSheet({
                 disabled={isSubmitting}
                 style={styles.backButton}
               >
-                <Text style={styles.backButtonText}>Back</Text>
+                <Text style={styles.backButtonText}>{t('feedback.back')}</Text>
               </Pressable>
             ) : (
               <View style={styles.placeholderBack} />
@@ -627,7 +609,7 @@ export function PostWorkoutFeedbackSheet({
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={styles.primaryButtonText}>
-                  {currentStep === TOTAL_STEPS ? 'Submit feedback' : 'Continue'}
+                  {t(currentStep === TOTAL_STEPS ? 'feedback.submit' : 'feedback.continue')}
                 </Text>
               )}
             </Pressable>

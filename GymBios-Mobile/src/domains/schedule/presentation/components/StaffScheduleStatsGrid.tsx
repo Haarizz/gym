@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { ScheduleStats } from '../../domain/StaffScheduleData';
 
@@ -8,23 +9,25 @@ interface StaffScheduleStatsGridProps {
 }
 
 export function StaffScheduleStatsGrid({ stats }: StaffScheduleStatsGridProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Today */}
       <View style={styles.card}>
-        <Text style={styles.label}>Today</Text>
+        <Text style={styles.label}>{t('schedule.stats.today')}</Text>
         <Text style={[styles.value, { color: BrandColors.teal }]}>{stats.today}</Text>
       </View>
 
       {/* This Week */}
       <View style={styles.card}>
-        <Text style={styles.label}>This Week</Text>
+        <Text style={styles.label}>{t('schedule.stats.thisWeek')}</Text>
         <Text style={[styles.value, { color: BrandColors.memberGold }]}>{stats.thisWeek}</Text>
       </View>
 
       {/* Pending */}
       <View style={styles.card}>
-        <Text style={styles.label}>Pending</Text>
+        <Text style={styles.label}>{t('schedule.stats.pending')}</Text>
         <Text style={[styles.value, { color: '#EF4444' }]}>{stats.pending}</Text>
       </View>
     </View>

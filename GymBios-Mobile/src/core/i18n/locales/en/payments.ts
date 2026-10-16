@@ -1,0 +1,79 @@
+const payments = {
+  approval: {
+    loading: 'Loading member portal...',
+    approvedTitle: 'Payment Approved',
+    approved: 'Your payment has been approved. Your membership is now active.',
+    approvedForPlan: 'Your payment for {{plan}} has been approved. Your membership is now active.',
+    rejectedTitle: 'Payment Rejected',
+    rejected: 'Your payment was rejected.',
+    rejectedForPlan: 'Your payment for {{plan}} was rejected.',
+    rejectedReason: 'Reason: {{reason}}',
+
+    pendingTitle: 'Payment Awaiting Approval',
+    pendingAtGym: 'Your payment at {{gym}} is submitted and waiting for gym staff to confirm it was received.',
+    pending: 'Your payment is submitted and waiting for gym staff to confirm it was received.',
+    pendingInfo:
+      "Show your payment confirmation at reception if you haven't already. Your app access unlocks automatically once staff approve it — pull down to check again.",
+
+    rejectedScreenTitle: 'Payment Rejected',
+    rejectedAtGymForPlan:
+      "Your payment at {{gym}} for {{plan}} was not approved by gym staff, so your membership hasn't been activated.",
+    rejectedAtGym: "Your payment at {{gym}} was not approved by gym staff, so your membership hasn't been activated.",
+    rejectedPlanOnly: "Your payment for {{plan}} was not approved by gym staff, so your membership hasn't been activated.",
+    rejectedGeneric: "Your payment was not approved by gym staff, so your membership hasn't been activated.",
+    reason: 'Reason',
+    noReason: 'No reason was given. Please contact the gym for details.',
+    rejectedInfo: "Please contact the gym's reception to sort out the payment, or purchase a plan again.",
+    browseGyms: 'Browse Gyms',
+  },
+
+  outstanding: {
+    subscription: 'Subscription',
+    membership: 'Membership',
+    statusValues: {
+      PAID: 'Paid',
+      PARTIALLY_PAID: 'Partially Paid',
+      UNPAID: 'Unpaid',
+    },
+    membershipAmount: 'Membership amount',
+    paid: 'Paid',
+    remainingBalance: 'Remaining balance',
+    completePayment: 'Complete Payment',
+    blockedApprovalPending: 'Your membership payment is awaiting approval by the gym.',
+    blockedNoBills: 'This balance can’t be paid in the app. Please pay at reception.',
+    cantPayInApp: 'This balance can’t be paid in the app.',
+
+    nothingToPayNow: 'There is nothing to pay right now.',
+    methodNotAllowed: "{{method}} can't be used in the app. Choose {{allowed}}, or pay at reception.",
+    splitNotAllowed: 'Split payments must be made at reception.',
+    payFull: 'Please pay the full outstanding balance of {{amount}}.',
+    conflict: 'Your balance has changed. Please review and try again.',
+    rejected: 'Payment could not be completed.',
+    network:
+      'We couldn’t confirm your payment because the connection was lost. Retrying is safe — you won’t be charged twice.',
+
+    screenTitle: 'Membership Payment',
+    screenSubtitle: 'Outstanding balance',
+    notAcceptedTitle: 'Payment not accepted',
+    notAvailableTitle: 'Payment not available',
+    notAvailable: "This payment isn't linked to your membership. It may belong to a different gym or account.",
+    goToMembership: 'Go to Membership',
+    loadErrorTitle: "Couldn't load your balance",
+    loadError: 'Check your connection and try again.',
+    retry: 'Retry',
+    recordedTitle: 'Payment recorded',
+    appliedWithReceipt: '{{amount}} was applied to your membership (receipt {{receipt}}).',
+    applied: '{{amount}} was applied to your membership.',
+    remainingAfter: 'Remaining balance: {{amount}}.',
+    fullyPaid: 'Your membership is fully paid.',
+    backToMembership: 'Back to Membership',
+    nothingToPayTitle: 'Nothing to pay',
+    unpaidBills: 'Unpaid bills',
+    billFallback: 'Bill {{id}}',
+    retryPayment: 'Retry payment',
+    pay: 'Pay <amount/>',
+    sheetSubtitle: 'Pay your remaining balance of {{amount}}',
+  },
+};
+
+export default payments;

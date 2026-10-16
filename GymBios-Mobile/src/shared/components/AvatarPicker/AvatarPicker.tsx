@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -32,6 +33,7 @@ export function AvatarPicker({
   onChangePhoto,
   variant = 'default',
 }: AvatarPickerProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
 
@@ -77,7 +79,7 @@ export function AvatarPicker({
           onPress={handlePress}
           style={({ pressed }) => [styles.compactRing, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={currentImage ? 'Change profile photo' : 'Add profile photo'}
+          accessibilityLabel={t(currentImage ? 'shared.photo.changeA11y' : 'shared.photo.addA11y')}
         >
           <Avatar
             initials={initials}
@@ -100,7 +102,7 @@ export function AvatarPicker({
               pressed && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Tap to select photo"
+            accessibilityLabel={t('shared.photo.selectA11y')}
           >
             <Avatar
               initials={initials}
@@ -110,7 +112,7 @@ export function AvatarPicker({
           </Pressable>
           <Pressable onPress={handlePress} hitSlop={8}>
             <Typography variant="caption" color="primary" style={styles.hint}>
-              {currentImage ? 'Tap to change photo' : 'Tap to add photo'}
+              {t(currentImage ? 'shared.photo.tapToChange' : 'shared.photo.tapToAdd')}
             </Typography>
           </Pressable>
         </>
@@ -119,8 +121,8 @@ export function AvatarPicker({
       <AppBottomSheet
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
-        title="Profile Photo"
-        subtitle="Choose an option"
+        title={t('shared.photo.title')}
+        subtitle={t('shared.photo.subtitle')}
       >
         <Pressable
           style={({ pressed }) => [
@@ -131,7 +133,7 @@ export function AvatarPicker({
           onPress={() => closeSheetThen(takePhoto)}
         >
           <Typography variant="body" style={{ color: theme.text }}>
-            Take Photo
+            {t('shared.photo.takePhoto')}
           </Typography>
         </Pressable>
         <Pressable
@@ -143,7 +145,7 @@ export function AvatarPicker({
           onPress={() => closeSheetThen(chooseFromGallery)}
         >
           <Typography variant="body" style={{ color: theme.text }}>
-            Choose from Gallery
+            {t('shared.photo.chooseFromGallery')}
           </Typography>
         </Pressable>
         {currentImage ? (
@@ -159,7 +161,7 @@ export function AvatarPicker({
             }}
           >
             <Typography variant="body" style={{ color: theme.error }}>
-              Remove Photo
+              {t('shared.photo.removePhoto')}
             </Typography>
           </Pressable>
         ) : null}
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
   },
   cameraBadge: {
     position: 'absolute',
-    left: -2,
+    start: -2,
     bottom: -2,
     width: 22,
     height: 22,

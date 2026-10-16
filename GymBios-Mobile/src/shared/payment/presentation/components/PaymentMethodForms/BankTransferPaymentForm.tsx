@@ -8,6 +8,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import { DEFAULT_BANK_ACCOUNTS, type LedgerBankAccount } from '@/shared/payment/constants';
 
 interface BankTransferPaymentFormProps {
@@ -36,6 +37,7 @@ export function BankTransferPaymentForm({
   onDueDateChange,
 }: BankTransferPaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const numPaid = parseFloat(paidAmount || '0');
   const remaining = Math.max(0, finalAmount - numPaid);
 
@@ -55,13 +57,13 @@ export function BankTransferPaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#0F766E' }}>
-        Bank Transfer Details
+        {t('paymentSheet.form.bankDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={<>Amount (<CurrencyGlyph />) *</>}
+            label={<Trans i18nKey="paymentSheet.form.amount" components={{ currency: <CurrencyGlyph /> }} />}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -72,17 +74,17 @@ export function BankTransferPaymentForm({
 
         <View style={styles.flex1}>
           <Input
-            label="Reference / Transaction ID *"
+            label={t('paymentSheet.form.referenceIdRequired')}
             value={reference}
             onChangeText={onReferenceChange}
-            placeholder="e.g. TRF-102938"
+            placeholder={t('paymentSheet.form.example', { value: 'TRF-102938' })}
             error={errors?.reference}
           />
         </View>
       </View>
 
       <Dropdown
-        label="Bank Account (Ledger, Optional)"
+        label={t('paymentSheet.form.bankAccountLedgerOptional')}
         value={bankAccountId}
         options={bankAccountOptions}
         onChange={onBankAccountIdChange}
@@ -91,13 +93,13 @@ export function BankTransferPaymentForm({
         variant="caption"
         style={{ color: '#0F766E', marginTop: -4 }}
       >
-        Accounts pulled from Chart of Accounts. Amount will be credited to selected account.
+        {t('paymentSheet.form.ledgerHint')}
       </Typography>
 
       {remaining > 0 ? (
         <DatePicker
-          label="Payment Due Date *"
-          placeholder="Select due date"
+          label={t('paymentSheet.form.dueDate')}
+          placeholder={t('paymentSheet.form.selectDueDate')}
           value={paymentDueDate ?? null}
           onChange={onDueDateChange}
           minimumDate={new Date()}
@@ -116,7 +118,7 @@ export function BankTransferPaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -124,7 +126,7 @@ export function BankTransferPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Paid Amount:
+            {t('paymentSheet.form.paidAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
             <CurrencyValue amount={(numPaid || 0)} decimals={2} />
@@ -132,7 +134,7 @@ export function BankTransferPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Remaining/Due:
+            {t('paymentSheet.form.remainingOrDue')}
           </Typography>
           <Typography
             variant="bodySmallBold"

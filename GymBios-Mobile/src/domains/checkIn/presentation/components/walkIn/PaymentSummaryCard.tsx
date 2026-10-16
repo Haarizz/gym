@@ -1,5 +1,7 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Typography } from '@/shared/components/Typography';
+import { CurrencyValue } from '@/core/providers';
 import { Radius, Spacing, BrandColors } from '@/core/theme';
 import { MemberStatusBadge } from '../members/MemberStatusBadge';
 
@@ -10,16 +12,24 @@ interface PaymentSummaryCardProps {
 }
 
 export function PaymentSummaryCard({ price, validityText, isPaid }: PaymentSummaryCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <View>
-          <Typography variant="caption" color="textSecondary">Total Charge</Typography>
-          <Typography variant="subtitle" style={styles.price}>Ð {price}</Typography>
+          <Typography variant="caption" color="textSecondary">
+            {t('checkIn.walkIn.totalCharge')}
+          </Typography>
+          <Typography variant="subtitle" style={styles.price}>
+            <CurrencyValue amount={price} />
+          </Typography>
           <Typography variant="caption" color="textSecondary">{validityText}</Typography>
         </View>
         <View style={styles.statusContainer}>
-          <MemberStatusBadge isActive={isPaid} statusText={isPaid ? "Paid" : "Pending"} />
+          <MemberStatusBadge
+            isActive={isPaid}
+            statusText={isPaid ? t('checkIn.status.paid') : t('checkIn.status.pending')}
+          />
         </View>
       </View>
     </View>

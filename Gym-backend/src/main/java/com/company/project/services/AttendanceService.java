@@ -26,17 +26,20 @@ public class AttendanceService {
     private final ReceiptService receiptService;
     private final com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository;
     private final BranchSettingsResolver branchSettingsResolver;
+    private final AttendanceSessionService sessionService;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              MemberRepository memberRepository,
                              @org.springframework.context.annotation.Lazy ReceiptService receiptService,
                              com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository,
-                             BranchSettingsResolver branchSettingsResolver) {
+                             BranchSettingsResolver branchSettingsResolver,
+                             AttendanceSessionService sessionService) {
         this.attendanceRepository = attendanceRepository;
         this.memberRepository     = memberRepository;
         this.receiptService       = receiptService;
         this.reportSettingsRepository = reportSettingsRepository;
         this.branchSettingsResolver = branchSettingsResolver;
+        this.sessionService = sessionService;
     }
 
     // ── Automated report settings (one row per branch — gym floor capacity ─────
@@ -163,18 +166,16 @@ public class AttendanceService {
             throw new RuntimeException("Already checked out");
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        int minutes = (int) Duration.between(record.getCheckInTime(), now).toMinutes();
-        record.setCheckOutTime(now);
-        record.setTotalMinutes(minutes);
-        record.setStatus("completed");
+        // A visit left open from an earlier day is closed at the capped length.
+        sessionService.close(record, LocalDateTime.now());
         attendanceRepository.save(record);
+        int minutes = record.getTotalMinutes();
 
         CheckOutResponse resp = new CheckOutResponse();
         resp.setSuccess(true);
         resp.setMessage("Checked out successfully");
         resp.setAttendanceId(attendanceId);
-        resp.setCheckOutTime(now);
+        resp.setCheckOutTime(record.getCheckOutTime());
         resp.setTotalMinutes(minutes);
         resp.setFormattedDuration(formatDuration(minutes));
         return resp;
@@ -477,6 +478,10 @@ public class AttendanceService {
         dto.setCheckOutTime(a.getCheckOutTime());
         dto.setTotalMinutes(a.getTotalMinutes());
         dto.setFormattedDuration(a.getTotalMinutes() != null ? formatDuration(a.getTotalMinutes()) : null);
+        dto.setWorkoutStartTime(a.getWorkoutStartTime());
+        dto.setWorkoutEndTime(a.getWorkoutEndTime());
+        dto.setWorkoutMinutes(a.getWorkoutMinutes());
+        dto.setFormattedWorkoutDuration(a.getWorkoutMinutes() != null ? formatDuration(a.getWorkoutMinutes()) : null);
         dto.setActivityType(a.getActivityType());
         dto.setStatus(a.getStatus());
         dto.setType(a.getType());

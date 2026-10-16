@@ -26,6 +26,7 @@ public class CheckInService {
     private final AttendanceRepository attendanceRepository;
     private final QrCodeService qrCodeService;
     private final CheckInPolicyService checkInPolicyService;
+    private final AttendanceSessionService sessionService;
 
     // Per-member lock so two near-simultaneous check-ins for the same member
     // (e.g. gate scanner + reception scanning the same QR within milliseconds)
@@ -38,12 +39,14 @@ public class CheckInService {
                           BookingRepository bookingRepository,
                           AttendanceRepository attendanceRepository,
                           QrCodeService qrCodeService,
-                          CheckInPolicyService checkInPolicyService) {
+                          CheckInPolicyService checkInPolicyService,
+                          AttendanceSessionService sessionService) {
         this.memberRepository    = memberRepository;
         this.bookingRepository   = bookingRepository;
         this.attendanceRepository = attendanceRepository;
         this.qrCodeService       = qrCodeService;
         this.checkInPolicyService = checkInPolicyService;
+        this.sessionService      = sessionService;
     }
 
     // ── POST /api/checkin ─────────────────────────────────────────────────────
@@ -57,13 +60,19 @@ public class CheckInService {
         validateMembership(member);
 
         Attendance attendance = new Attendance();
+        Attendance closedStale = null;
         Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
         synchronized (lock) {
-            // Prevent duplicate active check-ins for the same member on the same day
-            LocalDateTime startOfDayNow = LocalDate.now().atStartOfDay();
-            LocalDateTime endOfDayNow   = LocalDate.now().atTime(LocalTime.MAX);
-            if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDayNow, endOfDayNow)) {
-                throw new RuntimeException(member.getName() + " is already checked in. Please check out first.");
+            // Prevent duplicate active check-ins. A visit left open from an earlier
+            // day is closed first (capped length) instead of blocking or being ignored.
+            Attendance open = sessionService.findActiveSession(member.getId()).orElse(null);
+            if (open != null) {
+                if (!AttendanceSessionService.isStale(open)) {
+                    throw new RuntimeException(member.getName() + " is already checked in. Please check out first.");
+                }
+                sessionService.close(open, LocalDateTime.now());
+                attendanceRepository.saveAndFlush(open);
+                closedStale = open;
             }
             // Plan quota, daily cap and cooldown between visits
             checkInPolicyService.enforce(member);
@@ -93,7 +102,10 @@ public class CheckInService {
 
         CheckInResponse response = new CheckInResponse();
         response.setSuccess(true);
-        response.setMessage("Welcome, " + member.getName() + "!");
+        response.setMessage("Welcome, " + member.getName() + "!"
+                + (closedStale != null
+                    ? " Previous visit from " + closedStale.getCheckInTime().toLocalDate() + " had no check-out and was closed automatically."
+                    : ""));
         response.setAttendanceId(attendance.getId());
         response.setMemberName(member.getName());
         response.setMemberId(member.getMemberId());

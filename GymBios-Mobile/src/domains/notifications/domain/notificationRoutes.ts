@@ -1,5 +1,6 @@
 // Leaf import (not the domain index) so this stays free of screen/hook imports.
 import { membershipPaymentPath } from '@/domains/membershipPayment/domain/routes';
+import { MEMBER_ENQUIRY_PUSH_TYPE } from '@/domains/memberPortal/enquiries/enquiriesApi';
 
 /** Sent by the backend's MemberPaymentApprovalNotifier when staff approve a Cash/Credit/Mixed purchase. */
 export const PAYMENT_APPROVED_NOTIFICATION_TYPE = 'membership_payment_approved';
@@ -18,6 +19,13 @@ export function resolveNotificationPath(data: Record<string, unknown> | null | u
     case 'outstanding_balance': {
       const membershipId = Number(data.membershipId);
       return Number.isInteger(membershipId) && membershipId > 0 ? membershipPaymentPath(membershipId) : null;
+    }
+    // Only members raise enquiries, so the reply always opens the member profile.
+    case MEMBER_ENQUIRY_PUSH_TYPE: {
+      const enquiryId = Number(data.enquiryId);
+      return Number.isInteger(enquiryId) && enquiryId > 0
+        ? `/(member)/profile?view=enquiries&enquiryId=${enquiryId}`
+        : '/(member)/profile?view=enquiries';
     }
     // Informational only: tapping it just opens the app.
     case PAYMENT_APPROVED_NOTIFICATION_TYPE:

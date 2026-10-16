@@ -234,31 +234,31 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
     const todaysSchedule: MemberTodayScheduleItem[] = rawSchedule.map((item) => ({
       id: item.bookingId || item.booking_id || item.sessionId || item.session_id || '',
       time: formatTime(item.startTime || item.start_time),
-      class: item.sessionName || item.session_name || 'Class',
-      trainer: item.trainerName || item.trainer_name || 'Instructor',
-      spots:
-        (item.availableSpots ?? item.available_spots ?? 0) <= 0
-          ? 'Full'
-          : `${item.availableSpots ?? item.available_spots} left`,
+      class: item.sessionName || item.session_name || '',
+      trainer: item.trainerName || item.trainer_name || '',
+      spotsLeft: item.availableSpots ?? item.available_spots ?? 0,
       location: item.location || 'Main Floor',
     }));
 
     const quickStats = [
       {
+        kind: 'checkIns' as const,
         label: 'Check-ins',
         value: String(rawStats?.totalVisits ?? rawStats?.total_visits ?? 0),
         icon: 'check-circle',
         color: '#327f74',
       },
       {
+        kind: 'classes' as const,
         label: 'Classes',
         value: String(rawStats?.activeBookingsCount ?? rawStats?.active_bookings_count ?? 0),
         icon: 'calendar',
         color: '#F5C742',
       },
       {
+        kind: 'streak' as const,
         label: 'Streak',
-        value: `${rawStats?.currentStreakDays ?? rawStats?.current_streak_days ?? 0} days`,
+        value: String(rawStats?.currentStreakDays ?? rawStats?.current_streak_days ?? 0),
         icon: 'award',
         color: '#8b5cf6',
       },

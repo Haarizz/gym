@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -9,6 +10,7 @@ interface StaffWelcomeCardProps {
 }
 
 export function StaffWelcomeCard({ staffInfo }: StaffWelcomeCardProps) {
+  const { t } = useTranslation();
   const firstName = staffInfo.name.split(' ')[0] || staffInfo.name;
 
   return (
@@ -18,10 +20,10 @@ export function StaffWelcomeCard({ staffInfo }: StaffWelcomeCardProps) {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <Text style={styles.greeting}>Hello, {firstName}! 👋</Text>
+      <Text style={styles.greeting}>{t('dashboard.staff.welcomeGreeting', { name: firstName })}</Text>
       <Text style={styles.role}>{staffInfo.role}</Text>
       <View style={styles.branchRow}>
-        <Text style={styles.branchLabel}>Branch:</Text>
+        <Text style={styles.branchLabel}>{t('dashboard.staff.branchLabel')}</Text>
         <Text style={styles.branchValue}>{staffInfo.branch}</Text>
       </View>
     </LinearGradient>

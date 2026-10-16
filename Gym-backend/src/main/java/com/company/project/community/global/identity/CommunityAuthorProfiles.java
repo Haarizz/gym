@@ -33,7 +33,7 @@ public class CommunityAuthorProfiles {
         return switch (actor.kind()) {
             case GLOBAL -> fromUserProfile(primaryDataSource, actor.globalUserId(), null);
             case TENANT -> tenantDataSources.resolve(actor.tenantSlug())
-                    .map(db -> fromUserProfile(db.dataSource(), actor.tenantUserId(), memberName(db.dataSource(), actor.tenantUserId())))
+                    .map(db -> tenantProfile(db.dataSource(), actor.tenantUserId()))
                     .orElse(new Profile(FALLBACK_NAME, null));
             case PLATFORM -> new Profile("GymBios", null);
         };
@@ -48,6 +48,14 @@ public class CommunityAuthorProfiles {
             name = fallbackName;
         }
         return new Profile(name == null || name.isBlank() ? FALLBACK_NAME : name.trim(), blankToNull(photo));
+    }
+
+    // A gym-created member's name is the one on their members row — the name the gym's
+    // staff see — so other members see the same person. Staff fall back to user_profiles.
+    private static Profile tenantProfile(DataSource ds, long userId) {
+        Profile profile = fromUserProfile(ds, userId, null);
+        String name = memberName(ds, userId);
+        return name == null || name.isBlank() ? profile : new Profile(name.trim(), profile.avatarUrl());
     }
 
     private static String memberName(DataSource ds, long userId) {

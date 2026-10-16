@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { CurrencyValue } from '@/core/providers';
 import { Spacing, BrandColors, Radius } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
@@ -32,6 +33,7 @@ export function WalkInForm({
   selectedPlanPrice,
   onSelectPlan,
 }: WalkInFormProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {/* Visitor Information */}
@@ -47,7 +49,7 @@ export function WalkInForm({
       {/* Daily Plan */}
       <View style={styles.section}>
         <Typography variant="bodySmallBold" style={styles.sectionLabel}>
-          Daily Pass *
+          {t('checkIn.walkIn.dailyPassLabel')}
         </Typography>
         <DailyPlanSelector
           selectedPlanId={selectedPlanId}

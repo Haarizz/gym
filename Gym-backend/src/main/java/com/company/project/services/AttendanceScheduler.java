@@ -1,63 +1,67 @@
 package com.company.project.services;
 
-import com.company.project.entities.Attendance;
-import com.company.project.entities.StaffAttendance;
-import com.company.project.repositories.AttendanceRepository;
-import com.company.project.repositories.StaffAttendanceRepository;
+import com.company.project.controlplane.entities.Tenant;
+import com.company.project.controlplane.repositories.TenantRepository;
+import com.company.project.security.TenantContextHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
  * Runs at 00:01 every day to auto-close any sessions that were left open
- * (e.g. member forgot to check out, device went offline).
- * Sets checkOutTime = 23:59 of the session's start day.
+ * (e.g. member forgot to check out, device went offline). Member visits are
+ * closed at check-in + {@link AttendanceSessionService#STALE_SESSION_MAX_MINUTES};
+ * staff shifts at 23:59 of the shift's start day.
+ *
+ * Runs for every gym: first the primary database (no tenant context), then each
+ * active tenant's own database, each in its own transaction.
  */
 @Service
 public class AttendanceScheduler {
 
-    private final AttendanceRepository attendanceRepository;
-    private final StaffAttendanceRepository staffAttendanceRepository;
+    private static final Logger log = LoggerFactory.getLogger(AttendanceScheduler.class);
 
-    public AttendanceScheduler(AttendanceRepository attendanceRepository,
-                               StaffAttendanceRepository staffAttendanceRepository) {
-        this.attendanceRepository      = attendanceRepository;
-        this.staffAttendanceRepository = staffAttendanceRepository;
+    private final AttendanceSessionService sessionService;
+    private final TenantRepository tenantRepository;
+
+    public AttendanceScheduler(AttendanceSessionService sessionService,
+                               TenantRepository tenantRepository) {
+        this.sessionService   = sessionService;
+        this.tenantRepository = tenantRepository;
     }
 
     /** Runs at 00:01 every day */
     @Scheduled(cron = "0 1 0 * * *")
-    @Transactional
     public void autoCloseOpenSessions() {
-        LocalDateTime cutoff = LocalDate.now().atStartOfDay(); // start of today = end of yesterday
+        runForCurrentDatabase("primary");
 
-        // Close member sessions
-        List<Attendance> openMember = attendanceRepository.findActiveSessionsBefore(cutoff);
-        for (Attendance a : openMember) {
-            LocalDateTime eod = a.getCheckInTime().toLocalDate().atTime(LocalTime.of(23, 59));
-            int minutes = (int) java.time.Duration.between(a.getCheckInTime(), eod).toMinutes();
-            a.setCheckOutTime(eod);
-            a.setTotalMinutes(Math.max(minutes, 0));
-            a.setStatus("completed");
-            a.setNotes((a.getNotes() != null ? a.getNotes() + " | " : "") + "Auto-closed at midnight");
+        List<Tenant> tenants;
+        try {
+            tenants = tenantRepository.findAll();
+        } catch (Exception e) {
+            log.error("Attendance auto-close: could not list tenants", e);
+            return;
         }
-        if (!openMember.isEmpty()) attendanceRepository.saveAll(openMember);
+        for (Tenant tenant : tenants) {
+            if (tenant.getSlug() == null || !"ACTIVE".equalsIgnoreCase(tenant.getStatus())) continue;
+            try {
+                TenantContextHolder.setCurrentTenant(tenant.getSlug());
+                runForCurrentDatabase(tenant.getSlug());
+            } finally {
+                TenantContextHolder.clear();
+            }
+        }
+    }
 
-        // Close staff sessions
-        List<StaffAttendance> openStaff = staffAttendanceRepository.findActiveSessionsBefore(cutoff);
-        for (StaffAttendance sa : openStaff) {
-            LocalDateTime eod = sa.getClockInTime().toLocalDate().atTime(LocalTime.of(23, 59));
-            int minutes = (int) java.time.Duration.between(sa.getClockInTime(), eod).toMinutes();
-            sa.setClockOutTime(eod);
-            sa.setTotalMinutes(Math.max(minutes, 0));
-            sa.setStatus("completed");
-            sa.setNotes((sa.getNotes() != null ? sa.getNotes() + " | " : "") + "Auto-closed at midnight");
+    private void runForCurrentDatabase(String label) {
+        try {
+            int closed = sessionService.closeStaleSessions();
+            if (closed > 0) log.info("Auto-closed {} open session(s) in {}", closed, label);
+        } catch (Exception e) {
+            log.error("Attendance auto-close failed for {}", label, e);
         }
-        if (!openStaff.isEmpty()) staffAttendanceRepository.saveAll(openStaff);
     }
 }

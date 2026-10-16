@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +15,7 @@ interface CommunityHeaderProps {
 }
 
 export function CommunityHeader({ unreadCount, onNotificationsPress }: CommunityHeaderProps) {
+  const { t } = useTranslation();
   const { headerColors, primaryColor } = useCommunityTheme();
   const router = useRouter();
   // The global Community is one community across every GymBios gym, not the selected gym's.
@@ -30,7 +32,7 @@ export function CommunityHeader({ unreadCount, onNotificationsPress }: Community
           onPress={() => router.back()}
           style={styles.iconBtn}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('community.goBack')}
         >
           <Feather name="arrow-left" size={20} color="#fff" />
         </TouchableOpacity>
@@ -41,11 +43,11 @@ export function CommunityHeader({ unreadCount, onNotificationsPress }: Community
 
         <View style={styles.titleContainer}>
           <Typography variant="bodySmallBold" style={styles.title}>
-            {isGlobal ? 'GymBios Community' : 'Community'}
+            {t(isGlobal ? 'community.globalTitle' : 'community.title')}
           </Typography>
 
           <Typography variant="caption" style={styles.subtitle}>
-            {isGlobal ? 'One community across GymBios gyms' : 'Connect · Share · Inspire'}
+            {t(isGlobal ? 'community.globalSubtitle' : 'community.subtitle')}
           </Typography>
         </View>
 
@@ -54,7 +56,7 @@ export function CommunityHeader({ unreadCount, onNotificationsPress }: Community
           style={styles.iconBtn}
           accessibilityRole="button"
           accessibilityLabel={
-            unreadCount > 0 ? `Community notifications, ${unreadCount} unread` : 'Community notifications'
+            unreadCount > 0 ? t('community.notificationsUnread', { count: unreadCount }) : t('community.notifications')
           }
         >
           <Feather name="bell" size={20} color="#fff" />
@@ -119,7 +121,7 @@ const styles = StyleSheet.create({
   bellDot: {
     position: 'absolute',
     top: 9,
-    right: 9,
+    end: 9,
     width: 7,
     height: 7,
     borderRadius: 3.5,

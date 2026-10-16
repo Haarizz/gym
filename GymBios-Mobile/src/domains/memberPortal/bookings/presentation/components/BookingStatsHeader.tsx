@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
@@ -14,24 +15,25 @@ export function BookingStatsHeader({
   thisWeekCount,
   attendedCount,
 }: BookingStatsHeaderProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.grid}>
       <GlassSurface radius={Radius.md} style={styles.card}>
-        <Text style={styles.label}>Upcoming</Text>
+        <Text style={styles.label}>{t('bookings.stats.upcoming')}</Text>
         <Text style={[styles.value, { color: BrandColors.memberGold }]}>
           {upcomingCount}
         </Text>
       </GlassSurface>
 
       <GlassSurface radius={Radius.md} style={styles.card}>
-        <Text style={styles.label}>This Week</Text>
+        <Text style={styles.label}>{t('bookings.stats.thisWeek')}</Text>
         <Text style={[styles.value, { color: BrandColors.teal }]}>
           {thisWeekCount}
         </Text>
       </GlassSurface>
 
       <GlassSurface radius={Radius.md} style={styles.card}>
-        <Text style={styles.label}>Attended</Text>
+        <Text style={styles.label}>{t('bookings.stats.attended')}</Text>
         <Text style={[styles.value, { color: BrandColors.trainerAmber }]}>
           {attendedCount}
         </Text>

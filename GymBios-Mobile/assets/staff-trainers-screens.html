@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff & Trainers – Screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F4F0; --ink:#2A2418; --muted:#6B6250; --line:rgba(42,36,24,.08);
+  --amber:#F6B73C; --amber-2:#F9C866; --amber-soft:#FDF0CF; --amber-ink:#5A3E00;
+  --teal:#3F6E62; --teal-2:#335C52; --purple:#7C5CF5;
+  --glass:rgba(255,255,255,.72); --glass-b:rgba(255,255,255,.95);
+  --shadow:0 10px 30px rgba(70,50,0,.08), 0 2px 6px rgba(70,50,0,.05);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#E9E7E1;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--ink)}
+.page-head{max-width:1760px;margin:0 auto;padding:40px 24px 8px}
+.page-head h1{margin:0;font-size:26px;font-weight:800}
+.page-head p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.board{display:flex;flex-wrap:wrap;gap:48px;justify-content:center;padding:32px 24px 64px;max-width:1760px;margin:0 auto}
+.frame-wrap{display:flex;flex-direction:column;gap:12px}
+.frame-label{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+.phone{width:390px;height:844px;border-radius:40px;overflow:hidden;position:relative;background:var(--bg);box-shadow:0 30px 60px rgba(40,30,0,.18);border:6px solid #1d1a14}
+.screen{height:100%;overflow-y:auto;position:relative;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.blob{position:absolute;top:70px;right:-120px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(246,183,60,.28),rgba(246,183,60,.08) 60%,transparent 70%);pointer-events:none}
+.pad{padding:16px}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.glass{background:var(--glass);border:1px solid var(--glass-b);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:var(--shadow);border-radius:22px}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* header */
+.top{margin:12px 12px 0;border-radius:26px;padding:14px 14px 14px 18px;background:linear-gradient(135deg,var(--amber-2),var(--amber));display:flex;align-items:center;gap:12px;box-shadow:0 10px 24px rgba(246,183,60,.35);position:relative;z-index:1}
+.top h2{margin:0;font-size:20px;font-weight:800}
+.top small{display:block;font-size:12px;font-weight:600;color:var(--amber-ink)}
+.round{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.4)}
+.round:hover{background:rgba(255,255,255,.6)}
+
+/* search + chips */
+.search{display:flex;align-items:center;gap:10px;padding:0 16px;height:50px;margin:16px 16px 0}
+.search input{border:0;background:none;outline:none;font:inherit;font-size:15px;flex:1;color:var(--ink)}
+.search input::placeholder{color:#8a8170}
+.chips{display:flex;gap:8px;padding:14px 16px 4px;overflow-x:auto;scrollbar-width:none}
+.chip{height:38px;padding:0 16px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;background:rgba(255,255,255,.75);border:1px solid var(--glass-b)}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+.sec{display:flex;justify-content:space-between;align-items:baseline;padding:18px 18px 10px}
+.sec h3{margin:0;font-size:16px;font-weight:800}
+.sec span{font-size:12px;color:var(--muted);font-weight:600}
+
+/* featured */
+.feat{margin:0 16px;padding:18px;border-radius:24px;background:linear-gradient(140deg,#FDE7B0,#F9D27A);box-shadow:var(--shadow);display:flex;gap:14px;align-items:center;position:relative;overflow:hidden}
+.feat .badge{position:absolute;top:14px;right:14px;font-size:10px;font-weight:800;letter-spacing:.08em;padding:5px 10px;border-radius:999px;background:rgba(90,62,0,.12);color:var(--amber-ink)}
+.feat h4{margin:0;font-size:17px;font-weight:800}
+.feat p{margin:2px 0 6px;font-size:13px;color:var(--amber-ink);font-weight:600}
+
+/* avatar */
+.av{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-weight:800;font-size:16px;position:relative;flex:none}
+.av.lg{width:96px;height:96px;border-radius:30px;font-size:30px}
+.av.sm{width:40px;height:40px;border-radius:13px;font-size:13px}
+.dot{position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:50%;background:#22A06B;border:3px solid #fff}
+.av.lg .dot{width:20px;height:20px;border-width:4px}
+
+.rate{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700}
+.rate .muted{color:var(--muted);font-weight:600}
+.star{width:14px;height:14px;fill:#F2A60C;stroke:none}
+.star.off{fill:#E3DCCB}
+
+/* staff card */
+.list{display:flex;flex-direction:column;gap:12px;padding:0 16px 130px}
+.card{display:flex;gap:12px;align-items:center;padding:14px;cursor:pointer;transition:transform .15s, box-shadow .15s;text-align:left;width:100%}
+.card:hover{transform:translateY(-1px)}
+.card.sel{outline:2px solid var(--amber)}
+.card .body{flex:1;min-width:0}
+.card h4{margin:0;font-size:15px;font-weight:800}
+.card .role{font-size:12px;color:var(--muted);font-weight:600;margin:1px 0 5px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;background:rgba(42,36,24,.06);color:#4a4230}
+.acts{display:flex;flex-direction:column;gap:8px}
+.ibtn{width:44px;height:44px;border-radius:14px;display:grid;place-items:center}
+.ibtn.rate-b{background:var(--amber-soft);color:#8A5A00}
+.ibtn.msg-b{background:var(--teal);color:#fff}
+.ibtn:hover{filter:brightness(.95)}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:30px 0}
+
+/* bottom nav */
+.nav{position:absolute;left:16px;right:16px;bottom:18px;height:68px;border-radius:26px;display:flex;justify-content:space-around;align-items:center;z-index:5;background:rgba(255,255,255,.7);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid #fff;box-shadow:0 12px 30px rgba(40,30,0,.12)}
+.nav button{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#6f6858}
+.nav button.on{background:var(--amber);color:var(--ink);box-shadow:0 6px 14px rgba(246,183,60,.5)}
+
+/* profile */
+.pbar{display:flex;justify-content:space-between;padding:14px 16px;position:relative;z-index:1}
+.pbar .round{background:rgba(255,255,255,.75);border:1px solid #fff;box-shadow:var(--shadow)}
+.hero{text-align:center;padding:4px 16px 0;position:relative;z-index:1}
+.hero .av{margin:0 auto}
+.hero h2{margin:14px 0 2px;font-size:22px;font-weight:800}
+.hero .role{font-size:13px;color:var(--muted);font-weight:600}
+.hero .tags{justify-content:center;margin-top:10px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:16px;padding:14px 6px}
+.stats div{text-align:center}
+.stats div+div{border-left:1px solid var(--line)}
+.stats b{display:block;font-size:18px;font-weight:800}
+.stats span{font-size:11px;color:var(--muted);font-weight:600}
+.summary{margin:0 16px;padding:16px;display:flex;gap:16px;align-items:center}
+.summary .big{font-size:42px;font-weight:800;line-height:1}
+.bars{flex:1;display:flex;flex-direction:column;gap:5px}
+.bar{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--muted)}
+.bar i{flex:1;height:6px;border-radius:9px;background:rgba(42,36,24,.08);overflow:hidden}
+.bar i b{display:block;height:100%;background:var(--amber);border-radius:9px}
+.reviews{display:flex;flex-direction:column;gap:10px;padding:0 16px 120px}
+.rev{padding:14px}
+.rev .head{display:flex;gap:10px;align-items:center}
+.rev .head .name{font-weight:800;font-size:14px}
+.rev .head .when{font-size:11px;color:var(--muted);font-weight:600}
+.rev p{margin:10px 0 0;font-size:13px;line-height:1.5;color:#3d3525}
+.rev.new{outline:2px solid var(--amber)}
+.actionbar{position:absolute;left:12px;right:12px;bottom:14px;display:flex;gap:10px;padding:10px;border-radius:26px;z-index:5;background:rgba(255,255,255,.75);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid #fff;box-shadow:0 12px 30px rgba(40,30,0,.14)}
+.btn{flex:1;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800;font-size:15px}
+.btn.amber{background:var(--amber-soft);color:#6B4700}
+.btn.teal{background:var(--teal);color:#fff}
+.btn.teal:hover{background:var(--teal-2)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* rate sheet */
+.dim{position:absolute;inset:0;background:rgba(30,24,10,.45);backdrop-filter:blur(2px)}
+.under{filter:blur(1px);pointer-events:none}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#FBFAF7;border-radius:32px 32px 0 0;padding:10px 20px 24px;box-shadow:0 -10px 40px rgba(0,0,0,.2)}
+.grab{width:44px;height:5px;border-radius:9px;background:#d8d2c4;margin:0 auto 16px}
+.sheet .who{display:flex;gap:12px;align-items:center}
+.sheet .who h3{margin:0;font-size:17px;font-weight:800}
+.sheet .who small{font-size:12px;color:var(--muted);font-weight:600}
+.pick{display:flex;justify-content:center;gap:6px;margin:22px 0 4px}
+.pick button{width:48px;height:48px;display:grid;place-items:center;border-radius:14px}
+.pick button:hover{background:rgba(246,183,60,.12)}
+.pick svg{width:36px;height:36px;fill:#E3DCCB;transition:fill .12s, transform .12s}
+.pick button.on svg{fill:#F2A60C;transform:scale(1.06)}
+.pick-label{text-align:center;font-weight:800;font-size:15px;min-height:22px;color:#8A5A00}
+.lbl{font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:18px 0 8px}
+.qtags{display:flex;flex-wrap:wrap;gap:8px}
+.qtag{height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:700}
+.qtag.on{background:var(--amber-soft);border-color:var(--amber);color:#6B4700}
+textarea{width:100%;height:96px;resize:none;border-radius:16px;border:1px solid var(--line);background:#fff;padding:12px 14px;font:inherit;font-size:14px;color:var(--ink);outline:none}
+textarea:focus{border-color:var(--amber)}
+.count{text-align:right;font-size:11px;color:var(--muted);margin-top:4px;font-weight:600}
+.check{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin:6px 0 16px}
+.check input{width:20px;height:20px;accent-color:var(--teal)}
+.note{font-size:11px;color:var(--muted);text-align:center;margin-top:10px}
+.toast{position:absolute;left:20px;right:20px;top:24px;padding:14px 16px;border-radius:18px;background:var(--teal);color:#fff;font-weight:700;font-size:14px;display:flex;gap:10px;align-items:center;opacity:0;transform:translateY(-12px);transition:.25s;z-index:20;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+
+/* chat */
+.chat{display:flex;flex-direction:column;height:100%}
+.chead{display:flex;gap:10px;align-items:center;margin:12px 12px 0;padding:10px 12px;border-radius:24px}
+.chead .info{flex:1;min-width:0}
+.chead h3{margin:0;font-size:15px;font-weight:800}
+.chead small{font-size:11px;font-weight:600;color:#1E8A5C}
+.chead small.off{color:var(--muted)}
+.msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none}
+.day{align-self:center;font-size:11px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.7);padding:5px 10px;border-radius:999px;margin:4px 0}
+.b{max-width:78%;padding:10px 14px;font-size:14px;line-height:1.45;border-radius:20px;position:relative}
+.b time{display:block;font-size:10px;margin-top:4px;opacity:.65;font-weight:600}
+.b.them{align-self:flex-start;background:#fff;border:1px solid var(--glass-b);border-bottom-left-radius:6px;box-shadow:0 2px 8px rgba(40,30,0,.05)}
+.b.me{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:6px}
+.slot{align-self:flex-start;width:78%;padding:12px;border-radius:20px;background:var(--amber-soft);border:1px solid #F6D58A}
+.slot b{font-size:13px}
+.slot .row{display:flex;gap:6px;margin-top:8px}
+.slot button{flex:1;height:38px;border-radius:12px;background:#fff;font-size:12px;font-weight:800}
+.slot button.on{background:var(--ink);color:#fff}
+.typing{align-self:flex-start;background:#fff;border-radius:20px;padding:12px 16px;display:none;gap:4px}
+.typing.show{display:flex}
+.typing i{width:7px;height:7px;border-radius:50%;background:#b5ab95;animation:t 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes t{0%,60%,100%{transform:none;opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+.quick{display:flex;gap:8px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.quick button{height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.85);border:1px solid #fff;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(40,30,0,.06)}
+.composer{display:flex;gap:8px;align-items:center;margin:0 12px 16px;padding:6px 6px 6px 8px;border-radius:26px}
+.composer input{flex:1;border:0;background:none;outline:none;font:inherit;font-size:14px;color:var(--ink);min-width:0}
+.send{width:46px;height:46px;border-radius:18px;background:var(--teal);color:#fff;display:grid;place-items:center}
+.send:disabled{background:#b9c7c2}
+.attach{width:44px;height:44px;border-radius:16px;display:grid;place-items:center;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:440px){.phone{width:calc(100vw - 32px)}}
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <h1>Staff & Trainers</h1>
+  <p>Member app · list → profile & reviews → rate → message. Everything is clickable; picking a staff member updates all four screens.</p>
+</header>
+
+<main class="board">
+
+<!-- ============ 1. TEAM LIST ============ -->
+<section class="frame-wrap" id="f1">
+  <div class="frame-label">1 · Team list</div>
+  <div class="phone">
+    <div class="screen">
+      <div class="blob"></div>
+      <div class="top">
+        <div style="flex:1">
+          <small>Main Branch</small>
+          <h2>Our Team</h2>
+        </div>
+        <button class="round" aria-label="Notifications"><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button>
+      </div>
+
+      <label class="search glass" style="position:relative;z-index:1">
+        <svg class="i" viewBox="0 0 24 24" style="color:#8a8170"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span class="sr">Search staff</span>
+        <input id="q" type="search" placeholder="Search by name or speciality">
+      </label>
+
+      <div class="chips" id="chips" role="tablist">
+        <button class="chip on" data-cat="all">All</button>
+        <button class="chip" data-cat="trainer">Trainers</button>
+        <button class="chip" data-cat="nutrition">Nutrition</button>
+        <button class="chip" data-cat="desk">Front desk</button>
+      </div>
+
+      <div class="sec"><h3>Top rated this month</h3></div>
+      <div class="feat" id="feat"></div>
+
+      <div class="sec"><h3>All staff</h3><span id="cnt"></span></div>
+      <div class="list" id="list"></div>
+    </div>
+
+    <nav class="nav" aria-label="Main">
+      <button aria-label="Home"><svg class="i" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></button>
+      <button aria-label="Schedule"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></button>
+      <button class="on" aria-label="Team" aria-current="page"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg></button>
+      <button aria-label="Branches"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></button>
+      <button aria-label="Membership"><svg class="i" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></button>
+    </nav>
+  </div>
+</section>
+
+<!-- ============ 2. PROFILE ============ -->
+<section class="frame-wrap" id="f2">
+  <div class="frame-label">2 · Staff profile & reviews</div>
+  <div class="phone">
+    <div class="screen" id="pScreen">
+      <div class="blob" style="top:-80px"></div>
+      <div class="pbar">
+        <button class="round" aria-label="Back" onclick="go('f1')"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="round" aria-label="Share profile"><svg class="i" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+      </div>
+      <div class="hero" id="hero"></div>
+      <div class="stats glass" id="stats"></div>
+
+      <div class="sec"><h3>Ratings & reviews</h3><span id="revCnt"></span></div>
+      <div class="summary glass" id="summary"></div>
+
+      <div class="sec"><h3>What members say</h3></div>
+      <div class="qtags" id="praise" style="padding:0 16px 14px"></div>
+      <div class="reviews" id="reviews"></div>
+    </div>
+    <div class="actionbar">
+      <button class="btn amber" onclick="go('f3')"><svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Rate</button>
+      <button class="btn teal" onclick="go('f4')"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Message</button>
+    </div>
+    <div class="toast" id="toast"><svg class="i" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span>Thanks! Your review was posted.</span></div>
+  </div>
+</section>
+
+<!-- ============ 3. RATE SHEET ============ -->
+<section class="frame-wrap" id="f3">
+  <div class="frame-label">3 · Rate & review (bottom sheet)</div>
+  <div class="phone">
+    <div class="screen under" aria-hidden="true">
+      <div class="blob" style="top:-80px"></div>
+      <div class="hero" id="heroGhost" style="padding-top:70px"></div>
+    </div>
+    <div class="dim"></div>
+    <form class="sheet" id="rateForm" onsubmit="submitReview(event)">
+      <div class="grab"></div>
+      <div class="who" id="rateWho"></div>
+
+      <div class="pick" id="pick" role="radiogroup" aria-label="Rating"></div>
+      <div class="pick-label" id="pickLabel">Tap to rate</div>
+
+      <div class="lbl">What stood out?</div>
+      <div class="qtags" id="qtags"></div>
+
+      <div class="lbl">Write a review <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></div>
+      <label class="sr" for="revText">Review</label>
+      <textarea id="revText" maxlength="300" placeholder="Share how sessions with them have helped you…"></textarea>
+      <div class="count"><span id="chars">0</span>/300</div>
+
+      <label class="check"><input type="checkbox" id="anon"> Post anonymously</label>
+      <button class="btn dark" id="submitBtn" type="submit" style="width:100%" disabled>Submit review</button>
+      <div class="note">Reviews are visible to members after a quick check by the gym.</div>
+    </form>
+  </div>
+</section>
+
+<!-- ============ 4. CHAT ============ -->
+<section class="frame-wrap" id="f4">
+  <div class="frame-label">4 · Message</div>
+  <div class="phone">
+    <div class="chat">
+      <div class="chead glass" id="chead"></div>
+      <div class="msgs" id="msgs"></div>
+      <div class="quick" id="quick">
+        <button>Book a session</button>
+        <button>Reschedule my class</button>
+        <button>Diet question</button>
+        <button>Form check on my lift</button>
+      </div>
+      <form class="composer glass" onsubmit="sendMsg(event)">
+        <button type="button" class="attach" aria-label="Attach photo"><svg class="i" viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg></button>
+        <label class="sr" for="msgIn">Message</label>
+        <input id="msgIn" placeholder="Type a message…" autocomplete="off">
+        <button class="send" id="sendBtn" aria-label="Send" disabled><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+      </form>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+const STAFF = [
+  {id:'arjun', name:'Arjun Menon', ini:'AM', role:'Head Trainer', cat:'trainer', rating:4.9, reviews:128, exp:'8 yrs', members:'140+', tags:['Strength','HIIT','Powerlifting'], online:true, bg:'#F6B73C', fg:'#3a2800', dist:[86,10,3,1,0], praise:['Motivating','Knows form','Punctual']},
+  {id:'meera', name:'Meera Pillai', ini:'MP', role:'Yoga Coach', cat:'trainer', rating:4.8, reviews:96, exp:'6 yrs', members:'90+', tags:['Yoga','Mobility','Breathwork'], online:true, bg:'#7C5CF5', fg:'#fff', dist:[80,14,4,1,1], praise:['Calm & patient','Great playlists','Beginner friendly']},
+  {id:'rahul', name:'Rahul Nair', ini:'RN', role:'Personal Trainer', cat:'trainer', rating:4.6, reviews:74, exp:'4 yrs', members:'60+', tags:['Weight loss','Cardio'], online:false, bg:'#3F6E62', fg:'#fff', dist:[70,20,6,3,1], praise:['Pushes you','Clear plans','Friendly']},
+  {id:'divya', name:'Divya Thomas', ini:'DT', role:'Nutritionist', cat:'nutrition', rating:4.7, reviews:52, exp:'5 yrs', members:'75+', tags:['Diet plans','Weight loss'], online:true, bg:'#E07B53', fg:'#fff', dist:[76,16,5,2,1], praise:['Practical meals','Responsive','Kerala food friendly']},
+  {id:'anil', name:'Anil Kumar', ini:'AK', role:'Front Desk Manager', cat:'desk', rating:4.5, reviews:31, exp:'3 yrs', members:'—', tags:['Memberships','Billing'], online:false, bg:'#4C7BD9', fg:'#fff', dist:[64,24,8,3,1], praise:['Helpful','Quick fixes','Polite']}
+];
+const REVIEWS = [
+  {who:'Sreya K.', ini:'SK', when:'2 days ago', stars:5, text:'Explains every movement before we start and checks form on each set. Seeing real progress in 6 weeks.'},
+  {who:'Nikhil R.', ini:'NR', when:'1 week ago', stars:5, text:'Always on time and plans the session around how I feel that day. Highly recommend.'},
+  {who:'Anonymous member', ini:'?', when:'3 weeks ago', stars:4, text:'Great sessions, slots fill up fast in the evenings so book early.'}
+];
+const LABELS = ['', 'Poor', 'Below average', 'Good', 'Great', 'Excellent!'];
+const STAR = 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z';
+
+let cur = STAFF[0], cat = 'all', query = '', score = 0, picked = new Set(), extraReviews = {};
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const stars = (n, size=14) => Array.from({length:5}, (_, i) =>
+  `<svg class="star ${i < Math.round(n) ? '' : 'off'}" style="width:${size}px;height:${size}px" viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR}"/></svg>`).join('');
+const av = (s, cls='') => `<div class="av ${cls}" style="background:${s.bg};color:${s.fg}">${s.ini}${s.online ? '<span class="dot" title="Online"></span>' : ''}</div>`;
+
+function go(id){ document.getElementById(id).scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'}); }
+
+function select(s, jump){
+  cur = s; score = 0; picked.clear();
+  renderList(); renderProfile(); renderRate(); renderChat();
+  if (jump) go(jump);
+}
+
+/* ---- 1. list ---- */
+function renderList(){
+  const top = [...STAFF].sort((a,b) => b.rating - a.rating)[0];
+  $('feat').innerHTML = `<span class="badge">★ TOP RATED</span>${av(top)}
+    <div style="flex:1"><h4>${top.name}</h4><p>${top.role} · ${top.exp}</p>
+    <span class="rate">${stars(top.rating)} ${top.rating} <span class="muted" style="color:#6B4700">(${top.reviews})</span></span></div>`;
+  $('feat').onclick = () => select(top, 'f2'); $('feat').style.cursor = 'pointer';
+
+  const rows = STAFF.filter(s => (cat === 'all' || s.cat === cat) &&
+    (s.name + s.role + s.tags.join(' ')).toLowerCase().includes(query));
+  $('cnt').textContent = rows.length + ' people';
+  $('list').innerHTML = rows.length ? rows.map(s => `
+    <div class="card glass ${s.id === cur.id ? 'sel' : ''}" data-id="${s.id}" role="button" tabindex="0" aria-label="Open ${s.name}'s profile">
+      ${av(s)}
+      <div class="body">
+        <h4>${s.name}</h4>
+        <div class="role">${s.role}</div>
+        <span class="rate">${stars(s.rating, 13)} ${s.rating} <span class="muted">· ${s.reviews} reviews</span></span>
+        <div class="tags">${s.tags.slice(0,2).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+      </div>
+      <div class="acts">
+        <button class="ibtn rate-b" data-act="rate" aria-label="Rate ${s.name}"><svg class="i" viewBox="0 0 24 24"><path d="${STAR}"/></svg></button>
+        <button class="ibtn msg-b" data-act="msg" aria-label="Message ${s.name}"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+      </div>
+    </div>`).join('') : '<div class="empty">No staff match your search.</div>';
+}
+$('list').addEventListener('click', e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const s = STAFF.find(x => x.id === card.dataset.id);
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  select(s, act === 'rate' ? 'f3' : act === 'msg' ? 'f4' : 'f2');
+});
+$('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('card')) e.target.click(); });
+$('chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  cat = c.dataset.cat;
+  document.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c));
+  renderList();
+});
+$('q').addEventListener('input', e => { query = e.target.value.trim().toLowerCase(); renderList(); });
+
+/* ---- 2. profile ---- */
+function renderProfile(){
+  const s = cur, mine = extraReviews[s.id] || [];
+  const heroHTML = `${av(s,'lg')}<h2>${s.name}</h2><div class="role">${s.role} · Main Branch</div>
+    <div class="tags">${s.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>`;
+  $('hero').innerHTML = heroHTML;
+  $('stats').innerHTML = `<div><b>${s.rating}</b><span>Rating</span></div><div><b>${s.exp}</b><span>Experience</span></div><div><b>${s.members}</b><span>Members trained</span></div>`;
+  $('revCnt').textContent = (s.reviews + mine.length) + ' reviews';
+  $('summary').innerHTML = `<div style="text-align:center"><div class="big">${s.rating}</div><div style="margin-top:6px">${stars(s.rating,13)}</div></div>
+    <div class="bars">${s.dist.map((p,i) => `<div class="bar">${5-i}<i><b style="width:${p}%"></b></i></div>`).join('')}</div>`;
+  $('praise').innerHTML = s.praise.map(p => `<span class="qtag" style="display:inline-flex;align-items:center">${p}</span>`).join('');
+  $('reviews').innerHTML = [...mine, ...REVIEWS].map(r => `
+    <div class="rev glass ${r.mine ? 'new' : ''}">
+      <div class="head"><div class="av sm" style="background:#EDE8DC;color:#4a4230">${r.ini}</div>
+        <div style="flex:1"><div class="name">${esc(r.who)}</div><div class="when">${r.when}</div></div>
+        <span class="rate">${stars(r.stars,12)}</span></div>
+      ${r.tags?.length ? `<div class="tags">${r.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+      ${r.text ? `<p>${esc(r.text)}</p>` : ''}
+    </div>`).join('');
+}
+
+/* ---- 3. rate ---- */
+function renderRate(){
+  const s = cur;
+  $('heroGhost').innerHTML = `${av(s,'lg')}<h2>${s.name}</h2><div class="role">${s.role}</div>`;
+  $('rateWho').innerHTML = `${av(s,'sm')}<div><h3>Rate ${s.name.split(' ')[0]}</h3><small>${s.role} · your sessions this month</small></div>`;
+  $('pick').innerHTML = [1,2,3,4,5].map(n =>
+    `<button type="button" role="radio" aria-checked="${n===score}" aria-label="${n} star${n>1?'s':''}" class="${n<=score?'on':''}" data-n="${n}"><svg viewBox="0 0 24 24"><path d="${STAR}"/></svg></button>`).join('');
+  $('pickLabel').textContent = score ? LABELS[score] : 'Tap to rate';
+  const tags = s.cat === 'desk' ? ['Helpful','Quick','Polite','Clear answers','Friendly'] :
+               s.cat === 'nutrition' ? ['Practical plans','Responsive','Easy to follow','Motivating','Knowledgeable'] :
+               ['Motivating','Knows form','Punctual','Good plans','Patient','Fun sessions'];
+  $('qtags').innerHTML = tags.map(t => `<button type="button" class="qtag ${picked.has(t)?'on':''}" aria-pressed="${picked.has(t)}">${t}</button>`).join('');
+  $('submitBtn').disabled = !score;
+}
+$('pick').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; score = +b.dataset.n; renderRate(); });
+$('qtags').addEventListener('click', e => { const b = e.target.closest('.qtag'); if (!b) return; const t = b.textContent; picked.has(t) ? picked.delete(t) : picked.add(t); renderRate(); });
+$('revText').addEventListener('input', e => $('chars').textContent = e.target.value.length);
+function submitReview(e){
+  e.preventDefault(); if (!score) return;
+  const anon = $('anon').checked;
+  (extraReviews[cur.id] ||= []).unshift({who: anon ? 'Anonymous member' : 'You (Eum)', ini: anon ? '?' : 'EU', when:'Just now · pending check', stars:score, tags:[...picked], text:$('revText').value.trim(), mine:true});
+  $('revText').value = ''; $('chars').textContent = 0; $('anon').checked = false;
+  score = 0; picked.clear(); renderRate(); renderProfile();
+  go('f2'); $('pScreen').scrollTo({top:430, behavior:'smooth'});
+  $('toast').classList.add('show'); setTimeout(() => $('toast').classList.remove('show'), 2600);
+}
+
+/* ---- 4. chat ---- */
+const threads = {};
+function thread(s){
+  return threads[s.id] ||= [
+    {day:'Yesterday'},
+    {me:false, t:`Hi Eum! I'm ${s.name.split(' ')[0]}. Welcome to Main Branch — message me here any time.`, at:'6:42 PM'},
+    {me:true, t:'Thanks! Could we work on a plan for my first month?', at:'6:45 PM'},
+    {me:false, t:'Absolutely. Pick a slot for a quick 15-min intro and we\'ll set goals together.', at:'6:47 PM'},
+    {slot:true},
+    {day:'Today'}
+  ];
+}
+function renderChat(){
+  const s = cur;
+  $('chead').innerHTML = `<button class="round" style="background:none;width:40px;height:40px" aria-label="Back" onclick="go('f1')"><svg class="i" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+    ${av(s,'sm')}<div class="info"><h3>${s.name}</h3><small class="${s.online?'':'off'}">${s.online ? '● Online · replies in ~10 min' : 'Last seen 2h ago · replies within a day'}</small></div>
+    <button class="round" style="background:var(--amber-soft);width:40px;height:40px" aria-label="View profile" onclick="go('f2')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button>`;
+  $('msgs').innerHTML = thread(s).map(m =>
+    m.day ? `<div class="day">${m.day}</div>` :
+    m.slot ? `<div class="slot"><b>Intro session · choose a time</b><div class="row">${['Fri 7 AM','Fri 6 PM','Sat 9 AM'].map(x=>`<button type="button" class="${m.pick===x?'on':''}" data-slot="${x}">${x}</button>`).join('')}</div></div>` :
+    `<div class="b ${m.me?'me':'them'}">${esc(m.t)}<time>${m.at}${m.me?' · Seen':''}</time></div>`).join('') +
+    '<div class="typing" id="typing"><i></i><i></i><i></i></div>';
+  $('msgs').scrollTop = 1e6;
+}
+function now(){ return new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+function push(text){
+  const s = cur, th = thread(s);
+  th.push({me:true, t:text, at:now()}); renderChat();
+  $('typing').classList.add('show'); $('msgs').scrollTop = 1e6;
+  setTimeout(() => { if (cur !== s) return; th.push({me:false, t:'Got it 👍 I\'ll get back to you shortly.'.replace(' 👍',''), at:now()}); renderChat(); }, 1400);
+}
+$('msgIn').addEventListener('input', e => $('sendBtn').disabled = !e.target.value.trim());
+function sendMsg(e){ e.preventDefault(); const v = $('msgIn').value.trim(); if (!v) return; $('msgIn').value=''; $('sendBtn').disabled = true; push(v); }
+$('quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b) push(b.textContent); });
+$('msgs').addEventListener('click', e => {
+  const b = e.target.closest('[data-slot]'); if (!b) return;
+  const m = thread(cur).find(x => x.slot); m.pick = b.dataset.slot; push(`Booked ${b.dataset.slot} for the intro session.`);
+});
+
+select(STAFF[0]);
+</script>
+</body>
+</html>

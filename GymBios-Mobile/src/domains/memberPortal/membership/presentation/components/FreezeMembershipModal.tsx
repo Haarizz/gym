@@ -4,6 +4,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -22,7 +23,13 @@ interface FreezeMembershipModalProps {
 }
 
 const FREEZE_OPTIONS = [7, 14, 21, 30];
-const FREEZE_REASONS = ['Travel / Vacation', 'Medical / Injury', 'Work / Relocation', 'Other'];
+// Values are what the API stores (English); only the labels are translated.
+const FREEZE_REASONS = [
+  { key: 'travel', value: 'Travel / Vacation' },
+  { key: 'medical', value: 'Medical / Injury' },
+  { key: 'work', value: 'Work / Relocation' },
+  { key: 'other', value: 'Other' },
+] as const;
 
 /** Days of a freeze of this length billed at the plan's per-day rate (the rest are free). */
 export function chargeableFreezeDays(days: number, freeze: FreezeInfo): number {
@@ -37,12 +44,13 @@ export function FreezeMembershipModal({
   onClose,
   onConfirm,
 }: FreezeMembershipModalProps) {
+  const { t } = useTranslation();
   const daysAvailable = freeze.allowed_days;
   const defaultDays = FREEZE_OPTIONS.find((d) => d <= daysAvailable) ?? daysAvailable;
 
   const [selectedDays, setSelectedDays] = useState(defaultDays);
   const [customDays, setCustomDays] = useState('');
-  const [selectedReason, setSelectedReason] = useState(FREEZE_REASONS[0]);
+  const [selectedReason, setSelectedReason] = useState<string>(FREEZE_REASONS[0].value);
 
   const handleClose = () => {
     if (!isLoading) onClose();
@@ -58,7 +66,10 @@ export function FreezeMembershipModal({
   const charge = chargedDays * rate;
 
   const occurrencesText = freeze.max_occurrences != null
-    ? ` · ${freeze.remaining_occurrences ?? 0} of ${freeze.max_occurrences} freezes left`
+    ? ` · ${t('membership.freezeModal.occurrencesLeft', {
+        left: freeze.remaining_occurrences ?? 0,
+        max: freeze.max_occurrences,
+      })}`
     : '';
 
   const footer = (
@@ -68,13 +79,19 @@ export function FreezeMembershipModal({
           <View style={styles.chargeBox}>
             <Feather name="info" size={16} color={BrandColors.trainerAmber} />
             <Text style={styles.chargeText}>
-              {chargedDays} extra {chargedDays === 1 ? 'day' : 'days'} × <CurrencyValue amount={rate} options={MAX_2DP} /> ={' '}
-              <CurrencyValue style={styles.chargeAmount} amount={charge} options={MAX_2DP} />
-              {' '}will be added to your outstanding balance when the freeze ends. Unfreeze early and you only pay for the days actually frozen.
+              <Trans
+                i18nKey="membership.freezeModal.extraDaysCharge"
+                count={chargedDays}
+                values={{ count: chargedDays }}
+                components={{
+                  rate: <CurrencyValue amount={rate} options={MAX_2DP} />,
+                  total: <CurrencyValue style={styles.chargeAmount} amount={charge} options={MAX_2DP} />,
+                }}
+              />
             </Text>
           </View>
         ) : (
-          <Text style={styles.noChargeText}>No charge — within your free freeze days.</Text>
+          <Text style={styles.noChargeText}>{t('membership.freezeModal.noCharge')}</Text>
         )
       )}
       <Pressable
@@ -83,16 +100,16 @@ export function FreezeMembershipModal({
         disabled={isLoading || !isValidDuration}
       >
         {isLoading ? (
-          <Text style={styles.confirmButtonText}>Freezing...</Text>
+          <Text style={styles.confirmButtonText}>{t('membership.freezeModal.freezing')}</Text>
         ) : (
           <Text style={styles.confirmButtonText}>
             {isValidDuration ? (
               <>
-                Freeze for {selectedDays} Days
+                {t('membership.freezeModal.freezeForDays', { count: selectedDays })}
                 {charge > 0 ? <> · <CurrencyValue amount={charge} options={MAX_2DP} /></> : null}
               </>
             ) : (
-              `Choose 1–${daysAvailable} days`
+              t('membership.freezeModal.chooseRange', { max: daysAvailable })
             )}
           </Text>
         )}
@@ -102,7 +119,7 @@ export function FreezeMembershipModal({
         onPress={handleClose}
         disabled={isLoading}
       >
-        <Text style={styles.cancelButtonText}>Cancel</Text>
+        <Text style={styles.cancelButtonText}>{t('membership.freezeModal.cancel')}</Text>
       </Pressable>
     </View>
   );
@@ -110,8 +127,8 @@ export function FreezeMembershipModal({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Freeze Subscription"
-      subtitle={`${daysAvailable} of ${freeze.max_days} freeze days left${occurrencesText}`}
+      title={t('membership.freezeModal.title')}
+      subtitle={`${t('membership.freezeModal.daysLeftSubtitle', { left: daysAvailable, max: freeze.max_days })}${occurrencesText}`}
       onClose={handleClose}
       footer={footer}
     >
@@ -119,20 +136,25 @@ export function FreezeMembershipModal({
         {rate > 0 && (
           <Text style={styles.policyText}>
             {freeze.free_days_remaining > 0 ? (
-              <>{freeze.free_days_remaining} free freeze days left, then <CurrencyValue amount={rate} options={MAX_2DP} /> per extra day.</>
+              <Trans
+                i18nKey="membership.freezeModal.freeDaysThenRate"
+                values={{ count: freeze.free_days_remaining }}
+                components={{ rate: <CurrencyValue amount={rate} options={MAX_2DP} /> }}
+              />
             ) : (
-              <>No free freeze days left — each day costs <CurrencyValue amount={rate} options={MAX_2DP} />.</>
+              <Trans
+                i18nKey="membership.freezeModal.noFreeDays"
+                components={{ rate: <CurrencyValue amount={rate} options={MAX_2DP} /> }}
+              />
             )}
           </Text>
         )}
         <Text style={styles.policyText}>
-          {freeze.auto_unfreeze
-            ? 'Your subscription resumes automatically at the end of the freeze, and its end date moves forward by the days frozen.'
-            : 'Unfreeze from this screen when you\'re back — your subscription end date moves forward by the days frozen.'}
+          {t(freeze.auto_unfreeze ? 'membership.freezeModal.autoUnfreeze' : 'membership.freezeModal.manualUnfreeze')}
         </Text>
       </View>
 
-      <Text style={styles.sectionLabel}>Select Duration</Text>
+      <Text style={styles.sectionLabel}>{t('membership.freezeModal.selectDuration')}</Text>
       <View style={styles.daysRow}>
         {FREEZE_OPTIONS.map((days) => {
           const isSelected = selectedDays === days && customDays === '';
@@ -154,14 +176,14 @@ export function FreezeMembershipModal({
               disabled={isDisabled || isLoading}
             >
               <Text style={[styles.dayNum, isSelected && styles.textSelected]}>{days}</Text>
-              <Text style={[styles.dayText, isSelected && styles.textSelected]}>Days</Text>
+              <Text style={[styles.dayText, isSelected && styles.textSelected]}>{t('membership.freezeModal.days')}</Text>
             </Pressable>
           );
         })}
       </View>
 
       <View style={styles.customDaysContainer}>
-        <Text style={styles.customDaysLabel}>Or enter custom days:</Text>
+        <Text style={styles.customDaysLabel}>{t('membership.freezeModal.customDays')}</Text>
         <TextInput
           style={styles.customDaysInput}
           keyboardType="numeric"
@@ -175,22 +197,22 @@ export function FreezeMembershipModal({
               setSelectedDays(0);
             }
           }}
-          placeholder="e.g. 5"
+          placeholder={t('membership.freezeModal.customDaysPlaceholder')}
           placeholderTextColor="#94A3B8"
           maxLength={3}
           editable={!isLoading}
         />
       </View>
 
-      <Text style={[styles.sectionLabel, { marginTop: Spacing.four }]}>Reason</Text>
+      <Text style={[styles.sectionLabel, { marginTop: Spacing.four }]}>{t('membership.freezeModal.reason')}</Text>
       <View style={styles.reasonsList}>
         {FREEZE_REASONS.map((reason) => {
-          const isSelected = selectedReason === reason;
+          const isSelected = selectedReason === reason.value;
           return (
             <Pressable
-              key={reason}
+              key={reason.key}
               style={[styles.reasonOption, isSelected && styles.reasonOptionSelected]}
-              onPress={() => setSelectedReason(reason)}
+              onPress={() => setSelectedReason(reason.value)}
               disabled={isLoading}
             >
               <Feather
@@ -199,7 +221,7 @@ export function FreezeMembershipModal({
                 color={isSelected ? BrandColors.trainerAmber : '#94A3B8'}
               />
               <Text style={[styles.reasonText, isSelected && styles.reasonTextSelected]}>
-                {reason}
+                {t(`membership.freezeModal.reasons.${reason.key}`)}
               </Text>
             </Pressable>
           );

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ interface TransactionsScreenProps {
 }
 
 export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
+  const { t } = useTranslation();
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(null);
   const appRole = useAuthStore((s) => s.appRole);
   const accentColor = Colors.light[appRole ?? 'admin'];
@@ -31,8 +33,8 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
       <GlassBlob color={BrandColors.memberGold} size={280} opacity={0.26} top={380} left={-80} />
       <GlassBlob color={BrandColors.tealDark} size={240} opacity={0.2} top={800} right={-70} />
       <GlassHeader
-        title="Transactions"
-        subtitle="Salary, purchases & payment activity"
+        title={t('transactions.title')}
+        subtitle={t('transactions.subtitle')}
         onBack={onBack}
       />
 
@@ -46,7 +48,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
                 <CurrencyValue amount={summary.totalEarnings} />
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Total Earnings
+                {t('transactions.totalEarnings')}
               </Typography>
             </GlassSurface>
           )}
@@ -57,7 +59,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
                 {summary.totalTransactions}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Transactions
+                {t('transactions.transactions')}
               </Typography>
             </GlassSurface>
           )}
@@ -68,7 +70,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
                 {summary.totalPurchases}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Purchases
+                {t('transactions.purchases')}
               </Typography>
             </GlassSurface>
           )}
@@ -79,7 +81,7 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
                 {summary.totalBonuses}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Bonuses
+                {t('transactions.bonuses')}
               </Typography>
             </GlassSurface>
           )}
@@ -88,13 +90,13 @@ export function TransactionsScreen({ onBack }: TransactionsScreenProps) {
 
         {/* Transactions List */}
         <Typography variant="subtitle" style={styles.listHeader}>
-          Recent Activity
+          {t('transactions.recentActivity')}
         </Typography>
 
         {isLoading ? (
           <Loader />
         ) : transactions.length === 0 ? (
-          <EmptyState title="No Transactions" description="No recent transactions found." />
+          <EmptyState title={t('transactions.emptyTitle')} description={t('transactions.emptyDescription')} />
         ) : (
           <GlassSurface radius={Radius.lg} style={styles.listCard}>
             {transactions.map((tx, index) => (

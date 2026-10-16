@@ -7,6 +7,7 @@ import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 
 interface CashPaymentFormProps {
   finalAmount: number;
@@ -26,6 +27,7 @@ export function CashPaymentForm({
   onDueDateChange,
 }: CashPaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const numPaid = parseFloat(paidAmount || '0');
   const payBack = Math.max(0, numPaid - finalAmount);
@@ -42,13 +44,13 @@ export function CashPaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#065F46' }}>
-        Cash Payment Details
+        {t('paymentSheet.form.cashDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label={<>Paid Amount (<CurrencyGlyph />) *</>}
+            label={<Trans i18nKey="paymentSheet.form.paidAmount" components={{ currency: <CurrencyGlyph /> }} />}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -59,7 +61,7 @@ export function CashPaymentForm({
 
         <View style={styles.flex1}>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Pay Back Amount (<CurrencyGlyph />)
+            <Trans i18nKey="paymentSheet.form.payBackAmount" components={{ currency: <CurrencyGlyph /> }} />
           </Typography>
           <View
             style={[
@@ -78,15 +80,15 @@ export function CashPaymentForm({
             variant="caption"
             style={{ color: theme.textSecondary, marginTop: 4 }}
           >
-            Amount to return
+            {t('paymentSheet.form.amountToReturn')}
           </Typography>
         </View>
       </View>
 
       {remaining > 0 ? (
         <DatePicker
-          label="Payment Due Date *"
-          placeholder="Select due date"
+          label={t('paymentSheet.form.dueDate')}
+          placeholder={t('paymentSheet.form.selectDueDate')}
           value={paymentDueDate ?? null}
           onChange={onDueDateChange}
           minimumDate={new Date()}
@@ -105,7 +107,7 @@ export function CashPaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -113,7 +115,7 @@ export function CashPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Paid Amount:
+            {t('paymentSheet.form.paidAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
             <CurrencyValue amount={(numPaid || 0)} decimals={2} />
@@ -121,7 +123,7 @@ export function CashPaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            {remaining > 0 ? 'Remaining Due:' : 'Pay Back:'}
+            {t(remaining > 0 ? 'paymentSheet.form.remainingDue' : 'paymentSheet.form.payBack')}
           </Typography>
           <Typography
             variant="bodySmallBold"
@@ -135,18 +137,24 @@ export function CashPaymentForm({
           <View style={[styles.noteBox, { backgroundColor: '#10B98115' }]}>
             <Typography variant="caption" style={{ color: '#047857' }}>
               <Typography variant="caption" style={{ fontWeight: '700', color: '#047857' }}>
-                Cash Return Required:{' '}
+                {t('paymentSheet.form.cashReturnRequired')}{' '}
               </Typography>
-              Return <CurrencyValue amount={payBack} decimals={2} /> to customer
+              <Trans
+                i18nKey="paymentSheet.form.returnToCustomer"
+                components={{ amount: <CurrencyValue amount={payBack} decimals={2} /> }}
+              />
             </Typography>
           </View>
         ) : remaining > 0 ? (
           <View style={[styles.noteBox, { backgroundColor: '#F59E0B15' }]}>
             <Typography variant="caption" style={{ color: '#B45309' }}>
               <Typography variant="caption" style={{ fontWeight: '700', color: '#B45309' }}>
-                Partial Payment:{' '}
+                {t('paymentSheet.form.partialPayment')}{' '}
               </Typography>
-              <CurrencyValue amount={remaining} decimals={2} /> will be added to outstanding balance.
+              <Trans
+                i18nKey="paymentSheet.form.addedToOutstanding"
+                components={{ amount: <CurrencyValue amount={remaining} decimals={2} /> }}
+              />
             </Typography>
           </View>
         ) : null}

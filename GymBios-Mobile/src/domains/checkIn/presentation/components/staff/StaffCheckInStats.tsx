@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 import { Spacing } from '@/core/theme';
 
 export function StaffCheckInStats() {
+  const { t } = useTranslation();
   const { summary } = useRecentCheckIns();
 
   const occupancy = Math.round((summary.active / 150) * 100) || 0;
@@ -15,48 +17,48 @@ export function StaffCheckInStats() {
       <View style={styles.row}>
         <View style={[styles.statCard, styles.highlight]}>
           <View style={styles.statTop}>
-            <Text style={styles.statLabel}>Today's Check-ins</Text>
+            <Text style={styles.statLabel}>{t('checkIn.staff.todaysCheckIns')}</Text>
             <View style={[styles.statIcon, styles.iconTeal]}>
               <Feather name="log-in" size={14} color="#1c6e5a" />
             </View>
           </View>
           <Text style={[styles.statValue, styles.textTeal]}>{summary.total}</Text>
-          <Text style={styles.statSub}>Total visits today</Text>
+          <Text style={styles.statSub}>{t('checkIn.hub.stats.totalVisitsToday')}</Text>
         </View>
 
         <View style={styles.statCard}>
           <View style={styles.statTop}>
-            <Text style={styles.statLabel}>Currently Active</Text>
+            <Text style={styles.statLabel}>{t('checkIn.staff.currentlyActive')}</Text>
             <View style={[styles.statIcon, styles.iconGreen]}>
               <Feather name="users" size={14} color="#2f9e6e" />
             </View>
           </View>
           <Text style={styles.statValue}>{summary.active}</Text>
-          <Text style={styles.statSub}>Members in gym</Text>
+          <Text style={styles.statSub}>{t('checkIn.hub.stats.membersInGym')}</Text>
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.statCard}>
           <View style={styles.statTop}>
-            <Text style={styles.statLabel}>Occupancy Rate</Text>
+            <Text style={styles.statLabel}>{t('checkIn.staff.occupancyRate')}</Text>
             <View style={[styles.statIcon, styles.iconTeal]}>
               <Feather name="activity" size={14} color="#1c6e5a" />
             </View>
           </View>
           <Text style={styles.statValue}>{occupancy}%</Text>
-          <Text style={styles.statSub}>of 150 capacity</Text>
+          <Text style={styles.statSub}>{t('checkIn.hub.stats.capacitySubtitle', { count: 150 })}</Text>
         </View>
 
         <View style={styles.statCard}>
           <View style={styles.statTop}>
-            <Text style={styles.statLabel}>Daily Visitors</Text>
+            <Text style={styles.statLabel}>{t('checkIn.staff.dailyVisitors')}</Text>
             <View style={[styles.statIcon, styles.iconBlue]}>
               <Feather name="user-plus" size={14} color="#3d6fd6" />
             </View>
           </View>
           <Text style={[styles.statValue, styles.textBlue]}>{summary.walkIns}</Text>
-          <Text style={styles.statSub}>Walk-in passes today</Text>
+          <Text style={styles.statSub}>{t('checkIn.hub.stats.walkInPassesToday')}</Text>
         </View>
       </View>
     </View>

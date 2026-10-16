@@ -28,7 +28,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -82,10 +85,18 @@ public class MobileReferralService {
         if (tenantRoutingEnabled && TenantContextHolder.getCurrentTenant() == null) {
             return CodeBlocker.NO_GYM;
         }
-        Member member = globalUser
+        return blockerFor(findCallerMember(userId, globalUser), LocalDateTime.now());
+    }
+
+    /**
+     * The caller's members row in the current gym. An app-registered (global) login's id
+     * is a global user id; a gym-created login's id is this gym's users.id — a different
+     * number space, so the two must never be looked up the same way.
+     */
+    public Member findCallerMember(Long userId, boolean globalUser) {
+        return globalUser
                 ? resolutionService.findMemberByGlobalUserId(userId)
                 : memberRepository.findByUserId(userId).orElse(null);
-        return blockerFor(member, LocalDateTime.now());
     }
 
     /** Same "not active" rule as the reward engine (expired status), plus a lapsed expiry date. */
@@ -96,23 +107,44 @@ public class MobileReferralService {
         return expired ? CodeBlocker.MEMBERSHIP_INACTIVE : null;
     }
 
+    /**
+     * The member's own code in this gym. globalUserId is the caller's global id for an
+     * app-registered member, null for a gym-created login.
+     */
     @Transactional
-    public MobileReferralProfile getOrCreateProfile(Long globalUserId) {
-        return profileRepository.findByGlobalUserId(globalUserId).orElseGet(() -> {
-            MobileReferralProfile profile = new MobileReferralProfile();
-            profile.setGlobalUserId(globalUserId);
-            
-            // Retry logic for unique code generation
-            for (int i = 0; i < 3; i++) {
-                try {
-                    profile.setReferralCode(generateRandomCode());
-                    return profileRepository.save(profile);
-                } catch (DataIntegrityViolationException e) {
-                    if (i == 2) throw new RuntimeException("Failed to generate unique referral code after 3 attempts");
-                }
+    public MobileReferralProfile getOrCreateProfile(Member member, Long globalUserId) {
+        Optional<MobileReferralProfile> owned = profileRepository.findByMemberId(member.getId());
+        if (owned.isPresent()) {
+            return owned.get();
+        }
+        if (globalUserId != null) {
+            // A code made before V95, or one whose members row was replaced since (a
+            // rejected purchase released, then bought again) — keep the same code and
+            // re-point it at the member's current row.
+            Optional<MobileReferralProfile> legacy = profileRepository.findByGlobalUserId(globalUserId);
+            if (legacy.isPresent()) {
+                legacy.get().setMemberId(member.getId());
+                return profileRepository.save(legacy.get());
             }
-            throw new RuntimeException("Failed to generate unique referral code");
-        });
+        }
+        return createProfile(member.getId(), globalUserId);
+    }
+
+    private MobileReferralProfile createProfile(Long memberId, Long globalUserId) {
+        MobileReferralProfile profile = new MobileReferralProfile();
+        profile.setMemberId(memberId);
+        profile.setGlobalUserId(globalUserId);
+
+        // Retry logic for unique code generation
+        for (int i = 0; i < 3; i++) {
+            try {
+                profile.setReferralCode(generateRandomCode());
+                return profileRepository.save(profile);
+            } catch (DataIntegrityViolationException e) {
+                if (i == 2) throw new RuntimeException("Failed to generate unique referral code after 3 attempts");
+            }
+        }
+        throw new RuntimeException("Failed to generate unique referral code");
     }
 
     private String generateRandomCode() {
@@ -135,7 +167,7 @@ public class MobileReferralService {
             }
             DataSource ds = tenantDataSourceRegistry.getDataSource(tenant.getSlug());
             try (Connection conn = ds.getConnection();
-                 PreparedStatement ps = conn.prepareStatement("SELECT global_user_id FROM mobile_referral_profiles WHERE referral_code = ?")) {
+                 PreparedStatement ps = conn.prepareStatement("SELECT id FROM mobile_referral_profiles WHERE referral_code = ?")) {
                 ps.setString(1, code);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -156,9 +188,10 @@ public class MobileReferralService {
             throw new IllegalArgumentException("Invalid referral code");
         }
         
+        Long referrerMemberId = referrerProfileOpt.get().getMemberId();
         Long referrerGlobalUserId = referrerProfileOpt.get().getGlobalUserId();
         
-        if (referrerGlobalUserId.equals(refereeGlobalUserId)) {
+        if (refereeGlobalUserId.equals(referrerGlobalUserId)) {
             throw new IllegalArgumentException("Cannot claim your own referral code");
         }
         
@@ -172,39 +205,62 @@ public class MobileReferralService {
         // the referrer would keep a SIGNUP reward for a claim that never happened. Flushing first
         // makes a concurrent claim block on the unique index and fail here instead.
         MobileReferralAttribution attribution = attributionRepository.saveAndFlush(new MobileReferralAttribution(
-                referrerGlobalUserId, refereeGlobalUserId, MobileReferralStatus.PENDING));
+                referrerMemberId, referrerGlobalUserId, refereeGlobalUserId, MobileReferralStatus.PENDING));
 
         // Best-effort: fires any SIGNUP-triggered reward for the referrer right now, without
         // waiting for the referee to ever purchase a membership. Runs in its own transaction and
         // never throws — see createSignupReferral()'s javadoc — so it can't block this claim.
         try {
-            Long legacyReferralId = resolutionService.createSignupReferral(referrerGlobalUserId, refereeGlobalUserId);
+            Long legacyReferralId = resolutionService.createSignupReferral(referrerMemberId, referrerGlobalUserId, refereeGlobalUserId);
             if (legacyReferralId != null) {
                 attribution.setLegacyReferralId(legacyReferralId);
             }
         } catch (Exception e) {
-            log.warn("Signup-time referral creation threw unexpectedly for referrer {}: {}", referrerGlobalUserId, e.getMessage());
+            log.warn("Signup-time referral creation threw unexpectedly for referrer member {}: {}", referrerMemberId, e.getMessage());
         }
 
         return attributionRepository.save(attribution);
     }
     
+    /**
+     * The referrals made with this member's code in this gym. globalUserId (null for a
+     * gym-created login) also picks up ones filed against an earlier members row of the
+     * same app-registered member.
+     */
     @Transactional(readOnly = true)
-    public List<MobileReferralAttribution> getHistory(Long referrerGlobalUserId) {
-        return attributionRepository.findByReferrerGlobalUserId(referrerGlobalUserId);
+    public List<MobileReferralAttribution> getHistory(Member referrer, Long globalUserId) {
+        Map<Long, MobileReferralAttribution> byId = new LinkedHashMap<>();
+        attributionRepository.findByReferrerMemberId(referrer.getId()).forEach(a -> byId.put(a.getId(), a));
+        if (globalUserId != null) {
+            attributionRepository.findByReferrerGlobalUserId(globalUserId).forEach(a -> byId.putIfAbsent(a.getId(), a));
+        }
+        return new ArrayList<>(byId.values());
     }
 
     /** The code the current user claimed as a referee, if any — for the "referral you used" card. */
     @Transactional(readOnly = true)
     public Optional<MyReferralClaimDTO> getMyClaim(Long refereeGlobalUserId) {
         return attributionRepository.findByRefereeGlobalUserId(refereeGlobalUserId).map(attribution -> {
-            String referrerName = resolveReferrerName(attribution.getReferrerGlobalUserId());
+            String referrerName = resolveReferrerName(attribution);
             return new MyReferralClaimDTO(
                     referrerName,
                     attribution.getStatus(),
                     attribution.getCreatedAt(),
                     attribution.getStatus() == MobileReferralStatus.PENDING);
         });
+    }
+
+    // The referrer's name as their gym knows it; a referrer no longer in this gym falls
+    // back to their global profile name, when they have one.
+    private String resolveReferrerName(MobileReferralAttribution attribution) {
+        Member referrer = resolutionService.findReferrer(attribution.getReferrerMemberId(), null);
+        if (referrer != null && referrer.getName() != null && !referrer.getName().isBlank()) {
+            return referrer.getName();
+        }
+        if (attribution.getReferrerGlobalUserId() == null) {
+            return "A member";
+        }
+        return resolveGlobalProfileName(attribution.getReferrerGlobalUserId());
     }
 
     /**
@@ -214,7 +270,7 @@ public class MobileReferralService {
      * transaction still routes off whatever TenantContextHolder holds at the
      * moment it opens its connection) and restore it afterwards.
      */
-    private String resolveReferrerName(Long referrerGlobalUserId) {
+    private String resolveGlobalProfileName(Long referrerGlobalUserId) {
         String previousTenant = TenantContextHolder.getCurrentTenant();
         try {
             TenantContextHolder.clear();

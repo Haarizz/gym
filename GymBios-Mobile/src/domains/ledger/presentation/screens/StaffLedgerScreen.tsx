@@ -15,21 +15,24 @@ import { StaffLedgerTaxSection } from '../components/StaffLedgerTaxSection';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
+import { useTranslation } from 'react-i18next';
+
 type LedgerTab = 'breakdown' | 'earnings' | 'tax';
 
 export function StaffLedgerScreen() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
   const { data, isLoading, isError, refetch, isRefetching } = useStaffLedger();
 
   const handleDownloadSalarySlip = async () => {
     try {
       await staffLedgerRepository.downloadSalarySlip();
-      toast.info('Your salary slip advice has been generated successfully.', {
-        title: 'Salary Slip Ready'
+      toast.info(t('ledger.earnings.salarySlipSuccessDesc'), {
+        title: t('ledger.earnings.salarySlipSuccessTitle'),
       });
     } catch (err) {
-      toast.info('Your salary slip advice is being prepared by HR.', {
-        title: 'Download Notice'
+      toast.info(t('ledger.earnings.salarySlipNoticeDesc'), {
+        title: t('ledger.earnings.salarySlipNoticeTitle'),
       });
     }
   };
@@ -37,12 +40,12 @@ export function StaffLedgerScreen() {
   const handleDocumentPress = async (doc: TaxDocument) => {
     try {
       await staffLedgerRepository.downloadTaxDocument(doc.id);
-      toast.info(`${doc.title} is ready for viewing.`, {
-        title: 'Tax Document Ready'
+      toast.info(t('ledger.earnings.taxDocSuccessDesc', { title: doc.title }), {
+        title: t('ledger.earnings.taxDocSuccessTitle'),
       });
     } catch (err) {
-      toast.info(`${doc.title} will be provided once filed by the compliance team.`, {
-        title: 'Document Notice'
+      toast.info(t('ledger.earnings.taxDocNoticeDesc', { title: doc.title }), {
+        title: t('ledger.earnings.taxDocNoticeTitle'),
       });
     }
   };
@@ -50,7 +53,7 @@ export function StaffLedgerScreen() {
   if (isLoading && !data) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading ledger..." />
+        <Loader message={t('ledger.loading')} />
       </View>
     );
   }
@@ -60,9 +63,9 @@ export function StaffLedgerScreen() {
       <View style={styles.loaderContainer}>
         <EmptyState
           icon="alert-circle"
-          title="Couldn't load your ledger"
-          description={isError ? 'Check your connection and try again.' : 'No ledger data is available yet.'}
-          buttonLabel="Retry"
+          title={t('ledger.errorTitle')}
+          description={isError ? t('ledger.errorNetwork') : t('ledger.errorEmpty')}
+          buttonLabel={t('ledger.retry')}
           onPress={() => refetch()}
         />
       </View>
@@ -95,7 +98,7 @@ export function StaffLedgerScreen() {
           <Text
             style={[styles.tabText, activeTab === 'breakdown' && styles.tabTextActive]}
           >
-            Breakdown
+            {t('ledger.tabs.breakdown')}
           </Text>
         </Pressable>
 
@@ -106,7 +109,7 @@ export function StaffLedgerScreen() {
           <Text
             style={[styles.tabText, activeTab === 'earnings' && styles.tabTextActive]}
           >
-            Earnings
+            {t('ledger.tabs.earnings')}
           </Text>
         </Pressable>
 
@@ -115,7 +118,7 @@ export function StaffLedgerScreen() {
           onPress={() => setActiveTab('tax')}
         >
           <Text style={[styles.tabText, activeTab === 'tax' && styles.tabTextActive]}>
-            Tax Info
+            {t('ledger.tabs.tax')}
           </Text>
         </Pressable>
       </View>

@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing, TypographyScale } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
@@ -9,19 +10,18 @@ interface MemberWelcomeCardProps {
 }
 
 export function MemberWelcomeCard({ memberInfo }: MemberWelcomeCardProps) {
-  const firstName = memberInfo.name?.trim().split(/\s+/)[0] || 'Member';
+  const { t } = useTranslation();
+  const firstName = memberInfo.name?.trim().split(/\s+/)[0] || t('memberHome.memberFallback');
   // No check-ins yet means this is the member's first time here.
   const isNewMember = memberInfo.totalVisits === 0;
 
   return (
     <GlassSurface radius={18} style={styles.card}>
       <Text style={styles.title}>
-        {isNewMember ? `Welcome, ${firstName}! 👋` : `Welcome back, ${firstName}! 👋`}
+        {t(isNewMember ? 'memberHome.welcomeNew' : 'memberHome.welcomeBack', { name: firstName })}
       </Text>
       <Text style={styles.subtitle}>
-        {isNewMember
-          ? "Great to have you here — let's kick off your fitness journey."
-          : 'Ready to crush your goals today?'}
+        {t(isNewMember ? 'memberHome.welcomeNewSub' : 'memberHome.welcomeBackSub')}
       </Text>
     </GlassSurface>
   );

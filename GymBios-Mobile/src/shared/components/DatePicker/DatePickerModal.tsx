@@ -1,5 +1,6 @@
 // src/shared/components/DatePicker/DatePickerModal.tsx
 
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
@@ -38,6 +39,7 @@ export function DatePickerModal({
   onClose,
   onConfirm,
 }: DatePickerModalProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // ─── Animation ────────────────────────────────────────────────────────────
@@ -199,7 +201,7 @@ export function DatePickerModal({
                 disabled={!canGoPrev}
                 hitSlop={12}
                 style={[styles.navButton, { opacity: canGoPrev ? 1 : 0.3 }]}
-                accessibilityLabel="Previous month"
+                accessibilityLabel={t('shared.previousMonth')}
               >
                 <Feather
                   name="chevron-left"
@@ -213,7 +215,7 @@ export function DatePickerModal({
                 <Pressable
                   onPress={handleToggleMonthPanel}
                   hitSlop={8}
-                  accessibilityLabel="Select month"
+                  accessibilityLabel={t('shared.selectMonth')}
                 >
                   <Typography
                     variant="bodySmallBold"
@@ -233,7 +235,7 @@ export function DatePickerModal({
                 <Pressable
                   onPress={handleToggleYearPanel}
                   hitSlop={8}
-                  accessibilityLabel="Select year"
+                  accessibilityLabel={t('shared.selectYear')}
                 >
                   <Typography
                     variant="bodySmallBold"
@@ -250,7 +252,7 @@ export function DatePickerModal({
                 disabled={!canGoNext}
                 hitSlop={12}
                 style={[styles.navButton, { opacity: canGoNext ? 1 : 0.3 }]}
-                accessibilityLabel="Next month"
+                accessibilityLabel={t('shared.nextMonth')}
               >
                 <Feather
                   name="chevron-right"
@@ -304,10 +306,10 @@ export function DatePickerModal({
                   { backgroundColor: theme.backgroundElement },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel={t('shared.cancel')}
               >
                 <Typography variant="bodySmallBold" style={{ color: theme.text }}>
-                  Cancel
+                  {t('shared.cancel')}
                 </Typography>
               </Pressable>
 
@@ -323,13 +325,13 @@ export function DatePickerModal({
                   },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Confirm date"
+                accessibilityLabel={t('shared.confirmDate')}
               >
                 <Typography
                   variant="bodySmallBold"
                   style={{ color: theme.primaryText }}
                 >
-                  Done
+                  {t('shared.done')}
                 </Typography>
               </Pressable>
             </View>

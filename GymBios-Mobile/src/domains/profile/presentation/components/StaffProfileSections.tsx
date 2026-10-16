@@ -2,23 +2,35 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import * as WebBrowser from 'expo-web-browser';
-import { format, isBefore, parseISO, startOfDay } from 'date-fns';
+import { isBefore, parseISO, startOfDay } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { GlassSurface, InfoRow, StatusBadge, Typography } from '@/shared/components';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
+import { formatDate } from '@/core/i18n';
 
 import type { StaffCertification, StaffProfile } from '../../domain';
 
 // Same day order and slot labels the admin picks from on the web Staffs & Trainers page.
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-function formatDate(value?: string): string | undefined {
+const DAY_KEYS: Record<string, string> = {
+  Monday: 'mon',
+  Tuesday: 'tue',
+  Wednesday: 'wed',
+  Thursday: 'thu',
+  Friday: 'fri',
+  Saturday: 'sat',
+  Sunday: 'sun',
+};
+
+function formatJoinDate(value?: string): string | undefined {
   if (!value) return undefined;
   try {
-    return format(parseISO(value), 'd MMM yyyy');
+    return formatDate(value, 'PP');
   } catch {
     return value;
   }
@@ -45,48 +57,51 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
 }
 
 export function EmploymentCard({ staff }: { staff: StaffProfile }) {
+  const { t } = useTranslation();
   return (
-    <SectionCard title="Employment Details">
-      <InfoRow icon="hash" label="Employee ID" value={staff.staffId} divider={false} />
-      <InfoRow icon="briefcase" label="Role" value={staff.role} />
-      <InfoRow icon="layers" label="Department" value={staff.department} />
-      <InfoRow icon="home" label="Branch" value={staff.branch} />
-      <InfoRow icon="calendar" label="Join Date" value={formatDate(staff.joinDate)} />
+    <SectionCard title={t('staff.employmentDetails')}>
+      <InfoRow icon="hash" label={t('staff.employeeId')} value={staff.staffId} divider={false} />
+      <InfoRow icon="briefcase" label={t('staff.role')} value={staff.role} />
+      <InfoRow icon="layers" label={t('staff.department')} value={staff.department} />
+      <InfoRow icon="home" label={t('staff.branch')} value={staff.branch} />
+      <InfoRow icon="calendar" label={t('staff.joinDate')} value={formatJoinDate(staff.joinDate)} />
       <InfoRow
         icon="activity"
-        label="Status"
+        label={t('staff.status')}
         value={staff.status ? <StatusBadge status={staff.status.replace(/_/g, ' ')} /> : undefined}
       />
       <InfoRow
         icon="target"
-        label="Monthly Target"
+        label={t('staff.monthlyTarget')}
         value={staff.monthlyTarget != null ? <CurrencyValue amount={staff.monthlyTarget} /> : undefined}
       />
       <InfoRow
         icon="credit-card"
-        label="Base Salary"
+        label={t('staff.baseSalary')}
         value={staff.baseSalary != null ? <CurrencyValue amount={staff.baseSalary} /> : undefined}
       />
-      <InfoRow icon="at-sign" label="App Username" value={staff.appUsername} />
+      <InfoRow icon="at-sign" label={t('staff.appUsername')} value={staff.appUsername} />
     </SectionCard>
   );
 }
 
-async function openDocument(url: string) {
+async function openDocument(url: string, errorTitle: string, errorMsg: string) {
   const resolved = resolveImageUrl(url);
   if (!resolved) return;
   try {
     await WebBrowser.openBrowserAsync(resolved);
   } catch {
-    toast.error('Could not open the certificate file.', { title: 'Error' });
+    toast.error(errorMsg, { title: errorTitle });
   }
 }
 
 function CertificationRow({ cert, divider }: { cert: StaffCertification; divider: boolean }) {
+  const { t } = useTranslation();
   const expired = isExpired(cert.expiryDate);
-  const issued = formatDate(cert.issueDate);
-  const expires = formatDate(cert.expiryDate);
+  const issued = cert.issueDate ? formatDate(cert.issueDate, 'PP') : undefined;
+  const expires = cert.expiryDate ? formatDate(cert.expiryDate, 'PP') : undefined;
   const documentUrl = cert.documentUrl;
+  const certName = cert.name || t('staff.untitledCertification');
 
   return (
     <View style={[styles.certRow, divider && styles.divider]}>
@@ -95,7 +110,7 @@ function CertificationRow({ cert, divider }: { cert: StaffCertification; divider
       </View>
       <View style={styles.certBody}>
         <Typography variant="body" style={styles.certName}>
-          {cert.name || 'Untitled certification'}
+          {certName}
         </Typography>
         {cert.issuer ? (
           <Typography variant="caption" color="textSecondary">
@@ -104,32 +119,35 @@ function CertificationRow({ cert, divider }: { cert: StaffCertification; divider
         ) : null}
         {issued || expires ? (
           <Typography variant="caption" color="textSecondary">
-            {[issued && `Issued ${issued}`, expires && (expired ? `Expired ${expires}` : `Valid until ${expires}`)]
+            {[
+              issued && t('staff.issued', { date: issued }),
+              expires && (expired ? t('staff.expired', { date: expires }) : t('staff.validUntil', { date: expires })),
+            ]
               .filter(Boolean)
               .join(' · ')}
           </Typography>
         ) : null}
         {expired ? (
           <Typography variant="caption" style={styles.expiredText}>
-            Expired — contact your admin to renew
+            {t('staff.expiredNotice')}
           </Typography>
         ) : null}
       </View>
       {documentUrl ? (
         <Pressable
-          onPress={() => openDocument(documentUrl)}
+          onPress={() => openDocument(documentUrl, t('myProfile.errorTitle'), t('staff.certOpenError'))}
           style={styles.viewPill}
           accessibilityRole="button"
-          accessibilityLabel={`View ${cert.name} certificate file`}
+          accessibilityLabel={t('staff.viewCertA11y', { name: certName })}
         >
           <Feather name="file-text" size={12} color={BrandColors.tealDark} />
           <Typography variant="caption" style={styles.viewPillText}>
-            View
+            {t('staff.view')}
           </Typography>
         </Pressable>
       ) : (
         <Typography variant="caption" color="textSecondary" style={styles.noFile}>
-          No file
+          {t('staff.noFile')}
         </Typography>
       )}
     </View>
@@ -137,11 +155,12 @@ function CertificationRow({ cert, divider }: { cert: StaffCertification; divider
 }
 
 export function CertificationsCard({ certifications }: { certifications: StaffCertification[] }) {
+  const { t } = useTranslation();
   return (
-    <SectionCard title="Certifications">
+    <SectionCard title={t('staff.certifications')}>
       {certifications.length === 0 ? (
         <Typography variant="bodySmall" color="textSecondary" style={styles.empty}>
-          No certifications on file.
+          {t('staff.noCertifications')}
         </Typography>
       ) : (
         certifications.map((cert, i) => <CertificationRow key={cert.id ?? i} cert={cert} divider={i > 0} />)
@@ -157,13 +176,14 @@ function splitSlot(slot: string): { name: string; time?: string } {
 }
 
 export function ScheduleCard({ schedule }: { schedule: Record<string, string[]> }) {
+  const { t } = useTranslation();
   const hasAny = DAYS.some((day) => (schedule[day] ?? []).length > 0);
 
   return (
-    <SectionCard title="Work Schedule">
+    <SectionCard title={t('staff.workSchedule')}>
       {!hasAny ? (
         <Typography variant="bodySmall" color="textSecondary" style={styles.empty}>
-          No schedule configured yet.
+          {t('staff.noScheduleConfigured')}
         </Typography>
       ) : (
         DAYS.map((day, i) => {
@@ -171,12 +191,12 @@ export function ScheduleCard({ schedule }: { schedule: Record<string, string[]> 
           return (
             <View key={day} style={[styles.dayRow, i > 0 && styles.divider]}>
               <Typography variant="bodySmallBold" style={styles.dayLabel}>
-                {day.slice(0, 3)}
+                {t(`staff.days.${DAY_KEYS[day]}` as any)}
               </Typography>
               <View style={styles.slotWrap}>
                 {slots.length === 0 ? (
                   <Typography variant="caption" color="textSecondary" style={styles.offText}>
-                    Off
+                    {t('staff.off')}
                   </Typography>
                 ) : (
                   slots.map((slot) => {

@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: '返回',
+    confirm: '确认',
+    cancel: '取消',
+    done: '完成',
+    previous: '上一页',
+    next: '下一页',
+    search: '搜索...',
+    notAdded: '未添加',
+    selectOption: '选择一个选项',
+    dropdown: '下拉菜单',
+    selectDate: '选择日期',
+    datePicker: '日期选择器',
+    previousMonth: '上个月',
+    nextMonth: '下个月',
+    selectMonth: '选择月份',
+    selectYear: '选择年份',
+    confirmDate: '确认日期',
+    dismissBackdrop: '关闭弹窗背景',
+    userAvatar: '用户头像',
+    initialsAvatar: '{{initials}} 的头像',
+
+    photo: {
+      changeA11y: '更换个人头像',
+      addA11y: '添加个人头像',
+      selectA11y: '点击选择照片',
+      tapToChange: '点击更换照片',
+      tapToAdd: '点击添加照片',
+      title: '个人头像',
+      subtitle: '选择操作方式',
+      takePhoto: '拍照',
+      chooseFromGallery: '从相册选择',
+      removePhoto: '移除照片',
+      permissionTitle: '需要权限',
+      cameraNeeded: '拍照需要相机访问权限。',
+      cameraOff: '相机权限已关闭。请在系统设置中启用以进行拍照。',
+      cameraUnavailable: '此设备上不可用相机。',
+      galleryNeeded: '选择照片需要相册访问权限。',
+      galleryOff: '相册权限已关闭。请在系统设置中启用以选择照片。',
+      galleryFailed: '无法打开相册。',
+      uploadFailedStatus: '照片上传失败 ({{status}})',
+      uploadFailedNetwork: '照片上传失败（网络错误）',
+      uploadTimeout: '照片上传超时',
+    },
+
+    trafficLight: {
+      low: '低',
+      medium: '中',
+      high: '高',
+    },
+
+    timePicker: {
+      selectTime: '选择时间',
+      now: '现在',
+      setTime: '设置时间 · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: '保存修改',
+      createStaff: '创建员工',
+    },
+
+    roleMode: {
+      virtualStudio: '线上虚拟馆',
+      virtualStudioDesc: '创建并管理在线健身课程、实时直播与数字化会员服务。',
+      comingSoon: '即将推出',
+    },
+
+    charts: {
+      noData: '暂无数据',
+      noDataDesc: '所选条件下暂无可显示的图表数据。',
+      loading: '正在加载图表...',
+      unableToLoad: '无法加载图表',
+      loadFailed: '加载图表数据失败',
+      retry: '重试',
+    },
+
+    noInternet: {
+      title: '无网络连接',
+      tryAgain: '重试',
+      checkConnection: '请检查你的 Wi-Fi 或移动数据网络，然后重试。',
+      tipToggleWifi: '尝试重新开关 Wi-Fi',
+      tipMobileData: '检查移动蜂窝数据是否已开启',
+      tipSignal: '移步至信号较好的区域',
+      retryA11y: '重试连接',
+    },
+
+    receipt: {
+      title: '收据详情',
+      subtitle: '交易凭证',
+      loading: '正在加载收据详情...',
+      loadError: '无法加载收据数据。',
+      billedTo: '账单收款人',
+      memberName: '会员姓名',
+      memberId: '会员 ID',
+      phone: '电话',
+      transactionInfo: '交易信息',
+      type: '类型',
+      paymentMethod: '支付方式',
+      subscription: '订阅 / 服务项目',
+      validity: '有效期限',
+      processedBy: '经办人',
+      paymentSummary: '支付摘要',
+      price: '原价',
+      discount: '折扣',
+      totalAmount: '总金额',
+      amountPaid: '已付金额',
+      balanceDue: '欠缴余额',
+      download: '下载收据',
+      sharingUnavailableTitle: '无法分享',
+      sharingUnavailable: '此设备无法分享 PDF。',
+      errorTitle: '错误',
+      pdfFailed: '生成收据 PDF 失败。',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

@@ -1,3 +1,5 @@
+import { formatDate } from '@/core/i18n';
+
 /** Mirrors the backend's BookingPaymentService.REFUND_CUTOFF. */
 export const REFUND_CUTOFF_HOURS = 2;
 
@@ -12,12 +14,10 @@ function parseLocal(iso: string): Date | null {
   return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
 }
 
-/** "2:00 PM, Oct 12" — or null when there's no deadline. */
+/** "2:00 PM, Oct 12" (in the app language) — or null when there's no deadline. */
 export function formatRefundDeadline(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = parseLocal(iso);
   if (!d) return null;
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${time}, ${date}`;
+  return `${formatDate(d, 'p')}, ${formatDate(d, 'MMM d')}`;
 }

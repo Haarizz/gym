@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 
 import { CurrencyValue } from '@/core/providers';
@@ -15,17 +17,12 @@ interface OutstandingBalanceCardProps {
   onPay: () => void;
 }
 
-const STATUS_LABEL: Record<OutstandingBalance['paymentStatus'], string> = {
-  PAID: 'Paid',
-  PARTIALLY_PAID: 'Partially Paid',
-  UNPAID: 'Unpaid',
-};
-
 /**
  * Membership amount / paid / remaining for a membership with an outstanding
  * balance. "Complete Payment" only appears when the backend says it's payable.
  */
 export function OutstandingBalanceCard({ balance, onPay }: OutstandingBalanceCardProps) {
+  const { t } = useTranslation();
   const blockedMessage = balance.canPay ? null : payBlockedMessage(balance.payBlockedReason);
 
   return (
@@ -33,25 +30,25 @@ export function OutstandingBalanceCard({ balance, onPay }: OutstandingBalanceCar
       <View style={styles.headerRow}>
         <View style={styles.titleRow}>
           <Feather name="alert-circle" size={18} color={BrandColors.trainerAmber} />
-          <Text style={styles.title}>{balance.planName || 'Subscription'}</Text>
+          <Text style={styles.title}>{balance.planName || t('outstanding.subscription')}</Text>
         </View>
         <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{STATUS_LABEL[balance.paymentStatus]}</Text>
+          <Text style={styles.statusText}>{tOr(`outstanding.statusValues.${balance.paymentStatus}`, balance.paymentStatus)}</Text>
         </View>
       </View>
 
       <View style={styles.amountsRow}>
         <View style={styles.amountCell}>
           <CurrencyValue style={styles.amount} amount={balance.totalAmount} options={MAX_2DP} />
-          <Text style={styles.amountLabel}>Membership amount</Text>
+          <Text style={styles.amountLabel}>{t('outstanding.membershipAmount')}</Text>
         </View>
         <View style={styles.amountCell}>
           <CurrencyValue style={styles.amount} amount={balance.paidAmount} options={MAX_2DP} />
-          <Text style={styles.amountLabel}>Paid</Text>
+          <Text style={styles.amountLabel}>{t('outstanding.paid')}</Text>
         </View>
         <View style={styles.amountCell}>
           <CurrencyValue style={[styles.amount, styles.remaining]} amount={balance.outstandingAmount} options={MAX_2DP} />
-          <Text style={styles.amountLabel}>Remaining balance</Text>
+          <Text style={styles.amountLabel}>{t('outstanding.remainingBalance')}</Text>
         </View>
       </View>
 
@@ -60,10 +57,10 @@ export function OutstandingBalanceCard({ balance, onPay }: OutstandingBalanceCar
           style={({ pressed }) => [styles.payButton, pressed && styles.pressed]}
           onPress={onPay}
           accessibilityRole="button"
-          accessibilityLabel="Complete Payment"
+          accessibilityLabel={t('outstanding.completePayment')}
         >
           <Feather name="credit-card" size={18} color="#fff" />
-          <Text style={styles.payButtonText}>Complete Payment</Text>
+          <Text style={styles.payButtonText}>{t('outstanding.completePayment')}</Text>
         </Pressable>
       ) : blockedMessage ? (
         <Text style={styles.blockedText}>{blockedMessage}</Text>

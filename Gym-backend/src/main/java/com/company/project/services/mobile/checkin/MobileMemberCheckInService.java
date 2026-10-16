@@ -3,6 +3,7 @@ package com.company.project.services.mobile.checkin;
 import com.company.project.dto.mobile.checkin.MemberCheckInResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckInStatusResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckOutResponseDTO;
+import com.company.project.dto.mobile.checkin.MemberWorkoutResponseDTO;
 import com.company.project.entities.Attendance;
 import com.company.project.entities.Member;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -10,17 +11,14 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.AttendanceSessionService;
 import com.company.project.services.CheckInPolicyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -29,6 +27,7 @@ public class MobileMemberCheckInService {
     private final MemberRepository memberRepository;
     private final AttendanceRepository attendanceRepository;
     private final CheckInPolicyService checkInPolicyService;
+    private final AttendanceSessionService sessionService;
 
     // Per-member lock so a double-tap can't pass the active-session / daily-cap
     // checks twice before either insert commits (same approach as CheckInService).
@@ -36,10 +35,12 @@ public class MobileMemberCheckInService {
 
     public MobileMemberCheckInService(MemberRepository memberRepository,
                                       AttendanceRepository attendanceRepository,
-                                      CheckInPolicyService checkInPolicyService) {
+                                      CheckInPolicyService checkInPolicyService,
+                                      AttendanceSessionService sessionService) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
         this.checkInPolicyService = checkInPolicyService;
+        this.sessionService = sessionService;
     }
 
     private Member getAuthenticatedMember(UserDetailsImpl principal) {
@@ -75,17 +76,22 @@ public class MobileMemberCheckInService {
 
         Member member = memberOpt.get();
 
-        List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
-        Attendance activeAttendance = (attendances != null)
-                ? attendances.stream()
-                        .filter(a -> "active".equalsIgnoreCase(a.getStatus()))
-                        .findFirst()
-                        .orElse(null)
-                : null;
-
-        MemberCheckInStatusResponseDTO dto = activeAttendance != null
-                ? new MemberCheckInStatusResponseDTO(true, activeAttendance.getId(), activeAttendance.getCheckInTime())
-                : new MemberCheckInStatusResponseDTO(false, null, null);
+        Attendance open = sessionService.findActiveSession(member.getId()).orElse(null);
+        MemberCheckInStatusResponseDTO dto;
+        if (open == null) {
+            dto = new MemberCheckInStatusResponseDTO(false, null, null);
+        } else if (AttendanceSessionService.isStale(open)) {
+            // Left open from an earlier day — not a current visit. Checking in closes it.
+            dto = new MemberCheckInStatusResponseDTO(false, null, null);
+            dto.setUnclosedAttendanceId(open.getId());
+            dto.setUnclosedCheckInTime(open.getCheckInTime());
+            dto.setUnclosedAutoCloseTime(AttendanceSessionService.staleCloseTime(open));
+        } else {
+            dto = new MemberCheckInStatusResponseDTO(true, open.getId(), open.getCheckInTime());
+            dto.setWorkoutStartTime(open.getWorkoutStartTime());
+            dto.setWorkoutEndTime(open.getWorkoutEndTime());
+            dto.setWorkoutMinutes(open.getWorkoutMinutes());
+        }
 
         CheckInPolicyService.Allowance allowance = checkInPolicyService.evaluate(member);
         dto.setLimitUnit(allowance.limitUnit());
@@ -106,14 +112,18 @@ public class MobileMemberCheckInService {
 
         validateMembership(member);
 
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay   = LocalDate.now().atTime(LocalTime.MAX);
-
         Attendance attendance = new Attendance();
         Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
         synchronized (lock) {
-            if (attendanceRepository.existsActiveSessionForMember(member.getId(), startOfDay, endOfDay)) {
-                throw new BusinessRuleViolationException(member.getName() + " is already checked in. Please check out first.");
+            // A visit left open from an earlier day (the app warned about it) is closed
+            // at the capped length first; one from today means they're still checked in.
+            Attendance open = sessionService.findActiveSession(member.getId()).orElse(null);
+            if (open != null) {
+                if (!AttendanceSessionService.isStale(open)) {
+                    throw new BusinessRuleViolationException(member.getName() + " is already checked in. Please check out first.");
+                }
+                sessionService.close(open, LocalDateTime.now());
+                attendanceRepository.saveAndFlush(open);
             }
             // Plan quota, daily cap and cooldown between visits
             checkInPolicyService.enforce(member);
@@ -138,26 +148,60 @@ public class MobileMemberCheckInService {
     public MemberCheckOutResponseDTO checkOut(UserDetailsImpl principal) {
         Member member = getAuthenticatedMember(principal);
 
-        List<Attendance> attendances = attendanceRepository.findByMember_IdOrderByCheckInTimeDesc(member.getId());
-        Attendance activeAttendance = (attendances != null)
-                ? attendances.stream()
-                        .filter(a -> "active".equalsIgnoreCase(a.getStatus()))
-                        .findFirst()
-                        .orElseThrow(() -> new BusinessRuleViolationException("No active check-in session found to check out"))
-                : null;
+        Attendance activeAttendance = sessionService.findActiveSession(member.getId())
+                .orElseThrow(() -> new BusinessRuleViolationException("No active check-in session found to check out"));
 
-        if (activeAttendance == null) {
-            throw new BusinessRuleViolationException("No active check-in session found to check out");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        int minutes = (int) Duration.between(activeAttendance.getCheckInTime(), now).toMinutes();
-        activeAttendance.setCheckOutTime(now);
-        activeAttendance.setTotalMinutes(minutes);
-        activeAttendance.setStatus("completed");
+        // Also ends a running workout; a visit from an earlier day gets the capped length.
+        sessionService.close(activeAttendance, LocalDateTime.now());
         attendanceRepository.save(activeAttendance);
 
-        return new MemberCheckOutResponseDTO(false, activeAttendance.getId(), activeAttendance.getCheckInTime(), activeAttendance.getCheckOutTime(), minutes);
+        MemberCheckOutResponseDTO dto = new MemberCheckOutResponseDTO(false, activeAttendance.getId(),
+                activeAttendance.getCheckInTime(), activeAttendance.getCheckOutTime(), activeAttendance.getTotalMinutes());
+        dto.setWorkoutMinutes(activeAttendance.getWorkoutMinutes());
+        return dto;
+    }
+
+    @Transactional
+    public MemberWorkoutResponseDTO startWorkout(UserDetailsImpl principal) {
+        Member member = getAuthenticatedMember(principal);
+        Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
+        synchronized (lock) {
+            Attendance visit = currentVisit(member);
+            if (visit.getWorkoutStartTime() != null) {
+                throw new BusinessRuleViolationException(visit.getWorkoutEndTime() == null
+                        ? "Your workout is already running."
+                        : "You've already logged a workout for this visit.");
+            }
+            visit.setWorkoutStartTime(LocalDateTime.now());
+            attendanceRepository.saveAndFlush(visit);
+            return toWorkoutDto(visit);
+        }
+    }
+
+    @Transactional
+    public MemberWorkoutResponseDTO endWorkout(UserDetailsImpl principal) {
+        Member member = getAuthenticatedMember(principal);
+        Object lock = checkInLocks.computeIfAbsent(member.getId(), k -> new Object());
+        synchronized (lock) {
+            Attendance visit = currentVisit(member);
+            if (visit.getWorkoutStartTime() == null || visit.getWorkoutEndTime() != null) {
+                throw new BusinessRuleViolationException("No workout is running.");
+            }
+            AttendanceSessionService.endWorkout(visit, LocalDateTime.now());
+            attendanceRepository.saveAndFlush(visit);
+            return toWorkoutDto(visit);
+        }
+    }
+
+    /** Today's open visit — a workout can't be attached to one left open from an earlier day. */
+    private Attendance currentVisit(Member member) {
+        return sessionService.findActiveSession(member.getId())
+                .filter(a -> !AttendanceSessionService.isStale(a))
+                .orElseThrow(() -> new BusinessRuleViolationException("Check in first to start a workout."));
+    }
+
+    private static MemberWorkoutResponseDTO toWorkoutDto(Attendance a) {
+        return new MemberWorkoutResponseDTO(a.getId(), a.getWorkoutStartTime(), a.getWorkoutEndTime(), a.getWorkoutMinutes());
     }
 
     private void validateMembership(Member member) {

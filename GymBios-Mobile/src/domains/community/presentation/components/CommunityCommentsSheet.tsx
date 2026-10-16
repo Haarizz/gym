@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { formatTimeAgo, tOr } from '@/core/i18n';
 import { useCallback, useState } from 'react';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import {
@@ -9,7 +11,6 @@ import {
 } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
-import { formatDistanceToNow } from 'date-fns';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -26,13 +27,6 @@ import type { CommunityComment } from '../../domain/community.types';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
-/** Why a member can't comment at their selected gym (codes from the server). */
-const BLOCKED_REASONS: Record<string, string> = {
-  NOT_A_MEMBER: 'Only members of your selected gym can comment.',
-  APP_ACCESS_PENDING: 'You can comment once your membership is approved.',
-  GYM_CONTEXT_REQUIRED: 'Select one of your gyms to comment.',
-  MEMBERSHIP_UNDETERMINED: 'Your membership couldn\'t be confirmed.',
-};
 
 interface CommunityCommentsSheetProps {
   postId: number | null;
@@ -46,6 +40,7 @@ interface CommunityCommentsSheetProps {
  * so comments are NOT prefetched for every post in the feed.
  */
 export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCommentsSheetProps) {
+  const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
   const canInteract = useCommunityCanInteract();
@@ -65,8 +60,9 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
   const { mode, config } = useCommunityMode();
   const commentBlocked = mode === 'global' && config != null && !config.canComment;
   const blockedMessage = config?.readOnly
-    ? 'The Community is read-only right now.'
-    : BLOCKED_REASONS[config?.postingBlockedReason ?? ''] ?? 'Commenting isn\'t available right now.';
+    ? t('community.comments.readOnly')
+    : // Why a member can't comment at their selected gym (codes from the server).
+      tOr(`community.comments.blocked.${config?.postingBlockedReason ?? ''}`, t('community.comments.unavailable'));
 
   const handleModerate = useCallback(
     (comment: CommunityComment, action: 'hide' | 'restore') => {
@@ -74,10 +70,10 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       const scopes = action === 'hide' ? comment.capabilities?.hideScopes : comment.capabilities?.restoreScopes;
       moderateMutation.mutate(
         { postId, commentId: comment.id, action, scope: scopes?.[0] },
-        { onError: () => toast.error('Could not update the comment.', { title: 'Error' }) },
+        { onError: () => toast.error(t('community.comments.updateFailed'), { title: t('community.post.errorTitle') }) },
       );
     },
-    [moderateMutation, postId],
+    [moderateMutation, postId, t],
   );
 
   const handleReport = useCallback(
@@ -86,17 +82,17 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
         reportMutation.mutate(
           { commentId, reason },
           {
-            onSuccess: () => toast.success('Thanks — the gym\'s moderators will review it.', { title: 'Reported' }),
-            onError: () => toast.error('Could not send the report.', { title: 'Error' }),
+            onSuccess: () => toast.success(t('community.post.reported'), { title: t('community.post.reportedTitle') }),
+            onError: () => toast.error(t('community.post.reportFailed'), { title: t('community.post.errorTitle') }),
           },
         );
-      Alert.alert('Report comment', 'What\'s wrong with this comment?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Spam', onPress: () => send('SPAM') },
-        { text: 'Abusive', onPress: () => send('HARASSMENT') },
+      Alert.alert(t('community.comments.reportTitle'), t('community.comments.reportBody'), [
+        { text: t('community.post.cancel'), style: 'cancel' },
+        { text: t('community.comments.spam'), onPress: () => send('SPAM') },
+        { text: t('community.comments.abusive'), onPress: () => send('HARASSMENT') },
       ]);
     },
-    [reportMutation],
+    [reportMutation, t],
   );
 
   const handleSend = useCallback(() => {
@@ -105,26 +101,26 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       { postId, request: { content: commentText.trim() } },
       {
         onSuccess: () => setCommentText(''),
-        onError: () => toast.error('Could not post comment.', {
-          title: 'Error'
+        onError: () => toast.error(t('community.comments.postFailed'), {
+          title: t('community.post.errorTitle'),
         }),
       },
     );
-  }, [addMutation, commentText, postId]);
+  }, [addMutation, commentText, postId, t]);
 
   const handleDeleteComment = useCallback(
     (commentId: number) => {
       if (!postId) return;
-      Alert.alert('Delete Comment', 'Delete this comment?', [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('community.comments.deleteTitle'), t('community.comments.deleteBody'), [
+        { text: t('community.post.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('community.post.delete'),
           style: 'destructive',
           onPress: () => {
             deleteMutation.mutate(
               { postId, commentId },
-              { onError: () => toast.error('Could not delete comment.', {
-                title: 'Error'
+              { onError: () => toast.error(t('community.comments.deleteFailed'), {
+                title: t('community.post.errorTitle'),
               }) },
             );
           },
@@ -137,7 +133,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
   return (
     <AppBottomSheet
       visible={visible}
-      title="Comments"
+      title={t('community.comments.title')}
       onClose={onClose}
     >
       {/* Body */}
@@ -149,16 +145,16 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
         <View style={styles.centered}>
           <EmptyState
             icon="wifi-off"
-            title="Could not load comments"
-            description="Please try again."
+            title={t('community.comments.loadError')}
+            description={t('community.comments.tryAgain')}
           />
         </View>
       ) : !comments || comments.length === 0 ? (
         <View style={styles.centered}>
           <EmptyState
             icon="message-circle"
-            title="No comments yet"
-            description="Be the first to comment!"
+            title={t('community.comments.emptyTitle')}
+            description={t('community.comments.emptyDescription')}
           />
         </View>
       ) : (
@@ -169,7 +165,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
             const isOwn = caps ? caps.canDelete : comment.ownedByMe;
             const initials = comment.authorUsername?.slice(0, 2).toUpperCase() ?? '??';
             const timeAgo = comment.createdAt
-              ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })
+              ? formatTimeAgo(comment.createdAt, { addSuffix: true })
               : '';
 
             return (
@@ -189,7 +185,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                   </Typography>
                   {comment.hidden && (
                     <Typography variant="caption" color="textSecondary" style={{ fontStyle: 'italic' }}>
-                      Hidden by gym moderators
+                      {t('community.post.hiddenByModerators')}
                     </Typography>
                   )}
                 </View>
@@ -198,7 +194,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                     onPress={() => handleModerate(comment, 'restore')}
                     hitSlop={8}
                     style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
-                    accessibilityLabel="Restore comment"
+                    accessibilityLabel={t('community.comments.restoreA11y')}
                   >
                     <Feather name="eye" size={14} color={theme.textSecondary} />
                   </Pressable>
@@ -208,7 +204,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                     onPress={() => handleModerate(comment, 'hide')}
                     hitSlop={8}
                     style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
-                    accessibilityLabel="Hide comment"
+                    accessibilityLabel={t('community.comments.hideA11y')}
                   >
                     <Feather name="eye-off" size={14} color={theme.textSecondary} />
                   </Pressable>
@@ -218,7 +214,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                     onPress={() => handleReport(comment.id)}
                     hitSlop={8}
                     style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
-                    accessibilityLabel="Report comment"
+                    accessibilityLabel={t('community.comments.reportA11y')}
                   >
                     <Feather name="flag" size={14} color={theme.textSecondary} />
                   </Pressable>
@@ -228,7 +224,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
                     onPress={() => handleDeleteComment(comment.id)}
                     hitSlop={8}
                     style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }]}
-                    accessibilityLabel="Delete comment"
+                    accessibilityLabel={t('community.comments.deleteA11y')}
                   >
                     <Feather name="trash-2" size={14} color={theme.error} />
                   </Pressable>
@@ -243,14 +239,14 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
       {commentBlocked || !canInteract ? (
         <View style={[styles.inputRow, { borderTopColor: theme.border }]}>
           <Typography variant="caption" color="textSecondary">
-            {mode === 'global' ? blockedMessage : 'Get an active membership at any gym to join the conversation.'}
+            {mode === 'global' ? blockedMessage : t('community.comments.needMembership')}
           </Typography>
         </View>
       ) : (
       <View style={[styles.inputRow, { borderTopColor: theme.border }]}>
         <TextInput
           style={[styles.input, { backgroundColor: theme.muted, color: theme.text }]}
-          placeholder="Add a comment…"
+          placeholder={t('community.comments.placeholder')}
           placeholderTextColor={theme.textSecondary}
           value={commentText}
           onChangeText={setCommentText}
@@ -268,7 +264,7 @@ export function CommunityCommentsSheet({ postId, visible, onClose }: CommunityCo
           ]}
           onPress={handleSend}
           disabled={!commentText.trim() || addMutation.isPending}
-          accessibilityLabel="Send comment"
+          accessibilityLabel={t('community.comments.sendA11y')}
         >
           {addMutation.isPending ? (
             <ActivityIndicator size={16} color="#fff" />

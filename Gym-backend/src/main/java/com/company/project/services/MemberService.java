@@ -215,7 +215,14 @@ public class MemberService {
         Page<Member> memberPage = memberRepository.findApprovalHistory(statuses, term, pageable);
 
         List<MemberResponseDTO> dtos = memberPage.getContent().stream()
-                .map(MemberResponseDTO::fromEntity)
+                .map(m -> {
+                    MemberResponseDTO dto = MemberResponseDTO.fromEntity(m);
+                    // Drives the Approve button on rejected rows (see approveRejectedPayment).
+                    if ("REJECTED".equals(m.getApprovalStatus())) {
+                        dto.setSuperseded(isSupersededRejection(m));
+                    }
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         PaginationDTO pagination = new PaginationDTO(
@@ -246,6 +253,9 @@ public class MemberService {
         entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+        if ("REJECTED".equals(member.getApprovalStatus())) {
+            return approveRejectedPayment(member, approvedBy);
+        }
         if (!"PENDING".equals(member.getApprovalStatus())) {
             throw new BusinessRuleViolationException("This member has no payment awaiting approval");
         }
@@ -314,7 +324,7 @@ public class MemberService {
         member.setApprovedBy(rejectedBy);
         member.setApprovedAt(LocalDateTime.now());
         member.setRejectionReason(reason);
-        member.setMembershipStatus("inactive");
+        clearRejectedMembership(member);
         Member saved = memberRepository.save(member);
         paymentApprovalNotifier.notifyRejected(saved);
 
@@ -327,11 +337,118 @@ public class MemberService {
             dep.setApprovedBy(rejectedBy);
             dep.setApprovedAt(LocalDateTime.now());
             dep.setRejectionReason(reason);
-            dep.setMembershipStatus("inactive");
+            clearRejectedMembership(dep);
             paymentApprovalNotifier.notifyRejected(memberRepository.save(dep));
         }
 
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * Staff change their mind on a rejected purchase (e.g. the cash turned up after all).
+     * The member never had access, so the membership starts today rather than on the
+     * original purchase date; dues come back from the rejected receipt, which is now
+     * approved and posted to the ledger. Dependents rejected with a family head follow it.
+     */
+    private MemberResponseDTO approveRejectedPayment(Member member, String approvedBy) {
+        if (member.getFamilyHeadId() != null && !Boolean.TRUE.equals(member.getIsFamilyHead())) {
+            throw new BusinessRuleViolationException(
+                    "Approve the family head's payment instead — it covers the whole family.");
+        }
+        // A newer purchase (here or at another gym) is the one to approve — reviving this
+        // one would leave the person with a membership they didn't go on to choose.
+        if (isSupersededRejection(member)) {
+            throw new BusinessRuleViolationException(
+                    "This member has since bought another membership — approve that one instead.");
+        }
+
+        reinstateRejected(member, approvedBy);
+        Member saved = memberRepository.save(member);
+        paymentApprovalNotifier.notifyApproved(saved);
+
+        for (Member dep : memberRepository.findByFamilyHeadId(saved.getMemberId())) {
+            if (!"REJECTED".equals(dep.getApprovalStatus())) continue;
+            // An adult dependent whose email was released has bought here on their own since.
+            if (dep.getEmail() == null && !Boolean.TRUE.equals(dep.getIsMinor())) continue;
+            reinstateRejected(dep, approvedBy);
+            paymentApprovalNotifier.notifyApproved(memberRepository.save(dep));
+        }
+
+        return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * A rejected purchase the member replaced with a new one. Buying here again unlinks it
+     * from the account (releaseRejectedPurchases); buying at another gym is found through
+     * the cross-gym membership index, counting purchases made since the rejection.
+     */
+    private boolean isSupersededRejection(Member member) {
+        if (member.getGlobalUserId() == null) {
+            return true;
+        }
+        return globalMembershipService.hasPurchaseInAnotherGymSince(member.getGlobalUserId(), member.getApprovedAt());
+    }
+
+    private void reinstateRejected(Member member, String approvedBy) {
+        com.company.project.entities.Receipt receipt = receiptService.findRejectedReceiptForMember(member.getId());
+        BigDecimal outstanding = BigDecimal.ZERO;
+        if (receipt != null) {
+            receipt.setRejectionReason(null);
+            receipt = receiptService.approveReceipt(receipt, approvedBy);
+            outstanding = orZero(receipt.getAmount()).subtract(orZero(receipt.getPaidAmount())).max(BigDecimal.ZERO);
+        }
+
+        LocalDateTime start = LocalDateTime.now();
+        member.setMembershipStartDate(start);
+        MembershipPlan plan = member.getMembershipPlan() != null
+                ? planRepository.findByName(member.getMembershipPlan()).orElse(null)
+                : null;
+        LocalDateTime expiry = plan != null ? computeExpiry(start, plan) : null;
+        member.setMembershipEndDate(expiry);
+        member.setExpiryDate(expiry);
+        member.setOutstandingBalance(outstanding);
+        // A credit balance keeps the due date it was sold with; otherwise renewal is due at expiry.
+        member.setNextPaymentDate(outstanding.signum() > 0 && receipt != null && receipt.getDueDate() != null
+                ? receipt.getDueDate() : expiry);
+
+        member.setApprovalStatus("APPROVED");
+        member.setApprovedBy(approvedBy);
+        member.setApprovedAt(start);
+        member.setRejectionReason(null);
+        member.setAppAccessEnabled(true);
+        member.setMembershipStatus("active");
+    }
+
+    /**
+     * A rejected payment means the membership never started: drop its term and dues so
+     * the row doesn't read as a held plan (or feed expiry/renewal reminders). The plan
+     * name and fee stay for Approval History; getMembers() hides the row entirely.
+     */
+    private static void clearRejectedMembership(Member member) {
+        member.setMembershipStatus("inactive");
+        member.setMembershipStartDate(null);
+        member.setMembershipEndDate(null);
+        member.setExpiryDate(null);
+        member.setNextPaymentDate(null);
+        member.setOutstandingBalance(BigDecimal.ZERO);
+    }
+
+    /**
+     * Frees this account (and the emails it's about to register) from rejected purchases
+     * at the current gym, so a retry isn't refused as "already a member". Call before the
+     * purchase/claim paths' existence checks.
+     */
+    public void releaseRejectedPurchases(Long globalUserId, java.util.Collection<String> emails) {
+        if (globalUserId != null) {
+            memberRepository.releaseRejectedByGlobalUserId(globalUserId);
+        }
+        if (emails != null) {
+            for (String email : emails) {
+                if (email != null && !email.isBlank()) {
+                    memberRepository.releaseRejectedByEmail(email.trim());
+                }
+            }
+        }
     }
 
     private List<Member> pendingDependentsOf(Member head) {
@@ -702,6 +819,16 @@ public class MemberService {
         automationExecutorService.handleEvent("new_signup", saved);
 
         return MemberResponseDTO.fromEntity(saved);
+    }
+
+    /**
+     * createMember for a mobile purchase that may follow a rejected one here. Releasing
+     * the rejected row in the same transaction means a purchase that fails leaves it
+     * linked — still shown as approvable in Approval History, not as "purchased again".
+     */
+    public MemberResponseDTO createMemberReplacingRejected(MemberRequestDTO request, Long globalUserId, String email) {
+        releaseRejectedPurchases(globalUserId, email != null ? List.of(email) : List.of());
+        return createMember(request);
     }
 
     public void linkGlobalUser(Long memberId, Long globalUserId) {
@@ -1774,6 +1901,12 @@ public class MemberService {
             if (activeBranchId != null) {
                 predicates.add(cb.equal(root.get("branchId"), activeBranchId));
             }
+
+            // A rejected mobile purchase never became a member — it lives only in
+            // Approval History, not the directory or its stat cards.
+            predicates.add(cb.or(
+                    cb.isNull(root.get("approvalStatus")),
+                    cb.notEqual(root.get("approvalStatus"), "REJECTED")));
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";

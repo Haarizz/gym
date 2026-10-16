@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -43,11 +44,12 @@ export function NotificationList({
   onItemPress,
   bottomInset = 24,
 }: NotificationListProps) {
+  const { t } = useTranslation();
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={G.teal} />
-        <Text style={styles.loadingText}>Loading notifications...</Text>
+        <Text style={styles.loadingText}>{t('notifications.loading')}</Text>
       </View>
     );
   }
@@ -61,10 +63,10 @@ export function NotificationList({
           <Feather name={filter === 'UNREAD' ? 'check' : 'bell-off'} size={28} color={G.teal} />
         </View>
         <Text style={styles.emptyTitle}>
-          {filter === 'UNREAD' ? "You're all caught up" : 'No notifications yet'}
+          {t(filter === 'UNREAD' ? 'notifications.emptyUnread' : 'notifications.empty')}
         </Text>
         <Text style={styles.emptySubtitle}>
-          New updates about payments, classes and check-ins will show up here.
+          {t('notifications.emptyDescription')}
         </Text>
       </Animated.View>
     );

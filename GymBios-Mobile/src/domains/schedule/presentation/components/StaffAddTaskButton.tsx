@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 
 interface StaffAddTaskButtonProps {
@@ -9,11 +10,12 @@ interface StaffAddTaskButtonProps {
 }
 
 export function StaffAddTaskButton({ onPress }: StaffAddTaskButtonProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Add New Task"
+      accessibilityLabel={t('schedule.staff.addNewTask')}
     >
       <LinearGradient
         colors={[BrandColors.teal, BrandColors.tealDark]}
@@ -22,7 +24,7 @@ export function StaffAddTaskButton({ onPress }: StaffAddTaskButtonProps) {
         style={styles.container}
       >
         <Feather name="plus" size={20} color="#FFFFFF" />
-        <Text style={styles.text}>Add New Task</Text>
+        <Text style={styles.text}>{t('schedule.staff.addNewTask')}</Text>
       </LinearGradient>
     </Pressable>
   );

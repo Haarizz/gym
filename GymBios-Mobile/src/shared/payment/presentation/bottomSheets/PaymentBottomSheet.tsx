@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { Trans, useTranslation } from 'react-i18next';
 import { CurrencyValue } from '@/core/providers';
 import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
@@ -39,6 +40,7 @@ export function PaymentBottomSheet({
   onClose,
   onComplete,
 }: PaymentBottomSheetProps) {
+  const { t } = useTranslation();
   // State
   const [discountType, setDiscountType] = useState<DiscountType>(initialDiscount.type);
   const [discountValue, setDiscountValue] = useState<number>(initialDiscount.value);
@@ -96,38 +98,38 @@ export function PaymentBottomSheet({
     const newErrors: Record<string, string> = {};
 
     if (selectedMethod === 'card') {
-      if (!cardType) newErrors.cardType = 'Please select a card type';
+      if (!cardType) newErrors.cardType = t('paymentSheet.errors.selectCardType');
     } else if (selectedMethod === 'cheque') {
-      if (!chequeNumber.trim()) newErrors.chequeNumber = 'Cheque number is required';
+      if (!chequeNumber.trim()) newErrors.chequeNumber = t('paymentSheet.errors.chequeNumberRequired');
     } else if (selectedMethod === 'bank_transfer') {
-      if (!reference.trim()) newErrors.reference = 'Transaction reference is required';
+      if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.transactionReferenceRequired');
     } else if (selectedMethod === 'online') {
-      if (!onlinePaymentType) newErrors.onlinePaymentType = 'Please select payment type';
+      if (!onlinePaymentType) newErrors.onlinePaymentType = t('paymentSheet.errors.selectPaymentType');
       if (onlinePaymentType === 'Other' && !providerName.trim()) {
-        newErrors.providerName = 'Provider name is required';
+        newErrors.providerName = t('paymentSheet.errors.providerNameRequired');
       }
-      if (!reference.trim()) newErrors.reference = 'Transaction reference is required';
+      if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.transactionReferenceRequired');
     } else if (selectedMethod === 'credit') {
       if (creditReceivedAmount && parseFloat(creditReceivedAmount) > 0) {
-        if (!creditReceivedVia) newErrors.receivedVia = 'Please select payment method received via';
-        if (creditReceivedVia === 'card' && !cardType) newErrors.cardType = 'Card type is required';
-        if (creditReceivedVia === 'cheque' && !chequeNumber.trim()) newErrors.chequeNumber = 'Cheque number is required';
-        if (creditReceivedVia === 'bank_transfer' && !reference.trim()) newErrors.reference = 'Reference is required';
+        if (!creditReceivedVia) newErrors.receivedVia = t('paymentSheet.errors.selectReceivedVia');
+        if (creditReceivedVia === 'card' && !cardType) newErrors.cardType = t('paymentSheet.errors.cardTypeRequired');
+        if (creditReceivedVia === 'cheque' && !chequeNumber.trim()) newErrors.chequeNumber = t('paymentSheet.errors.chequeNumberRequired');
+        if (creditReceivedVia === 'bank_transfer' && !reference.trim()) newErrors.reference = t('paymentSheet.errors.referenceRequired');
         if (creditReceivedVia === 'online') {
-          if (!onlinePaymentType) newErrors.onlinePaymentType = 'Payment type is required';
-          if (onlinePaymentType === 'Other' && !providerName.trim()) newErrors.providerName = 'Provider name is required';
-          if (!reference.trim()) newErrors.reference = 'Reference is required';
+          if (!onlinePaymentType) newErrors.onlinePaymentType = t('paymentSheet.errors.paymentTypeRequired');
+          if (onlinePaymentType === 'Other' && !providerName.trim()) newErrors.providerName = t('paymentSheet.errors.providerNameRequired');
+          if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.referenceRequired');
         }
       }
     } else if (selectedMethod === 'mixed') {
       const { isValid } = validateSplitPayment(splitRows, finalAmount);
       if (!isValid) {
-        newErrors.rows = 'Total split amount must equal the final amount';
+        newErrors.rows = t('paymentSheet.errors.splitMismatch');
       }
     }
 
     if (remainingAmount > 0 && selectedMethod !== 'credit' && !paymentDueDate) {
-      newErrors.paymentDueDate = 'Payment due date is required for partial payments';
+      newErrors.paymentDueDate = t('paymentSheet.errors.dueDateRequired');
     }
 
     setErrors(newErrors);
@@ -145,6 +147,7 @@ export function PaymentBottomSheet({
     finalAmount,
     remainingAmount,
     paymentDueDate,
+    t,
   ]);
 
   // Complete Payment handler
@@ -309,8 +312,8 @@ export function PaymentBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Payment & Checkout"
-      subtitle={`Processing payment for ${title}`}
+      title={t('paymentSheet.title')}
+      subtitle={t('paymentSheet.processingFor', { title })}
       onClose={onClose}
     >
       <View style={styles.content}>
@@ -456,7 +459,12 @@ export function PaymentBottomSheet({
 
         {/* Action Button */}
         <Button
-          label={<>Complete Payment (<CurrencyValue amount={finalAmount} decimals={2} />)</>}
+          label={
+            <Trans
+              i18nKey="paymentSheet.completePayment"
+              components={{ amount: <CurrencyValue amount={finalAmount} decimals={2} /> }}
+            />
+          }
           onPress={handleComplete}
           size="lg"
           style={styles.actionButton}

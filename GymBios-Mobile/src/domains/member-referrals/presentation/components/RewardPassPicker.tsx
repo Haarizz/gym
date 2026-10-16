@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
+import { formatDate, i18n } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { useMyRewardPasses } from '../hooks/useMemberReferrals';
+import { useMyCoupons, useMyRewardPasses } from '../hooks/useMemberReferrals';
 import { rewardDiscount } from '../../infrastructure/discountCodeApi';
 import type { DiscountCode, MyReferralReward, PassContext } from '../../domain/types';
 
@@ -24,14 +26,22 @@ export function selectionDiscount(sel: RewardSelection, gross: number): number {
 }
 
 export function passTitle(p: MyReferralReward): React.ReactNode {
-  if (p.rewardType === 'MEMBERSHIP_DISCOUNT') {
-    return p.rewardUnit === 'PERCENT' ? `${p.rewardValue}% off` : <CurrencyValue amount={p.rewardValue} suffix=" off" />;
+  if (p.rewardType === 'MEMBERSHIP_DISCOUNT' || p.rewardType === 'COUPON') {
+    if (p.rewardValue == null) return p.rewardName;
+    return p.rewardUnit === 'PERCENT' ? (
+      i18n.t('rewardPicker.percentOff', { value: p.rewardValue })
+    ) : (
+      <Trans i18nKey="rewardPicker.amountOff" components={{ amount: <CurrencyValue amount={p.rewardValue} /> }} />
+    );
   }
-  return 'Free session';
+  return i18n.t('rewardPicker.freeSession');
 }
 
 interface Props {
-  /** Which passes to offer; null = coupon code only (e.g. a new member has no passes yet). */
+  /**
+   * Which passes to offer; null = coupon code only (e.g. a new member has no passes yet).
+   * The member's own coupons are listed only when this is set — they belong to their own gym.
+   */
   passContext: PassContext | null;
   value: RewardSelection;
   onChange: (sel: RewardSelection) => void;
@@ -42,9 +52,12 @@ interface Props {
 }
 
 export function RewardPassPicker({ passContext, value, onChange, validateCode, acceptPromotions = false }: Props) {
+  const { t } = useTranslation();
   const { data: passes = [] } = useMyRewardPasses(passContext);
+  const { data: coupons = [] } = useMyCoupons(passContext != null && !!validateCode);
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
+  const [checkingCoupon, setCheckingCoupon] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (passes.length === 0 && !validateCode) return null;
@@ -56,14 +69,28 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
     try {
       const resolved = await validateCode(code.trim());
       if (resolved.source !== 'COUPON' && !acceptPromotions) {
-        setError("That's a promotion code — it can't be used here");
+        setError(t('rewardPicker.promotionNotAllowed'));
         return;
       }
       onChange({ kind: 'coupon', coupon: resolved });
     } catch (err: any) {
-      setError(err?.message || 'Invalid code');
+      setError(err?.message || t('rewardPicker.invalidCode'));
     } finally {
       setChecking(false);
+    }
+  };
+
+  // Goes through validateCode like a typed code, so the server prices it on this purchase.
+  const applyMyCoupon = async (couponCode: string) => {
+    if (!validateCode) return;
+    setCheckingCoupon(couponCode);
+    setError(null);
+    try {
+      onChange({ kind: 'coupon', coupon: await validateCode(couponCode) });
+    } catch (err: any) {
+      setError(err?.message || t('rewardPicker.invalidCode'));
+    } finally {
+      setCheckingCoupon(null);
     }
   };
 
@@ -71,7 +98,7 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
     <View style={styles.card}>
       {passes.length > 0 && (
         <>
-          <Text style={styles.title}>Reward Passes</Text>
+          <Text style={styles.title}>{t('rewardPicker.passesTitle')}</Text>
           {passes.map((p) => {
             const selected = value?.kind === 'pass' && value.pass.id === p.id;
             return (
@@ -88,7 +115,44 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
                 <View style={styles.passText}>
                   <Text style={styles.passTitle}>{passTitle(p)}</Text>
                   <Text style={styles.passMeta}>
-                    {p.rewardCode ?? p.rewardName}{p.expiryDate ? ` · until ${p.expiryDate}` : ''}
+                    {p.rewardCode ?? p.rewardName}{p.expiryDate ? ` · ${t('rewardPicker.until', { date: formatDate(p.expiryDate, 'PP') })}` : ''}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </>
+      )}
+
+      {coupons.length > 0 && (
+        <>
+          <Text style={[styles.title, passes.length > 0 && styles.spaced]}>{t('rewardPicker.myCouponsTitle')}</Text>
+          {coupons.map((c) => {
+            const selected = value?.kind === 'coupon' && value.coupon.code === c.couponCode;
+            return (
+              <Pressable
+                key={c.id}
+                style={[styles.passRow, selected && styles.passRowSelected]}
+                disabled={checkingCoupon != null}
+                onPress={() => {
+                  if (selected) {
+                    setError(null);
+                    onChange(null);
+                  } else {
+                    applyMyCoupon(c.couponCode!);
+                  }
+                }}
+              >
+                {checkingCoupon === c.couponCode ? (
+                  <ActivityIndicator size="small" color={BrandColors.memberGold} />
+                ) : (
+                  <Feather name={selected ? 'check-circle' : 'circle'} size={18}
+                    color={selected ? BrandColors.memberGold : BrandColors.textSecondary} />
+                )}
+                <View style={styles.passText}>
+                  <Text style={styles.passTitle}>{passTitle(c)}</Text>
+                  <Text style={styles.passMeta}>
+                    {c.couponCode}{c.expiryDate ? ` · ${t('rewardPicker.until', { date: formatDate(c.expiryDate, 'PP') })}` : ''}
                   </Text>
                 </View>
               </Pressable>
@@ -99,37 +163,37 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
 
       {validateCode && (
         <>
-          <Text style={[styles.title, passes.length > 0 && styles.spaced]}>
-            {acceptPromotions ? 'Promo or Coupon Code' : 'Coupon Code'}
+          <Text style={[styles.title, (passes.length > 0 || coupons.length > 0) && styles.spaced]}>
+            {t(acceptPromotions ? 'rewardPicker.promoOrCoupon' : 'rewardPicker.couponCode')}
           </Text>
           {value?.kind === 'coupon' ? (
             <View style={styles.appliedRow}>
-              <Text style={styles.appliedText}>{value.coupon.code} applied</Text>
+              <Text style={styles.appliedText}>{t('rewardPicker.applied', { code: value.coupon.code })}</Text>
               <Pressable hitSlop={8} onPress={() => { onChange(null); setCode(''); }}>
-                <Text style={styles.link}>Remove</Text>
+                <Text style={styles.link}>{t('rewardPicker.remove')}</Text>
               </Pressable>
             </View>
           ) : (
             <View style={styles.codeRow}>
               <TextInput
                 style={styles.input}
-                placeholder={acceptPromotions ? 'Promotion or referral coupon code' : 'Referral coupon code'}
+                placeholder={t(acceptPromotions ? 'rewardPicker.promoPlaceholder' : 'rewardPicker.couponPlaceholder')}
                 autoCapitalize="characters"
                 value={code}
                 editable={value?.kind !== 'pass'}
-                onChangeText={(t) => setCode(t.toUpperCase())}
+                onChangeText={(text) => setCode(text.toUpperCase())}
               />
               <Pressable
                 style={[styles.applyButton, (checking || !code.trim() || value?.kind === 'pass') && styles.disabled]}
                 disabled={checking || !code.trim() || value?.kind === 'pass'}
                 onPress={applyCode}
               >
-                {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.applyText}>Apply</Text>}
+                {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.applyText}>{t('rewardPicker.apply')}</Text>}
               </Pressable>
             </View>
           )}
           {value?.kind === 'pass' && (
-            <Text style={styles.hint}>A Reward Pass is selected — only one discount can be used.</Text>
+            <Text style={styles.hint}>{t('rewardPicker.oneDiscountHint')}</Text>
           )}
         </>
       )}

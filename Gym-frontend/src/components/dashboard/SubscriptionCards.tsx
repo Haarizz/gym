@@ -111,10 +111,24 @@ export function SubscriptionCards({ period, periodLabel, refreshKey = 0, onNavig
               ) : (
                 <span className={`${styles.skeleton} ${styles.skeletonAmount}`} />
               )}
+              {showValues && (stats?.pendingCount ?? 0) > 0 && (
+                <p className={styles.pending}>
+                  {stats!.pendingCount} pending ·{' '}
+                  <CurrencyValue amount={Number(stats!.pendingAmount)} options={{ maximumFractionDigits: 2 }} /> due
+                </p>
+              )}
             </button>
           );
         })}
       </div>
+      {data && !isLoading && !error && (
+        <p className={styles.footer}>
+          Other income (settlements, POS, bookings):{' '}
+          <strong><CurrencyValue amount={Number(data.otherIncome ?? 0)} options={{ maximumFractionDigits: 2 }} /></strong>
+          {' · '}Total collected:{' '}
+          <strong><CurrencyValue amount={Number(data.totalCollection ?? 0)} options={{ maximumFractionDigits: 2 }} /></strong>
+        </p>
+      )}
     </section>
   );
 }

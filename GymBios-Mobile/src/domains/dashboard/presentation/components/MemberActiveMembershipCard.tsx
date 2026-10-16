@@ -1,5 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate } from '@/core/i18n';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Glass, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -16,19 +19,15 @@ const GOLD_START = 'rgba(255,214,110,0.88)';
 const GOLD_END   = 'rgba(242,187,61,0.68)';
 
 export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershipCardProps) {
+  const { t } = useTranslation();
+  const router = useRouter();
   const { selectedBranchId, availableBranches } = useBranchContext();
   const branchName =
     selectedBranchId === 'ALL'
-      ? 'All branches'
-      : availableBranches.find((b) => b.id === selectedBranchId)?.branch_name || 'All branches';
+      ? t('memberHome.allBranches')
+      : availableBranches.find((b) => b.id === selectedBranchId)?.branch_name || t('memberHome.allBranches');
 
-  const formattedDate = memberInfo.validUntil
-    ? new Date(memberInfo.validUntil).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : '-';
+  const formattedDate = memberInfo.validUntil ? formatDate(memberInfo.validUntil, 'PP') : '-';
 
   const isFrozen = memberInfo.isFrozen;
 
@@ -37,20 +36,30 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
       <View style={[styles.card, styles.inactiveCard]}>
         <View style={styles.topRow}>
           <View style={styles.infoLeft}>
-            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>Subscription Status</Text>
-            <Text style={[styles.membershipType, styles.inactiveTextDark]}>No Active Subscription</Text>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>{t('memberHome.subscriptionStatus')}</Text>
+            <Text style={[styles.membershipType, styles.inactiveTextDark]}>{t('memberHome.noActiveSubscription')}</Text>
             <View style={styles.locationRow}>
               <Feather name="info" size={12} color="#6B7280" />
-              <Text style={[styles.gymName, styles.inactiveTextLight]}>Action Required</Text>
+              <Text style={[styles.gymName, styles.inactiveTextLight]}>{t('memberHome.actionRequired')}</Text>
             </View>
           </View>
         </View>
         <View style={[styles.divider, styles.inactiveDivider]} />
         <View style={styles.bottomRow}>
           <Text style={styles.inactivePrompt}>
-            Please join a gym and select a subscription to unlock all features.
+            {t('memberHome.joinGymPrompt')}
           </Text>
         </View>
+        <Pressable
+          style={({ pressed }) => [styles.findGymButton, pressed && styles.findGymButtonPressed]}
+          onPress={() => router.push('/(member)/centers' as any)}
+          accessibilityRole="button"
+          hitSlop={6}
+        >
+          <Feather name="search" size={14} color="#FFFFFF" />
+          <Text style={styles.findGymText}>{t('memberHome.findGymCta')}</Text>
+          <Feather name="arrow-right" size={14} color="#FFFFFF" />
+        </Pressable>
       </View>
     );
   }
@@ -71,16 +80,16 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
       <View style={styles.topRow}>
         <View style={styles.infoLeft}>
-          <Text style={styles.badgeLabel}>{isFrozen ? 'Frozen Subscription' : 'Active Subscription'}</Text>
-          <Text style={styles.membershipType}>{memberInfo.membershipType}</Text>
+          <Text style={styles.badgeLabel}>{t(isFrozen ? 'memberHome.frozenSubscription' : 'memberHome.activeSubscription')}</Text>
+          <Text style={styles.membershipType} numberOfLines={2}>{memberInfo.membershipType}</Text>
           <View style={styles.locationRow}>
             <Feather name="map-pin" size={12} color="rgba(74,50,0,0.75)" />
-            <Text style={styles.gymName}>{branchName}</Text>
+            <Text style={styles.gymName} numberOfLines={1}>{branchName}</Text>
           </View>
         </View>
         {/* Active pill — amber-dark semi-transparent glass */}
         <View style={styles.statusPill}>
-          <Text style={styles.statusText}>{isFrozen ? 'FROZEN' : (memberInfo.isActive ? 'ACTIVE' : 'INACTIVE')}</Text>
+          <Text style={styles.statusText}>{t(isFrozen ? 'memberHome.statusFrozen' : memberInfo.isActive ? 'memberHome.statusActive' : 'memberHome.statusInactive')}</Text>
         </View>
       </View>
 
@@ -88,11 +97,11 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
 
       <View style={styles.bottomRow}>
         <View>
-          <Text style={styles.statLabel}>Days Remaining</Text>
+          <Text style={styles.statLabel}>{t('memberHome.daysRemaining')}</Text>
           <Text style={styles.statValue}>{memberInfo.daysRemaining}</Text>
         </View>
         <View style={styles.statRight}>
-          <Text style={styles.statLabel}>Valid Until</Text>
+          <Text style={styles.statLabel}>{t('memberHome.validUntil')}</Text>
           <Text style={styles.statValueDate}>{formattedDate}</Text>
         </View>
       </View>
@@ -126,7 +135,7 @@ const styles = StyleSheet.create({
   blobDecor: {
     position: 'absolute',
     top: -50,
-    right: -30,
+    end: -30,
     width: 130,
     height: 130,
     borderRadius: 65,
@@ -136,10 +145,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: Spacing.three,
     marginBottom: Spacing.three,
   },
   infoLeft: {
     flex: 1,
+    minWidth: 0,
   },
   badgeLabel: {
     fontSize: 11,
@@ -160,6 +171,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   gymName: {
+    flexShrink: 1,
     fontSize: TypographyScale.body,
     color: 'rgba(74,50,0,0.85)',
     fontWeight: '600',
@@ -171,6 +183,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 5,
     borderRadius: Radius.full,
+    flexShrink: 0,
   },
   statusText: {
     fontSize: 10,
@@ -231,5 +244,25 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     lineHeight: 20,
     marginTop: Spacing.two,
+  },
+  // Compact shortcut to gym discovery — sized to its label, not full width.
+  findGymButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.three,
+    paddingHorizontal: Spacing.three + 2,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.full,
+    backgroundColor: BrandColors.memberGold,
+  },
+  findGymButtonPressed: {
+    opacity: 0.85,
+  },
+  findGymText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -9,9 +9,12 @@ import {
   StyleSheet,
   View,
   ActivityIndicator,
+  I18nManager,
   useWindowDimensions,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { tOr } from '@/core/i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,21 +49,23 @@ const GENDER_STYLE: Record<string, BadgeStyle> = {
 };
 
 // Every option is always listed; the ones this center doesn't accept are dimmed.
-const PAYMENT_OPTIONS: { key: string; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { key: 'Cash', label: 'Cash', icon: 'dollar-sign' },
-  { key: 'Card', label: 'Card', icon: 'credit-card' },
-  { key: 'BNPL', label: 'BNPL', icon: 'zap' },
+const PAYMENT_OPTIONS: { key: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'Cash', icon: 'dollar-sign' },
+  { key: 'Card', icon: 'credit-card' },
+  { key: 'BNPL', icon: 'zap' },
 ];
 
 export function CenterDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const tenantSlug = params.tenantSlug as string;
   const branchId = Number(params.branchId);
   const initialTab = (params.tab as CenterDetailTab) || 'overview';
   // Only present when the member turned on location on the centers list.
-  const distanceLabel = typeof params.distance === 'string' && params.distance ? `${params.distance} km` : null;
+  const distanceLabel =
+    typeof params.distance === 'string' && params.distance ? t('centers.card.km', { value: params.distance }) : null;
 
   const [selectedPlan, setSelectedPlan] = useState<CenterPlan | null>(null);
   const [isPurchaseModalVisible, setIsPurchaseModalVisible] = useState(false);
@@ -137,11 +142,11 @@ export function CenterDetailScreen() {
 
   const handleCall = () => {
     if (!details?.phone) {
-      toast.info('This center has not listed a phone number yet.', { title: 'No phone number' });
+      toast.info(t('centers.detail.noPhone'), { title: t('centers.detail.noPhoneTitle') });
       return;
     }
     Linking.openURL(`tel:${details.phone}`).catch(() => {
-      toast.info(`Call center at ${details.phone}`, { title: 'Phone Call' });
+      toast.info(t('centers.detail.callCenterAt', { phone: details.phone }), { title: t('centers.detail.phoneCallTitle') });
     });
   };
 
@@ -183,7 +188,7 @@ export function CenterDetailScreen() {
   if (!details) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.bodyText}>Center not found.</Text>
+        <Text style={styles.bodyText}>{t('centers.detail.notFound')}</Text>
       </View>
     );
   }
@@ -236,9 +241,9 @@ export function CenterDetailScreen() {
           onPress={() => router.back()}
           style={[styles.backButton, { top: insets.top + Spacing.four }]}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('centers.detail.goBack')}
         >
-          <Feather name="chevron-left" size={20} color="#FFFFFF" />
+          <Feather name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'} size={20} color="#FFFFFF" />
         </Pressable>
 
         {images.length > 1 && (
@@ -252,7 +257,7 @@ export function CenterDetailScreen() {
                   onPress={() => goToImage(i)}
                   style={[styles.dot, i === currentImageIndex && styles.dotActive]}
                   accessibilityRole="button"
-                  accessibilityLabel={`Show image ${i + 1}`}
+                  accessibilityLabel={t('centers.detail.showImage', { index: i + 1 })}
                 />
               ))}
             </View>
@@ -263,18 +268,18 @@ export function CenterDetailScreen() {
               onPress={() => goToImage(currentImageIndex - 1)}
               style={[styles.arrowButton, styles.arrowLeft, { top: insets.top + HERO_IMAGE_HEIGHT / 2 - 14 }]}
               accessibilityRole="button"
-              accessibilityLabel="Previous image"
+              accessibilityLabel={t('centers.detail.previousImage')}
             >
-              <Feather name="chevron-left" size={16} color="#FFFFFF" />
+              <Feather name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'} size={16} color="#FFFFFF" />
             </Pressable>
             <Pressable
               hitSlop={8}
               onPress={() => goToImage(currentImageIndex + 1)}
               style={[styles.arrowButton, styles.arrowRight, { top: insets.top + HERO_IMAGE_HEIGHT / 2 - 14 }]}
               accessibilityRole="button"
-              accessibilityLabel="Next image"
+              accessibilityLabel={t('centers.detail.nextImage')}
             >
-              <Feather name="chevron-right" size={16} color="#FFFFFF" />
+              <Feather name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={16} color="#FFFFFF" />
             </Pressable>
           </>
         )}
@@ -290,7 +295,7 @@ export function CenterDetailScreen() {
               ]}
             >
               <MaterialCommunityIcons name={categoryStyle.icon} size={12} color={categoryStyle.text} />
-              <Text style={[styles.pillText, { color: categoryStyle.text }]}>{details.centerType}</Text>
+              <Text style={[styles.pillText, { color: categoryStyle.text }]}>{tOr(`centers.categories.${details.centerType}`, details.centerType ?? '')}</Text>
             </View>
           )}
           <Text style={styles.heroName}>{details.centerName}</Text>
@@ -300,15 +305,15 @@ export function CenterDetailScreen() {
               {hasRating ? (
                 <>
                   <Text style={styles.ratingValue}>{details.avgRating!.toFixed(1)}</Text>
-                  <Text style={styles.ratingCount}>({details.reviewCount} reviews)</Text>
+                  <Text style={styles.ratingCount}>{t('centers.detail.reviews', { count: details.reviewCount })}</Text>
                 </>
               ) : (
-                <Text style={styles.ratingCount}>No reviews yet</Text>
+                <Text style={styles.ratingCount}>{t('centers.detail.noReviews')}</Text>
               )}
             </View>
             {genderStyle && (
               <View style={[styles.pillBadge, { backgroundColor: genderStyle.bg, borderColor: genderStyle.border }]}>
-                <Text style={[styles.pillText, { color: genderStyle.text }]}>{details.accessType}</Text>
+                <Text style={[styles.pillText, { color: genderStyle.text }]}>{tOr(`centers.accessTypes.${details.accessType}`, details.accessType ?? '')}</Text>
               </View>
             )}
           </View>
@@ -320,24 +325,24 @@ export function CenterDetailScreen() {
         <View style={styles.statItem}>
           <Feather name="map-pin" size={14} color={BrandColors.teal} />
           <Text style={styles.statText} numberOfLines={1}>
-            {area || 'Location'}
+            {area || t('centers.detail.location')}
           </Text>
           {distanceLabel && <Text style={styles.statDistance}>· {distanceLabel}</Text>}
         </View>
         {details.establishedYear != null && (
           <View style={styles.statItem}>
             <Feather name="clock" size={14} color="#9CA3AF" />
-            <Text style={styles.statText}>Est. {details.establishedYear}</Text>
+            <Text style={styles.statText}>{t('centers.detail.established', { year: details.establishedYear })}</Text>
           </View>
         )}
         <Pressable
           onPress={handleCall}
           style={({ pressed }) => [styles.callPill, !details.phone && styles.disabled, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel="Call center"
+          accessibilityLabel={t('centers.detail.callA11y')}
         >
           <Feather name="phone" size={12} color={BrandColors.teal} />
-          <Text style={styles.callText}>Call</Text>
+          <Text style={styles.callText}>{t('centers.detail.call')}</Text>
         </Pressable>
       </View>
 
@@ -354,20 +359,20 @@ export function CenterDetailScreen() {
         {activeTab === 'overview' && (
           <>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>About</Text>
-              <Text style={styles.bodyText}>{details.about || 'This center has not added a description yet.'}</Text>
+              <Text style={styles.cardTitle}>{t('centers.detail.about')}</Text>
+              <Text style={styles.bodyText}>{details.about || t('centers.detail.noAbout')}</Text>
             </View>
 
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <Feather name="clock" size={16} color={BrandColors.teal} />
-                <Text style={[styles.cardTitle, styles.cardTitleInline]}>Timings</Text>
+                <Text style={[styles.cardTitle, styles.cardTitleInline]}>{t('centers.detail.timings')}</Text>
               </View>
-              <Text style={styles.bodyText}>{details.operatingHours || 'Timings not listed yet.'}</Text>
+              <Text style={styles.bodyText}>{details.operatingHours || t('centers.detail.noTimings')}</Text>
             </View>
 
             <View style={styles.card}>
-              <Text style={[styles.cardTitle, styles.cardTitleSpaced]}>Facilities</Text>
+              <Text style={[styles.cardTitle, styles.cardTitleSpaced]}>{t('centers.detail.facilities')}</Text>
               {details.amenities && details.amenities.length > 0 ? (
                 <View style={styles.facilityGrid}>
                   {details.amenities.map((fac) => (
@@ -378,7 +383,7 @@ export function CenterDetailScreen() {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.bodyText}>No facilities listed for this center yet.</Text>
+                <Text style={styles.bodyText}>{t('centers.detail.noFacilities')}</Text>
               )}
             </View>
           </>
@@ -398,7 +403,7 @@ export function CenterDetailScreen() {
             ))
           ) : (
             <View style={styles.card}>
-              <Text style={styles.bodyText}>No subscriptions available at the moment.</Text>
+              <Text style={styles.bodyText}>{t('centers.detail.noPlans')}</Text>
             </View>
           ))}
 
@@ -419,20 +424,20 @@ export function CenterDetailScreen() {
                 </LinearGradient>
                 <View style={styles.trainerInfo}>
                   <Text style={styles.trainerName}>{trainer.name}</Text>
-                  <Text style={styles.trainerSpecialty}>{trainer.department || trainer.role || 'Trainer'}</Text>
+                  <Text style={styles.trainerSpecialty}>{trainer.department || trainer.role || t('centers.detail.trainerFallback')}</Text>
                 </View>
               </View>
             ))
           ) : (
             <View style={styles.card}>
-              <Text style={styles.bodyText}>No trainers listed for this center yet.</Text>
+              <Text style={styles.bodyText}>{t('centers.detail.noTrainers')}</Text>
             </View>
           ))}
 
         {activeTab === 'info' && (
           <>
             <View style={styles.card}>
-              <Text style={[styles.cardTitle, styles.cardTitleSpaced]}>Payment Options</Text>
+              <Text style={[styles.cardTitle, styles.cardTitleSpaced]}>{t('centers.detail.paymentOptions')}</Text>
               <View style={styles.paymentList}>
                 {PAYMENT_OPTIONS.map((opt) => {
                   const enabled = isMethodEnabled(opt.key);
@@ -440,8 +445,10 @@ export function CenterDetailScreen() {
                     <View key={opt.key} style={[styles.paymentRow, enabled ? styles.paymentRowOn : styles.paymentRowOff]}>
                       <FeatherIcon name={opt.icon} size={16} color={enabled ? BrandColors.teal : '#9CA3AF'} />
                       <Text style={[styles.paymentLabel, !enabled && styles.paymentLabelOff]}>
-                        {opt.label}
-                        {opt.key === 'BNPL' && enabled && details.bnplProvider ? ` via ${details.bnplProvider}` : ''}
+                        {tOr(`centers.paymentModes.${opt.key}`, opt.key)}
+                        {opt.key === 'BNPL' && enabled && details.bnplProvider
+                          ? t('centers.detail.viaProvider', { provider: details.bnplProvider })
+                          : ''}
                       </Text>
                       {enabled ? (
                         <Feather name="check-circle" size={16} color={BrandColors.teal} />
@@ -457,10 +464,10 @@ export function CenterDetailScreen() {
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <Feather name="shield" size={16} color={BrandColors.teal} />
-                <Text style={[styles.cardTitle, styles.cardTitleInline]}>Terms & Policies</Text>
+                <Text style={[styles.cardTitle, styles.cardTitleInline]}>{t('centers.detail.terms')}</Text>
               </View>
               <Text style={styles.bodyText}>
-                {details.termsAndPolicies || 'This center has not listed any terms or policies yet.'}
+                {details.termsAndPolicies || t('centers.detail.noTerms')}
               </Text>
             </View>
           </>
@@ -473,7 +480,7 @@ export function CenterDetailScreen() {
           onPress={handleBuyMembership}
           style={({ pressed }) => [styles.ctaWrapper, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={`Subscribe at ${details.centerName}`}
+          accessibilityLabel={t('centers.detail.subscribeA11y', { name: details.centerName })}
         >
           <LinearGradient
             colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
@@ -481,7 +488,7 @@ export function CenterDetailScreen() {
             end={{ x: 1, y: 0 }}
             style={styles.ctaButton}
           >
-            <Text style={styles.ctaText}>Subscribe</Text>
+            <Text style={styles.ctaText}>{t('centers.detail.subscribe')}</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -526,7 +533,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: Spacing.four,
+    start: Spacing.four,
     padding: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -539,16 +546,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   arrowLeft: {
-    left: Spacing.four,
+    start: Spacing.four,
   },
   arrowRight: {
-    right: Spacing.four,
+    end: Spacing.four,
   },
   dotsRow: {
     position: 'absolute',
     bottom: 64,
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 6,
@@ -565,8 +572,8 @@ const styles = StyleSheet.create({
   },
   nameOverlay: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    start: 0,
+    end: 0,
     bottom: 0,
     padding: Spacing.four,
   },
@@ -707,7 +714,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingRight: Spacing.two,
+    paddingEnd: Spacing.two,
   },
   facilityName: {
     flex: 1,

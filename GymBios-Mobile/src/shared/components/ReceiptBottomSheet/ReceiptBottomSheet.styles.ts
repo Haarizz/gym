@@ -123,6 +123,6 @@ export const styles = StyleSheet.create({
     color: 'white',
     fontSize: TypographyScale.body,
     fontWeight: '600',
-    marginLeft: Spacing.two,
+    marginStart: Spacing.two,
   },
 });

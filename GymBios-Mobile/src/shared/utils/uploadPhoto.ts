@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { apiClient } from '@/core/network/apiClient';
 import { env } from '@/core/platform/config';
+import { i18n } from '@/core/i18n';
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -68,7 +69,12 @@ export async function uploadPhoto(localUri: string): Promise<string> {
 
   if (status < 200 || status >= 300) {
     console.error('[uploadPhoto] upload failed', status, body);
-    throw new Error(`Photo upload failed (${status})`);
+    throw new Error(
+      i18n.t('shared.photo.uploadFailedStatus', {
+        status,
+        defaultValue: `Photo upload failed (${status})`,
+      })
+    );
   }
 
   const data = JSON.parse(body) as { url: string };
@@ -86,8 +92,22 @@ function postWithXhr(
     xhr.open('POST', url);
     Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
     xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
-    xhr.onerror = () => reject(new Error('Photo upload failed (network error)'));
-    xhr.ontimeout = () => reject(new Error('Photo upload timed out'));
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          i18n.t('shared.photo.uploadFailedNetwork', {
+            defaultValue: 'Photo upload failed (network error)',
+          })
+        )
+      );
+    xhr.ontimeout = () =>
+      reject(
+        new Error(
+          i18n.t('shared.photo.uploadTimeout', {
+            defaultValue: 'Photo upload timed out',
+          })
+        )
+      );
     xhr.timeout = 60000;
     xhr.send(body);
   });

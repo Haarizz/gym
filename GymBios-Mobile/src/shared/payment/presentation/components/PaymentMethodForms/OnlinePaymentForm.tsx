@@ -8,6 +8,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
+import { Trans, useTranslation } from 'react-i18next';
 import { ONLINE_PAYMENT_TYPE_OPTIONS } from '@/shared/payment/constants';
 
 interface OnlinePaymentFormProps {
@@ -40,6 +41,7 @@ export function OnlinePaymentForm({
   onDueDateChange,
 }: OnlinePaymentFormProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const numPaid = parseFloat(paidAmount || '0');
   const remaining = Math.max(0, finalAmount - numPaid);
 
@@ -59,13 +61,13 @@ export function OnlinePaymentForm({
       ]}
     >
       <Typography variant="bodySmallBold" style={{ color: '#B91C1C' }}>
-        Online Payment Details
+        {t('paymentSheet.form.onlineDetails')}
       </Typography>
 
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Dropdown
-            label="Online Payment Type *"
+            label={t('paymentSheet.form.onlinePaymentType')}
             value={onlinePaymentType}
             options={onlineOptions}
             onChange={onOnlinePaymentTypeChange}
@@ -75,7 +77,7 @@ export function OnlinePaymentForm({
 
         <View style={styles.flex1}>
           <Input
-            label={<>Amount (<CurrencyGlyph />) *</>}
+            label={<Trans i18nKey="paymentSheet.form.amount" components={{ currency: <CurrencyGlyph /> }} />}
             value={paidAmount}
             onChangeText={onPaidAmountChange}
             keyboardType="decimal-pad"
@@ -87,26 +89,26 @@ export function OnlinePaymentForm({
 
       {onlinePaymentType === 'Other' ? (
         <Input
-          label="Payment Provider Name *"
+          label={t('paymentSheet.form.paymentProviderName')}
           value={providerName}
           onChangeText={onProviderNameChange}
-          placeholder="e.g. Razorpay"
+          placeholder={t('paymentSheet.form.example', { value: 'Razorpay' })}
           error={errors?.providerName}
         />
       ) : null}
 
       <Input
-        label="Transaction / Reference ID *"
+        label={t('paymentSheet.form.transactionReferenceIdRequired')}
         value={reference}
         onChangeText={onReferenceChange}
-        placeholder="e.g. PAY-884920"
+        placeholder={t('paymentSheet.form.example', { value: 'PAY-884920' })}
         error={errors?.reference}
       />
 
       {remaining > 0 ? (
         <DatePicker
-          label="Payment Due Date *"
-          placeholder="Select due date"
+          label={t('paymentSheet.form.dueDate')}
+          placeholder={t('paymentSheet.form.selectDueDate')}
           value={paymentDueDate ?? null}
           onChange={onDueDateChange}
           minimumDate={new Date()}
@@ -125,7 +127,7 @@ export function OnlinePaymentForm({
       >
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Final Amount:
+            {t('paymentSheet.form.finalAmount')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={finalAmount} decimals={2} />
@@ -133,7 +135,7 @@ export function OnlinePaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Paid Amount:
+            {t('paymentSheet.form.paidAmountLabel')}
           </Typography>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
             <CurrencyValue amount={(numPaid || 0)} decimals={2} />
@@ -141,7 +143,7 @@ export function OnlinePaymentForm({
         </View>
         <View style={styles.summaryRow}>
           <Typography variant="caption" color="textSecondary">
-            Remaining/Due:
+            {t('paymentSheet.form.remainingOrDue')}
           </Typography>
           <Typography
             variant="bodySmallBold"

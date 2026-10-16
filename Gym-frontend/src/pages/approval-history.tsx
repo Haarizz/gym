@@ -12,6 +12,16 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -82,6 +92,26 @@ export function ApprovalHistory() {
       setLoading(false);
     }
   }, [statusFilter, search, currentPage]);
+
+  // Re-approving a rejected purchase (e.g. the cash turned up after all).
+  const [approving, setApproving] = useState<Member | null>(null);
+  const [approveBusy, setApproveBusy] = useState(false);
+
+  const confirmApprove = async () => {
+    if (!approving) return;
+    setApproveBusy(true);
+    try {
+      await membersService.approveMemberPayment(approving.id);
+      toast.success(`${approving.name}'s payment approved — membership starts today`);
+      setApproving(null);
+      loadHistory();
+      loadSummary();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve payment');
+    } finally {
+      setApproveBusy(false);
+    }
+  };
 
   const loadSummary = useCallback(async () => {
     try {
@@ -198,19 +228,20 @@ export function ApprovalHistory() {
                 <TableHead>Decided By</TableHead>
                 <TableHead>Decided On</TableHead>
                 <TableHead>Reason</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Loading approval history...
                   </TableCell>
                 </TableRow>
               )}
               {!loading && members.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     <History className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     {search || statusFilter !== 'all'
                       ? 'No decisions match these filters.'
@@ -220,6 +251,10 @@ export function ApprovalHistory() {
               )}
               {!loading && members.map((member) => {
                 const approved = member.approval_status === 'APPROVED';
+                // Dependents follow their family head's decision; a rejected purchase the
+                // member replaced with a newer one (here or at another gym) is superseded.
+                const isDependent = !!member.family_head_id && !member.is_family_head;
+                const superseded = !!member.superseded || !member.global_user_id;
                 return (
                   <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
                     <TableCell>
@@ -253,6 +288,20 @@ export function ApprovalHistory() {
                           {member.rejection_reason}
                         </span>
                       ) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!approved && (isDependent ? (
+                        <span className="text-xs text-muted-foreground">Approve via family head</span>
+                      ) : superseded ? (
+                        <span className="text-xs text-muted-foreground" title="They bought a membership after this rejection (here or at another gym)">
+                          Purchased again
+                        </span>
+                      ) : (
+                        <Button size="sm" variant="outline" className="text-green-700 border-green-200 hover:bg-green-50"
+                          onClick={() => setApproving(member)}>
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+                        </Button>
+                      ))}
                     </TableCell>
                   </TableRow>
                 );
@@ -289,6 +338,29 @@ export function ApprovalHistory() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!approving} onOpenChange={(o) => { if (!o && !approveBusy) setApproving(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve {approving?.name}'s payment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This reverses the rejection: their {approving?.membership_plan || 'membership'} starts today, the
+              payment is posted to the ledger, any unpaid balance becomes due again, and they get app access.
+              Family members rejected with them are approved too.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={approveBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={approveBusy}
+              onClick={(e) => { e.preventDefault(); confirmApprove(); }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {approveBusy ? 'Approving…' : 'Approve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

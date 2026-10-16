@@ -107,7 +107,7 @@ export function PieChart({
               <Typography variant="subtitle" style={{ fontWeight: '700' }}>
                 {selectedSlice.name}
               </Typography>
-              <Typography variant="subtitle" style={{ fontWeight: '700', marginLeft: 'auto' }}>
+              <Typography variant="subtitle" style={{ fontWeight: '700', marginStart: 'auto' }}>
                 {valueFormatter(selectedSlice.value)} ({selectedSlice.percentage.toFixed(1)}%)
               </Typography>
             </View>

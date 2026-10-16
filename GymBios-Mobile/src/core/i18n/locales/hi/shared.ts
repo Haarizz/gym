@@ -1,0 +1,121 @@
+import type { LocaleResource } from '../en';
+
+const shared = {
+  shared: {
+    goBack: 'वापस जाएँ',
+    confirm: 'पुष्टि करें',
+    cancel: 'रद्द करें',
+    done: 'हो गया',
+    previous: 'पिछला',
+    next: 'अगला',
+    search: 'खोजें...',
+    notAdded: 'नहीं जोड़ा गया',
+    selectOption: 'एक विकल्प चुनें',
+    dropdown: 'ड्रॉपडाउन',
+    selectDate: 'तारीख चुनें',
+    datePicker: 'तारीख चयनकर्ता',
+    previousMonth: 'पिछला महीना',
+    nextMonth: 'अगला महीना',
+    selectMonth: 'महीना चुनें',
+    selectYear: 'वर्ष चुनें',
+    confirmDate: 'तारीख की पुष्टि करें',
+    dismissBackdrop: 'बंद करें',
+    userAvatar: 'उपयोगकर्ता अवतार',
+    initialsAvatar: '{{initials}} अवतार',
+
+    photo: {
+      changeA11y: 'प्रोफ़ाइल फ़ोटो बदलें',
+      addA11y: 'प्रोफ़ाइल फ़ोटो जोड़ें',
+      selectA11y: 'फ़ोटो चुनने के लिए टैप करें',
+      tapToChange: 'फ़ोटो बदलने के लिए टैप करें',
+      tapToAdd: 'फ़ोटो जोड़ने के लिए टैप करें',
+      title: 'प्रोफ़ाइल फ़ोटो',
+      subtitle: 'एक विकल्प चुनें',
+      takePhoto: 'फ़ोटो लें',
+      chooseFromGallery: 'गैलरी से चुनें',
+      removePhoto: 'फ़ोटो हटाएँ',
+      permissionTitle: 'अनुमति आवश्यक',
+      cameraNeeded: 'फ़ोटो लेने के लिए कैमरा एक्सेस आवश्यक है।',
+      cameraOff: 'कैमरा एक्सेस बंद है। फ़ोटो लेने के लिए सेटिंग्स में इसे चालू करें।',
+      cameraUnavailable: 'इस डिवाइस पर कैमरा उपलब्ध नहीं है।',
+      galleryNeeded: 'फ़ोटो चुनने के लिए गैलरी एक्सेस आवश्यक है।',
+      galleryOff: 'फ़ोटो एक्सेस बंद है। फ़ोटो चुनने के लिए सेटिंग्स में इसे चालू करें।',
+      galleryFailed: 'इमेज गैलरी नहीं खुल सकी।',
+      uploadFailedStatus: 'फ़ोटो अपलोड विफल ({{status}})',
+      uploadFailedNetwork: 'फ़ोटो अपलोड विफल (नेटवर्क त्रुटि)',
+      uploadTimeout: 'फ़ोटो अपलोड का समय समाप्त हुआ',
+    },
+
+    trafficLight: {
+      low: 'कम',
+      medium: 'मध्यम',
+      high: 'उच्च',
+    },
+
+    timePicker: {
+      selectTime: 'समय चुनें',
+      now: 'अभी',
+      setTime: 'समय सेट करें · {{time}}',
+    },
+
+    wizard: {
+      saveChanges: 'परिवर्तन सहेजें',
+      createStaff: 'स्टाफ़ बनाएँ',
+    },
+
+    roleMode: {
+      virtualStudio: 'वर्चुअल स्टूडियो',
+      virtualStudioDesc: 'ऑनलाइन फ़िटनेस प्रोग्राम, लाइव सत्र और डिजिटल सदस्यताएँ बनाएँ और प्रबंधित करें।',
+      comingSoon: 'जल्द आ रहा है',
+    },
+
+    charts: {
+      noData: 'कोई डेटा उपलब्ध नहीं',
+      noDataDesc: 'चयनित मानदंडों के लिए प्रदर्शित करने के लिए कोई चार्ट डेटा नहीं है।',
+      loading: 'चार्ट लोड हो रहा है...',
+      unableToLoad: 'चार्ट लोड करने में असमर्थ',
+      loadFailed: 'चार्ट डेटा लोड करने में विफल',
+      retry: 'पुनः प्रयास करें',
+    },
+
+    noInternet: {
+      title: 'इंटरनेट कनेक्शन नहीं',
+      tryAgain: 'फिर से प्रयास करें',
+      checkConnection: 'कृपया अपना Wi-Fi या मोबाइल डेटा जाँचें और फिर से प्रयास करें।',
+      tipToggleWifi: 'Wi-Fi बंद करके फिर चालू करें',
+      tipMobileData: 'जाँचें कि मोबाइल डेटा चालू है',
+      tipSignal: 'बेहतर सिग्नल वाली जगह पर जाएँ',
+      retryA11y: 'फिर से कनेक्ट करें',
+    },
+
+    receipt: {
+      title: 'रसीद विवरण',
+      subtitle: 'लेनदेन रिकॉर्ड',
+      loading: 'रसीद विवरण लोड हो रहा है...',
+      loadError: 'रसीद डेटा लोड नहीं हो सका।',
+      billedTo: 'बिल प्राप्तकर्ता',
+      memberName: 'सदस्य का नाम',
+      memberId: 'सदस्य ID',
+      phone: 'फ़ोन',
+      transactionInfo: 'लेनदेन जानकारी',
+      type: 'प्रकार',
+      paymentMethod: 'भुगतान तरीका',
+      subscription: 'सदस्यता / सेवा',
+      validity: 'वैधता',
+      processedBy: 'द्वारा संसाधित',
+      paymentSummary: 'भुगतान सारांश',
+      price: 'मूल्य',
+      discount: 'छूट',
+      totalAmount: 'कुल राशि',
+      amountPaid: 'भुगतान की गई राशि',
+      balanceDue: 'बकाया राशि',
+      download: 'रसीद डाउनलोड करें',
+      sharingUnavailableTitle: 'शेयरिंग उपलब्ध नहीं',
+      sharingUnavailable: 'इस डिवाइस पर PDF शेयर नहीं किया जा सकता।',
+      errorTitle: 'त्रुटि',
+      pdfFailed: 'रसीद PDF नहीं बन सकी।',
+    },
+  },
+} satisfies LocaleResource;
+
+export default shared;

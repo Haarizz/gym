@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
 
   left: {
     flex: 1,
-    marginRight: Spacing.three,
+    marginEnd: Spacing.three,
   },
 
   title: {

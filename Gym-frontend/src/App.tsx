@@ -64,6 +64,9 @@ import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
 import { GymManagement } from "./pages/gym-management";
+import { GymRatings } from "./pages/ratings";
+import { Enquiries } from "./pages/enquiries";
+import { PlatformRatings } from "./pages/platform-ratings";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
 import { AssetReports } from "./pages/asset-reports";
@@ -200,6 +203,8 @@ import {
   Info,
   ClipboardCheck,
   Warehouse,
+  Star,
+  Inbox,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -370,6 +375,25 @@ const menuItems = [
         permission: "MEMBER_CONNECT_ANALYTICS_VIEW",
       },
     ],
+  },
+  {
+    // Members' ratings of each branch (mobile app), and "Request reviews". Member Connect
+    // permission: asking members for reviews is member outreach, and a new permission key
+    // wouldn't reach existing gyms' roles.
+    title: "Ratings",
+    icon: Star,
+    id: "ratings",
+    path: "/ratings",
+    permission: "MEMBER_CONNECT_VIEW",
+  },
+  {
+    // Members' enquiries from the mobile app (Profile → Raise Enquiry); one reply each.
+    // Member Connect permission, like Ratings.
+    title: "Enquiries",
+    icon: Inbox,
+    id: "enquiries",
+    path: "/enquiries",
+    permission: "MEMBER_CONNECT_VIEW",
   },
   {
     title: "Sales & Purchases",
@@ -685,6 +709,14 @@ const menuItems = [
     permission: "GYM_MANAGEMENT_VIEW",
   },
   {
+    // Platform admin: every gym's member ratings.
+    title: "Ratings",
+    icon: Star,
+    id: "platform-ratings",
+    path: "/platform-ratings",
+    permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
     title: "Pending Approval",
     icon: ClipboardCheck,
     id: "pending-approval",
@@ -846,7 +878,10 @@ export default function App() {
   }, [currentPath]);
   // Off-canvas navigation drawer (phones/tablets) — closed after picking a page.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const activeSectionPathId = currentPath === '/' ? 'dashboard' : currentPath.slice(1);
+  // Ratings detail pages (/ratings/:branchId, /platform-ratings/:slug/...) keep their menu item highlighted.
+  const activeSectionPathId = currentPath === '/'
+    ? 'dashboard'
+    : /^\/(platform-)?ratings\//.test(currentPath) ? currentPath.split('/')[1] : currentPath.slice(1);
 
   // Global state for branches
   const { activeBranchId, activeBranchName, accessibleBranches, setActiveBranch, isAllBranches, refreshBranches } = useBranch();
@@ -862,8 +897,10 @@ export default function App() {
   // gym clients and prospects, not its own branch/profile, so both are hidden for
   // this role specifically rather than gated by the normal per-module permission
   // system.
-  const gymbiosAdminMenuIds = ['gym-management', 'pending-approval', 'platform-leads', 'platform-follow-up'];
-  const gymbiosAdminPaths = ['/gym-management', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
+  const gymbiosAdminMenuIds = ['gym-management', 'platform-ratings', 'pending-approval', 'platform-leads', 'platform-follow-up'];
+  const gymbiosAdminPaths = ['/gym-management', '/platform-ratings', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
+  // Also covers the platform Ratings drill-down pages (/platform-ratings/:tenantSlug/...).
+  const isGymbiosAdminPath = (path: string) => gymbiosAdminPaths.includes(path) || path.startsWith('/platform-ratings/');
   const rolesRaw = sessionStorage.getItem('roles');
   const roles = rolesRaw ? (JSON.parse(rolesRaw) as string[]) : [];
   const isGymbiosAdmin = roles.some(r => r.toLowerCase().replace('role_', '') === 'gymbios_admin') || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'gymbios_admin';
@@ -929,7 +966,7 @@ export default function App() {
   // doesn't stop typing e.g. /payroll-employees straight into the address bar.
   const requiredRoutePermission = routePermissionMap[location.pathname];
   const routeAllowed = isGymbiosAdmin
-    ? gymbiosAdminPaths.includes(location.pathname)
+    ? isGymbiosAdminPath(location.pathname)
     : (!requiredRoutePermission || permissions.includes(requiredRoutePermission));
 
   // Provide navigation params from location state if available
@@ -1320,6 +1357,12 @@ export default function App() {
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
       <Route path="/gym-management" element={<GymManagement />} />
+      <Route path="/platform-ratings" element={<PlatformRatings />} />
+      <Route path="/platform-ratings/:tenantSlug" element={<PlatformRatings />} />
+      <Route path="/platform-ratings/:tenantSlug/:branchId" element={<PlatformRatings />} />
+      <Route path="/ratings" element={<GymRatings />} />
+      <Route path="/ratings/:branchId" element={<GymRatings />} />
+      <Route path="/enquiries" element={<Enquiries />} />
       <Route path="/pending-approval" element={<PendingApproval />} />
       <Route path="/platform-leads" element={<PlatformLeads />} />
       <Route path="/platform-follow-up" element={<PlatformFollowUp />} />
@@ -1628,7 +1671,7 @@ export default function App() {
               <ProtectedRoute isAuthenticated={isAuthenticated}>
                 {routeAllowed ? (
                   <React.Fragment key={`branch-${activeBranchId || 'all'}`}>
-                    {isAllBranches && !gymbiosAdminPaths.includes(currentPath) && (
+                    {isAllBranches && !isGymbiosAdminPath(currentPath) && (
                       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 m-4 rounded-r-md flex items-start shadow-sm">
                         <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
                         <div>

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Fragment } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
@@ -22,7 +24,8 @@ export function ProfileSummaryCard({
   firstName,
   onEditPhoto,
 }: ProfileSummaryCardProps) {
-  const metrics = summary ? buildMetrics(summary) : null;
+  const { t } = useTranslation();
+  const metrics = summary ? buildMetrics(t, summary) : null;
   const roleDisplay = profile?.role ? profile.role.toUpperCase() : 'MEMBER';
 
   return (
@@ -42,7 +45,7 @@ export function ProfileSummaryCard({
               style={({ pressed }) => [styles.cameraButton, pressed && styles.cameraButtonPressed]}
               onPress={onEditPhoto}
               accessibilityRole="button"
-              accessibilityLabel="Change profile picture"
+              accessibilityLabel={t('profileHub.changePictureA11y')}
             >
               <Feather name="camera" size={15} color="#ffffff" />
             </Pressable>
@@ -50,7 +53,7 @@ export function ProfileSummaryCard({
         </View>
 
         <Typography variant="title" style={styles.greeting}>
-          Hello, {firstName}
+          {t('profileHub.greetingName', { name: firstName })}
         </Typography>
 
         <View style={styles.badge}>
@@ -93,23 +96,23 @@ const BLUE = '#2563eb';
 
 const percentOrDash = (value: number | null) => (value == null ? '—' : `${value}%`);
 
-function buildMetrics(summary: ProfileSummary): SummaryMetric[] {
+function buildMetrics(t: TFunction, summary: ProfileSummary): SummaryMetric[] {
   if (summary.kind === 'member') {
     const daysLeft = summary.membershipDaysLeft;
     return [
-      { label: 'Visits', value: `${summary.totalVisits}`, color: GREEN },
-      { label: 'Streak', value: `${summary.streakDays} ${summary.streakDays === 1 ? 'day' : 'days'}`, color: BrandColors.teal },
-      { label: 'Plan Days Left', value: daysLeft == null ? '—' : `${daysLeft}`, color: BLUE },
+      { label: t('profileHub.metrics.visits'), value: `${summary.totalVisits}`, color: GREEN },
+      { label: t('profileHub.metrics.streak'), value: t('profileHub.metrics.streakDays', { count: summary.streakDays }), color: BrandColors.teal },
+      { label: t('profileHub.metrics.planDaysLeft'), value: daysLeft == null ? '—' : `${daysLeft}`, color: BLUE },
     ];
   }
   return [
-    { label: 'Performance', value: percentOrDash(summary.performanceScore), color: GREEN },
+    { label: t('profileHub.metrics.performance'), value: percentOrDash(summary.performanceScore), color: GREEN },
     {
-      label: 'Targets',
+      label: t('profileHub.metrics.targets'),
       value: summary.targetTotal > 0 ? `${summary.targetAchieved}/${summary.targetTotal}` : '—',
       color: BrandColors.teal,
     },
-    { label: 'Attendance', value: percentOrDash(summary.attendanceRate), color: BLUE },
+    { label: t('profileHub.metrics.attendance'), value: percentOrDash(summary.attendanceRate), color: BLUE },
   ];
 }
 
@@ -129,7 +132,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     position: 'absolute',
     bottom: -2,
-    right: -2,
+    end: -2,
     width: 28,
     height: 28,
     borderRadius: 10,

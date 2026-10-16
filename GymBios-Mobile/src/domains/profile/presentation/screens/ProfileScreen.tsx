@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { useAuthStore, useRestoreSession } from '@/domains/auth';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
@@ -11,7 +11,9 @@ import { MemberReferralsScreen } from '../../../member-referrals/presentation/sc
 import { MyPerformanceScreen } from './MyPerformanceScreen';
 import { TransactionsScreen } from './TransactionsScreen';
 import { SettingsScreen } from './SettingsScreen';
+import { LanguageSelectScreen } from './LanguageSelectScreen';
 import { WalletScreen } from '@/domains/memberPortal/wallet/WalletScreen';
+import { EnquiriesScreen } from '@/domains/memberPortal/enquiries/presentation/EnquiriesScreen';
 
 const SLIDE_DURATION = 320;
 
@@ -22,14 +24,17 @@ export type ProfileView =
   | 'my-performance'
   | 'transactions'
   | 'wallet'
-  | 'settings';
+  | 'enquiries'
+  | 'settings'
+  | 'language';
 
-const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'settings'];
+const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'enquiries', 'settings', 'language'];
 
 export function ProfileScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { logout } = useRestoreSession();
-  const { view } = useLocalSearchParams<{ view?: string }>();
+  const { view, enquiryId } = useLocalSearchParams<{ view?: string; enquiryId?: string }>();
   const appRole = useAuthStore((s) => s.appRole);
   // Performance metrics are per-employee — admins and members have no data here —
   // while Referrals is a member/admin feature hidden from staff and trainers.
@@ -44,7 +49,7 @@ export function ProfileScreen() {
     if (view && (VALID_VIEWS as string[]).includes(view)) {
       if (view === 'my-performance' && !isEmployee) return;
       if (view === 'referrals' && isEmployee) return;
-      if (view === 'wallet' && appRole !== 'member') return;
+      if ((view === 'wallet' || view === 'enquiries') && appRole !== 'member') return;
       setActiveView(view as ProfileView);
     }
   }, [view, isEmployee, appRole]);
@@ -94,8 +99,32 @@ export function ProfileScreen() {
     case 'wallet':
       content = <WalletScreen onBack={() => setActiveView('hub')} />;
       break;
+    case 'enquiries':
+      content = (
+        <EnquiriesScreen
+          onBack={() => setActiveView('hub')}
+          initialEnquiryId={view === 'enquiries' && enquiryId ? Number(enquiryId) || null : null}
+        />
+      );
+      break;
     case 'settings':
-      content = <SettingsScreen onBack={() => setActiveView('hub')} />;
+      content = (
+        <SettingsScreen
+          onBack={() => setActiveView('hub')}
+          onNavigateToLanguage={() => setActiveView('language')}
+        />
+      );
+      break;
+    case 'language':
+      content = (
+        <LanguageSelectScreen
+          mode="settings"
+          // Switching to/from Arabic restarts the app; come back to Settings.
+          resumeHref={`${pathname}?view=settings`}
+          onDone={() => setActiveView('settings')}
+          onBack={() => setActiveView('settings')}
+        />
+      );
       break;
     case 'hub':
     default:
@@ -107,6 +136,7 @@ export function ProfileScreen() {
           onNavigateToPerformance={() => setActiveView('my-performance')}
           onNavigateToTransactions={() => setActiveView('transactions')}
           onNavigateToWallet={() => setActiveView('wallet')}
+          onNavigateToEnquiries={() => setActiveView('enquiries')}
           onNavigateToSettings={() => setActiveView('settings')}
           onLogout={handleLogout}
         />

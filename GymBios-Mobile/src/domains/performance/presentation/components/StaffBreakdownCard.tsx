@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -8,14 +9,16 @@ interface StaffBreakdownCardProps {
 }
 
 export function StaffBreakdownCard({ breakdown }: StaffBreakdownCardProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Performance Breakdown</Text>
+      <Text style={styles.title}>{t('staffPerformance.performanceBreakdown')}</Text>
 
       {/* Conversion Rate */}
       <View style={styles.item}>
         <View style={styles.itemHeader}>
-          <Text style={styles.label}>Conversion Rate</Text>
+          <Text style={styles.label}>{t('staffPerformance.conversionRate')}</Text>
           <Text style={styles.value}>{breakdown.conversionRate}%</Text>
         </View>
         <View style={styles.barTrack}>
@@ -31,7 +34,7 @@ export function StaffBreakdownCard({ breakdown }: StaffBreakdownCardProps) {
       {/* Follow-up Completion */}
       <View style={styles.item}>
         <View style={styles.itemHeader}>
-          <Text style={styles.label}>Follow-up Completion</Text>
+          <Text style={styles.label}>{t('staffPerformance.followUpCompletion')}</Text>
           <Text style={styles.value}>{breakdown.followUpCompletion}%</Text>
         </View>
         <View style={styles.barTrack}>
@@ -50,7 +53,7 @@ export function StaffBreakdownCard({ breakdown }: StaffBreakdownCardProps) {
       {/* Customer Satisfaction */}
       <View style={[styles.item, styles.lastItem]}>
         <View style={styles.itemHeader}>
-          <Text style={styles.label}>Customer Satisfaction</Text>
+          <Text style={styles.label}>{t('staffPerformance.customerSatisfaction')}</Text>
           <Text style={styles.value}>{breakdown.customerSatisfaction}%</Text>
         </View>
         <View style={styles.barTrack}>

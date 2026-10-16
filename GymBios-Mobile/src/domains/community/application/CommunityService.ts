@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n';
 import type { CommunityRepository } from './CommunityRepository';
 import type {
   CommunityPost,
@@ -111,5 +112,5 @@ export class CommunityService {
 
 /** Global-only operations are never offered in legacy mode; reaching one there is a programming error. */
 function unsupported(): Promise<never> {
-  return Promise.reject(new Error('This action is not supported by the connected Community API'));
+  return Promise.reject(new Error(i18n.t('community.unsupportedAction')));
 }

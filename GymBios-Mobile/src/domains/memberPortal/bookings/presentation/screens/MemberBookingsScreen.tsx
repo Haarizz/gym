@@ -7,7 +7,9 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate, i18n, tOr } from '@/core/i18n';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -37,10 +39,10 @@ function toBookingItem(b: MemberBookingData): BookingItemData {
   const price = b.price ?? 0;
   return {
     id: String(b.id),
-    class: b.className ?? 'Unknown Class',
+    class: b.className ?? i18n.t('bookings.unknownClass'),
     date: b.date,
     time: b.startTime ?? '',
-    duration: `${b.durationMinutes ?? 0} min`,
+    duration: i18n.t('bookings.minutes', { count: b.durationMinutes ?? 0 }),
     trainer: b.trainerName ?? '',
     location: b.location ?? '',
     spotsLeft: b.availableSpots,
@@ -57,14 +59,9 @@ function toBookingItem(b: MemberBookingData): BookingItemData {
   };
 }
 
-const REFUND_NOTES: Record<string, string> = {
-  REFUNDED: 'Refunded to wallet',
-  NOT_REFUNDABLE: 'Not refunded',
-  VOIDED: 'Nothing charged',
-};
-
 export function MemberBookingsScreen() {
   const { formatCurrency } = useCurrency();
+  const { t } = useTranslation();
   const {
     data: upcomingBookings,
     isLoading: isLoadingUpcoming,
@@ -97,13 +94,13 @@ export function MemberBookingsScreen() {
       onSuccess: (result) => {
         setBookingToCancel(null);
         if (result.refundStatus === 'REFUNDED' && result.refundedAmount) {
-          toast.success(`${formatCurrency(result.refundedAmount)} has been refunded to your wallet.`, {
-            title: 'Booking Cancelled',
+          toast.success(t('bookings.refundedToast', { amount: formatCurrency(result.refundedAmount) }), {
+            title: t('bookings.cancelledToastTitle'),
           });
         } else if (result.refundStatus === 'NOT_REFUNDABLE') {
-          toast.success('Your spot has been released. No refund was given.', { title: 'Booking Cancelled' });
+          toast.success(t('bookings.releasedNoRefundToast'), { title: t('bookings.cancelledToastTitle') });
         } else {
-          toast.success('Your reservation has been cancelled.');
+          toast.success(t('bookings.reservationCancelledToast'));
         }
       },
       // The API client already shows the server's reason.
@@ -139,13 +136,13 @@ export function MemberBookingsScreen() {
 
   const mappedPast: PastBookingData[] = actualPastRaw.map((b) => ({
     id: String(b.id),
-    class: b.className ?? 'Unknown Class',
+    class: b.className ?? t('bookings.unknownClass'),
     date: b.date,
     time: b.startTime ?? '',
     trainer: b.trainerName ?? '',
     attended: isAttendedStatus(b.status),
     cancelled: (b.status || '').toUpperCase() === 'CANCELLED',
-    refundNote: b.refundStatus ? REFUND_NOTES[b.refundStatus] : null,
+    refundNote: b.refundStatus ? tOr(`bookings.refundNote.${b.refundStatus}`, '') || null : null,
   }));
 
   const details = selectedBookingForDetails;
@@ -181,15 +178,15 @@ export function MemberBookingsScreen() {
         style={({ pressed }) => [styles.bookButton, pressed && styles.bookButtonPressed]}
         onPress={() => setIsBookModalVisible(true)}
         accessibilityRole="button"
-        accessibilityLabel="Book a Session"
+        accessibilityLabel={t('bookings.bookSession')}
       >
         <Feather name="plus" size={20} color="#FFFFFF" />
-        <Text style={styles.bookButtonText}>Book a Session</Text>
+        <Text style={styles.bookButtonText}>{t('bookings.bookSession')}</Text>
       </Pressable>
 
       {/* Upcoming Bookings Section */}
       <GlassSurface radius={Radius.lg} style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Upcoming Classes</Text>
+        <Text style={styles.sectionTitle}>{t('bookings.upcomingTitle')}</Text>
         {mappedUpcoming.length > 0 ? (
           <View style={styles.list}>
             {mappedUpcoming.map((booking) => (
@@ -204,14 +201,14 @@ export function MemberBookingsScreen() {
         ) : (
           <View style={styles.emptyState}>
             <Feather name="calendar" size={24} color="#94A3B8" />
-            <Text style={styles.emptyText}>No upcoming classes booked</Text>
+            <Text style={styles.emptyText}>{t('bookings.upcomingEmpty')}</Text>
           </View>
         )}
       </GlassSurface>
 
       {/* Past Bookings Section */}
       <GlassSurface radius={Radius.lg} style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Past Classes</Text>
+        <Text style={styles.sectionTitle}>{t('bookings.pastTitle')}</Text>
         {mappedPast.length > 0 ? (
           <View style={styles.list}>
             {mappedPast.map((booking) => (
@@ -220,7 +217,7 @@ export function MemberBookingsScreen() {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No past classes</Text>
+            <Text style={styles.emptyText}>{t('bookings.pastEmpty')}</Text>
           </View>
         )}
       </GlassSurface>
@@ -241,51 +238,57 @@ export function MemberBookingsScreen() {
 
       <AppBottomSheet
         visible={!!details}
-        title={details?.class || 'Class Details'}
-        subtitle={details?.trainer ? `with ${details.trainer}` : ''}
+        title={details?.class || t('bookings.details.fallbackTitle')}
+        subtitle={details?.trainer ? t('bookings.withTrainer', { name: details.trainer }) : ''}
         onClose={() => setSelectedBookingForDetails(null)}
       >
         {details && (
           <View style={styles.detailsBody}>
             <View>
-              <Text style={styles.detailLabel}>Date & Time</Text>
+              <Text style={styles.detailLabel}>{t('bookings.details.dateTime')}</Text>
               <Text style={styles.detailValue}>
-                {details.date} at {details.time}
+                {t('bookings.details.dateAtTime', { date: formatDate(details.date, 'PP'), time: details.time })}
               </Text>
-              <Text style={styles.detailMeta}>Duration: {details.duration}</Text>
+              <Text style={styles.detailMeta}>{t('bookings.details.duration', { duration: details.duration })}</Text>
             </View>
 
             <View>
-              <Text style={styles.detailLabel}>Location</Text>
+              <Text style={styles.detailLabel}>{t('bookings.details.location')}</Text>
               <Text style={styles.detailValue}>{details.location}</Text>
             </View>
 
             <View>
-              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={styles.detailLabel}>{t('bookings.details.status')}</Text>
               <Text style={[styles.detailValue, styles.capitalize]}>
-                {details.status === 'pending_approval' ? 'Awaiting payment approval' : details.status}
+                {tOr(`bookings.status.${details.status}`, details.status)}
               </Text>
             </View>
 
             {(details.price > 0 || details.paidWithPass) && (
               <View>
-                <Text style={styles.detailLabel}>Payment</Text>
+                <Text style={styles.detailLabel}>{t('bookings.details.payment')}</Text>
                 {details.paidWithPass && details.price === 0 ? (
-                  <Text style={styles.detailValue}>Paid with Reward Pass</Text>
+                  <Text style={styles.detailValue}>{t('bookings.details.paidWithPass')}</Text>
                 ) : (
                   <Text style={styles.detailValue}>
                     <CurrencyValue amount={details.price} />
+                    {' · '}
                     {details.status === 'pending_approval'
-                      ? ' · awaiting approval'
-                      : details.partlyPaid ? ' · part-paid' : ' · paid'}
+                      ? t('bookings.details.awaitingApprovalSuffix')
+                      : details.partlyPaid
+                        ? t('bookings.details.partPaidSuffix')
+                        : t('bookings.details.paidSuffix')}
                   </Text>
                 )}
                 {details.discountLabel && !details.paidWithPass ? (
-                  <Text style={styles.detailMeta}>Discount: {details.discountLabel}</Text>
+                  <Text style={styles.detailMeta}>{t('bookings.details.discount', { label: details.discountLabel })}</Text>
                 ) : null}
                 {details.walletAmount ? (
                   <Text style={styles.detailMeta}>
-                    <CurrencyValue amount={details.walletAmount} /> from wallet
+                    <Trans
+                      i18nKey="bookings.details.fromWallet"
+                      components={{ amount: <CurrencyValue amount={details.walletAmount} /> }}
+                    />
                   </Text>
                 ) : null}
               </View>
@@ -293,11 +296,11 @@ export function MemberBookingsScreen() {
 
             {(details.price > 0 || details.paidWithPass) && detailsDeadline && details.status !== 'pending_approval' && (
               <View>
-                <Text style={styles.detailLabel}>Cancellation</Text>
+                <Text style={styles.detailLabel}>{t('bookings.details.cancellation')}</Text>
                 <Text style={styles.detailValue}>
                   {details.refundableIfCancelledNow
-                    ? `Full refund if cancelled before ${detailsDeadline}`
-                    : 'No refund — the session starts in less than 2 hours'}
+                    ? t('bookings.details.fullRefundBefore', { deadline: detailsDeadline })
+                    : t('bookings.details.noRefundSoon')}
                 </Text>
               </View>
             )}
