@@ -76,49 +76,11 @@ import {
 import { PermissionGate, hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
+import { EmployeeForm } from "../components/workforce/EmployeeForm";
 
 
 interface StaffsTrainersProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
-}
-
-// ── Schedule options ───────────────────────────────────────────────────────
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const SLOTS = ['Morning (6am–12pm)', 'Afternoon (12pm–5pm)', 'Evening (5pm–10pm)'];
-// Single set of roles used both as the employee's job role and their app login/RBAC role,
-// so Add/Edit Employee only asks for one "Role" instead of two confusingly similar fields.
-// The real list comes from Roles & Permissions (so custom roles can be assigned); this is
-// only the fallback if it can't be loaded.
-const FALLBACK_STAFF_ROLES = ['Receptionist', 'Trainer', 'Accountant', 'Manager'];
-
-/** "RECEPTIONIST" -> "Receptionist"; custom mixed-case names are kept as typed. The
- * backend matches the stored text to a role case-insensitively. */
-const roleLabel = (name: string) =>
-  name === name.toUpperCase()
-    ? name.toLowerCase().replace(/(^|[_\s])(\w)/g, (_m, sep, c) => sep + c.toUpperCase())
-    : name;
-
-/** Picker options, keeping a staff member's current free-text role selectable. */
-function staffRoleOptions(roles: AssignableRole[], current?: string): string[] {
-  const options = roles.length ? roles.map(r => roleLabel(r.role_name)) : [...FALLBACK_STAFF_ROLES];
-  if (current && !options.some(o => o.toLowerCase() === current.toLowerCase())) options.push(current);
-  return options;
-}
-
-/** The option matching a stored role regardless of case ("TRAINER" vs "Trainer"). */
-function staffRoleValue(options: string[], current?: string): string {
-  if (!current) return '';
-  return options.find(o => o.toLowerCase() === current.toLowerCase()) ?? current;
-}
-
-// "Add Certification" rows the admin left empty shouldn't be saved as nameless certificates.
-const withoutBlankCerts = (certs: StaffCertification[]) => certs.filter(c => c.cert_name?.trim());
-
-const ERROR_BORDER: React.CSSProperties = { borderColor: '#dc2626' };
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p className="text-xs mt-1" style={{ color: 'light-dark(#dc2626, oklch(82% 0.15 27.3))' }}>{message}</p>;
 }
 
 /** Money for the list: whole numbers stay whole, otherwise two decimals. */
@@ -157,157 +119,6 @@ function PosCommissionFields({ percent, perSale, onChange }: {
   );
 }
 
-// ── Controlled Certifications tab (Add & Edit modals) ──────────────────────
-interface CertificationsTabProps {
-  certifications: StaffCertification[];
-  onChange: (certs: StaffCertification[]) => void;
-}
-function CertificationsTab({ certifications, onChange }: CertificationsTabProps) {
-  const [uploadingIndex, setUploadingIndex] = React.useState<number | null>(null);
-
-  const addCert = () =>
-    onChange([...certifications, { cert_name: '', issuer: '', issue_date: '', expiry_date: '' }]);
-
-  const removeCert = (i: number) => onChange(certifications.filter((_, idx) => idx !== i));
-
-  const updateCert = (i: number, field: keyof StaffCertification, value: string) =>
-    onChange(certifications.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Add professional certifications and qualifications</p>
-        <Button size="sm" variant="outline" onClick={addCert} className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Certification
-        </Button>
-      </div>
-      {certifications.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">No certifications on file.</p>
-      )}
-      {certifications.map((cert, i) => (
-        <div key={i} className="p-4 rounded-lg border border-primary/10 bg-muted/20 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-primary/10">
-                <GraduationCap className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Certification {i + 1}</span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={() => removeCert(i)} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Certification Name</Label>
-              <Input placeholder="e.g. CPT, ACE" value={cert.cert_name} className="mt-1 h-8 text-sm"
-                onChange={e => updateCert(i, 'cert_name', e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Issuing Body</Label>
-              <Input placeholder="e.g. NASM, ACE" value={cert.issuer} className="mt-1 h-8 text-sm"
-                onChange={e => updateCert(i, 'issuer', e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Issue Date</Label>
-              <Input type="date" value={cert.issue_date} className="mt-1 h-8 text-sm"
-                onChange={e => updateCert(i, 'issue_date', e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Expiry Date</Label>
-              <Input type="date" value={cert.expiry_date} className="mt-1 h-8 text-sm"
-                onChange={e => updateCert(i, 'expiry_date', e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">Document</Label>
-            <div className="mt-1 flex items-center gap-2 flex-wrap">
-              {cert.document_url && (
-                <a href={staffService.resolveDocumentUrl(cert.document_url)} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-primary/20 bg-white text-xs text-primary hover:underline">
-                  <FileText className="h-3.5 w-3.5" />
-                  View document
-                </a>
-              )}
-              <label className={`flex items-center gap-2 px-3 py-1.5 rounded-md border border-dashed border-primary/30 bg-primary/5 text-xs text-primary transition-colors ${uploadingIndex === i ? 'opacity-60 pointer-events-none' : 'cursor-pointer hover:bg-primary/10'}`}>
-                {uploadingIndex === i ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {uploadingIndex === i ? 'Uploading…' : cert.document_url ? 'Replace file' : 'Choose file (PDF / Image)'}
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden"
-                  onChange={async e => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (!file) return;
-                    setUploadingIndex(i);
-                    try {
-                      updateCert(i, 'document_url', await staffService.uploadCertificationDocument(file));
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : 'Failed to upload document');
-                    } finally {
-                      setUploadingIndex(null);
-                    }
-                  }} />
-              </label>
-              {cert.document_url && (
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={() => updateCert(i, 'document_url', '')}>
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Controlled Schedule tab (Add & Edit modals) ─────────────────────────────
-interface ScheduleTabProps {
-  schedule: Record<string, string[]>;
-  onChange: (schedule: Record<string, string[]>) => void;
-}
-function ScheduleTab({ schedule, onChange }: ScheduleTabProps) {
-  const toggle = (day: string, slot: string) => {
-    const current = schedule[day] || [];
-    onChange({
-      ...schedule,
-      [day]: current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot]
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Select working days and time slots</p>
-      <div className="rounded-lg border border-primary/10 overflow-hidden">
-        <div className="grid bg-slate-50/80" style={{ gridTemplateColumns: '140px repeat(3, 1fr)' }}>
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-primary/10">Day</div>
-          {SLOTS.map(slot => (
-            <div key={slot} className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-l border-primary/10 text-center">{slot}</div>
-          ))}
-        </div>
-        {DAYS.map((day, di) => (
-          <div key={day} className={`grid items-center ${di % 2 === 0 ? 'bg-white' : 'bg-muted/10'}`}
-            style={{ gridTemplateColumns: '140px repeat(3, 1fr)' }}>
-            <div className="px-3 py-3 text-sm font-medium border-r border-primary/10">{day}</div>
-            {SLOTS.map(slot => {
-              const active = (schedule[day] || []).includes(slot);
-              return (
-                <div key={slot} className="flex justify-center px-3 py-3 border-l border-primary/10">
-                  <button type="button" onClick={() => toggle(day, slot)}
-                    className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${active ? 'bg-primary border-primary text-white' : 'bg-white border-muted-foreground/30 hover:border-primary/50'}`}>
-                    {active && <CheckCircle className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('all-staff');
@@ -317,7 +128,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
-  const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showTargetSettings, setShowTargetSettings] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -336,30 +146,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
   const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
   const [roleTargets, setRoleTargets] = useState<Record<string, { revenue: number; sessions: number; newClients: number }>>({});
-  const [newEmployeeBasicInfo, setNewEmployeeBasicInfo] = useState<{
-    name: string; email: string; phone: string; role: string; department: string;
-    branch: string; monthly_target: number; base_salary: number; address: string; photo_url?: string;
-    join_date: string; appUsername?: string; appPassword?: string;
-  }>({
-    name: '', email: '', phone: '', role: '', department: '', branch: '',
-    monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0],
-    appUsername: '', appPassword: ''
-  });
-  const [newEmployeeCerts, setNewEmployeeCerts] = useState<StaffCertification[]>([]);
-  const [newEmployeeSchedule, setNewEmployeeSchedule] = useState<Record<string, string[]>>({});
-  // Per-field messages for Add Employee (BG_80): the Create button used to sit
-  // disabled with no hint of which field was missing.
-  const [addEmpErrors, setAddEmpErrors] = useState<Record<string, string>>({});
-  const [addEmpTab, setAddEmpTab] = useState('basic');
-  const [isCreatingEmployee, setIsCreatingEmployee] = useState(false);
-  const [showNewEmpPassword, setShowNewEmpPassword] = useState(false);
-  const [isTogglingStaffAccess, setIsTogglingStaffAccess] = useState(false);
-  const [editAppUsername, setEditAppUsername] = useState('');
-  const [editAppPassword, setEditAppPassword] = useState('');
-  const [showEditAppPassword, setShowEditAppPassword] = useState(false);
-  const [isSavingStaffCredentials, setIsSavingStaffCredentials] = useState(false);
-  const [showEditEmployee, setShowEditEmployee] = useState(false);
-  const [editEmployeeData, setEditEmployeeData] = useState<Staff | null>(null);
   const [showViewSchedule, setShowViewSchedule] = useState(false);
   const [scheduleViewEmployee, setScheduleViewEmployee] = useState<Staff | null>(null);
   const [showSetTarget, setShowSetTarget] = useState(false);
@@ -367,6 +153,11 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [targetForm, setTargetForm] = useState({ revenue_target: '', sessions_target: '', new_clients_target: '', timeframe: 'monthly' });
   const [existingTargetId, setExistingTargetId] = useState<string | null>(null);
   const [isSavingTarget, setIsSavingTarget] = useState(false);
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [photoViewerSrc, setPhotoViewerSrc] = useState<string | null>(null);
+  const [photoViewerName, setPhotoViewerName] = useState('');
+  // Full-page Add / Edit Employee form (replaces the list while open).
+  const [formMode, setFormMode] = useState<null | { mode: 'add' } | { mode: 'edit'; staff: Staff }>(null);
   const [deleteConfirmEmployee, setDeleteConfirmEmployee] = useState<Staff | null>(null);
   const [statusEmployee, setStatusEmployee] = useState<Staff | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -376,28 +167,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const dropdownBranches = isAllBranches 
     ? accessibleBranches 
     : accessibleBranches.filter(b => b.id === activeBranchId);
-
-  useEffect(() => {
-    if (!isAllBranches && dropdownBranches.length === 1 && !newEmployeeBasicInfo.branch) {
-      setNewEmployeeBasicInfo(prev => ({ ...prev, branch: dropdownBranches[0].branchName }));
-    }
-  }, [isAllBranches, dropdownBranches, newEmployeeBasicInfo.branch]);
-
-  // Photo states
-  const [photoAdjustMode, setPhotoAdjustMode] = useState(false);
-  const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [photoZoom, setPhotoZoom] = useState([1]);
-  const [photoPosition, setPhotoPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [photoTarget, setPhotoTarget] = useState<'add' | 'edit'>('add');
-  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
-  const [photoViewerSrc, setPhotoViewerSrc] = useState<string | null>(null);
-  const [photoViewerName, setPhotoViewerName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     loadStaff();
@@ -466,79 +235,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     } catch (e) { console.error('Failed to load commission rules', e); }
   };
 
-  const ADD_EMP_FIELD_LABELS: Record<string, string> = {
-    name: 'Full Name', email: 'Email Address', role: 'Role', branch: 'Branch',
-    appUsername: 'App Username', appPassword: 'App Password',
-  };
-
-  const validateNewEmployee = (): Record<string, string> => {
-    const info = newEmployeeBasicInfo;
-    const errors: Record<string, string> = {};
-    if (!info.name.trim()) errors.name = 'Full name is required';
-    if (!info.email.trim()) errors.email = 'Email address is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(info.email.trim())) errors.email = 'Enter a valid email address';
-    if (!info.role) errors.role = 'Select a role';
-    if (!info.branch) errors.branch = 'Select a branch';
-    const username = (info.appUsername || '').trim();
-    const password = info.appPassword || '';
-    // App access is optional, but half-filled credentials used to be dropped silently.
-    if (username && !password) errors.appPassword = 'Enter a password, or clear the username to skip app access';
-    else if (password && !username) errors.appUsername = 'Enter a username, or clear the password to skip app access';
-    else if (password && password.length < 6) errors.appPassword = 'Password must be at least 6 characters';
-    return errors;
-  };
-
-  const clearAddEmpError = (field: string) =>
-    setAddEmpErrors(prev => {
-      if (!prev[field]) return prev;
-      const { [field]: _removed, ...rest } = prev;
-      return rest;
-    });
-
-  const handleCreateEmployee = async () => {
-    const errors = validateNewEmployee();
-    setAddEmpErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      // Every required field lives on Basic Info — jump there so the highlights are visible.
-      setAddEmpTab('basic');
-      toast.error('Please complete the required fields', {
-        description: Object.keys(errors).map(f => ADD_EMP_FIELD_LABELS[f] || f).join(', '),
-      });
-      return;
-    }
-    setIsCreatingEmployee(true);
-    try {
-      await staffService.createStaff({
-        ...newEmployeeBasicInfo,
-        name: newEmployeeBasicInfo.name.trim(),
-        email: newEmployeeBasicInfo.email.trim(),
-        status: 'active',
-        join_date: newEmployeeBasicInfo.join_date || new Date().toISOString().split('T')[0],
-        certifications: withoutBlankCerts(newEmployeeCerts),
-        schedule: newEmployeeSchedule,
-        photo_url: newEmployeeBasicInfo.photo_url,
-        ...(newEmployeeBasicInfo.appUsername && newEmployeeBasicInfo.appPassword ? {
-          app_username: newEmployeeBasicInfo.appUsername,
-          app_password: newEmployeeBasicInfo.appPassword,
-          app_role: newEmployeeBasicInfo.role || undefined,
-        } : {}),
-      });
-      setShowAddEmployee(false);
-      setNewEmployeeCerts([]);
-      setNewEmployeeSchedule({});
-      setNewEmployeeBasicInfo({ name: '', email: '', phone: '', role: '', department: '', branch: '', monthly_target: 0, base_salary: 0, address: '', join_date: new Date().toISOString().split('T')[0], appUsername: '', appPassword: '' });
-      setAddEmpErrors({});
-      setAddEmpTab('basic');
-      toast.success('Employee created');
-      await loadStaff();
-    } catch (e: any) {
-      console.error('Failed to create employee', e);
-      toast.error(e?.message || 'Failed to create employee');
-    } finally {
-      setIsCreatingEmployee(false);
-    }
-  };
-
   const handleDeleteEmployee = async () => {
     if (!deleteConfirmEmployee) return;
     try {
@@ -573,31 +269,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     finally { setIsChangingStatus(false); }
   };
 
-  const handleUpdateEmployee = async () => {
-    if (!editEmployeeData) return;
-    try {
-      await staffService.updateStaff(editEmployeeData.id, {
-        name: editEmployeeData.name,
-        email: editEmployeeData.email,
-        phone: editEmployeeData.phone,
-        role: editEmployeeData.role,
-        department: editEmployeeData.department,
-        branch: editEmployeeData.branch,
-        monthly_target: editEmployeeData.monthly_target,
-        base_salary: editEmployeeData.base_salary,
-        address: editEmployeeData.address,
-        status: editEmployeeData.status,
-        join_date: editEmployeeData.join_date,
-        photo_url: editEmployeeData.photo_url,
-        certifications: withoutBlankCerts(editEmployeeData.certifications || []),
-        schedule: editEmployeeData.schedule || {},
-      });
-      setShowEditEmployee(false);
-      setEditEmployeeData(null);
-      await loadStaff();
-    } catch (e) { console.error('Failed to update employee', e); }
-  };
-
   const handleSaveTarget = async () => {
     if (!targetEmployee || !targetForm.revenue_target) return;
     setIsSavingTarget(true);
@@ -629,103 +300,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     } catch (e) { console.error('Failed to save target', e); }
     finally { setIsSavingTarget(false); }
   };
-
-  // ── Photo handlers ──────────────────────────────────────────────────────
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) { videoRef.current.srcObject = stream; }
-      setCameraDialogOpen(true);
-    } catch { alert('Camera unavailable. Please use Upload Photo instead.'); }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraDialogOpen(false);
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-        setSelectedPhoto(canvas.toDataURL('image/jpeg', 0.8));
-        setPhotoZoom([1]);
-        setPhotoPosition({ x: 0, y: 0 });
-        stopCamera();
-        setPhotoAdjustMode(true);
-      }
-    }
-  };
-
-  const handlePhotoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        setSelectedPhoto(ev.target?.result as string);
-        setPhotoZoom([1]);
-        setPhotoPosition({ x: 0, y: 0 });
-        setPhotoAdjustMode(true);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const handlePhotoSave = () => {
-    if (!selectedPhoto) return;
-    const previewSize = 192;
-    const outputSize = 300;
-    const ratio = outputSize / previewSize;
-    const canvas = document.createElement('canvas');
-    canvas.width = outputSize;
-    canvas.height = outputSize;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const img = new Image();
-    img.onload = () => {
-      const zoom = photoZoom[0];
-      // Replicate object-cover: scale image to cover previewSize x previewSize
-      const coverScale = Math.max(previewSize / img.naturalWidth, previewSize / img.naturalHeight);
-      const covW = img.naturalWidth * coverScale;
-      const covH = img.naturalHeight * coverScale;
-      // object-cover centers the content within the element box
-      const covX = (previewSize - covW) / 2;
-      const covY = (previewSize - covH) / 2;
-      // CSS transform: translate(px,py) scale(zoom) with transform-origin center
-      // A point (x,y) in element space moves to:
-      //   ((x - previewSize/2) * zoom + previewSize/2 + px)
-      const outputX = (covX - previewSize / 2) * zoom + previewSize / 2 + photoPosition.x;
-      const outputY = (covY - previewSize / 2) * zoom + previewSize / 2 + photoPosition.y;
-      ctx.drawImage(img, outputX * ratio, outputY * ratio, covW * zoom * ratio, covH * zoom * ratio);
-      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      if (photoTarget === 'add') {
-        setNewEmployeeBasicInfo(p => ({ ...p, photo_url: croppedDataUrl }));
-      } else {
-        setEditEmployeeData(p => p ? { ...p, photo_url: croppedDataUrl } : p);
-      }
-      setPhotoAdjustMode(false);
-    };
-    img.src = selectedPhoto;
-  };
-
-  const handlePhotoMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - photoPosition.x, y: e.clientY - photoPosition.y });
-  };
-  const handlePhotoMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) setPhotoPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
-  const handlePhotoMouseUp = () => setIsDragging(false);
 
   const openSetTarget = async (employee: Staff) => {
     setTargetEmployee(employee);
@@ -888,6 +462,22 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
       .join(' ');
   };
 
+  if (formMode) {
+    return (
+      <EmployeeForm
+        mode={formMode.mode}
+        employee={formMode.mode === 'edit' ? formMode.staff : null}
+        assignableRoles={assignableRoles}
+        branches={dropdownBranches}
+        departments={Array.from(new Set(staffList.map(x => x.department).filter(Boolean)))}
+        staffList={staffList}
+        onCancel={() => setFormMode(null)}
+        onSaved={() => { setFormMode(null); loadStaff(); }}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
   if (!hasPermission("STAFF_VIEW")) {
     return (
       <div className="p-6">
@@ -909,9 +499,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button variant="outline" size="sm" onClick={() => onNavigate?.('shifts-schedules')}>
+            <Clock className="h-4 w-4 mr-2" />
+            Shifts & Schedules
+          </Button>
           <Button variant="outline" size="sm" onClick={() => onNavigate?.('set-targets')}>
             <Target className="h-4 w-4 mr-2" />
-            Set Targets
+            Targets & Commission
           </Button>
           <Button variant="outline" size="sm" onClick={() => onNavigate?.('targets-overview')}>
             <Gauge className="h-4 w-4 mr-2" />
@@ -922,7 +516,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             Settings
           </Button>
           <PermissionGate permission="STAFF_CREATE">
-            <Button onClick={() => { setAddEmpErrors({}); setAddEmpTab('basic'); setShowAddEmployee(true); }}>
+            <Button onClick={() => setFormMode({ mode: 'add' })}>
               <Plus className="h-4 w-4 mr-2" />
               Add Employee
             </Button>
@@ -1239,7 +833,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                                 View Profile
                               </DropdownMenuItem>
                               <PermissionGate permission="STAFF_EDIT">
-                                <DropdownMenuItem onClick={() => { setEditEmployeeData({...employee}); setEditAppUsername(''); setEditAppPassword(''); setShowEditAppPassword(false); setShowEditEmployee(true); }}>
+                                <DropdownMenuItem onClick={() => setFormMode({ mode: 'edit', staff: employee })}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Details
                                 </DropdownMenuItem>
@@ -1451,628 +1045,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
         </DialogContent>
       </Dialog>
 
-      {/* Add Employee Modal */}
-      <Dialog open={showAddEmployee} onOpenChange={setShowAddEmployee}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-2">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <UserCheck className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl">Add New Employee</DialogTitle>
-                <DialogDescription className="mt-0.5">
-                  Fill in details across all tabs before creating the profile
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <Separator className="my-3" />
-
-          <Tabs value={addEmpTab} onValueChange={setAddEmpTab} className="space-y-4">
-            <TabsList className="bg-muted/50 p-1 w-full">
-              <TabsTrigger value="basic" className="flex-1 flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                Basic Info
-                {Object.keys(addEmpErrors).length > 0 && (
-                  <span aria-label="Has errors" className="rounded-full" style={{ width: 8, height: 8, backgroundColor: '#dc2626' }} />
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="certifications" className="flex-1 flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                Certifications
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                Schedule
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Basic Info Tab */}
-            <TabsContent value="basic" className="space-y-4 mt-0">
-              {/* Photo section — inline adjust when photoAdjustMode & photoTarget=add */}
-              {photoAdjustMode && photoTarget === 'add' ? (
-                <div className="flex flex-col items-center gap-3 p-4 rounded-lg border border-primary/10 bg-muted/20">
-                  <p className="text-sm font-medium self-start">Adjust Photo — drag to reposition</p>
-                  <div
-                    style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid light-dark(#d1d5db, var(--border))', background: 'light-dark(#e5e7eb, var(--border))', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
-                    onMouseDown={handlePhotoMouseDown}
-                    onMouseMove={handlePhotoMouseMove}
-                    onMouseUp={handlePhotoMouseUp}
-                    onMouseLeave={handlePhotoMouseUp}
-                  >
-                    {selectedPhoto && (
-                      <img src={selectedPhoto} alt="Adjust" draggable={false}
-                        style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${photoPosition.x}px,${photoPosition.y}px) scale(${photoZoom[0]})`, transformOrigin: 'center', pointerEvents: 'none', userSelect: 'none' }} />
-                    )}
-                  </div>
-                  <div className="w-full space-y-1 px-1">
-                    <Label className="text-xs">Zoom: {photoZoom[0].toFixed(1)}x</Label>
-                    <Slider value={photoZoom} onValueChange={setPhotoZoom} min={0.5} max={3} step={0.1} />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => { setPhotoZoom([1]); setPhotoPosition({ x: 0, y: 0 }); }}>Reset</Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => { setPhotoAdjustMode(false); setSelectedPhoto(null); }}>Cancel</Button>
-                    <Button type="button" size="sm" onClick={handlePhotoSave}>Use Photo</Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-6 p-4 rounded-lg border border-primary/10 bg-muted/20">
-                  <button
-                    type="button"
-                    style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: 'light-dark(#f1f5f9, var(--muted-bg))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: newEmployeeBasicInfo.photo_url ? 'pointer' : 'default' }}
-                    onClick={() => { if (newEmployeeBasicInfo.photo_url) { setPhotoViewerSrc(newEmployeeBasicInfo.photo_url); setPhotoViewerName(newEmployeeBasicInfo.name || 'Employee'); setPhotoViewerOpen(true); } }}
-                  >
-                    {newEmployeeBasicInfo.photo_url
-                      ? <img src={newEmployeeBasicInfo.photo_url} alt="Photo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      : <Camera className="h-8 w-8 text-muted-foreground/50" />}
-                  </button>
-                  <div>
-                    <p className="text-sm font-medium mb-2">Employee Photo</p>
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setPhotoTarget('add'); startCamera(); }}>
-                        <Camera className="h-3.5 w-3.5" /> Camera
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setPhotoTarget('add'); fileInputRef.current?.click(); }}>
-                        <Upload className="h-3.5 w-3.5" /> Upload
-                      </Button>
-                      {newEmployeeBasicInfo.photo_url && (
-                        <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => setNewEmployeeBasicInfo(p => ({ ...p, photo_url: undefined }))}>
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Full Name *</Label>
-                  <Input
-                    placeholder="Enter full name"
-                    className="mt-1"
-                    style={addEmpErrors.name ? ERROR_BORDER : undefined}
-                    value={newEmployeeBasicInfo.name}
-                    onChange={e => { clearAddEmpError('name'); setNewEmployeeBasicInfo(p => ({...p, name: e.target.value})); }}
-                  />
-                  <FieldError message={addEmpErrors.name} />
-                </div>
-                <div>
-                  <Label>Email Address *</Label>
-                  <Input
-                    type="email"
-                    placeholder="employee@gymbios.com"
-                    className="mt-1"
-                    style={addEmpErrors.email ? ERROR_BORDER : undefined}
-                    value={newEmployeeBasicInfo.email}
-                    onChange={e => { clearAddEmpError('email'); setNewEmployeeBasicInfo(p => ({...p, email: e.target.value})); }}
-                  />
-                  <FieldError message={addEmpErrors.email} />
-                </div>
-                <div>
-                  <Label>Role * <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
-                  <Select
-                    value={newEmployeeBasicInfo.role}
-                    onValueChange={v => { clearAddEmpError('role'); setNewEmployeeBasicInfo(p => ({...p, role: v})); }}
-                  >
-                    <SelectTrigger className="mt-1" style={addEmpErrors.role ? ERROR_BORDER : undefined}>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {staffRoleOptions(assignableRoles).map(r => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={addEmpErrors.role} />
-                </div>
-                <div>
-                  <Label>Department</Label>
-                  <Select
-                    value={newEmployeeBasicInfo.department}
-                    onValueChange={v => setNewEmployeeBasicInfo(p => ({...p, department: v}))}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Personal Training">Personal Training</SelectItem>
-                      <SelectItem value="Group Classes">Group Classes</SelectItem>
-                      <SelectItem value="Customer Service">Customer Service</SelectItem>
-                      <SelectItem value="Specialized Training">Specialized Training</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Branch *</Label>
-                  <Select
-                    value={newEmployeeBasicInfo.branch}
-                    onValueChange={v => { clearAddEmpError('branch'); setNewEmployeeBasicInfo(p => ({...p, branch: v})); }}
-                  >
-                    <SelectTrigger className="mt-1" style={addEmpErrors.branch ? ERROR_BORDER : undefined}>
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dropdownBranches.map(b => (
-                        <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={addEmpErrors.branch} />
-                </div>
-                <div>
-                  <Label>Monthly Target ({currencyCode})</Label>
-                  <Input
-                    type="number"
-                    placeholder="25000"
-                    className="mt-1"
-                    value={newEmployeeBasicInfo.monthly_target || ''}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, monthly_target: Number(e.target.value)}))}
-                  />
-                </div>
-                <div>
-                  <Label>Base Salary ({currencyCode})</Label>
-                  <Input
-                    type="number"
-                    placeholder="8000"
-                    className="mt-1"
-                    value={newEmployeeBasicInfo.base_salary || ''}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, base_salary: Number(e.target.value)}))}
-                  />
-                </div>
-                <div>
-                  <Label>Phone Number</Label>
-                  <Input
-                    placeholder="+971 50 123 4567"
-                    className="mt-1"
-                    value={newEmployeeBasicInfo.phone}
-                    onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setNewEmployeeBasicInfo(p => ({...p, phone: v})); }}
-                  />
-                </div>
-                <div>
-                  <Label>Join Date</Label>
-                  <Input
-                    type="date"
-                    className="mt-1"
-                    value={newEmployeeBasicInfo.join_date}
-                    onChange={e => setNewEmployeeBasicInfo(p => ({...p, join_date: e.target.value}))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Address</Label>
-                <Textarea
-                  placeholder="Enter address"
-                  rows={2}
-                  className="mt-1"
-                  value={newEmployeeBasicInfo.address}
-                  onChange={e => setNewEmployeeBasicInfo(p => ({...p, address: e.target.value}))}
-                />
-              </div>
-
-              {/* App Access Section */}
-              <div className="pt-2 border-t">
-                <p className="text-sm font-medium mb-3">App Access <span className="text-muted-foreground font-normal">(Optional — leave blank to skip)</span></p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>App Username</Label>
-                    <Input
-                      placeholder="e.g. john.trainer"
-                      className="mt-1"
-                      style={addEmpErrors.appUsername ? ERROR_BORDER : undefined}
-                      value={newEmployeeBasicInfo.appUsername || ''}
-                      onChange={e => { clearAddEmpError('appUsername'); clearAddEmpError('appPassword'); setNewEmployeeBasicInfo(p => ({...p, appUsername: e.target.value})); }}
-                      autoComplete="off"
-                    />
-                    <FieldError message={addEmpErrors.appUsername} />
-                  </div>
-                  <div>
-                    <Label>App Password</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        type={showNewEmpPassword ? 'text' : 'password'}
-                        placeholder="Min 6 characters"
-                        className="pr-10"
-                        style={addEmpErrors.appPassword ? ERROR_BORDER : undefined}
-                        value={newEmployeeBasicInfo.appPassword || ''}
-                        onChange={e => { clearAddEmpError('appPassword'); clearAddEmpError('appUsername'); setNewEmployeeBasicInfo(p => ({...p, appPassword: e.target.value})); }}
-                        autoComplete="new-password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewEmpPassword(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showNewEmpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <FieldError message={addEmpErrors.appPassword} />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Certifications Tab */}
-            <TabsContent value="certifications" className="space-y-4 mt-0">
-              <CertificationsTab certifications={newEmployeeCerts} onChange={setNewEmployeeCerts} />
-            </TabsContent>
-
-            {/* Schedule Tab */}
-            <TabsContent value="schedule" className="space-y-4 mt-0">
-              <ScheduleTab schedule={newEmployeeSchedule} onChange={setNewEmployeeSchedule} />
-            </TabsContent>
-          </Tabs>
-
-          <Separator className="my-3" />
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowAddEmployee(false)}>
-                Cancel
-              </Button>
-              {/* Never silently disabled — clicking with gaps highlights exactly what's missing (BG_80). */}
-              <Button onClick={handleCreateEmployee} disabled={isCreatingEmployee}>
-                {isCreatingEmployee ? 'Creating...' : 'Create Employee'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Employee Modal */}
-      <Dialog open={showEditEmployee} onOpenChange={v => { setShowEditEmployee(v); if (!v) setEditEmployeeData(null); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-2">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Edit className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl">Edit Employee Details</DialogTitle>
-                <DialogDescription className="mt-0.5">
-                  Update employee information, certifications and schedule
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <Separator className="my-3" />
-          {editEmployeeData && (
-            <>
-            <Tabs defaultValue="basic" className="space-y-4">
-              <TabsList className="bg-muted/50 p-1 w-full">
-                <TabsTrigger value="basic" className="flex-1 flex items-center gap-2">
-                  <Briefcase className="h-4 w-4" />
-                  Basic Info
-                </TabsTrigger>
-                <TabsTrigger value="certifications" className="flex-1 flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4" />
-                  Certifications
-                </TabsTrigger>
-                <TabsTrigger value="schedule" className="flex-1 flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  Schedule
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="basic" className="space-y-4 mt-0">
-                {/* Photo section — inline adjust when photoAdjustMode & photoTarget=edit */}
-                {photoAdjustMode && photoTarget === 'edit' ? (
-                  <div className="flex flex-col items-center gap-3 p-4 rounded-lg border border-primary/10 bg-muted/20">
-                    <p className="text-sm font-medium self-start">Adjust Photo — drag to reposition</p>
-                    <div
-                      style={{ width: 192, height: 192, borderRadius: '50%', overflow: 'hidden', border: '3px solid light-dark(#d1d5db, var(--border))', background: 'light-dark(#e5e7eb, var(--border))', cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none', flexShrink: 0 }}
-                      onMouseDown={handlePhotoMouseDown}
-                      onMouseMove={handlePhotoMouseMove}
-                      onMouseUp={handlePhotoMouseUp}
-                      onMouseLeave={handlePhotoMouseUp}
-                    >
-                      {selectedPhoto && (
-                        <img src={selectedPhoto} alt="Adjust" draggable={false}
-                          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${photoPosition.x}px,${photoPosition.y}px) scale(${photoZoom[0]})`, transformOrigin: 'center', pointerEvents: 'none', userSelect: 'none' }} />
-                      )}
-                    </div>
-                    <div className="w-full space-y-1 px-1">
-                      <Label className="text-xs">Zoom: {photoZoom[0].toFixed(1)}x</Label>
-                      <Slider value={photoZoom} onValueChange={setPhotoZoom} min={0.5} max={3} step={0.1} />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => { setPhotoZoom([1]); setPhotoPosition({ x: 0, y: 0 }); }}>Reset</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => { setPhotoAdjustMode(false); setSelectedPhoto(null); }}>Cancel</Button>
-                      <Button type="button" size="sm" onClick={handlePhotoSave}>Use Photo</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-6 p-4 rounded-lg border border-primary/10 bg-muted/20">
-                    <button
-                      type="button"
-                      style={{ width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(0,71,171,0.2)', background: 'light-dark(#f1f5f9, var(--muted-bg))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: editEmployeeData.photo_url ? 'pointer' : 'default' }}
-                      onClick={() => { if (editEmployeeData.photo_url) { setPhotoViewerSrc(editEmployeeData.photo_url); setPhotoViewerName(editEmployeeData.name); setPhotoViewerOpen(true); } }}
-                    >
-                      {editEmployeeData.photo_url
-                        ? <img src={editEmployeeData.photo_url} alt="Photo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                        : <Camera className="h-8 w-8 text-muted-foreground/50" />}
-                    </button>
-                    <div>
-                      <p className="text-sm font-medium mb-2">Employee Photo</p>
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setPhotoTarget('edit'); startCamera(); }}>
-                          <Camera className="h-3.5 w-3.5" /> Camera
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setPhotoTarget('edit'); fileInputRef.current?.click(); }}>
-                          <Upload className="h-3.5 w-3.5" /> Upload
-                        </Button>
-                        {editEmployeeData.photo_url && (
-                          <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => setEditEmployeeData(p => p ? { ...p, photo_url: undefined } : p)}>
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Full Name</Label>
-                    <Input className="mt-1" value={editEmployeeData.name}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, name: e.target.value} : p)} />
-                  </div>
-                  <div>
-                    <Label>Email Address</Label>
-                    <Input type="email" className="mt-1" value={editEmployeeData.email}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, email: e.target.value} : p)} />
-                  </div>
-                  <div>
-                    <Label>Role <span className="text-muted-foreground font-normal">(also controls app access)</span></Label>
-                    <Select
-                      value={staffRoleValue(staffRoleOptions(assignableRoles, editEmployeeData.role), editEmployeeData.role)}
-                      onValueChange={v => setEditEmployeeData(p => p ? {...p, role: v} : p)}
-                    >
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {staffRoleOptions(assignableRoles, editEmployeeData.role).map(r => (
-                          <SelectItem key={r} value={r}>{r}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Department</Label>
-                    <Select value={editEmployeeData.department} onValueChange={v => setEditEmployeeData(p => p ? {...p, department: v} : p)}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Personal Training">Personal Training</SelectItem>
-                        <SelectItem value="Group Classes">Group Classes</SelectItem>
-                        <SelectItem value="Customer Service">Customer Service</SelectItem>
-                        <SelectItem value="Specialized Training">Specialized Training</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Branch</Label>
-                    <Select value={editEmployeeData.branch} onValueChange={v => setEditEmployeeData(p => p ? {...p, branch: v} : p)}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {dropdownBranches.map(b => (
-                          <SelectItem key={b.id} value={b.branchName}>{b.branchName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Status</Label>
-                    <Select value={editEmployeeData.status} onValueChange={v => setEditEmployeeData(p => p ? {...p, status: v as any} : p)}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="on_leave">On Leave</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Monthly Target ({currencyCode})</Label>
-                    <Input type="number" className="mt-1" value={editEmployeeData.monthly_target || ''}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, monthly_target: Number(e.target.value)} : p)} />
-                  </div>
-                  <div>
-                    <Label>Base Salary ({currencyCode})</Label>
-                    <Input type="number" className="mt-1" value={editEmployeeData.base_salary || ''}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, base_salary: Number(e.target.value)} : p)} />
-                  </div>
-                  <div>
-                    <Label>Phone Number</Label>
-                    <Input className="mt-1" value={editEmployeeData.phone}
-                      onChange={e => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditEmployeeData(p => p ? {...p, phone: v} : p); }} />
-                  </div>
-                  <div>
-                    <Label>Join Date</Label>
-                    <Input type="date" className="mt-1" value={editEmployeeData.join_date ? editEmployeeData.join_date.slice(0, 10) : ''}
-                      onChange={e => setEditEmployeeData(p => p ? {...p, join_date: e.target.value} : p)} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Address</Label>
-                  <Textarea rows={2} className="mt-1" value={editEmployeeData.address}
-                    onChange={e => setEditEmployeeData(p => p ? {...p, address: e.target.value} : p)} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="certifications" className="mt-0">
-                <CertificationsTab
-                  certifications={editEmployeeData.certifications || []}
-                  onChange={certs => setEditEmployeeData(p => p ? {...p, certifications: certs} : p)}
-                />
-              </TabsContent>
-
-              <TabsContent value="schedule" className="mt-0">
-                <ScheduleTab
-                  schedule={editEmployeeData.schedule || {}}
-                  onChange={sched => setEditEmployeeData(p => p ? {...p, schedule: sched} : p)}
-                />
-              </TabsContent>
-            </Tabs>
-
-            {/* App Access Section */}
-            <div className="pt-3 mt-2 border-t space-y-3">
-              <p className="text-sm font-medium">App Access</p>
-
-              {editEmployeeData.user_id ? (
-                <>
-                  {/* Toggle row */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Username: <span className="font-mono">{editEmployeeData.app_username}</span>
-                    </p>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-muted-foreground">
-                        {editEmployeeData.app_access_enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                      <Switch
-                        checked={editEmployeeData.app_access_enabled ?? false}
-                        disabled={isTogglingStaffAccess}
-                        onCheckedChange={async (checked) => {
-                          setIsTogglingStaffAccess(true);
-                          try {
-                            const updated = await staffService.toggleStaffAccess(editEmployeeData.id, checked);
-                            setEditEmployeeData(p => p ? { ...p, app_access_enabled: updated.app_access_enabled } : p);
-                          } catch (e) { console.error('Failed to toggle staff access', e); }
-                          finally { setIsTogglingStaffAccess(false); }
-                        }}
-                      />
-                    </div>
-                  </div>
-                  {/* Change password */}
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Change Password <span className="font-normal">(also applies the Role selected above)</span></Label>
-                    <div className="flex gap-2 mt-1">
-                      <div className="relative flex-1">
-                        <Input
-                          type={showEditAppPassword ? 'text' : 'password'}
-                          placeholder="New password"
-                          className="pr-9"
-                          value={editAppPassword}
-                          onChange={e => setEditAppPassword(e.target.value)}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowEditAppPassword(v => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showEditAppPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!editAppPassword || isSavingStaffCredentials}
-                        onClick={async () => {
-                          setIsSavingStaffCredentials(true);
-                          try {
-                            await staffService.setStaffCredentials(editEmployeeData.id, editEmployeeData.app_username!, editAppPassword, editEmployeeData.role || undefined);
-                            setEditAppPassword('');
-                            toast.success('Password updated');
-                          } catch (e: any) {
-                            toast.error(e.message || 'Failed to update password');
-                          } finally { setIsSavingStaffCredentials(false); }
-                        }}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                /* No credentials yet — set new ones */
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">This staff member has no app login. Set credentials below.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Username</Label>
-                      <Input
-                        placeholder="e.g. john.trainer"
-                        className="mt-1"
-                        value={editAppUsername}
-                        onChange={e => setEditAppUsername(e.target.value)}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Password</Label>
-                      <div className="relative mt-1">
-                        <Input
-                          type={showEditAppPassword ? 'text' : 'password'}
-                          placeholder="Min 6 characters"
-                          className="pr-9"
-                          value={editAppPassword}
-                          onChange={e => setEditAppPassword(e.target.value)}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowEditAppPassword(v => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showEditAppPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={!editAppUsername || !editAppPassword || isSavingStaffCredentials}
-                    onClick={async () => {
-                      setIsSavingStaffCredentials(true);
-                      try {
-                        const updated = await staffService.setStaffCredentials(editEmployeeData.id, editAppUsername, editAppPassword, editEmployeeData.role || undefined);
-                        setEditEmployeeData(p => p ? { ...p, user_id: updated.user_id, app_username: updated.app_username, app_access_enabled: updated.app_access_enabled } : p);
-                        setEditAppUsername('');
-                        setEditAppPassword('');
-                        toast.success('App access created');
-                      } catch (e: any) {
-                        toast.error(e.message || 'Failed to set credentials');
-                      } finally { setIsSavingStaffCredentials(false); }
-                    }}
-                  >
-                    Set App Access
-                  </Button>
-                </div>
-              )}
-            </div>
-            </>
-          )}
-          <Separator className="my-3" />
-
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setShowEditEmployee(false)}>Cancel</Button>
-            <Button onClick={handleUpdateEmployee} disabled={!editEmployeeData?.name || !editEmployeeData?.email}>
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* View Schedule Modal */}
       <Dialog open={showViewSchedule} onOpenChange={v => { setShowViewSchedule(v); if (!v) setScheduleViewEmployee(null); }}>
         <DialogContent className="max-w-lg">
@@ -2174,34 +1146,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-      <canvas ref={canvasRef} className="hidden" />
-
-      {/* Camera Dialog */}
-      <Dialog open={cameraDialogOpen} onOpenChange={open => !open && stopCamera()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Take Employee Photo</DialogTitle>
-            <DialogDescription>Position the face in the frame, then capture.</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <video ref={videoRef} autoPlay playsInline className="w-80 h-60 bg-gray-900 rounded-xl" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border-4 border-white border-dashed rounded-full bg-white/10 pointer-events-none" />
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={stopCamera}>Cancel</Button>
-              <Button onClick={capturePhoto} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Camera className="h-4 w-4 mr-2" /> Capture
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-
 
       {/* Photo Viewer Dialog */}
       <Dialog open={photoViewerOpen} onOpenChange={setPhotoViewerOpen}>

@@ -714,6 +714,43 @@ public class FinancialEventService {
     }
 
     /**
+     * PAYROLL — Salary advance installment recovered.
+     * Through payroll (the amount was withheld from salary):
+     *   DR  Salary Expense               (amount)
+     *   CR  Salary Advance Receivable    (amount)
+     * Repaid directly by the employee:
+     *   DR  Cash at Bank                 (amount)
+     *   CR  Salary Advance Receivable    (amount)
+     */
+    public void onSalaryAdvanceRepaid(AdvanceRepayment repayment, SalaryAdvance advance) {
+        if (alreadyJournaled("AdvanceRepayment", repayment.getId())) return;
+
+        BigDecimal amount = safe(repayment.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        // taken out of a salary (payroll, or a salary payment made without payroll) vs repaid in cash
+        boolean viaPayroll = "payroll".equals(repayment.getSource()) || "salary_payment".equals(repayment.getSource());
+        List<JvLine> lines = List.of(
+                viaPayroll
+                        ? dr(ACC_SALARY_EXPENSE, "Salary Expense", amount,
+                                "Advance withheld from salary — " + advance.getEmployeeName())
+                        : dr(ACC_CASH_AT_BANK, "Cash at Bank", amount,
+                                "Advance repaid — " + advance.getEmployeeName()),
+                cr(ACC_SALARY_ADVANCE_REC, "Salary Advance Receivable", amount,
+                        "Advance installment" + (repayment.getInstallmentNo() != null ? " #" + repayment.getInstallmentNo() : ""))
+        );
+
+        LocalDate date = repayment.getPeriodMonth() != null && viaPayroll
+                ? repayment.getPeriodMonth().withDayOfMonth(repayment.getPeriodMonth().lengthOfMonth())
+                : LocalDate.now();
+        if (date.isAfter(LocalDate.now())) date = LocalDate.now();
+
+        JournalVoucher jv = createAndPost(
+                "Salary Advance Repayment: " + advance.getEmployeeName(), date, lines, "PAYROLL");
+        registerSource("AdvanceRepayment", repayment.getId(), "PAYROLL", jv.getId());
+    }
+
+    /**
      * ASSETS — Fixed asset purchased.
      * DR  Fixed Assets                 (purchasePrice)
      * CR  Accounts Payable             (purchasePrice)

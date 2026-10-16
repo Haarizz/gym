@@ -273,7 +273,7 @@ public class PaymentVoucherService {
      * automatically post a PaymentVoucher into the General Ledger / Financials.
      * NOT exposed as an HTTP endpoint.
      */
-    public void createPaymentVoucherFromModule(
+    public PaymentVoucher createPaymentVoucherFromModule(
             String supplierName,
             String supplierType,
             String billNo,
@@ -282,7 +282,7 @@ public class PaymentVoucherService {
             String description,
             String notes) {
 
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return null;
 
         PaymentVoucher pv = new PaymentVoucher();
         pv.setVoucherNo(voucherNumberService.next("PV"));
@@ -296,8 +296,8 @@ public class PaymentVoucherService {
         pv.setNotes(notes);
         pv.setStatus("Paid");
 
-        paymentVoucherRepository.save(pv);
         // No separate notification — callers already send their own
+        return paymentVoucherRepository.save(pv);
     }
 
     /**

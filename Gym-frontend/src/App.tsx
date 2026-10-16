@@ -106,6 +106,8 @@ import { Bookings } from "./pages/bookings";
 import { Payroll } from "./pages/payroll";
 import { SalaryPayments } from "./pages/salary-payments";
 import { SalaryAdvances } from "./pages/salary-advances";
+import { ShiftsSchedules } from "./pages/shifts-schedules";
+import { StaffAttendance } from "./pages/staff-attendance";
 import { MyProfile } from "./pages/my-profile";
 import { AppSettings } from "./pages/settings";
 import { MyPerformance } from "./pages/my-performance";
@@ -582,6 +584,20 @@ const menuItems = [
         permission: "STAFF_VIEW",
       },
       {
+        title: "Shifts & Schedules",
+        icon: Clock,
+        id: "shifts-schedules",
+        path: "/shifts-schedules",
+        permission: "STAFF_VIEW",
+      },
+      {
+        title: "Staff Attendance",
+        icon: UserCheck,
+        id: "staff-attendance",
+        path: "/staff-attendance",
+        permission: "STAFF_VIEW",
+      },
+      {
         title: "Roles & Permissions",
         icon: ShieldCheck,
         id: "roles-permissions",
@@ -617,7 +633,7 @@ const menuItems = [
         permission: "SALARY_PAYMENTS_VIEW",
       },
       {
-        title: "Salary Advances",
+        title: "Advances & Deductions",
         icon: TrendingUp,
         id: "salary-advances",
         path: "/salary-advances",
@@ -1114,6 +1130,8 @@ export default function App() {
       // Auto-expand Payroll & Employees for its sub-items
       const payrollEmployeesSubItems = [
         "staffs-trainers",
+        "shifts-schedules",
+        "staff-attendance",
         "roles-permissions",
         "trainings-classes",
         "bookings",
@@ -1279,8 +1297,10 @@ export default function App() {
       <Route path="/trainings-classes" element={<TrainingsClasses onNavigate={handleNavClick} />} />
       <Route path="/bookings" element={<Bookings onNavigate={handleNavClick} />} />
       <Route path="/payroll" element={<Payroll onNavigate={handleNavClick} />} />
-      <Route path="/salary-payments" element={<SalaryPayments onNavigate={handleNavClick} />} />
+      <Route path="/salary-payments" element={<SalaryPayments onNavigate={handleNavClick} initialMonth={navigationParams.month} initialYear={navigationParams.year} />} />
       <Route path="/salary-advances" element={<SalaryAdvances onNavigate={handleNavClick} />} />
+      <Route path="/shifts-schedules" element={<ShiftsSchedules onNavigate={handleNavClick} />} />
+      <Route path="/staff-attendance" element={<StaffAttendance onNavigate={handleNavClick} />} />
       <Route path="/recruitment" element={<Recruitment />} />
       <Route path="/payroll-reports" element={<PayrollReports />} />
       <Route path="/payroll-analytics" element={<PayrollAnalytics />} />

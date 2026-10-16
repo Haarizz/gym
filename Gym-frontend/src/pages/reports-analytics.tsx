@@ -16,6 +16,7 @@ import { attendanceService, AttendanceStats } from "../utils/supabase/attendance
 import { dashboardService, ClassAttendance as DashboardClassAttendance } from "../utils/supabase/dashboard-service";
 import { CustomReports } from "./custom-reports";
 import { DayReport } from "../components/reports/DayReport";
+import { withPrintFont } from "../utils/print-font";
 
 interface ReportsAnalyticsProps {
   onNavigate?: (section: string) => void;
@@ -883,16 +884,16 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       return;
     }
     const lines = csv.split("\n").map((l) => l.split(",").map((c) => c.replace(/^"|"$/g, '').replaceAll('""', '"')));
-    w.document.write(`
+    w.document.write(withPrintFont(`
       <html><head><meta charset="utf-8" /><title>Report</title>
-      <style>body{font-family:ui-sans-serif,system-ui;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}</style>
+      <style>body{font-family:'Plus Jakarta Sans Variable',ui-sans-serif,system-ui;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}</style>
       </head><body>
       <h1 style="margin:0 0 6px;font-size:18px;">${type.charAt(0).toUpperCase() + type.slice(1)} Report</h1>
       <div style="color:#6b7280;font-size:12px;margin-bottom:16px;">Range: ${RANGE_LABELS[rangeKey]}</div>
       <table>${lines.map((cells, i) => `<tr>${cells.map((c) => `<${i === 0 ? 'th' : 'td'}>${c}</${i === 0 ? 'th' : 'td'}>`).join('')}</tr>`).join('')}</table>
-      <script>window.onload = () => window.print();</script>
+      <script>window.onload = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print());</script>
       </body></html>
-    `);
+    `));
     w.document.close();
     toast.success("Print dialog opened (Save as PDF)");
   }, [csvBuilders, rangeKey, rangeLabel]);
@@ -949,10 +950,10 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       })
       .join("");
 
-    w.document.write(`
+    w.document.write(withPrintFont(`
       <html><head><meta charset="utf-8" /><title>Revenue Analysis Report</title>
       <style>
-        body{font-family:ui-sans-serif,system-ui;padding:24px;color:#1f2937}
+        body{font-family:'Plus Jakarta Sans Variable',ui-sans-serif,system-ui;padding:24px;color:#1f2937}
         h1{margin:0 0 4px;font-size:20px}
         h2{margin:24px 0 8px;font-size:15px}
         table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
@@ -973,9 +974,9 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       <table><tr><th>Category</th><th>Amount</th><th>Share</th></tr>${categoryTableRows}</table>
       <h2>Detailed Revenue Breakdown</h2>
       <table><tr><th>Period</th>${detailedTableHeader.map((h) => `<th>${h}</th>`).join("")}</tr>${detailedTableRows}</table>
-      <script>window.onload = () => window.print();</script>
+      <script>window.onload = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print());</script>
       </body></html>
-    `);
+    `));
     w.document.close();
     toast.success("Print dialog opened (Save as PDF)");
   }, [currencyCode, revenueReportKpis, paymentBreakdown, reportPeriods, revenueBreakdown, rangeKey]);

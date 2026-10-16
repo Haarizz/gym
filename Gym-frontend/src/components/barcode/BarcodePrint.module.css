@@ -189,7 +189,7 @@
   border-radius: 5px;
   background: var(--muted);
   color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   line-height: 18px;
 }
@@ -246,7 +246,7 @@
   border-radius: 8px;
   background: var(--input-background, var(--card));
   color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   appearance: none;
   cursor: pointer;

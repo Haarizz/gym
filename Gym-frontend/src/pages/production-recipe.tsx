@@ -26,6 +26,7 @@ import {
   ProductionStats,
 } from "../utils/supabase/production-recipe-service";
 import { productsService, Product, Warehouse } from "../utils/supabase/products-service";
+import { printWhenFontReady, withPrintFont } from "../utils/print-font";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -364,8 +365,8 @@ export function ProductionRecipe() {
   function printRecipe(r: Recipe) {
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<html><head><title>${r.name}</title>
-    <style>body{font-family:sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
+    win.document.write(withPrintFont(`<html><head><title>${r.name}</title>
+    <style>body{font-family:'Plus Jakarta Sans Variable',sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
     td,th{border:1px solid #ccc;padding:6px 10px;font-size:12px}</style></head><body>
     <h2>${r.name}</h2>
     <p><b>Output:</b> ${r.outputQuantity} ${r.outputUnit}${r.outputProductName ? ` of ${r.outputProductName}` : ''}</p>
@@ -377,15 +378,15 @@ export function ProductionRecipe() {
     <td>${i.quantity} ${i.unit}</td><td>${fmt(i.unitCost)}</td>
     <td>${fmt(i.quantity * i.unitCost)}</td></tr>`).join('')}</tbody></table>
     <p><b>Estimated Cost:</b> ${currencyCode} ${fmt(r.estimatedCost)}</p>
-    </body></html>`);
-    win.document.close(); win.print();
+    </body></html>`));
+    win.document.close(); printWhenFontReady(win);
   }
 
   function printOrder(o: ProductionOrder) {
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<html><head><title>${o.orderNumber}</title>
-    <style>body{font-family:sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
+    win.document.write(withPrintFont(`<html><head><title>${o.orderNumber}</title>
+    <style>body{font-family:'Plus Jakarta Sans Variable',sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
     td,th{border:1px solid #ccc;padding:6px 10px;font-size:12px}</style></head><body>
     <h2>Production Order — ${o.orderNumber}</h2>
     <p><b>Recipe:</b> ${o.recipeName}</p>
@@ -397,8 +398,8 @@ export function ProductionRecipe() {
     <tbody>${o.ingredients.map(i => `<tr><td>${i.productName}</td><td>${i.sku}</td>
     <td>${i.quantity}</td><td>${i.unit}</td></tr>`).join('')}</tbody></table>
     <p><b>Total Ingredient Cost:</b> ${currencyCode} ${fmt(o.totalIngredientCost)}</p>
-    </body></html>`);
-    win.document.close(); win.print();
+    </body></html>`));
+    win.document.close(); printWhenFontReady(win);
   }
 
   // ── recipe form cost preview

@@ -43,6 +43,25 @@ public class SalaryPayment extends BaseEntity implements BranchAware {
     @Column(name = "processed_by")
     private String processedBy;
 
+    // The approved payroll run line this payment settled (null for a manual payment).
+    @Column(name = "payroll_run_id")
+    private Long payrollRunId;
+
+    @Column(name = "payroll_run_line_id")
+    private Long payrollRunLineId;
+
+    public Long getPayrollRunId() { return payrollRunId; }
+    public void setPayrollRunId(Long payrollRunId) { this.payrollRunId = payrollRunId; }
+    public Long getPayrollRunLineId() { return payrollRunLineId; }
+    public void setPayrollRunLineId(Long payrollRunLineId) { this.payrollRunLineId = payrollRunLineId; }
+
+    // What the payment covered: basic, earnings and deductions (from the payroll line, or the manual items).
+    @Column(name = "settlement_json", columnDefinition = "TEXT")
+    private String settlementJson;
+
+    public String getSettlementJson() { return settlementJson; }
+    public void setSettlementJson(String settlementJson) { this.settlementJson = settlementJson; }
+
     public SalaryPayment() {}
 
     public Long getId() { return id; }

@@ -62,11 +62,14 @@ public class SalaryAdvanceService {
         advance.setRemarks(req.getRemarks());
         advance.setTotalDeducted(BigDecimal.ZERO);
         advance.setBalance(BigDecimal.ZERO);
-        advance.setInstallmentCount(0);
-        advance.setInstallmentAmount(BigDecimal.ZERO);
-        advance.setStartMonth(null);
+        int proposedInstallments = req.getInstallmentCount() != null && req.getInstallmentCount() > 0 ? req.getInstallmentCount() : 0;
+        advance.setInstallmentCount(proposedInstallments);
+        advance.setInstallmentAmount(proposedInstallments > 0 && advance.getRequestedAmount().signum() > 0
+                ? advance.getRequestedAmount().divide(BigDecimal.valueOf(proposedInstallments), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO);
+        advance.setStartMonth(req.getStartMonth() != null ? req.getStartMonth().withDayOfMonth(1) : null);
         advance.setDeductionMode("Monthly");
-        advance.setAutoDeduct(true);
+        advance.setAutoDeduct(req.getAutoDeduct() != null ? req.getAutoDeduct() : true);
         advance.setStatus("Pending Approval");
         advance.setNextDeductionDate(null);
         advance.setApprovedBy(null);
@@ -118,7 +121,7 @@ public class SalaryAdvanceService {
         advance.setDeductionMode(req.getDeductionMode() != null ? req.getDeductionMode() : "Monthly");
         advance.setStartMonth(req.getStartMonth());
         advance.setAutoDeduct(req.getAutoDeduct() != null ? req.getAutoDeduct() : true);
-        advance.setApprovedBy(req.getApprovedBy() != null ? req.getApprovedBy() : "HR Manager");
+        advance.setApprovedBy(req.getApprovedBy() != null ? req.getApprovedBy() : StaffAttendanceReviewService.currentUser());
         advance.setApprovedDate(LocalDate.now());
 
         if ("Approved".equalsIgnoreCase(decision)) {

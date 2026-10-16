@@ -11,6 +11,9 @@ public interface PaymentVoucherRepository extends JpaRepository<PaymentVoucher, 
 
     List<PaymentVoucher> findAllByOrderByPaymentDateDesc();
 
+    /** Vouchers raised by a module, e.g. salary payments (bill no "SAL-<employee>-<month>-<year>"). */
+    List<PaymentVoucher> findByBillNoStartingWith(String prefix);
+
     List<PaymentVoucher> findByStatusOrderByPaymentDateDesc(String status);
 
     List<PaymentVoucher> findBySupplierTypeOrderByPaymentDateDesc(String supplierType);

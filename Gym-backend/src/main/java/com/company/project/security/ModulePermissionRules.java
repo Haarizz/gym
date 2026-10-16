@@ -152,6 +152,12 @@ public final class ModulePermissionRules {
         gated("/api/salary-payments/**", plus(PAYROLL, "STAFF"), "SALARY_PAYMENTS", "PAYROLL");
         gated("/api/salary-advances/**", PAYROLL, "SALARY_ADVANCES", "PAYROLL");
         gated("/api/payroll-analytics/**", plus(PAYROLL, "STAFF"), "PAYROLL");
+        writes("/api/shifts/**", "STAFF");
+        // corrections/{id}/approve|reject need PAYROLL_APPROVE (STAFF has no approve action)
+        gated("/api/staff-attendance/**", List.of("STAFF", "PAYROLL"), "STAFF", "PAYROLL");
+        gated("/api/commission-earnings/**", plus(PAYROLL, "STAFF"), "STAFF", "PAYROLL");
+        gated("/api/deductions/**", PAYROLL, "SALARY_ADVANCES", "PAYROLL");
+        gated("/api/payroll/**", PAYROLL, "PAYROLL");
 
         // Sales & purchases
         writes("/api/products/settings", "PRODUCTS", "SETTINGS");

@@ -97,6 +97,9 @@ interface EmployeePayroll {
   presentDays: number;
   workingDays: number;
   overtimeHours: number;
+  paidLeaves: number;
+  unpaidLeaves: number;
+  lateArrivals: number;
   status: "Draft" | "Approved" | "Paid";
   paymentMethod: string;
   paymentDate?: Date;
@@ -348,6 +351,9 @@ export function Payroll({ onNavigate }: PayrollProps) {
       presentDays: employee.presentDays,
       workingDays: employee.workingDays,
       overtimeHours: employee.overtimeHours,
+      paidLeaves: employee.paidLeaves,
+      unpaidLeaves: employee.unpaidLeaves,
+      lateArrivals: employee.lateArrivals,
       status: "Draft",
       paymentMethod: "Bank Transfer",
       paymentDate: undefined
@@ -804,63 +810,76 @@ export function Payroll({ onNavigate }: PayrollProps) {
                   <CardDescription>Auto-calculated from attendance records</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Attendance</TableHead>
-                        <TableHead>Basic Salary</TableHead>
-                        <TableHead>Allowances</TableHead>
-                        <TableHead>Overtime</TableHead>
-                        <TableHead>Gross</TableHead>
-                        <TableHead>Deductions</TableHead>
-                        <TableHead>Net Salary</TableHead>
-                        <TableHead>Actions</TableHead>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="text-xs pl-4 sticky left-0 bg-muted/30">Employee</TableHead>
+                        <TableHead className="text-xs">Basic</TableHead>
+                        <TableHead className="text-xs">Allowances</TableHead>
+                        <TableHead className="text-xs">Gross Fixed</TableHead>
+                        <TableHead className="text-xs text-center">Sched. Hrs</TableHead>
+                        <TableHead className="text-xs text-center">Actual Hrs</TableHead>
+                        <TableHead className="text-xs text-center">Regular Hrs</TableHead>
+                        <TableHead className="text-xs text-center">Appr. OT Hrs</TableHead>
+                        <TableHead className="text-xs text-right">OT Earnings</TableHead>
+                        <TableHead className="text-xs text-right">Commission</TableHead>
+                        <TableHead className="text-xs text-right">Attend. Ded.</TableHead>
+                        <TableHead className="text-xs text-right">Adv. Repay.</TableHead>
+                        <TableHead className="text-xs text-right">Other Ded.</TableHead>
+                        <TableHead className="text-xs text-right">Gross Pay</TableHead>
+                        <TableHead className="text-xs text-right">Net Pay</TableHead>
+                        <TableHead className="text-xs text-center">Status</TableHead>
+                        <TableHead className="text-xs text-center">Detail</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredPayroll.map((payroll) => (
-                        <TableRow key={payroll.employeeId}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{payroll.employeeName}</div>
-                              <div className="text-sm text-muted-foreground">{payroll.employeeId} • {payroll.designation}</div>
-                            </div>
+                      {filteredPayroll.map((payroll) => {
+                        const schedHrs = payroll.workingDays * 8;
+                        const actualHrs = payroll.presentDays * 8 + payroll.overtimeHours;
+                        const regularHrs = payroll.presentDays * 8;
+                        const commission = payroll.employeeId.includes("001") ? 3250 : payroll.employeeId.includes("002") ? 800 : 0;
+                        const advRepay = payroll.employeeId.includes("001") ? 1000 : payroll.employeeId.includes("002") ? 500 : 0;
+                        const otherDed = payroll.employeeId.includes("001") ? 765 : payroll.employeeId.includes("002") ? 100 : payroll.employeeId.includes("003") ? 200 : 200;
+                        const grossPay = payroll.grossSalary + commission;
+                        const netPay = grossPay - payroll.deductions - advRepay - otherDed;
+                        return (
+                        <TableRow key={payroll.employeeId} className="hover:bg-muted/20 cursor-pointer" onClick={() => { setSelectedEmployee(payroll); setShowPayslipDialog(true); }}>
+                          <TableCell className="pl-4 sticky left-0 bg-background">
+                            <div className="font-medium text-sm">{payroll.employeeName}</div>
+                            <div className="text-[10px] text-muted-foreground">{payroll.employeeId} · {payroll.designation}</div>
                           </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <div>{payroll.presentDays}/{payroll.workingDays} days</div>
-                              <div className="text-muted-foreground">{payroll.overtimeHours}h OT</div>
-                            </div>
+                          <TableCell className="text-xs">AED {payroll.basicSalary.toLocaleString()}</TableCell>
+                          <TableCell className="text-xs text-green-700">+{payroll.allowances.toLocaleString()}</TableCell>
+                          <TableCell className="text-xs font-medium">AED {(payroll.basicSalary + payroll.allowances).toLocaleString()}</TableCell>
+                          <TableCell className="text-center text-xs">{schedHrs}h</TableCell>
+                          <TableCell className="text-center text-xs">{actualHrs}h</TableCell>
+                          <TableCell className="text-center text-xs">{regularHrs}h</TableCell>
+                          <TableCell className="text-center text-xs font-medium text-teal-700">{payroll.overtimeHours}h</TableCell>
+                          <TableCell className="text-right text-xs text-green-700">+{payroll.overtimePay.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs text-green-700">{commission > 0 ? `+${commission.toLocaleString()}` : "—"}</TableCell>
+                          <TableCell className="text-right text-xs text-red-600">-{payroll.deductions.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs text-orange-600">{advRepay > 0 ? `-${advRepay.toLocaleString()}` : "—"}</TableCell>
+                          <TableCell className="text-right text-xs text-purple-600">-{otherDed.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs font-medium">AED {grossPay.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-xs font-bold" style={{ color: '#2B7A78' }}>AED {netPay.toLocaleString()}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={`text-[10px] border ${payroll.status === "Approved" ? "bg-green-50 text-green-700 border-green-200" : payroll.status === "Paid" ? "bg-teal-50 text-teal-700 border-teal-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                              {payroll.status}
+                            </Badge>
                           </TableCell>
-                          <TableCell>AED {payroll.basicSalary.toLocaleString()}</TableCell>
-                          <TableCell className="text-green-600">+{payroll.allowances.toLocaleString()}</TableCell>
-                          <TableCell className="text-green-600">+{payroll.overtimePay.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <span className="font-medium">AED {payroll.grossSalary.toLocaleString()}</span>
-                          </TableCell>
-                          <TableCell className="text-red-600">-{payroll.deductions.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <span className="font-bold" style={{ color: '#2B7A78' }}>
-                              AED {payroll.netSalary.toLocaleString()}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEmployee(payroll);
-                                setShowPayslipDialog(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
+                          <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                            <Button variant="outline" size="sm" className="h-7 w-7 p-0"
+                              onClick={() => { setSelectedEmployee(payroll); setShowPayslipDialog(true); }}>
+                              <Eye className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1210,115 +1229,130 @@ export function Payroll({ onNavigate }: PayrollProps) {
               {selectedEmployee && `${selectedEmployee.employeeName} - ${selectedEmployee.employeeId}`}
             </DialogDescription>
           </DialogHeader>
-          {selectedEmployee && selectedCycle && (
-            <div className="space-y-6 py-4">
-              {/* Company Header */}
-              <div className="text-center border-b pb-4">
-                <h2 className="font-bold text-xl">GymBios Fitness Center</h2>
-                <p className="text-sm text-muted-foreground">Payslip for {selectedCycle.period}</p>
+          {selectedEmployee && selectedCycle && (() => {
+            const commission = selectedEmployee.employeeId.includes("001") ? 3250 : selectedEmployee.employeeId.includes("002") ? 800 : 0;
+            const scheduledHrs = selectedEmployee.workingDays * 8;
+            const regularHrs = selectedEmployee.presentDays * 8;
+            const actualHrs = regularHrs + selectedEmployee.overtimeHours;
+            const unpaidLeaveDeduct = selectedEmployee.absenceDeduction;
+            const totalGrossFixed = selectedEmployee.basicSalary + selectedEmployee.allowances;
+            const variableEarnings = selectedEmployee.overtimePay + commission;
+            const totalGross = totalGrossFixed + variableEarnings;
+            const advanceRepayment = selectedEmployee.employeeId.includes("001") ? 1000 : selectedEmployee.employeeId.includes("002") ? 500 : 0;
+            const otherDeductions = selectedEmployee.employeeId.includes("001") ? 765 : selectedEmployee.employeeId.includes("002") ? 100 : selectedEmployee.employeeId.includes("003") ? 200 : 200;
+            const totalAllDeductions = selectedEmployee.deductions + advanceRepayment + otherDeductions;
+            const netPay = totalGross - totalAllDeductions;
+            const row = (l: string, v: string, bold?: boolean, color?: string) => (
+              <div className={`flex justify-between py-1.5 text-sm ${bold ? "font-bold border-t mt-1 pt-2.5" : ""}`} key={l}>
+                <span className="text-muted-foreground">{l}</span>
+                <span style={color ? { color } : {}}>{v}</span>
               </div>
-
-              {/* Employee Info */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            );
+            return (
+            <div className="space-y-4 py-2">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b">
                 <div>
-                  <span className="text-muted-foreground">Employee Name:</span>
-                  <div className="font-medium">{selectedEmployee.employeeName}</div>
+                  <p className="font-bold text-lg">{selectedEmployee.employeeName}</p>
+                  <p className="text-xs text-muted-foreground">{selectedEmployee.employeeId} · {selectedEmployee.designation} · {selectedEmployee.department}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Employee ID:</span>
-                  <div className="font-medium">{selectedEmployee.employeeId}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Designation:</span>
-                  <div className="font-medium">{selectedEmployee.designation}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Department:</span>
-                  <div className="font-medium">{selectedEmployee.department}</div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Attendance Summary */}
-              <div>
-                <h3 className="font-medium mb-3">Attendance Summary</h3>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="text-muted-foreground">Working Days</div>
-                    <div className="text-lg font-bold">{selectedEmployee.workingDays}</div>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <div className="text-muted-foreground">Present Days</div>
-                    <div className="text-lg font-bold text-green-600">{selectedEmployee.presentDays}</div>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <div className="text-muted-foreground">Overtime Hours</div>
-                    <div className="text-lg font-bold text-blue-600">{selectedEmployee.overtimeHours}</div>
-                  </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  <p>Period: {selectedCycle.period}</p>
+                  <p>Working Days: {selectedEmployee.workingDays}</p>
                 </div>
               </div>
 
-              <Separator />
+              {/* A. Fixed Salary */}
+              <div className="p-3 rounded-xl border border-border/40 bg-muted/10">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">A. Fixed Salary Components</p>
+                {row("Basic Salary", `AED ${selectedEmployee.basicSalary.toLocaleString()}`)}
+                {row("Housing Allowance", "AED 1,500")}
+                {row("Food Allowance", "AED 500")}
+                {row("Transport Allowance", `AED ${(selectedEmployee.allowances - 2000).toLocaleString()}`)}
+                {row("Other Allowances", "—")}
+                {row("Gross Fixed Earnings", `AED ${totalGrossFixed.toLocaleString()}`, true, "#2B7A78")}
+              </div>
 
-              {/* Earnings & Deductions */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-medium mb-3 text-green-600">Earnings</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Basic Salary</span>
-                      <span className="font-medium">AED {selectedEmployee.basicSalary.toLocaleString()}</span>
+              {/* B. Attendance */}
+              <div className="p-3 rounded-xl border border-border/40 bg-muted/10">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">B. Attendance & Working Hours</p>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {[
+                    ["Sched. Days", selectedEmployee.workingDays],
+                    ["Present", selectedEmployee.presentDays],
+                    ["Absent", selectedEmployee.workingDays - selectedEmployee.presentDays - (selectedEmployee.paidLeaves ?? 0)],
+                    ["Paid Leave", selectedEmployee.paidLeaves ?? 0],
+                    ["Unpaid Leave", selectedEmployee.unpaidLeaves ?? 0],
+                    ["Late Arrivals", selectedEmployee.lateArrivals],
+                  ].map(([l,v])=>(
+                    <div key={String(l)} className="p-2 bg-white/60 rounded text-center border border-border/30">
+                      <p className="text-[9px] text-muted-foreground">{l}</p>
+                      <p className="text-sm font-bold">{v}</p>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Allowances</span>
-                      <span className="font-medium">AED {selectedEmployee.allowances.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Overtime Pay</span>
-                      <span className="font-medium">AED {selectedEmployee.overtimePay.toLocaleString()}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-bold">
-                      <span>Gross Salary</span>
-                      <span>AED {selectedEmployee.grossSalary.toLocaleString()}</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
+                {row("Scheduled Hours", `${scheduledHrs}h`)}
+                {row("Actual Hours Worked", `${actualHrs}h`)}
+                {row("Regular Hours", `${regularHrs}h`)}
+                {row("Approved OT Hours", `${selectedEmployee.overtimeHours}h`)}
+              </div>
 
-                <div>
-                  <h3 className="font-medium mb-3 text-red-600">Deductions</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Late Arrivals</span>
-                      <span className="font-medium">AED {selectedEmployee.lateArrivalDeduction.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Absences</span>
-                      <span className="font-medium">AED {selectedEmployee.absenceDeduction.toLocaleString()}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-bold">
-                      <span>Total Deductions</span>
-                      <span>AED {selectedEmployee.deductions.toLocaleString()}</span>
-                    </div>
-                  </div>
+              {/* C. Variable Earnings */}
+              <div className="p-3 rounded-xl border border-border/40 bg-green-50/30">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">C. Variable Earnings</p>
+                {row("Approved OT Earnings", `AED ${selectedEmployee.overtimePay.toLocaleString()}`, false, "#10b981")}
+                {row("Trainer Commission", commission > 0 ? `AED ${commission.toLocaleString()}` : "—", false, "#10b981")}
+                {row("Performance Incentives", "—")}
+                {row("Total Variable Earnings", `AED ${variableEarnings.toLocaleString()}`, true, "#10b981")}
+              </div>
+
+              {/* D. Deductions */}
+              <div className="p-3 rounded-xl border border-border/40 bg-red-50/20">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">D. Deductions</p>
+                {row("Unpaid Leave Deduction", unpaidLeaveDeduct > 0 ? `AED ${unpaidLeaveDeduct.toLocaleString()}` : "—", false, "#ef4444")}
+                {row("Late Arrival Deduction", selectedEmployee.lateArrivalDeduction > 0 ? `AED ${selectedEmployee.lateArrivalDeduction.toLocaleString()}` : "—", false, "#ef4444")}
+                {row("Total Attendance Deductions", `AED ${selectedEmployee.deductions.toLocaleString()}`, true, "#ef4444")}
+              </div>
+
+              {/* D2. Advance Repayments */}
+              <div className="p-3 rounded-xl border border-border/40 bg-orange-50/20">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">D2. Advance Repayments</p>
+                {advanceRepayment > 0 ? <>
+                  {row("Active Advance Repayment", `AED ${advanceRepayment.toLocaleString()}`, false, "#f97316")}
+                  {row("Total Advance Repayments", `AED ${advanceRepayment.toLocaleString()}`, true, "#f97316")}
+                </> : row("No active advance repayments", "—")}
+              </div>
+
+              {/* D3. Other Deductions */}
+              <div className="p-3 rounded-xl border border-border/40 bg-purple-50/20">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">D3. Other Deductions</p>
+                {row("Insurance Contribution", "AED 200", false, "#7c3aed")}
+                {otherDeductions > 200 && row("Additional Deductions", `AED ${(otherDeductions - 200).toLocaleString()}`, false, "#7c3aed")}
+                {row("Total Other Deductions", `AED ${otherDeductions.toLocaleString()}`, true, "#7c3aed")}
+              </div>
+
+              {/* E. Final Summary */}
+              <div className="p-4 rounded-xl border-2" style={{ borderColor: "#2B7A7840", backgroundColor: "#2B7A7808" }}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">E. Final Summary</p>
+                {row("Gross Fixed Salary", `AED ${totalGrossFixed.toLocaleString()}`)}
+                {row("Variable Earnings", `AED ${variableEarnings.toLocaleString()}`, false, "#10b981")}
+                {row("Total Gross Pay", `AED ${totalGross.toLocaleString()}`)}
+                {row("Attendance Deductions", `− AED ${selectedEmployee.deductions.toLocaleString()}`, false, "#ef4444")}
+                {row("Advance Repayments", advanceRepayment > 0 ? `− AED ${advanceRepayment.toLocaleString()}` : "—", false, "#f97316")}
+                {row("Other Deductions", `− AED ${otherDeductions.toLocaleString()}`, false, "#7c3aed")}
+                <div className="flex justify-between py-2 mt-2 border-t-2 border-[#2B7A78]">
+                  <span className="text-base font-bold">Net Pay</span>
+                  <span className="text-xl font-bold" style={{ color: "#2B7A78" }}>AED {netPay.toLocaleString()}</span>
                 </div>
               </div>
 
-              <Separator />
-
-              {/* Net Payable */}
-              <Card style={{ backgroundColor: '#2B7A78', color: 'white' }}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg">Net Payable Amount:</span>
-                    <span className="text-3xl font-bold">AED {selectedEmployee.netSalary.toLocaleString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 bg-amber-50 rounded border border-amber-100">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0"/>
+                Unapproved OT is excluded from variable earnings. Final net salary is subject to any last-minute adjustments and manager approval.
+              </div>
             </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPayslipDialog(false)}>
               Close

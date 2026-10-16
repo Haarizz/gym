@@ -17,7 +17,7 @@ export function reportA4Html(doc: ReportDoc, extraTables: { heading: string; col
   return `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(doc.title)} ${esc(doc.number)}</title><style>
   @page{size:A4;margin:12mm}
   *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#1E293B;font-size:11px;margin:0}
+  body{font-family:'Plus Jakarta Sans Variable','Segoe UI',Arial,sans-serif;color:#1E293B;font-size:11px;margin:0}
   .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2B7A78;padding-bottom:10px;margin-bottom:14px}
   .logo{max-height:46px;max-width:200px;object-fit:contain;display:block;margin-bottom:6px}
   .co{font-size:20px;font-weight:800;color:#2B7A78}

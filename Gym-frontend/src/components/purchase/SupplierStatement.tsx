@@ -10,6 +10,7 @@ import { SearchableSelect } from '../shared/SearchableSelect';
 import styles from './PurchaseInvoice.module.css';
 import { cx } from './purchaseUi';
 import { displayDate, money, todayIso } from './purchaseInvoiceUtils';
+import { printWhenFontReady, withPrintFont } from "../../utils/print-font";
 
 type Preset = 'THIS_MONTH' | 'LAST_3_MONTHS' | 'THIS_YEAR' | 'ALL';
 
@@ -97,8 +98,8 @@ export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers:
       <td>${html(e.description)}</td><td>${html(e.reference || '—')}</td>
       <td class="r">${e.debit ? money(e.debit) : '—'}</td><td class="r">${e.credit ? money(e.credit) : '—'}</td>
       <td class="r"><b>${balanceText(e.runningBalance)}</b></td></tr>`).join('');
-    win.document.write(`<!doctype html><html><head><title>${html(fileBase)}</title><style>
-      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e293b;margin:0;padding:32px;font-size:12px}
+    win.document.write(withPrintFont(`<!doctype html><html><head><title>${html(fileBase)}</title><style>
+      *{box-sizing:border-box} body{font-family:'Plus Jakarta Sans Variable',Arial,sans-serif;color:#1e293b;margin:0;padding:32px;font-size:12px}
       .top{display:flex;justify-content:space-between;border-bottom:3px solid #2b7a78;padding-bottom:14px;margin-bottom:18px}
       h1{margin:0;font-size:20px;color:#2b7a78;letter-spacing:.05em} .m{color:#64748b}
       .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
@@ -128,10 +129,10 @@ export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers:
         <tfoot><tr><td colspan="5" class="r">Closing totals</td><td class="r">${money(statement.totalDebit)}</td>
         <td class="r">${money(statement.totalCredit)}</td><td class="r">${balanceText(statement.closingBalance)}</td></tr></tfoot></table>
       <div class="note">Cr = amount payable to the supplier · Dr = advance paid to the supplier. This is a computer-generated statement and does not require a signature.</div>
-    </body></html>`);
+    </body></html>`));
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 250);
+    printWhenFontReady(win);
   };
 
   const presets: { key: Preset; label: string }[] = [

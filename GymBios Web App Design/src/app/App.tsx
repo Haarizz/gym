@@ -45,6 +45,8 @@ import { Automations } from "./components/automations";
 import { PostWorkoutCheckin } from "./components/post-workout-checkin";
 import { PlansServicesCatalog } from "./components/plans-services-catalog";
 import { StaffsTrainers } from "./components/staffs-trainers";
+import { ShiftsSchedules } from "./components/shifts-schedules";
+import { StaffAttendance } from "./components/staff-attendance";
 import { ManageAssets } from "./components/manage-assets";
 import { AssetTransactions } from "./components/asset-transactions";
 import { Ledgers } from "./components/ledgers";
@@ -397,6 +399,16 @@ const menuItems = [
         id: "staffs-trainers",
       },
       {
+        title: "Shifts & Schedules",
+        icon: Clock,
+        id: "shifts-schedules",
+      },
+      {
+        title: "Staff Attendance",
+        icon: UserCheck,
+        id: "staff-attendance",
+      },
+      {
         title: "Trainings & Classes",
         icon: GraduationCap,
         id: "trainings-classes",
@@ -417,7 +429,7 @@ const menuItems = [
         id: "salary-payments",
       },
       {
-        title: "Salary Advances",
+        title: "Advances & Deductions",
         icon: TrendingUp,
         id: "salary-advances",
       },
@@ -921,6 +933,10 @@ export default function App() {
         return <PayrollEmployees />;
       case "staffs-trainers":
         return <StaffsTrainers onNavigate={handleNavClick} />;
+      case "shifts-schedules":
+        return <ShiftsSchedules onNavigate={handleNavClick} />;
+      case "staff-attendance":
+        return <StaffAttendance onNavigate={handleNavClick} />;
       case "set-targets":
         return <SetTargets onNavigate={handleNavClick} />;
       case "targets-overview":

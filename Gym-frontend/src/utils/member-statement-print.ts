@@ -47,7 +47,7 @@ export async function printMemberStatement(s: MemberStatement, currencyCode: str
 <style>
   @page { size: A4; margin: 14mm 12mm; }
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Arial, sans-serif; color: #1f2937; font-size: 12px; margin: 0; }
+  body { font-family: 'Plus Jakarta Sans Variable', "Segoe UI", Arial, sans-serif; color: #1f2937; font-size: 12px; margin: 0; }
   .wrap { max-width: 780px; margin: 0 auto; padding: 8px; }
   .top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #327F74; padding-bottom: 14px; }
   .logo { max-height: 46px; max-width: 200px; object-fit: contain; display: block; margin-bottom: 6px; }
@@ -72,7 +72,7 @@ export async function printMemberStatement(s: MemberStatement, currencyCode: str
   td { padding: 6px 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
   tr.alt td { background: #fafafa; }
   .num { text-align: right; white-space: nowrap; }
-  .mono { font-family: Consolas, monospace; font-size: 11px; }
+  .mono { font-variant-numeric: tabular-nums; font-size: 11px; }
   .credit { color: #047857; }
   .due { color: #b91c1c; }
   .bold { font-weight: 700; }

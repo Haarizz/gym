@@ -65,6 +65,14 @@ public class Staff extends BaseEntity implements BranchAware {
     @Column(name = "app_access_enabled")
     private Boolean appAccessEnabled;
 
+    // Extended HR profile from the Add/Edit Employee form (personal, contact, employment,
+    // documents, payroll & allowances, leave, emergency contacts...) as one JSON document.
+    @Column(name = "profile_json", columnDefinition = "TEXT")
+    private String profileJson;
+
+    public String getProfileJson() { return profileJson; }
+    public void setProfileJson(String profileJson) { this.profileJson = profileJson; }
+
     // getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

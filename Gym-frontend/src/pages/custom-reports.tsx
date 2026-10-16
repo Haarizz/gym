@@ -28,6 +28,7 @@ import { PeriodComparison } from "../components/reports/PeriodComparison";
 import { PAY_METHOD_ORDER, splitPaid } from "../utils/payment-split";
 import { toast } from "sonner";
 import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
+import { withPrintFont } from "../utils/print-font";
 
 interface CustomReportsProps {
   onNavigate?: (section: string) => void;
@@ -310,13 +311,13 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
     }
     const rangeLabel = getRangeLabel().replaceAll("_", " ");
     const rows = filteredData;
-    w.document.write(`
+    w.document.write(withPrintFont(`
       <html>
         <head>
           <meta charset="utf-8" />
           <title>Custom Reports</title>
           <style>
-            body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
+            body { font-family: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
             h1 { margin: 0 0 6px; font-size: 18px; }
             .sub { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -354,11 +355,11 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
             </tbody>
           </table>
           <script>
-            window.onload = () => { window.print(); };
+            window.onload = () => { (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print()); };
           </script>
         </body>
       </html>
-    `);
+    `));
     w.document.close();
     toast.success("Print dialog opened (Save as PDF)");
   };

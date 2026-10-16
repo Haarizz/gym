@@ -30,6 +30,7 @@ import {
   WastageReturnStats,
 } from "../utils/supabase/wastage-return-service";
 import { productsService, Product } from "../utils/supabase/products-service";
+import { printWhenFontReady, withPrintFont } from "../utils/print-font";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -419,9 +420,9 @@ export function WastageReturns() {
   function printVoucher(v: WastageReturn) {
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`
+    win.document.write(withPrintFont(`
       <html><head><title>${v.voucherNumber}</title>
-      <style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}
+      <style>body{font-family:'Plus Jakarta Sans Variable',sans-serif;padding:20px}table{width:100%;border-collapse:collapse}
       td,th{border:1px solid #ccc;padding:6px 10px;font-size:12px}.header{margin-bottom:16px}</style>
       </head><body>
       <div class="header">
@@ -444,9 +445,9 @@ export function WastageReturns() {
       <b>Total Value:</b> ${currencyCode} ${fmt(v.totalValue)}</p>
       ${v.notes ? `<p><b>Notes:</b> ${v.notes}</p>` : ''}
       </body></html>
-    `);
+    `));
     win.document.close();
-    win.print();
+    printWhenFontReady(win);
   }
 
   function duplicateVoucher(v: WastageReturn) {

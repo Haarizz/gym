@@ -1,0 +1,45 @@
+/*
+ * GymBios typeface: Plus Jakarta Sans (self-hosted variable font, weights 200–800, loaded in
+ * main.tsx). Overriding --font-sans re-points Tailwind's base font (html, form controls,
+ * .font-sans) everywhere; this file is unlayered so it wins over the precompiled theme layer.
+ * Arabic and emoji fall through to the system fonts after it.
+ */
+:root {
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans Arabic", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+html {
+  font-family: var(--font-sans);
+  /* Plus Jakarta Sans has a narrow word space (0.17em, vs ~0.27em in system fonts), so small text
+     reads cramped; open it up slightly. */
+  word-spacing: 0.04em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Form controls and buttons don't inherit fonts in every browser. */
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+}
+
+/* Fixed-width digits wherever figures are compared: tables, number fields and amounts,
+   so columns of money, counts and codes line up. */
+table,
+input[type="number"],
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Receipt numbers, IDs and shortcut keys stay in the app font (one typeface throughout) with
+   fixed-width digits; only <pre>/<code> (stack traces) keep a true monospace. */
+.font-mono,
+kbd {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}

@@ -22,6 +22,20 @@ public class SalaryPaymentResponseDTO {
     private String notes;
     private String status;
     private String processedBy;
+    // Number of the payment voucher posted to Financials for this payment (null for very old ones).
+    private String voucherNo;
+    private Long payrollRunId;
+    private Long payrollRunLineId;
+    public Long getPayrollRunId() { return payrollRunId; }
+    public void setPayrollRunId(Long payrollRunId) { this.payrollRunId = payrollRunId; }
+    public Long getPayrollRunLineId() { return payrollRunLineId; }
+    public void setPayrollRunLineId(Long payrollRunLineId) { this.payrollRunLineId = payrollRunLineId; }
+    public String getVoucherNo() { return voucherNo; }
+    public void setVoucherNo(String voucherNo) { this.voucherNo = voucherNo; }
+    // basic / earnings / deductions the payment covered (null for payments made before this was kept)
+    private com.fasterxml.jackson.databind.JsonNode settlement;
+    public com.fasterxml.jackson.databind.JsonNode getSettlement() { return settlement; }
+    public void setSettlement(com.fasterxml.jackson.databind.JsonNode settlement) { this.settlement = settlement; }
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -42,6 +56,8 @@ public class SalaryPaymentResponseDTO {
         dto.setNotes(p.getNotes());
         dto.setStatus(p.getStatus());
         dto.setProcessedBy(p.getProcessedBy());
+        dto.setPayrollRunId(p.getPayrollRunId());
+        dto.setPayrollRunLineId(p.getPayrollRunLineId());
         dto.setCreatedAt(p.getCreatedAt());
         dto.setUpdatedAt(p.getUpdatedAt());
         return dto;

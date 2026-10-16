@@ -66,6 +66,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { authService } from "../utils/supabase/auth-service";
 import { attendanceService } from "../utils/supabase/attendance-service";
+import { withPrintFont } from "../utils/print-font";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -244,7 +245,7 @@ function buildPrintHTML(
 <title>Attendance Report – ${dateLabel}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a1a;background:#fff;padding:40px;font-size:13px}
+  body{font-family:'Plus Jakarta Sans Variable','Segoe UI',Arial,sans-serif;color:#1a1a1a;background:#fff;padding:40px;font-size:13px}
   .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
   .brand h1{font-size:26px;font-weight:800;color:#0047AB}
   .brand p{color:#666;font-size:12px;margin-top:2px}
@@ -336,7 +337,7 @@ function buildPrintHTML(
     Dubai, United Arab Emirates &nbsp;|&nbsp; support@gymbios.ae &nbsp;|&nbsp; www.gymbios.ae
   </div>
 
-  <script>window.onload = function(){ window.print(); }</script>
+  <script>window.onload = function(){ (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){ window.print(); }); }</script>
 </body>
 </html>`;
 }
@@ -554,7 +555,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
     const html = buildPrintHTML(report, trainers, startStr, endStr);
     const win = window.open("", "_blank", "width=900,height=950");
     if (win) {
-      win.document.write(html);
+      win.document.write(withPrintFont(html));
       win.document.close();
       toast.success("PDF report opened — use browser Print (Ctrl+P) to save as PDF");
     } else {

@@ -1,4 +1,5 @@
 import { authService } from "./auth-service";
+import { parseApiError } from "./api-error";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -36,6 +37,10 @@ export interface SalaryAdvanceCreateRequest {
   requestedAmount: number;
   remarks?: string;
   attachment?: string | null;
+  // Proposed repayment plan (the approver can change it).
+  installmentCount?: number;
+  startMonth?: string | null;
+  autoDeduct?: boolean;
 }
 
 export interface SalaryAdvanceApprovalRequest {
@@ -91,6 +96,9 @@ function toCreateBody(req: SalaryAdvanceCreateRequest) {
     requested_amount: req.requestedAmount,
     remarks: req.remarks,
     attachment: req.attachment,
+    installment_count: req.installmentCount,
+    start_month: req.startMonth,
+    auto_deduct: req.autoDeduct,
   };
 }
 
@@ -115,7 +123,7 @@ class SalaryAdvancesService {
     if (filters.department) params.append("department", filters.department);
 
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/salary-advances?${params.toString()}`);
-    if (!res.ok) throw new Error("Failed to load salary advances");
+    if (!res.ok) throw new Error(await parseApiError(res, "Failed to load salary advances"));
     const data = await res.json();
     return (data ?? []).map(mapAdvance);
   }
@@ -125,7 +133,7 @@ class SalaryAdvancesService {
       method: "POST",
       body: JSON.stringify(toCreateBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to create salary advance");
+    if (!res.ok) throw new Error(await parseApiError(res, "Failed to create salary advance"));
     return mapAdvance(await res.json());
   }
 
@@ -134,7 +142,7 @@ class SalaryAdvancesService {
       method: "PUT",
       body: JSON.stringify(toCreateBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to update salary advance");
+    if (!res.ok) throw new Error(await parseApiError(res, "Failed to update salary advance"));
     return mapAdvance(await res.json());
   }
 
@@ -143,7 +151,7 @@ class SalaryAdvancesService {
       method: "POST",
       body: JSON.stringify(toApprovalBody(req)),
     });
-    if (!res.ok) throw new Error("Failed to approve salary advance");
+    if (!res.ok) throw new Error(await parseApiError(res, "Failed to approve salary advance"));
     return mapAdvance(await res.json());
   }
 
@@ -151,7 +159,7 @@ class SalaryAdvancesService {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/salary-advances/${id}`, {
       method: "DELETE",
     });
-    if (!res.ok) throw new Error("Failed to delete salary advance");
+    if (!res.ok) throw new Error(await parseApiError(res, "Failed to delete salary advance"));
   }
 }
 

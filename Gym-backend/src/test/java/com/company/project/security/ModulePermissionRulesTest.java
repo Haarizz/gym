@@ -56,6 +56,30 @@ class ModulePermissionRulesTest {
     }
 
     @Test
+    void workforceRoutesAreGated() {
+        // Shifts & Schedules belong to Staff.
+        assertTrue(allowed("POST", "/api/shifts", "STAFF_CREATE"));
+        assertTrue(allowed("POST", "/api/shifts/assign", "STAFF_EDIT"));
+        assertFalse(allowed("POST", "/api/shifts/assign", "STAFF_VIEW"));
+        // Staff attendance management: readable by staff or payroll, corrections approved by payroll approvers.
+        assertTrue(allowed("GET", "/api/staff-attendance/daily", "STAFF_VIEW"));
+        assertFalse(allowed("GET", "/api/staff-attendance/daily", "MEMBERS_VIEW"));
+        assertTrue(allowed("POST", "/api/staff-attendance/corrections", "STAFF_EDIT"));
+        assertFalse(allowed("POST", "/api/staff-attendance/corrections/4/approve", "STAFF_EDIT"));
+        assertTrue(allowed("POST", "/api/staff-attendance/corrections/4/approve", "PAYROLL_APPROVE"));
+        // Payroll runs, deductions and commission payouts.
+        assertFalse(allowed("GET", "/api/payroll/runs", "STAFF_VIEW"));
+        assertTrue(allowed("GET", "/api/payroll/runs", "PAYROLL_VIEW"));
+        assertFalse(allowed("POST", "/api/payroll/runs/1/approve", "PAYROLL_EDIT"));
+        assertTrue(allowed("POST", "/api/payroll/runs/1/approve", "PAYROLL_APPROVE"));
+        assertTrue(allowed("POST", "/api/deductions/2/approve", "SALARY_ADVANCES_APPROVE"));
+        assertFalse(allowed("POST", "/api/deductions", "STAFF_CREATE"));
+        assertTrue(allowed("POST", "/api/commission-earnings/bulk/approve", "PAYROLL_APPROVE"));
+        assertFalse(allowed("POST", "/api/commission-earnings/approve", "STAFF_EDIT"));
+        assertTrue(allowed("POST", "/api/commission-earnings/pay", "STAFF_EDIT"));
+    }
+
+    @Test
     void specificSubRoutesWinOverTheirParent() {
         // Redeeming a promotion during a member renewal is not "managing promotions".
         assertTrue(allowed("POST", "/api/promotions/9/redeem", "MEMBERS_EDIT"));

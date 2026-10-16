@@ -1,3 +1,5 @@
+import { printFontReady, withPrintFont } from "./print-font";
+
 let activePrintFrame: HTMLIFrameElement | null = null;
 
 /**
@@ -19,7 +21,7 @@ export function printHtml(html: string) {
   const doc = frame.contentDocument!;
   doc.open();
   // The caller decides when to print; drop any print-on-load script in the document.
-  doc.write(html.replace(/<script[\s\S]*?<\/script>/gi, ""));
+  doc.write(withPrintFont(html.replace(/<script[\s\S]*?<\/script>/gi, "")));
   doc.close();
 
   let printed = false;
@@ -47,7 +49,7 @@ export function printHtml(html: string) {
     const done = () => { if (--left === 0) resolve(); };
     pending.forEach((img) => { img.onload = done; img.onerror = done; });
   });
-  const fontsReady = doc.fonts?.ready ?? Promise.resolve();
+  const fontsReady = printFontReady(doc);
   Promise.all([imagesReady, fontsReady]).then(() => setTimeout(doPrint, 50));
   setTimeout(doPrint, 3000);
 }

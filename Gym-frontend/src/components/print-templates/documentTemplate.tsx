@@ -3,6 +3,9 @@ import { buildQrCodeSvg, type CompanyDetails } from '../../utils/company-details
 import { CURRENCIES, type CurrencyCode } from '../../utils/currency';
 import aedSymbolUrl from '../../assets/currency/aed-symbol.webp';
 
+/** GymBios document font (Plus Jakarta Sans, declared in each print document by print-font.ts). */
+export const DOC_FONT = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif";
+
 // Sales / purchase document layout ported from BillBull's Print & Email Templates
 // ("Classic" DocumentTemplateDesigner). One component renders both the live
 // designer preview and the real print (via renderToStaticMarkup), so what the
@@ -153,7 +156,7 @@ export function defaultSettings(docType: DocType): DocTemplateSettings {
     tableHeaderText: '#1a1a2e',
     totalRowBg: '#f8fafc',
     borderColor: '#e2e8f0',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: DOC_FONT,
     fontSize: 9,
     showGrandTotalBanner: true,
     showWatermark: false,
@@ -237,7 +240,10 @@ export function defaultSettings(docType: DocType): DocTemplateSettings {
 
 /** Saved settings over the defaults, so templates saved before a field existed still render. */
 export function resolveSettings(docType: DocType, saved?: Record<string, unknown> | null): DocTemplateSettings {
-  return { ...defaultSettings(docType), ...(saved ?? {}), docType } as DocTemplateSettings;
+  const s = { ...defaultSettings(docType), ...(saved ?? {}), docType } as DocTemplateSettings;
+  // Inter was the old default but was never loaded, so it printed in the system font.
+  if (/^Inter/.test(s.fontFamily ?? '')) s.fontFamily = DOC_FONT;
+  return s;
 }
 
 // ── Document data ────────────────────────────────────────────────────────────
@@ -579,11 +585,11 @@ export function DocumentView({ s, doc, forPrint = false }: { s: DocTemplateSetti
                   {s.colItemCode && (
                     <td style={td()}>
                       <p style={{ fontWeight: 700, margin: '0 0 1px' }}>{l.name}</p>
-                      {l.code && <p style={{ margin: 0, color: '#666', fontSize: `${f - 1}px`, fontFamily: 'monospace' }}>{l.code}</p>}
+                      {l.code && <p style={{ margin: 0, color: '#666', fontSize: `${f - 1}px`, fontVariantNumeric: 'tabular-nums' }}>{l.code}</p>}
                       {subInfo.length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: '2px 8px' }}>
                           {subInfo.map(([label, value, mono]) => (
-                            <span key={label} style={{ fontSize: `${f - 1.5}px`, color: '#64748b', fontFamily: mono ? 'monospace' : undefined }}>
+                            <span key={label} style={{ fontSize: `${f - 1.5}px`, color: '#64748b', fontVariantNumeric: mono ? 'tabular-nums' : undefined }}>
                               <span style={{ color: '#94a3b8', fontFamily: s.fontFamily }}>{label}: </span>{value}
                             </span>
                           ))}

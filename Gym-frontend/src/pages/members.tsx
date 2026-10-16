@@ -95,6 +95,7 @@ import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type R
 import { FamilyRenewalPanel, type FamilyPanelState } from '../components/members/FamilyRenewalPanel';
 import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
+import { withPrintFont } from "../utils/print-font";
 
 const membershipPlans = [
   {
@@ -697,7 +698,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       const body = reportData.map((r: any, i: number) => [i + 1, r.docDate, r.docNo, r.memberId, r.memberName, r.mobile, r.membershipType, r.transactionType, r.plan, r.amount, r.mode, r.cash, r.card, r.due, r.dueDate]);
       const win = window.open('', '_blank', 'width=1100,height=800');
       if (win) {
-        win.document.write(`<!doctype html><html><head><title>Membership Report</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:16px}h2{margin:0 0 8px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}th{background:#f1f5f9}</style></head><body><h2>Membership Report</h2><p>Total records: ${reportData.length} · Total amount: ${currencyCode} ${reportSummary.totalAmount.toLocaleString()} · Cash: ${reportSummary.totalCash.toLocaleString()} · Card: ${reportSummary.totalCard.toLocaleString()} · Due: ${reportSummary.totalDue.toLocaleString()}</p><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+        win.document.write(withPrintFont(`<!doctype html><html><head><title>Membership Report</title><style>body{font-family:'Plus Jakarta Sans Variable',Arial,sans-serif;font-size:11px;margin:16px}h2{margin:0 0 8px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}th{background:#f1f5f9}</style></head><body><h2>Membership Report</h2><p>Total records: ${reportData.length} · Total amount: ${currencyCode} ${reportSummary.totalAmount.toLocaleString()} · Cash: ${reportSummary.totalCash.toLocaleString()} · Card: ${reportSummary.totalCard.toLocaleString()} · Due: ${reportSummary.totalDue.toLocaleString()}</p><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`));
         win.document.close();
       }
       return;

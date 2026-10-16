@@ -26,8 +26,10 @@ public class SalaryPaymentController {
     public ResponseEntity<List<SalaryPaymentEmployeeResponseDTO>> getEmployees(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String department,
-            @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(salaryPaymentService.getEmployees(search, department, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) Integer year) {
+        return ResponseEntity.ok(salaryPaymentService.getEmployees(search, department, status, month, year));
     }
 
     @PostMapping("/employees")

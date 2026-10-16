@@ -61,11 +61,23 @@ import {
   Building,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
   Bell,
-  Gauge
+  Gauge,
+  Save,
+  UserPlus,
+  Trash2,
+  CreditCard,
+  Landmark,
+  FileCheck,
+  FilePlus,
+  CalendarCheck,
+  Info,
+  AlertTriangle as AlertTriangleIcon,
+  ExternalLink,
 } from 'lucide-react';
 
 // Sample data - in real app, this would come from staff-service.tsx
@@ -278,6 +290,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [view, setView] = useState<'list' | 'addEmployee' | 'editEmployee'>('list');
+  const [editingEmployee, setEditingEmployee] = useState<any>(null);
+  const [empFormTab, setEmpFormTab] = useState('personal');
   const [showTargetSettings, setShowTargetSettings] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -372,6 +387,405 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
       : 'bg-red-100 text-red-800';
   };
 
+  // ── Employee Form Sections ──────────────────────────────────────────────
+  const EMP_SECTIONS = [
+    { id: 'personal',    label: 'Personal Details',       icon: <UserPlus className="h-4 w-4" /> },
+    { id: 'contact',     label: 'Contact Details',         icon: <Phone className="h-4 w-4" /> },
+    { id: 'employment',  label: 'Employment & Role',       icon: <Briefcase className="h-4 w-4" /> },
+    { id: 'department',  label: 'Department & Reporting',  icon: <Building className="h-4 w-4" /> },
+    { id: 'documents',   label: 'Documents',               icon: <FileText className="h-4 w-4" /> },
+    { id: 'payroll',     label: 'Payroll & Benefits',      icon: <Banknote className="h-4 w-4" /> },
+    { id: 'shifts',      label: 'Shifts & Schedule',       icon: <Clock className="h-4 w-4" /> },
+    { id: 'leave',       label: 'Leave Policy',            icon: <CalendarCheck className="h-4 w-4" /> },
+    { id: 'emergency',   label: 'Emergency Contact',       icon: <Shield className="h-4 w-4" /> },
+    { id: 'additional',  label: 'Additional Details',      icon: <Star className="h-4 w-4" /> },
+  ];
+
+  const genEmpId = () => `EMP${String(staffData.length + 1).padStart(3, '0')}`;
+
+  const renderEmpForm = () => {
+    const isEdit = view === 'editEmployee';
+    const emp = isEdit ? editingEmployee : null;
+    const sectionContent: Record<string, React.ReactNode> = {
+      personal: (
+        <div className="space-y-5">
+          <div className="flex items-center gap-4 p-4 bg-muted/20 rounded-xl border border-border/40">
+            <div className="h-20 w-20 rounded-full bg-[#2B7A7818] border-2 border-dashed border-[#2B7A7840] flex flex-col items-center justify-center cursor-pointer hover:bg-[#2B7A7825] transition-colors">
+              <Camera className="h-5 w-5 text-[#2B7A78]" />
+              <span className="text-[10px] text-[#2B7A78] mt-0.5">Photo</span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Profile Photo</p>
+              <p>JPG, PNG or GIF up to 2MB</p>
+              <Button size="sm" variant="outline" className="mt-1.5 h-7 text-xs">Upload Photo</Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[['First Name','firstName','e.g. Ahmed'],['Middle Name','middleName','Optional'],['Last Name','lastName','e.g. Al-Rashid']].map(([l,n,p])=>(
+              <div key={n} className="space-y-1"><Label className="text-xs">{l}</Label><Input placeholder={p} defaultValue={emp?.[n]??''} className="h-9 text-sm"/></div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label:'Gender', opts:['Male','Female','Other'] },
+              { label:'Marital Status', opts:['Single','Married','Divorced','Widowed'] },
+              { label:'Nationality', opts:['UAE','India','Pakistan','Philippines','UK','Other'] },
+            ].map(f=>(
+              <div key={f.label} className="space-y-1"><Label className="text-xs">{f.label}</Label>
+                <Select defaultValue={f.opts[0]}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>{f.opts.map(o=><SelectItem key={o} value={o} className="text-sm">{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ))}
+            <div className="space-y-1"><Label className="text-xs">Date of Birth</Label><Input type="date" className="h-9 text-sm" defaultValue="1990-01-01"/></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[['Emirates ID / National ID','','784-XXXX-XXXXXXX-X'],['Passport Number','','A12345678'],['Personal Email','email','personal@email.com'],['Mobile Number','tel','+971 50 XXX XXXX']].map(([l,t,p])=>(
+              <div key={l} className="space-y-1"><Label className="text-xs">{l}</Label><Input type={t||'text'} placeholder={p} className="h-9 text-sm"/></div>
+            ))}
+          </div>
+        </div>
+      ),
+      contact: (
+        <div className="space-y-5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Residential Address</p>
+          <div className="grid grid-cols-2 gap-4">
+            {[['Address Line 1','Building / Street'],['Address Line 2','Area / Landmark'],['City','e.g. Dubai'],['Emirate / State','e.g. Dubai'],['Country','e.g. UAE'],['Postal Code','']].map(([l,p])=>(
+              <div key={l} className="space-y-1"><Label className="text-xs">{l}</Label><Input placeholder={p} className="h-9 text-sm"/></div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-[#2B7A78] cursor-pointer hover:underline"><FilePlus className="h-3.5 w-3.5"/>Same as Residential Address (for Permanent Address)</div>
+          <Separator/>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Emergency Contact</p>
+          <div className="grid grid-cols-2 gap-4">
+            {[['Emergency Contact Name','Full name'],['Relationship','e.g. Spouse'],['Emergency Phone','+971 XX XXX XXXX'],['Emergency Email','Optional']].map(([l,p])=>(
+              <div key={l} className="space-y-1"><Label className="text-xs">{l}</Label><Input placeholder={p} className="h-9 text-sm"/></div>
+            ))}
+          </div>
+        </div>
+      ),
+      employment: (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><Label className="text-xs">Employee ID</Label><Input value={genEmpId()} readOnly className="h-9 text-sm bg-muted/30"/></div>
+            <div className="space-y-1"><Label className="text-xs">Joining Date</Label><Input type="date" className="h-9 text-sm" defaultValue="2026-10-01"/></div>
+            {[
+              { label:'Employment Type', opts:['Full-Time','Part-Time','Contract','Temporary'] },
+              { label:'Employee Category', opts:['Staff','Trainer','Receptionist','Sales','Management','Other'] },
+              { label:'Employment Status', opts:['Active','Probation','On Leave','Suspended','Resigned'] },
+              { label:'Branch / Center', opts:['Downtown Dubai','Marina Branch','JLT Branch'] },
+            ].map(f=>(
+              <div key={f.label} className="space-y-1"><Label className="text-xs">{f.label}</Label>
+                <Select defaultValue={f.opts[0]}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>{f.opts.map(o=><SelectItem key={o} value={o} className="text-sm">{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ))}
+            <div className="space-y-1"><Label className="text-xs">Designation / Job Title</Label><Input placeholder="e.g. Senior Fitness Trainer" className="h-9 text-sm"/></div>
+            <div className="space-y-1"><Label className="text-xs">Contract Start Date</Label><Input type="date" className="h-9 text-sm" defaultValue="2026-10-01"/></div>
+            <div className="space-y-1"><Label className="text-xs">Contract End Date</Label><Input type="date" className="h-9 text-sm"/></div>
+            <div className="space-y-1"><Label className="text-xs">Probation End Date</Label><Input type="date" className="h-9 text-sm"/></div>
+          </div>
+        </div>
+      ),
+      department: (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label:'Department', opts:['Personal Training','Group Classes','Customer Service','Specialized Training','Sales','Management'], create:true },
+              { label:'Team', opts:['Morning Team','Evening Team','Weekend Team','All Shifts'] },
+              { label:'Reporting Manager', opts:['Mohammed Hassan','Ahmed Al-Rashid','Sarah Johnson'] },
+              { label:'Direct Supervisor', opts:['Same as Manager','Mohammed Hassan','Ahmed Al-Rashid'] },
+              { label:'Cost Center', opts:['Main Gym','PT Studio','Group Classes','Admin'] },
+              { label:'Access Role / Permissions', opts:['Staff','Trainer','Manager','Admin','Read Only'] },
+            ].map(f=>(
+              <div key={f.label} className="space-y-1">
+                <div className="flex items-center justify-between"><Label className="text-xs">{f.label}</Label>
+                  {f.create && <button className="text-[10px] text-[#2B7A78] hover:underline">+ New</button>}
+                </div>
+                <Select defaultValue={f.opts[0]}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>{f.opts.map(o=><SelectItem key={o} value={o} className="text-sm">{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+      documents: (
+        <div className="space-y-4">
+          {['Emirates ID','Passport','Visa/Residency','Work Permit','Employment Contract','Trainer Certification'].map((docType,i)=>(
+            <div key={docType} className="p-3 rounded-xl border border-border/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-[#2B7A78]"/>
+                  <p className="text-sm font-medium">{docType}</p>
+                </div>
+                <Badge className={`text-[10px] border ${i===0?'bg-green-50 text-green-700 border-green-200':i===1?'bg-amber-50 text-amber-700 border-amber-200':i===4?'bg-green-50 text-green-700 border-green-200':'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                  {i===0?'Valid':i===1?'Expiring Soon':i===4?'Valid':'Pending Upload'}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-0.5"><Label className="text-[10px] text-muted-foreground">Document Number</Label><Input placeholder="Doc number" className="h-8 text-xs"/></div>
+                <div className="space-y-0.5"><Label className="text-[10px] text-muted-foreground">Issue Date</Label><Input type="date" className="h-8 text-xs"/></div>
+                <div className="space-y-0.5"><Label className="text-[10px] text-muted-foreground">Expiry Date</Label><Input type="date" className="h-8 text-xs"/></div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs"><Upload className="h-3 w-3 mr-1"/>Upload</Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs"><Eye className="h-3 w-3 mr-1"/>Preview</Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
+                  <Trash2 className="h-3 w-3"/>
+                </Button>
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" className="w-full text-sm border-dashed h-10">
+            <Plus className="h-4 w-4 mr-2 text-[#2B7A78]"/> Add Document
+          </Button>
+        </div>
+      ),
+      payroll: (
+        <div className="space-y-5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salary Details</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><Label className="text-xs">Salary Structure</Label>
+              <Select defaultValue="standard"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent><SelectItem value="standard">Standard — Trainer Grade A</SelectItem><SelectItem value="senior">Senior Trainer Grade B</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Pay Frequency</Label>
+              <Select defaultValue="monthly"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="weekly">Weekly</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Basic Salary (AED)</Label><Input type="number" placeholder="8000" className="h-9 text-sm"/></div>
+            <div className="space-y-1"><Label className="text-xs">Currency</Label><Input value="AED" readOnly className="h-9 text-sm bg-muted/30"/></div>
+            <div className="space-y-1"><Label className="text-xs">Effective From</Label><Input type="date" defaultValue="2026-10-01" className="h-9 text-sm"/></div>
+            <div className="space-y-1"><Label className="text-xs">Payment Method</Label>
+              <Select defaultValue="bank"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent><SelectItem value="bank">Bank Transfer</SelectItem><SelectItem value="cash">Cash</SelectItem><SelectItem value="cheque">Cheque</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Bank Name</Label><Input placeholder="Emirates NBD" className="h-9 text-sm"/></div>
+            <div className="space-y-1"><Label className="text-xs">Account / IBAN</Label><Input placeholder="AE07 0331 2345 6789 0123 456" className="h-9 text-sm"/></div>
+          </div>
+          <Separator/>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Allowances</p>
+          <div className="space-y-2">
+            {[['Housing Allowance','2000'],['Food Allowance','500'],['Transport Allowance','500'],['Communication Allowance','200']].map(([l,def])=>(
+              <div key={l} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/40 bg-muted/10">
+                <span className="text-sm flex-1">{l}</span>
+                <div className="flex items-center gap-2">
+                  <Select defaultValue="fixed"><SelectTrigger className="h-7 w-24 text-xs"><SelectValue/></SelectTrigger>
+                    <SelectContent><SelectItem value="fixed">Fixed</SelectItem><SelectItem value="pct">% of Basic</SelectItem></SelectContent>
+                  </Select>
+                  <Input type="number" defaultValue={def} className="h-7 w-24 text-xs"/>
+                  <span className="text-xs text-muted-foreground">AED</span>
+                </div>
+              </div>
+            ))}
+            <Button variant="outline" className="w-full text-xs h-8 border-dashed"><Plus className="h-3.5 w-3.5 mr-1"/>Add Allowance</Button>
+          </div>
+          <Separator/>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Salary Preview</p>
+          <div className="p-4 rounded-xl border border-[#2B7A7830]" style={{backgroundColor:'#2B7A7808'}}>
+            {[['Basic Salary','AED 8,000'],['Total Allowances','AED 3,200'],['Gross Salary','AED 11,200'],['Estimated Net (before var.)','AED 11,200']].map(([l,v],i)=>(
+              <div key={l} className={`flex justify-between py-1.5 text-sm ${i===3?'font-bold border-t border-[#2B7A7830] mt-1 pt-2':''}`}>
+                <span className="text-muted-foreground">{l}</span><span style={i===3?{color:'#2B7A78'}:{}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+      shifts: (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><Label className="text-xs">Assigned Shift</Label>
+              <Select defaultValue="morning"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="morning">Morning Shift (06:00–14:00)</SelectItem>
+                  <SelectItem value="afternoon">Afternoon Shift (14:00–22:00)</SelectItem>
+                  <SelectItem value="evening">Evening Shift (16:00–24:00)</SelectItem>
+                  <SelectItem value="flexible">Flexible</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">Expected Daily Hours</Label><Input type="number" defaultValue="8" className="h-9 text-sm"/></div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Work Days</Label>
+            <div className="flex gap-2 flex-wrap">
+              {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>(
+                <label key={d} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border cursor-pointer text-xs font-medium ${i<5?'border-[#2B7A78] bg-[#2B7A7815] text-[#2B7A78]':'border-border text-muted-foreground'}`}>
+                  <input type="checkbox" defaultChecked={i<5} className="hidden"/>{d}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              {label:'Break Policy', opts:['1 hour break (13:00-14:00)','30 min break','No break','Flexible break']},
+              {label:'Grace Period', opts:['5 minutes','10 minutes','15 minutes','No grace']},
+              {label:'Overtime Eligibility', opts:['Eligible','Not Eligible','Manager Approval']},
+              {label:'Overtime Policy', opts:['1.25x after 8hrs','1.5x weekends','Fixed rate']},
+              {label:'Holiday Calendar', opts:['UAE National Calendar','Custom']},
+            ].map(f=>(
+              <div key={f.label} className="space-y-1"><Label className="text-xs">{f.label}</Label>
+                <Select defaultValue={f.opts[0]}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>{f.opts.map(o=><SelectItem key={o} value={o} className="text-sm">{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ))}
+            <div className="space-y-1"><Label className="text-xs">Effective From</Label><Input type="date" defaultValue="2026-10-01" className="h-9 text-sm"/></div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-[#2B7A78] cursor-pointer hover:underline" onClick={()=>onNavigate?.('shifts-schedules')}>
+            <ExternalLink className="h-3.5 w-3.5"/>Manage all Shifts & Schedules
+          </div>
+        </div>
+      ),
+      leave: (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              {label:'Leave Policy', opts:['Standard UAE Policy','Trainer Policy','Management Policy']},
+              {label:'Leave Approval Manager', opts:['Mohammed Hassan','Ahmed Al-Rashid']},
+              {label:'Annual Leave', opts:['30 days','24 days','20 days','Custom']},
+              {label:'Sick Leave', opts:['15 days','10 days','As per UAE law']},
+              {label:'Accrual Method', opts:['Monthly Accrual','Upfront','Custom']},
+              {label:'Carry Forward', opts:['Up to 15 days','No carry forward','All unused']},
+            ].map(f=>(
+              <div key={f.label} className="space-y-1"><Label className="text-xs">{f.label}</Label>
+                <Select defaultValue={f.opts[0]}><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                  <SelectContent>{f.opts.map(o=><SelectItem key={o} value={o} className="text-sm">{o}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex gap-2">
+            <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5"/>
+            Leave entitlements are calculated from the Joining Date. Any changes to leave policy take effect from the next payroll cycle.
+          </div>
+        </div>
+      ),
+      emergency: (
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">Emergency contacts are used in case of workplace incidents. At least one contact is required.</p>
+          {[1,2].map(n=>(
+            <div key={n} className="p-4 rounded-xl border border-border/40 space-y-3">
+              <p className="text-sm font-medium text-foreground">Contact #{n}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[['Full Name','e.g. Ali Hassan'],['Relationship','e.g. Brother'],['Phone Number','+971 XX XXX XXXX'],['Email','Optional']].map(([l,p])=>(
+                  <div key={l} className="space-y-0.5"><Label className="text-xs">{l}</Label><Input placeholder={p} className="h-8 text-sm"/></div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" className="text-xs border-dashed w-full h-8"><Plus className="h-3.5 w-3.5 mr-1"/>Add Another Contact</Button>
+        </div>
+      ),
+      additional: (
+        <div className="space-y-5">
+          <div className="space-y-1"><Label className="text-xs">Skills / Specialization</Label>
+            <Input placeholder="e.g. Weight Loss, HIIT, Yoga, Martial Arts" className="h-9 text-sm"/>
+          </div>
+          <div className="space-y-1"><Label className="text-xs">Trainer Certifications</Label>
+            <Input placeholder="e.g. NASM-CPT, ACSM, First Aid CPR" className="h-9 text-sm"/>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><Label className="text-xs">Profile Status</Label>
+              <Select defaultValue="active"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="draft">Draft</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label className="text-xs">System Login Access</Label>
+              <Select defaultValue="yes"><SelectTrigger className="h-9 text-sm"><SelectValue/></SelectTrigger>
+                <SelectContent><SelectItem value="yes">Yes — Staff Portal</SelectItem><SelectItem value="no">No Access</SelectItem></SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1"><Label className="text-xs">Internal Notes</Label>
+            <Textarea placeholder="Internal remarks, onboarding notes, manager comments..." rows={3} className="text-sm resize-none"/>
+          </div>
+        </div>
+      ),
+    };
+
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        {/* Form Header */}
+        <div className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setView('list')}>
+              <ArrowDownRight className="h-4 w-4 rotate-[135deg] mr-1"/>Back
+            </Button>
+            <Separator orientation="vertical" className="h-5"/>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>Payroll & Employees</span><ChevronRight className="h-3 w-3"/>
+              <span>Staffs & Trainers</span><ChevronRight className="h-3 w-3"/>
+              <span className="text-foreground font-medium">{isEdit ? 'Edit Employee' : 'Add Employee'}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-muted-foreground border rounded px-2 py-1">ID: {genEmpId()}</div>
+            <Select defaultValue="active">
+              <SelectTrigger className="h-8 text-xs w-32"><SelectValue/></SelectTrigger>
+              <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="probation">Probation</SelectItem><SelectItem value="draft">Draft</SelectItem></SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" className="text-xs h-8">Save as Draft</Button>
+            <Button size="sm" className="text-xs h-8 text-white" style={{backgroundColor:'#2B7A78'}} onClick={()=>{setView('list');}}>
+              <Save className="h-3.5 w-3.5 mr-1"/>Save Employee
+            </Button>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        <div className="flex flex-1">
+          {/* Left section navigator */}
+          <div className="w-56 border-r bg-muted/10 p-3 space-y-0.5 flex-shrink-0">
+            {EMP_SECTIONS.map((s,i) => (
+              <button key={s.id} onClick={() => setEmpFormTab(s.id)}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all ${empFormTab===s.id ? 'bg-[#2B7A78] text-white font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                <span className={empFormTab===s.id?'text-white':'text-[#2B7A78]'}>{s.icon}</span>
+                {s.label}
+              </button>
+            ))}
+            <div className="pt-3 px-3 text-[10px] text-muted-foreground">
+              {EMP_SECTIONS.findIndex(s=>s.id===empFormTab)+1} of {EMP_SECTIONS.length}
+            </div>
+          </div>
+
+          {/* Form content */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-2xl">
+              <h2 className="text-base font-semibold mb-4">{EMP_SECTIONS.find(s=>s.id===empFormTab)?.label}</h2>
+              {sectionContent[empFormTab]}
+              {/* Navigation buttons */}
+              <div className="flex justify-between mt-8 pt-4 border-t">
+                <Button variant="outline" size="sm"
+                  onClick={() => {
+                    const i = EMP_SECTIONS.findIndex(s=>s.id===empFormTab);
+                    if (i > 0) setEmpFormTab(EMP_SECTIONS[i-1].id);
+                  }}
+                  disabled={empFormTab === EMP_SECTIONS[0].id}>
+                  ← Previous
+                </Button>
+                <Button size="sm" style={{backgroundColor:'#2B7A78'}} className="text-white"
+                  onClick={() => {
+                    const i = EMP_SECTIONS.findIndex(s=>s.id===empFormTab);
+                    if (i < EMP_SECTIONS.length-1) setEmpFormTab(EMP_SECTIONS[i+1].id);
+                    else setView('list');
+                  }}>
+                  {empFormTab === EMP_SECTIONS[EMP_SECTIONS.length-1].id ? 'Save Employee' : 'Next →'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (view === 'addEmployee' || view === 'editEmployee') return renderEmpForm();
+
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Breadcrumb */}
@@ -410,7 +824,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button onClick={() => setShowAddEmployee(true)}>
+          <Button onClick={() => { setEmpFormTab('personal'); setView('addEmployee'); }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Employee
           </Button>

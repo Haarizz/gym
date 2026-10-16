@@ -1,5 +1,6 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { printFontReady, withPrintFont } from '../../utils/print-font';
 import { getCompanyDetails, type CompanyDetails } from '../../utils/company-details';
 import { CURRENCIES, type CurrencyCode } from '../../utils/currency';
 import { financialSettingsService } from '../../utils/supabase/financial-settings-service';
@@ -222,9 +223,9 @@ export async function printHtml(html: string, paperSize: DocTemplateSettings['pa
   const win = frame.contentWindow!;
   const doc = win.document;
   doc.open();
-  doc.write(html);
+  doc.write(withPrintFont(html));
   doc.close();
-  await waitForImages(doc);
+  await Promise.all([waitForImages(doc), printFontReady(doc)]);
 
   // Column headers never wrap, so a big font with every column on can be wider than the
   // paper — scale the document down to fit rather than cutting off the right-hand columns.

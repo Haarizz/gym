@@ -470,7 +470,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--input-background, var(--card));
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 

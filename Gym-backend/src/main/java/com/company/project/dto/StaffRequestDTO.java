@@ -18,6 +18,10 @@ public class StaffRequestDTO {
     private String joinDate;   // ISO date string yyyy-MM-dd
     private String address;
     private String photoUrl;
+    // Extended HR profile (see Staff.profileJson); null = leave unchanged.
+    private String profileJson;
+    public String getProfileJson() { return profileJson; }
+    public void setProfileJson(String profileJson) { this.profileJson = profileJson; }
 
     // List of certification objects
     private List<CertificationInput> certifications;

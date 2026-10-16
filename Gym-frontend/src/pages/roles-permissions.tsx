@@ -186,7 +186,7 @@ const MODULE_INFO: Record<string, { label: string; hint?: string }> = {
   BOOKINGS: { label: "Bookings" },
   PAYROLL: { label: "Payroll" },
   SALARY_PAYMENTS: { label: "Salary Payments" },
-  SALARY_ADVANCES: { label: "Salary Advances" },
+  SALARY_ADVANCES: { label: "Advances & Deductions" },
   PAYROLL_REPORTS: { label: "Payroll Reports" },
   PAYROLL_ANALYTICS: { label: "Payroll Analytics" },
   ADMINISTRATION: { label: "Roles & Permissions", hint: "Manage roles like this one" },

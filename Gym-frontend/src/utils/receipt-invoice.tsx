@@ -81,7 +81,7 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
     <style>
         ${receiptColorsCss(colors)}
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
+        body { font-family: 'Plus Jakarta Sans Variable', 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
         .invoice {
           font-variant-numeric: tabular-nums lining-nums;
           font-feature-settings: "tnum" 1, "lnum" 1;
@@ -349,7 +349,7 @@ export function buildReceiptVoucherHtml(data: ReceiptVoucherPrintData, company: 
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
+        body { font-family: 'Plus Jakarta Sans Variable', 'Noto Sans', 'Noto Sans Arabic', sans-serif; padding: 20px; background: #f5f5f5; }
         .invoice {
           font-variant-numeric: tabular-nums lining-nums;
           font-feature-settings: "tnum" 1, "lnum" 1;

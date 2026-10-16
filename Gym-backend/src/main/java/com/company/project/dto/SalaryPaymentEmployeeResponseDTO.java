@@ -23,6 +23,27 @@ public class SalaryPaymentEmployeeResponseDTO {
     private LocalDate lastPaymentDate;
     private String bankAccount;
     private String email;
+    // From the month's payroll run, when there is one.
+    private Long payrollRunId;
+    private Long payrollRunLineId;
+    private String payrollRunStatus;
+    private BigDecimal grossPay;
+    public Long getPayrollRunId() { return payrollRunId; }
+    public void setPayrollRunId(Long payrollRunId) { this.payrollRunId = payrollRunId; }
+    public Long getPayrollRunLineId() { return payrollRunLineId; }
+    public void setPayrollRunLineId(Long payrollRunLineId) { this.payrollRunLineId = payrollRunLineId; }
+    public String getPayrollRunStatus() { return payrollRunStatus; }
+    public void setPayrollRunStatus(String payrollRunStatus) { this.payrollRunStatus = payrollRunStatus; }
+    public BigDecimal getGrossPay() { return grossPay; }
+    public void setGrossPay(BigDecimal grossPay) { this.grossPay = grossPay; }
+    // Without a payroll line: the month's items a payment would cover ({key, kind, label, amount, ref_id}).
+    private java.util.List<java.util.Map<String, Object>> items;
+    // Whether this gym has ever run payroll (the "no payroll this month" hint is only shown then).
+    private Boolean payrollUsed;
+    public java.util.List<java.util.Map<String, Object>> getItems() { return items; }
+    public void setItems(java.util.List<java.util.Map<String, Object>> items) { this.items = items; }
+    public Boolean getPayrollUsed() { return payrollUsed; }
+    public void setPayrollUsed(Boolean payrollUsed) { this.payrollUsed = payrollUsed; }
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)

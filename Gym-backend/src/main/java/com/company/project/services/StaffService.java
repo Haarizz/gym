@@ -509,6 +509,7 @@ public class StaffService {
         if (req.getStatus() != null)       staff.setStatus(req.getStatus());
         if (req.getAddress() != null)      staff.setAddress(req.getAddress());
         if (req.getPhotoUrl() != null)     staff.setPhotoUrl(req.getPhotoUrl());
+        if (req.getProfileJson() != null)  staff.setProfileJson(req.getProfileJson());
         if (req.getJoinDate() != null && !req.getJoinDate().isBlank()) {
             staff.setJoinDate(LocalDate.parse(req.getJoinDate()));
         }

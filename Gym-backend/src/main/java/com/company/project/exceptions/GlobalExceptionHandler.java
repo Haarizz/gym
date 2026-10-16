@@ -256,9 +256,33 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
+        if (isDatabaseError(ex)) return handleDatabaseError(ex);
         log.error("Unhandled exception", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
                 ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
+    }
+
+    /**
+     * Any other database failure (missing column after an incomplete migration, bad query,
+     * lost connection, ...). Their messages carry the raw SQL — which reached users as a
+     * toast full of "JDBC exception executing SQL [select ...]" — so the detail is logged
+     * and the response says only what happened. (Integrity violations are handled above.)
+     */
+    @ExceptionHandler({ org.springframework.dao.DataAccessException.class, org.hibernate.JDBCException.class })
+    public ResponseEntity<Map<String, Object>> handleDatabaseError(Exception ex) {
+        log.error("Database error", ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "DATABASE_ERROR",
+                "Something went wrong while reading or saving this data. Please try again — if it keeps happening, contact support.");
+    }
+
+    private static boolean isDatabaseError(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof java.sql.SQLException || t instanceof org.hibernate.JDBCException
+                    || t instanceof org.springframework.dao.DataAccessException) {
+                return !(t instanceof DataIntegrityViolationException);
+            }
+        }
+        return false;
     }
 
     private ResponseEntity<Map<String, Object>> build(HttpStatus status, String error, String message) {

@@ -37,6 +37,8 @@ export interface Staff {
   user_id?: number;
   app_username?: string;
   app_access_enabled?: boolean;
+  // Extended HR profile (personal, contact, employment, documents, payroll, leave...) as JSON.
+  profile_json?: string | null;
 }
 
 export interface StaffRequestData {
@@ -66,6 +68,7 @@ export interface StaffRequestData {
   // Security role for the linked login account (Admin/Receptionist/Trainer/Accountant/Manager) —
   // independent of `role` (job title, used for commission/target filtering).
   app_role?: string;
+  profile_json?: string;
 }
 
 export interface StaffFilters {
@@ -208,7 +211,7 @@ class StaffService {
       `${backendBaseUrl}/staff/${id}`,
       { method: 'PUT', body: JSON.stringify(data) }
     );
-    if (!response.ok) throw new Error(`Failed to update staff member: ${response.status}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to update staff member: ${response.status}`));
     return response.json();
   }
 

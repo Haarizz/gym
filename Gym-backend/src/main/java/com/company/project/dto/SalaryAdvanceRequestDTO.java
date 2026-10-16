@@ -13,6 +13,17 @@ public class SalaryAdvanceRequestDTO {
     private BigDecimal requestedAmount;
     private String remarks;
     private String attachment;
+    // Proposed repayment plan; the approver can change it.
+    private Integer installmentCount;
+    private LocalDate startMonth;
+    private Boolean autoDeduct;
+
+    public Integer getInstallmentCount() { return installmentCount; }
+    public void setInstallmentCount(Integer installmentCount) { this.installmentCount = installmentCount; }
+    public LocalDate getStartMonth() { return startMonth; }
+    public void setStartMonth(LocalDate startMonth) { this.startMonth = startMonth; }
+    public Boolean getAutoDeduct() { return autoDeduct; }
+    public void setAutoDeduct(Boolean autoDeduct) { this.autoDeduct = autoDeduct; }
 
     public SalaryAdvanceRequestDTO() {}
 

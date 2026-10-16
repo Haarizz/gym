@@ -30,6 +30,7 @@ public class StaffResponseDTO {
     private Long userId;
     private String appUsername;
     private Boolean appAccessEnabled;
+    private String profileJson;
 
     public static StaffResponseDTO fromEntity(Staff s) {
         StaffResponseDTO dto = new StaffResponseDTO();
@@ -66,6 +67,7 @@ public class StaffResponseDTO {
         dto.userId = s.getUserId();
         dto.appUsername = s.getAppUsername();
         dto.appAccessEnabled = s.getAppAccessEnabled();
+        dto.profileJson = s.getProfileJson();
 
         return dto;
     }
@@ -112,4 +114,6 @@ public class StaffResponseDTO {
     public void setAppUsername(String appUsername) { this.appUsername = appUsername; }
     public Boolean getAppAccessEnabled() { return appAccessEnabled; }
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
+    public String getProfileJson() { return profileJson; }
+    public void setProfileJson(String profileJson) { this.profileJson = profileJson; }
 }

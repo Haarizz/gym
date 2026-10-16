@@ -16,7 +16,7 @@ import {
 import type { CompanyDetails } from '../../utils/company-details';
 import type { CurrencyCode } from '../../utils/currency';
 import {
-  DocumentView, PAPER_MM, docTypeMeta, isInvoiceType, sampleDocument, shippingLabel,
+  DOC_FONT, DocumentView, PAPER_MM, docTypeMeta, isInvoiceType, sampleDocument, shippingLabel,
   type DocTemplateSettings, type DocType, type PaperSize,
 } from './documentTemplate';
 import { printDocumentHtml, printHtml } from './purchasePrint';
@@ -36,7 +36,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 ];
 
 const FONTS = [
-  { value: 'Inter, sans-serif', label: 'Inter' },
+  { value: DOC_FONT, label: 'Plus Jakarta Sans' },
   { value: 'Arial, sans-serif', label: 'Arial' },
   { value: 'Helvetica, sans-serif', label: 'Helvetica' },
   { value: 'Georgia, serif', label: 'Georgia' },

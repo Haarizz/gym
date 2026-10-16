@@ -89,6 +89,7 @@ import { SearchableSelect } from "../components/shared/SearchableSelect";
 import { SupplierFormDialog } from "../components/purchase/purchaseUi";
 import QRCode from "react-qr-code";
 import JsBarcode from "jsbarcode";
+import { printWhenFontReady, withPrintFont } from "../utils/print-font";
 
 // Types
 interface ProductUnit {
@@ -600,10 +601,10 @@ export function AddProduct({ onNavigate }: AddProductProps) {
 
     const printWindow = window.open('', '_blank', 'width=420,height=360');
     if (printWindow) {
-      printWindow.document.write(`
+      printWindow.document.write(withPrintFont(`
         <html>
           <head><title>Barcode - ${productName || 'Product'}</title></head>
-          <body style="text-align:center;font-family:system-ui, sans-serif;padding:20px;">
+          <body style="text-align:center;font-family:&quot;Plus Jakarta Sans Variable&quot;, system-ui, sans-serif;padding:20px;">
             <h3 style="margin:0 0 8px;">${productName || 'Product'}</h3>
             <div style="display:flex;justify-content:center;margin:12px 0;">
               ${svgMarkup}
@@ -613,10 +614,9 @@ export function AddProduct({ onNavigate }: AddProductProps) {
             <p style="font-size:12px;color:#666;margin:4px 0;">Template: ${barcodeTemplate}</p>
           </body>
         </html>
-      `);
+      `));
       printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
+      printWhenFontReady(printWindow);
     }
 
     toast.success(`Printing ${barcodeTemplate} barcode: ${generatedBarcode}`);

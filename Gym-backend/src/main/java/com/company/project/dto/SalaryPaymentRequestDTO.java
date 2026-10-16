@@ -15,6 +15,26 @@ public class SalaryPaymentRequestDTO {
     private LocalDate paymentDate;
     private String notes;
     private String processedBy;
+    // Payroll line being paid; when null and the month has an approved payroll, it is found automatically.
+    private Long payrollRunLineId;
+    public Long getPayrollRunLineId() { return payrollRunLineId; }
+    public void setPayrollRunLineId(Long payrollRunLineId) { this.payrollRunLineId = payrollRunLineId; }
+
+    // Manual payment (no payroll line): apply the month's items listed by GET /employees.
+    // itemKeys = the items included (allowances, commission, advance installments, deductions);
+    // extras are free amounts added / taken off. net_salary must match.
+    private Boolean applyItems;
+    private List<String> itemKeys;
+    private BigDecimal extraAllowance;
+    private BigDecimal extraDeduction;
+    public Boolean getApplyItems() { return applyItems; }
+    public void setApplyItems(Boolean applyItems) { this.applyItems = applyItems; }
+    public List<String> getItemKeys() { return itemKeys; }
+    public void setItemKeys(List<String> itemKeys) { this.itemKeys = itemKeys; }
+    public BigDecimal getExtraAllowance() { return extraAllowance; }
+    public void setExtraAllowance(BigDecimal extraAllowance) { this.extraAllowance = extraAllowance; }
+    public BigDecimal getExtraDeduction() { return extraDeduction; }
+    public void setExtraDeduction(BigDecimal extraDeduction) { this.extraDeduction = extraDeduction; }
 
     public SalaryPaymentRequestDTO() {}
 

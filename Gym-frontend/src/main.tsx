@@ -6,7 +6,10 @@ import { BranchProvider } from "./utils/branch-context";
 import { PrivacyPolicyPage, TermsOfServicePage, SupportPage } from "./pages/legal-pages";
 import { PublicLeadFormPage } from "./pages/public-lead-form";
 import { applyResponsiveScope } from "./utils/responsive-scope";
+import "@fontsource-variable/plus-jakarta-sans/wght.css";
+import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
 import "./styles/index.css";
+import "./styles/fonts.css";
 import "./styles/snapshot-gaps.css";
 import "./styles/responsive.css";
 
