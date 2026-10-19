@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 
@@ -14,17 +15,19 @@ export function CompensationSection({
   onChangeSalary,
   onChangeMonthlyTarget,
 }: CompensationSectionProps) {
+  const { t } = useTranslation();
+
   return (
-    <FormSection title="Compensation">
+    <FormSection title={t('hr.compensation.title')}>
       <Input
-        label="Base Salary"
+        label={t('hr.compensation.baseSalary')}
         value={salary}
         onChangeText={onChangeSalary}
         placeholder="0"
         keyboardType="numeric"
       />
       <Input
-        label="Monthly Target"
+        label={t('hr.compensation.monthlyTarget')}
         value={monthlyTarget}
         onChangeText={onChangeMonthlyTarget}
         placeholder="0"

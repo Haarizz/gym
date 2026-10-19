@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "Angebote & Deals",
+    "subtitle": "Aktive Aktionen, Rabatte und Sonderangebote",
+    "activeOffers": "Aktive Angebote",
+    "totalRedemptions": "Gesamteinlösungen",
+    "viewAll": "Alle anzeigen",
+    "failedLoadOffers": "Angebote konnten nicht geladen werden.",
+    "noActiveOffers": "Keine aktiven Angebote gefunden.",
+    "failedLoadPromoOffers": "Gutscheincode-Angebote konnten nicht geladen werden.",
+    "failedLoadPlanOffers": "Tarif-Angebote konnten nicht geladen werden.",
+    "planOffer": "TARIFANGEBOT",
+    "plan": "Tarif:",
+    "price": "Preis:",
+    "validUntil": "Gültig bis:",
+    "applies": "Gilt:",
+    "autoNoCode": "Automatisch, kein Code erforderlich",
+    "promoCode": "Gutscheincode",
+    "branches": "Filialen:",
+    "usage": "Nutzung:",
+    "noUsageLimit": "Kein Nutzungslimit festgelegt",
+    "referralCodes": "Empfehlungscodes",
+    "failedLoadReferrals": "Empfehlungen konnten nicht geladen werden.",
+    "noReferralCodes": "Keine Empfehlungscodes gefunden.",
+    "status": "Status",
+    "date": "Datum",
+    "reward": "Prämie",
+    "createNewOffer": "Neues Angebot erstellen",
+    "revenueFromDeals": "Umsatz aus Angeboten",
+    "newMembers": "Neue Mitglieder",
+    "thisMonthsImpact": "Einfluss dieses Monats",
+    "failedLoadImpact": "Einfluss dieses Monats konnte nicht geladen werden.",
+    "noExpiry": "Kein Ablaufdatum",
+    "copiedPromoCode": "Gutscheincode {{code}} in die Zwischenablage kopiert.",
+    "failedCopyPromoCode": "Gutscheincode konnte nicht kopiert werden.",
+    "shareMessage": "{{name}}: Verwenden Sie den Code {{code}}, um {{discount}} zu erhalten.",
+    "unknownBranch": "Unbekannte Filiale",
+    "unknown": "Unbekannt",
+    "planOfferSuffix": "{{name}} Angebot"
+  }
+};
+
+export default crm;

@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { Radius, Spacing } from "@/core/theme";
 import { GlassSurface } from "@/shared/components";
@@ -9,12 +10,14 @@ interface AdminPaymentMixCardProps {
 }
 
 export function AdminPaymentMixCard({ paymentMix }: AdminPaymentMixCardProps) {
+  const { t } = useTranslation();
+
   return (
     <GlassSurface radius={16} style={styles.container}>
-      <Text style={styles.title}>Payment Mix</Text>
+      <Text style={styles.title}>{t('dashboard.admin.paymentMixTitle')}</Text>
       {paymentMix.length === 0 ? (
         <Text style={styles.emptyText}>
-          No payments collected in this period.
+          {t('dashboard.admin.noPaymentsInPeriod')}
         </Text>
       ) : (
         <View style={styles.list}>

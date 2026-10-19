@@ -14,12 +14,15 @@ import { adminDashboardRepository } from '../infrastructure/ApiAdminDashboardRep
 import type { AdminDashboardKpiApi, AdminDashboardResponseApi } from '../infrastructure/AdminDashboardApiModels';
 import { formatChange, formatCompactCurrency, formatKpiValue, formatKpiValueText } from '../utils/adminDashboardFormat';
 
+import { formatDate, tOr } from '@/core/i18n/format';
+import i18n from '@/core/i18n/i18n';
+
 // Purely structural placeholder for the brief window before the first real
 // response arrives (or after a failed request) — every value is a genuine
 // "no data yet" marker, never a plausible-looking fabricated number, so it
 // can never be mistaken for real data by whoever is looking at the screen.
 const EMPTY_ADMIN_DASHBOARD: AdminDashboardData = {
-  branch: 'All Branches',
+  branch: '',
   dateText: '',
   kpis: [],
   paymentMix: [],
@@ -41,6 +44,18 @@ const KPI_STYLE: Record<string, { icon: string; color: string }> = {
   'retention-rate': { icon: 'user-plus', color: '#16A34A' },
 };
 
+const KPI_I18N_KEYS: Record<string, string> = {
+  'total-collections': 'dashboard.admin.kpis.totalCollections',
+  'membership-sales': 'dashboard.admin.kpis.membershipSales',
+  'pos-revenue': 'dashboard.admin.kpis.posRevenue',
+  'pt-sales': 'dashboard.admin.kpis.ptSales',
+  'day-pass': 'dashboard.admin.kpis.dayPass',
+  'check-ins': 'dashboard.admin.kpis.checkIns',
+  'active-members': 'dashboard.admin.kpis.activeMembers',
+  'churn-rate': 'dashboard.admin.kpis.churnRate',
+  'retention-rate': 'dashboard.admin.kpis.retentionRate',
+};
+
 const PAYMENT_MODE_COLORS: Record<string, string> = {
   Card: BrandColors.teal,
   Cash: BrandColors.memberGold,
@@ -50,11 +65,26 @@ const PAYMENT_MODE_COLORS: Record<string, string> = {
 };
 const FALLBACK_PAYMENT_COLOR = '#94A3B8';
 
+const PAYMENT_MODE_I18N_KEYS: Record<string, string> = {
+  Card: 'dashboard.admin.paymentModes.Card',
+  Cash: 'dashboard.admin.paymentModes.Cash',
+  Online: 'dashboard.admin.paymentModes.Online',
+  'Bank Transfer': 'dashboard.admin.paymentModes.BankTransfer',
+  Wallet: 'dashboard.admin.paymentModes.Wallet',
+};
+
 // Accent colors for highlights that need attention, keyed by highlight id.
 // Applied only when the count is non-zero so an all-clear row stays neutral.
 const HIGHLIGHT_COLORS: Record<string, string> = {
   'renewals-due': '#DC2626',
   'pending-follow-ups': '#CA8A04',
+};
+
+const HIGHLIGHT_I18N_KEYS: Record<string, string> = {
+  'renewals-due': 'dashboard.admin.highlights.renewalsDue',
+  'pending-follow-ups': 'dashboard.admin.highlights.pendingFollowUps',
+  'expiring-soon': 'dashboard.admin.highlights.expiringSoon',
+  'birthdays-today': 'dashboard.admin.highlights.birthdaysToday',
 };
 
 export const adminDashboardKeys = {
@@ -64,9 +94,10 @@ export const adminDashboardKeys = {
 function mapKpi(kpi: AdminDashboardKpiApi): AdminKpiItem {
   const style = KPI_STYLE[kpi.id] ?? { icon: 'bar-chart-2', color: '#64748B' };
   const { text, trend } = formatChange(kpi.change_percent);
+  const label = KPI_I18N_KEYS[kpi.id] ? tOr(KPI_I18N_KEYS[kpi.id], kpi.label) : kpi.label;
   return {
     id: kpi.id,
-    label: kpi.label,
+    label,
     value: kpi.available ? formatKpiValue(kpi.unit, kpi.value) : 'N/A',
     valueText: kpi.available ? formatKpiValueText(kpi.unit, kpi.value) : 'N/A',
     change: kpi.available ? text : '—',
@@ -79,7 +110,7 @@ function mapKpi(kpi: AdminDashboardKpiApi): AdminKpiItem {
 
 function mapPaymentMix(api: AdminDashboardResponseApi): AdminPaymentMixItem[] {
   return api.payment_mix.map((pm) => ({
-    mode: pm.mode,
+    mode: PAYMENT_MODE_I18N_KEYS[pm.mode] ? tOr(PAYMENT_MODE_I18N_KEYS[pm.mode], pm.mode) : pm.mode,
     amount: formatCompactCurrency(pm.amount),
     percentage: pm.percentage,
     color: PAYMENT_MODE_COLORS[pm.mode] ?? FALLBACK_PAYMENT_COLOR,
@@ -92,7 +123,7 @@ function mapAlerts(api: AdminDashboardResponseApi): AdminAlertItem[] {
 
 function mapHighlights(api: AdminDashboardResponseApi): AdminOperationalHighlight[] {
   return api.operational_highlights.map((h) => ({
-    label: h.label,
+    label: HIGHLIGHT_I18N_KEYS[h.id] ? tOr(HIGHLIGHT_I18N_KEYS[h.id], h.label) : h.label,
     value: h.value,
     color: parseInt(h.value, 10) > 0 ? HIGHLIGHT_COLORS[h.id] : undefined,
   }));
@@ -102,14 +133,17 @@ function formatDateText(fromIso: string, toIso: string): string {
   const from = new Date(`${fromIso}T00:00:00`);
   const to = new Date(`${toIso}T00:00:00`);
   if (fromIso === toIso) {
-    return isToday(from) ? `Today: ${format(from, 'MMM d, yyyy')}` : format(from, 'MMM d, yyyy');
+    const formattedDate = formatDate(from, 'MMM d, yyyy');
+    return isToday(from)
+      ? (i18n.t('dashboard.admin.todayPrefix', { date: formattedDate }) as string)
+      : formattedDate;
   }
-  return `${format(from, 'MMM d, yyyy')} – ${format(to, 'MMM d, yyyy')}`;
+  return `${formatDate(from, 'MMM d, yyyy')} – ${formatDate(to, 'MMM d, yyyy')}`;
 }
 
 function mapDashboard(api: AdminDashboardResponseApi): AdminDashboardData {
   return {
-    branch: api.branch.all_branches ? 'All Branches' : api.branch.branch_name,
+    branch: api.branch.all_branches ? (i18n.t('dashboard.admin.allBranches') as string) : api.branch.branch_name,
     dateText: formatDateText(api.from, api.to),
     kpis: api.kpis.map(mapKpi),
     paymentMix: mapPaymentMix(api),

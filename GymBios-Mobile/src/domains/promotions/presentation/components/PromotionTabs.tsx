@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -17,6 +18,8 @@ export function PromotionTabs({
   onChangeTab,
   promotionsCount,
 }: PromotionTabsProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       <Pressable
@@ -32,7 +35,7 @@ export function PromotionTabs({
             activeTab === 'promotions' && styles.activeTabText,
           ]}
         >
-          Promotions
+          {t('promotions.promotionsTab')}
           {promotionsCount !== undefined ? ` (${promotionsCount})` : ''}
         </Text>
       </Pressable>
@@ -50,7 +53,7 @@ export function PromotionTabs({
             activeTab === 'statistics' && styles.activeTabText,
           ]}
         >
-          Statistics
+          {t('promotions.statisticsTab')}
         </Text>
       </Pressable>
     </View>

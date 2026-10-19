@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Spacing } from '@/core/theme';
 
@@ -9,14 +10,16 @@ interface RoleEmptyStateProps {
 }
 
 export function RoleEmptyState({ searchQuery, onClearSearch, onCreateRole }: RoleEmptyStateProps) {
+  const { t } = useTranslation();
+
   if (searchQuery) {
     return (
       <View style={styles.container}>
         <EmptyState
           icon="search"
-          title="No roles found"
-          description={`We couldn't find any roles matching "${searchQuery}".`}
-          buttonLabel="Clear Search"
+          title={t('roles.noRolesFoundTitle')}
+          description={t('roles.noRolesFoundDesc', { query: searchQuery })}
+          buttonLabel={t('roles.clearSearch')}
           onPress={onClearSearch}
         />
       </View>
@@ -27,9 +30,9 @@ export function RoleEmptyState({ searchQuery, onClearSearch, onCreateRole }: Rol
     <View style={styles.container}>
       <EmptyState
         icon="shield"
-        title="No Roles Yet"
-        description="Create your first role to start managing permissions."
-        buttonLabel="Create Role"
+        title={t('roles.noRolesYetTitle')}
+        description={t('roles.noRolesYetDesc')}
+        buttonLabel={t('roles.createRole')}
         onPress={onCreateRole}
       />
     </View>

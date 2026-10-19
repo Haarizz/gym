@@ -28,6 +28,8 @@ export interface PromotionFormValues {
   usageLimit: string;
   usageLimitPerMember: string;
   targetAudience: string;
+  /** Member ids, used when targetAudience is "specific" */
+  specificMembers: string[];
   priority: string;
 }
 
@@ -42,7 +44,7 @@ export type FieldErrors = Partial<Record<string, string>>;
 export const STEP_FIELD_ORDER: Record<PromotionStepId, string[]> = {
   basic: ["name", "type", "startDate", "endDate", "category", "code"],
   discount: ["discountType", "discountValue", "minimumPurchase", "maximumDiscount", "usageLimit", "usageLimitPerMember", "policyRules"],
-  targeting: ["targetAudience"],
+  targeting: ["targetAudience", "specificMembers"],
   settings: ["priority"],
 };
 
@@ -124,6 +126,9 @@ export function validateStep(
 
   if (step === "targeting") {
     if (!v.targetAudience) e.targetAudience = "Select a target audience.";
+    else if (v.targetAudience === "specific" && v.specificMembers.length === 0) {
+      e.specificMembers = "Choose at least one member.";
+    }
   }
 
   if (step === "settings") {

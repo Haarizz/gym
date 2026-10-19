@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "Ofertas y promociones",
+    "subtitle": "Promociones activas, descuentos y ofertas especiales",
+    "activeOffers": "Ofertas activas",
+    "totalRedemptions": "Canjes totales",
+    "viewAll": "Ver todo",
+    "failedLoadOffers": "Error al cargar las ofertas.",
+    "noActiveOffers": "No se encontraron ofertas activas.",
+    "failedLoadPromoOffers": "Error al cargar ofertas con código promocional.",
+    "failedLoadPlanOffers": "Error al cargar ofertas de planes.",
+    "planOffer": "OFERTA DE PLAN",
+    "plan": "Plan:",
+    "price": "Precio:",
+    "validUntil": "Válido hasta:",
+    "applies": "Aplica:",
+    "autoNoCode": "Automáticamente, no se requiere código",
+    "promoCode": "Código promocional",
+    "branches": "Sedes:",
+    "usage": "Uso:",
+    "noUsageLimit": "Sin límite de uso establecido",
+    "referralCodes": "Códigos de referido",
+    "failedLoadReferrals": "Error al cargar referidos.",
+    "noReferralCodes": "No se encontraron códigos de referido.",
+    "status": "Estado",
+    "date": "Fecha",
+    "reward": "Recompensa",
+    "createNewOffer": "Crear nueva oferta",
+    "revenueFromDeals": "Ingresos por ofertas",
+    "newMembers": "Nuevos miembros",
+    "thisMonthsImpact": "Impacto de este mes",
+    "failedLoadImpact": "Error al cargar el impacto de este mes.",
+    "noExpiry": "Sin caducidad",
+    "copiedPromoCode": "Código promocional {{code}} copiado al portapapeles.",
+    "failedCopyPromoCode": "No se pudo copiar el código promocional.",
+    "shareMessage": "{{name}}: use el código {{code}} para obtener {{discount}}.",
+    "unknownBranch": "Sucursal desconocida",
+    "unknown": "Desconocido",
+    "planOfferSuffix": "Oferta {{name}}"
+  }
+};
+
+export default crm;

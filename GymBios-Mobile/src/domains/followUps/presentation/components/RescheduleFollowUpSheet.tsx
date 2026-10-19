@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -25,6 +26,7 @@ export function RescheduleFollowUpSheet({
   onSubmit,
   submitting = false,
 }: RescheduleFollowUpSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [dueDate, setDueDate] = useState<Date | null>(new Date());
 
@@ -62,7 +64,7 @@ export function RescheduleFollowUpSheet({
         >
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Reschedule Follow-up
+              {t('followUps.rescheduleTitle')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Feather name="x" size={22} color={theme.text} />
@@ -71,14 +73,14 @@ export function RescheduleFollowUpSheet({
 
           <ScrollView style={styles.modalBody}>
             <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
-              Rescheduling follow-up for{' '}
+              {t('followUps.reschedulingFor')}{' '}
               <Text style={{ color: theme.text, fontWeight: '700' }}>
                 {followUp.leadName}
               </Text>
             </Text>
 
             <DatePicker
-              label="New Due Date"
+              label={t('followUps.newDueDate')}
               required
               minimumDate={new Date()}
               value={dueDate}
@@ -93,7 +95,7 @@ export function RescheduleFollowUpSheet({
               disabled={submitting}
             >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                Cancel
+                {t('followUps.cancel')}
               </Text>
             </TouchableOpacity>
 
@@ -103,7 +105,7 @@ export function RescheduleFollowUpSheet({
               disabled={submitting}
             >
               <Text style={styles.submitBtnText}>
-                {submitting ? 'Rescheduling...' : 'Confirm New Date'}
+                {submitting ? t('common.pleaseWait', 'Rescheduling...') : t('followUps.reschedule')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -19,6 +19,7 @@ import {
 } from '@/domains/rewards';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 type StatusFilter = 'all' | 'PENDING' | 'AVAILABLE' | 'REDEEMED';
 
@@ -92,6 +93,7 @@ function RewardValue({
 }
 
 export function RewardQueueScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [pendingAction, setPendingAction] = useState<{ reward: ReferralReward; action: RewardAction } | null>(null);
@@ -135,8 +137,8 @@ export function RewardQueueScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Reward Queue"
-        subtitle="Review, approve, and redeem rewards"
+        title={t('adminReferrals.queueTitle')}
+        subtitle={t('adminReferrals.queueSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -157,7 +159,7 @@ export function RewardQueueScreen() {
           <View style={styles.kpiRow}>
             <View style={[styles.kpiCard, { backgroundColor: '#dbeafe' }]}>
               <Typography variant="caption" style={{ color: '#1e40af', fontSize: 10 }}>
-                Total Generated
+                {t('adminReferrals.totalGenerated')}
               </Typography>
               <Typography variant="subtitle" style={{ color: '#1d4ed8', fontSize: 18, fontWeight: '700' }}>
                 {statValue(stats?.totalGenerated)}
@@ -166,7 +168,7 @@ export function RewardQueueScreen() {
 
             <View style={[styles.kpiCard, { backgroundColor: '#fef9c3' }]}>
               <Typography variant="caption" style={{ color: '#854d0e', fontSize: 10 }}>
-                Pending
+                {t('adminReferrals.pending')}
               </Typography>
               <Typography variant="subtitle" style={{ color: '#a16207', fontSize: 18, fontWeight: '700' }}>
                 {statValue(stats?.pendingApproval)}
@@ -175,7 +177,7 @@ export function RewardQueueScreen() {
 
             <View style={[styles.kpiCard, { backgroundColor: '#dcfce7' }]}>
               <Typography variant="caption" style={{ color: '#166534', fontSize: 10 }}>
-                Redeemed
+                {t('adminReferrals.redeemedStatus')}
               </Typography>
               <Typography variant="subtitle" style={{ color: '#15803d', fontSize: 18, fontWeight: '700' }}>
                 {statValue(stats?.redeemed)}
@@ -184,7 +186,7 @@ export function RewardQueueScreen() {
 
             <View style={[styles.kpiCard, { backgroundColor: '#fee2e2' }]}>
               <Typography variant="caption" style={{ color: '#991b1b', fontSize: 10 }}>
-                Expired
+                {t('adminReferrals.expiredStatus')}
               </Typography>
               <Typography variant="subtitle" style={{ color: '#b91c1c', fontSize: 18, fontWeight: '700' }}>
                 {statValue(stats?.expired)}
@@ -212,14 +214,14 @@ export function RewardQueueScreen() {
 
           {/* Queue Items */}
           <Typography variant="subtitle" style={styles.sectionHeader}>
-            Queue Items
+            {t('adminReferrals.queueItems')}
           </Typography>
 
           {isRewardsLoading ? (
             <ActivityIndicator size="small" color={BrandColors.teal} style={styles.stateBlock} />
           ) : rewardsError ? (
             <Typography variant="bodySmall" style={[styles.stateBlock, { color: '#dc2626' }]}>
-              Failed to load rewards. Pull down to retry.
+              {t('adminReferrals.failedLoadRewards')}
             </Typography>
           ) : rewards.length === 0 ? (
             <Typography variant="bodySmall" color="textSecondary" style={styles.stateBlock}>
@@ -253,25 +255,25 @@ export function RewardQueueScreen() {
 
                   <View style={styles.itemBody}>
                     <Typography variant="bodySmall">
-                      Type:{' '}
+                      {t('adminReferrals.typeLabel')}{' '}
                       <Typography variant="bodySmall" style={{ fontWeight: '600' }}>
                         {REWARD_TYPE_LABELS[item.rewardType] ?? item.rewardType}
                       </Typography>
                     </Typography>
                     <Typography variant="bodySmall">
-                      Value: <RewardValue reward={item} />
+                      {t('adminReferrals.valueLabel')} <RewardValue reward={item} />
                     </Typography>
                   </View>
 
                   {showApproveReject ? (
                     <View style={styles.actionRow}>
                       <Button
-                        title="Approve"
+                        title={t('adminReferrals.approve')}
                         onPress={() => setPendingAction({ reward: item, action: 'approve' })}
                         style={[styles.btn, { backgroundColor: '#16a34a' }]}
                       />
                       <Button
-                        title="Reject"
+                        title={t('adminReferrals.reject')}
                         variant="outline"
                         onPress={() => setPendingAction({ reward: item, action: 'reject' })}
                         style={[styles.btn, { borderColor: '#dc2626' }]}
@@ -280,7 +282,7 @@ export function RewardQueueScreen() {
                   ) : showRedeem ? (
                     <View style={styles.actionRow}>
                       <Button
-                        title="Mark Redeemed"
+                        title={t('adminReferrals.markRedeemed')}
                         onPress={() => setPendingAction({ reward: item, action: 'redeem' })}
                         style={styles.btn}
                       />
@@ -293,7 +295,7 @@ export function RewardQueueScreen() {
 
           {hiddenCount > 0 ? (
             <Typography variant="caption" color="textSecondary" style={styles.stateBlock}>
-              Showing the latest {rewards.length} of {rewardPage?.totalItems} rewards.
+              {t('adminReferrals.showingLatest', { count: rewards.length, total: rewardPage?.totalItems })}
             </Typography>
           ) : null}
         </View>

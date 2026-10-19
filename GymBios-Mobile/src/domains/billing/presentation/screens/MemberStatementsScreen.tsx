@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -34,6 +35,7 @@ interface MemberStatementsScreenProps {
  *  3. Generate Statement -> Loads and displays Statement of Account inline
  */
 export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -101,8 +103,8 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
   return (
     <ScreenLayout>
       <AppHeader
-        title="Member Statements"
-        subtitle="Statement Generator & Ledger"
+        title={t('billing.statements.hubTitle')}
+        subtitle={t('billing.statements.hubSubtitle')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -124,23 +126,23 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
         {/* ── Form Card: Select Member & Date Range ───────────────── */}
         <View style={styles.formCard}>
           <Typography variant="bodySmallBold" style={styles.formTitle}>
-            Generate Statement of Account
+            {t('billing.statements.generateTitle')}
           </Typography>
           <Typography variant="caption" color="textSecondary" style={styles.formSubtitle}>
-            Select a member and optional date range to inspect account history.
+            {t('billing.statements.generateDesc')}
           </Typography>
 
           {/* Autocomplete Member Input */}
           <View style={styles.inputGroup}>
             <Typography variant="caption" style={styles.inputLabel}>
-              Select Member *
+              {t('billing.statements.selectMember')}
             </Typography>
 
             <View style={styles.searchBox}>
               <Feather name="search" size={16} color={BrandColors.textSecondary} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Type name, ID, or phone..."
+                placeholder={t('billing.createReceipt.searchPlaceholder')}
                 placeholderTextColor={BrandColors.textSecondary}
                 value={searchQuery}
                 onFocus={() => setShowSuggestions(true)}
@@ -163,13 +165,13 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
                 {searchLoading ? (
                   <View style={styles.noResultsItem}>
                     <Typography variant="caption" color="textSecondary">
-                      Searching members...
+                      {t('billing.statements.searchingMembers')}
                     </Typography>
                   </View>
                 ) : noResults || memberSuggestions.length === 0 ? (
                   <View style={styles.noResultsItem}>
                     <Typography variant="caption" color="textSecondary">
-                      No matching members found. Try another search.
+                      {t('billing.statements.noMatchingMembers')}
                     </Typography>
                   </View>
                 ) : (
@@ -187,7 +189,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
                       <View style={styles.suggestionInfo}>
                         <Typography variant="bodySmallBold">{m.name}</Typography>
                         <Typography variant="caption" color="textSecondary">
-                          ID: {m.memberId} {m.phone ? `· ${m.phone}` : ''}
+                          {t('billing.statements.idLabel')} {m.memberId} {m.phone ? `· ${m.phone}` : ''}
                         </Typography>
                       </View>
                     </Pressable>
@@ -201,7 +203,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
           <View style={styles.datesRow}>
             <View style={styles.dateField}>
               <Typography variant="caption" style={styles.inputLabel}>
-                From Date
+                {t('billing.statements.fromDate')}
               </Typography>
               <TextInput
                 style={styles.dateInput}
@@ -213,7 +215,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
             </View>
             <View style={styles.dateField}>
               <Typography variant="caption" style={styles.inputLabel}>
-                To Date
+                {t('billing.statements.toDate')}
               </Typography>
               <TextInput
                 style={styles.dateInput}
@@ -235,7 +237,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
             >
               <Feather name="file-text" size={16} color="#ffffff" />
               <Typography variant="bodySmallBold" style={styles.generateBtnText}>
-                Generate Statement
+                {t('billing.statements.generateBtn')}
               </Typography>
             </Pressable>
           </View>
@@ -251,11 +253,11 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
               <View style={styles.warningBox}>
                 <Feather name="info" size={18} color="#d97706" />
                 <Typography variant="caption" style={styles.warningText}>
-                  {statement.memberName} is billed to guardian{' '}
+                  {statement.memberName} {t('billing.statements.isBilledToGuardian')}{' '}
                   <Typography variant="caption" style={{ fontWeight: '700' }}>
                     {statement.familyHeadName ?? 'Family Head'}
                   </Typography>
-                  . Fees are managed under their main account.
+                  {t('billing.statements.feesManagedUnderMain')}
                 </Typography>
               </View>
             )}
@@ -264,28 +266,28 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
             <View style={styles.totalsCard}>
               <View style={styles.totalCell}>
                 <Typography variant="caption" color="textSecondary">
-                  Opening
+                  {t('billing.statements.opening')}
                 </Typography>
                 <MoneyText amount={statement.openingBalance} variant="bodySmallBold" />
               </View>
               <View style={styles.totalDivider} />
               <View style={styles.totalCell}>
                 <Typography variant="caption" color="textSecondary">
-                  Billed
+                  {t('billing.statements.billed')}
                 </Typography>
                 <MoneyText amount={statement.totalBilled} variant="bodySmallBold" color="#dc2626" />
               </View>
               <View style={styles.totalDivider} />
               <View style={styles.totalCell}>
                 <Typography variant="caption" color="textSecondary">
-                  Paid
+                  {t('billing.statements.paid')}
                 </Typography>
                 <MoneyText amount={statement.totalPaid} variant="bodySmallBold" color="#16a34a" />
               </View>
               <View style={styles.totalDivider} />
               <View style={styles.totalCell}>
                 <Typography variant="caption" color="textSecondary">
-                  Closing
+                  {t('billing.statements.closing')}
                 </Typography>
                 <MoneyText
                   amount={statement.closingBalance}
@@ -299,17 +301,17 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
             <View style={styles.resultsHeader}>
               <View style={{ flex: 1 }}>
                 <Typography variant="bodySmallBold" style={{ fontSize: 15 }}>
-                  {statement.memberName} — Statement
+                  {statement.memberName} {t('billing.statements.statementSuffix')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Member ID: {statement.memberId ?? activeMemberId}
+                  {t('billing.statements.memberId')} {statement.memberId ?? activeMemberId}
                 </Typography>
               </View>
 
               <Pressable onPress={handleExportCSV} style={styles.exportBtn} accessibilityRole="button">
                 <Feather name="download" size={14} color={BrandColors.teal} />
                 <Typography variant="caption" style={styles.exportBtnText}>
-                  Export CSV
+                  {t('billing.statements.exportCsv')}
                 </Typography>
               </Pressable>
             </View>
@@ -317,8 +319,8 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
             {/* Statement Timeline List */}
             {lines.length === 0 ? (
               <EmptyBillingState
-                title="No transactions"
-                description="No transaction lines found for this date range."
+                title={t('billing.statements.noTransactions')}
+                description={t('billing.statements.noTransactionsDesc')}
                 icon="file-text"
               />
             ) : (
@@ -338,10 +340,10 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
           <View style={styles.promptCard}>
             <Feather name="user-check" size={32} color={BrandColors.teal} />
             <Typography variant="bodySmallBold" style={{ marginTop: Spacing.two }}>
-              Statement Generator Ready
+              {t('billing.statements.generatorReady')}
             </Typography>
             <Typography variant="caption" color="textSecondary" style={{ textAlign: 'center' }}>
-              Search and select a member above, then tap Generate Statement to load their full account ledger.
+              {t('billing.statements.generatorReadyDesc')}
             </Typography>
           </View>
         )}

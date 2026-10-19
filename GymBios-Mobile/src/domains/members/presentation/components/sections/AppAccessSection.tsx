@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -19,23 +20,6 @@ interface AppAccessSectionProps {
 
 type AccessState = 'none' | 'enabled' | 'blocked';
 
-const STATE_TONES: Record<AccessState, Tone> = {
-  none: { label: 'No login', color: '#6b7280' },
-  enabled: { label: 'Enabled', color: '#16a34a' },
-  blocked: { label: 'Blocked', color: '#dc2626' },
-};
-
-const STATE_HINTS: Record<AccessState, string> = {
-  none: "This member hasn't got an app login yet.",
-  enabled: 'Member can sign in to the app.',
-  blocked: 'Member is blocked from signing in to the app.',
-};
-
-/**
- * A member has a login when they own a local account (userId) or signed up in the app
- * with a GymBios account (globalUserId). Only an explicit appAccessEnabled === false
- * blocks them — TenantContextFilter treats null as allowed.
- */
 function getAccessState(member: Member): AccessState {
   const hasLogin = member.userId !== undefined || member.globalUserId !== undefined;
   if (!hasLogin) return 'none';
@@ -48,6 +32,7 @@ export function AppAccessSection({
   onToggleAccess,
   busy = false,
 }: AppAccessSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const state = getAccessState(member);
   // GymBios accounts manage their own password; only local logins can be reset here.
@@ -55,16 +40,34 @@ export function AppAccessSection({
 
   const username = member.appUsername ?? (isGlobalAccount ? member.email : undefined);
 
+  const stateTones: Record<AccessState, Tone> = {
+    none: { label: t('members.appAccessSection.noLoginState'), color: '#6b7280' },
+    enabled: { label: t('members.appAccessSection.enabledState'), color: '#16a34a' },
+    blocked: { label: t('members.appAccessSection.blockedState'), color: '#dc2626' },
+  };
+
+  const stateHints: Record<AccessState, string> = {
+    none: t('members.appAccessSection.noLoginHint'),
+    enabled: t('members.appAccessSection.enabledHint'),
+    blocked: t('members.appAccessSection.blockedHint'),
+  };
+
   return (
-    <DetailCard title="App access" icon="smartphone" right={<TonePill tone={STATE_TONES[state]} />}>
+    <DetailCard title={t('members.appAccessSection.title')} icon="smartphone" right={<TonePill tone={stateTones[state]} />}>
       <Typography variant="caption" color="textSecondary" style={styles.hint}>
-        {STATE_HINTS[state]}
+        {stateHints[state]}
       </Typography>
 
       {state !== 'none' ? (
         <DetailGrid>
-          <DetailField label={isGlobalAccount ? 'GymBios account' : 'Username'} value={username} />
-          <DetailField label="Login type" value={isGlobalAccount ? 'Self sign-up' : 'Created by gym'} />
+          <DetailField
+            label={isGlobalAccount ? t('members.appAccessSection.gymBiosAccount') : t('members.appAccessSection.username')}
+            value={username}
+          />
+          <DetailField
+            label={t('members.appAccessSection.loginType')}
+            value={isGlobalAccount ? t('members.appAccessSection.selfSignUp') : t('members.appAccessSection.createdByGym')}
+          />
         </DetailGrid>
       ) : null}
 
@@ -72,7 +75,7 @@ export function AppAccessSection({
         <View style={[styles.note, { backgroundColor: theme.backgroundSelected }]}>
           <Feather name="info" size={14} color={theme.textSecondary} />
           <Typography variant="caption" color="textSecondary" style={styles.noteText}>
-            This member manages their own GymBios password, so it can't be reset by the gym.
+            {t('members.appAccessSection.managedNote')}
           </Typography>
         </View>
       ) : null}
@@ -81,7 +84,7 @@ export function AppAccessSection({
         {state === 'none' ? (
           <ActionButton
             icon="user-plus"
-            label="Create login"
+            label={t('members.appAccessSection.createLogin')}
             primary
             disabled={busy}
             onPress={onSetCredentials}
@@ -91,7 +94,7 @@ export function AppAccessSection({
             {state === 'enabled' ? (
               <ActionButton
                 icon="slash"
-                label="Block access"
+                label={t('members.appAccessSection.blockAccess')}
                 color={BrandColors.danger}
                 disabled={busy}
                 onPress={() => onToggleAccess(false)}
@@ -99,7 +102,7 @@ export function AppAccessSection({
             ) : (
               <ActionButton
                 icon="unlock"
-                label="Restore access"
+                label={t('members.appAccessSection.restoreAccess')}
                 primary
                 disabled={busy}
                 onPress={() => onToggleAccess(true)}
@@ -108,7 +111,7 @@ export function AppAccessSection({
             {!isGlobalAccount ? (
               <ActionButton
                 icon="key"
-                label="Reset password"
+                label={t('members.appAccessSection.resetPassword')}
                 color={theme.text}
                 disabled={busy}
                 onPress={onSetCredentials}

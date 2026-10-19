@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
@@ -23,6 +24,7 @@ export function FamilyMemberBottomSheet({
   onClose,
   onAdd,
 }: FamilyMemberBottomSheetProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -72,30 +74,30 @@ export function FamilyMemberBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title="Add Family Member"
-      subtitle="Add an adult or minor to this family"
+      title={t('members.familySheet.addTitle')}
+      subtitle={t('members.familySheet.addSubtitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
-        <Input label="Full Name" value={name} onChangeText={setName} placeholder="Enter full name" />
-        <Input label="Email" value={email} onChangeText={setEmail} placeholder="Enter email" keyboardType="email-address" autoCapitalize="none" />
-        <Input label="Phone" value={phone} onChangeText={setPhone} placeholder="Enter phone" keyboardType="phone-pad" />
+        <Input label={t('members.familySheet.fullNameLabel')} value={name} onChangeText={setName} placeholder={t('members.familySheet.fullNamePlaceholder')} />
+        <Input label={t('members.familySheet.emailLabel')} value={email} onChangeText={setEmail} placeholder={t('members.familySheet.emailPlaceholder')} keyboardType="email-address" autoCapitalize="none" />
+        <Input label={t('members.familySheet.phoneLabel')} value={phone} onChangeText={setPhone} placeholder={t('members.familySheet.phonePlaceholder')} keyboardType="phone-pad" />
         <DatePicker
-          label="Date of Birth"
-          placeholder="Select date of birth"
+          label={t('members.familySheet.dobLabel')}
+          placeholder={t('members.familySheet.dobPlaceholder')}
           value={dateOfBirth}
           onChange={setDateOfBirth}
           initialView="year"
           minimumDate={getMinBirthDate()}
           maximumDate={getMaxBirthDate()}
         />
-        <Input label="Gender" value={gender} onChangeText={setGender} placeholder="e.g. Male, Female" />
-        <Input label="Family Role" value={familyRole} onChangeText={setFamilyRole} placeholder="ADULT or MINOR" />
-        <Input label="Membership Type" value={membershipType} onChangeText={setMembershipType} placeholder="e.g. FAMILY" />
-        <Input label="Status" value={status} onChangeText={setStatus} placeholder="e.g. ACTIVE" />
-        <Input label="Start Date" value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" />
+        <Input label={t('members.familySheet.genderLabel')} value={gender} onChangeText={setGender} placeholder={t('members.familySheet.genderPlaceholder')} />
+        <Input label={t('members.familySheet.familyRoleLabel')} value={familyRole} onChangeText={setFamilyRole} placeholder={t('members.familySheet.familyRolePlaceholder')} />
+        <Input label={t('members.familySheet.membershipTypeLabel')} value={membershipType} onChangeText={setMembershipType} placeholder={t('members.familySheet.membershipTypePlaceholder')} />
+        <Input label={t('members.familySheet.statusLabel')} value={status} onChangeText={setStatus} placeholder={t('members.familySheet.statusPlaceholder')} />
+        <Input label={t('members.familySheet.startDateLabel')} value={startDate} onChangeText={setStartDate} placeholder={t('members.familySheet.startDatePlaceholder')} />
         <Button
-          label="Add Family Member"
+          label={t('members.familySheet.addBtn')}
           onPress={handleSubmit}
           loading={submitting}
           size="lg"

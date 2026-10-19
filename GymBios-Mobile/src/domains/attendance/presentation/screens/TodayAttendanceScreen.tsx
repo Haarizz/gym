@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FlatList,
   RefreshControl,
@@ -36,6 +37,7 @@ interface TodayAttendanceScreenProps {
  * filter into a sticky header, and uses pull-to-refresh.
  */
 export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { datePeriod, search, apiFilters, setDatePeriod, setSearch } =
     useAttendanceFilters();
@@ -101,8 +103,11 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
     return (
       <View style={styles.pagination}>
         <Typography variant="caption" color="textSecondary">
-          Page {pagination.page} of {pagination.totalPages} ·{' '}
-          {pagination.total} records
+          {t('attendance.today.pageIndicator', {
+            page: pagination.page,
+            totalPages: pagination.totalPages,
+            total: pagination.total,
+          })}
         </Typography>
       </View>
     );
@@ -114,8 +119,8 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Today's Attendance"
-          subtitle="Active check-ins & manual checkout"
+          title={t('attendance.today.title')}
+          subtitle={t('attendance.today.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -123,7 +128,7 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search members..."
+            placeholder={t('attendance.today.searchPlaceholder')}
           />
           <DatePeriodFilter value={datePeriod} onChange={setDatePeriod} />
         </View>
@@ -138,8 +143,8 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Today's Attendance"
-          subtitle="Active check-ins & manual checkout"
+          title={t('attendance.today.title')}
+          subtitle={t('attendance.today.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -147,7 +152,7 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search members..."
+            placeholder={t('attendance.today.searchPlaceholder')}
           />
           <DatePeriodFilter value={datePeriod} onChange={setDatePeriod} />
         </View>
@@ -165,8 +170,8 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Today's Attendance"
-          subtitle="Active check-ins & manual checkout"
+          title={t('attendance.today.title')}
+          subtitle={t('attendance.today.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -174,13 +179,13 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search members..."
+            placeholder={t('attendance.today.searchPlaceholder')}
           />
           <DatePeriodFilter value={datePeriod} onChange={setDatePeriod} />
         </View>
         <EmptyState
-          title="No attendance records"
-          description="No check-ins found for the selected period."
+          title={t('attendance.today.noRecordsTitle')}
+          description={t('attendance.today.noRecordsDesc')}
           icon="user-check"
         />
       </ScreenLayout>
@@ -192,8 +197,8 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Today's Attendance"
-        subtitle="Active check-ins & manual checkout"
+        title={t('attendance.today.title')}
+        subtitle={t('attendance.today.subtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
@@ -202,7 +207,7 @@ export function TodayAttendanceScreen({ onBack }: TodayAttendanceScreenProps) {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search members..."
+          placeholder={t('attendance.today.searchPlaceholder')}
         />
         <DatePeriodFilter value={datePeriod} onChange={setDatePeriod} />
       </View>

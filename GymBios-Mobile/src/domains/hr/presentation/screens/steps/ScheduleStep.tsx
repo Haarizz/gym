@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { format, parseISO } from 'date-fns';
 import { Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -36,6 +37,7 @@ export function ScheduleStep({
   removeCertification,
   onChangeCert,
 }: ScheduleStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const workingDays = DAYS.filter((day) => (data.schedule[day] ?? []).length > 0).length;
 
@@ -72,11 +74,13 @@ export function ScheduleStep({
     <View style={styles.container}>
       <FormCard
         icon="calendar"
-        title="Weekly schedule"
+        title={t('hr.scheduleStep.weeklySchedule')}
         description={
           workingDays
-            ? `${workingDays} working day${workingDays > 1 ? 's' : ''} · tap a shift to toggle`
-            : 'Tap the shifts this person usually works'
+            ? (workingDays === 1
+                ? t('hr.scheduleStep.workingDays_one', { count: workingDays })
+                : t('hr.scheduleStep.workingDays_other', { count: workingDays }))
+            : t('hr.scheduleStep.noWorkingDays')
         }
       >
         {DAYS.map((day) => {
@@ -123,30 +127,32 @@ export function ScheduleStep({
           );
         })}
         <Typography variant="caption" color="textSecondary">
-          Morning 6am–12pm · Afternoon 12pm–5pm · Evening 5pm–10pm
+          {t('hr.scheduleStep.timeHint')}
         </Typography>
       </FormCard>
 
       <FormCard
         icon="award"
-        title="Certifications"
+        title={t('hr.certifications')}
         description={
           data.certifications.length
-            ? `${data.certifications.length} on file`
-            : 'Optional · e.g. CPT, first aid, nutrition'
+            ? (data.certifications.length === 1
+                ? t('hr.scheduleStep.certificationsDesc_one', { count: data.certifications.length })
+                : t('hr.scheduleStep.certificationsDesc_other', { count: data.certifications.length }))
+            : t('hr.scheduleStep.noCertificationsDesc')
         }
       >
         {data.certifications.map((cert, index) => (
           <View key={index} style={[styles.certCard, { borderColor: theme.border }]}>
             <View style={styles.certHeader}>
               <Typography variant="bodySmallBold" style={styles.certTitle} numberOfLines={1}>
-                {cert.certName.trim() || `Certification ${index + 1}`}
+                {cert.certName.trim() || t('hr.scheduleStep.certNumber', { number: index + 1 })}
               </Typography>
               <Pressable
                 hitSlop={10}
                 onPress={() => removeCertification(index)}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove certification ${index + 1}`}
+                accessibilityLabel={t('hr.scheduleStep.removeCertA11y', { number: index + 1 })}
                 style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}
               >
                 <Feather name="trash-2" size={15} color={theme.error} />
@@ -154,28 +160,28 @@ export function ScheduleStep({
             </View>
 
             <Input
-              label="Name"
+              label={t('hr.scheduleStep.certName')}
               value={cert.certName}
               onChangeText={(value) => onChangeCert(index, 'certName', value)}
-              placeholder="e.g. Certified Personal Trainer"
+              placeholder={t('hr.scheduleStep.certNamePlaceholder')}
             />
             <Input
-              label="Issuer"
+              label={t('hr.scheduleStep.issuer')}
               value={cert.issuer}
               onChangeText={(value) => onChangeCert(index, 'issuer', value)}
-              placeholder="e.g. ACE"
+              placeholder={t('hr.scheduleStep.issuerPlaceholder')}
             />
             <View style={styles.dateRow}>
               <DatePicker
-                label="Issued"
-                placeholder="Select"
+                label={t('hr.scheduleStep.issued')}
+                placeholder={t('hr.scheduleStep.select')}
                 value={toDate(cert.issueDate)}
                 onChange={(d) => onChangeCert(index, 'issueDate', toDateString(d))}
                 style={styles.dateField}
               />
               <DatePicker
-                label="Expires"
-                placeholder="Select"
+                label={t('hr.scheduleStep.expires')}
+                placeholder={t('hr.scheduleStep.select')}
                 value={toDate(cert.expiryDate)}
                 minimumDate={toDate(cert.issueDate)}
                 onChange={(d) => onChangeCert(index, 'expiryDate', toDateString(d))}
@@ -186,7 +192,7 @@ export function ScheduleStep({
             <Pressable
               onPress={() => handlePickDocument(index)}
               accessibilityRole="button"
-              accessibilityLabel={cert.documentUrl ? 'Replace document' : 'Upload document'}
+              accessibilityLabel={cert.documentUrl ? t('hr.scheduleStep.replace') : t('hr.scheduleStep.uploadDocument')}
               style={({ pressed }) => [
                 styles.docButton,
                 { borderColor: theme.border },
@@ -199,11 +205,11 @@ export function ScheduleStep({
                 color={BrandColors.teal}
               />
               <Typography variant="bodySmall" style={styles.docText} numberOfLines={1}>
-                {cert.documentUrl ? cert.documentUrl.split('/').pop() : 'Upload document'}
+                {cert.documentUrl ? cert.documentUrl.split('/').pop() : t('hr.scheduleStep.uploadDocument')}
               </Typography>
               {cert.documentUrl ? (
                 <Typography variant="caption" style={[styles.docAction, { color: theme.primary }]}>
-                  Replace
+                  {t('hr.scheduleStep.replace')}
                 </Typography>
               ) : null}
             </Pressable>
@@ -213,7 +219,7 @@ export function ScheduleStep({
         <Pressable
           onPress={addCertification}
           accessibilityRole="button"
-          accessibilityLabel="Add certification"
+          accessibilityLabel={t('hr.scheduleStep.addCertification')}
           style={({ pressed }) => [
             styles.addButton,
             { borderColor: theme.primary },
@@ -222,7 +228,7 @@ export function ScheduleStep({
         >
           <Feather name="plus" size={16} color={theme.primary} />
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            Add certification
+            {t('hr.scheduleStep.addCertification')}
           </Typography>
         </Pressable>
       </FormCard>

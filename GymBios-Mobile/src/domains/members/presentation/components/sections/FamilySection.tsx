@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -23,6 +24,7 @@ export function FamilySection({
   onAddFamilyMember,
   onSelectMember,
 }: FamilySectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isFamily = member.membershipType?.toUpperCase() === 'FAMILY';
 
@@ -34,16 +36,19 @@ export function FamilySection({
   const headName = family?.headName ?? member.familyHeadName;
 
   return (
-    <DetailCard title="Family" icon="users">
+    <DetailCard title={t('members.familySection.title')} icon="users">
       {headName ? (
         <Typography variant="caption" color="textSecondary" style={styles.headLine}>
-          Family head: <Typography variant="caption" style={styles.headName}>{headName}</Typography>
+          {t('members.familySection.headLine')}{' '}
+          <Typography variant="caption" style={styles.headName}>
+            {headName}
+          </Typography>
         </Typography>
       ) : null}
 
       {others.length === 0 ? (
         <Typography variant="bodySmall" color="textSecondary" style={styles.empty}>
-          No other family members yet.
+          {t('members.familySection.noMembers')}
         </Typography>
       ) : (
         others.map((fm, idx) => (
@@ -84,7 +89,7 @@ export function FamilySection({
       >
         <Feather name="user-plus" size={15} color={BrandColors.teal} />
         <Typography variant="bodySmallBold" style={{ color: BrandColors.teal }}>
-          Add family member
+          {t('members.familySection.addMemberBtn')}
         </Typography>
       </Pressable>
     </DetailCard>

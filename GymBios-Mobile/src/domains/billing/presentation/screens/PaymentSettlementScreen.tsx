@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyGlyph } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -68,6 +69,7 @@ export function PaymentSettlementScreen({
   onBack,
   onSuccess,
 }: PaymentSettlementScreenProps) {
+  const { t } = useTranslation();
   const { bills, loading: billsLoading } = usePendingBills(memberId);
   const settlePayment = useSettlePayment();
 
@@ -116,7 +118,7 @@ export function PaymentSettlementScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Payment Settlement"
+          title={t('billing.settlement.title')}
           subtitle={memberName ?? ''}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
@@ -130,13 +132,13 @@ export function PaymentSettlementScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Payment Settlement"
+          title={t('billing.settlement.title')}
           subtitle={memberName ?? ''}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
         <ErrorState
-          message="The selected bills could not be loaded."
+          message={t('common.error')}
           onRetry={onBack}
         />
       </ScreenLayout>
@@ -154,7 +156,7 @@ export function PaymentSettlementScreen({
   return (
     <ScreenLayout>
       <AppHeader
-        title="Payment Settlement"
+        title={t('billing.settlement.title')}
         subtitle={memberName ?? ''}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
@@ -166,7 +168,7 @@ export function PaymentSettlementScreen({
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Bills & amounts ──────────────────────────────────── */}
-        <BillingSection title="Bills to Settle">
+        <BillingSection title={t('billing.settlement.billsToSettle')}>
           <View style={styles.billsCard}>
             {selectedBills.map((bill, index) => {
               const entry = form.billAmounts.find(
@@ -186,7 +188,7 @@ export function PaymentSettlementScreen({
                     </Typography>
                     <View style={styles.dueRow}>
                       <Typography variant="caption" color="textSecondary">
-                        Outstanding:{' '}
+                        {t('billing.settlement.outstanding')}{' '}
                       </Typography>
                       <MoneyText
                         amount={bill.dueAmount}
@@ -219,7 +221,7 @@ export function PaymentSettlementScreen({
 
             {/* Total row */}
             <View style={styles.totalRow}>
-              <Typography variant="bodySmallBold">Total Payment</Typography>
+              <Typography variant="bodySmallBold">{t('billing.settlement.totalPayment')}</Typography>
               <MoneyText
                 amount={form.totalAmount}
                 variant="bodySmallBold"
@@ -230,7 +232,7 @@ export function PaymentSettlementScreen({
         </BillingSection>
 
         {/* ── Payment method ───────────────────────────────────── */}
-        <BillingSection title="Payment Method">
+        <BillingSection title={t('billing.createReceipt.paymentMethod')}>
           <View style={styles.methodGrid}>
             {PAYMENT_METHODS.map((method) => (
               <Pressable
@@ -250,7 +252,7 @@ export function PaymentSettlementScreen({
         </BillingSection>
 
         {/* ── Payment details ──────────────────────────────────── */}
-        <BillingSection title="Payment Details">
+        <BillingSection title={t('billing.settlement.paymentDetails')}>
           <View style={styles.formCard}>
             {/* Date */}
             <View style={styles.formRow}>
@@ -310,7 +312,7 @@ export function PaymentSettlementScreen({
           accessibilityState={{ disabled: !form.isValid }}
         >
           <Typography variant="bodySmallBold" style={styles.reviewBtnText}>
-            Review Payment
+            {t('billing.settlement.reviewPayment')}
           </Typography>
           <Feather name="arrow-right" size={18} color="#ffffff" />
         </Pressable>
@@ -319,7 +321,7 @@ export function PaymentSettlementScreen({
       {/* Review bottom sheet */}
       <AppBottomSheet
         visible={form.isReviewVisible}
-        title="Confirm Payment"
+        title={t('billing.settlement.confirmPayment')}
         subtitle={`Settling ${selectedBills.length} bill${selectedBills.length !== 1 ? 's' : ''} for ${memberName ?? 'member'}`}
         onClose={form.hideReview}
       >
@@ -338,16 +340,16 @@ export function PaymentSettlementScreen({
 
           <View style={styles.reviewMeta}>
             <View style={styles.reviewMetaRow}>
-              <Typography variant="caption" color="textSecondary">Method</Typography>
+              <Typography variant="caption" color="textSecondary">{t('billing.settlement.method')}</Typography>
               <PaymentMethodBadge method={form.paymentMethod} />
             </View>
             <View style={styles.reviewMetaRow}>
-              <Typography variant="caption" color="textSecondary">Date</Typography>
+              <Typography variant="caption" color="textSecondary">{t('billing.settlement.date')}</Typography>
               <Typography variant="bodySmall">{form.paymentDate}</Typography>
             </View>
             {form.transactionRef ? (
               <View style={styles.reviewMetaRow}>
-                <Typography variant="caption" color="textSecondary">Ref</Typography>
+                <Typography variant="caption" color="textSecondary">{t('billing.settlement.ref')}</Typography>
                 <Typography variant="bodySmall">{form.transactionRef}</Typography>
               </View>
             ) : null}
@@ -361,13 +363,13 @@ export function PaymentSettlementScreen({
           >
             {settlePayment.isPending ? (
               <Typography variant="bodySmallBold" style={styles.confirmBtnText}>
-                Processing…
+                {t('billing.settlement.processing')}
               </Typography>
             ) : (
               <>
                 <Feather name="check-circle" size={18} color="#ffffff" />
                 <Typography variant="bodySmallBold" style={styles.confirmBtnText}>
-                  Confirm Payment
+                  {t('billing.settlement.confirmPayment')}
                 </Typography>
               </>
             )}

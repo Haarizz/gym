@@ -15,6 +15,8 @@ public interface PromotionRedemptionRepository extends JpaRepository<PromotionRe
             "WHERE r.redeemedAt >= :from AND r.redeemedAt < :to")
     BigDecimal sumRevenueBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    long countByPromotionIdAndMemberId(Long promotionId, Long memberId);
+
     long countByRedeemedAtGreaterThanEqualAndRedeemedAtLessThan(LocalDateTime from, LocalDateTime to);
 
     @Query("SELECT DISTINCT r.memberId FROM PromotionRedemption r " +

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
@@ -11,6 +12,7 @@ interface MembershipPlanSummaryProps {
 }
 
 export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isFamily = plan.planType?.toUpperCase() === 'FAMILY';
 
@@ -28,7 +30,7 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
       <View style={styles.metrics}>
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Typography variant="caption" color="textSecondary">
-            Duration
+            {t('membershipPlans.card.duration')}
           </Typography>
           <Typography variant="bodySmallBold">
             {plan.durationValue} {plan.durationType}
@@ -37,7 +39,7 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
 
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Typography variant="caption" color="textSecondary">
-            Price
+            {t('membershipPlans.card.price')}
           </Typography>
           <Typography variant="bodySmallBold">
             <CurrencyValue amount={hasOffer ? plan.effectivePrice : plan.price} decimals={2} />
@@ -51,12 +53,12 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
 
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Typography variant="caption" color="textSecondary">
-            {isFamily ? 'Family Size' : 'Visits'}
+            {isFamily ? t('membershipPlans.card.familySize') : t('attendance.cards.workout')}
           </Typography>
           <Typography variant="bodySmallBold">
             {isFamily
               ? plan.maxFamilyMembers
-                ? `Up to ${plan.maxFamilyMembers}`
+                ? t('membershipPlans.card.upToFamily', { count: plan.maxFamilyMembers })
                 : '—'
               : plan.maxSessions !== undefined
                 ? String(plan.maxSessions)

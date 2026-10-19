@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
 import { useRouter, useLocalSearchParams, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { MessagingFlowHeader } from '../components/MessagingFlowHeader';
 import { MessageTypeSelector } from '../components/MessageTypeSelector';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
@@ -17,12 +18,6 @@ const AV = ['#2F8A73', '#4FA3D1', '#8E7CC3'];
 const initials = (name: string) =>
   (name || '?').split(' ').filter(Boolean).slice(0, 2).map(n => n[0].toUpperCase()).join('');
 
-const VAR_GROUPS = [
-  { g: 'Member', vars: ['FirstName', 'LastName', 'FullName', 'Email', 'Phone'] },
-  { g: 'Membership', vars: ['MembershipPlan', 'MembershipStatus', 'ExpiryDate', 'JoinDate'] },
-  { g: 'Gym', vars: ['GymName', 'Location'] },
-];
-
 const SAMPLE = {
   FirstName: 'Jordan', LastName: 'Blake', FullName: 'Jordan Blake', Email: 'jordan@example.com', 
   Phone: '(415) 555-0132', MembershipPlan: 'Premium', MembershipStatus: 'Active', 
@@ -30,6 +25,7 @@ const SAMPLE = {
 };
 
 export function ComposeMessageScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
@@ -55,6 +51,12 @@ export function ComposeMessageScreen() {
   const [varSheetVisible, setVarSheetVisible] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  const varGroups = useMemo(() => [
+    { g: t('messaging.compose.varGroups.member'), vars: ['FirstName', 'LastName', 'FullName', 'Email', 'Phone'] },
+    { g: t('messaging.compose.varGroups.membership'), vars: ['MembershipPlan', 'MembershipStatus', 'ExpiryDate', 'JoinDate'] },
+    { g: t('messaging.compose.varGroups.gym'), vars: ['GymName', 'Location'] },
+  ], [t]);
 
   useEffect(() => {
     if (params.templateSubject) {
@@ -92,7 +94,7 @@ export function ComposeMessageScreen() {
           }, 1500);
         },
         onError: (error: any) => {
-          setSendError(error?.response?.data?.message || error?.message || 'Failed to send message');
+          setSendError(error?.response?.data?.message || error?.message || t('messaging.compose.failedToSend'));
         },
       }
     );
@@ -112,16 +114,16 @@ export function ComposeMessageScreen() {
     });
   };
 
-    const renderPreviewText = (text: string) => {
+  const renderPreviewText = (text: string) => {
     return text.replace(/\{(\w+)\}/g, (match, key) => (SAMPLE as any)[key] ? (SAMPLE as any)[key] : match);
   };
 
   const renderPreview = () => {
-    const body = renderPreviewText(content || 'Your message will appear here...');
+    const body = renderPreviewText(content || t('messaging.compose.previewPlaceholder'));
     if (messageType === 'email') {
       return (
         <View style={styles.previewBox}>
-          <Text style={styles.pvSubj}>{renderPreviewText(subject || '(No subject)')}</Text>
+          <Text style={styles.pvSubj}>{renderPreviewText(subject || t('messaging.compose.noSubject'))}</Text>
           <Text style={styles.pvBody}>{body}</Text>
         </View>
       );
@@ -155,8 +157,8 @@ export function ComposeMessageScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <MessagingFlowHeader 
-        title="Compose Message"
-        subtitle="Send new messages & campaigns"
+        title={t('messaging.compose.title')}
+        subtitle={t('messaging.compose.subtitle')}
         step={2}
         onBack={() => router.back()}
       />
@@ -176,17 +178,19 @@ export function ComposeMessageScreen() {
           <View style={styles.recipTextWrap}>
             <Text style={styles.recipTextCount}>
               {recipientCount === 0
-                ? 'No recipients selected'
-                : `${recipientCount} recipient${recipientCount === 1 ? '' : 's'} selected`}
+                ? t('messaging.compose.noRecipients')
+                : t('messaging.compose.recipientsSelected', { count: recipientCount })}
             </Text>
-            <Text style={styles.recipTextSub}>{recipientCount === 0 ? 'Tap to choose recipients' : 'Tap to edit list'}</Text>
+            <Text style={styles.recipTextSub}>
+              {recipientCount === 0 ? t('messaging.compose.tapToChoose') : t('messaging.compose.tapToEdit')}
+            </Text>
           </View>
           <Feather name="chevron-right" size={18} color={MessagingColors.muted} />
         </Pressable>
 
         {sent && (
           <View style={styles.sentBanner}>
-            <Text style={styles.sentBannerText}>✅  Message sent</Text>
+            <Text style={styles.sentBannerText}>✅  {t('messaging.compose.messageSent')}</Text>
           </View>
         )}
 
@@ -197,19 +201,19 @@ export function ComposeMessageScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.label}>Message type</Text>
+          <Text style={styles.label}>{t('messaging.compose.messageType')}</Text>
           <MessageTypeSelector selectedType={messageType} onSelectType={setMessageType} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Template</Text>
+          <Text style={styles.label}>{t('messaging.compose.template')}</Text>
           <Pressable style={styles.tplField} onPress={() => setTemplateSheetVisible(true)}>
             <View style={styles.tplIc}>
               <Feather name="layout" size={16} color={MessagingColors.dark} />
             </View>
             <View style={styles.tplTextWrap}>
-              <Text style={styles.tplT1}>{selectedTemplate ? selectedTemplate.t : 'Choose a template'}</Text>
-              <Text style={styles.tplT2}>{selectedTemplate ? 'Tap to switch template' : 'Optional — start from a saved message'}</Text>
+              <Text style={styles.tplT1}>{selectedTemplate ? selectedTemplate.t : t('messaging.compose.chooseTemplate')}</Text>
+              <Text style={styles.tplT2}>{selectedTemplate ? t('messaging.compose.switchTemplate') : t('messaging.compose.optionalTemplate')}</Text>
             </View>
             <Feather name="chevron-right" size={18} color={MessagingColors.faint} />
           </Pressable>
@@ -217,12 +221,12 @@ export function ComposeMessageScreen() {
 
         {messageType === 'email' && (
           <View style={styles.section}>
-            <Text style={styles.label}>Subject</Text>
+            <Text style={styles.label}>{t('messaging.compose.subject')}</Text>
             <TextInput
               style={styles.field}
               value={subject}
               onChangeText={setSubject}
-              placeholder="Enter message subject"
+              placeholder={t('messaging.compose.subjectPlaceholder')}
               placeholderTextColor={MessagingColors.faint}
             />
           </View>
@@ -232,15 +236,15 @@ export function ComposeMessageScreen() {
           <View style={styles.contentToolbar}>
             <View style={styles.tabRow}>
               <Pressable style={[styles.tabBtn, tab === 'edit' && styles.tabBtnActive]} onPress={() => setTab('edit')}>
-                <Text style={[styles.tabBtnText, tab === 'edit' && styles.tabBtnTextActive]}>Edit</Text>
+                <Text style={[styles.tabBtnText, tab === 'edit' && styles.tabBtnTextActive]}>{t('messaging.compose.editTab')}</Text>
               </Pressable>
               <Pressable style={[styles.tabBtn, tab === 'preview' && styles.tabBtnActive]} onPress={() => setTab('preview')}>
-                <Text style={[styles.tabBtnText, tab === 'preview' && styles.tabBtnTextActive]}>Preview</Text>
+                <Text style={[styles.tabBtnText, tab === 'preview' && styles.tabBtnTextActive]}>{t('messaging.compose.previewTab')}</Text>
               </Pressable>
             </View>
             <Pressable style={styles.varBtn} onPress={() => setVarSheetVisible(true)}>
               <Feather name="code" size={13} color={MessagingColors.dark} />
-              <Text style={styles.varBtnText}>Insert variable</Text>
+              <Text style={styles.varBtnText}>{t('messaging.compose.insertVariable')}</Text>
             </Pressable>
           </View>
 
@@ -252,15 +256,15 @@ export function ComposeMessageScreen() {
                 style={[styles.field, styles.textArea]}
                 value={content}
                 onChangeText={setContent}
-                placeholder="Type your message here..."
+                placeholder={t('messaging.compose.typeMessagePlaceholder')}
                 placeholderTextColor={MessagingColors.faint}
                 multiline
                 textAlignVertical="top"
               />
               <Text style={styles.counter}>
                 {messageType === 'sms' 
-                  ? `${content.length} chars · ${Math.max(1, Math.ceil(content.length / 160))} SMS segment${Math.ceil(content.length / 160) > 1 ? 's' : ''}`
-                  : `${content.length} / 1000`}
+                  ? t('messaging.compose.smsCounter', { chars: content.length, segments: Math.max(1, Math.ceil(content.length / 160)) })
+                  : t('messaging.compose.charCounter', { chars: content.length })}
               </Text>
             </>
           )}
@@ -271,7 +275,7 @@ export function ComposeMessageScreen() {
 
       <View style={styles.footer}>
         <Pressable style={styles.ghostBtn} onPress={() => setTab(tab === 'edit' ? 'preview' : 'edit')}>
-          <Text style={styles.ghostBtnText}>{tab === 'edit' ? 'Preview' : 'Edit'}</Text>
+          <Text style={styles.ghostBtnText}>{tab === 'edit' ? t('messaging.compose.previewTab') : t('messaging.compose.editTab')}</Text>
         </Pressable>
         <Pressable onPress={handleSend} disabled={isPending || sent || !canSend}>
           {({ pressed }) => (
@@ -281,7 +285,9 @@ export function ComposeMessageScreen() {
               end={{ x: 1, y: 1 }}
               style={[styles.primaryBtn, !(isPending || sent || !canSend) && styles.primaryBtnShadow, pressed && { opacity: 0.9 }]}
             >
-              <Text style={styles.primaryBtnText}>{isPending ? 'Sending...' : `Send to ${recipientCount}`}</Text>
+              <Text style={styles.primaryBtnText}>
+                {isPending ? t('messaging.compose.sending') : t('messaging.compose.sendToCount', { count: recipientCount })}
+              </Text>
             </LinearGradient>
           )}
         </Pressable>
@@ -289,32 +295,34 @@ export function ComposeMessageScreen() {
 
       <AppBottomSheet
         visible={templateSheetVisible}
-        title="Choose a template"
+        title={t('messaging.compose.chooseTemplate')}
         onClose={() => setTemplateSheetVisible(false)}
       >
         <View style={styles.sheetSearch}>
           <Feather name="search" size={15} color={MessagingColors.faint} />
-          <Text style={{ color: MessagingColors.faint, marginLeft: 9, fontSize: 13.5 }}>Search templates...</Text>
+          <Text style={{ color: MessagingColors.faint, marginLeft: 9, fontSize: 13.5 }}>
+            {t('messaging.compose.searchTemplatesPlaceholder')}
+          </Text>
         </View>
         <View style={styles.sheetList}>
-          {templates.map((t) => (
+          {templates.map((tpl) => (
             <Pressable 
-              key={t.id} 
+              key={tpl.id} 
               style={styles.stpl}
               onPress={() => {
-                setSelectedTemplate({ t: t.subject, snip: t.content });
-                setSubject(t.subject);
-                setContent(t.content);
-                setMessageType(t.type || 'email');
+                setSelectedTemplate({ t: tpl.subject, snip: tpl.content });
+                setSubject(tpl.subject);
+                setContent(tpl.content);
+                setMessageType(tpl.type || 'email');
                 setTemplateSheetVisible(false);
               }}
             >
               <View style={styles.stplIc}>
-                <Feather name={t.type === 'sms' ? 'message-circle' : t.type === 'in-app' ? 'bell' : 'mail'} size={16} color={MessagingColors.muted} />
+                <Feather name={tpl.type === 'sms' ? 'message-circle' : tpl.type === 'in-app' ? 'bell' : 'mail'} size={16} color={MessagingColors.muted} />
               </View>
               <View style={styles.stplMeta}>
-                <Text style={styles.stplT1}>{t.name}</Text>
-                <Text style={styles.stplT2}>{t.category} · used recently</Text>
+                <Text style={styles.stplT1}>{tpl.name}</Text>
+                <Text style={styles.stplT2}>{tpl.category} · {t('messaging.compose.usedRecently')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={MessagingColors.faint} />
             </Pressable>
@@ -324,17 +332,17 @@ export function ComposeMessageScreen() {
           setTemplateSheetVisible(false);
           router.push(`/${roleGroup}/messaging/templates` as any);
         }}>
-          <Text style={styles.sheetBrowseText}>Browse full template library →</Text>
+          <Text style={styles.sheetBrowseText}>{t('messaging.compose.browseLibrary')}</Text>
         </Pressable>
       </AppBottomSheet>
 
       <AppBottomSheet
         visible={varSheetVisible}
-        title="Insert Variable"
+        title={t('messaging.compose.insertVariableTitle')}
         onClose={() => setVarSheetVisible(false)}
       >
         <View style={styles.varMenuContainer}>
-          {VAR_GROUPS.map(g => (
+          {varGroups.map(g => (
             <View key={g.g} style={styles.varGroupBlock}>
               <Text style={styles.varGrpTitle}>{g.g}</Text>
               <View style={styles.varChipRow}>

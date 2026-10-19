@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
@@ -12,11 +13,13 @@ const PRIORITY_OPTIONS: Option[] = [
 ];
 
 export function SettingsStep({ values, onChange }: StepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={stepStyles.container}>
       <Dropdown
-        label="Priority Level"
-        placeholder="Select priority"
+        label={t('promotions.priorityLevel')}
+        placeholder={t('promotions.selectPriority')}
         options={PRIORITY_OPTIONS}
         value={values.priority}
         onChange={(val) => onChange('priority', val)}
@@ -24,25 +27,25 @@ export function SettingsStep({ values, onChange }: StepProps) {
 
       <View>
         <ToggleRow
-          label="Auto-apply at checkout"
+          label={t('promotions.autoApply')}
           value={values.autoApply}
           onChange={(val) => onChange('autoApply', val)}
         />
         <ToggleRow
-          label="Can be combined with other promotions"
+          label={t('promotions.combinable')}
           value={values.stackable}
           onChange={(val) => onChange('stackable', val)}
         />
         <ToggleRow
-          label="Publicly visible"
+          label={t('promotions.publiclyVisible')}
           value={values.isPublic}
           onChange={(val) => onChange('isPublic', val)}
         />
       </View>
 
       <Input
-        label="Terms & Conditions"
-        placeholder="Enter terms and conditions..."
+        label={t('promotions.terms')}
+        placeholder={t('promotions.termsPlaceholder')}
         value={values.termsAndConditions}
         onChangeText={(val) => onChange('termsAndConditions', val)}
         multiline
@@ -50,8 +53,8 @@ export function SettingsStep({ values, onChange }: StepProps) {
       />
 
       <Input
-        label="Tags (comma-separated)"
-        placeholder="e.g., new-year, discount, annual"
+        label={t('promotions.tags')}
+        placeholder={t('promotions.tagsPlaceholder')}
         autoCapitalize="none"
         value={values.tags}
         onChangeText={(val) => onChange('tags', val)}

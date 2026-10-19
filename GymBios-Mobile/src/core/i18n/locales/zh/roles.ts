@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "角色与权限",
+    "createRole": "创建角色",
+    "editRole": "编辑角色",
+    "subtitle": "员工与薪资管理",
+    "searchPlaceholder": "搜索角色...",
+    "filterModulesPlaceholder": "筛选模块...",
+    "roleName": "角色名称",
+    "roleNamePlaceholder": "例如：前台接待",
+    "description": "描述",
+    "descriptionPlaceholder": "该角色的用途（可选）",
+    "modulePermissions": "模块权限",
+    "selectedCount": "已选 {{count}} 项",
+    "selectAll": "全选",
+    "system": "系统内置",
+    "allAccess": "完全访问权限",
+    "allModules": "所有模块",
+    "permissions_one": "{{count}} 项权限",
+    "permissions_other": "{{count}} 项权限",
+    "users_one": "{{count}} 位用户",
+    "users_other": "{{count}} 位用户",
+    "edit": "编辑",
+    "duplicate": "复制",
+    "delete": "删除",
+    "systemRole": "系统角色",
+    "customRole": "自定义角色",
+    "noRolesFoundTitle": "未找到角色",
+    "noRolesFoundDesc": "未找到与“{{query}}”匹配的角色。",
+    "clearSearch": "清除搜索",
+    "noRolesYetTitle": "暂无角色",
+    "noRolesYetDesc": "创建您的第一个角色以开始管理权限。",
+    "deleteRoleTitle": "删除角色？",
+    "deleteRoleMessage": "您确定要删除“{{name}}”吗？\n\n此操作无法撤销。",
+    "cancel": "取消",
+    "saving": "保存中...",
+    "save": "保存",
+    "failedDuplicate": "复制角色失败。",
+    "unableDelete": "无法删除角色。"
+  }
+};
+
+export default roles;

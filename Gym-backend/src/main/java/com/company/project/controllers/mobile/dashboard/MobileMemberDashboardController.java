@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/mobile/member/dashboard")
 public class MobileMemberDashboardController {
@@ -28,5 +30,12 @@ public class MobileMemberDashboardController {
     public ResponseEntity<MemberDashboardResponseDTO> getMemberDashboard(
             @AuthenticationPrincipal UserDetailsImpl principal) {
         return ResponseEntity.ok(dashboardService.getMemberDashboard(principal));
+    }
+
+    /** GET /api/mobile/member/dashboard/offers — every offer the member can use, best first (the banner shows the first). */
+    @GetMapping("/offers")
+    public ResponseEntity<List<MemberDashboardResponseDTO.ActivePromotionDTO>> getOffers(
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(dashboardService.getOffers(principal));
     }
 }

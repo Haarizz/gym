@@ -1,9 +1,10 @@
 import Feather from '@expo/vector-icons/Feather';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
-import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
+import { formatDate } from '@/core/i18n';
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
@@ -26,7 +27,7 @@ interface AppAccessStepProps extends MemberStepProps {
 const labelOf = (options: readonly { value: string; label: string }[], value: string) =>
   options.find((o) => o.value === value)?.label ?? value;
 
-const formatDate = (d: Date | null) => (d ? format(d, 'd MMM yyyy') : '—');
+const formatD = (d: Date | null) => (d ? formatDate(d, 'd MMM yyyy') : '—');
 
 export function AppAccessStep({
   data,
@@ -37,6 +38,7 @@ export function AppAccessStep({
   goToStep,
   validateStep,
 }: AppAccessStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { plans } = useMembershipPlans();
   const plan = plans.find((p) => String(p.id) === data.membershipPlanId);
@@ -58,12 +60,12 @@ export function AppAccessStep({
 
   return (
     <View style={styles.container}>
-      <FormCard icon="smartphone" title="App access">
+      <FormCard icon="smartphone" title={t('members.form.appAccessStep.title')}>
         <View style={styles.switchRow}>
           <View style={styles.switchText}>
-            <Typography variant="bodySmallBold">Allow mobile app login</Typography>
+            <Typography variant="bodySmallBold">{t('members.form.appAccessStep.allowLoginTitle')}</Typography>
             <Typography variant="caption" color="textSecondary">
-              Member can book classes, check in and view their plan
+              {t('members.form.appAccessStep.allowLoginSubtitle')}
             </Typography>
           </View>
           <Switch
@@ -77,30 +79,46 @@ export function AppAccessStep({
         {data.appAccessEnabled ? (
           <View style={styles.fields}>
             <Input
-              label={<RequiredLabel>Username</RequiredLabel>}
+              label={<RequiredLabel>{t('members.form.appAccessStep.usernameReq')}</RequiredLabel>}
               value={data.username}
               onChangeText={(v) => updateField('username', v)}
-              placeholder="e.g. sara.ahmed"
+              placeholder={t('members.form.appAccessStep.usernamePlaceholder')}
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="username"
               error={errors?.username}
             />
             <Input
-              label={mode === 'create' ? <RequiredLabel>Password</RequiredLabel> : 'New password'}
+              label={
+                mode === 'create' ? (
+                  <RequiredLabel>{t('members.form.appAccessStep.passwordReq')}</RequiredLabel>
+                ) : (
+                  t('members.form.appAccessStep.newPassword')
+                )
+              }
               value={data.password}
               onChangeText={(v) => updateField('password', v)}
-              placeholder={mode === 'create' ? 'At least 6 characters' : 'Leave blank to keep current'}
+              placeholder={
+                mode === 'create'
+                  ? t('members.form.appAccessStep.passwordPlaceholderCreate')
+                  : t('members.form.appAccessStep.passwordPlaceholderEdit')
+              }
               secureTextEntry
               textContentType="newPassword"
               autoCapitalize="none"
               error={errors?.password}
             />
             <Input
-              label={mode === 'create' ? <RequiredLabel>Confirm password</RequiredLabel> : 'Confirm new password'}
+              label={
+                mode === 'create' ? (
+                  <RequiredLabel>{t('members.form.appAccessStep.confirmPasswordReq')}</RequiredLabel>
+                ) : (
+                  t('members.form.appAccessStep.confirmNewPassword')
+                )
+              }
               value={data.confirmPassword}
               onChangeText={(v) => updateField('confirmPassword', v)}
-              placeholder="Re-enter password"
+              placeholder={t('members.form.appAccessStep.confirmPasswordPlaceholder')}
               secureTextEntry
               textContentType="newPassword"
               autoCapitalize="none"
@@ -108,7 +126,7 @@ export function AppAccessStep({
             />
             {hasExistingLogin && !data.password ? (
               <Typography variant="caption" color="textSecondary">
-                This member already has a login. Their current password stays unchanged.
+                {t('members.form.appAccessStep.existingLoginNote')}
               </Typography>
             ) : null}
           </View>
@@ -116,7 +134,7 @@ export function AppAccessStep({
       </FormCard>
 
       <Typography variant="caption" color="textSecondary" style={styles.reviewHeading}>
-        REVIEW
+        {t('members.form.appAccessStep.reviewHeading')}
       </Typography>
 
       <ReviewCard
@@ -126,11 +144,11 @@ export function AppAccessStep({
         goToStep={goToStep}
         invalid={Object.keys(validateStep(1)).length > 0}
         rows={[
-          ['Name', data.name || '—'],
-          ['Phone', data.phone || '—'],
-          ['Email', data.email || '—'],
-          ['Gender', data.gender ? labelOf(GENDERS, data.gender) : '—'],
-          ['Date of birth', formatDate(data.dateOfBirth)],
+          [t('members.form.appAccessStep.nameRow'), data.name || '—'],
+          [t('members.form.appAccessStep.phoneRow'), data.phone || '—'],
+          [t('members.form.appAccessStep.emailRow'), data.email || '—'],
+          [t('members.form.appAccessStep.genderRow'), data.gender ? labelOf(GENDERS, data.gender) : '—'],
+          [t('members.form.appAccessStep.dobRow'), formatD(data.dateOfBirth)],
         ]}
       />
 
@@ -141,11 +159,11 @@ export function AppAccessStep({
         goToStep={goToStep}
         invalid={Object.keys(validateStep(2)).length > 0}
         rows={[
-          ['Type', data.membershipType ? labelOf(MEMBERSHIP_TYPES, data.membershipType) : '—'],
-          ['Plan', plan?.name ?? '—'],
-          ['Joining', formatDate(data.joinDate)],
-          ['Period', `${formatDate(data.startDate)} → ${formatDate(data.endDate)}`],
-          ['Fee', Number.isFinite(fee) ? <CurrencyValue amount={fee} decimals={2} /> : '—'],
+          [t('members.form.appAccessStep.typeRow'), data.membershipType ? labelOf(MEMBERSHIP_TYPES, data.membershipType) : '—'],
+          [t('members.form.appAccessStep.planRow'), plan?.name ?? '—'],
+          [t('members.form.appAccessStep.joiningRow'), formatD(data.joinDate)],
+          [t('members.form.appAccessStep.periodRow'), `${formatD(data.startDate)} → ${formatD(data.endDate)}`],
+          [t('members.form.appAccessStep.feeRow'), Number.isFinite(fee) ? <CurrencyValue amount={fee} decimals={2} /> : '—'],
         ]}
       />
 
@@ -155,8 +173,13 @@ export function AppAccessStep({
         step={3}
         goToStep={goToStep}
         rows={[
-          ['Body', bodyStats.length ? bodyStats.join(' · ') : 'Not provided'],
-          ['History', healthNotesCount ? `${healthNotesCount} note${healthNotesCount > 1 ? 's' : ''} added` : 'None'],
+          [t('members.form.appAccessStep.bodyRow'), bodyStats.length ? bodyStats.join(' · ') : t('members.form.appAccessStep.notProvided')],
+          [
+            t('members.form.appAccessStep.historyRow'),
+            healthNotesCount
+              ? t('members.form.appAccessStep.notesCount', { count: healthNotesCount })
+              : t('members.form.appAccessStep.none'),
+          ],
         ]}
       />
 
@@ -168,12 +191,20 @@ export function AppAccessStep({
         rows={
           isFamily
             ? [
-                ['Role', data.isFamilyHead ? 'Family head' : labelOf(RELATIONSHIPS, data.relationshipToHead)],
+                [
+                  t('members.form.appAccessStep.roleRow'),
+                  data.isFamilyHead ? 'Family head' : labelOf(RELATIONSHIPS, data.relationshipToHead),
+                ],
                 ...(data.isFamilyHead
-                  ? [['Members', data.familyMembers.length ? data.familyMembers.map((m) => m.name).join(', ') : 'None added'] as Row]
+                  ? [
+                      [
+                        t('members.form.appAccessStep.membersRow'),
+                        data.familyMembers.length ? data.familyMembers.map((m) => m.name).join(', ') : t('members.form.appAccessStep.noneAdded'),
+                      ] as Row,
+                    ]
                   : []),
               ]
-            : [['Status', 'Not a family membership']]
+            : [[t('members.form.appAccessStep.statusRow'), t('members.form.appAccessStep.notFamilyStatus')]]
         }
       />
     </View>
@@ -192,23 +223,24 @@ interface ReviewCardProps {
 }
 
 function ReviewCard({ icon, title, step, rows, goToStep, invalid }: ReviewCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   return (
     <FormCard
       icon={icon}
       title={title}
-      description={invalid ? 'Needs attention' : undefined}
+      description={invalid ? t('members.form.appAccessStep.needsAttention') : undefined}
       action={
         <Pressable
           onPress={() => goToStep(step)}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel={`Edit ${title}`}
+          accessibilityLabel={t('members.form.appAccessStep.editA11y', { title })}
           style={({ pressed }) => [styles.editLink, pressed && { opacity: 0.6 }]}
         >
           <Feather name="edit-2" size={13} color={theme.primary} />
           <Typography variant="caption" style={[styles.editText, { color: theme.primary }]}>
-            Edit
+            {t('members.form.appAccessStep.edit')}
           </Typography>
         </Pressable>
       }

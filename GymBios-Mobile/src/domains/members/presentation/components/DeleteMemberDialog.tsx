@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import i18n from '@/core/i18n/i18n';
 
 interface DeleteMemberDialogOptions {
   memberName: string;
@@ -10,12 +11,12 @@ export function showDeleteMemberDialog({
   onConfirm,
 }: DeleteMemberDialogOptions) {
   Alert.alert(
-    'Delete Member',
-    `Are you sure you want to delete ${memberName}? This action cannot be undone.`,
+    i18n.t('members.dialogs.deleteTitle'),
+    i18n.t('members.dialogs.deleteConfirm', { name: memberName }),
     [
-      { text: 'Cancel', style: 'cancel' },
+      { text: i18n.t('members.dialogs.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: i18n.t('members.dialogs.delete'),
         style: 'destructive',
         onPress: onConfirm,
       },

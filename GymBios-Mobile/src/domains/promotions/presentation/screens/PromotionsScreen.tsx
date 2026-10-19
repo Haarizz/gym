@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Spacing } from '@/core/theme';
@@ -37,6 +38,7 @@ export function PromotionsScreen({
   onNavigateToCreate,
   onNavigateToEdit,
 }: PromotionsScreenProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const numColumns = width >= 600 ? 2 : 1;
   // The tab bar floats over the screen, so the list must scroll its last card
@@ -129,11 +131,11 @@ export function PromotionsScreen({
         <View style={styles.headerRow}>
           <View style={styles.headerTextGroup}>
             <Typography variant="title" style={styles.screenTitle}>
-              Promotions & Campaigns
+              {t('promotions.title')}
             </Typography>
           </View>
           <Button
-            label="+ Create"
+            label={t('promotions.create')}
             onPress={onNavigateToCreate}
             size="md"
           />
@@ -177,9 +179,9 @@ export function PromotionsScreen({
         {renderHeader()}
         <View style={styles.centerContainer}>
           <EmptyState
-            title="Failed to load promotions"
-            description="An error occurred while fetching promotions from server."
-            buttonLabel="Try Again"
+            title={t('promotions.failedLoad')}
+            description={t('promotions.failedLoadDesc')}
+            buttonLabel={t('promotions.tryAgain')}
             onPress={() => refetch()}
           />
         </View>
@@ -215,9 +217,9 @@ export function PromotionsScreen({
             ListEmptyComponent={
               search || hasActiveFilters ? (
                 <EmptyState
-                  title="No matching promotions"
-                  description="Try adjusting your search query or clear existing filters."
-                  buttonLabel="Clear Filters"
+                  title={t('promotions.noMatching')}
+                  description={t('promotions.noMatchingDesc')}
+                  buttonLabel={t('promotions.clearFilters')}
                   onPress={() => {
                     setSearch('');
                     setFilterState(DEFAULT_PROMOTION_FILTERS);
@@ -225,9 +227,9 @@ export function PromotionsScreen({
                 />
               ) : (
                 <EmptyState
-                  title="No promotions yet"
-                  description="Create your first promotional campaign to boost member engagement."
-                  buttonLabel="Create Promotion"
+                  title={t('promotions.noPromotions')}
+                  description={t('promotions.noPromotionsDesc')}
+                  buttonLabel={t('promotions.createPromotion')}
                   onPress={onNavigateToCreate}
                 />
               )
@@ -244,14 +246,14 @@ export function PromotionsScreen({
                 <View style={styles.statisticsContainer}>
                   <View style={styles.statRow}>
                     <PromotionStatisticsCard
-                      title="Total"
+                      title={t('promotions.total')}
                       value={statistics.totalPromotions}
                       iconName="tag"
                       iconColor="#0284C7"
                       iconBgColor="#E0F2FE"
                     />
                     <PromotionStatisticsCard
-                      title="Active"
+                      title={t('promotions.active')}
                       value={statistics.activePromotions}
                       iconName="check-circle"
                       iconColor="#15803D"
@@ -261,14 +263,14 @@ export function PromotionsScreen({
 
                   <View style={styles.statRow}>
                     <PromotionStatisticsCard
-                      title="Expired"
+                      title={t('promotions.expired')}
                       value={statistics.expiredPromotions}
                       iconName="x-circle"
                       iconColor="#B91C1C"
                       iconBgColor="#FEE2E2"
                     />
                     <PromotionStatisticsCard
-                      title="Redemptions"
+                      title={t('promotions.redemptions')}
                       value={statistics.totalRedemptions}
                       iconName="target"
                       iconColor="#7E22CE"
@@ -278,14 +280,14 @@ export function PromotionsScreen({
 
                   <View style={styles.statRow}>
                     <PromotionStatisticsCard
-                      title="Total Revenue"
+                      title={t('promotions.totalRevenue')}
                       value={<CurrencyValue amount={statistics.totalRevenue} />}
                       iconName="dollar-sign"
                       iconColor="#059669"
                       iconBgColor="#ECFDF5"
                     />
                     <PromotionStatisticsCard
-                      title="Total Savings"
+                      title={t('promotions.totalSavings')}
                       value={<CurrencyValue amount={statistics.totalSavings} />}
                       iconName="zap"
                       iconColor="#EA580C"
@@ -295,19 +297,19 @@ export function PromotionsScreen({
 
                   <View style={styles.statRow}>
                     <PromotionStatisticsCard
-                      title="Conversion"
+                      title={t('promotions.conversion')}
                       value={`${statistics.conversionRate}%`}
                       iconName="trending-up"
                       iconColor="#2563EB"
                       iconBgColor="#EFF6FF"
                     />
                     <PromotionStatisticsCard
-                      title="Growth"
+                      title={t('promotions.growth')}
                       value={`${statistics.growth >= 0 ? '+' : ''}${statistics.growth}%`}
                       iconName="arrow-up-right"
                       iconColor="#4F46E5"
                       iconBgColor="#EEF2FF"
-                      subtitle="new promos vs last mo"
+                      subtitle={t('promotions.growthSubtitle')}
                     />
                   </View>
                 </View>

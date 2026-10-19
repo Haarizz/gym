@@ -4,6 +4,7 @@ import { Text } from '@/shared/components/AppText';
 import { useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { BrandColors, Spacing } from '@/core/theme';
@@ -26,6 +27,7 @@ const formatShortDate = (date: Date) =>
  * campaign history (the backend returns the latest 200 campaigns).
  */
 export function MessagingAnalyticsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
@@ -58,7 +60,7 @@ export function MessagingAnalyticsScreen() {
   // that shows up in history so nothing sent is silently left out of the totals.
   const channelStats = useMemo(() => {
     const extraTypes = Array.from(new Set(history.map((m) => m.type))).filter(
-      (t) => !MESSAGING_CHANNELS.some((c) => c.id === t)
+      (typeKey) => !MESSAGING_CHANNELS.some((c) => c.id === typeKey)
     );
     const channels = [...MESSAGING_CHANNELS, ...extraTypes.map(getChannel)];
     return channels.map((channel) => {
@@ -84,25 +86,25 @@ export function MessagingAnalyticsScreen() {
   const maxChannelCount = Math.max(1, ...channelStats.map((c) => c.count));
   const recent = history.slice(0, 5);
 
-  const summaryCards: { label: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; tint: string }[] = [
-    { label: 'Total Messages', value: String(history.length), icon: 'send', color: MessagingColors.dark, tint: MessagingColors.tint },
-    { label: 'Average Open Rate', value: formatPct(analytics?.openRate ?? 0), icon: 'eye', color: '#3B82F6', tint: '#E6EFFD' },
-    { label: 'Average Click Rate', value: formatPct(analytics?.clickRate ?? 0), icon: 'mouse-pointer', color: MessagingColors.sms, tint: MessagingColors.smsTint },
-    { label: 'Total Cost', value: formatCurrency(analytics?.totalCost ?? 0), icon: 'credit-card', color: MessagingColors.push, tint: MessagingColors.pushTint },
-  ];
+  const summaryCards: { label: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; tint: string }[] = useMemo(() => [
+    { label: t('messaging.analytics.totalMessages'), value: String(history.length), icon: 'send', color: MessagingColors.dark, tint: MessagingColors.tint },
+    { label: t('messaging.analytics.avgOpenRate'), value: formatPct(analytics?.openRate ?? 0), icon: 'eye', color: '#3B82F6', tint: '#E6EFFD' },
+    { label: t('messaging.analytics.avgClickRate'), value: formatPct(analytics?.clickRate ?? 0), icon: 'mouse-pointer', color: MessagingColors.sms, tint: MessagingColors.smsTint },
+    { label: t('messaging.analytics.totalCost'), value: formatCurrency(analytics?.totalCost ?? 0), icon: 'credit-card', color: MessagingColors.push, tint: MessagingColors.pushTint },
+  ], [history.length, analytics, t, formatCurrency]);
 
-  const miniStats = [
-    { label: 'Sent today', value: analytics?.sentToday ?? 0 },
-    { label: 'Scheduled', value: analytics?.scheduledMessages ?? 0 },
-    { label: 'Recipients', value: analytics?.totalRecipients ?? 0 },
-    { label: 'Delivered', value: formatPct(overallDelivery) },
-  ];
+  const miniStats = useMemo(() => [
+    { label: t('messaging.analytics.sentToday'), value: analytics?.sentToday ?? 0 },
+    { label: t('messaging.analytics.scheduled'), value: analytics?.scheduledMessages ?? 0 },
+    { label: t('messaging.analytics.recipients'), value: analytics?.totalRecipients ?? 0 },
+    { label: t('messaging.analytics.delivered'), value: formatPct(overallDelivery) },
+  ], [analytics, overallDelivery, t]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <AppHeader
-        title="Messaging Analytics"
-        subtitle="Performance & insights"
+        title={t('messaging.analytics.title')}
+        subtitle={t('messaging.analytics.subtitle')}
         colors={headerColors}
         onBack={() => router.back()}
       />
@@ -119,7 +121,7 @@ export function MessagingAnalyticsScreen() {
           {loadError && (
             <View style={styles.errorBanner}>
               <Feather name="alert-circle" size={15} color="#B42318" />
-              <Text style={styles.errorText}>Couldn't load all analytics. Pull down to retry.</Text>
+              <Text style={styles.errorText}>{t('messaging.analytics.loadError')}</Text>
             </View>
           )}
 
@@ -146,7 +148,7 @@ export function MessagingAnalyticsScreen() {
             ))}
           </View>
 
-          <Text style={styles.sectionTitle}>Message Performance by Type</Text>
+          <Text style={styles.sectionTitle}>{t('messaging.analytics.performanceByType')}</Text>
           <View style={styles.card}>
             {channelStats.map(({ channel, count, recipients, openRate, deliveryRate }, i) => (
               <View key={channel.id} style={[styles.channelRow, i > 0 && styles.rowDivider]}>
@@ -157,12 +159,12 @@ export function MessagingAnalyticsScreen() {
                   <View style={styles.channelMeta}>
                     <Text style={styles.channelName}>{channel.label}</Text>
                     <Text style={styles.channelSub}>
-                      {count} sent · {recipients} recipient{recipients === 1 ? '' : 's'}
+                      {t('messaging.analytics.sentAndRecipients', { count, recipients })}
                     </Text>
                   </View>
                   <View style={styles.channelRates}>
                     <Text style={styles.channelRate}>{formatPct(openRate)}</Text>
-                    <Text style={styles.channelRateLabel}>open rate</Text>
+                    <Text style={styles.channelRateLabel}>{t('messaging.analytics.openRateLabel')}</Text>
                   </View>
                 </View>
                 <View style={styles.barTrack}>
@@ -174,18 +176,20 @@ export function MessagingAnalyticsScreen() {
                   />
                 </View>
                 {count > 0 && (
-                  <Text style={styles.channelFoot}>{formatPct(deliveryRate)} delivered</Text>
+                  <Text style={styles.channelFoot}>
+                    {t('messaging.analytics.deliveredLabel', { rate: formatPct(deliveryRate) })}
+                  </Text>
                 )}
               </View>
             ))}
           </View>
 
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Text style={styles.sectionTitle}>{t('messaging.analytics.recentActivity')}</Text>
           <View style={styles.card}>
             {recent.length === 0 ? (
               <View style={styles.empty}>
                 <Feather name="inbox" size={22} color={MessagingColors.faint} />
-                <Text style={styles.emptyText}>No messages sent yet.</Text>
+                <Text style={styles.emptyText}>{t('messaging.analytics.noMessages')}</Text>
               </View>
             ) : (
               recent.map((message, i) => {
@@ -197,10 +201,13 @@ export function MessagingAnalyticsScreen() {
                     </View>
                     <View style={styles.activityMeta}>
                       <Text style={styles.activitySubject} numberOfLines={1}>
-                        {message.subject || message.content || '(No subject)'}
+                        {message.subject || message.content || t('messaging.compose.noSubject')}
                       </Text>
                       <Text style={styles.activitySub}>
-                        {message.recipientCount} recipient{message.recipientCount === 1 ? '' : 's'} · {formatShortDate(message.sentDate)}
+                        {t('messaging.analytics.recipientsAndDate', {
+                          recipients: message.recipientCount,
+                          date: formatShortDate(message.sentDate),
+                        })}
                       </Text>
                     </View>
                     <StatusBadge status={message.status} />

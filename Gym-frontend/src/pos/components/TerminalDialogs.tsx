@@ -390,11 +390,13 @@ const ruleSummary = (r: { discountType: string; discountValue: number | null; ma
 };
 
 /** Enter a promotion or referral-coupon code; validated against the current basket before it is applied. */
-export function CouponDialog({ open, onOpenChange, base, current, onApply, onRemove }: {
+export function CouponDialog({ open, onOpenChange, base, memberId, current, onApply, onRemove }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   /** Basket after the cashier's bill discount — what the code applies to. */
   base: number;
+  /** The sale's customer, checked against the promotion's target audience (null: walk-in). */
+  memberId: number | null;
   current: PromoRule | null;
   onApply: (rule: PromoRule) => void;
   onRemove: () => void;
@@ -413,7 +415,7 @@ export function CouponDialog({ open, onOpenChange, base, current, onApply, onRem
     setError(null);
     setFound(null);
     try {
-      setFound(await posApi.lookupCode(c, base));
+      setFound(await posApi.lookupCode(c, base, memberId));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -470,10 +472,12 @@ export function CouponDialog({ open, onOpenChange, base, current, onApply, onRem
 }
 
 /** Active promotions the cashier can apply to the sale (Gymbios promotions with a price discount). */
-export function PromotionsDialog({ open, onOpenChange, base, current, onApply, onRemove }: {
+export function PromotionsDialog({ open, onOpenChange, base, memberId, current, onApply, onRemove }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   base: number;
+  /** The sale's customer; only promotions they're in the target audience of are listed (null: walk-in). */
+  memberId: number | null;
   current: PromoRule | null;
   onApply: (rule: PromoRule) => void;
   onRemove: () => void;
@@ -484,8 +488,8 @@ export function PromotionsDialog({ open, onOpenChange, base, current, onApply, o
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    posApi.promotions().then(setRows).catch((e) => { toast.error((e as Error).message); setRows([]); }).finally(() => setLoading(false));
-  }, [open]);
+    posApi.promotions(memberId).then(setRows).catch((e) => { toast.error((e as Error).message); setRows([]); }).finally(() => setLoading(false));
+  }, [open, memberId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

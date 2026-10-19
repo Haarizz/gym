@@ -19,6 +19,7 @@ import type { Referral } from '../../domain/Referral';
 import type { NewReferralFormState } from '../hooks/useReferralForm';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 interface ReferralFormModalProps {
   visible: boolean;
@@ -35,6 +36,7 @@ export function ReferralFormModal({
   initialState,
   onSuccess,
 }: ReferralFormModalProps) {
+  const { t } = useTranslation();
   const isEditing = Boolean(editingReferral);
 
   const { members, loading: isMembersLoading } = useMembers();
@@ -168,7 +170,7 @@ export function ReferralFormModal({
           <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent}>
             {/* Referrer Selector */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Referrer Name (Existing Member) *
+              {t('adminReferrals.referrerNameRequired')}
             </Typography>
             <Pressable
               style={styles.pickerTrigger}
@@ -206,7 +208,7 @@ export function ReferralFormModal({
 
             {/* Referred Person */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Referred Person Name *
+              {t('adminReferrals.referredPersonNameRequired')}
             </Typography>
             <Pressable
               style={styles.pickerTrigger}
@@ -245,14 +247,14 @@ export function ReferralFormModal({
 
             <TextInput
               style={styles.input}
-              placeholder="Or type referred person name"
+              placeholder={t('adminReferrals.referredPersonNamePlaceholder')}
               value={refereeName}
               onChangeText={setRefereeName}
             />
 
             {/* Email */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Referred Person Email
+              {t('adminReferrals.referredPersonEmail')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -265,7 +267,7 @@ export function ReferralFormModal({
 
             {/* Phone */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Referred Person Phone
+              {t('adminReferrals.referredPersonPhone')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -277,13 +279,13 @@ export function ReferralFormModal({
 
             {/* Date */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Referral Date (YYYY-MM-DD)
+              {t('adminReferrals.referralDate')}
             </Typography>
             <TextInput style={styles.input} value={date} onChangeText={setDate} />
 
             {/* Status */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Status
+              {t('adminReferrals.status')}
             </Typography>
             <View style={styles.statusRow}>
               {['pending', 'successful', 'expired'].map((st) => (
@@ -306,7 +308,7 @@ export function ReferralFormModal({
             {!isEditing && (
               <>
                 <Typography variant="bodySmall" style={styles.fieldLabel}>
-                  Reward Rule (Optional)
+                  {t('adminReferrals.rewardRuleOptional')}
                 </Typography>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rulesRow}>
                   <Pressable
@@ -317,7 +319,7 @@ export function ReferralFormModal({
                       variant="caption"
                       style={[styles.ruleChipText, ruleId === 'auto' && styles.ruleChipTextActive]}
                     >
-                      Auto-assign
+                      {t('adminReferrals.autoAssign')}
                     </Typography>
                   </Pressable>
 
@@ -346,7 +348,7 @@ export function ReferralFormModal({
             {!isEditing && (
               <>
                 <Typography variant="bodySmall" style={styles.fieldLabel}>
-                  Referral Code (Optional)
+                  {t('adminReferrals.referralCodeOptional')}
                 </Typography>
                 <TextInput
                   style={styles.input}
@@ -360,11 +362,11 @@ export function ReferralFormModal({
 
             {/* Notes */}
             <Typography variant="bodySmall" style={styles.fieldLabel}>
-              Notes
+              {t('adminReferrals.notes')}
             </Typography>
             <TextInput
               style={[styles.input, styles.multilineInput]}
-              placeholder="Additional notes about this referral"
+              placeholder={t('adminReferrals.notesPlaceholder')}
               multiline
               numberOfLines={3}
               value={notes}
@@ -375,13 +377,13 @@ export function ReferralFormModal({
           {/* Footer Actions */}
           <View style={styles.modalFooter}>
             <Button
-              title="Cancel"
+              title={t('adminReferrals.cancel')}
               variant="outline"
               onPress={onClose}
               style={{ flex: 1, marginRight: Spacing.two }}
             />
             <Button
-              title={isEditing ? 'Save Changes' : 'Save Referral'}
+              title={isEditing ? (t('shared.wizard.saveChanges') || 'Save Changes') : (t('common.save') || 'Save')}
               onPress={handleSubmit}
               loading={isSubmitting}
               style={{ flex: 1 }}

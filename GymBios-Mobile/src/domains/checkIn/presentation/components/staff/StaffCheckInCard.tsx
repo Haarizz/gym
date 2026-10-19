@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Avatar } from '@/shared/components/Avatar';
 import { Radius, Spacing } from '@/core/theme';
 import { getCheckInEligibility } from '../../../domain/membershipEligibility';
+import { useCheckInTheme } from '../../hooks/useCheckInTheme';
 
 export interface StaffCheckInCardProps {
   person: any; // Can be a member or staff
@@ -16,6 +17,7 @@ export interface StaffCheckInCardProps {
 
 export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: StaffCheckInCardProps) {
   const { t } = useTranslation();
+  const theme = useCheckInTheme();
   const name = person.name || t('checkIn.members.unknownMember');
   // Fallbacks across Member and Staff domains
   const id = person.bizId || person.memberNumber || person.id;
@@ -43,7 +45,7 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
     <View style={[styles.card, isActive && styles.cardActive, !isActive && !hasMembership && styles.cardDisabled]}>
       <View style={styles.leftContent}>
         <View style={styles.avatarContainer}>
-          <Avatar imageUrl={avatarUrl} initials={initials} size={38} />
+          <Avatar imageUrl={avatarUrl} initials={initials} size={38} backgroundColor={theme.avatar} />
         </View>
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{name}</Text>
@@ -84,7 +86,7 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
               <Text style={[styles.statusText, styles.statusTextOut]}>{t('checkIn.staff.notIn')}</Text>
             </View>
             <Pressable 
-              style={[styles.actionBtn, styles.actionIn, !hasMembership && styles.actionInDisabled]} 
+              style={[styles.actionBtn, { backgroundColor: theme.accent }, !hasMembership && styles.actionInDisabled]} 
               onPress={() => hasMembership && onCheckIn(person)}
               disabled={!hasMembership}
             >
@@ -200,9 +202,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 11,
     borderRadius: 9,
-  },
-  actionIn: {
-    backgroundColor: '#1c6e5a',
   },
   actionOut: {
     backgroundColor: '#fbeceb',

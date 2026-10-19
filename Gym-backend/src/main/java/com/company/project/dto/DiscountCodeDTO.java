@@ -19,6 +19,8 @@ public class DiscountCodeDTO {
     private String discountType;    // percentage / fixed — same vocabulary as promotions
     private BigDecimal discountValue;
     private BigDecimal discountAmount;  // only when validated against an amount
+    private BigDecimal maximumDiscount; // PROMOTION only: cap on a percentage discount
+    private BigDecimal minimumPurchase; // PROMOTION only: smallest amount it applies to
 
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
@@ -40,4 +42,10 @@ public class DiscountCodeDTO {
 
     public BigDecimal getDiscountAmount() { return discountAmount; }
     public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public BigDecimal getMaximumDiscount() { return maximumDiscount; }
+    public void setMaximumDiscount(BigDecimal maximumDiscount) { this.maximumDiscount = maximumDiscount; }
+
+    public BigDecimal getMinimumPurchase() { return minimumPurchase; }
+    public void setMinimumPurchase(BigDecimal minimumPurchase) { this.minimumPurchase = minimumPurchase; }
 }

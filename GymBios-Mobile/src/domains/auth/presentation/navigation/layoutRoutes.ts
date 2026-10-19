@@ -68,7 +68,6 @@ export const MODULE_ROUTES = [
   'billing',
   'attendance',
   'check-in',
-  'training-streams',
   'facilities',
   'community',
   'promotions',
@@ -76,11 +75,10 @@ export const MODULE_ROUTES = [
   'leads',
   'follow-ups',
   'messaging',
-  'automations',
-  'workout-feedback',
   'roles',
   'profile',
   'team',
+  'offers',
   'catalog',
   'catalog/t/[tenantSlug]/b/[branchId]',
   'family',
@@ -115,10 +113,6 @@ export const HIDE_ROLE_HEADER_ROUTES: readonly (readonly [string, string])[] = [
   ['check-in', 'members-staff'],
   ['check-in', 'walk-in'],
 
-  // Training Streams
-  ['training-streams', 'create'],
-  ['training-streams', 'upload'],
-
   // Facilities
   ['facilities', 'create'],
   ['facilities', '[id]'],
@@ -141,16 +135,7 @@ export const HIDE_ROLE_HEADER_ROUTES: readonly (readonly [string, string])[] = [
   ['messaging','compose-message'],
   ['messaging','templates'],
   ['messaging','analytics'],
-  
-  ['automations','[id]'],
-  ['automations','create'],
 
-  ['workout-feedback','check-in'],
-  ['workout-feedback','recent'],
-  ['workout-feedback','active-sessions'],
-  ['workout-feedback','analytics'],
-  ['workout-feedback','stats'],
-  
   ['roles', '[id]']
 ] as const;
 

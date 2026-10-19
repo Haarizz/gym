@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -52,6 +53,7 @@ export function AddFollowUpSheet({
   onSubmit,
   submitting = false,
 }: AddFollowUpSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // Load leads and staff
@@ -160,7 +162,7 @@ export function AddFollowUpSheet({
         >
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {editingFollowUp ? 'Edit Follow-up' : 'Add Follow-up'}
+              {editingFollowUp ? t('followUps.edit') : t('followUps.addFollowUp')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Feather name="x" size={22} color={theme.text} />
@@ -169,65 +171,65 @@ export function AddFollowUpSheet({
 
           <ScrollView style={styles.modalBody}>
             <Dropdown
-              label="Member / Lead"
+              label={t('followUps.memberLead')}
               required
-              placeholder="Select lead..."
+              placeholder={t('followUps.selectLead')}
               value={leadId}
               options={leadOptions}
               onChange={setLeadId}
             />
 
             <Dropdown
-              label="Follow-up Type"
+              label={t('followUps.followUpType')}
               value={type}
               options={TYPE_OPTIONS}
               onChange={setType}
             />
 
-            <Text style={[styles.fieldLabel, { color: theme.text }]}>Subject *</Text>
+            <Text style={[styles.fieldLabel, { color: theme.text }]}>{t('followUps.subjectRequired')}</Text>
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
               value={subject}
               onChangeText={setSubject}
-              placeholder="Enter follow-up subject"
+              placeholder={t('followUps.subjectPlaceholder')}
               placeholderTextColor={theme.textSecondary}
             />
 
             <Dropdown
-              label="Priority"
+              label={t('followUps.priority')}
               value={priority}
               options={PRIORITY_OPTIONS}
               onChange={setPriority}
             />
 
             <DatePicker
-              label="Due Date"
+              label={t('followUps.dueDate')}
               required
               value={dueDate}
               onChange={val => setDueDate(val)}
             />
 
             <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              Scheduled Time
+              {t('followUps.scheduledTime')}
             </Text>
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
               value={scheduledTime}
               onChangeText={setScheduledTime}
-              placeholder="e.g. 10:00 AM"
+              placeholder={t('followUps.timePlaceholder')}
               placeholderTextColor={theme.textSecondary}
             />
 
             <Dropdown
-              label="Assigned Staff"
-              placeholder="Select staff member..."
+              label={t('followUps.assignedStaff')}
+              placeholder={t('followUps.selectStaff')}
               value={assignedStaff}
               options={staffOptions}
               onChange={setAssignedStaff}
             />
 
             <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              Estimated Duration (mins)
+              {t('followUps.durationMins')}
             </Text>
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.border }]}
@@ -239,7 +241,7 @@ export function AddFollowUpSheet({
             />
 
             <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              Notes
+              {t('followUps.notes')}
             </Text>
             <TextInput
               style={[
@@ -251,7 +253,7 @@ export function AddFollowUpSheet({
               onChangeText={setNotes}
               multiline
               numberOfLines={3}
-              placeholder="Enter any additional notes..."
+              placeholder={t('followUps.notesPlaceholder')}
               placeholderTextColor={theme.textSecondary}
             />
           </ScrollView>
@@ -263,7 +265,7 @@ export function AddFollowUpSheet({
               disabled={submitting}
             >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                Cancel
+                {t('followUps.cancel')}
               </Text>
             </TouchableOpacity>
 
@@ -274,10 +276,10 @@ export function AddFollowUpSheet({
             >
               <Text style={styles.submitBtnText}>
                 {submitting
-                  ? 'Saving...'
+                  ? t('common.pleaseWait', 'Saving...')
                   : editingFollowUp
-                  ? 'Save Changes'
-                  : 'Create Follow-up'}
+                  ? t('common.saveChanges', 'Save Changes')
+                  : t('followUps.addFollowUp')}
               </Text>
             </TouchableOpacity>
           </View>

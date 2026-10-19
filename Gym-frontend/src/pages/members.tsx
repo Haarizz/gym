@@ -440,7 +440,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       const fetcher = isDemoMode
         ? membersService.getDemoMembersData({}, { limit: 10000 })
         : membersService.getMembers({}, { limit: 10000 });
-      const res = await fetcher;
+      // The unfiltered list leaves out purchases awaiting approval (they aren't
+      // members yet), so that card is counted with the explicit filter.
+      const [res, pendingRes] = await Promise.all([
+        fetcher,
+        isDemoMode ? null : membersService.getMembers({ status: 'pending_approval' }, { limit: 1 }).catch(() => null),
+      ]);
       const all = res.members;
       // Use the same date-derived status the Member Directory table shows
       // (getComputedStatus) rather than the raw membership_status column —
@@ -453,7 +458,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         expired: all.filter((m: Member) => getComputedStatus(m) === 'Expired').length,
         frozen: all.filter((m: Member) => getComputedStatus(m) === 'Frozen').length,
         suspended: all.filter((m: Member) => getComputedStatus(m) === 'Suspended').length,
-        pendingApproval: all.filter((m: Member) => getComputedStatus(m) === 'pending_approval').length,
+        pendingApproval: pendingRes?.pagination.total ?? 0,
       });
     } catch (e) {
       console.error('Failed to load status counts:', e);
@@ -1755,7 +1760,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Edit Member
                                   </DropdownMenuItem>
-                                  {isFamilyHeadBillingHead(member) && (
+                                  {isFamilyHeadBillingHead(member) && member.membership_status !== 'pending_approval' && (
                                     <DropdownMenuItem className="cursor-pointer" onClick={() => openFamilyRenewalDialog(member)}>
                                       <FaArrowsRotate className="h-4 w-4 mr-2" />
                                       Renew Family

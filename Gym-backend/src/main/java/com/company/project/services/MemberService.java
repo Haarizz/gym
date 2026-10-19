@@ -1128,8 +1128,26 @@ public class MemberService {
     public MemberResponseDTO updateMember(Long id, MemberRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+        // Profile edits are fine while awaiting approval, but the status itself
+        // only leaves pending_approval through approve-payment / reject-payment.
+        if (request.getMembershipStatus() != null
+                && !"pending_approval".equalsIgnoreCase(request.getMembershipStatus())) {
+            requireApproved(member, "Changing the membership status");
+        }
         applyRequest(request, member);
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
+    }
+
+    /**
+     * Membership actions (freeze, renew, deactivate, …) would overwrite the
+     * pending_approval status and start the membership before reception has
+     * confirmed the payment — days must count from approval.
+     */
+    void requireApproved(Member member, String action) {
+        if ("pending_approval".equalsIgnoreCase(member.getMembershipStatus())) {
+            throw new BusinessRuleViolationException(action
+                    + " is available after the membership payment is approved.");
+        }
     }
 
     public void deleteMember(Long id) {
@@ -1149,6 +1167,7 @@ public class MemberService {
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+        requireApproved(member, "Renewal");
         if (member.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
                     + "use the family member renewal endpoint instead.");
@@ -1163,7 +1182,8 @@ public class MemberService {
         // Reward Pass / shareable coupon: membershipFee arrived as the fee before it, so
         // take the discount off here — before outstanding/amountReceived are derived —
         // and spend the pass/coupon in this same transaction.
-        RenewalReward reward = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode());
+        RenewalReward reward = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode(),
+                request.getPromotionId());
 
         // Compute new expiry from plan duration, extending from current expiry (or today)
         if (member.getMembershipPlan() != null) {
@@ -1281,15 +1301,16 @@ public class MemberService {
     }
 
     /**
-     * Applies a Reward Pass or a shareable coupon to a renewal: member.membershipFee holds
-     * the fee before the discount and is replaced with the net fee. Returns null when
-     * neither was sent.
+     * Applies a Reward Pass, a promotion / shareable coupon code, or a promotion picked by id
+     * to a renewal: member.membershipFee holds the fee before the discount and is replaced
+     * with the net fee. Returns null when none was sent.
      */
-    private RenewalReward applyRenewalReward(Member member, Long rewardPassId, String couponCode) {
+    private RenewalReward applyRenewalReward(Member member, Long rewardPassId, String couponCode, Long promotionId) {
         boolean hasCoupon = couponCode != null && !couponCode.isBlank();
-        if (rewardPassId == null && !hasCoupon) return null;
-        if (rewardPassId != null && hasCoupon) {
-            throw new BusinessRuleViolationException("Apply either a Reward Pass or a coupon code, not both");
+        int picked = (rewardPassId != null ? 1 : 0) + (hasCoupon ? 1 : 0) + (promotionId != null ? 1 : 0);
+        if (picked == 0) return null;
+        if (picked > 1) {
+            throw new BusinessRuleViolationException("Apply one discount only: a Reward Pass, a code or an offer");
         }
         BigDecimal gross = member.getMembershipFee() != null ? member.getMembershipFee() : BigDecimal.ZERO;
         BigDecimal discount;
@@ -1299,9 +1320,15 @@ public class MemberService {
             ReferralReward pass = rewardRedemptionService.consumePass(
                     rewardPassId, member.getMemberId(), PassContext.MEMBERSHIP, member.getId());
             label = "Reward Pass " + pass.getRewardCode();
+        } else if (promotionId != null) {
+            String name = discountCodeService.resolvePromotion(promotionId, gross, PromotionAudience.Buyer.of(member)).getName();
+            discount = discountCodeService.redeemPromotionAtCheckout(promotionId, gross, member.getId());
+            label = "Offer " + name;
         } else {
-            discount = rewardRedemptionService.redeemCouponAtCheckout(couponCode, gross, member.getId(), member.getName());
-            label = "Coupon " + couponCode.trim().toUpperCase();
+            // Promotion code first, then referral coupon; the promotion's audience is checked for this member.
+            String source = discountCodeService.resolve(couponCode, gross, PromotionAudience.Buyer.of(member)).getSource();
+            discount = discountCodeService.redeemAtCheckout(couponCode, gross, member.getId(), member.getName());
+            label = ("PROMOTION".equals(source) ? "Code " : "Coupon ") + couponCode.trim().toUpperCase();
         }
         member.setMembershipFee(gross.subtract(discount));
         member.setDiscountApplied(discount);
@@ -1675,6 +1702,7 @@ public class MemberService {
     public MemberResponseDTO freezeMember(Long id, FreezeRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+        requireApproved(member, "Freeze");
         LocalDateTime freezeUntil = parseDateTime(request.getFreezeUntil());
         LocalDateTime freezeStart = request.getFreezeStartDate() != null
                 ? parseDateTime(request.getFreezeStartDate())
@@ -1907,6 +1935,14 @@ public class MemberService {
             predicates.add(cb.or(
                     cb.isNull(root.get("approvalStatus")),
                     cb.notEqual(root.get("approvalStatus"), "REJECTED")));
+
+            // A purchase awaiting reception approval isn't a member yet either —
+            // it's only listed when the pending_approval filter is asked for.
+            if (status == null || status.isBlank()) {
+                predicates.add(cb.or(
+                        cb.isNull(root.get("membershipStatus")),
+                        cb.notEqual(cb.lower(root.get("membershipStatus")), "pending_approval")));
+            }
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";

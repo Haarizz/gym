@@ -12,9 +12,11 @@ import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
+import com.company.project.repositories.PromotionRedemptionRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.AttendanceSessionService;
 import com.company.project.services.MembershipFreezeService;
+import com.company.project.services.PromotionAudience;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,18 +36,24 @@ public class MobileMemberDashboardService {
     private final BookingRepository bookingRepository;
     private final PromotionCampaignRepository promotionCampaignRepository;
     private final AttendanceSessionService attendanceSessionService;
+    private final PromotionRedemptionRepository redemptionRepository;
+
+    /** The promotion distribution channel for the member app */
+    private static final String APP_CHANNEL = "app";
 
     public MobileMemberDashboardService(
             MemberRepository memberRepository,
             AttendanceRepository attendanceRepository,
             BookingRepository bookingRepository,
             PromotionCampaignRepository promotionCampaignRepository,
-            AttendanceSessionService attendanceSessionService) {
+            AttendanceSessionService attendanceSessionService,
+            PromotionRedemptionRepository redemptionRepository) {
         this.memberRepository = memberRepository;
         this.attendanceRepository = attendanceRepository;
         this.bookingRepository = bookingRepository;
         this.promotionCampaignRepository = promotionCampaignRepository;
         this.attendanceSessionService = attendanceSessionService;
+        this.redemptionRepository = redemptionRepository;
     }
 
     public MemberDashboardResponseDTO getMemberDashboard(UserDetailsImpl principal) {
@@ -166,7 +174,7 @@ public class MobileMemberDashboardService {
         );
 
         // 6. Active Promotion (if supported and currently active)
-        ActivePromotionDTO activePromotion = resolveActivePromotion(today);
+        ActivePromotionDTO activePromotion = offersFor(today, member).stream().findFirst().orElse(null);
 
         return new MemberDashboardResponseDTO(
                 identity,
@@ -265,31 +273,59 @@ public class MobileMemberDashboardService {
         return streak;
     }
 
-    private ActivePromotionDTO resolveActivePromotion(LocalDate today) {
-        List<PromotionCampaign> activePromotions = promotionCampaignRepository.findByStatusOrderByCreatedAtDesc("active");
-        if (activePromotions == null || activePromotions.isEmpty()) {
-            return null;
+    /** Every offer the signed-in member can use, best first (the dashboard banner shows the first); none without a member record. */
+    public List<ActivePromotionDTO> getOffers(UserDetailsImpl principal) {
+        if (principal == null || principal.getId() == null) {
+            throw new EntityNotFoundException("User not authenticated");
         }
+        Optional<Member> member = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+        // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
+        if (member.isEmpty() && principal.isGlobal()) member = memberRepository.findByUserId(principal.getId());
+        return member.map(m -> offersFor(LocalDate.now(), m)).orElse(List.of());
+    }
 
-        for (PromotionCampaign promo : activePromotions) {
-            boolean startsValid = promo.getStartDate() == null || !promo.getStartDate().isAfter(today);
-            boolean endsValid = promo.getEndDate() == null || !promo.getEndDate().isBefore(today);
+    /**
+     * The member's offers: active, in date, with uses left (overall and for this member), shown
+     * in the app (no channel ticked, or Mobile App), and in their target audience. One picked
+     * for this member beats one for a member group, which beats one for everyone; then the
+     * promotion's priority (1 = high), then the newest.
+     */
+    private List<ActivePromotionDTO> offersFor(LocalDate today, Member member) {
+        PromotionAudience.Buyer buyer = PromotionAudience.Buyer.of(member);
+        return promotionCampaignRepository.findByStatusOrderByCreatedAtDesc("active").stream()
+                .filter(p -> p.getStartDate() == null || !p.getStartDate().isAfter(today))
+                .filter(p -> p.getEndDate() == null || !p.getEndDate().isBefore(today))
+                .filter(p -> p.getChannels() == null || p.getChannels().isEmpty() || p.getChannels().contains(APP_CHANNEL))
+                .filter(p -> p.getUsageLimit() == null || p.getUsageCount() == null || p.getUsageCount() < p.getUsageLimit())
+                .filter(p -> PromotionAudience.allows(p, buyer))
+                .filter(p -> p.getUsageLimitPerMember() == null
+                        || redemptionRepository.countByPromotionIdAndMemberId(p.getId(), member.getId()) < p.getUsageLimitPerMember())
+                // Stable sort: ties keep the repository's newest-first order
+                .sorted(Comparator.comparingInt(PromotionAudience::specificity)
+                        .thenComparingInt(p -> p.getPriority() != null ? p.getPriority() : 2))
+                .map(this::toActivePromotion)
+                .toList();
+    }
 
-            if (startsValid && endsValid) {
-                return new ActivePromotionDTO(
-                        promo.getId(),
-                        promo.getName(),
-                        promo.getType(),
-                        promo.getDescription(),
-                        promo.getDiscountType(),
-                        promo.getDiscountValue(),
-                        promo.getCode(),
-                        promo.getStartDate(),
-                        promo.getEndDate()
-                );
-            }
-        }
-
-        return null;
+    private ActivePromotionDTO toActivePromotion(PromotionCampaign promo) {
+        ActivePromotionDTO dto = new ActivePromotionDTO(
+                promo.getId(),
+                promo.getName(),
+                promo.getType(),
+                promo.getDescription(),
+                promo.getDiscountType(),
+                promo.getDiscountValue(),
+                promo.getCode(),
+                promo.getStartDate(),
+                promo.getEndDate()
+        );
+        dto.setCategory(promo.getCategory());
+        dto.setMaximumDiscount(promo.getMaximumDiscount());
+        dto.setMinimumPurchase(promo.getMinimumPurchase());
+        dto.setTermsAndConditions(promo.getTermsAndConditions());
+        dto.setPersonal(PromotionAudience.specificity(promo) == 0);
+        return dto;
     }
 }

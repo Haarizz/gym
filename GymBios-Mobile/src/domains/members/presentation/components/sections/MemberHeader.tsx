@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -19,19 +20,20 @@ interface MemberHeaderProps {
 }
 
 export function MemberHeader({ member, onEdit, onRenew, onFreeze, onDelete }: MemberHeaderProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const actions = [
-    { key: 'edit', label: 'Edit', icon: 'edit-2', color: theme.text, onPress: onEdit },
-    { key: 'renew', label: 'Renew', icon: 'refresh-cw', color: theme.text, onPress: onRenew },
+    { key: 'edit', label: t('members.header.edit'), icon: 'edit-2', color: theme.text, onPress: onEdit },
+    { key: 'renew', label: t('members.header.renew'), icon: 'refresh-cw', color: theme.text, onPress: onRenew },
     {
       key: 'freeze',
-      label: member.isFrozen ? 'Unfreeze' : 'Freeze',
+      label: member.isFrozen ? t('members.header.unfreeze') : t('members.header.freeze'),
       icon: member.isFrozen ? 'sun' : 'pause-circle',
       color: theme.text,
       onPress: onFreeze,
     },
-    { key: 'delete', label: 'Delete', icon: 'trash-2', color: BrandColors.danger, onPress: onDelete },
+    { key: 'delete', label: t('members.header.delete'), icon: 'trash-2', color: BrandColors.danger, onPress: onDelete },
   ] as const;
 
   return (

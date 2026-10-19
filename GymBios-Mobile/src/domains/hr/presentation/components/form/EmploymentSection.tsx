@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/shared/components/Input';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { FormSection } from '@/shared/components/FormSection';
@@ -28,22 +29,23 @@ export function EmploymentSection({
   onChangeJoinDate,
   onChangeStatus,
 }: EmploymentSectionProps) {
+  const { t } = useTranslation();
   const { data: branchData } = useAllBranches();
   const branchOptions = branchData ? branchData.map((b) => ({ label: b.branch_name, value: b.branch_name })) : [];
 
   return (
-    <FormSection title="Employment">
-      <Input label="Role" value={role} onChangeText={onChangeRole} placeholder="e.g. Sales Manager" />
-      <Input label="Department" value={department} onChangeText={onChangeDepartment} placeholder="e.g. Sales" />
+    <FormSection title={t('hr.step.jobTitle')}>
+      <Input label={t('hr.employment.role')} value={role} onChangeText={onChangeRole} placeholder={t('hr.employment.selectRole')} />
+      <Input label={t('hr.employment.department')} value={department} onChangeText={onChangeDepartment} placeholder={t('hr.employment.selectDepartment')} />
       <Dropdown
-        label="Branch"
+        label={t('hr.employment.branch')}
         value={branch}
         options={branchOptions}
         onChange={(v) => onChangeBranch(v)}
-        placeholder="Select Branch"
+        placeholder={t('hr.employment.selectBranch')}
       />
-      <Input label="Join Date" value={joinDate} onChangeText={onChangeJoinDate} placeholder="YYYY-MM-DD" />
-      <Input label="Status" value={status} onChangeText={onChangeStatus} placeholder="e.g. ACTIVE" />
+      <Input label={t('hr.joinDate')} value={joinDate} onChangeText={onChangeJoinDate} placeholder={t('hr.datePlaceholder')} />
+      <Input label={t('hr.employment.status')} value={status} onChangeText={onChangeStatus} placeholder={t('hr.employment.statusPlaceholder')} />
     </FormSection>
   );
 }

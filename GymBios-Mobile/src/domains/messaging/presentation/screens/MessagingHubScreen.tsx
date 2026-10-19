@@ -4,6 +4,7 @@ import { Text } from '@/shared/components/AppText';
 import { useRouter, useSegments } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { useMessagingAnalytics } from '../../hooks/useMessagingHooks';
 
@@ -16,6 +17,7 @@ type MessagingModule = {
 };
 
 export function MessagingHubScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const { data: analytics } = useMessagingAnalytics();
@@ -37,29 +39,29 @@ export function MessagingHubScreen() {
   }
 
   const messagingModules: MessagingModule[] = useMemo(() => [
-    { id: 'compose', title: 'Compose Message', icon: 'edit', route: `/${roleGroup}/messaging/compose`, description: 'Send new messages & campaigns' },
-    { id: 'history', title: 'Message History', icon: 'clock', route: `/${roleGroup}/messaging/history`, description: 'View sent & scheduled messages' },
-    { id: 'templates', title: 'Templates', icon: 'layout', route: `/${roleGroup}/messaging/templates`, description: 'Manage reusable message templates' },
-    { id: 'analytics', title: 'Analytics', icon: 'bar-chart-2', route: `/${roleGroup}/messaging/analytics`, description: 'Messaging performance & insights' },
-  ], [roleGroup]);
+    { id: 'compose', title: t('messaging.hub.composeTitle'), icon: 'edit', route: `/${roleGroup}/messaging/compose`, description: t('messaging.hub.composeDesc') },
+    { id: 'history', title: t('messaging.hub.historyTitle'), icon: 'clock', route: `/${roleGroup}/messaging/history`, description: t('messaging.hub.historyDesc') },
+    { id: 'templates', title: t('messaging.hub.templatesTitle'), icon: 'layout', route: `/${roleGroup}/messaging/templates`, description: t('messaging.hub.templatesDesc') },
+    { id: 'analytics', title: t('messaging.hub.analyticsTitle'), icon: 'bar-chart-2', route: `/${roleGroup}/messaging/analytics`, description: t('messaging.hub.analyticsDesc') },
+  ], [roleGroup, t]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Messaging Center</Text>
-          <Text style={styles.headerSubtitle}>Manage member communications</Text>
+          <Text style={styles.headerTitle}>{t('messaging.hub.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('messaging.hub.subtitle')}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {analytics && (
             <View style={styles.statsContainer}>
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Sent Today</Text>
+                <Text style={styles.statLabel}>{t('messaging.hub.sentToday')}</Text>
                 <Text style={styles.statValue}>{analytics.sentToday}</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Scheduled</Text>
+                <Text style={styles.statLabel}>{t('messaging.hub.scheduled')}</Text>
                 <Text style={styles.statValue}>{analytics.scheduledMessages}</Text>
               </View>
             </View>

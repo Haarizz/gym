@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Spacing } from '@/core/theme';
@@ -32,6 +33,7 @@ export function AppAccessFormSection({
   onChangeConfirmPassword,
   onChangeAppAccess,
 }: AppAccessFormSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const animatedHeight = useRef(
     new Animated.Value(appAccessEnabled ? EXPANDED_HEIGHT : 0),
@@ -53,9 +55,9 @@ export function AppAccessFormSection({
   );
 
   return (
-    <FormSection title="App Access">
+    <FormSection title={t('members.appAccessSection.title')}>
       <View style={styles.switchRow}>
-        <Typography variant="bodySmallBold">Enable Member Login</Typography>
+        <Typography variant="bodySmallBold">{t('members.form.appAccessStep.allowLoginTitle')}</Typography>
         <Switch
           value={appAccessEnabled}
           onValueChange={handleToggle}
@@ -67,26 +69,26 @@ export function AppAccessFormSection({
       <Animated.View style={[styles.expandable, { height: animatedHeight }]}>
         <View style={styles.fields}>
           <Input
-            label="Username"
+            label={t('members.appAccessSection.username')}
             value={username}
             onChangeText={onChangeUsername}
-            placeholder="Enter app username"
+            placeholder={t('members.form.appAccessStep.usernamePlaceholder')}
             autoCapitalize="none"
             error={errors?.username}
           />
           <Input
-            label="Password"
+            label={t('members.form.appAccessStep.passwordReq')}
             value={password}
             onChangeText={onChangePassword}
-            placeholder="Enter password"
+            placeholder={t('members.form.appAccessStep.passwordPlaceholderCreate')}
             secureTextEntry
             error={errors?.password}
           />
           <Input
-            label="Confirm Password"
+            label={t('members.form.appAccessStep.confirmPasswordReq')}
             value={confirmPassword}
             onChangeText={onChangeConfirmPassword}
-            placeholder="Re-enter password"
+            placeholder={t('members.form.appAccessStep.confirmPasswordPlaceholder')}
             secureTextEntry
             error={errors?.confirmPassword}
           />

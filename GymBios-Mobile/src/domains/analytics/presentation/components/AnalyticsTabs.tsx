@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -11,10 +12,11 @@ interface AnalyticsTabsProps {
 }
 
 export function AnalyticsTabs({ selected, onSelect }: AnalyticsTabsProps) {
+  const { t } = useTranslation();
   const tabs: { key: AnalyticsTab; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'revenue', label: 'Revenue' },
-    { key: 'operations', label: 'Operations' },
+    { key: 'overview', label: t('analytics.tabs.overview') },
+    { key: 'revenue', label: t('analytics.tabs.revenue') },
+    { key: 'operations', label: t('analytics.tabs.operations') },
   ];
 
   return (

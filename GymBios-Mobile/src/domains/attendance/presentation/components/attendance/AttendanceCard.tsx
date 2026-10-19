@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -29,6 +30,7 @@ export const AttendanceCard = memo(function AttendanceCard({
   checkingOut = false,
   compact = false,
 }: AttendanceCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const name = getDisplayName(record);
   const isActive = record.status === AttendanceStatus.Active;
@@ -58,23 +60,23 @@ export const AttendanceCard = memo(function AttendanceCard({
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="log-in" size={12} color="#16a34a" />
           <Typography variant="caption" color="textSecondary">
-            In
+            {t('attendance.cards.in')}
           </Typography>
           <Typography variant="bodySmallBold">{formatTime(record.checkInTime)}</Typography>
         </View>
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="log-out" size={12} color="#dc2626" />
           <Typography variant="caption" color="textSecondary">
-            Out
+            {t('attendance.cards.out')}
           </Typography>
           <Typography variant="bodySmallBold">
-            {record.checkOutTime ? formatTime(record.checkOutTime) : 'In progress'}
+            {record.checkOutTime ? formatTime(record.checkOutTime) : t('attendance.cards.inProgress')}
           </Typography>
         </View>
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="clock" size={12} color={BrandColors.teal} />
           <Typography variant="caption" color="textSecondary">
-            Duration
+            {t('attendance.cards.duration')}
           </Typography>
           <Typography variant="bodySmallBold">
             {record.formattedDuration || '—'}
@@ -85,10 +87,10 @@ export const AttendanceCard = memo(function AttendanceCard({
       {record.workoutStartTime ? (
         <View style={styles.activityRow}>
           <Typography variant="caption" color="textSecondary">
-            Workout
+            {t('attendance.cards.workout')}
           </Typography>
           <Typography variant="caption" style={styles.workoutText}>
-            {record.workoutEndTime ? record.formattedWorkoutDuration || '—' : 'In progress'}
+            {record.workoutEndTime ? record.formattedWorkoutDuration || '—' : t('attendance.cards.inProgress')}
           </Typography>
         </View>
       ) : null}
@@ -96,7 +98,7 @@ export const AttendanceCard = memo(function AttendanceCard({
       {!compact && record.activityType ? (
         <View style={styles.activityRow}>
           <Typography variant="caption" color="textSecondary">
-            Activity
+            {t('attendance.cards.activity')}
           </Typography>
           <View style={styles.activityBadge}>
             <Typography variant="caption" style={styles.activityText}>
@@ -119,7 +121,7 @@ export const AttendanceCard = memo(function AttendanceCard({
             <Feather name="log-out" size={14} color="#dc2626" />
           )}
           <Typography variant="caption" style={styles.checkoutText}>
-            {checkingOut ? 'Checking out…' : 'Check Out'}
+            {checkingOut ? t('attendance.today.checkingOut') : t('attendance.today.checkoutBtn')}
           </Typography>
         </Pressable>
       ) : null}

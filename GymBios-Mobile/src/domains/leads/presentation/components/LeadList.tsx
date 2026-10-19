@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Spacing } from '@/core/theme';
@@ -50,6 +51,7 @@ export function LeadList({
   onDelete,
   ListHeaderComponent,
 }: LeadListProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const renderItem = useCallback(
@@ -83,20 +85,20 @@ export function LeadList({
     if (error) {
       return (
         <EmptyState
-          title="Failed to Load Leads"
-          description="Something went wrong while fetching leads. Pull to refresh to try again."
+          title={t('leads.list.failedToLoadTitle')}
+          description={t('leads.list.failedToLoadDesc')}
           icon="alert-circle"
         />
       );
     }
     return (
       <EmptyState
-        title="No leads found"
-        description="No leads match your current search or filter criteria."
+        title={t('leads.list.emptyTitle')}
+        description={t('leads.list.emptyDesc')}
         icon="users"
       />
     );
-  }, [loading, error]);
+  }, [loading, error, t]);
 
   if (loading && leads.length === 0) {
     return (

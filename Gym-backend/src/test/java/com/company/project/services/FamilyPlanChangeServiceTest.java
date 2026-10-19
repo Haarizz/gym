@@ -42,6 +42,7 @@ class FamilyPlanChangeServiceTest {
     @Mock private MembershipPlanRepository planRepository;
     @Mock private MembershipFreezeService freezeService;
     @Mock private RewardRedemptionService rewardRedemptionService;
+    @Mock private DiscountCodeService discountCodeService;
 
     private FamilyPlanChangeService service;
     private final Map<Long, Member> db = new HashMap<>();
@@ -53,7 +54,7 @@ class FamilyPlanChangeServiceTest {
     void setUp() {
         MobileFamilyPricingService pricing = new MobileFamilyPricingService(planRepository, memberService);
         service = new FamilyPlanChangeService(memberService, memberRepository, planRepository, freezeService,
-                pricing, rewardRedemptionService);
+                pricing, rewardRedemptionService, discountCodeService);
 
         // Real pricing/cap rules — they're pure functions of the plan.
         when(memberService.memberPriceForIndex(any(), anyInt())).thenCallRealMethod();

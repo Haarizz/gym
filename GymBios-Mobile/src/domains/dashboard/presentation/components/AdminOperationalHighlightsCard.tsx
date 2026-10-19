@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { Radius, Spacing } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
@@ -11,9 +12,11 @@ interface AdminOperationalHighlightsCardProps {
 export function AdminOperationalHighlightsCard({
   highlights,
 }: AdminOperationalHighlightsCardProps) {
+  const { t } = useTranslation();
+
   return (
     <GlassSurface radius={Radius.lg} style={styles.container}>
-      <Text style={styles.title}>Operational Highlights</Text>
+      <Text style={styles.title}>{t('dashboard.admin.operationalHighlightsTitle')}</Text>
       <View style={styles.list}>
         {highlights.map((item, idx) => (
           <View

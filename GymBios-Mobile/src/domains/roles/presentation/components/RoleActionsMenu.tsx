@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Typography } from '@/shared/components/Typography';
@@ -23,13 +24,14 @@ export function RoleActionsMenu({
   onDuplicate,
   onDelete,
 }: RoleActionsMenuProps) {
+  const { t } = useTranslation();
   if (!role) return null;
 
   return (
     <AppBottomSheet
       visible={visible}
       title={role.roleName}
-      subtitle={role.isSystem ? 'System Role' : 'Custom Role'}
+      subtitle={role.isSystem ? t('roles.systemRole') : t('roles.customRole')}
       onClose={onClose}
     >
       <Pressable 
@@ -37,7 +39,7 @@ export function RoleActionsMenu({
         onPress={() => { onClose(); onEdit(role); }}
       >
         <Feather name="edit-2" size={18} color={BrandColors.textPrimary} />
-        <Typography variant="body" style={styles.actionText}>Edit</Typography>
+        <Typography variant="body" style={styles.actionText}>{t('roles.edit')}</Typography>
       </Pressable>
 
       <Pressable 
@@ -45,7 +47,7 @@ export function RoleActionsMenu({
         onPress={() => { onClose(); onDuplicate(role); }}
       >
         <Feather name="copy" size={18} color={BrandColors.textPrimary} />
-        <Typography variant="body" style={styles.actionText}>Duplicate</Typography>
+        <Typography variant="body" style={styles.actionText}>{t('roles.duplicate')}</Typography>
       </Pressable>
 
       {!role.isSystem && (
@@ -54,7 +56,7 @@ export function RoleActionsMenu({
           onPress={() => { onClose(); onDelete(role); }}
         >
           <Feather name="trash-2" size={18} color="#d4183d" />
-          <Typography variant="body" style={[styles.actionText, { color: '#d4183d' }]}>Delete</Typography>
+          <Typography variant="body" style={[styles.actionText, { color: '#d4183d' }]}>{t('roles.delete')}</Typography>
         </Pressable>
       )}
     </AppBottomSheet>

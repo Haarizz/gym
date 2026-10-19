@@ -4,6 +4,7 @@ import { Text, TextInput } from '@/shared/components/AppText';
 import { useRouter, useSegments, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { MessagingFlowHeader } from '../components/MessagingFlowHeader';
 import { useMessagingRecipients } from '../../hooks/useMessagingHooks';
 import { RecipientListItem } from '../components/RecipientListItem';
@@ -12,23 +13,23 @@ import { MessagingColors } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMessagingSelectionStore } from '../../store/messagingSelectionStore';
 
-// Mirrors the recipient filter on the web messaging page.
-const FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active Members' },
-  { id: 'expired', label: 'Expired Members' },
-  { id: 'vip', label: 'VIP' },
-  { id: 'staff', label: 'Staff' },
-  { id: 'prospects', label: 'Prospects' },
-];
-
 export function RecipientSelectionScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
   // Draft forwarded from compose when it was opened without recipients.
   const draft = useLocalSearchParams<{ templateSubject?: string; templateContent?: string; templateType?: string }>();
   
+  const filters = useMemo(() => [
+    { id: 'all', label: t('messaging.recipients.filters.all') },
+    { id: 'active', label: t('messaging.recipients.filters.active') },
+    { id: 'expired', label: t('messaging.recipients.filters.expired') },
+    { id: 'vip', label: t('messaging.recipients.filters.vip') },
+    { id: 'staff', label: t('messaging.recipients.filters.staff') },
+    { id: 'prospects', label: t('messaging.recipients.filters.prospects') },
+  ], [t]);
+
   const { data: recipients = [], isLoading } = useMessagingRecipients();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -106,8 +107,8 @@ export function RecipientSelectionScreen() {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <MessagingFlowHeader 
-        title="Select Recipients"
-        subtitle="Choose members, staff or prospects"
+        title={t('messaging.recipients.title')}
+        subtitle={t('messaging.recipients.subtitle')}
         step={1}
         onBack={() => router.back()}
       />
@@ -119,7 +120,7 @@ export function RecipientSelectionScreen() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search recipients..."
+            placeholder={t('messaging.recipients.searchPlaceholder')}
             placeholderTextColor={MessagingColors.faint}
           />
         </View>
@@ -127,7 +128,7 @@ export function RecipientSelectionScreen() {
 
       <View style={styles.chipsWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {FILTERS.map(f => (
+          {filters.map(f => (
             <Pressable 
               key={f.id} 
               style={[styles.chip, activeFilter === f.id && styles.chipActive]}
@@ -146,10 +147,12 @@ export function RecipientSelectionScreen() {
           <View style={[styles.checkbox, allFilteredSelected && styles.checkboxSelected]}>
             {allFilteredSelected && <Feather name="check" size={12} color="#fff" strokeWidth={3} />}
           </View>
-          <Text style={styles.selectAllText}>Select all ({filteredRecipients.length})</Text>
+          <Text style={styles.selectAllText}>
+            {t('messaging.recipients.selectAll', { count: filteredRecipients.length })}
+          </Text>
         </Pressable>
         <Pressable onPress={clearSelection}>
-          <Text style={styles.clearBtn}>Clear</Text>
+          <Text style={styles.clearBtn}>{t('messaging.recipients.clear')}</Text>
         </Pressable>
       </View>
 
@@ -169,8 +172,8 @@ export function RecipientSelectionScreen() {
           !isLoading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyTitle}>No recipients match</Text>
-              <Text style={styles.emptySubtitle}>Try a different search term or clear the filter.</Text>
+              <Text style={styles.emptyTitle}>{t('messaging.recipients.noRecipientsTitle')}</Text>
+              <Text style={styles.emptySubtitle}>{t('messaging.recipients.noRecipientsSubtitle')}</Text>
             </View>
           ) : null
         }
@@ -178,7 +181,8 @@ export function RecipientSelectionScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footCount}>
-          <Text style={styles.footCountBold}>{selectedIds.size}</Text> selected
+          <Text style={styles.footCountBold}>{selectedIds.size} </Text>
+          {t('messaging.recipients.selectedCount', { count: selectedIds.size }).replace(String(selectedIds.size), '').trim()}
         </Text>
         <Pressable 
           disabled={selectedIds.size === 0} 
@@ -191,7 +195,7 @@ export function RecipientSelectionScreen() {
               end={{ x: 1, y: 1 }}
               style={[styles.primaryBtn, selectedIds.size > 0 && styles.primaryBtnShadow, pressed && { opacity: 0.9 }]}
             >
-              <Text style={styles.primaryBtnText}>Continue</Text>
+              <Text style={styles.primaryBtnText}>{t('messaging.recipients.continue')}</Text>
             </LinearGradient>
           )}
         </Pressable>

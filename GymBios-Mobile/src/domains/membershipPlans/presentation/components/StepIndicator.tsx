@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
@@ -11,12 +12,13 @@ interface StepIndicatorProps {
 }
 
 export function StepIndicator({ current, total, labels }: StepIndicatorProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
     <View style={styles.container}>
       <Typography variant="caption" color="textSecondary" style={styles.stepLabel}>
-        Step {current} of {total}
+        {t('membershipPlans.form.stepIndicator', { current, total })}
       </Typography>
 
       <View style={styles.dots}>

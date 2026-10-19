@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -12,8 +13,11 @@ interface MemberTrendsListProps {
 
 export function MemberTrendsList({
   rows,
-  title = 'Top Consistent Members',
+  title,
 }: MemberTrendsListProps) {
+  const { t } = useTranslation();
+  const displayTitle = title ?? t('attendance.reports.topConsistent');
+
   // Already pre-sorted by the backend; still cap at 5 for display safety.
   const topRows = rows.slice(0, 5);
 
@@ -22,7 +26,7 @@ export function MemberTrendsList({
   }
 
   return (
-    <AttendanceSection title={title}>
+    <AttendanceSection title={displayTitle}>
       <View style={styles.list}>
         {topRows.map((row, index) => (
           <View key={`${row.id}-${index}`} style={styles.row}>
@@ -36,7 +40,7 @@ export function MemberTrendsList({
                 {row.name || 'Unknown'}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                {row.visits ?? 0} visits
+                {`${row.visits ?? 0} `}{t('attendance.reports.visits')}
               </Typography>
             </View>
             <View style={styles.stats}>
@@ -44,7 +48,7 @@ export function MemberTrendsList({
                 {row.attendanceRate != null ? `${row.attendanceRate}%` : '—'}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                rate
+                {t('attendance.reports.rate')}
               </Typography>
             </View>
           </View>

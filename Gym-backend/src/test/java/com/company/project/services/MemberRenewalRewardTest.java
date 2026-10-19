@@ -2,6 +2,7 @@ package com.company.project.services;
 
 import com.company.project.automation.AutomationExecutorService;
 import com.company.project.controlplane.repositories.UserDirectoryRepository;
+import com.company.project.dto.DiscountCodeDTO;
 import com.company.project.dto.RenewalRequestDTO;
 import com.company.project.entities.Member;
 import com.company.project.entities.Receipt;
@@ -27,7 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** A Reward Pass or coupon applied through MemberService.renewMember. */
+/** A Reward Pass, or a promotion / coupon code, applied through MemberService.renewMember. */
 class MemberRenewalRewardTest {
 
     @Mock private MemberRepository memberRepository;
@@ -44,6 +45,7 @@ class MemberRenewalRewardTest {
     @Mock private UserBranchRepository userBranchRepository;
     @Mock private UserDirectoryRepository userDirectoryRepository;
     @Mock private RewardRedemptionService rewardRedemptionService;
+    @Mock private DiscountCodeService discountCodeService;
 
     private MemberService service;
     private Member member;
@@ -59,7 +61,7 @@ class MemberRenewalRewardTest {
         service = new MemberService(memberRepository, planRepository, receiptService, userRepository,
                 roleRepository, userRoleRepository, passwordEncoder, notificationService,
                 automationExecutorService, receiptVoucherService, financialEventService, branchService,
-                userBranchRepository, userDirectoryRepository, rewardRedemptionService, null, null, null, null);
+                userBranchRepository, userDirectoryRepository, rewardRedemptionService, discountCodeService, null, null, null);
 
         member = new Member();
         member.setId(10L);
@@ -68,6 +70,15 @@ class MemberRenewalRewardTest {
         when(memberRepository.findById(10L)).thenReturn(Optional.of(member));
         when(memberRepository.save(any(Member.class))).thenAnswer(inv -> inv.getArgument(0));
         when(planRepository.findByName(any())).thenReturn(Optional.empty());
+    }
+
+    /** A code that resolves as `source` and is worth `discount` on 300 for Sam. */
+    private void code(String code, String source, String discount) {
+        DiscountCodeDTO resolved = new DiscountCodeDTO();
+        resolved.setSource(source);
+        when(discountCodeService.resolve(eq(code), eq(new BigDecimal("300")), any())).thenReturn(resolved);
+        when(discountCodeService.redeemAtCheckout(eq(code), eq(new BigDecimal("300")), eq(10L), eq("Sam")))
+                .thenReturn(new BigDecimal(discount));
     }
 
     private RenewalRequestDTO renewal() {
@@ -101,8 +112,7 @@ class MemberRenewalRewardTest {
     void fullyDiscountedRenewalIsPaidNotCredit() {
         RenewalRequestDTO req = renewal();
         req.setCouponCode("free100");
-        when(rewardRedemptionService.redeemCouponAtCheckout(eq("free100"), eq(new BigDecimal("300")), eq(10L), eq("Sam")))
-                .thenReturn(new BigDecimal("300.00"));
+        code("free100", "COUPON", "300.00");
 
         service.renewMember(10L, req);
 
@@ -118,13 +128,51 @@ class MemberRenewalRewardTest {
     void couponComesOffTheFee() {
         RenewalRequestDTO req = renewal();
         req.setCouponCode("GYMABC123");
-        when(rewardRedemptionService.redeemCouponAtCheckout(eq("GYMABC123"), eq(new BigDecimal("300")), eq(10L), eq("Sam")))
-                .thenReturn(new BigDecimal("50.00"));
+        code("GYMABC123", "COUPON", "50.00");
 
         service.renewMember(10L, req);
 
         assertEquals(0, new BigDecimal("250").compareTo(member.getMembershipFee()));
         assertEquals(0, new BigDecimal("50").compareTo(member.getDiscountApplied()));
+    }
+
+    @Test
+    void promotionCodeComesOffTheFeeAndIsLabelledAsACode() {
+        RenewalRequestDTO req = renewal();
+        req.setCouponCode("renew15");
+        code("renew15", "PROMOTION", "45.00");
+
+        service.renewMember(10L, req);
+
+        assertEquals(0, new BigDecimal("255").compareTo(member.getMembershipFee()));
+        assertEquals(0, new BigDecimal("45").compareTo(member.getDiscountApplied()));
+        verify(discountCodeService).redeemAtCheckout("renew15", new BigDecimal("300"), 10L, "Sam");
+        verify(receiptService).recordDiscount(any(Receipt.class), eq(new BigDecimal("45.00")), eq("Code RENEW15"));
+    }
+
+    @Test
+    void offerPickedByIdComesOffTheFee() {
+        RenewalRequestDTO req = renewal();
+        req.setPromotionId(5L);
+        DiscountCodeDTO resolved = new DiscountCodeDTO();
+        resolved.setName("Renewal Special");
+        when(discountCodeService.resolvePromotion(eq(5L), eq(new BigDecimal("300")), any())).thenReturn(resolved);
+        when(discountCodeService.redeemPromotionAtCheckout(5L, new BigDecimal("300"), 10L)).thenReturn(new BigDecimal("30.00"));
+
+        service.renewMember(10L, req);
+
+        assertEquals(0, new BigDecimal("270").compareTo(member.getMembershipFee()));
+        verify(receiptService).recordDiscount(any(Receipt.class), eq(new BigDecimal("30.00")), eq("Offer Renewal Special"));
+    }
+
+    @Test
+    void codeAndOfferTogetherAreRejected() {
+        RenewalRequestDTO req = renewal();
+        req.setCouponCode("GYMABC123");
+        req.setPromotionId(5L);
+
+        assertThrows(BusinessRuleViolationException.class, () -> service.renewMember(10L, req));
+        verify(discountCodeService, never()).redeemPromotionAtCheckout(any(), any(), any());
     }
 
     @Test

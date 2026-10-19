@@ -1,13 +1,16 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
 export function WalkInBadge() {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.badge}>
       <Typography variant="caption" style={styles.text}>
-        Walk-in
+        {t('attendance.cards.walkIn')}
       </Typography>
     </View>
   );

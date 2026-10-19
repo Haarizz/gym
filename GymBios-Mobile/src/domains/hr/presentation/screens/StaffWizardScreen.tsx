@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { ApiError } from '@/core/platform/api/types';
@@ -34,14 +35,6 @@ interface StaffWizardScreenProps {
   onSuccess: () => void;
 }
 
-const STEPS = [
-  { label: 'Personal', title: 'Personal details' },
-  { label: 'Job', title: 'Employment' },
-  { label: 'Pay', title: 'Compensation' },
-  { label: 'Schedule', title: 'Schedule & certifications' },
-  { label: 'Review', title: 'App access & review' },
-];
-
 const SCREEN_BACKGROUND = BrandColors.screenBackground;
 
 export function StaffWizardScreen({
@@ -50,6 +43,14 @@ export function StaffWizardScreen({
   staffId,
   onSuccess,
 }: StaffWizardScreenProps) {
+  const { t } = useTranslation();
+  const STEPS = [
+    { label: t('hr.step.personal'), title: t('hr.step.personalTitle') },
+    { label: t('hr.step.job'), title: t('hr.step.jobTitle') },
+    { label: t('hr.step.pay'), title: t('hr.step.payTitle') },
+    { label: t('hr.step.schedule'), title: t('hr.step.scheduleTitle') },
+    { label: t('hr.step.review'), title: t('hr.step.reviewTitle') },
+  ];
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
@@ -238,10 +239,10 @@ export function StaffWizardScreen({
 
             <View style={styles.headerText}>
               <Typography variant="body" style={styles.headerTitle} numberOfLines={1}>
-                {mode === 'create' ? 'New staff' : 'Edit staff'}
+                {mode === 'create' ? t('hr.newStaff') : t('hr.editStaff')}
               </Typography>
               <Typography variant="caption" color="textSecondary" numberOfLines={1}>
-                Step {step} of {totalSteps} · {STEPS[step - 1]?.title}
+                {t('hr.stepOf', { step, totalSteps, title: STEPS[step - 1]?.title })}
               </Typography>
             </View>
 
@@ -251,11 +252,11 @@ export function StaffWizardScreen({
                 disabled={loading}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Save changes"
+                accessibilityLabel={t('hr.saveChanges')}
                 style={({ pressed }) => [styles.saveLink, (pressed || loading) && styles.pressed]}
               >
                 <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-                  Save
+                  {t('hr.save')}
                 </Typography>
               </Pressable>
             ) : null}
@@ -320,14 +321,14 @@ export function StaffWizardScreen({
             ]}
           >
             <Button
-              label={isFirst ? 'Cancel' : 'Back'}
+              label={isFirst ? t('hr.cancel') : t('hr.back')}
               variant="outline"
               size="lg"
               onPress={isFirst ? () => setShowDiscardDialog(true) : () => navigateTo(step - 1)}
               style={styles.secondaryAction}
             />
             <Button
-              label={isLast ? (mode === 'edit' ? 'Save changes' : 'Create staff') : 'Next'}
+              label={isLast ? (mode === 'edit' ? t('hr.saveChanges') : t('hr.createStaff')) : t('hr.next')}
               size="lg"
               loading={loading}
               onPress={isLast ? handleSubmit : handleNext}
@@ -349,22 +350,22 @@ export function StaffWizardScreen({
               <Feather name="alert-triangle" size={22} color={theme.error} />
             </View>
             <Typography variant="body" style={styles.modalTitle}>
-              Discard {mode === 'edit' ? 'changes' : 'this staff member'}?
+              {t('hr.discardConfirm', { target: mode === 'edit' ? t('hr.discardChanges') : t('hr.discardStaff') })}
             </Typography>
             <Typography variant="bodySmall" color="textSecondary" style={styles.modalText}>
-              Everything you&apos;ve entered on this form will be lost.
+              {t('hr.discardWarning')}
             </Typography>
 
             <View style={styles.modalActions}>
               <Button
-                label="Keep editing"
+                label={t('hr.keepEditing')}
                 variant="outline"
                 onPress={handleKeepEditing}
                 size="lg"
                 style={styles.modalButton}
               />
               <Button
-                label="Discard"
+                label={t('hr.discard')}
                 onPress={handleDiscard}
                 size="lg"
                 style={[styles.modalButton, { backgroundColor: theme.error }]}

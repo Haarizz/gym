@@ -1,3 +1,5 @@
+import i18n from '@/core/i18n/i18n';
+import { formatDate } from '@/core/i18n';
 import type { Member } from '../../domain/Member';
 
 export interface Tone {
@@ -7,21 +9,20 @@ export interface Tone {
 
 const NEUTRAL = '#6b7280';
 
-// Keys are the lowercase values the backend stores (membership_status / payment_status).
-const MEMBER_STATUS_TONES: Record<string, Tone> = {
-  active: { label: 'Active', color: '#16a34a' },
-  expired: { label: 'Expired', color: '#dc2626' },
-  frozen: { label: 'Frozen', color: '#0284c7' },
-  suspended: { label: 'Suspended', color: '#ea580c' },
-  pending_approval: { label: 'Pending Approval', color: '#d97706' },
-  inactive: { label: 'Inactive', color: NEUTRAL },
+const STATUS_COLORS: Record<string, string> = {
+  active: '#16a34a',
+  expired: '#dc2626',
+  frozen: '#0284c7',
+  suspended: '#ea580c',
+  pending_approval: '#d97706',
+  inactive: NEUTRAL,
 };
 
-const PAYMENT_STATUS_TONES: Record<string, Tone> = {
-  paid: { label: 'Paid', color: '#16a34a' },
-  partial: { label: 'Partial', color: '#2563eb' },
-  pending: { label: 'Pending', color: '#d97706' },
-  overdue: { label: 'Overdue', color: '#dc2626' },
+const PAYMENT_COLORS: Record<string, string> = {
+  paid: '#16a34a',
+  partial: '#2563eb',
+  pending: '#d97706',
+  overdue: '#dc2626',
 };
 
 export function titleCase(value?: string | null): string {
@@ -30,11 +31,6 @@ export function titleCase(value?: string | null): string {
     .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function toTone(map: Record<string, Tone>, value?: string | null): Tone {
-  const key = (value ?? '').toLowerCase();
-  return map[key] ?? { label: titleCase(value) || '—', color: NEUTRAL };
 }
 
 export function getMemberExpiry(member: Member): string | undefined {
@@ -59,29 +55,57 @@ export function daysUntil(iso?: string): number | null {
 export function getMemberStatusTone(member: Member): Tone {
   const status = (member.status ?? '').toLowerCase();
   const left = daysUntil(getMemberExpiry(member));
-  if (status === 'active' && left !== null && left < 0) {
-    return MEMBER_STATUS_TONES.expired;
-  }
-  return toTone(MEMBER_STATUS_TONES, member.status);
+  const isExp = status === 'active' && left !== null && left < 0;
+  const key = isExp ? 'expired' : status;
+  const color = STATUS_COLORS[key] ?? NEUTRAL;
+
+  const statusKeyMap: Record<string, string> = {
+    active: 'members.statuses.active',
+    expired: 'members.statuses.expired',
+    frozen: 'members.statuses.frozen',
+    inactive: 'members.statuses.inactive',
+    suspended: 'members.statuses.suspended',
+    pending_approval: 'members.statuses.pendingApproval',
+  };
+
+  const label = statusKeyMap[key] && i18n.exists(statusKeyMap[key])
+    ? i18n.t(statusKeyMap[key] as never)
+    : titleCase(key) || '—';
+
+  return { label, color };
 }
 
 export function getPaymentStatusTone(status?: string | null): Tone {
-  return toTone(PAYMENT_STATUS_TONES, status);
+  const key = (status ?? '').toLowerCase();
+  const color = PAYMENT_COLORS[key] ?? NEUTRAL;
+
+  const paymentKeyMap: Record<string, string> = {
+    paid: 'members.paymentStatuses.paid',
+    partial: 'members.paymentStatuses.partial',
+    pending: 'members.paymentStatuses.pending',
+    overdue: 'members.paymentStatuses.overdue',
+  };
+
+  const label = paymentKeyMap[key] && i18n.exists(paymentKeyMap[key])
+    ? i18n.t(paymentKeyMap[key] as never)
+    : titleCase(status) || '—';
+
+  return { label, color };
 }
 
 export function formatMemberDate(iso?: string | null): string {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDate(date, 'd MMM yyyy');
 }
 
 export function describeDaysLeft(days: number | null): string {
-  if (days === null) return 'No expiry set';
-  if (days === 0) return 'Expires today';
-  if (days > 0) return `${days} day${days === 1 ? '' : 's'} left`;
+  if (days === null) return i18n.t('members.display.noExpiry');
+  if (days === 0) return i18n.t('members.display.expiresToday');
+  if (days > 0) return i18n.t('members.display.daysLeft', { count: days });
   const ago = -days;
-  return `Expired ${ago} day${ago === 1 ? '' : 's'} ago`;
+  return i18n.t('members.display.expiredAgo', { count: ago });
 }
 
 export function getInitials(name?: string | null): string {

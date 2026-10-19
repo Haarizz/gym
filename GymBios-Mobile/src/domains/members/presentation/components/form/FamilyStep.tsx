@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -30,6 +31,7 @@ export function FamilyStep({
   addFamilyMember,
   removeFamilyMember,
 }: FamilyStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -63,7 +65,7 @@ export function FamilyStep({
   if (!isFamily) {
     return (
       <View style={styles.container}>
-        <FormCard icon="users" title="Family">
+        <FormCard icon="users" title={t('members.form.familyStep.title')}>
           <View style={styles.disabledContainer}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundSelected }]}>
               <Feather name="users" size={24} color={theme.textSecondary} />
@@ -73,11 +75,10 @@ export function FamilyStep({
               color="textSecondary"
               style={styles.disabledText}
             >
-              Not a family membership
+              {t('members.form.familyStep.notFamilyTitle')}
             </Typography>
             <Typography variant="caption" color="textSecondary" style={styles.centered}>
-              Nothing to set up here. Choose &quot;Family&quot; as the membership type
-              in the previous step to link relatives.
+              {t('members.form.familyStep.notFamilyDesc')}
             </Typography>
           </View>
         </FormCard>
@@ -87,12 +88,16 @@ export function FamilyStep({
 
   return (
     <View style={styles.container}>
-      <FormCard icon="users" title="Family" description="Link this member to a family membership">
+      <FormCard
+        icon="users"
+        title={t('members.form.familyStep.title')}
+        description={t('members.form.familyStep.description')}
+      >
         <View style={styles.switchRow}>
           <View style={styles.switchText}>
-            <Typography variant="bodySmallBold">Family head</Typography>
+            <Typography variant="bodySmallBold">{t('members.form.familyStep.headLabel')}</Typography>
             <Typography variant="caption" color="textSecondary">
-              The head pays for and manages the family plan
+              {t('members.form.familyStep.headSub')}
             </Typography>
           </View>
           <Switch
@@ -105,8 +110,8 @@ export function FamilyStep({
 
         {!data.isFamilyHead ? (
           <Dropdown
-            label="Relationship to Family Head"
-            placeholder="Select relationship"
+            label={t('members.form.familyStep.relationLabel')}
+            placeholder={t('members.form.familyStep.relationPlaceholder')}
             value={data.relationshipToHead}
             options={RELATIONSHIPS}
             onChange={(v) => updateField('relationshipToHead', v)}
@@ -115,7 +120,7 @@ export function FamilyStep({
 
         {data.familyMembers.length > 0 ? (
           <View style={styles.memberList}>
-            <Typography variant="bodySmallBold">Family Members</Typography>
+            <Typography variant="bodySmallBold">{t('members.form.familyStep.membersListTitle')}</Typography>
             {data.familyMembers.map(
               (member: DraftFamilyMember, index: number) => (
                 <View key={index} style={styles.memberCard}>
@@ -127,7 +132,7 @@ export function FamilyStep({
                     </Typography>
                   </View>
                   <Button
-                    label="Remove"
+                    label={t('members.form.familyStep.removeBtn')}
                     variant="ghost"
                     onPress={() => removeFamilyMember(index)}
                   />
@@ -138,7 +143,7 @@ export function FamilyStep({
         ) : null}
 
         <Button
-          label="Add Family Member"
+          label={t('members.form.familyStep.addMemberBtn')}
           variant="secondary"
           onPress={handleOpenModal}
         />
@@ -146,40 +151,40 @@ export function FamilyStep({
 
       <AppBottomSheet
         visible={modalVisible}
-        title="Add Family Member"
-        subtitle="Add a relative to this family membership"
+        title={t('members.form.familyStep.sheetTitle')}
+        subtitle={t('members.form.familyStep.sheetSubtitle')}
         onClose={() => setModalVisible(false)}
       >
         <View style={styles.modalBody}>
           <Input
-            label="Full Name *"
+            label={t('members.form.familyStep.nameReq')}
             value={memberName}
             onChangeText={setMemberName}
-            placeholder="Enter family member's name"
+            placeholder={t('members.form.familyStep.namePlaceholder')}
           />
           <Dropdown
-            label="Relationship *"
+            label={t('members.form.familyStep.relationReq')}
             value={memberRelationship}
             options={RELATIONSHIPS}
             onChange={setMemberRelationship}
           />
           <Input
-            label="Phone"
+            label={t('members.form.familyStep.phoneLabel')}
             value={memberPhone}
             onChangeText={setMemberPhone}
-            placeholder="Enter phone number"
+            placeholder={t('members.form.familyStep.phonePlaceholder')}
             keyboardType="phone-pad"
           />
           <Input
-            label="Email"
+            label={t('members.form.familyStep.emailLabel')}
             value={memberEmail}
             onChangeText={setMemberEmail}
-            placeholder="Enter email address"
+            placeholder={t('members.form.familyStep.emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
           />
           <Button
-            label="Add Member"
+            label={t('members.form.familyStep.addBtn')}
             onPress={handleAddMember}
             disabled={!memberName.trim()}
             size="lg"

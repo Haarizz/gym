@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -15,13 +16,6 @@ import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayou
 import { useStaff } from '../hooks/useStaff';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
-
-// Same values the web admin's "Change status" dialog writes.
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active', icon: 'check-circle', color: BrandColors.teal },
-  { value: 'inactive', label: 'Inactive', icon: 'user-x', color: BrandColors.danger },
-  { value: 'on_leave', label: 'On Leave', icon: 'clock', color: BrandColors.trainerAmber },
-] as const;
 
 const WEEKDAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -44,11 +38,18 @@ export function StaffDetailScreen({
   onDeleted,
   onUpdated,
 }: StaffDetailScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const { selectedStaff, loadStaff, deleteStaff, updateStaffStatus, submitting } = useStaff();
   const [statusSheetVisible, setStatusSheetVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+
+  const statusOptions = [
+    { value: 'active', label: t('facilities.active'), icon: 'check-circle' as const, color: BrandColors.teal },
+    { value: 'inactive', label: t('facilities.inactive'), icon: 'user-x' as const, color: BrandColors.danger },
+    { value: 'on_leave', label: t('hr.card.onLeave'), icon: 'clock' as const, color: BrandColors.trainerAmber },
+  ];
 
   useEffect(() => {
     loadStaff(staffId);
@@ -100,13 +101,13 @@ export function StaffDetailScreen({
     return (
       <ScreenLayout edges={TAB_SCREEN_EDGES}>
         <AppHeader
-          title="Staff Details"
+          title={t('hr.staffDetails')}
           colors={[theme.primary, theme.primary]}
           onBack={onBack}
         />
         <View style={styles.loadingContainer}>
           <Typography variant="body" color="textSecondary">
-            Loading...
+            {t('hr.loading')}
           </Typography>
         </View>
       </ScreenLayout>
@@ -123,7 +124,7 @@ export function StaffDetailScreen({
   return (
     <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <AppHeader
-        title="Staff Details"
+        title={t('hr.staffDetails')}
         colors={[theme.primary, theme.primary]}
         onBack={onBack}
       />
@@ -150,7 +151,7 @@ export function StaffDetailScreen({
           <View style={styles.actionButtonsRow}>
             <Pressable style={styles.actionButton} onPress={handleEdit}>
               <Feather name="edit" size={15} color={theme.text} />
-              <Typography variant="caption">Edit details</Typography>
+              <Typography variant="caption">{t('hr.editDetails')}</Typography>
             </Pressable>
             <Pressable
               style={styles.actionButton}
@@ -158,11 +159,11 @@ export function StaffDetailScreen({
               disabled={submitting}
             >
               <Feather name="sliders" size={15} color={theme.text} />
-              <Typography variant="caption">Change status</Typography>
+              <Typography variant="caption">{t('hr.changeStatus')}</Typography>
             </Pressable>
             <Pressable style={styles.actionButton} onPress={handleSetTarget}>
               <Feather name="target" size={15} color={theme.text} />
-              <Typography variant="caption">Set target</Typography>
+              <Typography variant="caption">{t('hr.setTarget')}</Typography>
             </Pressable>
             <Pressable
               style={styles.actionButton}
@@ -170,33 +171,33 @@ export function StaffDetailScreen({
               disabled={submitting}
             >
               <Feather name="trash-2" size={15} color={BrandColors.danger} />
-              <Typography variant="caption" style={{ color: BrandColors.danger }}>Delete</Typography>
+              <Typography variant="caption" style={{ color: BrandColors.danger }}>{t('hr.delete')}</Typography>
             </Pressable>
           </View>
         </View>
 
         {/* Contact Information Card */}
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <Typography variant="bodySmallBold" style={styles.cardTitle}>Contact information</Typography>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>{t('hr.contactInformation')}</Typography>
           <View style={styles.gridContainer}>
             <View style={styles.gridItem}>
-              <Typography variant="caption" color="textSecondary">Employee ID</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.employeeId')}</Typography>
               <Typography variant="bodySmall">{selectedStaff.id || `EMP-${staffId.slice(0, 5)}`}</Typography>
             </View>
             <View style={styles.gridItem}>
-              <Typography variant="caption" color="textSecondary">Join date</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.joinDate')}</Typography>
               <Typography variant="bodySmall">{selectedStaff.joinDate}</Typography>
             </View>
             <View style={styles.gridItem}>
-              <Typography variant="caption" color="textSecondary">Phone</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.phone')}</Typography>
               <Typography variant="bodySmall">{selectedStaff.phone}</Typography>
             </View>
             <View style={styles.gridItem}>
-              <Typography variant="caption" color="textSecondary">Email</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.email')}</Typography>
               <Typography variant="bodySmall">{selectedStaff.email}</Typography>
             </View>
             <View style={styles.gridItemFull}>
-              <Typography variant="caption" color="textSecondary">Address</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.address')}</Typography>
               <Typography variant="bodySmall">{selectedStaff.address}</Typography>
             </View>
           </View>
@@ -204,15 +205,15 @@ export function StaffDetailScreen({
 
         {/* Certifications Card */}
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <Typography variant="bodySmallBold" style={styles.cardTitle}>Certifications</Typography>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>{t('hr.certifications')}</Typography>
           {selectedStaff.certifications.length === 0 ? (
-            <Typography variant="bodySmall" color="textSecondary">No certifications on file.</Typography>
+            <Typography variant="bodySmall" color="textSecondary">{t('hr.noCertifications')}</Typography>
           ) : (
             selectedStaff.certifications.map((cert, idx) => (
               <View key={idx} style={{ marginBottom: idx < selectedStaff.certifications.length - 1 ? Spacing.two : 0 }}>
                 <Typography variant="bodySmall">{cert.certName}</Typography>
                 <Typography variant="caption" color="textSecondary">
-                  {cert.issuer} · {cert.issueDate} to {cert.expiryDate}
+                  {cert.issuer} · {cert.issueDate} {t('hr.card.to')} {cert.expiryDate}
                 </Typography>
               </View>
             ))
@@ -221,9 +222,9 @@ export function StaffDetailScreen({
 
         {/* Schedule Card */}
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <Typography variant="bodySmallBold" style={styles.cardTitle}>Schedule</Typography>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>{t('hr.schedule')}</Typography>
           {Object.keys(selectedStaff.schedule).length === 0 ? (
-            <Typography variant="bodySmall" color="textSecondary">No shifts scheduled this week.</Typography>
+            <Typography variant="bodySmall" color="textSecondary">{t('hr.noShiftsScheduled')}</Typography>
           ) : (
             Object.entries(selectedStaff.schedule)
               .sort(([a], [b]) => weekdayRank(a) - weekdayRank(b))
@@ -238,22 +239,22 @@ export function StaffDetailScreen({
 
         {/* Performance Card */}
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <Typography variant="bodySmallBold" style={styles.cardTitle}>Performance</Typography>
+          <Typography variant="bodySmallBold" style={styles.cardTitle}>{t('hr.performance')}</Typography>
           <View style={styles.performanceGrid}>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
-              <Typography variant="caption" color="textSecondary">Sessions completed</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.sessionsCompleted')}</Typography>
               <Typography variant="subtitle">0</Typography>
             </View>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
-              <Typography variant="caption" color="textSecondary">New clients</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.newClients')}</Typography>
               <Typography variant="subtitle">0</Typography>
             </View>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
-              <Typography variant="caption" color="textSecondary">Revenue generated</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.revenueGenerated')}</Typography>
               <Typography variant="subtitle"><CurrencyValue amount={0} /></Typography>
             </View>
             <View style={[styles.performanceBox, { backgroundColor: theme.background }]}>
-              <Typography variant="caption" color="textSecondary">Commission earned</Typography>
+              <Typography variant="caption" color="textSecondary">{t('hr.commissionEarned')}</Typography>
               <Typography variant="subtitle"><CurrencyValue amount={0} /></Typography>
             </View>
           </View>
@@ -262,11 +263,11 @@ export function StaffDetailScreen({
 
       <AppBottomSheet
         visible={statusSheetVisible}
-        title="Change status"
+        title={t('hr.changeStatus')}
         subtitle={selectedStaff.name}
         onClose={() => setStatusSheetVisible(false)}
       >
-        {STATUS_OPTIONS.map((option) => {
+        {statusOptions.map((option) => {
           const isCurrent = selectedStaff.status?.toLowerCase() === option.value;
           return (
             <Pressable
@@ -289,9 +290,9 @@ export function StaffDetailScreen({
 
       <ConfirmationModal
         visible={deleteConfirmVisible}
-        title="Delete Staff"
-        message="Are you sure you want to delete this staff member? This action cannot be undone."
-        confirmText="Delete"
+        title={t('hr.deleteStaffTitle')}
+        message={t('hr.deleteStaffConfirm')}
+        confirmText={t('hr.delete')}
         variant="danger"
         icon="trash-2"
         loading={submitting}

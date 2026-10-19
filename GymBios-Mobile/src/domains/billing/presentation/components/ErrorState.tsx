@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -16,9 +17,12 @@ interface ErrorStateProps {
  * Displays a retry button when a handler is provided.
  */
 export function ErrorState({
-  message = 'Something went wrong. Please try again.',
+  message,
   onRetry,
 }: ErrorStateProps) {
+  const { t } = useTranslation();
+  const errorMessage = message ?? t('common.error');
+
   return (
     <View style={styles.container}>
       <View style={styles.iconBox}>
@@ -26,16 +30,16 @@ export function ErrorState({
       </View>
 
       <Typography variant="bodySmallBold" style={styles.title}>
-        Error
+        {t('common.error')}
       </Typography>
 
       <Typography variant="bodySmall" color="textSecondary" style={styles.message}>
-        {message}
+        {errorMessage}
       </Typography>
 
       {onRetry && (
         <Button
-          label="Try Again"
+          label={t('common.retry', { defaultValue: 'Try Again' })}
           onPress={onRetry}
           variant="secondary"
           style={styles.button}

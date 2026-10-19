@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -11,6 +12,7 @@ interface AdminBranchSelectSheetProps {
 }
 
 export function AdminBranchSelectSheet({ visible, onClose }: AdminBranchSelectSheetProps) {
+  const { t } = useTranslation();
   const { selectedBranchId, setSelectedBranchId, availableBranches } = useBranchContext();
 
   const select = (id: number | 'ALL') => {
@@ -19,10 +21,15 @@ export function AdminBranchSelectSheet({ visible, onClose }: AdminBranchSelectSh
   };
 
   return (
-    <AppBottomSheet visible={visible} title="Select Branch" subtitle="Scope the dashboard to a branch" onClose={onClose}>
+    <AppBottomSheet
+      visible={visible}
+      title={t('dashboard.admin.branchSelectSheet.title')}
+      subtitle={t('dashboard.admin.branchSelectSheet.subtitle')}
+      onClose={onClose}
+    >
       <View style={styles.list}>
         <Pressable style={styles.row} onPress={() => select('ALL')} accessibilityRole="button">
-          <Text style={styles.rowText}>All Branches</Text>
+          <Text style={styles.rowText}>{t('dashboard.admin.branchSelectSheet.allBranches')}</Text>
           {selectedBranchId === 'ALL' && <Feather name="check" size={18} color={BrandColors.teal} />}
         </Pressable>
         {availableBranches.map((branch) => (

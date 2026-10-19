@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -11,22 +12,25 @@ interface AttendanceErrorStateProps {
 }
 
 export function AttendanceErrorState({
-  message = 'Something went wrong. Please try again.',
+  message,
   onRetry,
 }: AttendanceErrorStateProps) {
+  const { t } = useTranslation();
+  const errorMessage = message ?? t('common.error');
+
   return (
     <View style={styles.container}>
       <View style={styles.iconBox}>
         <Feather name="alert-triangle" size={32} color="#b91c1c" />
       </View>
       <Typography variant="bodySmallBold" style={styles.title}>
-        Error
+        {t('common.error')}
       </Typography>
       <Typography variant="bodySmall" color="textSecondary" style={styles.message}>
-        {message}
+        {errorMessage}
       </Typography>
       {onRetry ? (
-        <Button label="Try Again" onPress={onRetry} variant="secondary" style={styles.button} />
+        <Button label={t('common.retry', { defaultValue: 'Try Again' })} onPress={onRetry} variant="secondary" style={styles.button} />
       ) : null}
     </View>
   );

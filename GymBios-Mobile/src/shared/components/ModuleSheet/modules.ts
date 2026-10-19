@@ -39,12 +39,6 @@ export const topLevelModules: ModuleItem[] = [
         route: '/check-in',
       },
       {
-        id: 'training-streams',
-        title: 'Training Streams',
-        icon: 'video',
-        route: '/training-streams',
-      },
-      {
         id: 'community-hub',
         title: 'Community Hub',
         icon: 'users',
@@ -86,18 +80,6 @@ export const topLevelModules: ModuleItem[] = [
         title: 'Messaging',
         icon: 'message-circle',
         route: '/(admin)/messaging',
-      },
-      {
-        id: 'automations',
-        title: 'Automations',
-        icon: 'zap',
-        route: '/(admin)/automations',
-      },
-      {
-        id: 'workout-feedback',
-        title: 'Workout Feedback',
-        icon: 'star',
-        route: '/(admin)/workout-feedback',
       },
     ],
   },

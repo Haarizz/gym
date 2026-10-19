@@ -4,6 +4,7 @@ import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue, formatCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -56,6 +57,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
   return function AdminDealsScreen() {
     useRestoreSession();
     const router = useRouter();
+    const { t } = useTranslation();
 
     const { data: activePromotions, isLoading: isLoadingActive, error: activeError } = usePromotions('active');
     const { data: allPromotions, isLoading: isLoadingAll } = usePromotions();
@@ -78,16 +80,16 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
     const handleCopy = async (code: string) => {
       try {
         await Clipboard.setStringAsync(code);
-        toast.success(`Promo code ${code} copied to clipboard.`);
+        toast.success(t('crm.copiedPromoCode', { code }));
       } catch {
-        toast.error('Could not copy the promo code.');
+        toast.error(t('crm.failedCopyPromoCode'));
       }
     };
 
     const handleShare = (deal: PromotionCampaignResponse, discountText: string) => {
       if (!deal.code) return;
       Share.share({
-        message: `${deal.name}: use code ${deal.code} to get ${discountText}.`,
+        message: t('crm.shareMessage', { name: deal.name, code: deal.code, discount: discountText }),
       }).catch(() => {});
     };
     const totalRedemptions = (allPromotions || []).reduce((sum, deal) => sum + (deal.usageCount || 0), 0);
@@ -99,13 +101,13 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
           {/* Header Stats */}
           <View style={styles.headerStatsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Active Offers</Text>
+              <Text style={styles.statLabel}>{t('crm.activeOffers')}</Text>
               <Text style={[styles.statValue, { color: BrandColors.teal }]}>
                 {isLoadingOffers ? '-' : activeOfferCount}
               </Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total Redemptions</Text>
+              <Text style={styles.statLabel}>{t('crm.totalRedemptions')}</Text>
               <Text style={[styles.statValue, { color: '#F5C742' }]}>
                 {isLoadingAll ? '-' : totalRedemptions}
               </Text>
@@ -115,25 +117,25 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
           {/* Active Deals Section */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Active Offers</Text>
+              <Text style={styles.sectionTitle}>{t('crm.activeOffers')}</Text>
               <TouchableOpacity onPress={() => router.push('/(admin)/promotions')}>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllText}>{t('crm.viewAll')}</Text>
               </TouchableOpacity>
             </View>
 
             {isLoadingOffers ? (
               <ActivityIndicator size="small" color={BrandColors.teal} />
             ) : activeError && plansError ? (
-              <Text style={{ color: 'red' }}>Failed to load offers.</Text>
+              <Text style={{ color: 'red' }}>{t('crm.failedLoadOffers')}</Text>
             ) : activeOfferCount === 0 ? (
-              <Text style={{ color: '#6b7280' }}>No active offers found.</Text>
+              <Text style={{ color: '#6b7280' }}>{t('crm.noActiveOffers')}</Text>
             ) : (
               <View style={styles.dealsList}>
                 {activeError ? (
-                  <Text style={{ color: 'red' }}>Failed to load promo code offers.</Text>
+                  <Text style={{ color: 'red' }}>{t('crm.failedLoadPromoOffers')}</Text>
                 ) : null}
                 {plansError ? (
-                  <Text style={{ color: 'red' }}>Failed to load plan offers.</Text>
+                  <Text style={{ color: 'red' }}>{t('crm.failedLoadPlanOffers')}</Text>
                 ) : null}
                 {planOffers.map((plan) => (
                   <TouchableOpacity
@@ -143,7 +145,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                     onPress={() => router.push(`/(admin)/membership-plans/edit/${plan.id}` as any)}>
                     <View style={styles.dealHeader}>
                       <View style={styles.dealHeaderInfo}>
-                        <Text style={styles.dealTitle}>{plan.offerLabel || `${plan.name} Offer`}</Text>
+                        <Text style={styles.dealTitle}>{plan.offerLabel || t('crm.planOfferSuffix', { name: plan.name })}</Text>
                         <View style={styles.discountBadge}>
                           <Text style={styles.discountText}>
                             {plan.offerType === 'percentage'
@@ -157,17 +159,17 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                           styles.statusBadge,
                           { backgroundColor: STATUS_COLORS.active.bg, borderColor: STATUS_COLORS.active.border },
                         ]}>
-                        <Text style={[styles.statusText, { color: STATUS_COLORS.active.fg }]}>PLAN OFFER</Text>
+                        <Text style={[styles.statusText, { color: STATUS_COLORS.active.fg }]}>{t('crm.planOffer')}</Text>
                       </View>
                     </View>
 
                     <View style={styles.dealDetails}>
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Plan:</Text>
+                        <Text style={styles.detailLabel}>{t('crm.plan')}</Text>
                         <Text style={styles.detailValue}>{plan.name}</Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Price:</Text>
+                        <Text style={styles.detailLabel}>{t('crm.price')}</Text>
                         <Text style={styles.detailValue}>
                           <Text style={styles.strikePrice}><CurrencyValue amount={plan.price} /></Text>
                           {'  '}
@@ -175,14 +177,14 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Valid Until:</Text>
+                        <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
                         <Text style={styles.detailValue}>
-                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString() : 'No Expiry'}
+                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString() : t('crm.noExpiry')}
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Applies:</Text>
-                        <Text style={styles.detailValue}>Automatically, no code needed</Text>
+                        <Text style={styles.detailLabel}>{t('crm.applies')}</Text>
+                        <Text style={styles.detailValue}>{t('crm.autoNoCode')}</Text>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -227,7 +229,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                       {/* Code Box */}
                       <View style={styles.codeBox}>
                         <View style={styles.codeInfo}>
-                          <Text style={styles.codeLabel}>Promo Code</Text>
+                          <Text style={styles.codeLabel}>{t('crm.promoCode')}</Text>
                           <Text style={styles.codeValue}>{deal.code || 'N/A'}</Text>
                         </View>
                         <View style={styles.codeActions}>
@@ -249,17 +251,17 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                       {/* Details */}
                       <View style={styles.dealDetails}>
                         <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Valid Until:</Text>
+                          <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
                           <Text style={styles.detailValue}>
-                            {deal.endDate ? new Date(deal.endDate).toLocaleDateString() : 'No Expiry'}
+                            {deal.endDate ? new Date(deal.endDate).toLocaleDateString() : t('crm.noExpiry')}
                           </Text>
                         </View>
                         <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Branches:</Text>
-                          <Text style={styles.detailValue}>{deal.branchName || 'Unknown Branch'}</Text>
+                          <Text style={styles.detailLabel}>{t('crm.branches')}</Text>
+                          <Text style={styles.detailValue}>{deal.branchName || t('crm.unknownBranch')}</Text>
                         </View>
                         <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Usage:</Text>
+                          <Text style={styles.detailLabel}>{t('crm.usage')}</Text>
                           <Text style={styles.detailValue}>
                             {usageCount} / {deal.usageLimit || '∞'}
                           </Text>
@@ -272,7 +274,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                           <View style={[styles.progressBarFill, { width: `${usagePercent}%` }]} />
                         </View>
                         {!deal.usageLimit ? (
-                          <Text style={styles.progressHint}>No usage limit set</Text>
+                          <Text style={styles.progressHint}>{t('crm.noUsageLimit')}</Text>
                         ) : null}
                       </View>
                     </View>
@@ -285,42 +287,42 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
           {/* Referral Codes Section */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Referral Codes</Text>
+              <Text style={styles.sectionTitle}>{t('crm.referralCodes')}</Text>
               <TouchableOpacity onPress={() => router.push('/(admin)/referrals')}>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllText}>{t('crm.viewAll')}</Text>
               </TouchableOpacity>
             </View>
             
             {isLoadingReferrals ? (
               <ActivityIndicator size="small" color={BrandColors.teal} />
             ) : referralsError ? (
-              <Text style={{ color: 'red' }}>Failed to load referrals.</Text>
+              <Text style={{ color: 'red' }}>{t('crm.failedLoadReferrals')}</Text>
             ) : referralsList.length === 0 ? (
-              <Text style={{ color: '#6b7280' }}>No referral codes found.</Text>
+              <Text style={{ color: '#6b7280' }}>{t('crm.noReferralCodes')}</Text>
             ) : (
               <View style={styles.dealsList}>
                 {referralsList.map((referral) => (
                   <View key={referral.id} style={styles.referralCard}>
                     <View style={styles.referralHeader}>
                       <Text style={styles.referralCode}>{referral.referralCode || 'N/A'}</Text>
-                      <Text style={styles.referralOwner}>{referral.referrerName || 'Unknown'}</Text>
+                      <Text style={styles.referralOwner}>{referral.referrerName || t('crm.unknown')}</Text>
                     </View>
                     <View style={styles.referralMetrics}>
                       <View style={styles.referralMetricBox}>
-                        <Text style={styles.referralMetricLabel}>Status</Text>
+                        <Text style={styles.referralMetricLabel}>{t('crm.status')}</Text>
                         <Text style={styles.referralMetricValue}>
-                          {referral.status ? referral.status.charAt(0).toUpperCase() + referral.status.slice(1) : 'Unknown'}
+                          {referral.status ? referral.status.charAt(0).toUpperCase() + referral.status.slice(1) : t('crm.unknown')}
                         </Text>
                       </View>
                       <View style={styles.referralMetricBox}>
-                        <Text style={styles.referralMetricLabel}>Date</Text>
+                        <Text style={styles.referralMetricLabel}>{t('crm.date')}</Text>
                         <Text style={styles.referralMetricValue}>
                           {referral.date ? new Date(referral.date).toLocaleDateString() : 'N/A'}
                         </Text>
                       </View>
                       {referral.rewardAmount !== undefined && referral.rewardAmount !== null ? (
                         <View style={styles.referralMetricBox}>
-                          <Text style={styles.referralMetricLabel}>Reward</Text>
+                          <Text style={styles.referralMetricLabel}>{t('crm.reward')}</Text>
                           <Text style={[styles.referralMetricValue, { color: '#16a34a' }]}>
                             <CurrencyValue amount={referral.rewardAmount} />
                           </Text>
@@ -336,26 +338,26 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
           {/* Create New Deal */}
           <TouchableOpacity style={styles.createButton} onPress={handleCreateOffer}>
             <Feather name="plus" size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>Create New Offer</Text>
+            <Text style={styles.createButtonText}>{t('crm.createNewOffer')}</Text>
           </TouchableOpacity>
 
           {/* Quick Stats */}
           <View style={styles.quickStatsCard}>
-            <Text style={styles.quickStatsTitle}>{"This Month's Impact"}</Text>
+            <Text style={styles.quickStatsTitle}>{t('crm.thisMonthsImpact')}</Text>
             {isLoadingImpact ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : impactError ? (
-              <Text style={styles.quickStatsError}>{"Failed to load this month's impact."}</Text>
+              <Text style={styles.quickStatsError}>{t('crm.failedLoadImpact')}</Text>
             ) : (
               <View style={styles.quickStatsRow}>
                 <View style={styles.quickStatBox}>
-                  <Text style={styles.quickStatLabel}>Revenue from Deals</Text>
+                  <Text style={styles.quickStatLabel}>{t('crm.revenueFromDeals')}</Text>
                   <Text style={styles.quickStatValue}>
                     {formatCompactCurrency(impact?.revenueFromDeals ?? 0)}
                   </Text>
                 </View>
                 <View style={styles.quickStatBox}>
-                  <Text style={styles.quickStatLabel}>New Members</Text>
+                  <Text style={styles.quickStatLabel}>{t('crm.newMembers')}</Text>
                   <Text style={styles.quickStatValue}>{formatCount(impact?.newMembers ?? 0)}</Text>
                 </View>
               </View>

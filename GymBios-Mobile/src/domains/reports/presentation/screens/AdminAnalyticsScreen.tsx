@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -14,19 +15,25 @@ interface AdminAnalyticsScreenProps {
 
 export function createAdminAnalyticsScreen(useRestoreSession: ReturnType<typeof createUseRestoreSession>) {
   return function AdminAnalyticsScreen() {
+    const { t } = useTranslation();
     const { logout, isLoggingOut } = useRestoreSession();
 
-    const timeframes = ['Today', '7 Days', '30 Days', '12 Months'];
-    const activeTimeframe = '30 Days';
+    const timeframes = [
+      t('reports.timeframes.today'),
+      t('reports.timeframes.sevenDays'),
+      t('reports.timeframes.thirtyDays'),
+      t('reports.timeframes.twelveMonths'),
+    ];
+    const activeTimeframe = t('reports.timeframes.thirtyDays');
 
     const revenueMetrics = [
-      { label: 'Total Revenue', value: <CurrencyValue amount={420000} compact />, trend: '+15%', isUp: true },
-      { label: 'Avg per Member', value: <CurrencyValue amount={2450} />, trend: '+5%', isUp: true },
+      { label: t('reports.metrics.totalRevenue'), value: <CurrencyValue amount={420000} compact />, trend: '+15%', isUp: true },
+      { label: t('reports.metrics.avgPerMember'), value: <CurrencyValue amount={2450} />, trend: '+5%', isUp: true },
     ];
 
     const growthMetrics = [
-      { label: 'New Members', value: '124', trend: '+12%', isUp: true },
-      { label: 'Churn Rate', value: '2.4%', trend: '-0.5%', isUp: true }, // Lower churn is good
+      { label: t('reports.metrics.newMembers'), value: '124', trend: '+12%', isUp: true },
+      { label: t('reports.metrics.churnRate'), value: '2.4%', trend: '-0.5%', isUp: true }, // Lower churn is good
     ];
 
     return (
@@ -61,7 +68,7 @@ export function createAdminAnalyticsScreen(useRestoreSession: ReturnType<typeof 
 
           {/* Revenue Overview */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Revenue Overview</Text>
+            <Text style={styles.cardTitle}>{t('reports.revenueOverview')}</Text>
             <View style={styles.metricsRow}>
               {revenueMetrics.map((metric, index) => (
                 <View key={index} style={styles.metricBox}>
@@ -88,13 +95,13 @@ export function createAdminAnalyticsScreen(useRestoreSession: ReturnType<typeof 
             {/* Placeholder for Chart */}
             <View style={styles.chartPlaceholder}>
               <Feather name="bar-chart-2" size={48} color="#e5e7eb" />
-              <Text style={styles.chartPlaceholderText}>Revenue Chart Placeholder</Text>
+              <Text style={styles.chartPlaceholderText}>{t('reports.revenueChartPlaceholder')}</Text>
             </View>
           </View>
 
           {/* Membership Growth */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Membership Growth</Text>
+            <Text style={styles.cardTitle}>{t('reports.membershipGrowth')}</Text>
             <View style={styles.metricsRow}>
               {growthMetrics.map((metric, index) => (
                 <View key={index} style={styles.metricBox}>
@@ -121,14 +128,14 @@ export function createAdminAnalyticsScreen(useRestoreSession: ReturnType<typeof 
             {/* Placeholder for Chart */}
             <View style={styles.chartPlaceholder}>
               <Feather name="pie-chart" size={48} color="#e5e7eb" />
-              <Text style={styles.chartPlaceholderText}>Growth Chart Placeholder</Text>
+              <Text style={styles.chartPlaceholderText}>{t('reports.growthChartPlaceholder')}</Text>
             </View>
           </View>
 
           {/* Export Report */}
           <TouchableOpacity style={styles.exportButton}>
             <Feather name="download" size={20} color={BrandColors.teal} />
-            <Text style={styles.exportButtonText}>Export Detailed Report</Text>
+            <Text style={styles.exportButtonText}>{t('reports.exportDetailedReport')}</Text>
           </TouchableOpacity>
         </View>
       </ScreenLayout>

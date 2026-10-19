@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import React from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 
 import { useCurrency } from '@/core/providers';
@@ -17,14 +18,15 @@ const DISCOUNT_TYPE_OPTIONS: Option[] = [
 ];
 
 export function DiscountStep({ values, onChange }: StepProps) {
+  const { t } = useTranslation();
   const { currencyCode } = useCurrency();
   const accessDays = isAccessDaysPromotion(values);
 
   return (
     <View style={stepStyles.container}>
       <Dropdown
-        label="Discount Type"
-        placeholder="Select discount type"
+        label={t('promotions.discountType')}
+        placeholder={t('promotions.selectDiscountType')}
         options={DISCOUNT_TYPE_OPTIONS}
         value={values.discountType}
         onChange={(val) => onChange('discountType', val)}
@@ -32,8 +34,8 @@ export function DiscountStep({ values, onChange }: StepProps) {
 
       {!accessDays && (
         <Input
-          label="Discount Value"
-          placeholder="Enter value"
+          label={t('promotions.discountValue')}
+          placeholder={t('promotions.enterValue')}
           keyboardType="decimal-pad"
           value={values.discountValue}
           onChangeText={(val) => onChange('discountValue', val)}
@@ -43,8 +45,8 @@ export function DiscountStep({ values, onChange }: StepProps) {
       <View style={stepStyles.gridRow}>
         <View style={stepStyles.gridCol}>
           <Input
-            label={`Minimum Purchase (${currencyCode})`}
-            placeholder="Optional"
+            label={`${t('promotions.minPurchase')} (${currencyCode})`}
+            placeholder={t('promotions.optional')}
             keyboardType="decimal-pad"
             value={values.minimumPurchase}
             onChangeText={(val) => onChange('minimumPurchase', val)}
@@ -53,7 +55,7 @@ export function DiscountStep({ values, onChange }: StepProps) {
         <View style={stepStyles.gridCol}>
           <Input
             label={`Maximum Discount (${currencyCode})`}
-            placeholder="Optional"
+            placeholder={t('promotions.optional')}
             keyboardType="decimal-pad"
             value={values.maximumDiscount}
             onChangeText={(val) => onChange('maximumDiscount', val)}
@@ -64,8 +66,8 @@ export function DiscountStep({ values, onChange }: StepProps) {
       <View style={stepStyles.gridRow}>
         <View style={stepStyles.gridCol}>
           <Input
-            label="Total Usage Limit"
-            placeholder="Unlimited"
+            label={t('promotions.totalUsageLimit')}
+            placeholder={t('promotions.unlimited')}
             keyboardType="number-pad"
             value={values.usageLimit}
             onChangeText={(val) => onChange('usageLimit', val)}
@@ -73,8 +75,8 @@ export function DiscountStep({ values, onChange }: StepProps) {
         </View>
         <View style={stepStyles.gridCol}>
           <Input
-            label="Usage Limit Per Member"
-            placeholder="Unlimited"
+            label={t('promotions.usageLimitPerMember')}
+            placeholder={t('promotions.unlimited')}
             keyboardType="number-pad"
             value={values.usageLimitPerMember}
             onChangeText={(val) => onChange('usageLimitPerMember', val)}
@@ -86,8 +88,7 @@ export function DiscountStep({ values, onChange }: StepProps) {
         <View style={stepStyles.note}>
           <Feather name="info" size={16} color="#92400E" />
           <Text style={stepStyles.noteText}>
-            Access-day eligibility rules are configured from the web dashboard. Any rules
-            already set on this promotion are kept when you save.
+            {t('promotions.accessDayRulesNote')}
           </Text>
         </View>
       )}

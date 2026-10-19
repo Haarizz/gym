@@ -3,6 +3,7 @@ import { Alert, Modal, FlatList, Pressable, RefreshControl, ScrollView, StyleShe
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue, formatCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -46,6 +47,7 @@ export function CreateReceiptScreen({
   onReceiptCreated,
   onViewMemberProfile,
 }: CreateReceiptScreenProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -185,8 +187,8 @@ export function CreateReceiptScreen({
   return (
     <ScreenLayout>
       <AppHeader
-        title="Create Receipt"
-        subtitle="Collect Payment & Issue Receipt"
+        title={t('billing.createReceipt.title')}
+        subtitle={t('billing.createReceipt.step3Title')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -199,17 +201,17 @@ export function CreateReceiptScreen({
         {/* ── Step 1: Member Autocomplete Search ─────────────────── */}
         <View style={styles.sectionCard}>
           <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-            Step 1: Select Member
+            {t('billing.createReceipt.step1Title')}
           </Typography>
           <Typography variant="caption" color="textSecondary" style={styles.sectionSubtitle}>
-            Search member by Name, Member ID, Phone, or Email
+            {t('billing.createReceipt.step1Desc')}
           </Typography>
 
           <View style={styles.searchBox}>
             <Feather name="search" size={16} color={BrandColors.textSecondary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Type member name, ID, phone..."
+              placeholder={t('billing.createReceipt.searchPlaceholder')}
               placeholderTextColor={BrandColors.textSecondary}
               value={searchQuery}
               onFocus={() => setShowSuggestions(true)}
@@ -232,13 +234,13 @@ export function CreateReceiptScreen({
               {searchLoading ? (
                 <View style={styles.noResultsItem}>
                   <Typography variant="caption" color="textSecondary">
-                    Searching members...
+                    {t('billing.createReceipt.searching')}
                   </Typography>
                 </View>
               ) : noResults || searchPool.length === 0 ? (
                 <View style={styles.noResultsItem}>
                   <Typography variant="caption" color="textSecondary">
-                    No matching members found.
+                    {t('billing.createReceipt.noMatchingMembers')}
                   </Typography>
                 </View>
               ) : (
@@ -256,7 +258,7 @@ export function CreateReceiptScreen({
                     <View style={styles.suggestionInfo}>
                       <Typography variant="bodySmallBold">{m.name}</Typography>
                       <Typography variant="caption" color="textSecondary">
-                        ID: {m.memberId} {m.phone ? `· ${m.phone}` : ''}
+                        {t('billing.createReceipt.idLabel')} {m.memberId} {m.phone ? `· ${m.phone}` : ''}
                       </Typography>
                     </View>
                   </Pressable>
@@ -281,7 +283,7 @@ export function CreateReceiptScreen({
                   {selectedMember.name}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Member ID: {selectedMember.memberId} {selectedMember.phone ? `· ${selectedMember.phone}` : ''}
+                  {t('billing.createReceipt.memberIdLabel')} {selectedMember.memberId} {selectedMember.phone ? `· ${selectedMember.phone}` : ''}
                 </Typography>
                 {selectedMember.membershipType && (
                   <View style={styles.badgeChip}>
@@ -302,7 +304,7 @@ export function CreateReceiptScreen({
                 >
                   <Feather name="user" size={14} color={BrandColors.teal} />
                   <Typography variant="caption" style={styles.memberActionText}>
-                    View Profile
+                    {t('billing.createReceipt.viewProfile')}
                   </Typography>
                 </Pressable>
               )}
@@ -314,7 +316,7 @@ export function CreateReceiptScreen({
               >
                 <Feather name="x" size={14} color="#b91c1c" />
                 <Typography variant="caption" style={{ color: '#b91c1c', fontWeight: '600' }}>
-                  Clear Selection
+                  {t('billing.createReceipt.clearSelection')}
                 </Typography>
               </Pressable>
             </View>
@@ -327,17 +329,17 @@ export function CreateReceiptScreen({
             <View style={styles.billsHeaderRow}>
               <View>
                 <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                  Step 3: Select Pending Bills
+                  {t('billing.createReceipt.step2Title')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  {bills.length} pending bill{bills.length !== 1 ? 's' : ''} available
+                  {t('billing.createReceipt.pendingBillsCount', { count: bills.length })}
                 </Typography>
               </View>
 
               {bills.length > 0 && (
                 <Pressable onPress={handleSelectAllBills} style={styles.selectAllBtn}>
                   <Typography variant="caption" style={{ color: BrandColors.teal, fontWeight: '700' }}>
-                    {selectedBillIds.size === bills.length ? 'Deselect All' : 'Auto Apply'}
+                    {selectedBillIds.size === bills.length ? t('billing.createReceipt.deselectAll') : t('billing.createReceipt.autoApply')}
                   </Typography>
                 </Pressable>
               )}
@@ -347,8 +349,8 @@ export function CreateReceiptScreen({
               <BillingSkeleton variant="list" count={3} />
             ) : bills.length === 0 ? (
               <EmptyBillingState
-                title="No pending bills"
-                description="This member has no outstanding bills to collect."
+                title={t('billing.createReceipt.noPendingBills')}
+                description={t('billing.createReceipt.noPendingBillsDesc')}
                 icon="check-circle"
               />
             ) : (
@@ -374,7 +376,7 @@ export function CreateReceiptScreen({
                         </View>
 
                         <Typography variant="caption" color="textSecondary">
-                          Type: {bill.transactionType} · Due: <CurrencyValue amount={bill.dueAmount} />
+                          {t('billing.createReceipt.type')} {bill.transactionType} · {t('billing.createReceipt.due')} <CurrencyValue amount={bill.dueAmount} />
                         </Typography>
                       </View>
 
@@ -393,7 +395,7 @@ export function CreateReceiptScreen({
         <View style={styles.stickyFooter}>
           <View style={styles.footerSummaryRow}>
             <Typography variant="caption" color="textSecondary">
-              {selectedBillIds.size} bill{selectedBillIds.size !== 1 ? 's' : ''} selected
+              {t('billing.createReceipt.billsSelected', { count: selectedBillIds.size })}
             </Typography>
             <MoneyText amount={totalSelectedAmount} variant="bodySmallBold" color={BrandColors.teal} />
           </View>
@@ -405,7 +407,7 @@ export function CreateReceiptScreen({
             accessibilityRole="button"
           >
             <Typography variant="bodySmallBold" style={styles.proceedText}>
-              Proceed to Payment
+              {t('billing.createReceipt.proceedToPayment')}
             </Typography>
             <Feather name="arrow-right" size={16} color="#ffffff" />
           </Pressable>
@@ -426,15 +428,15 @@ export function CreateReceiptScreen({
             <View style={styles.sheetHandle} />
 
             <Typography variant="bodySmallBold" style={styles.sheetTitle}>
-              Collect Payment & Issue Receipt
+              {t('billing.createReceipt.step3Title')}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              Member: {selectedMember?.name}
+              {t('billing.createReceipt.member')} {selectedMember?.name}
             </Typography>
 
             {/* Payment Method Selector */}
             <Typography variant="caption" style={styles.fieldLabel}>
-              Payment Method *
+              {t('billing.createReceipt.paymentMethod')}
             </Typography>
             <View style={styles.methodsGrid}>
               {paymentMethodsList.map((pm) => {
@@ -463,7 +465,7 @@ export function CreateReceiptScreen({
 
             {/* Payment Date */}
             <Typography variant="caption" style={styles.fieldLabel}>
-              Payment Date
+              {t('billing.createReceipt.paymentDate')}
             </Typography>
             <TextInput
               style={styles.dateInput}
@@ -476,19 +478,19 @@ export function CreateReceiptScreen({
             <View style={styles.summaryBox}>
               <View style={styles.summaryRow}>
                 <Typography variant="caption" color="textSecondary">
-                  Total Outstanding
+                  {t('billing.createReceipt.totalOutstanding')}
                 </Typography>
                 <MoneyText amount={totalOutstandingForMember} variant="caption" />
               </View>
               <View style={styles.summaryRow}>
                 <Typography variant="bodySmallBold" style={{ color: BrandColors.teal }}>
-                  Receipt Total (Paid Now)
+                  {t('billing.createReceipt.receiptTotalPaid')}
                 </Typography>
                 <MoneyText amount={totalSelectedAmount} variant="bodySmallBold" color={BrandColors.teal} />
               </View>
               <View style={styles.summaryRow}>
                 <Typography variant="caption" color="textSecondary">
-                  Remaining Balance
+                  {t('billing.createReceipt.remainingBalance')}
                 </Typography>
                 <MoneyText amount={remainingBalanceAfterPayment} variant="caption" color="#b91c1c" />
               </View>
@@ -501,7 +503,7 @@ export function CreateReceiptScreen({
                 onPress={() => setPaymentSheetVisible(false)}
               >
                 <Typography variant="bodySmallBold" style={styles.cancelSheetText}>
-                  Cancel
+                  {t('billing.createReceipt.cancel')}
                 </Typography>
               </Pressable>
 
@@ -511,7 +513,7 @@ export function CreateReceiptScreen({
                 disabled={settlePaymentMutation.isPending}
               >
                 <Typography variant="bodySmallBold" style={styles.generateReceiptText}>
-                  {settlePaymentMutation.isPending ? 'Generating...' : 'Generate Receipt'}
+                  {settlePaymentMutation.isPending ? t('billing.createReceipt.issuingReceipt') : t('billing.createReceipt.issueReceipt')}
                 </Typography>
               </Pressable>
             </View>

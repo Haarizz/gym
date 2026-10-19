@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -15,27 +16,28 @@ interface TrainerProductivityCardProps {
 }
 
 export function TrainerProductivityCard({ data }: TrainerProductivityCardProps) {
+  const { t } = useTranslation();
   const averageSessions = data?.averageSessionsPerTrainer ?? 0;
   const satisfaction = data?.memberSatisfaction ?? 0;
   const ptSales = data?.ptPackageSales ?? 0;
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Trainer Productivity</Text>
+      <Text style={styles.title}>{t('analytics.cards.trainerProductivity')}</Text>
       
       <View style={styles.list}>
         <View style={[styles.row, styles.borderBottom]}>
-          <Text style={styles.label}>Avg. Sessions per Trainer</Text>
+          <Text style={styles.label}>{t('analytics.cards.avgSessionsPerTrainer')}</Text>
           <Text style={styles.value}>{averageSessions}</Text>
         </View>
         
         <View style={[styles.row, styles.borderBottom]}>
-          <Text style={styles.label}>Member Satisfaction</Text>
+          <Text style={styles.label}>{t('analytics.cards.memberSatisfaction')}</Text>
           <Text style={[styles.value, { color: '#16A34A' }]}>{satisfaction.toFixed(1)}/5.0</Text>
         </View>
         
         <View style={styles.row}>
-          <Text style={styles.label}>PT Package Sales</Text>
+          <Text style={styles.label}>{t('analytics.cards.ptPackageSales')}</Text>
           <Text style={styles.value}><CurrencyValue amount={ptSales} options={{ maximumFractionDigits: 0 }} /></Text>
         </View>
       </View>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { StaffWizardScreen } from '@/domains/hr/presentation/screens/StaffWizardScreen';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
@@ -8,6 +9,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Typography } from '@/shared/components/Typography';
 
 export default function EditStaffRoute() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { selectedStaff, loadStaff, loading } = useStaff();
@@ -28,7 +30,7 @@ export default function EditStaffRoute() {
       <View style={styles.loading}>
         <ActivityIndicator size="large" />
         <Typography variant="body" color="textSecondary">
-          Loading staff data...
+          {t('hr.loadingStaffData')}
         </Typography>
       </View>
     );

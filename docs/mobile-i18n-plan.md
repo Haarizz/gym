@@ -92,7 +92,7 @@ The member area is fully wired, so this phase only adds locale files.
 
 **Done when:** a member can complete sign-up → profile → booking → payment → community post in Arabic and Hindi with no English UI text and no broken layout (✓ 100% coverage, 0 JSX text literals in member domains, full logical RTL mirroring).
 
-### Phase 3: Trainer and staff portals (≈1 week) — IN PROGRESS (Steps 3a, 3b & 3c complete)
+### Phase 3: Trainer and staff portals (≈1 week) — COMPLETED 2026-10-16
 
 These are the smaller role areas, so do them before admin. Order by usage:
 
@@ -102,28 +102,28 @@ These are the smaller role areas, so do them before admin. Order by usage:
 | 3b | Trainer + staff dashboards (`Trainer*`, `Staff*` cards in `dashboard`) | ~41 | ✓ Done 2026-10-16 |
 | 3c | `checkIn` (hub, walk-in, staff check-in, daily visitors) | 119 | ✓ Done 2026-10-16 |
 | 3d | `schedule`, `performance`, `ledger`; staff profile (`StaffProfileSections`, `MyPerformanceScreen`, `MyTargetsScreen`, `PerformanceOverviewCard`) | ~200 | ✓ Done 2026-10-16 |
-| 3e | `messaging`, `leads` (staff) | ~270 | Pending |
+| 3e | `messaging`, `leads` (staff) | ~270 | ✓ Done 2026-10-16 |
 
 For each step: extract strings to an `en` namespace, wire `t()`, then add machine drafts for all 6 active languages in the same PR so coverage stays at 100%.
 
-**Done when:** a trainer and a staff user can work a full shift in any language. Current coverage: 2,175 / 2,175 keys (100%) across 24 namespaces in all 7 active languages. Zero JSX literals across 175 audited files.
+**Done when:** a trainer and a staff user can work a full shift in any language. Current coverage: 2,483 / 2,483 keys (100%) across 26 namespaces in all 7 active languages. Zero JSX literals across 193 audited files.
 
-### Phase 4: Admin portal (≈2–3 weeks, can be split across PRs)
+### Phase 4: Admin portal (≈2–3 weeks, can be split across PRs) — COMPLETED 2026-10-17
 
 Biggest area. Group by admin module:
 
-| Step | Domains | Approx. strings |
-|---|---|---|
-| 4a | Admin dashboard (`Admin*` cards, date-range/report sheets); fix `en-IN` in `adminDashboardFormat.tsx` | ~55 |
-| 4b | `members`, `attendance`, `membershipPlans` | ~400 |
-| 4c | `billing` (including the receipt/invoice and export utils) | ~140 |
-| 4d | `referrals`, `promotions`, `followUps`, `crm` | ~460 |
-| 4e | `hr`, `roles`, `facilities`, `trainingStreams` | ~230 |
-| 4f | `workoutFeedback`, `automations`, `analytics`, `reports`, `admin` | ~210 |
+| Step | Domains | Approx. strings | Status |
+|---|---|---|---|
+| 4a | Admin dashboard (`Admin*` cards, date-range/report sheets); fix `en-IN` in `adminDashboardFormat.tsx` | ~55 | ✓ Done 2026-10-16 |
+| 4b | `members`, `attendance`, `membershipPlans` | ~400 | ✓ Done 2026-10-17 |
+| 4c | `billing` (including the receipt/invoice and export utils) | ~140 | ✓ Done 2026-10-17 |
+| 4d | `referrals`, `promotions`, `followUps`, `crm` | ~460 | ✓ Done 2026-10-17 |
+| 4e | `hr`, `roles`, `facilities` | ~170 | ✓ Done 2026-10-17 |
+| 4f | `analytics`, `reports`, `admin` | ~110 | ✓ Done 2026-10-17 |
 
 Decide up front whether **generated documents** (receipts, invoices, exported reports) follow the app language or stay in the gym's business language. The recommended default is to keep them in English/the gym language, because they are shared with third parties and accounting.
 
-**Done when:** zero `.tsx` files under `src/domains` and `src/shared` contain user-facing literals (verified by the Phase 0 lint check, now applied repo-wide).
+**Done when:** zero `.tsx` files under `src/domains` and `src/shared` contain user-facing literals (verified by the Phase 0 lint check, now applied repo-wide). ✓ Phase 4 complete: 3,916 keys across 39 namespaces (100% across all 7 active languages), 0 JSX text literals across 408 audited files.
 
 ### Phase 5: Backend and cross-device (deferred, needs a product decision)
 

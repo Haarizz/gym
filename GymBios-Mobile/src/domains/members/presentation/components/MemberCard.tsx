@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -32,6 +33,7 @@ export const MemberCard = memo(function MemberCard({
   onPress,
   onCall,
 }: MemberCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const statusTone = getMemberStatusTone(member);
@@ -79,7 +81,7 @@ export const MemberCard = memo(function MemberCard({
             <View style={styles.metricLabelRow}>
               <Feather name="calendar" size={12} color={theme.textSecondary} />
               <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
-                Expires
+                {t('members.card.expires')}
               </Typography>
             </View>
             <Typography variant="bodySmallBold" numberOfLines={1}>
@@ -93,14 +95,14 @@ export const MemberCard = memo(function MemberCard({
             <View style={styles.metricLabelRow}>
               <Feather name="credit-card" size={12} color={theme.textSecondary} />
               <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
-                Payment
+                {t('members.card.payment')}
               </Typography>
             </View>
             <Typography variant="bodySmallBold" style={{ color: paymentTone.color }} numberOfLines={1}>
               {paymentTone.label}
             </Typography>
             <Typography variant="caption" color="textSecondary" style={styles.metricHint} numberOfLines={1}>
-              {titleCase(member.membershipType) || '—'} plan
+              {titleCase(member.membershipType) || '—'} {t('members.card.planSuffix')}
             </Typography>
           </View>
         </View>
@@ -117,7 +119,7 @@ export const MemberCard = memo(function MemberCard({
             accessibilityRole="button"
           >
             <Typography variant="bodySmallBold" style={{ color: theme.primaryText }}>
-              View Profile
+              {t('members.card.viewProfile')}
             </Typography>
           </Pressable>
           <Pressable

@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -22,14 +23,15 @@ export function CertificationsSection({
   onRemove,
   onChangeCert,
 }: CertificationsSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
-    <FormSection title="Certifications">
+    <FormSection title={t('hr.certifications')}>
       {certifications.map((cert, index) => (
         <View key={index} style={[styles.certCard, { backgroundColor: theme.backgroundElement }]}>
           <View style={styles.certHeader}>
-            <Typography variant="bodySmallBold">Certification {index + 1}</Typography>
+            <Typography variant="bodySmallBold">{t('hr.scheduleStep.certNumber', { number: index + 1 })}</Typography>
             <Pressable
               hitSlop={8}
               onPress={() => onRemove(index)}
@@ -39,40 +41,40 @@ export function CertificationsSection({
             </Pressable>
           </View>
           <Input
-            label="Certification Name"
+            label={t('hr.scheduleStep.certName')}
             value={cert.certName}
             onChangeText={(value) => onChangeCert(index, 'certName', value)}
-            placeholder="e.g. CPT"
+            placeholder={t('hr.scheduleStep.certNamePlaceholder')}
           />
           <Input
-            label="Issuer"
+            label={t('hr.scheduleStep.issuer')}
             value={cert.issuer}
             onChangeText={(value) => onChangeCert(index, 'issuer', value)}
-            placeholder="e.g. ACE"
+            placeholder={t('hr.scheduleStep.issuerPlaceholder')}
           />
           <Input
-            label="Issue Date"
+            label={t('hr.scheduleStep.issued')}
             value={cert.issueDate}
             onChangeText={(value) => onChangeCert(index, 'issueDate', value)}
-            placeholder="YYYY-MM-DD"
+            placeholder={t('hr.datePlaceholder')}
           />
           <Input
-            label="Expiry Date"
+            label={t('hr.scheduleStep.expires')}
             value={cert.expiryDate}
             onChangeText={(value) => onChangeCert(index, 'expiryDate', value)}
-            placeholder="YYYY-MM-DD"
+            placeholder={t('hr.datePlaceholder')}
           />
           <Input
-            label="Document URL"
+            label={t('hr.scheduleStep.documentUrl')}
             value={cert.documentUrl}
             onChangeText={(value) => onChangeCert(index, 'documentUrl', value)}
-            placeholder="URL to certificate"
+            placeholder={t('hr.scheduleStep.documentUrlPlaceholder')}
             autoCapitalize="none"
           />
         </View>
       ))}
       <Button
-        label="+ Add Certification"
+        label={t('hr.scheduleStep.addCertification')}
         variant="secondary"
         onPress={onAdd}
       />

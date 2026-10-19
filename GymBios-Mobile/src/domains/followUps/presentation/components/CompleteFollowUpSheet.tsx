@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -40,6 +41,7 @@ export function CompleteFollowUpSheet({
   onSubmit,
   submitting = false,
 }: CompleteFollowUpSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [outcome, setOutcome] = useState('successful');
   const [notes, setNotes] = useState('');
@@ -71,7 +73,7 @@ export function CompleteFollowUpSheet({
         >
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Complete Follow-up
+              {t('followUps.completeTitle')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Feather name="x" size={22} color={theme.text} />
@@ -80,21 +82,21 @@ export function CompleteFollowUpSheet({
 
           <ScrollView style={styles.modalBody}>
             <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
-              Completing follow-up for{' '}
+              {t('followUps.completingFor')}{' '}
               <Text style={{ color: theme.text, fontWeight: '700' }}>
                 {followUp.leadName}
               </Text>
             </Text>
 
             <Dropdown
-              label="Outcome"
+              label={t('followUps.outcome')}
               value={outcome}
               options={OUTCOME_OPTIONS}
               onChange={setOutcome}
             />
 
             <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              Completion Notes
+              {t('followUps.completionNotes')}
             </Text>
             <TextInput
               style={[
@@ -106,7 +108,7 @@ export function CompleteFollowUpSheet({
               onChangeText={setNotes}
               multiline
               numberOfLines={3}
-              placeholder="Record any details about the outcome..."
+              placeholder={t('followUps.outcomeNotesPlaceholder')}
               placeholderTextColor={theme.textSecondary}
             />
           </ScrollView>
@@ -118,7 +120,7 @@ export function CompleteFollowUpSheet({
               disabled={submitting}
             >
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                Cancel
+                {t('followUps.cancel')}
               </Text>
             </TouchableOpacity>
 
@@ -128,7 +130,7 @@ export function CompleteFollowUpSheet({
               disabled={submitting}
             >
               <Text style={styles.submitBtnText}>
-                {submitting ? 'Completing...' : 'Mark Completed'}
+                {submitting ? t('common.pleaseWait', 'Completing...') : t('followUps.complete')}
               </Text>
             </TouchableOpacity>
           </View>

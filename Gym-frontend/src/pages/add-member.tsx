@@ -1270,7 +1270,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     setIsValidatingPromoCode(true);
     try {
       // The code may be a promotion or a shareable referral coupon.
-      const resolved = await discountCodeService.validate(promoCodeInput.trim());
+      const resolved = await discountCodeService.validate(promoCodeInput.trim(), { joining: true });
       if (resolved.source === 'COUPON') {
         applyCouponDiscount(resolved.code, resolved.discountType, resolved.discountValue);
         return;

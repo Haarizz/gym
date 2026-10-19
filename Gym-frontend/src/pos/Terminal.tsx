@@ -1593,10 +1593,10 @@ export function Terminal() {
       <CashMovementDialog open={showCash} onOpenChange={setShowCash} />
       <QuickAddProductDialog open={showQuickAdd} onOpenChange={setShowQuickAdd} initialName={query || entry}
         onCreated={(p) => { addProduct(p); setQuery(""); flash("success", `${p.name} added`); reloadProducts(); }} />
-      <CouponDialog open={showCoupon} onOpenChange={setShowCoupon} base={promoBase} current={cart.promo}
+      <CouponDialog open={showCoupon} onOpenChange={setShowCoupon} base={promoBase} memberId={cart.member?.id ?? null} current={cart.promo}
         onApply={(promo) => { setCart((c) => ({ ...c, promo })); toast.success(`${promo.name} applied`); }}
         onRemove={() => setCart((c) => ({ ...c, promo: null }))} />
-      <PromotionsDialog open={showPromos} onOpenChange={setShowPromos} base={promoBase} current={cart.promo}
+      <PromotionsDialog open={showPromos} onOpenChange={setShowPromos} base={promoBase} memberId={cart.member?.id ?? null} current={cart.promo}
         onApply={(promo) => { setCart((c) => ({ ...c, promo })); toast.success(`${promo.name} applied`); }}
         onRemove={() => setCart((c) => ({ ...c, promo: null }))} />
       <CreditBalanceDialog open={showCredit} onOpenChange={setShowCredit} initialMember={cart.member}

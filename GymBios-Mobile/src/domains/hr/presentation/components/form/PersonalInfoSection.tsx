@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/shared/components/Input';
 import { FormSection } from '@/shared/components/FormSection';
 
@@ -26,13 +27,15 @@ export function PersonalInfoSection({
   onChangeAddress,
   onChangePhotoUrl,
 }: PersonalInfoSectionProps) {
+  const { t } = useTranslation();
+
   return (
-    <FormSection title="Personal Information">
-      <Input label="Full Name" value={name} onChangeText={onChangeName} placeholder="Enter full name" />
-      <Input label="Email" value={email} onChangeText={onChangeEmail} placeholder="Enter email address" keyboardType="email-address" autoCapitalize="none" />
-      <Input label="Phone" value={phone} onChangeText={onChangePhone} placeholder="Enter phone number" keyboardType="phone-pad" />
-      <Input label="Address" value={address} onChangeText={onChangeAddress} placeholder="Enter address" />
-      <Input label="Photo URL" value={photoUrl} onChangeText={onChangePhotoUrl} placeholder="Enter photo URL" autoCapitalize="none" />
+    <FormSection title={t('hr.step.personalTitle')}>
+      <Input label={t('hr.personal.fullName')} value={name} onChangeText={onChangeName} placeholder={t('hr.personal.fullNamePlaceholder')} />
+      <Input label={t('hr.email')} value={email} onChangeText={onChangeEmail} placeholder={t('hr.personal.emailPlaceholder')} keyboardType="email-address" autoCapitalize="none" />
+      <Input label={t('hr.phone')} value={phone} onChangeText={onChangePhone} placeholder={t('hr.personal.phonePlaceholder')} keyboardType="phone-pad" />
+      <Input label={t('hr.address')} value={address} onChangeText={onChangeAddress} placeholder={t('hr.personal.addressPlaceholder')} />
+      <Input label={t('hr.personal.photoUrl')} value={photoUrl} onChangeText={onChangePhotoUrl} placeholder={t('hr.personal.photoUrlPlaceholder')} autoCapitalize="none" />
     </FormSection>
   );
 }

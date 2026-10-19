@@ -40,6 +40,8 @@ public class RenewalRequestDTO {
     // the server subtracts it and spends the pass/coupon in the same transaction.
     private Long rewardPassId;
     private String couponCode;
+    /** A promotion picked by id instead of a typed code (one without a code, e.g. the app's offer banner) */
+    private Long promotionId;
     // A head moving onto a Family/Couple plan (MemberService.convertToFamilyHead):
     // the billed-to-head members' fees added on top of membershipFee, itemized on
     // the renewal receipt like createMember's minorCharges.
@@ -87,6 +89,9 @@ public class RenewalRequestDTO {
 
     public String getCouponCode() { return couponCode; }
     public void setCouponCode(String couponCode) { this.couponCode = couponCode; }
+
+    public Long getPromotionId() { return promotionId; }
+    public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
 
     public BigDecimal getBilledToHeadFeeTotal() { return billedToHeadFeeTotal; }
     public void setBilledToHeadFeeTotal(BigDecimal billedToHeadFeeTotal) { this.billedToHeadFeeTotal = billedToHeadFeeTotal; }

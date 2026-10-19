@@ -57,17 +57,20 @@ public class FamilyPlanChangeService {
     private final MembershipFreezeService freezeService;
     private final MobileFamilyPricingService pricingService;
     private final RewardRedemptionService rewardRedemptionService;
+    private final DiscountCodeService discountCodeService;
 
     public FamilyPlanChangeService(MemberService memberService, MemberRepository memberRepository,
                                    MembershipPlanRepository planRepository, MembershipFreezeService freezeService,
                                    MobileFamilyPricingService pricingService,
-                                   RewardRedemptionService rewardRedemptionService) {
+                                   RewardRedemptionService rewardRedemptionService,
+                                   DiscountCodeService discountCodeService) {
         this.memberService = memberService;
         this.memberRepository = memberRepository;
         this.planRepository = planRepository;
         this.freezeService = freezeService;
         this.pricingService = pricingService;
         this.rewardRedemptionService = rewardRedemptionService;
+        this.discountCodeService = discountCodeService;
     }
 
     private static final String KEEP = "KEEP", LINK = "LINK", NEW = "NEW";
@@ -405,7 +408,8 @@ public class FamilyPlanChangeService {
             rewardDiscount = rewardRedemptionService.previewPassDiscount(req.getRewardPassId(), head.getMemberId(),
                     PassContext.MEMBERSHIP, headOwnFee);
         } else if (hasCoupon) {
-            rewardDiscount = rewardRedemptionService.previewCouponDiscount(req.getCouponCode(), headOwnFee);
+            rewardDiscount = discountCodeService.previewDiscount(req.getCouponCode(), headOwnFee,
+                    PromotionAudience.Buyer.of(head));
         }
 
         // The quote staff see.

@@ -54,6 +54,17 @@ const MIGRATED_DIRS = [
   'src/domains/dashboard/presentation/components/StaffUrgentFollowUpsCard.tsx',
   'src/domains/dashboard/presentation/components/StaffRecentConversionsCard.tsx',
   'src/domains/dashboard/presentation/components/StaffMonthSummaryCard.tsx',
+  // Phase 4a: Admin dashboard
+  'src/domains/dashboard/presentation/screens/AdminDashboardScreen.tsx',
+  'src/domains/dashboard/presentation/components/AdminTopControls.tsx',
+  'src/domains/dashboard/presentation/components/AdminKpiGrid.tsx',
+  'src/domains/dashboard/presentation/components/AdminAlertsList.tsx',
+  'src/domains/dashboard/presentation/components/AdminOperationalHighlightsCard.tsx',
+  'src/domains/dashboard/presentation/components/AdminPaymentMixCard.tsx',
+  'src/domains/dashboard/presentation/components/AdminQuickActionsCard.tsx',
+  'src/domains/dashboard/presentation/components/AdminDateRangeSheet.tsx',
+  'src/domains/dashboard/presentation/components/AdminBranchSelectSheet.tsx',
+  'src/domains/dashboard/presentation/components/AdminReportDetailSheet.tsx',
   // Phase 3c: Check-In domain
   'src/domains/checkIn',
   // Phase 3d: Schedule domain
@@ -62,12 +73,37 @@ const MIGRATED_DIRS = [
   'src/domains/performance',
   // Phase 3d: Ledger domain
   'src/domains/ledger',
+  // Phase 3e: Messaging domain
+  'src/domains/messaging',
+  // Phase 3e: Leads domain
+  'src/domains/leads',
+  // Phase 4b: Members, Attendance, MembershipPlans
+  'src/domains/members',
+  'src/domains/attendance',
+  'src/domains/membershipPlans',
+  // Phase 4c: Billing
+  'src/domains/billing',
+  // Phase 4d: Referrals, Promotions, FollowUps, CRM
+  'src/domains/referrals',
+  'src/domains/promotions',
+  'src/domains/followUps',
+  'src/domains/crm',
+  // Phase 4e: Facilities, Roles, HR (Staff)
+  'src/domains/facilities',
+  'src/domains/roles',
+  'src/domains/hr',
+  'src/app/(admin)/staff',
+  // Phase 4f: Analytics, Reports, Admin
+  'src/domains/analytics',
+  'src/domains/reports',
+  'src/domains/admin',
+  'src/app/(admin)/analytics',
 ];
 
 // Patterns and tokens that are allowed as literals
 const IGNORE_PATTERNS = [
-  /^[\s\d•·\-\/\$\€\₹\¥\%\:\,\.\+\(\)\#\*\★\|\>\<\=\_\–\—\✓\🎉\👥\→\←\↑\↓]+$/, // Symbols, math, punctuation
-  /^(GymBios|BNPL|JPEG|JPG|PNG|PDF|UPI|Stripe|SMS|OTP|ID|URL|HTTP|HTTPS)$/i,       // Acronyms & brand names
+  /^[\s\d•·/$€₹¥%:,.+()#*★|><=_\u2013\u2014✓🎉👥→←↑↓\p{Extended_Pictographic}-]+$/u, // Symbols, math, punctuation, emojis
+  /^(GymBios|BNPL|JPEG|JPG|PNG|PDF|UPI|Stripe|SMS|OTP|ID|URL|HTTP|HTTPS|VIP)$/i,       // Acronyms & brand names
 ];
 
 function isIgnored(text) {
@@ -157,4 +193,12 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  checkFile,
+  isIgnored,
+  MIGRATED_DIRS,
+};

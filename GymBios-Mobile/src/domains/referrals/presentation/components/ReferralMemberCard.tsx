@@ -7,6 +7,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import { CurrencyValue } from '@/core/providers';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 export interface MemberReferralData {
   id: string;
@@ -36,6 +37,7 @@ export function ReferralMemberCard({
   onCopyLink,
   onGenerateQr,
 }: ReferralMemberCardProps) {
+  const { t } = useTranslation();
 
   const getTierStyle = (tier: string) => {
     switch (tier) {
@@ -102,7 +104,7 @@ export function ReferralMemberCard({
       {/* Code & Link Section */}
       <View style={styles.inputGroup}>
         <Typography variant="caption" color="textSecondary" style={styles.inputLabel}>
-          Referral Code
+          {t('adminReferrals.referralCode')}
         </Typography>
         <View style={styles.inputRow}>
           <Typography variant="bodySmall" style={styles.codeText} numberOfLines={1}>
@@ -116,7 +118,7 @@ export function ReferralMemberCard({
 
       <View style={styles.inputGroup}>
         <Typography variant="caption" color="textSecondary" style={styles.inputLabel}>
-          Referral Link
+          {t('adminReferrals.referralLink')}
         </Typography>
         <View style={styles.inputRow}>
           <Typography variant="caption" style={styles.linkText} numberOfLines={1}>
@@ -132,7 +134,7 @@ export function ReferralMemberCard({
       <View style={styles.statsGrid}>
         <View style={[styles.statBox, { backgroundColor: '#dcfce7' }]}>
           <Typography variant="caption" style={{ color: '#166534', fontSize: 10 }}>
-            Successful
+            {t('adminReferrals.successful')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#15803d', fontWeight: '700' }}>
             {member.successfulReferrals}
@@ -141,7 +143,7 @@ export function ReferralMemberCard({
 
         <View style={[styles.statBox, { backgroundColor: '#fef9c3' }]}>
           <Typography variant="caption" style={{ color: '#854d0e', fontSize: 10 }}>
-            Pending
+            {t('adminReferrals.pending')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#a16207', fontWeight: '700' }}>
             {member.pendingReferrals}
@@ -152,7 +154,7 @@ export function ReferralMemberCard({
       <View style={styles.statsGrid}>
         <View style={[styles.statBox, { backgroundColor: '#f3e8ff' }]}>
           <Typography variant="caption" style={{ color: '#6b21a8', fontSize: 10 }}>
-            Total Earned
+            {t('adminReferrals.totalEarned')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#7e22ce', fontWeight: '700', fontSize: 13 }}>
             <CurrencyValue amount={member.totalRewardsEarned} />
@@ -161,7 +163,7 @@ export function ReferralMemberCard({
 
         <View style={[styles.statBox, { backgroundColor: '#dbeafe' }]}>
           <Typography variant="caption" style={{ color: '#1e40af', fontSize: 10 }}>
-            Balance
+            {t('adminReferrals.balance')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#1d4ed8', fontWeight: '700', fontSize: 13 }}>
             <CurrencyValue amount={member.rewardBalance} />
@@ -174,14 +176,14 @@ export function ReferralMemberCard({
         <Pressable style={styles.shareBtn} onPress={handleWhatsAppShare}>
           <Feather name="message-circle" size={14} color="#16a34a" />
           <Typography variant="caption" style={styles.shareBtnText}>
-            WhatsApp
+            {t('adminReferrals.whatsapp')}
           </Typography>
         </Pressable>
 
         <Pressable style={styles.shareBtn} onPress={handleEmailShare}>
           <Feather name="mail" size={14} color="#2563eb" />
           <Typography variant="caption" style={styles.shareBtnText}>
-            Email
+            {t('adminReferrals.email')}
           </Typography>
         </Pressable>
 

@@ -19,8 +19,10 @@ import { useReferrals } from '../../hooks/useReferrals';
 import { useReferralFilters, type TierFilter } from '../hooks/useReferralFilters';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 export function ReferralMembersScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: referralsPage, isLoading, refetch } = useReferrals({ size: 1000 });
   const [refreshing, setRefreshing] = useState(false);
@@ -113,8 +115,8 @@ export function ReferralMembersScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Referral Members"
-        subtitle="View members and their referral performance"
+        title={t('adminReferrals.membersTitle')}
+        subtitle={t('adminReferrals.membersSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -136,7 +138,7 @@ export function ReferralMembersScreen() {
             <Feather name="search" size={16} color={BrandColors.textSecondary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by name or email..."
+              placeholder={t('adminReferrals.searchMembersPlaceholder')}
               value={searchTerm}
               onChangeText={setSearchTerm}
             />
@@ -170,14 +172,14 @@ export function ReferralMembersScreen() {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={BrandColors.teal} />
               <Typography variant="bodySmall" color="textSecondary" style={{ marginTop: 8 }}>
-                Loading referral members...
+                {t('adminReferrals.loadingMembers')}
               </Typography>
             </View>
           ) : filteredMembers.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Feather name="users" size={32} color={BrandColors.textSecondary} style={{ opacity: 0.5 }} />
               <Typography variant="bodySmall" color="textSecondary" style={{ marginTop: 8 }}>
-                No members found matching filters.
+                {t('adminReferrals.noMembersFound')}
               </Typography>
             </View>
           ) : (

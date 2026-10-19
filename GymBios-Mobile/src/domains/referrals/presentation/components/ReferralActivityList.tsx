@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { CurrencyValue } from '@/core/providers';
+import { useTranslation } from 'react-i18next';
 import { ReferralStatusBadge } from './ReferralStatusBadge';
 import type { Referral } from '../../domain/Referral';
 
@@ -24,6 +25,7 @@ export function ReferralActivityList({
   onMarkSuccessful,
   maxItems,
 }: ReferralActivityListProps) {
+  const { t } = useTranslation();
   const list = maxItems ? referrals.slice(0, maxItems) : referrals;
 
   if (list.length === 0) {
@@ -31,7 +33,7 @@ export function ReferralActivityList({
       <View style={styles.emptyContainer}>
         <Feather name="activity" size={32} color={BrandColors.textSecondary} style={{ opacity: 0.5 }} />
         <Typography variant="bodySmall" color="textSecondary" style={styles.emptyText}>
-          No referral activity recorded yet.
+          {t('adminReferrals.noActivity')}
         </Typography>
       </View>
     );
@@ -51,7 +53,7 @@ export function ReferralActivityList({
                   {item.referrerName || 'Unknown Referrer'}
                 </Typography>
                 <Typography variant="bodySmall" color="textSecondary">
-                  Referred: {item.refereeName || 'Unknown Referee'}
+                  {t('adminReferrals.referred')} {item.refereeName || 'Unknown Referee'}
                 </Typography>
                 {item.refereeEmail ? (
                   <Typography variant="caption" color="textSecondary">

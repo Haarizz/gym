@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   RefreshControl,
   ScrollView,
@@ -35,6 +36,7 @@ interface WeeklyTrendsScreenProps {
  * for easy scanning on a small screen.
  */
 export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading, error, refresh } = useAttendanceStats();
 
@@ -48,8 +50,8 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Weekly Trends"
-          subtitle="Visit patterns & insights"
+          title={t('attendance.trends.title')}
+          subtitle={t('attendance.trends.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -69,8 +71,8 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Weekly Trends"
-          subtitle="Visit patterns & insights"
+          title={t('attendance.trends.title')}
+          subtitle={t('attendance.trends.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -120,8 +122,8 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Weekly Trends"
-        subtitle="Visit patterns & insights"
+        title={t('attendance.trends.title')}
+        subtitle={t('attendance.trends.subtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
@@ -141,10 +143,10 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Typography variant="bodySmallBold" style={styles.cardTitle}>
-              Weekly Visits
+              {t('attendance.trends.weeklyVisits')}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {weeklyTotal} total this week
+              {t('attendance.trends.totalThisWeek', { count: weeklyTotal })}
             </Typography>
           </View>
 
@@ -153,7 +155,7 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
           ) : (
             <View style={styles.emptyChart}>
               <Typography variant="caption" color="textSecondary">
-                No trend data available
+                {t('attendance.trends.noTrendData')}
               </Typography>
             </View>
           )}
@@ -162,24 +164,24 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
         {/* ── Insight Cards ── */}
         <View style={styles.insightsGrid}>
           <TrendInsightCard
-            label="Busiest Day"
+            label={t('attendance.trends.busiestDay')}
             value={busiestDay.label}
-            subtitle={`${busiestDay.value} visits`}
+            subtitle={t('attendance.hub.visitsCount', { count: busiestDay.value })}
           />
           <TrendInsightCard
-            label="Quietest Day"
+            label={t('attendance.trends.quietestDay')}
             value={quietestDay.label}
-            subtitle={`${quietestDay.value === Infinity ? 0 : quietestDay.value} visits`}
+            subtitle={t('attendance.hub.visitsCount', { count: quietestDay.value === Infinity ? 0 : quietestDay.value })}
           />
           <TrendInsightCard
-            label="Avg Duration"
+            label={t('attendance.trends.avgDuration')}
             value={avgDuration}
-            subtitle="Per visit"
+            subtitle={t('attendance.trends.perVisit')}
           />
           <TrendInsightCard
-            label="Peak Hour"
+            label={t('attendance.trends.peakHour')}
             value={stats?.peakHour || '—'}
-            subtitle="Busiest time today"
+            subtitle={t('attendance.trends.busiestToday')}
           />
         </View>
 
@@ -187,10 +189,10 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Typography variant="bodySmallBold" style={styles.cardTitle}>
-              Monthly Trend
+              {t('attendance.trends.monthlyTrend')}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              Last 12 months
+              {t('attendance.trends.last12Months')}
             </Typography>
           </View>
 
@@ -206,7 +208,7 @@ export function WeeklyTrendsScreen({ onBack }: WeeklyTrendsScreenProps) {
           ) : (
             <View style={styles.emptyChart}>
               <Typography variant="caption" color="textSecondary">
-                No monthly data available
+                {t('attendance.trends.noMonthlyData')}
               </Typography>
             </View>
           )}

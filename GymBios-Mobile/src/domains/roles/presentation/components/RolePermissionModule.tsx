@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { Typography } from '@/shared/components/Typography';
 import { Spacing, Radius, BrandColors } from '@/core/theme';
@@ -19,6 +20,7 @@ export function RolePermissionModule({
   onTogglePermission,
   onToggleModule,
 }: RolePermissionModuleProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const moduleKeys = PERMISSION_ACTIONS.map(action => `${moduleName}.${action}`);
@@ -61,7 +63,7 @@ export function RolePermissionModule({
         <View style={styles.body}>
           <View style={styles.selectAllRow}>
             <Typography variant="bodySmall" style={styles.selectAllText}>
-              Select all
+              {t('roles.selectAll')}
             </Typography>
             <Switch
               value={allSelected}

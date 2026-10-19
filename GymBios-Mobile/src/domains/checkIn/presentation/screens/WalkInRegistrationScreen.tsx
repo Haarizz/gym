@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +28,7 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
 export function WalkInRegistrationScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const roleGroup = useSegments()[0] ?? '(admin)';
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const queryClient = useQueryClient();
   const [isPaymentVisible, setIsPaymentVisible] = useState(false);
@@ -68,10 +69,15 @@ export function WalkInRegistrationScreen() {
         queryClient.invalidateQueries({ queryKey: checkInKeys.today() });
         reset();
         // Navigate to today's visitors screen to show the newly registered visitor
-        router.replace('/(admin)/check-in/walk-in/visitors');
+        // Admin nests walk-ins under check-in/walk-in; staff and trainer apps don't.
+        router.replace(
+          (roleGroup === '(admin)'
+            ? '/(admin)/check-in/walk-in/visitors'
+            : `/${roleGroup}/check-in/visitors`) as any,
+        );
       }
     },
-    [handlePaymentComplete, queryClient, reset, router],
+    [handlePaymentComplete, queryClient, reset, roleGroup, router],
   );
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -60,6 +61,7 @@ export function PromotionFilterSheet({
   onApplyFilters,
   onResetFilters,
 }: PromotionFilterSheetProps) {
+  const { t } = useTranslation();
   const [localFilters, setLocalFilters] = useState<PromotionFilterState>(filters);
 
   const handleSelectStatus = (status: string) => {
@@ -89,13 +91,13 @@ export function PromotionFilterSheet({
     <AppBottomSheet
       visible={visible}
       onClose={onClose}
-      title="Filter Promotions"
-      subtitle="Refine promotional campaigns by attributes"
+      title={t('promotions.filterTitle')}
+      subtitle={t('promotions.subtitle')}
     >
       <View style={styles.content}>
         {/* Status Filter Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Status</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.status')}</Text>
           <View style={styles.chipRow}>
             {STATUS_OPTIONS.map((opt) => (
               <Pressable
@@ -121,7 +123,7 @@ export function PromotionFilterSheet({
 
         {/* Type Filter Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Promotion Type</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.promoType')}</Text>
           <View style={styles.chipRow}>
             {TYPE_OPTIONS.map((opt) => (
               <Pressable
@@ -147,7 +149,7 @@ export function PromotionFilterSheet({
 
         {/* Category Filter Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Category</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.category')}</Text>
           <View style={styles.chipRow}>
             {CATEGORY_OPTIONS.map((opt) => (
               <Pressable
@@ -174,10 +176,10 @@ export function PromotionFilterSheet({
         {/* Footer Actions */}
         <View style={styles.footerActions}>
           <Pressable style={styles.resetButton} onPress={handleReset}>
-            <Text style={styles.resetButtonText}>Reset All</Text>
+            <Text style={styles.resetButtonText}>{t('promotions.resetAll')}</Text>
           </Pressable>
           <Pressable style={styles.applyButton} onPress={handleApply}>
-            <Text style={styles.applyButtonText}>Apply Filters</Text>
+            <Text style={styles.applyButtonText}>{t('promotions.applyFilters')}</Text>
           </Pressable>
         </View>
       </View>

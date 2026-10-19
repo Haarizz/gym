@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -17,6 +18,7 @@ const DEPARTMENTS = [
 ];
 
 export function EmploymentStep({ data, updateField, errors }: StaffStepProps) {
+  const { t } = useTranslation();
   const { roles } = useRoles();
   const { data: branchData } = useAllBranches();
 
@@ -27,40 +29,40 @@ export function EmploymentStep({ data, updateField, errors }: StaffStepProps) {
 
   return (
     <View style={styles.container}>
-      <FormCard icon="briefcase" title="Position" description="Role controls what this person can access">
+      <FormCard icon="briefcase" title={t('hr.employment.position')} description={t('hr.employment.positionDesc')}>
         <Dropdown
-          label="Role"
+          label={t('hr.employment.role')}
           required
           value={data.role}
           options={roleOptions}
           onChange={(v) => updateField('role', v)}
-          placeholder="Select role"
+          placeholder={t('hr.employment.selectRole')}
           error={errors?.role}
         />
         <Dropdown
-          label="Department"
+          label={t('hr.employment.department')}
           required
           value={data.department}
           options={DEPARTMENTS}
           onChange={(v) => updateField('department', v)}
-          placeholder="Select department"
+          placeholder={t('hr.employment.selectDepartment')}
           error={errors?.department}
         />
       </FormCard>
 
-      <FormCard icon="map-pin" title="Workplace">
+      <FormCard icon="map-pin" title={t('hr.employment.workplace')}>
         <Dropdown
-          label="Branch"
+          label={t('hr.employment.branch')}
           required
           value={data.branch}
           options={branchOptions}
           onChange={(v) => updateField('branch', v)}
-          placeholder="Select branch"
+          placeholder={t('hr.employment.selectBranch')}
           error={errors?.branch}
         />
         <DatePicker
-          label="Join date"
-          placeholder="Select join date"
+          label={t('hr.joinDate')}
+          placeholder={t('hr.employment.selectJoinDate')}
           // Parsed/formatted as local dates so the stored day doesn't shift with the timezone.
           value={data.joinDate ? parseISO(data.joinDate) : undefined}
           onChange={(d) => updateField('joinDate', d ? format(d, 'yyyy-MM-dd') : '')}

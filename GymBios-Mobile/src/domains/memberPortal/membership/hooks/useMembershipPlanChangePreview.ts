@@ -6,10 +6,10 @@ export const MEMBERSHIP_PLAN_PREVIEW_QUERY_KEY = ['membership', 'plan-preview'];
 
 export function useMembershipPlanChangePreview(
   planId?: number,
-  reward?: { rewardPassId?: number; couponCode?: string },
+  reward?: { rewardPassId?: number; couponCode?: string; promotionId?: number },
 ) {
   return useQuery<MembershipChangePreviewResponse, Error>({
-    queryKey: [...MEMBERSHIP_PLAN_PREVIEW_QUERY_KEY, planId, reward?.rewardPassId, reward?.couponCode],
+    queryKey: [...MEMBERSHIP_PLAN_PREVIEW_QUERY_KEY, planId, reward?.rewardPassId, reward?.couponCode, reward?.promotionId],
     queryFn: () => {
       if (!planId) throw new Error('Plan ID is required');
       return membershipApi.previewMembershipChange(planId, reward);

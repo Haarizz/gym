@@ -263,6 +263,7 @@ public class MobileDiscoveryController {
     /**
      * GET .../{tenantSlug}/{branchId}/discount-codes/validate?code=&amount= — promo or coupon
      * code, checked in the gym's tenant; with amount, also returns the discount it gives on it.
+     * The user is about to join, so they count as a new member for the promotion's audience.
      */
     @GetMapping("/{tenantSlug}/{branchId}/discount-codes/validate")
     public ResponseEntity<com.company.project.dto.DiscountCodeDTO> validateDiscountCode(
@@ -273,7 +274,8 @@ public class MobileDiscoveryController {
         try {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
-            return ResponseEntity.ok(discountCodeService.resolve(code, amount));
+            return ResponseEntity.ok(discountCodeService.resolve(code, amount,
+                    com.company.project.services.PromotionAudience.Buyer.JOINING));
         } finally {
             BranchContextHolder.clear();
             TenantContextHolder.clear();
@@ -401,7 +403,8 @@ public class MobileDiscoveryController {
             BigDecimal couponDiscount = BigDecimal.ZERO;
             if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
                 BigDecimal gross = offerPrice;
-                couponDiscount = discountCodeService.previewDiscount(request.getCouponCode(), gross);
+                couponDiscount = discountCodeService.previewDiscount(request.getCouponCode(), gross,
+                        com.company.project.services.PromotionAudience.Buyer.JOINING);
                 memberRequest.setCouponCode(request.getCouponCode().trim());
                 memberRequest.setDiscountApplied(couponDiscount);
                 memberRequest.setMembershipFee(gross.subtract(couponDiscount));

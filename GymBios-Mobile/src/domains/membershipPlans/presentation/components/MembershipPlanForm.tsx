@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,14 +37,15 @@ export function MembershipPlanForm({
   onSuccess,
   onCancel,
 }: MembershipPlanFormProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    toast.error('Something went wrong. Please try again.', {
-      title: 'Error'
+    toast.error(t('common.error'), {
+      title: t('common.error'),
     });
-  }, []);
+  }, [t]);
 
   const {
     step,
@@ -172,16 +174,16 @@ export function MembershipPlanForm({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Typography variant="subtitle" color="text">
-              Discard changes?
+              {t('membershipPlans.form.discardTitle')}
             </Typography>
             <View style={styles.modalSpacer} />
             <Typography variant="body" color="textSecondary">
-              All entered information will be lost.
+              {t('membershipPlans.form.discardMsg')}
             </Typography>
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label="Keep Editing"
+                  label={t('membershipPlans.form.keepEditing')}
                   variant="secondary"
                   onPress={handleKeepEditing}
                   size="lg"
@@ -191,7 +193,7 @@ export function MembershipPlanForm({
               <View style={styles.modalButtonSpacer} />
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label="Discard"
+                  label={t('membershipPlans.form.discard')}
                   variant="primary"
                   onPress={handleDiscard}
                   size="lg"

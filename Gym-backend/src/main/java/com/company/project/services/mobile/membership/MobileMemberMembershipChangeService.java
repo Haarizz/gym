@@ -12,6 +12,8 @@ import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.MemberService;
 import com.company.project.services.MembershipFreezeService;
+import com.company.project.services.DiscountCodeService;
+import com.company.project.services.PromotionAudience;
 import com.company.project.services.RewardRedemptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,18 +39,21 @@ public class MobileMemberMembershipChangeService {
     private final MemberService memberService;
     private final RewardRedemptionService rewardRedemptionService;
     private final MembershipFreezeService freezeService;
+    private final DiscountCodeService discountCodeService;
 
     public MobileMemberMembershipChangeService(
             MemberRepository memberRepository,
             MembershipPlanRepository membershipPlanRepository,
             MemberService memberService,
             RewardRedemptionService rewardRedemptionService,
-            MembershipFreezeService freezeService) {
+            MembershipFreezeService freezeService,
+            DiscountCodeService discountCodeService) {
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.memberService = memberService;
         this.rewardRedemptionService = rewardRedemptionService;
         this.freezeService = freezeService;
+        this.discountCodeService = discountCodeService;
     }
 
     private Member getAuthenticatedMember(UserDetailsImpl principal) {
@@ -163,7 +168,8 @@ public class MobileMemberMembershipChangeService {
 
         // A picked Reward Pass / coupon comes off the plan's offer price —
         // previewed only here; changePlan() spends it.
-        BigDecimal rewardDiscount = previewRewardDiscount(member, request.getRewardPassId(), request.getCouponCode(), finalAmount);
+        BigDecimal rewardDiscount = previewRewardDiscount(member, request.getRewardPassId(), request.getCouponCode(),
+                request.getPromotionId(), finalAmount);
 
         response.setRegularAmount(regularAmount);
         response.setDiscountAmount(discountAmount);
@@ -199,6 +205,7 @@ public class MobileMemberMembershipChangeService {
         // discount off it and caps amountReceived at the net fee.
         renewalRequest.setRewardPassId(request.getRewardPassId());
         renewalRequest.setCouponCode(request.getCouponCode());
+        renewalRequest.setPromotionId(request.getPromotionId());
 
         freezeService.renewEndingFreeze(member.getId(), renewalRequest);
     }
@@ -218,16 +225,22 @@ public class MobileMemberMembershipChangeService {
         }
     }
 
-    private BigDecimal previewRewardDiscount(Member member, Long rewardPassId, String couponCode, BigDecimal gross) {
+    private BigDecimal previewRewardDiscount(Member member, Long rewardPassId, String couponCode, Long promotionId,
+                                             BigDecimal gross) {
         boolean hasCoupon = couponCode != null && !couponCode.isBlank();
-        if (rewardPassId != null && hasCoupon) {
-            throw new BusinessRuleViolationException("Apply either a Reward Pass or a coupon code, not both");
+        if ((rewardPassId != null ? 1 : 0) + (hasCoupon ? 1 : 0) + (promotionId != null ? 1 : 0) > 1) {
+            throw new BusinessRuleViolationException("Apply one discount only: a Reward Pass, a code or an offer");
+        }
+        if (promotionId != null) {
+            return discountCodeService.resolvePromotion(promotionId, gross, PromotionAudience.Buyer.of(member))
+                    .getDiscountAmount();
         }
         if (rewardPassId != null) {
             return rewardRedemptionService.previewPassDiscount(rewardPassId, member.getMemberId(), PassContext.MEMBERSHIP, gross);
         }
         if (hasCoupon) {
-            return rewardRedemptionService.previewCouponDiscount(couponCode, gross);
+            // A promotion or referral coupon code, the same lookup changePlan()'s renewal spends it with
+            return discountCodeService.previewDiscount(couponCode, gross, PromotionAudience.Buyer.of(member));
         }
         return BigDecimal.ZERO;
     }

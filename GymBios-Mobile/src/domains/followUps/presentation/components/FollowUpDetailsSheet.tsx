@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
@@ -64,6 +65,7 @@ export function FollowUpDetailsSheet({
   onReschedule,
   onCancel,
 }: FollowUpDetailsSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // Detail query hook (uses cached list item as placeholder)
@@ -195,9 +197,9 @@ export function FollowUpDetailsSheet({
             <ScrollView style={styles.modalBody}>
               {/* Member Contact Quick Actions */}
               <View style={[styles.sectionCard, { backgroundColor: theme.backgroundElement }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Member Info</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('followUps.memberInfo')}</Text>
                 <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
-                  Name: <Text style={{ color: theme.text, fontWeight: '600' }}>{followUp.leadName}</Text>
+                  {t('followUps.name')} <Text style={{ color: theme.text, fontWeight: '600' }}>{followUp.leadName}</Text>
                 </Text>
 
                 {followUp.leadPhone ? (
@@ -220,7 +222,7 @@ export function FollowUpDetailsSheet({
 
                 {followUp.membershipPlan ? (
                   <Text style={[styles.infoLabel, { color: theme.textSecondary, marginTop: 4 }]}>
-                    Plan:{' '}
+                    {t('followUps.plan')}{' '}
                     <Text style={{ color: theme.text, fontWeight: '600' }}>
                       {followUp.membershipPlan} ({followUp.membershipStatus || 'active'})
                     </Text>
@@ -230,32 +232,32 @@ export function FollowUpDetailsSheet({
 
               {/* Status & Operational Specs */}
               <View style={[styles.sectionCard, { backgroundColor: theme.backgroundElement }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Follow-up Details</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('followUps.followUpDetails')}</Text>
 
                 <View style={styles.detailGrid}>
                   <View style={styles.gridItem}>
-                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Type</Text>
+                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.type')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
                       {followUp.type.toUpperCase()}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
-                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Status</Text>
+                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.status')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
                       {followUp.status.toUpperCase()}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
-                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Priority</Text>
+                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.priority')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
                       {followUp.priority.toUpperCase()}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
-                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Due Date</Text>
+                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.dueDate')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
                       {new Date(followUp.dueDate).toLocaleDateString()}
                     </Text>
@@ -264,7 +266,7 @@ export function FollowUpDetailsSheet({
 
                 {followUp.assignedStaff ? (
                   <Text style={[styles.infoLabel, { color: theme.textSecondary, marginTop: Spacing.two }]}>
-                    Assigned Staff:{' '}
+                    {t('followUps.assignedStaff')}{' '}
                     <Text style={{ color: theme.text, fontWeight: '600' }}>
                       {followUp.assignedStaff}
                     </Text>
@@ -273,7 +275,7 @@ export function FollowUpDetailsSheet({
 
                 {followUp.notes ? (
                   <View style={styles.notesContainer}>
-                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>Notes</Text>
+                    <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.notes')}</Text>
                     <Text style={[styles.notesText, { color: theme.text }]}>{followUp.notes}</Text>
                   </View>
                 ) : null}
@@ -283,20 +285,20 @@ export function FollowUpDetailsSheet({
               <View style={[styles.sectionCard, { backgroundColor: theme.backgroundElement }]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                    Communication History ({followUp.communicationHistory?.length ?? 0})
+                    {t('followUps.communicationHistory', { count: followUp.communicationHistory?.length ?? 0 })}
                   </Text>
                   <TouchableOpacity
                     style={[styles.addRecordBtn, { backgroundColor: BrandColors.teal }]}
                     onPress={() => setAddRecordVisible(true)}
                   >
                     <Feather name="plus" size={14} color="#ffffff" />
-                    <Text style={styles.addRecordBtnText}>Log Record</Text>
+                    <Text style={styles.addRecordBtnText}>{t('followUps.logRecord')}</Text>
                   </TouchableOpacity>
                 </View>
 
                 {(followUp.communicationHistory ?? []).length === 0 ? (
                   <Text style={[styles.emptyRecordsText, { color: theme.textSecondary }]}>
-                    No communication records logged yet.
+                    {t('followUps.noCommunicationRecords')}
                   </Text>
                 ) : (
                   (followUp.communicationHistory ?? []).map(record => (
@@ -363,7 +365,7 @@ export function FollowUpDetailsSheet({
                       onComplete?.(followUp);
                     }}
                   >
-                    <Text style={styles.footerBtnText}>Complete</Text>
+                    <Text style={styles.footerBtnText}>{t('followUps.complete')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -373,7 +375,7 @@ export function FollowUpDetailsSheet({
                       onReschedule?.(followUp);
                     }}
                   >
-                    <Text style={styles.footerBtnText}>Reschedule</Text>
+                    <Text style={styles.footerBtnText}>{t('followUps.reschedule')}</Text>
                   </TouchableOpacity>
                 </>
               ) : null}
@@ -396,7 +398,7 @@ export function FollowUpDetailsSheet({
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Log Communication Record
+                {t('followUps.logCommunicationRecord')}
               </Text>
               <TouchableOpacity onPress={() => setAddRecordVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
@@ -405,32 +407,32 @@ export function FollowUpDetailsSheet({
 
             <ScrollView style={styles.modalBody}>
               <Dropdown
-                label="Communication Type"
+                label={t('followUps.communicationType')}
                 value={recordType}
                 options={RECORD_TYPE_OPTIONS}
                 onChange={setRecordType}
               />
 
               <Dropdown
-                label="Outcome"
+                label={t('followUps.outcome')}
                 value={recordOutcome}
                 options={OUTCOME_OPTIONS}
                 onChange={setRecordOutcome}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Staff Member
+                {t('followUps.staffMember')}
               </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={recordStaff}
                 onChangeText={setRecordStaff}
-                placeholder="Staff name"
+                placeholder={t('followUps.staffNamePlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Duration (minutes)
+                {t('followUps.durationMinutes')}
               </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
@@ -442,7 +444,7 @@ export function FollowUpDetailsSheet({
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Record Notes *
+                {t('followUps.recordNotesRequired')}
               </Text>
               <TextInput
                 style={[
@@ -454,18 +456,18 @@ export function FollowUpDetailsSheet({
                 onChangeText={setRecordNotes}
                 multiline
                 numberOfLines={3}
-                placeholder="Summary of communication..."
+                placeholder={t('followUps.recordNotesPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Next Action (Optional)
+                {t('followUps.nextActionOptional')}
               </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={recordNextAction}
                 onChangeText={setRecordNextAction}
-                placeholder="e.g. Schedule demo next week"
+                placeholder={t('followUps.nextActionPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
             </ScrollView>
@@ -475,7 +477,7 @@ export function FollowUpDetailsSheet({
                 style={[styles.actionIconBtn, { flex: 1, borderColor: theme.border }]}
                 onPress={() => setAddRecordVisible(false)}
               >
-                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('followUps.cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

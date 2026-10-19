@@ -73,7 +73,7 @@ export function MemberDashboardScreen() {
         <MemberStatsGrid stats={data.quickStats} />
         <MemberTodayScheduleCard schedule={data.todaysSchedule} />
         <MemberQuickActions />
-        <MemberOfferBanner />
+        <MemberOfferBanner offer={data.offer} />
       </ScrollView>
 
       <ClaimReferralSheet

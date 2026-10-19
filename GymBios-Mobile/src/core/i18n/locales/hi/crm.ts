@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "सौदा और ऑफ़र",
+    "subtitle": "सक्रिय प्रचार, छूट और विशेष सौदे",
+    "activeOffers": "सक्रिय ऑफ़र",
+    "totalRedemptions": "कुल रिडेम्पशन",
+    "viewAll": "सभी देखें",
+    "failedLoadOffers": "ऑफ़र लोड करने में विफल।",
+    "noActiveOffers": "कोई सक्रिय ऑफ़र नहीं मिला।",
+    "failedLoadPromoOffers": "प्रोमो कोड ऑफ़र लोड करने में विफल।",
+    "failedLoadPlanOffers": "योजना ऑफ़र लोड करने में विफल।",
+    "planOffer": "योजना ऑफ़र",
+    "plan": "योजना:",
+    "price": "मूल्य:",
+    "validUntil": "तक मान्य:",
+    "applies": "लागू होता है:",
+    "autoNoCode": "स्वतः लागू, किसी कोड की आवश्यकता नहीं",
+    "promoCode": "प्रोमो कोड",
+    "branches": "शाखाएं:",
+    "usage": "उपयोग:",
+    "noUsageLimit": "कोई उपयोग सीमा निर्धारित नहीं",
+    "referralCodes": "रेफरल कोड",
+    "failedLoadReferrals": "रेफरल लोड करने में विफल।",
+    "noReferralCodes": "कोई रेफरल कोड नहीं मिला।",
+    "status": "स्थिति",
+    "date": "दिनांक",
+    "reward": "पुरस्कार",
+    "createNewOffer": "नया ऑफ़र बनाएं",
+    "revenueFromDeals": "सौदों से राजस्व",
+    "newMembers": "नए सदस्य",
+    "thisMonthsImpact": "इस महीने का प्रभाव",
+    "failedLoadImpact": "इस महीने का प्रभाव लोड करने में विफल।",
+    "noExpiry": "कोई समाप्ति नहीं",
+    "copiedPromoCode": "प्रोमो कोड {{code}} क्लिपबोर्ड पर कॉपी किया गया।",
+    "failedCopyPromoCode": "प्रोमो कोड कॉपी नहीं किया जा सका।",
+    "shareMessage": "{{name}}: {{discount}} पाने के लिए कोड {{code}} का उपयोग करें।",
+    "unknownBranch": "अज्ञात शाखा",
+    "unknown": "अज्ञात",
+    "planOfferSuffix": "{{name}} ऑफ़र"
+  }
+};
+
+export default crm;

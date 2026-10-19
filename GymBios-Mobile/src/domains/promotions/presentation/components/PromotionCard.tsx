@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
@@ -16,6 +17,7 @@ interface PromotionCardProps {
 }
 
 export function PromotionCard({ promotion, onPress, style }: PromotionCardProps) {
+  const { t } = useTranslation();
   const statusColor = getStatusColor(promotion.status);
   const typeLabel = promotion.type ? promotion.type.toUpperCase() : 'PROMO';
   const discountText = formatDiscountDisplay(
@@ -87,14 +89,14 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
         <View style={styles.metaRow}>
           <Feather name="calendar" size={13} color="#64748B" />
           <Text style={styles.metaText} numberOfLines={1}>
-            Until {formattedEndDate}
+            {t('promotions.until')} {formattedEndDate}
           </Text>
         </View>
 
         <View style={styles.metaRow}>
           <Feather name="users" size={13} color="#64748B" />
           <Text style={styles.metaText} numberOfLines={1}>
-            Used: {usageText}
+            {t('promotions.used')} {usageText}
           </Text>
         </View>
 

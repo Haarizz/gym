@@ -1,9 +1,10 @@
 import { format, isValid, parseISO } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { useTheme } from '@/core/hooks';
-import { CurrencyValue } from '@/core/providers';
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { FormSection } from '@/shared/components/FormSection';
 import { Input } from '@/shared/components/Input';
@@ -86,28 +87,39 @@ interface DurationPricingStepProps {
 }
 
 export function DurationPricingStep({ values, errors, onChange }: DurationPricingStepProps) {
+  const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
+
+  const offerTypeOptions: { label: string; value: PlanWizardData['offerType'] }[] = [
+    { label: t('membershipPlans.form.pricingStep.noOffer'), value: 'none' },
+    { label: t('membershipPlans.form.pricingStep.percentage'), value: 'percentage' },
+    { label: t('membershipPlans.form.pricingStep.flatAmount'), value: 'fixed' },
+  ];
+
   return (
     <View style={styles.container}>
-      <FormSection title="Duration">
-        <Typography variant="bodySmallBold">Duration Type *</Typography>
+      <FormSection title={t('membershipPlans.form.pricingStep.durationSection')}>
+        <Typography variant="bodySmallBold">
+          {t('membershipPlans.form.pricingStep.durationTypeLabel')}
+        </Typography>
         <OptionRow
           options={DURATION_TYPES}
           selected={values.durationType}
           onSelect={(v) => onChange('durationType', v)}
         />
         <Input
-          label="Duration Value *"
+          label={t('membershipPlans.form.pricingStep.durationValueLabel')}
           value={values.durationValue}
           onChangeText={(v) => onChange('durationValue', v)}
-          placeholder="e.g. 1, 3, 12"
+          placeholder={t('membershipPlans.form.pricingStep.durationValuePlaceholder')}
           keyboardType="numeric"
           error={errors.durationValue}
         />
       </FormSection>
 
-      <FormSection title="Pricing">
+      <FormSection title={t('membershipPlans.form.pricingStep.pricingSection')}>
         <Input
-          label="Price *"
+          label={t('membershipPlans.form.pricingStep.priceLabel')}
           value={values.price}
           onChangeText={(v) => onChange('price', v)}
           placeholder="0.00"
@@ -116,48 +128,61 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
         />
       </FormSection>
 
-      <FormSection title="Offer">
+      <FormSection title={t('membershipPlans.form.pricingStep.offerSection')}>
         <Typography variant="caption" color="textSecondary">
-          A discount every member gets on this subscription — no code needed. Members see the regular price
-          crossed out.
+          {t('membershipPlans.form.pricingStep.offerDescription')}
         </Typography>
         <OptionRow
-          options={OFFER_TYPES.map((o) => o.label)}
-          selected={OFFER_TYPES.find((o) => o.value === values.offerType)?.label ?? 'No offer'}
+          options={offerTypeOptions.map((o) => o.label)}
+          selected={
+            offerTypeOptions.find((o) => o.value === values.offerType)?.label ??
+            t('membershipPlans.form.pricingStep.noOffer')
+          }
           onSelect={(label) =>
-            onChange('offerType', OFFER_TYPES.find((o) => o.label === label)?.value ?? 'none')
+            onChange(
+              'offerType',
+              offerTypeOptions.find((o) => o.label === label)?.value ?? 'none',
+            )
           }
         />
         {values.offerType !== 'none' && (
           <>
             <Input
-              label={values.offerType === 'percentage' ? 'Offer (%) *' : 'Amount off *'}
+              label={
+                values.offerType === 'percentage'
+                  ? t('membershipPlans.form.pricingStep.offerPercentageLabel')
+                  : t('membershipPlans.form.pricingStep.offerAmountLabel')
+              }
               value={values.offerValue}
               onChangeText={(v) => onChange('offerValue', v)}
-              placeholder={values.offerType === 'percentage' ? 'e.g. 10' : '0.00'}
+              placeholder={
+                values.offerType === 'percentage'
+                  ? t('membershipPlans.form.pricingStep.offerPercentagePlaceholder')
+                  : t('membershipPlans.form.pricingStep.offerValuePlaceholder')
+              }
               keyboardType="decimal-pad"
               error={offerError(values) ?? undefined}
             />
             <Input
-              label="Offer label"
+              label={t('membershipPlans.form.pricingStep.offerLabelText')}
               value={values.offerLabel}
               onChangeText={(v) => onChange('offerLabel', v)}
-              placeholder="e.g. New Year Offer"
+              placeholder={t('membershipPlans.form.pricingStep.offerLabelPlaceholder')}
               maxLength={100}
             />
             <View style={styles.dateRow}>
               <View style={styles.dateCol}>
                 <DatePicker
-                  label="Starts"
-                  placeholder="Now"
+                  label={t('membershipPlans.form.pricingStep.startsLabel')}
+                  placeholder={t('membershipPlans.form.pricingStep.startsPlaceholder')}
                   value={toDate(values.offerStartDate)}
                   onChange={(d) => onChange('offerStartDate', toFormDate(d))}
                 />
               </View>
               <View style={styles.dateCol}>
                 <DatePicker
-                  label="Ends"
-                  placeholder="No end date"
+                  label={t('membershipPlans.form.pricingStep.endsLabel')}
+                  placeholder={t('membershipPlans.form.pricingStep.endsPlaceholder')}
                   value={toDate(values.offerEndDate)}
                   minimumDate={toDate(values.offerStartDate) ?? undefined}
                   onChange={(d) => onChange('offerEndDate', toFormDate(d))}
@@ -168,8 +193,10 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
               const preview = offerPreview(values);
               return preview ? (
                 <Typography variant="bodySmall">
-                  Members pay <CurrencyValue amount={preview.pays} /> (save{' '}
-                  <CurrencyValue amount={preview.discount} />)
+                  {t('membershipPlans.form.pricingStep.membersPayPreview', {
+                    pays: formatCurrency(preview.pays),
+                    discount: formatCurrency(preview.discount),
+                  })}
                 </Typography>
               ) : null;
             })()}

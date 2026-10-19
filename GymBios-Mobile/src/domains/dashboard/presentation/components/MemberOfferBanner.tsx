@@ -5,14 +5,23 @@ import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing, TypographyScale } from '@/core/theme';
+import type { MemberOffer } from '../../domain/MemberDashboardData';
+import { DiscountLabel, useOfferActions, useOfferEndsLabel } from './offerParts';
 
 // Purple gradient glass — translucent violet tint over a glass surface
 const PURPLE_START = 'rgba(124,58,237,0.82)';
 const PURPLE_END   = 'rgba(109,40,217,0.68)';
 
-export function MemberOfferBanner() {
+/** The dashboard's offer: the best promotion the server found for this member; nothing when there's none. */
+export function MemberOfferBanner({ offer }: { offer?: MemberOffer }) {
+  return offer ? <OfferBanner offer={offer} /> : null;
+}
+
+function OfferBanner({ offer }: { offer: MemberOffer }) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { claim, onClaim, copyCode, claimLabel, claimA11y } = useOfferActions(offer);
+  const endsLabel = useOfferEndsLabel(offer);
 
   return (
     <View style={styles.banner}>
@@ -29,21 +38,61 @@ export function MemberOfferBanner() {
 
       <View style={styles.headerRow}>
         <View style={styles.iconBox}>
-          <Feather name="gift" size={16} color="#FFFFFF" />
+          <Feather name={offer.personal ? 'star' : 'gift'} size={16} color="#FFFFFF" />
         </View>
-        <Text style={styles.title}>{t('memberHome.offer.title')}</Text>
+        <Text style={styles.eyebrow}>
+          {offer.personal ? t('memberHome.offer.justForYou') : t('memberHome.offer.title')}
+        </Text>
       </View>
-      <Text style={styles.description}>
-        {t('memberHome.offer.description')}
-      </Text>
-      <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        onPress={() => router.push('/(member)/membership' as any)}
-        accessibilityRole="button"
-        accessibilityLabel={t('memberHome.offer.ctaA11y')}
-      >
-        <Text style={styles.buttonText}>{t('memberHome.offer.cta')}</Text>
-      </Pressable>
+
+      <Text style={styles.title}>{offer.name}</Text>
+
+      <View style={styles.metaRow}>
+        <View style={styles.badge}><DiscountLabel offer={offer} style={styles.badgeText} /></View>
+        {endsLabel && <Text style={styles.metaText}>{endsLabel}</Text>}
+      </View>
+
+      {!!offer.description && (
+        <Text style={styles.description} numberOfLines={3}>{offer.description}</Text>
+      )}
+
+      {!!offer.code && (
+        <Pressable
+          style={styles.codeChip}
+          onPress={copyCode}
+          accessibilityRole="button"
+          accessibilityLabel={t('memberHome.offer.copyA11y', { code: offer.code })}
+        >
+          <Text style={styles.codeLabel}>{t('memberHome.offer.code')}</Text>
+          <Text style={styles.codeValue}>{offer.code}</Text>
+          <Feather name="copy" size={13} color="#FFFFFF" />
+        </Pressable>
+      )}
+
+      {!!offer.termsAndConditions && (
+        <Text style={styles.terms} numberOfLines={2}>{offer.termsAndConditions}</Text>
+      )}
+
+      <View style={styles.actionsRow}>
+        {claim !== 'none' && (
+          <Pressable
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+            onPress={onClaim}
+            accessibilityRole="button"
+            accessibilityLabel={claimA11y}
+          >
+            <Text style={styles.buttonText}>{claimLabel}</Text>
+          </Pressable>
+        )}
+        <Pressable
+          hitSlop={8}
+          onPress={() => router.push('/(member)/offers' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={t('memberHome.offer.seeAllA11y')}
+        >
+          <Text style={styles.seeAll}>{t('memberHome.offer.seeAll')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -96,11 +145,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  eyebrow: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.92)',
+    letterSpacing: 0.2,
+  },
   title: {
     fontSize: TypographyScale.subtitle,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
+    marginBottom: Spacing.two,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  badge: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: 3,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.88)',
   },
   description: {
     fontSize: 13,
@@ -109,9 +188,51 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
     fontWeight: '500',
   },
+  codeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    marginBottom: Spacing.three,
+  },
+  codeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    textTransform: 'uppercase',
+  },
+  codeValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  terms: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: 'rgba(255,255,255,0.75)',
+    marginBottom: Spacing.three,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+  },
+  seeAll: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textDecorationLine: 'underline',
+  },
   button: {
     backgroundColor: '#FFFFFF',
-    alignSelf: 'flex-start',
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two + 2,
     borderRadius: Radius.full,

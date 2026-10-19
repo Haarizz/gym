@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Spacing } from '@/core/theme';
@@ -48,6 +49,7 @@ export function MemberDetailsScreen({
   onSelectFamilyMember,
   onDeleted,
 }: MemberDetailsScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tabBarInset = useTabBarBottomInset();
   const { selectedMember, loadMember } = useMembers();
@@ -92,13 +94,13 @@ export function MemberDetailsScreen({
           await deleteMember(selectedMember.id);
           onDeleted();
         } catch {
-          toast.error('Failed to delete member.', {
-            title: 'Error'
+          toast.error(t('members.details.deleteErrorMsg'), {
+            title: t('members.details.deleteErrorTitle')
           });
         }
       },
     });
-  }, [selectedMember, deleteMember, onDeleted]);
+  }, [selectedMember, deleteMember, onDeleted, t]);
 
   const handleContinueToPayment = useCallback((plan: MembershipPlan) => {
     setRenewPlan(plan);
@@ -139,7 +141,7 @@ export function MemberDetailsScreen({
         }
         setPaymentVisible(false);
         setRenewPlan(null);
-        toast.success(`${selectedMember.name}'s membership was renewed.`, { title: 'Renewed' });
+        toast.success(t('members.details.renewedMsg', { name: selectedMember.name }), { title: t('members.details.renewedTitle') });
         loadMember(selectedMember.id).catch(() => {});
       } catch {
         // The API client already surfaced the server's message as a toast.
@@ -147,7 +149,7 @@ export function MemberDetailsScreen({
         setRenewing(false);
       }
     },
-    [selectedMember, renewPlan, renewMember, renewMinor, loadMember],
+    [selectedMember, renewPlan, renewMember, renewMinor, loadMember, t],
   );
 
   const handleFreeze = useCallback(
@@ -186,18 +188,18 @@ export function MemberDetailsScreen({
       if (!selectedMember) return;
       try {
         await toggleAccess(selectedMember.id, enabled);
-        toast.success(enabled ? 'App access restored.' : 'App access blocked.');
+        toast.success(enabled ? t('members.details.accessRestored') : t('members.details.accessBlocked'));
         loadMember(selectedMember.id).catch(() => {});
       } catch {
         // Toasted by the API client.
       }
     },
-    [selectedMember, toggleAccess, loadMember],
+    [selectedMember, toggleAccess, loadMember, t],
   );
 
   const header = (
     <AppHeader
-      title="Member Details"
+      title={t('members.details.title')}
       colors={[theme.primary, theme.primary]}
       onBack={onBack}
     />
@@ -209,7 +211,7 @@ export function MemberDetailsScreen({
         {header}
         <View style={styles.loadingContainer}>
           <Typography variant="body" color="textSecondary">
-            Loading...
+            {t('members.details.loading')}
           </Typography>
         </View>
       </ScreenLayout>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { CurrencyValue, formatAmount } from '@/core/providers';
@@ -72,6 +73,7 @@ function monotonePath(points: { x: number; y: number }[]) {
 }
 
 export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -132,7 +134,7 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Revenue Trend ({data.length} Months)</Text>
+      <Text style={styles.title}>{t('analytics.charts.revenueTrend', { count: data.length })}</Text>
 
       <View
         style={styles.chartArea}
@@ -244,12 +246,12 @@ export function RevenueTrendChart({ data }: RevenueTrendChartProps) {
         {activePoint && activeDatum && (
           <View pointerEvents="none" style={[styles.tooltip, { left: tooltipLeft, top: tooltipTop }]}>
             <Text style={styles.tooltipLabel}>{fullMonth(activeDatum.month)}</Text>
-            <Text style={styles.tooltipValue}>Revenue: <CurrencyValue amount={Math.round(activeDatum.revenue)} /></Text>
+            <Text style={styles.tooltipValue}>{t('analytics.charts.revenue')}: <CurrencyValue amount={Math.round(activeDatum.revenue)} /></Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.hint}>Tap or drag across the chart to see monthly revenue</Text>
+      <Text style={styles.hint}>{t('analytics.charts.revenueHint')}</Text>
     </View>
   );
 }

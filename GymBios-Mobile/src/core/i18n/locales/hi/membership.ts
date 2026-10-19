@@ -201,6 +201,8 @@ const membership = {
       offer: 'ऑफ़र',
       coupon: 'कूपन',
       rewardPass: 'रिवॉर्ड पास',
+      offerApplied: 'ऑफ़र लागू: {{name}}',
+      removeOffer: 'ऑफ़र हटाएँ',
       totalPayable: 'कुल देय',
       paymentFor: '{{name}} के लिए भुगतान',
     },

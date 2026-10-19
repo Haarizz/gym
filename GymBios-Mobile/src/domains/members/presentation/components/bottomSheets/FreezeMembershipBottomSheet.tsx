@@ -1,10 +1,11 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { CurrencyValue } from '@/core/providers';
+import { useCurrency } from '@/core/providers';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
 import { DatePicker } from '@/shared/components/DatePicker';
@@ -33,6 +34,8 @@ export function FreezeMembershipBottomSheet({
   onUnfreeze,
   loadAllowance,
 }: FreezeMembershipBottomSheetProps) {
+  const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
   const theme = useTheme();
   const [startDate, setStartDate] = useState<Date | null>(() => startOfToday());
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -83,11 +86,11 @@ export function FreezeMembershipBottomSheet({
 
   const handleFreeze = useCallback(async () => {
     if (!endDate) {
-      setError('Select the date the freeze ends.');
+      setError(t('members.freezeSheet.endDateRequired'));
       return;
     }
     if (startDate && endDate < startDate) {
-      setError('The freeze can\'t end before it starts.');
+      setError(t('members.freezeSheet.endDateBeforeStart'));
       return;
     }
     try {
@@ -105,7 +108,7 @@ export function FreezeMembershipBottomSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [startDate, endDate, reason, overrideLimits, waiveCharge, member.id, onFreeze, onClose]);
+  }, [startDate, endDate, reason, overrideLimits, waiveCharge, member.id, onFreeze, onClose, t]);
 
   const handleUnfreeze = useCallback(async () => {
     try {
@@ -119,10 +122,14 @@ export function FreezeMembershipBottomSheet({
     }
   }, [member.id, onUnfreeze, onClose]);
 
+  const occurrencesStr = allowance && allowance.maxOccurrences != null
+    ? t('members.freezeSheet.freezesLeft', { count: allowance.remainingOccurrences ?? 0, max: allowance.maxOccurrences })
+    : '';
+
   return (
     <AppBottomSheet
       visible={visible}
-      title={member.isFrozen ? 'Unfreeze Membership' : 'Freeze Membership'}
+      title={member.isFrozen ? t('members.freezeSheet.unfreezeTitle') : t('members.freezeSheet.freezeTitle')}
       subtitle={member.name}
       onClose={onClose}
     >
@@ -132,14 +139,17 @@ export function FreezeMembershipBottomSheet({
             <View style={[styles.summary, { backgroundColor: `${FROZEN_COLOR}14`, borderColor: `${FROZEN_COLOR}40` }]}>
               <Feather name="pause-circle" size={16} color={FROZEN_COLOR} />
               <Typography variant="bodySmall" style={[styles.summaryText, { color: FROZEN_COLOR }]}>
-                Frozen {formatMemberDate(member.freezeStartDate)} → {formatMemberDate(member.freezeEndDate)}
+                {t('members.freezeSheet.frozenPeriod', {
+                  start: formatMemberDate(member.freezeStartDate),
+                  end: formatMemberDate(member.freezeEndDate),
+                })}
               </Typography>
             </View>
             <Typography variant="bodySmall" color="textSecondary">
-              Unfreezing reactivates the membership today.
+              {t('members.freezeSheet.unfreezeReactivates')}
             </Typography>
             <Button
-              label="Unfreeze Membership"
+              label={t('members.freezeSheet.unfreezeBtn')}
               onPress={handleUnfreeze}
               loading={submitting}
               size="lg"
@@ -148,8 +158,8 @@ export function FreezeMembershipBottomSheet({
         ) : (
           <>
             <DatePicker
-              label="Freeze from"
-              placeholder="Select start date"
+              label={t('members.freezeSheet.freezeFrom')}
+              placeholder={t('members.freezeSheet.selectStartDate')}
               value={startDate}
               onChange={(d) => {
                 setStartDate(d);
@@ -158,8 +168,8 @@ export function FreezeMembershipBottomSheet({
               minimumDate={startOfToday()}
             />
             <DatePicker
-              label="Freeze until"
-              placeholder="Select end date"
+              label={t('members.freezeSheet.freezeUntil')}
+              placeholder={t('members.freezeSheet.selectEndDate')}
               value={endDate}
               onChange={(d) => {
                 setEndDate(d);
@@ -172,9 +182,12 @@ export function FreezeMembershipBottomSheet({
 
             {allowance ? (
               <Typography variant="bodySmall" color="textSecondary">
-                {allowance.remainingDays} of {allowance.maxDays} freeze days left
-                {allowance.maxOccurrences != null ? ` · ${allowance.remainingOccurrences ?? 0} of ${allowance.maxOccurrences} freezes left` : ''}
-                {' · '}{allowance.freeDaysRemaining} free
+                {t('members.freezeSheet.allowanceStatus', {
+                  remainingDays: allowance.remainingDays,
+                  maxDays: allowance.maxDays,
+                  occurrences: occurrencesStr,
+                  freeDays: allowance.freeDaysRemaining,
+                })}
               </Typography>
             ) : null}
 
@@ -182,7 +195,7 @@ export function FreezeMembershipBottomSheet({
               <View style={[styles.summary, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
                 <Feather name="clock" size={16} color={theme.textSecondary} />
                 <Typography variant="bodySmall" style={styles.summaryText}>
-                  {freezeDays} day{freezeDays === 1 ? '' : 's'} — expiry is extended by the days frozen once it ends
+                  {t('members.freezeSheet.summaryText', { count: freezeDays })}
                 </Typography>
               </View>
             ) : null}
@@ -190,16 +203,23 @@ export function FreezeMembershipBottomSheet({
             {extraDays > 0 ? (
               <View style={[styles.notice, { borderColor: theme.border }]}>
                 <Typography variant="bodySmall" style={waiveCharge ? styles.waived : undefined}>
-                  {freeDays} free + {extraDays} extra day{extraDays === 1 ? '' : 's'} × <CurrencyValue amount={rate} /> ={' '}
-                  <CurrencyValue amount={extraDays * rate} />
+                  {t('members.freezeSheet.chargeCalculation', {
+                    count: extraDays,
+                    freeDays,
+                    extraDays,
+                    rate: formatCurrency(rate),
+                    total: formatCurrency(extraDays * rate),
+                  })}
                 </Typography>
                 <Typography variant="bodySmall" color="textSecondary">
                   {waiveCharge
-                    ? 'Charge waived.'
-                    : 'Added to their balance when the freeze ends, for the days actually frozen.'}
+                    ? t('members.freezeSheet.chargeWaivedNote')
+                    : t('members.freezeSheet.chargeAddedNote')}
                 </Typography>
                 <View style={styles.toggleRow}>
-                  <Typography variant="bodySmall" style={styles.toggleLabel}>Waive the extra-day charge</Typography>
+                  <Typography variant="bodySmall" style={styles.toggleLabel}>
+                    {t('members.freezeSheet.waiveChargeLabel')}
+                  </Typography>
                   <Switch value={waiveCharge} onValueChange={setWaiveCharge} />
                 </View>
               </View>
@@ -209,17 +229,23 @@ export function FreezeMembershipBottomSheet({
               <View style={[styles.notice, styles.limitNotice]}>
                 <Typography variant="bodySmall" style={styles.limitText}>
                   {allowance.canFreeze
-                    ? `Only ${allowance.remainingDays} freeze day${allowance.remainingDays === 1 ? '' : 's'} left on this plan — this freeze is ${days} days.`
+                    ? t('members.freezeSheet.overLimitsPlanRemaining', {
+                        count: allowance.remainingDays,
+                        remainingDays: allowance.remainingDays,
+                        days,
+                      })
                     : allowance.unavailableMessage}
                 </Typography>
                 {allowance.canOverrideLimits ? (
                   <View style={styles.toggleRow}>
-                    <Typography variant="bodySmall" style={styles.toggleLabel}>Override the plan&apos;s limits (manager)</Typography>
+                    <Typography variant="bodySmall" style={styles.toggleLabel}>
+                      {t('members.freezeSheet.overrideLimitsManager')}
+                    </Typography>
                     <Switch value={overrideLimits} onValueChange={setOverrideLimits} />
                   </View>
                 ) : (
                   <Typography variant="bodySmall" style={styles.limitText}>
-                    Only a manager can freeze past the plan&apos;s limits.
+                    {t('members.freezeSheet.onlyManagerCanOverride')}
                   </Typography>
                 )}
               </View>
@@ -228,19 +254,19 @@ export function FreezeMembershipBottomSheet({
             {allowance ? (
               <Typography variant="bodySmall" color="textSecondary">
                 {allowance.autoUnfreeze
-                  ? 'This plan unfreezes automatically the day after the end date.'
-                  : "This plan doesn't unfreeze automatically — unfreeze the membership when the member is back."}
+                  ? t('members.freezeSheet.autoUnfreezeNote')
+                  : t('members.freezeSheet.manualUnfreezeNote')}
               </Typography>
             ) : null}
 
             <Input
-              label="Reason"
+              label={t('members.freezeSheet.reasonLabel')}
               value={reason}
               onChangeText={setReason}
-              placeholder="Optional, e.g. travel or injury"
+              placeholder={t('members.freezeSheet.reasonPlaceholder')}
             />
             <Button
-              label="Freeze Membership"
+              label={t('members.freezeSheet.freezeBtn')}
               onPress={handleFreeze}
               loading={submitting}
               disabled={!canSubmit}

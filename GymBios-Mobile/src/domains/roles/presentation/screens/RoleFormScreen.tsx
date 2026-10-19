@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { Input } from '@/shared/components/Input';
@@ -21,6 +22,7 @@ import { RolePermissionModule } from '../components/RolePermissionModule';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function RoleFormScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isEditing = !!id && id !== 'create';
@@ -72,6 +74,7 @@ interface RoleFormContentProps {
 }
 
 function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitAction, onSuccess }: RoleFormContentProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const {
     roleName,
@@ -108,14 +111,14 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
   return (
     <View style={styles.container}>
       <AppHeader 
-        title={isEditing ? 'Edit Role' : 'Create Role'} 
-        subtitle="Employees & Payroll"
+        title={isEditing ? t('roles.editRole') : t('roles.createRole')} 
+        subtitle={t('roles.subtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={() => onSuccess()}
         rightAction={
           <TouchableOpacity onPress={handleSave} disabled={submitting}>
             <Typography variant="bodySmallBold" color="primaryText">
-              {submitting ? 'Saving...' : 'Save'}
+              {submitting ? t('roles.saving') : t('roles.save')}
             </Typography>
           </TouchableOpacity>
         }
@@ -127,15 +130,15 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
       >
         <View style={styles.section}>
           <Input 
-            label="Role name"
-            placeholder="e.g. Front Desk"
+            label={t('roles.roleName')}
+            placeholder={t('roles.roleNamePlaceholder')}
             value={roleName}
             onChangeText={setRoleName}
             error={errors.roleName}
           />
           <Input 
-            label="Description"
-            placeholder="What this role is for (optional)"
+            label={t('roles.description')}
+            placeholder={t('roles.descriptionPlaceholder')}
             value={description}
             onChangeText={setDescription}
           />
@@ -148,7 +151,7 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
             <SearchBar
               value={moduleSearch}
               onChangeText={setModuleSearch}
-              placeholder="Filter modules..."
+              placeholder={t('roles.filterModulesPlaceholder')}
             />
           </View>
 

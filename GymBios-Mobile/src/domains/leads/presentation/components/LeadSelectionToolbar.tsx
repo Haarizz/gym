@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -21,6 +22,7 @@ export function LeadSelectionToolbar({
   onDelete,
   onClear,
 }: LeadSelectionToolbarProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (selectedCount === 0) return null;
@@ -36,12 +38,14 @@ export function LeadSelectionToolbar({
         <View style={styles.countWrap}>
           <Feather name="check-square" size={16} color={BrandColors.teal} />
           <Text style={[styles.countText, { color: theme.text }]}>
-            {selectedCount} {selectedCount === 1 ? 'lead' : 'leads'} selected
+            {t('leads.toolbar.selectedCount', { count: selectedCount })}
           </Text>
         </View>
 
         <TouchableOpacity style={styles.clearBtn} onPress={onClear} hitSlop={6}>
-          <Text style={[styles.clearText, { color: theme.textSecondary }]}>Clear</Text>
+          <Text style={[styles.clearText, { color: theme.textSecondary }]}>
+            {t('leads.toolbar.clear')}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -51,7 +55,9 @@ export function LeadSelectionToolbar({
           onPress={onAssignStaff}
         >
           <Feather name="user-check" size={13} color={theme.text} />
-          <Text style={[styles.actionBtnText, { color: theme.text }]}>Assign Staff</Text>
+          <Text style={[styles.actionBtnText, { color: theme.text }]}>
+            {t('leads.toolbar.assignStaff')}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -59,7 +65,9 @@ export function LeadSelectionToolbar({
           onPress={onUpdateStatus}
         >
           <Feather name="refresh-cw" size={13} color={theme.text} />
-          <Text style={[styles.actionBtnText, { color: theme.text }]}>Update Status</Text>
+          <Text style={[styles.actionBtnText, { color: theme.text }]}>
+            {t('leads.toolbar.updateStatus')}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -67,7 +75,7 @@ export function LeadSelectionToolbar({
           onPress={onDelete}
         >
           <Feather name="trash-2" size={13} color="#f87171" />
-          <Text style={styles.deleteBtnText}>Delete</Text>
+          <Text style={styles.deleteBtnText}>{t('leads.toolbar.delete')}</Text>
         </TouchableOpacity>
       </View>
     </View>

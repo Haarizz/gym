@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Svg, { Path, Rect, Line, Text as SvgText } from 'react-native-svg';
@@ -42,6 +43,7 @@ function topRoundedBar(x: number, y: number, width: number, height: number) {
 }
 
 export function MemberChurnChart({ data }: MemberChurnChartProps) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -106,16 +108,16 @@ export function MemberChurnChart({ data }: MemberChurnChartProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>New Members vs Churn</Text>
+      <Text style={styles.title}>{t('analytics.charts.newMembersVsChurn')}</Text>
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: NEW_COLOR }]} />
-          <Text style={styles.legendText}>New members</Text>
+          <Text style={styles.legendText}>{t('analytics.charts.newMembers')}</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { backgroundColor: CHURN_COLOR }]} />
-          <Text style={styles.legendText}>Churned</Text>
+          <Text style={styles.legendText}>{t('analytics.charts.churned')}</Text>
         </View>
       </View>
 
@@ -216,13 +218,13 @@ export function MemberChurnChart({ data }: MemberChurnChartProps) {
         {activeGroup && activeDatum && (
           <View pointerEvents="none" style={[styles.tooltip, { left: tooltipLeft, top: tooltipTop }]}>
             <Text style={styles.tooltipLabel}>{fullMonth(activeDatum.month)}</Text>
-            <Text style={[styles.tooltipValue, { color: '#b45309' }]}>New: {activeDatum.newMembers}</Text>
-            <Text style={[styles.tooltipValue, { color: CHURN_COLOR }]}>Churned: {activeDatum.churned}</Text>
+            <Text style={[styles.tooltipValue, { color: '#b45309' }]}>{t('analytics.charts.new')}: {activeDatum.newMembers}</Text>
+            <Text style={[styles.tooltipValue, { color: CHURN_COLOR }]}>{t('analytics.charts.churned')}: {activeDatum.churned}</Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.hint}>Tap or drag across the chart to see monthly numbers</Text>
+      <Text style={styles.hint}>{t('analytics.charts.churnHint')}</Text>
     </View>
   );
 }

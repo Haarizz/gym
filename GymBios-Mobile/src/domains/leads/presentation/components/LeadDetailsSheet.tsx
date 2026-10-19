@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -32,15 +33,6 @@ interface LeadDetailsSheetProps {
   onRegisterMember?: (lead: Lead) => void;
 }
 
-const INTERACTION_TYPES: Array<{ label: string; value: LeadInteractionType }> = [
-  { label: 'Call', value: 'call' },
-  { label: 'Email', value: 'email' },
-  { label: 'Meeting', value: 'meeting' },
-  { label: 'SMS', value: 'sms' },
-  { label: 'Tour', value: 'tour' },
-  { label: 'Note', value: 'note' },
-];
-
 export function LeadDetailsSheet({
   visible,
   leadId,
@@ -49,7 +41,17 @@ export function LeadDetailsSheet({
   onDelete,
   onRegisterMember,
 }: LeadDetailsSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
+
+  const interactionTypes = useMemo<Array<{ label: string; value: LeadInteractionType }>>(() => [
+    { label: t('leads.interactionTypes.call'), value: 'call' },
+    { label: t('leads.interactionTypes.email'), value: 'email' },
+    { label: t('leads.interactionTypes.meeting'), value: 'meeting' },
+    { label: t('leads.interactionTypes.sms'), value: 'sms' },
+    { label: t('leads.interactionTypes.tour'), value: 'tour' },
+    { label: t('leads.interactionTypes.note'), value: 'note' },
+  ], [t]);
 
   // Fetch full lead details using existing TanStack Query hook
   const { data: leadData } = useLead(leadId ?? 0);
@@ -75,42 +77,42 @@ export function LeadDetailsSheet({
 
   const handleCall = () => {
     if (!lead?.phone) {
-      toast.info('No phone number available for this lead.', {
-        title: 'No Phone'
+      toast.info(t('leads.actions.noPhoneMessage'), {
+        title: t('leads.actions.noPhoneTitle')
       });
       return;
     }
     Linking.openURL(`tel:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to open phone dialer.', {
-        title: 'Error'
+      toast.error(t('leads.actions.phoneError'), {
+        title: t('leads.actions.noPhoneTitle')
       });
     });
   };
 
   const handleEmail = () => {
     if (!lead?.email) {
-      toast.info('No email address available for this lead.', {
-        title: 'No Email'
+      toast.info(t('leads.actions.noEmailMessage'), {
+        title: t('leads.actions.noEmailTitle')
       });
       return;
     }
     Linking.openURL(`mailto:${lead.email}`).catch(() => {
-      toast.error('Unable to open mail client.', {
-        title: 'Error'
+      toast.error(t('leads.actions.emailError'), {
+        title: t('leads.actions.noEmailTitle')
       });
     });
   };
 
   const handleMessage = () => {
     if (!lead?.phone) {
-      toast.info('No phone number available for this lead.', {
-        title: 'No Phone'
+      toast.info(t('leads.actions.noPhoneMessage'), {
+        title: t('leads.actions.noPhoneTitle')
       });
       return;
     }
     Linking.openURL(`sms:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to open SMS messaging.', {
-        title: 'Error'
+      toast.error(t('leads.actions.messageError'), {
+        title: t('leads.actions.noPhoneTitle')
       });
     });
   };
@@ -118,8 +120,8 @@ export function LeadDetailsSheet({
   const handleAddInteractionSubmit = () => {
     if (!leadId) return;
     if (!interactionNotes.trim()) {
-      toast.error('Interaction notes are required.', {
-        title: 'Validation Error'
+      toast.error(t('leads.details.interactionValidation'), {
+        title: t('leads.form.validationErrorTitle')
       });
       return;
     }
@@ -142,8 +144,8 @@ export function LeadDetailsSheet({
           setStaffMemberName('');
         },
         onError: (err: any) => {
-          toast.error(err.message || 'Failed to add interaction.', {
-            title: 'Error'
+          toast.error(err.message || t('leads.details.addInteractionError'), {
+            title: t('leads.form.validationErrorTitle')
           });
         },
       },
@@ -176,7 +178,7 @@ export function LeadDetailsSheet({
               </View>
               <View style={[styles.badge, getPriorityBadgeStyle(lead.priority).bg]}>
                 <Text style={[styles.badgeText, getPriorityBadgeStyle(lead.priority).text]}>
-                  {lead.priority} priority
+                  {t('leads.card.priorityLabel', { priority: lead.priority })}
                 </Text>
               </View>
             </View>
@@ -185,19 +187,25 @@ export function LeadDetailsSheet({
 
         {/* Contact Information Card */}
         <View style={[styles.cardSection, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Contact Information</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {t('leads.details.contactInfo')}
+          </Text>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.email')}
+              </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.email || 'N/A'}
+                {lead.email || t('leads.details.notAvailable')}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.phone')}
+              </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.phone || 'N/A'}
+                {lead.phone || t('leads.details.notAvailable')}
               </Text>
             </View>
           </View>
@@ -205,14 +213,16 @@ export function LeadDetailsSheet({
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                Preferred Contact
+                {t('leads.details.preferredContact')}
               </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
                 {lead.preferredContactMethod || 'Email'}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Lead Score</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.leadScore')}
+              </Text>
               <View style={styles.scoreWrap}>
                 <Text style={[styles.scoreNumber, { color: BrandColors.teal }]}>
                   {lead.leadScore ?? 50}
@@ -232,19 +242,25 @@ export function LeadDetailsSheet({
 
         {/* Lead Details Card */}
         <View style={[styles.cardSection, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Lead Details</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {t('leads.details.leadDetails')}
+          </Text>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Source</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.source')}
+              </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
                 {lead.source ? formatSource(lead.source) : 'Website'}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Assigned Staff</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.assignedStaff')}
+              </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.assignedStaff || 'Unassigned'}
+                {lead.assignedStaff || t('leads.management.unassigned')}
               </Text>
             </View>
           </View>
@@ -252,23 +268,27 @@ export function LeadDetailsSheet({
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
-                Membership Interest
+                {t('leads.details.membershipInterest')}
               </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.membershipInterest || 'Not specified'}
+                {lead.membershipInterest || t('leads.details.notSpecified')}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Budget</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.budget')}
+              </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.budget ? <CurrencyValue amount={Number(lead.budget)} /> : 'Not specified'}
+                {lead.budget ? <CurrencyValue amount={Number(lead.budget)} /> : t('leads.details.notSpecified')}
               </Text>
             </View>
           </View>
 
           {!!lead.tags && lead.tags.length > 0 && (
             <View style={styles.tagsSection}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Tags</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.tags')}
+              </Text>
               <View style={styles.tagsRow}>
                 {lead.tags.map(tag => (
                   <View key={tag} style={[styles.tagPill, { backgroundColor: theme.muted }]}>
@@ -281,7 +301,9 @@ export function LeadDetailsSheet({
 
           {!!lead.notes && (
             <View style={styles.notesSection}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Notes</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
+                {t('leads.details.notes')}
+              </Text>
               <Text style={[styles.notesBody, { color: theme.text, backgroundColor: theme.muted }]}>
                 {lead.notes}
               </Text>
@@ -291,21 +313,29 @@ export function LeadDetailsSheet({
 
         {/* Quick Action Buttons */}
         <View style={[styles.cardSection, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {t('leads.details.quickActions')}
+          </Text>
           <View style={styles.actionsGrid}>
             <TouchableOpacity style={styles.actionGridBtn} onPress={handleCall}>
               <Feather name="phone" size={16} color={BrandColors.teal} />
-              <Text style={[styles.actionGridText, { color: theme.text }]}>Call Lead</Text>
+              <Text style={[styles.actionGridText, { color: theme.text }]}>
+                {t('leads.details.callLead')}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionGridBtn} onPress={handleEmail}>
               <Feather name="mail" size={16} color={BrandColors.teal} />
-              <Text style={[styles.actionGridText, { color: theme.text }]}>Send Email</Text>
+              <Text style={[styles.actionGridText, { color: theme.text }]}>
+                {t('leads.details.sendEmail')}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionGridBtn} onPress={handleMessage}>
               <Feather name="message-square" size={16} color={BrandColors.teal} />
-              <Text style={[styles.actionGridText, { color: theme.text }]}>Message</Text>
+              <Text style={[styles.actionGridText, { color: theme.text }]}>
+                {t('leads.details.messageLead')}
+              </Text>
             </TouchableOpacity>
 
             {/* Hidden once registered — a second registration would duplicate the member. */}
@@ -318,7 +348,9 @@ export function LeadDetailsSheet({
                 }}
               >
                 <Feather name="user-plus" size={16} color={BrandColors.teal} />
-                <Text style={[styles.actionGridText, { color: theme.text }]}>Register as Member</Text>
+                <Text style={[styles.actionGridText, { color: theme.text }]}>
+                  {t('leads.details.registerAsMember')}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -331,7 +363,9 @@ export function LeadDetailsSheet({
                 }}
               >
                 <Feather name="edit-2" size={16} color={BrandColors.teal} />
-                <Text style={[styles.actionGridText, { color: theme.text }]}>Edit Lead</Text>
+                <Text style={[styles.actionGridText, { color: theme.text }]}>
+                  {t('leads.details.editLead')}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -344,7 +378,7 @@ export function LeadDetailsSheet({
                 }}
               >
                 <Feather name="trash-2" size={16} color="#f87171" />
-                <Text style={styles.deleteActionGridText}>Delete Lead</Text>
+                <Text style={styles.deleteActionGridText}>{t('leads.details.deleteLead')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -353,7 +387,9 @@ export function LeadDetailsSheet({
         {/* Interaction History */}
         <View style={[styles.cardSection, { backgroundColor: theme.backgroundElement }]}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Interaction History</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {t('leads.details.interactionHistory')}
+            </Text>
             <TouchableOpacity
               style={styles.addInteractionBtn}
               onPress={() => setShowAddInteraction(!showAddInteraction)}
@@ -364,7 +400,7 @@ export function LeadDetailsSheet({
                 color={BrandColors.teal}
               />
               <Text style={styles.addInteractionText}>
-                {showAddInteraction ? 'Cancel' : 'Add'}
+                {showAddInteraction ? t('leads.details.cancelInteraction') : t('leads.details.addInteraction')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -372,25 +408,25 @@ export function LeadDetailsSheet({
           {showAddInteraction && (
             <View style={[styles.addFormContainer, { borderColor: theme.border }]}>
               <Dropdown
-                label="Type"
+                label={t('leads.details.interactionType')}
                 value={interactionType}
-                options={INTERACTION_TYPES}
+                options={interactionTypes}
                 onChange={val => setInteractionType(val as LeadInteractionType)}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Staff Member
+                {t('leads.details.staffMember')}
               </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={staffMemberName}
                 onChangeText={setStaffMemberName}
-                placeholder="Staff name"
+                placeholder={t('leads.details.staffMemberPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Notes *
+                {t('leads.details.notesRequired')}
               </Text>
               <TextInput
                 style={[
@@ -402,13 +438,13 @@ export function LeadDetailsSheet({
                 onChangeText={setInteractionNotes}
                 multiline
                 numberOfLines={3}
-                placeholder="Details of interaction..."
+                placeholder={t('leads.details.interactionNotesPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
               <View style={styles.formSubmitRow}>
                 <Button
-                  label="Save Interaction"
+                  label={t('leads.details.saveInteraction')}
                   onPress={handleAddInteractionSubmit}
                   disabled={addInteractionMutation.isPending}
                 />
@@ -433,7 +469,7 @@ export function LeadDetailsSheet({
                   </Text>
                   <View style={styles.historyMetaRow}>
                     <Text style={[styles.historyStaff, { color: theme.textSecondary }]}>
-                      By: {item.staffMember || 'Staff'}
+                      {t('leads.details.byStaff', { staff: item.staffMember || 'Staff' })}
                     </Text>
                     {!!item.outcome && (
                       <View style={[styles.outcomeBadge, { backgroundColor: theme.muted }]}>
@@ -447,7 +483,7 @@ export function LeadDetailsSheet({
               ))
             ) : (
               <Text style={[styles.emptyHistoryText, { color: theme.textSecondary }]}>
-                No interactions logged yet.
+                {t('leads.details.noInteractions')}
               </Text>
             )}
           </View>

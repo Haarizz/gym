@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -9,19 +10,25 @@ import { FormCard } from './FormCard';
 import type { MemberStepProps } from './stepTypes';
 
 export function MedicalStep({ data, updateField }: MemberStepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <FormCard icon="activity" title="Body" description="All fields on this step are optional">
+      <FormCard
+        icon="activity"
+        title={t('members.form.medicalStep.bodyTitle')}
+        description={t('members.form.medicalStep.bodyDescription')}
+      >
         <Dropdown
-          label="Blood group"
-          placeholder="Select blood group"
+          label={t('members.form.medicalStep.bloodGroup')}
+          placeholder={t('members.form.medicalStep.selectBloodGroup')}
           value={data.bloodGroup}
           options={BLOOD_GROUPS}
           onChange={(v) => updateField('bloodGroup', v)}
         />
         <View style={styles.row}>
           <Input
-            label="Height (cm)"
+            label={t('members.form.medicalStep.height')}
             value={data.height}
             onChangeText={(v) => updateField('height', v)}
             placeholder="175"
@@ -29,7 +36,7 @@ export function MedicalStep({ data, updateField }: MemberStepProps) {
             containerStyle={styles.half}
           />
           <Input
-            label="Weight (kg)"
+            label={t('members.form.medicalStep.weight')}
             value={data.weight}
             onChangeText={(v) => updateField('weight', v)}
             placeholder="70"
@@ -39,44 +46,48 @@ export function MedicalStep({ data, updateField }: MemberStepProps) {
         </View>
       </FormCard>
 
-      <FormCard icon="heart" title="Health history" description="Shared with trainers to keep sessions safe">
+      <FormCard
+        icon="heart"
+        title={t('members.form.medicalStep.historyTitle')}
+        description={t('members.form.medicalStep.historyDescription')}
+      >
         <Input
-          label="Medical conditions"
+          label={t('members.form.medicalStep.medicalConditions')}
           value={data.medicalConditions}
           onChangeText={(v) => updateField('medicalConditions', v)}
-          placeholder="e.g. Asthma, past knee injury"
+          placeholder={t('members.form.medicalStep.conditionsPlaceholder')}
           multiline
           style={styles.multiline}
         />
         <Input
-          label="Chronic illnesses"
+          label={t('members.form.medicalStep.chronicIllnesses')}
           value={data.chronicIllnesses}
           onChangeText={(v) => updateField('chronicIllnesses', v)}
-          placeholder="e.g. Diabetes, hypertension"
+          placeholder={t('members.form.medicalStep.illnessesPlaceholder')}
           multiline
           style={styles.multiline}
         />
         <Input
-          label="Allergies"
+          label={t('members.form.medicalStep.allergies')}
           value={data.allergies}
           onChangeText={(v) => updateField('allergies', v)}
-          placeholder="e.g. Peanuts, latex"
+          placeholder={t('members.form.medicalStep.allergiesPlaceholder')}
           multiline
           style={styles.multiline}
         />
         <Input
-          label="Current medications"
+          label={t('members.form.medicalStep.currentMedications')}
           value={data.currentMedications}
           onChangeText={(v) => updateField('currentMedications', v)}
-          placeholder="Name and dosage"
+          placeholder={t('members.form.medicalStep.medicationsPlaceholder')}
           multiline
           style={styles.multiline}
         />
         <Input
-          label="Notes"
+          label={t('members.form.medicalStep.notes')}
           value={data.healthNotes}
           onChangeText={(v) => updateField('healthNotes', v)}
-          placeholder="Anything else trainers should know"
+          placeholder={t('members.form.medicalStep.notesPlaceholder')}
           multiline
           style={styles.multiline}
         />

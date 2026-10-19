@@ -23,6 +23,21 @@ import checkIn from './checkIn';
 import schedule from './schedule';
 import performance from './performance';
 import ledger from './ledger';
+import messaging from './messaging';
+import leads from './leads';
+import members from './members';
+import attendance from './attendance';
+import membershipPlans from './membershipPlans';
+import billing from './billing';
+import promotions from './promotions';
+import followUps from './followUps';
+import crm from './crm';
+import facilities from './facilities';
+import roles from './roles';
+import hr from './hr';
+import analytics from './analytics';
+import reports from './reports';
+import admin from './admin';
 
 const ar: LocaleResource = {
   ...common,
@@ -49,6 +64,21 @@ const ar: LocaleResource = {
   ...schedule,
   ...performance,
   ...ledger,
+  ...messaging,
+  ...leads,
+  ...members,
+  ...attendance,
+  ...membershipPlans,
+  ...billing,
+  ...promotions,
+  ...followUps,
+  ...crm,
+  ...facilities,
+  ...roles,
+  ...hr,
+  ...analytics,
+  ...reports,
+  ...admin,
 };
 
 export default ar;

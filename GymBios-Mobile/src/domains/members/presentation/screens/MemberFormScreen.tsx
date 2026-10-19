@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { ApiError } from '@/core/platform/api/types';
@@ -37,14 +38,6 @@ interface MemberFormScreenProps {
   onSuccess: () => void;
 }
 
-const STEPS = [
-  { label: 'Personal', title: 'Personal details' },
-  { label: 'Plan', title: 'Membership' },
-  { label: 'Health', title: 'Health information' },
-  { label: 'Family', title: 'Family' },
-  { label: 'Review', title: 'App access & review' },
-];
-
 const SCREEN_BACKGROUND = BrandColors.screenBackground;
 
 export function MemberFormScreen({
@@ -54,15 +47,28 @@ export function MemberFormScreen({
   prefill,
   onSuccess,
 }: MemberFormScreenProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
+
+  const steps = useMemo(
+    () => [
+      { label: t('members.form.steps.personal'), title: t('members.form.steps.personalTitle') },
+      { label: t('members.form.steps.plan'), title: t('members.form.steps.planTitle') },
+      { label: t('members.form.steps.health'), title: t('members.form.steps.healthTitle') },
+      { label: t('members.form.steps.family'), title: t('members.form.steps.familyTitle') },
+      { label: t('members.form.steps.review'), title: t('members.form.steps.reviewTitle') },
+    ],
+    [t],
+  );
+
   const scrollRef = useRef<ScrollView>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   // Errors stay hidden until the user tries to move on, so a fresh form isn't all red.
   const [showErrors, setShowErrors] = useState(false);
-  const [furthestStep, setFurthestStep] = useState(mode === 'edit' ? STEPS.length : 1);
+  const [furthestStep, setFurthestStep] = useState(mode === 'edit' ? steps.length : 1);
 
   const handleError = useCallback((error: Error) => {
     // API failures are already toasted (with the server's reason) by apiClient.
@@ -135,8 +141,8 @@ export function MemberFormScreen({
   }, [step, navigateTo, showPaymentSheet]);
 
   const warnInvalid = useCallback(() => {
-    toast.warning('Please fix the highlighted fields to continue.');
-  }, []);
+    toast.warning(t('members.form.fixHighlightedFields'));
+  }, [t]);
 
   /** Jumps to the first step (up to `upTo`, exclusive) with errors. Returns true if one was found. */
   const goToFirstInvalidStep = useCallback(
@@ -262,10 +268,10 @@ export function MemberFormScreen({
 
             <View style={styles.headerText}>
               <Typography variant="body" style={styles.headerTitle} numberOfLines={1}>
-                {mode === 'create' ? 'New member' : 'Edit member'}
+                {mode === 'create' ? t('members.form.newMember') : t('members.form.editMember')}
               </Typography>
               <Typography variant="caption" color="textSecondary" numberOfLines={1}>
-                Step {step} of {totalSteps} · {STEPS[step - 1]?.title}
+                {t('members.form.stepIndicator', { step, total: totalSteps, title: steps[step - 1]?.title })}
               </Typography>
             </View>
 
@@ -275,18 +281,18 @@ export function MemberFormScreen({
                 disabled={loading}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Save changes"
+                accessibilityLabel={t('members.form.saveChangesBtn')}
                 style={({ pressed }) => [styles.saveLink, (pressed || loading) && styles.pressed]}
               >
                 <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-                  Save
+                  {t('members.form.saveBtn')}
                 </Typography>
               </Pressable>
             ) : null}
           </View>
 
           <View style={styles.stepper}>
-            {STEPS.map((s, index) => {
+            {steps.map((s, index) => {
               const n = index + 1;
               const active = n === step;
               const done = n < step;
@@ -298,7 +304,7 @@ export function MemberFormScreen({
                   disabled={!reachable || active}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active, disabled: !reachable }}
-                  accessibilityLabel={`Step ${n}: ${s.title}`}
+                  accessibilityLabel={t('members.form.stepA11y', { step: n, title: s.title })}
                   style={styles.stepItem}
                 >
                   <View
@@ -344,7 +350,7 @@ export function MemberFormScreen({
             ]}
           >
             <Button
-              label={isFirst ? 'Cancel' : 'Back'}
+              label={isFirst ? t('members.form.cancelBtn') : t('members.form.backBtn')}
               variant="outline"
               size="lg"
               onPress={isFirst ? () => setShowDiscardDialog(true) : () => navigateTo(step - 1)}
@@ -354,9 +360,9 @@ export function MemberFormScreen({
               label={
                 isLast
                   ? mode === 'edit'
-                    ? 'Save changes'
-                    : 'Continue to payment'
-                  : 'Next'
+                    ? t('members.form.saveChangesBtn')
+                    : t('members.form.continueToPaymentBtn')
+                  : t('members.form.nextBtn')
               }
               size="lg"
               loading={loading}
@@ -388,22 +394,24 @@ export function MemberFormScreen({
               <Feather name="alert-triangle" size={22} color={theme.error} />
             </View>
             <Typography variant="body" style={styles.modalTitle}>
-              Discard {mode === 'edit' ? 'changes' : 'this member'}?
+              {t('members.form.discardDialogTitle', {
+                target: mode === 'edit' ? t('members.form.discardDialogChanges') : t('members.form.discardDialogMember'),
+              })}
             </Typography>
             <Typography variant="bodySmall" color="textSecondary" style={styles.modalText}>
-              Everything you&apos;ve entered on this form will be lost.
+              {t('members.form.discardDialogMsg')}
             </Typography>
 
             <View style={styles.modalActions}>
               <Button
-                label="Keep editing"
+                label={t('members.form.keepEditingBtn')}
                 variant="outline"
                 onPress={handleKeepEditing}
                 size="lg"
                 style={styles.modalButton}
               />
               <Button
-                label="Discard"
+                label={t('members.form.discardBtn')}
                 onPress={handleDiscard}
                 size="lg"
                 style={[styles.modalButton, { backgroundColor: theme.error }]}

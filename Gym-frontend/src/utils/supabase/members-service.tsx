@@ -10,7 +10,7 @@ export interface Member {
   email: string;
   phone: string;
   membership_type: string;
-  membership_status: 'active' | 'inactive' | 'suspended' | 'expired' | 'frozen';
+  membership_status: 'active' | 'inactive' | 'suspended' | 'expired' | 'frozen' | 'pending_approval';
   join_date: string;
   expiry_date?: string;
   emergency_contact?: string;

@@ -333,6 +333,13 @@ public class MemberDashboardResponseDTO {
         private String code;
         private LocalDate startDate;
         private LocalDate endDate;
+        /** membership / services / special-events / loyalty / demographics — what "Claim" opens */
+        private String category;
+        private BigDecimal maximumDiscount;
+        private BigDecimal minimumPurchase;
+        private String termsAndConditions;
+        /** Picked for this member (a "Specific Members" promotion) */
+        private boolean personal;
 
         public ActivePromotionDTO() {}
 
@@ -383,5 +390,20 @@ public class MemberDashboardResponseDTO {
 
         public LocalDate getEndDate() { return endDate; }
         public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+        public String getCategory() { return category; }
+        public void setCategory(String category) { this.category = category; }
+
+        public BigDecimal getMaximumDiscount() { return maximumDiscount; }
+        public void setMaximumDiscount(BigDecimal maximumDiscount) { this.maximumDiscount = maximumDiscount; }
+
+        public BigDecimal getMinimumPurchase() { return minimumPurchase; }
+        public void setMinimumPurchase(BigDecimal minimumPurchase) { this.minimumPurchase = minimumPurchase; }
+
+        public String getTermsAndConditions() { return termsAndConditions; }
+        public void setTermsAndConditions(String termsAndConditions) { this.termsAndConditions = termsAndConditions; }
+
+        public boolean isPersonal() { return personal; }
+        public void setPersonal(boolean personal) { this.personal = personal; }
     }
 }

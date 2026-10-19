@@ -8,8 +8,10 @@ import { ReferralPerformanceCards } from '../components/ReferralPerformanceCards
 import { ReferralInsightCard } from '../components/ReferralInsightCard';
 import { useReferrals, useReferralStats } from '../../hooks/useReferrals';
 import { useRewardStats } from '@/domains/rewards';
+import { useTranslation } from 'react-i18next';
 
 export function ReferralAnalyticsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: referralsPage, refetch: refetchReferrals } = useReferrals({ size: 1000 });
   const { data: stats, refetch: refetchStats } = useReferralStats();
@@ -89,8 +91,8 @@ export function ReferralAnalyticsScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Referral Analytics"
-        subtitle="Analyze referral conversion and performance"
+        title={t('adminReferrals.analyticsTitle')}
+        subtitle={t('adminReferrals.analyticsSubtitle')}
         onBack={() => router.back()}
       />
 

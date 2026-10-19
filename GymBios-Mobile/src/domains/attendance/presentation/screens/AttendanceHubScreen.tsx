@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -37,6 +38,7 @@ export function AttendanceHubScreen({
   onNavigateToTrends,
   onNavigateToReports,
 }: AttendanceHubScreenProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading, error, refresh } = useAttendanceStats();
 
@@ -50,8 +52,8 @@ export function AttendanceHubScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Attendance"
-          subtitle="Track member & staff attendance"
+          title={t('attendance.hub.title')}
+          subtitle={t('attendance.hub.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
         />
         <ScrollView
@@ -70,8 +72,8 @@ export function AttendanceHubScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Attendance"
-          subtitle="Track member & staff attendance"
+          title={t('attendance.hub.title')}
+          subtitle={t('attendance.hub.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
         />
         <ScrollView
@@ -88,7 +90,7 @@ export function AttendanceHubScreen({
           <View style={styles.errorContainer}>
             <Feather name="alert-triangle" size={32} color="#b91c1c" />
             <Typography variant="bodySmallBold" style={styles.errorTitle}>
-              Failed to load attendance data
+              {t('attendance.hub.loadErrorTitle')}
             </Typography>
             <Typography variant="bodySmall" color="textSecondary">
               {error.message}
@@ -147,30 +149,30 @@ export function AttendanceHubScreen({
         {/* ── Summary Stat Cards ── */}
         <View style={styles.statsGrid}>
           <AttendanceSummaryCard
-            label="Today's Visits"
+            label={t('attendance.hub.todaysVisits')}
             value={String(todayVisits)}
-            subtitle={`${activeNow} currently active`}
+            subtitle={t('attendance.hub.activeSub', { count: activeNow })}
             iconName="user-check"
             iconBg={BrandColors.teal}
           />
           <AttendanceSummaryCard
-            label="Avg Duration"
+            label={t('attendance.hub.avgDuration')}
             value={avgDuration}
-            subtitle="Per visit today"
+            subtitle={t('attendance.hub.avgDurationSub')}
             iconName="clock"
             iconBg="#10b981"
           />
           <AttendanceSummaryCard
-            label="Peak Hour"
+            label={t('attendance.hub.peakHour')}
             value={peakHour}
-            subtitle="Busiest time today"
+            subtitle={t('attendance.hub.peakHourSub')}
             iconName="trending-up"
             iconBg="#f59e0b"
           />
           <AttendanceSummaryCard
-            label="Attendance Rate"
+            label={t('attendance.hub.attendanceRate')}
             value={attendanceRate}
-            subtitle="Of active members"
+            subtitle={t('attendance.hub.attendanceRateSub')}
             iconName="users"
             iconBg="#8b5cf6"
           />
@@ -180,11 +182,11 @@ export function AttendanceHubScreen({
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Typography variant="bodySmallBold" style={styles.cardTitle}>
-              Weekly Trend
+              {t('attendance.hub.weeklyTrend')}
             </Typography>
             <View style={styles.cardHeaderRight}>
               <Typography variant="caption" color="textSecondary">
-                {weeklyTotal} visits this week
+                {t('attendance.hub.weeklyVisits', { count: weeklyTotal })}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </View>
@@ -194,14 +196,14 @@ export function AttendanceHubScreen({
             <SimpleBarChart data={weeklyTrend} height={140} />
           ) : (
             <Typography variant="caption" color="textSecondary">
-              No trend data available
+              {t('attendance.hub.noTrendData')}
             </Typography>
           )}
 
           <View style={styles.trendInsights}>
             <View style={styles.trendInsight}>
               <Typography variant="caption" color="textSecondary">
-                Busiest
+                {t('attendance.hub.busiest')}
               </Typography>
               <Typography variant="bodySmallBold">
                 {busiestDay.label} ({busiestDay.value})
@@ -209,7 +211,7 @@ export function AttendanceHubScreen({
             </View>
             <View style={styles.trendInsight}>
               <Typography variant="caption" color="textSecondary">
-                Quietest
+                {t('attendance.hub.quietest')}
               </Typography>
               <Typography variant="bodySmallBold">
                 {quietestDay.label} ({quietestDay.value})
@@ -221,18 +223,18 @@ export function AttendanceHubScreen({
         {/* ── Feature Cards ── */}
         <View style={styles.featureCards}>
           <HubFeatureCard
-            title="Today's Attendance"
-            subtitle="Active check-ins & manual checkout"
+            title={t('attendance.hub.todaysAttendanceTitle')}
+            subtitle={t('attendance.hub.todaysAttendanceSubtitle')}
             iconName="clipboard"
             iconBg="#e0f2fe"
             iconColor="#0284c7"
             onPress={onNavigateToToday}
-            countLabel={`${todayVisits} visits`}
+            countLabel={t('attendance.hub.visitsCount', { count: todayVisits })}
           />
 
           <HubFeatureCard
-            title="Staff & Trainers"
-            subtitle="Clock-in / clock-out records"
+            title={t('attendance.hub.staffTrainersTitle')}
+            subtitle={t('attendance.hub.staffTrainersSubtitle')}
             iconName="briefcase"
             iconBg="#fef3c7"
             iconColor="#d97706"
@@ -240,8 +242,8 @@ export function AttendanceHubScreen({
           />
 
           <HubFeatureCard
-            title="Weekly Trends"
-            subtitle="Visit patterns & insights"
+            title={t('attendance.hub.trendsTitle')}
+            subtitle={t('attendance.hub.trendsSubtitle')}
             iconName="bar-chart-2"
             iconBg="#dcfce7"
             iconColor="#15803d"
@@ -249,8 +251,8 @@ export function AttendanceHubScreen({
           />
 
           <HubFeatureCard
-            title="Reports"
-            subtitle="Detailed analytics & exports"
+            title={t('attendance.hub.reportsTitle')}
+            subtitle={t('attendance.hub.reportsSubtitle')}
             iconName="file-text"
             iconBg="#ede9fe"
             iconColor="#7c3aed"
@@ -261,12 +263,12 @@ export function AttendanceHubScreen({
         {/* ── Quick Stats ── */}
         <View style={styles.quickStatsCard}>
           <Typography variant="bodySmallBold" style={styles.quickStatsTitle}>
-            Quick Stats
+            {t('common.quickStats', { defaultValue: 'Quick Stats' })}
           </Typography>
           <View style={styles.quickStatsGrid}>
             <View style={styles.quickStat}>
               <Typography variant="caption" color="textSecondary">
-                Active Members
+                {t('attendance.reports.activeMembers', { defaultValue: 'Active Members' })}
               </Typography>
               <Typography variant="bodySmallBold" style={styles.quickStatValue}>
                 {totalActiveMembers}
@@ -274,7 +276,7 @@ export function AttendanceHubScreen({
             </View>
             <View style={styles.quickStat}>
               <Typography variant="caption" color="textSecondary">
-                Peak Hour
+                {t('attendance.hub.peakHour')}
               </Typography>
               <Typography variant="bodySmallBold" style={styles.quickStatValue}>
                 {peakHour}

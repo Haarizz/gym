@@ -195,6 +195,8 @@ const membership = {
       offer: '优惠',
       coupon: '优惠券',
       rewardPass: '奖励券',
+      offerApplied: '已使用优惠：{{name}}',
+      removeOffer: '移除优惠',
       totalPayable: '应付总额',
       paymentFor: '支付 {{name}}',
     },

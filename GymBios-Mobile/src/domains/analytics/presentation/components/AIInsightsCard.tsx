@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -11,13 +12,14 @@ interface AIInsightsCardProps {
 }
 
 export function AIInsightsCard({ insights }: AIInsightsCardProps) {
+  const { t } = useTranslation();
   if (!insights || insights.length === 0) return null;
 
   return (
     <LinearGradient colors={['#327f74', '#2a6b62']} style={styles.card}>
       <View style={styles.header}>
         <Feather name="activity" size={20} color="#FFF" />
-        <Text style={styles.title}>AI Insights</Text>
+        <Text style={styles.title}>{t('analytics.cards.aiInsights')}</Text>
       </View>
       <Text style={styles.text}>
         {insights.join(' ')}

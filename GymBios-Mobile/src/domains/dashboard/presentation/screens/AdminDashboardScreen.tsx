@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Spacing } from '@/core/theme';
 import { GlassBlob, Loader } from '@/shared/components';
@@ -18,6 +19,7 @@ import { AdminBranchSelectSheet } from '../components/AdminBranchSelectSheet';
 import { AdminDateRangeSheet } from '../components/AdminDateRangeSheet';
 
 export function AdminDashboardScreen() {
+  const { t } = useTranslation();
   const [selectedReport, setSelectedReport] = useState<AdminReportType>(null);
   const [range, setRange] = useState<AdminDashboardDateRange>(todayRange());
   const [branchSheetOpen, setBranchSheetOpen] = useState(false);
@@ -29,7 +31,7 @@ export function AdminDashboardScreen() {
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
-        <Loader message="Loading dashboard..." />
+        <Loader message={t('dashboard.admin.loading')} />
       </View>
     );
   }
@@ -66,8 +68,8 @@ export function AdminDashboardScreen() {
 
         {isError && (
           <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>Couldn&apos;t load the latest dashboard data.</Text>
-            <Text style={styles.errorRetry} onPress={() => refetch()}>Tap to retry</Text>
+            <Text style={styles.errorText}>{t('dashboard.admin.loadError')}</Text>
+            <Text style={styles.errorRetry} onPress={() => refetch()}>{t('dashboard.admin.tapToRetry')}</Text>
           </View>
         )}
 

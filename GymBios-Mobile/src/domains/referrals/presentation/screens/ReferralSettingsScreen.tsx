@@ -13,8 +13,10 @@ import { useUpdateReferralSettings } from '../../hooks/useReferralActions';
 import type { ReferralSettings } from '../../domain/ReferralSettings';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 export function ReferralSettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: serverSettings, isLoading } = useReferralSettings();
   const updateSettingsMutation = useUpdateReferralSettings();
@@ -55,8 +57,8 @@ export function ReferralSettingsScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Referral Settings"
-        subtitle="Configure global referral program parameters"
+        title={t('adminReferrals.settingsTitle')}
+        subtitle={t('adminReferrals.settingsSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -65,16 +67,16 @@ export function ReferralSettingsScreen() {
           {/* General Settings */}
           <View style={styles.card}>
             <Typography variant="subtitle" style={styles.cardTitle}>
-              General Settings
+              {t('adminReferrals.generalSettings')}
             </Typography>
 
             <View style={styles.switchRow}>
               <View style={{ flex: 1, marginRight: Spacing.two }}>
                 <Typography variant="bodySmall" style={styles.switchLabel}>
-                  Enable Referral Program
+                  {t('adminReferrals.enableProgram')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Turn the entire referral system on/off
+                  {t('adminReferrals.enableProgramDesc')}
                 </Typography>
               </View>
               <Switch
@@ -87,10 +89,10 @@ export function ReferralSettingsScreen() {
             <View style={styles.switchRow}>
               <View style={{ flex: 1, marginRight: Spacing.two }}>
                 <Typography variant="bodySmall" style={styles.switchLabel}>
-                  Auto-generate Codes
+                  {t('adminReferrals.autoGenerateCodes')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Automatically create codes for new members
+                  {t('adminReferrals.autoGenerateCodesDesc')}
                 </Typography>
               </View>
               <Switch
@@ -103,10 +105,10 @@ export function ReferralSettingsScreen() {
             <View style={styles.switchRow}>
               <View style={{ flex: 1, marginRight: Spacing.two }}>
                 <Typography variant="bodySmall" style={styles.switchLabel}>
-                  Email Notifications
+                  {t('adminReferrals.emailNotifications')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Send email updates for referral activities
+                  {t('adminReferrals.emailNotificationsDesc')}
                 </Typography>
               </View>
               <Switch
@@ -117,7 +119,7 @@ export function ReferralSettingsScreen() {
             </View>
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
-              Referral Code Prefix
+              {t('adminReferrals.codePrefix')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -126,7 +128,7 @@ export function ReferralSettingsScreen() {
             />
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
-              Referral Link Domain
+              {t('adminReferrals.linkDomain')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -138,11 +140,11 @@ export function ReferralSettingsScreen() {
           {/* Reward Settings */}
           <View style={styles.card}>
             <Typography variant="subtitle" style={styles.cardTitle}>
-              Reward Settings
+              {t('adminReferrals.rewardSettings')}
             </Typography>
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
-              Maximum Rewards per Member
+              {t('adminReferrals.maxRewardsPerMember')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -156,11 +158,11 @@ export function ReferralSettingsScreen() {
               }
             />
             <Typography variant="caption" color="textSecondary" style={styles.helpText}>
-              Limit in <CurrencyGlyph />
+              {t('adminReferrals.limitIn')} <CurrencyGlyph />
             </Typography>
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
-              Default Reward Expiry (Days)
+              {t('adminReferrals.defaultRewardExpiry')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -175,7 +177,7 @@ export function ReferralSettingsScreen() {
             />
 
             <Typography variant="bodySmall" style={styles.inputLabel}>
-              Minimum Purchase Amount
+              {t('adminReferrals.minPurchaseAmount')}
             </Typography>
             <TextInput
               style={styles.input}
@@ -189,16 +191,16 @@ export function ReferralSettingsScreen() {
               }
             />
             <Typography variant="caption" color="textSecondary" style={styles.helpText}>
-              Minimum <CurrencyGlyph /> amount to trigger rewards
+              {t('adminReferrals.minAmountTrigger')}
             </Typography>
 
             <View style={styles.switchRow}>
               <View style={{ flex: 1, marginRight: Spacing.two }}>
                 <Typography variant="bodySmall" style={styles.switchLabel}>
-                  Auto-process Rewards
+                  {t('adminReferrals.autoProcessRewards')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Automatically credit rewards when conditions are met
+                  {t('adminReferrals.autoProcessRewardsDesc')}
                 </Typography>
               </View>
               <Switch
@@ -212,27 +214,27 @@ export function ReferralSettingsScreen() {
           {/* Tier System Information */}
           <View style={styles.card}>
             <Typography variant="subtitle" style={styles.cardTitle}>
-              Tier System
+              {t('adminReferrals.tierSystem')}
             </Typography>
 
             <View style={styles.tierGrid}>
               <View style={[styles.tierBox, { backgroundColor: '#ffedd5', borderColor: '#fed7aa' }]}>
                 <Feather name="target" size={24} color="#c2410c" />
                 <Typography variant="bodySmall" style={{ fontWeight: '700', color: '#c2410c', marginTop: 4 }}>
-                  Bronze
+                  {t('adminReferrals.bronze')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  0-2 referrals
+                  {t('adminReferrals.bronzeDesc')}
                 </Typography>
               </View>
 
               <View style={[styles.tierBox, { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' }]}>
                 <Feather name="star" size={24} color="#475569" />
                 <Typography variant="bodySmall" style={{ fontWeight: '700', color: '#475569', marginTop: 4 }}>
-                  Silver
+                  {t('adminReferrals.silver')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  3-5 referrals
+                  {t('adminReferrals.silverDesc')}
                 </Typography>
               </View>
             </View>
@@ -241,20 +243,20 @@ export function ReferralSettingsScreen() {
               <View style={[styles.tierBox, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
                 <Feather name="sun" size={24} color="#b45309" />
                 <Typography variant="bodySmall" style={{ fontWeight: '700', color: '#b45309', marginTop: 4 }}>
-                  Gold
+                  {t('adminReferrals.gold')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  6-10 referrals
+                  {t('adminReferrals.goldDesc')}
                 </Typography>
               </View>
 
               <View style={[styles.tierBox, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff' }]}>
                 <Feather name="award" size={24} color="#7e22ce" />
                 <Typography variant="bodySmall" style={{ fontWeight: '700', color: '#7e22ce', marginTop: 4 }}>
-                  Platinum
+                  {t('adminReferrals.platinum')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  11+ referrals
+                  {t('adminReferrals.platinumDesc')}
                 </Typography>
               </View>
             </View>
@@ -262,7 +264,7 @@ export function ReferralSettingsScreen() {
 
           {/* Save Button */}
           <Button
-            title="Save Settings"
+            title={t('adminReferrals.saveSettings')}
             onPress={handleSave}
             loading={updateSettingsMutation.isPending}
             style={styles.saveBtn}

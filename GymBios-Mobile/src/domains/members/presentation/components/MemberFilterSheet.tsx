@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -18,12 +19,23 @@ export const EMPTY_MEMBER_FILTERS: MemberListFilters = {
   paymentStatus: '',
 };
 
-interface Option {
+export interface Option {
   label: string;
   value: string;
 }
 
-// Values are the lowercase strings the backend stores and filters on.
+export function getMemberStatusOptions(t: (k: any) => string): Option[] {
+  return [
+    { label: t('members.statuses.all'), value: '' },
+    { label: t('members.statuses.active'), value: 'active' },
+    { label: t('members.statuses.expired'), value: 'expired' },
+    { label: t('members.statuses.frozen'), value: 'frozen' },
+    { label: t('members.statuses.inactive'), value: 'inactive' },
+    { label: t('members.statuses.suspended'), value: 'suspended' },
+  ];
+}
+
+// Fallback constant for backwards compatibility
 export const MEMBER_STATUS_OPTIONS: Option[] = [
   { label: 'All', value: '' },
   { label: 'Active', value: 'active' },
@@ -33,21 +45,25 @@ export const MEMBER_STATUS_OPTIONS: Option[] = [
   { label: 'Suspended', value: 'suspended' },
 ];
 
-const MEMBERSHIP_TYPE_OPTIONS: Option[] = [
-  { label: 'All', value: '' },
-  { label: 'Individual', value: 'individual' },
-  { label: 'Family', value: 'family' },
-  { label: 'Couple', value: 'couple' },
-  { label: 'Corporate', value: 'corporate' },
-];
+export function getMembershipTypeOptions(t: (k: any) => string): Option[] {
+  return [
+    { label: t('members.types.all'), value: '' },
+    { label: t('members.types.individual'), value: 'individual' },
+    { label: t('members.types.family'), value: 'family' },
+    { label: t('members.types.couple'), value: 'couple' },
+    { label: t('members.types.corporate'), value: 'corporate' },
+  ];
+}
 
-const PAYMENT_STATUS_OPTIONS: Option[] = [
-  { label: 'All', value: '' },
-  { label: 'Paid', value: 'paid' },
-  { label: 'Partial', value: 'partial' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Overdue', value: 'overdue' },
-];
+export function getPaymentStatusOptions(t: (k: any) => string): Option[] {
+  return [
+    { label: t('members.paymentStatuses.all'), value: '' },
+    { label: t('members.paymentStatuses.paid'), value: 'paid' },
+    { label: t('members.paymentStatuses.partial'), value: 'partial' },
+    { label: t('members.paymentStatuses.pending'), value: 'pending' },
+    { label: t('members.paymentStatuses.overdue'), value: 'overdue' },
+  ];
+}
 
 interface FilterChipProps {
   label: string;
@@ -86,6 +102,7 @@ interface MemberFilterSheetProps {
 }
 
 export function MemberFilterSheet({ visible, filters, onApply, onClose }: MemberFilterSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   // Edit a draft so the list only refetches once, on Apply.
   const [draft, setDraft] = useState(filters);
@@ -98,13 +115,13 @@ export function MemberFilterSheet({ visible, filters, onApply, onClose }: Member
   }
 
   const groups: { title: string; key: keyof MemberListFilters; options: Option[] }[] = [
-    { title: 'Membership status', key: 'status', options: MEMBER_STATUS_OPTIONS },
-    { title: 'Membership type', key: 'membershipType', options: MEMBERSHIP_TYPE_OPTIONS },
-    { title: 'Payment status', key: 'paymentStatus', options: PAYMENT_STATUS_OPTIONS },
+    { title: t('members.filters.membershipStatus'), key: 'status', options: getMemberStatusOptions(t) },
+    { title: t('members.filters.membershipType'), key: 'membershipType', options: getMembershipTypeOptions(t) },
+    { title: t('members.filters.paymentStatus'), key: 'paymentStatus', options: getPaymentStatusOptions(t) },
   ];
 
   return (
-    <AppBottomSheet visible={visible} title="Filter members" onClose={onClose}>
+    <AppBottomSheet visible={visible} title={t('members.filters.title')} onClose={onClose}>
       {groups.map((group) => (
         <View key={group.key} style={styles.group}>
           <Typography variant="bodySmallBold">{group.title}</Typography>
@@ -128,7 +145,7 @@ export function MemberFilterSheet({ visible, filters, onApply, onClose }: Member
           accessibilityRole="button"
         >
           <Typography variant="bodySmallBold" color="textSecondary">
-            Reset
+            {t('members.filters.reset')}
           </Typography>
         </Pressable>
         <Pressable
@@ -137,7 +154,7 @@ export function MemberFilterSheet({ visible, filters, onApply, onClose }: Member
           accessibilityRole="button"
         >
           <Typography variant="bodySmallBold" style={{ color: BrandColors.white }}>
-            Apply filters
+            {t('members.filters.applyFilters')}
           </Typography>
         </Pressable>
       </View>

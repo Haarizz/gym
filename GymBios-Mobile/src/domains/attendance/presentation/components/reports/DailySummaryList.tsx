@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -10,18 +11,20 @@ interface DailySummaryListProps {
 }
 
 export function DailySummaryList({ rows }: DailySummaryListProps) {
+  const { t } = useTranslation();
+
   if (rows.length === 0) {
     return (
-      <AttendanceSection title="Daily Summary">
+      <AttendanceSection title={t('attendance.reports.dailySummary')}>
         <Typography variant="caption" color="textSecondary">
-          No daily data for this period.
+          {t('attendance.reports.noDailyData')}
         </Typography>
       </AttendanceSection>
     );
   }
 
   return (
-    <AttendanceSection title="Daily Summary">
+    <AttendanceSection title={t('attendance.reports.dailySummary')}>
       <View style={styles.list}>
         {rows.map((row, index) => (
           <View key={`${row.fullDate ?? row.date}-${index}`} style={styles.row}>

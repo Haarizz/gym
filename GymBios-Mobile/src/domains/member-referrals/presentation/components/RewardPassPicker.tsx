@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Trans, useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
@@ -47,11 +47,13 @@ interface Props {
   onChange: (sel: RewardSelection) => void;
   /** Resolves a typed code; omit to hide the coupon field. */
   validateCode?: (code: string) => Promise<DiscountCode>;
-  /** Also accept promotion codes (new-member purchases); otherwise only COUPON results are. */
+  /** Also accept promotion codes; otherwise only COUPON results are. */
   acceptPromotions?: boolean;
+  /** A code to fill in and apply once on mount, e.g. from the dashboard's offer */
+  initialCode?: string;
 }
 
-export function RewardPassPicker({ passContext, value, onChange, validateCode, acceptPromotions = false }: Props) {
+export function RewardPassPicker({ passContext, value, onChange, validateCode, acceptPromotions = false, initialCode }: Props) {
   const { t } = useTranslation();
   const { data: passes = [] } = useMyRewardPasses(passContext);
   const { data: coupons = [] } = useMyCoupons(passContext != null && !!validateCode);
@@ -59,15 +61,25 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
   const [checking, setChecking] = useState(false);
   const [checkingCoupon, setCheckingCoupon] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const appliedInitial = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!initialCode || !validateCode || value || appliedInitial.current === initialCode) return;
+    appliedInitial.current = initialCode;
+    setCode(initialCode.toUpperCase());
+    applyCode(initialCode);
+    // Once per initialCode; applyCode is recreated each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCode, validateCode, value]);
 
   if (passes.length === 0 && !validateCode) return null;
 
-  const applyCode = async () => {
-    if (!validateCode || !code.trim()) return;
+  async function applyCode(typed: string = code) {
+    if (!validateCode || !typed.trim()) return;
     setChecking(true);
     setError(null);
     try {
-      const resolved = await validateCode(code.trim());
+      const resolved = await validateCode(typed.trim());
       if (resolved.source !== 'COUPON' && !acceptPromotions) {
         setError(t('rewardPicker.promotionNotAllowed'));
         return;
@@ -186,7 +198,7 @@ export function RewardPassPicker({ passContext, value, onChange, validateCode, a
               <Pressable
                 style={[styles.applyButton, (checking || !code.trim() || value?.kind === 'pass') && styles.disabled]}
                 disabled={checking || !code.trim() || value?.kind === 'pass'}
-                onPress={applyCode}
+                onPress={() => applyCode()}
               >
                 {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.applyText}>{t('rewardPicker.apply')}</Text>}
               </Pressable>

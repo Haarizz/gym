@@ -11,6 +11,7 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.PromotionCampaignRepository;
 import com.company.project.services.DiscountCodeService;
+import com.company.project.services.PromotionAudience;
 import com.company.project.services.PromotionCampaignService;
 import com.company.project.services.WalletService;
 import org.springframework.stereotype.Service;
@@ -60,23 +61,31 @@ public class PosPromotionService {
 
     // ── Lookups for the till ────────────────────────────────────────────────
 
-    /** Active, in-date promotions with a price discount and uses left — the till's Promotions list. */
+    /**
+     * Active, in-date promotions with a price discount and uses left — the till's Promotions list —
+     * that the sale's customer (null: a walk-in) is in the target audience of.
+     */
     @Transactional(readOnly = true)
-    public List<DiscountRule> activePromotions() {
+    public List<DiscountRule> activePromotions(Long memberDbId) {
         LocalDate today = LocalDate.now();
+        PromotionAudience.Buyer buyer = PromotionAudience.Buyer.of(member(memberDbId));
         return promotionRepo.findByStatusOrderByCreatedAtDesc("active").stream()
                 .filter(p -> p.getStartDate() == null || !p.getStartDate().isAfter(today))
                 .filter(p -> p.getEndDate() == null || !p.getEndDate().isBefore(today))
                 .filter(p -> p.getUsageLimit() == null || p.getUsageCount() == null || p.getUsageCount() < p.getUsageLimit())
                 .filter(p -> PRICE_TYPES.contains(type(p.getDiscountType())))
+                .filter(p -> PromotionAudience.allows(p, buyer))
                 .map(p -> rule(PromotionCampaignResponseDTO.fromEntity(p), null))
                 .toList();
     }
 
-    /** Resolves a typed code (promotion first, then referral coupon); with `gross`, includes its discount. */
+    /**
+     * Resolves a typed code (promotion first, then referral coupon) for the sale's customer
+     * (null: a walk-in); with `gross`, includes its discount.
+     */
     @Transactional(readOnly = true)
-    public DiscountRule lookupCode(String code, BigDecimal gross) {
-        DiscountCodeDTO d = resolveCode(code, gross);
+    public DiscountRule lookupCode(String code, BigDecimal gross, Long memberDbId) {
+        DiscountCodeDTO d = resolveCode(code, gross, member(memberDbId));
         if ("PROMOTION".equals(d.getSource())) {
             return rule(promotionService.getPromotionById(d.getPromotionId()), gross);
         }
@@ -93,15 +102,19 @@ public class PosPromotionService {
 
     // ── Checkout ────────────────────────────────────────────────────────────
 
-    /** The discount a code or picked promotion gives on `base` (the basket after the cashier's bill discount). */
+    /**
+     * The discount a code or picked promotion gives `member` (null: a walk-in) on `base`
+     * (the basket after the cashier's bill discount).
+     */
     @Transactional(readOnly = true)
-    public Applied preview(String code, Long promotionId, BigDecimal base) {
+    public Applied preview(String code, Long promotionId, BigDecimal base, Member member) {
         if (code != null && !code.isBlank()) {
-            DiscountCodeDTO d = resolveCode(code, base);
+            DiscountCodeDTO d = resolveCode(code, base, member);
             return new Applied(d.getSource(), d.getCode(), d.getPromotionId(), d.getName(), base, r2(nz(d.getDiscountAmount())));
         }
         if (promotionId != null) {
             PromotionCampaignResponseDTO promo = validPromotion(promotionId);
+            PromotionAudience.require(promo, PromotionAudience.Buyer.of(member));
             BigDecimal discount = discountOf(promo, base);
             return new Applied("PROMOTION", promo.getCode(), promo.getId(), promo.getName(), base, discount);
         }
@@ -139,12 +152,17 @@ public class PosPromotionService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private DiscountCodeDTO resolveCode(String code, BigDecimal gross) {
+    private DiscountCodeDTO resolveCode(String code, BigDecimal gross, Member member) {
         try {
-            return discountCodeService.resolve(code, gross);
+            return discountCodeService.resolve(code, gross, PromotionAudience.Buyer.of(member));
         } catch (IllegalStateException | IllegalArgumentException e) {
             throw new BusinessRuleViolationException(e.getMessage());
         }
+    }
+
+    private Member member(Long memberDbId) {
+        return memberDbId == null ? null : memberRepo.findById(memberDbId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberDbId));
     }
 
     /** Same checks a promotion code gets (active, in date, uses left), for a promotion picked by id. */

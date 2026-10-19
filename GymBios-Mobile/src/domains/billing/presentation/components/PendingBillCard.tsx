@@ -2,6 +2,8 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { useTranslation } from 'react-i18next';
+
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { Bill } from '../../domain/Bill';
@@ -38,6 +40,7 @@ export const PendingBillCard = memo(function PendingBillCard({
   isSelected,
   onToggle,
 }: PendingBillCardProps) {
+  const { t } = useTranslation();
   const isOverdue = bill.status === ReceiptStatus.Overdue;
 
   return (
@@ -82,19 +85,19 @@ export const PendingBillCard = memo(function PendingBillCard({
               style={isOverdue ? styles.overdueDateText : undefined}
               color={isOverdue ? undefined : 'textSecondary'}
             >
-              Due {formatDate(bill.dueDate)}
+              {t('billing.cards.due')} {formatDate(bill.dueDate)}
             </Typography>
           </View>
 
           <View style={styles.amounts}>
             <Typography variant="caption" color="textSecondary">
-              Billed:{' '}
+              {t('billing.cards.billed')}{' '}
             </Typography>
             <MoneyText amount={bill.amount} variant="caption" />
             {(bill.totalPaidToDate ?? 0) > 0 && (
               <>
                 <Typography variant="caption" color="textSecondary">
-                  {' '}· Paid:{' '}
+                  {' '}{t('billing.cards.paid')}{' '}
                 </Typography>
                 <MoneyText amount={bill.totalPaidToDate} variant="caption" />
               </>
@@ -111,7 +114,7 @@ export const PendingBillCard = memo(function PendingBillCard({
           color={isOverdue ? '#b91c1c' : BrandColors.teal}
         />
         <Typography variant="caption" color="textSecondary">
-          due
+          {t('billing.cards.duePrefix')}
         </Typography>
       </View>
     </Pressable>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Loader } from '@/shared/components/Loader';
@@ -23,6 +24,7 @@ export function PromotionFormScreen({
   onSuccess,
   onCancel,
 }: PromotionFormScreenProps) {
+  const { t } = useTranslation();
   const {
     data: fetchedData,
     isLoading,
@@ -47,9 +49,9 @@ export function PromotionFormScreen({
       <ScreenLayout>
         <View style={styles.centerContainer}>
           <EmptyState
-            title="Promotion not found"
-            description="Could not fetch promotion details for editing."
-            buttonLabel="Try Again"
+            title={t('promotions.notFoundTitle')}
+            description={t('promotions.notFoundDesc')}
+            buttonLabel={t('promotions.tryAgain')}
             onPress={() => refetch()}
           />
         </View>

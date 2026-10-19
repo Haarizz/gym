@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ScrollView, View, StyleSheet, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -20,38 +21,39 @@ import {
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
 import { useAddLead } from '../../hooks/useAddLead';
 
-const sourceOptions = [
-  { label: 'Website', value: 'website' },
-  { label: 'Referral', value: 'referral' },
-  { label: 'Walk-in', value: 'walk-in' },
-  { label: 'Social Media', value: 'social-media' },
-  { label: 'Google Ads', value: 'google-ads' },
-  { label: 'Facebook Ads', value: 'facebook-ads' },
-];
-
-const followUpTypeOptions = [
-  { label: 'Call', value: 'call' },
-  { label: 'Email', value: 'email' },
-  { label: 'SMS', value: 'sms' },
-  { label: 'WhatsApp', value: 'whatsapp' },
-  { label: 'In-App Message', value: 'in_app' },
-  { label: 'Meeting', value: 'meeting' },
-  { label: 'Visit', value: 'visit' },
-];
-
-const durationOptions = [
-  { label: '15 minutes', value: '15' },
-  { label: '30 minutes', value: '30' },
-  { label: '45 minutes', value: '45' },
-  { label: '1 hour', value: '60' },
-];
-
 export function AddLeadScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { addLead, isAdding } = useAddLead();
   const [isExiting, setIsExiting] = useState(false);
+
+  const sourceOptions = useMemo(() => [
+    { label: t('leads.sources.website'), value: 'website' },
+    { label: t('leads.sources.referral'), value: 'referral' },
+    { label: t('leads.sources.walkIn'), value: 'walk-in' },
+    { label: t('leads.sources.socialMedia'), value: 'social-media' },
+    { label: t('leads.sources.googleAds'), value: 'google-ads' },
+    { label: t('leads.sources.facebookAds'), value: 'facebook-ads' },
+  ], [t]);
+
+  const followUpTypeOptions = useMemo(() => [
+    { label: t('leads.followUpTypes.call'), value: 'call' },
+    { label: t('leads.followUpTypes.email'), value: 'email' },
+    { label: t('leads.followUpTypes.sms'), value: 'sms' },
+    { label: t('leads.followUpTypes.whatsapp'), value: 'whatsapp' },
+    { label: t('leads.followUpTypes.inApp'), value: 'in_app' },
+    { label: t('leads.followUpTypes.meeting'), value: 'meeting' },
+    { label: t('leads.followUpTypes.visit'), value: 'visit' },
+  ], [t]);
+
+  const durationOptions = useMemo(() => [
+    { label: t('leads.durations.min15'), value: '15' },
+    { label: t('leads.durations.min30'), value: '30' },
+    { label: t('leads.durations.min45'), value: '45' },
+    { label: t('leads.durations.hour1'), value: '60' },
+  ], [t]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -93,15 +95,15 @@ export function AddLeadScreen() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!form.firstName.trim()) newErrors.firstName = 'Required';
-    if (!form.lastName.trim()) newErrors.lastName = 'Required';
-    if (!form.phone.trim()) newErrors.phone = 'Required';
-    if (!form.source) newErrors.source = 'Required';
-    if (!form.priority) newErrors.priority = 'Required';
-    if (!form.followUpType) newErrors.followUpType = 'Required';
-    if (!form.followUpDueDate) newErrors.followUpDueDate = 'Required';
-    if (!form.followUpScheduledTime) newErrors.followUpScheduledTime = 'Required';
-    if (!form.followUpPriority) newErrors.followUpPriority = 'Required';
+    if (!form.firstName.trim()) newErrors.firstName = t('leads.form.requiredField');
+    if (!form.lastName.trim()) newErrors.lastName = t('leads.form.requiredField');
+    if (!form.phone.trim()) newErrors.phone = t('leads.form.requiredField');
+    if (!form.source) newErrors.source = t('leads.form.requiredField');
+    if (!form.priority) newErrors.priority = t('leads.form.requiredField');
+    if (!form.followUpType) newErrors.followUpType = t('leads.form.requiredField');
+    if (!form.followUpDueDate) newErrors.followUpDueDate = t('leads.form.requiredField');
+    if (!form.followUpScheduledTime) newErrors.followUpScheduledTime = t('leads.form.requiredField');
+    if (!form.followUpPriority) newErrors.followUpPriority = t('leads.form.requiredField');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -119,7 +121,7 @@ export function AddLeadScreen() {
         priority: form.priority as 'low' | 'medium' | 'high',
         notes: form.notes || undefined,
         followUpType: form.followUpType,
-        followUpSubject: form.followUpSubject || 'Follow-up',
+        followUpSubject: form.followUpSubject || t('leads.statuses.followUp'),
         // Local calendar date — toISOString() would shift it back a day in timezones ahead of UTC.
         followUpDueDate: format(form.followUpDueDate!, 'yyyy-MM-dd') + 'T00:00:00',
         followUpScheduledTime: form.followUpScheduledTime || undefined,
@@ -147,10 +149,10 @@ export function AddLeadScreen() {
           </Pressable>
           <View style={styles.headerTextContainer}>
             <Typography variant="title" style={styles.headerTitle}>
-              Add New Lead
+              {t('leads.form.addNewLead')}
             </Typography>
             <Typography variant="bodySmall" style={styles.headerSubtitle}>
-              Fill in the details below
+              {t('leads.form.fillDetails')}
             </Typography>
           </View>
         </View>
@@ -166,25 +168,25 @@ export function AddLeadScreen() {
             <View style={styles.sectionTitleContainer}>
               <View style={styles.dot} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                CONTACT DETAILS
+                {t('leads.form.contactDetails')}
               </Typography>
             </View>
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <Input
-                  label="First name"
-                  placeholder="e.g. Jana"
+                  label={t('leads.form.firstName')}
+                  placeholder={t('leads.form.firstNamePlaceholder')}
                   value={form.firstName}
-                  onChangeText={(t) => updateForm('firstName', t)}
+                  onChangeText={(val) => updateForm('firstName', val)}
                   error={errors.firstName}
                 />
               </View>
               <View style={styles.flex1}>
                 <Input
-                  label="Last name"
-                  placeholder="e.g. Doe"
+                  label={t('leads.form.lastName')}
+                  placeholder={t('leads.form.lastNamePlaceholder')}
                   value={form.lastName}
-                  onChangeText={(t) => updateForm('lastName', t)}
+                  onChangeText={(val) => updateForm('lastName', val)}
                   error={errors.lastName}
                 />
               </View>
@@ -192,19 +194,19 @@ export function AddLeadScreen() {
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <Input
-                  label="Email"
-                  placeholder="jana@email.com"
+                  label={t('leads.form.emailLabel')}
+                  placeholder={t('leads.form.emailPlaceholder')}
                   value={form.email}
-                  onChangeText={(t) => updateForm('email', t)}
+                  onChangeText={(val) => updateForm('email', val)}
                   keyboardType="email-address"
                 />
               </View>
               <View style={styles.flex1}>
                 <Input
-                  label="Phone"
-                  placeholder="+91 98765 43210"
+                  label={t('leads.form.phoneLabel')}
+                  placeholder={t('leads.form.phonePlaceholder')}
                   value={form.phone}
-                  onChangeText={(t) => updateForm('phone', t)}
+                  onChangeText={(val) => updateForm('phone', val)}
                   error={errors.phone}
                   keyboardType="phone-pad"
                 />
@@ -217,12 +219,12 @@ export function AddLeadScreen() {
             <View style={styles.sectionTitleContainer}>
               <View style={styles.dot} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                LEAD DETAILS
+                {t('leads.form.leadDetailsSection')}
               </Typography>
             </View>
             <Dropdown
-              label="Lead source"
-              placeholder="Select source"
+              label={t('leads.form.source')}
+              placeholder={t('leads.form.source')}
               options={sourceOptions}
               value={form.source}
               onChange={(v) => updateForm('source', v)}
@@ -230,7 +232,7 @@ export function AddLeadScreen() {
               error={errors.source}
             />
             <TrafficLightSelector
-              label="Lead Priority"
+              label={t('leads.form.leadPriority')}
               value={form.priority}
               onChange={(v) => updateForm('priority', v)}
               required
@@ -247,12 +249,12 @@ export function AddLeadScreen() {
             <View style={styles.sectionTitleContainer}>
               <View style={styles.dot} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                SCHEDULE FOLLOW-UP
+                {t('leads.form.scheduleFollowUp')}
               </Typography>
             </View>
             <Dropdown
-              label="Follow-up type"
-              placeholder="Select type"
+              label={t('leads.form.followUpType')}
+              placeholder={t('leads.form.followUpType')}
               options={followUpTypeOptions}
               value={form.followUpType}
               onChange={(v) => updateForm('followUpType', v)}
@@ -260,7 +262,7 @@ export function AddLeadScreen() {
               error={errors.followUpType}
             />
             <TrafficLightSelector
-              label="Follow-up Priority"
+              label={t('leads.form.followUpPriority')}
               value={form.followUpPriority}
               onChange={(v) => updateForm('followUpPriority', v)}
               required
@@ -271,14 +273,14 @@ export function AddLeadScreen() {
               </Typography>
             )}
             <Input
-              label="Follow-up subject"
-              placeholder="e.g. Subscription"
+              label={t('leads.form.followUpSubject')}
+              placeholder={t('leads.form.followUpSubjectPlaceholder')}
               value={form.followUpSubject}
-              onChangeText={(t) => updateForm('followUpSubject', t)}
+              onChangeText={(val) => updateForm('followUpSubject', val)}
             />
             <View style={styles.row}>
               <DatePicker
-                label="Due date"
+                label={t('leads.form.dueDate')}
                 value={form.followUpDueDate}
                 onChange={(d) => updateForm('followUpDueDate', d)}
                 required
@@ -286,16 +288,16 @@ export function AddLeadScreen() {
                 style={styles.flex1}
               />
               <TimePicker
-                label="Time"
+                label={t('leads.form.time')}
                 value={form.followUpScheduledTime}
-                onChange={(t) => updateForm('followUpScheduledTime', t)}
+                onChange={(val) => updateForm('followUpScheduledTime', val)}
                 required
                 error={errors.followUpScheduledTime}
               />
             </View>
             <Dropdown
-              label="Estimated duration"
-              placeholder="Select duration"
+              label={t('leads.form.estimatedDuration')}
+              placeholder={t('leads.form.selectDuration')}
               options={durationOptions}
               value={form.followUpEstimatedDuration}
               onChange={(v) => updateForm('followUpEstimatedDuration', v)}
@@ -307,14 +309,14 @@ export function AddLeadScreen() {
             <View style={styles.sectionTitleContainer}>
               <View style={styles.dot} />
               <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-                NOTES
+                {t('leads.form.notesSection')}
               </Typography>
             </View>
             <Input
-              label="Additional notes"
-              placeholder="Anything the team should know..."
+              label={t('leads.form.additionalNotes')}
+              placeholder={t('leads.form.additionalNotesPlaceholder')}
               value={form.notes}
-              onChangeText={(t) => updateForm('notes', t)}
+              onChangeText={(val) => updateForm('notes', val)}
               multiline
               numberOfLines={3}
               style={{ minHeight: 80, alignItems: 'flex-start' }}
@@ -328,7 +330,7 @@ export function AddLeadScreen() {
             onPress={handleBack}
             disabled={isAdding || isExiting}
           >
-            <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Text style={styles.cancelBtnText}>{t('leads.form.cancel')}</Text>
           </Pressable>
           <Pressable
             style={styles.submitBtnWrapper}
@@ -342,11 +344,11 @@ export function AddLeadScreen() {
               style={styles.submitBtn}
             >
               {isAdding ? (
-                <Text style={styles.submitBtnText}>Saving...</Text>
+                <Text style={styles.submitBtnText}>{t('leads.form.saving')}</Text>
               ) : (
                 <>
                   <Feather name="check" size={20} color="#FFF" style={styles.submitIcon} />
-                  <Text style={styles.submitBtnText}>Save Lead</Text>
+                  <Text style={styles.submitBtnText}>{t('leads.form.saveLead')}</Text>
                 </>
               )}
             </LinearGradient>

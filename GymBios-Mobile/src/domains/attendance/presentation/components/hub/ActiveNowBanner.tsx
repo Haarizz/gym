@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -10,14 +11,16 @@ interface ActiveNowBannerProps {
 }
 
 export function ActiveNowBanner({ activeCount, todayVisits }: ActiveNowBannerProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.banner}>
       <View style={styles.textGroup}>
         <Typography variant="bodySmallBold" style={styles.title}>
-          {activeCount} currently in gym
+          {t('attendance.hub.activeCount', { count: activeCount })}
         </Typography>
         <Typography variant="caption" style={styles.subtitle}>
-          {todayVisits} total visits today
+          {t('attendance.hub.totalVisitsToday', { count: todayVisits })}
         </Typography>
       </View>
       <View style={styles.iconWrap}>

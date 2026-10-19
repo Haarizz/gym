@@ -4,6 +4,7 @@ import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Spacing } from '@/core/theme';
+import { useTranslation } from 'react-i18next';
 import { useCreateMessageTemplate } from '../../../hooks/useMessagingHooks';
 
 interface CreateTemplateBottomSheetProps {
@@ -12,6 +13,7 @@ interface CreateTemplateBottomSheetProps {
 }
 
 export function CreateTemplateBottomSheet({ visible, onClose }: CreateTemplateBottomSheetProps) {
+  const { t } = useTranslation();
   const { mutateAsync: createTemplate } = useCreateMessageTemplate();
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
@@ -44,28 +46,28 @@ export function CreateTemplateBottomSheet({ visible, onClose }: CreateTemplateBo
   return (
     <AppBottomSheet
       visible={visible}
-      title="Create New Template"
-      subtitle="Add a new message template"
+      title={t('messaging.templates.modalTitle')}
+      subtitle={t('messaging.templates.modalSubtitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
         <Input
-          label="Template Name"
+          label={t('messaging.templates.templateName')}
           value={name}
           onChangeText={setName}
-          placeholder="e.g. Welcome Email"
+          placeholder={t('messaging.templates.templateNamePlaceholder')}
         />
         <Input
-          label="Subject"
+          label={t('messaging.compose.subject')}
           value={subject}
           onChangeText={setSubject}
-          placeholder="Enter message subject"
+          placeholder={t('messaging.compose.subjectPlaceholder')}
         />
         <Input
-          label="Message Content"
+          label={t('messaging.templates.content')}
           value={content}
           onChangeText={setContent}
-          placeholder="Type your template content here..."
+          placeholder={t('messaging.templates.contentPlaceholder')}
           multiline
           numberOfLines={6}
           textAlignVertical="top"
@@ -73,7 +75,7 @@ export function CreateTemplateBottomSheet({ visible, onClose }: CreateTemplateBo
         
         {/* We use standard Button instead of label/loading size based on previous usage */}
         <Button
-          title="Create Template"
+          title={t('messaging.templates.createBtn')}
           onPress={handleSubmit}
           loading={submitting}
           disabled={!name || !content}

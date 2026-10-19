@@ -54,8 +54,12 @@ export interface DiscountCode {
   promotionId?: number;
   code: string;
   name: string;
-  discountType: 'percentage' | 'fixed';
+  /** "free" = the whole amount (promotions only) */
+  discountType: 'percentage' | 'fixed' | 'free';
   discountValue: number;
+  /** Promotions only: cap on a percentage discount, and the smallest amount the code applies to */
+  maximumDiscount?: number | null;
+  minimumPurchase?: number | null;
 }
 
 /** Same maths as the backend's RewardRedemptionService.discountFor — percent or flat, capped at gross. */
@@ -542,8 +546,15 @@ export const couponService = {
 // ── Discount codes (promotion or shareable coupon) ─────────────────────────────
 
 export const discountCodeService = {
-  async validate(code: string): Promise<DiscountCode> {
-    const res = await fetch(`${BASE_URL}/discount-codes/validate?code=${encodeURIComponent(code)}`, { headers: await getHeaders() });
+  /**
+   * `joining`: checked for someone signing up, who counts as a new member for a promotion's
+   * audience; `memberId` (database id): checked for that member instead.
+   */
+  async validate(code: string, opts: { joining?: boolean; memberId?: number } = {}): Promise<DiscountCode> {
+    const params = new URLSearchParams({ code });
+    if (opts.joining) params.append('joining', 'true');
+    if (opts.memberId != null) params.append('memberId', String(opts.memberId));
+    const res = await fetch(`${BASE_URL}/discount-codes/validate?${params}`, { headers: await getHeaders() });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.message || 'Invalid code');
     return {
@@ -553,6 +564,8 @@ export const discountCodeService = {
       name: body.name,
       discountType: body.discount_type ?? body.discountType,
       discountValue: Number(body.discount_value ?? body.discountValue ?? 0),
+      maximumDiscount: body.maximum_discount ?? body.maximumDiscount ?? null,
+      minimumPurchase: body.minimum_purchase ?? body.minimumPurchase ?? null,
     };
   },
 };

@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Avatar } from '@/shared/components/Avatar';
+import { useTranslation } from 'react-i18next';
 import type { Referral } from '../../domain/Referral';
 
 interface LeaderboardMember {
@@ -19,6 +20,7 @@ interface ReferralLeaderboardProps {
 }
 
 export function ReferralLeaderboard({ referrals }: ReferralLeaderboardProps) {
+  const { t } = useTranslation();
   // Aggregate top referrers from actual referral data
   const referrersMap: Record<string, LeaderboardMember> = {};
 
@@ -70,10 +72,10 @@ export function ReferralLeaderboard({ referrals }: ReferralLeaderboardProps) {
         </View>
         <View style={styles.headerTitles}>
           <Typography variant="subtitle" style={styles.title}>
-            Top Referrers
+            {t('adminReferrals.topReferrers')}
           </Typography>
           <Typography variant="caption" color="textSecondary">
-            Members with highest successful referrals
+            {t('adminReferrals.topReferrersSubtitle')}
           </Typography>
         </View>
       </View>
@@ -81,7 +83,7 @@ export function ReferralLeaderboard({ referrals }: ReferralLeaderboardProps) {
       <View style={styles.list}>
         {topReferrers.length === 0 ? (
           <Typography variant="bodySmall" color="textSecondary" style={styles.emptyText}>
-            No top referrers recorded yet.
+            {t('adminReferrals.noTopReferrers')}
           </Typography>
         ) : (
           topReferrers.map((item, index) => {
@@ -109,7 +111,7 @@ export function ReferralLeaderboard({ referrals }: ReferralLeaderboardProps) {
 
                 <View style={styles.statsCol}>
                   <Typography variant="bodySmall" style={styles.countText}>
-                    {item.successfulCount} referrals
+                    {item.successfulCount} {t('adminReferrals.referralsCount')}
                   </Typography>
                   <View style={[styles.tierBadge, { backgroundColor: tierStyle.bg }]}>
                     <Feather name={tierStyle.icon} size={10} color={tierStyle.text} />

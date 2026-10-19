@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -71,6 +72,7 @@ export function RenewMembershipBottomSheet({
   onClose,
   onContinue,
 }: RenewMembershipBottomSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { plans: allPlans, loading, error } = useMembershipPlans();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -89,27 +91,27 @@ export function RenewMembershipBottomSheet({
   const isFamily = member.membershipType?.toUpperCase() === 'FAMILY';
   const isMinor = member.familyRole?.toUpperCase() === 'MINOR';
   const title = isMinor
-    ? 'Renew Minor Membership'
+    ? t('members.renewSheet.renewMinorTitle')
     : isFamily
-      ? 'Renew Family Membership'
-      : 'Renew Membership';
+      ? t('members.renewSheet.renewFamilyTitle')
+      : t('members.renewSheet.renewTitle');
 
   return (
     <AppBottomSheet visible={visible} title={title} subtitle={member.name} onClose={onClose}>
       <View style={styles.container}>
-        <Typography variant="bodySmallBold">Choose a plan</Typography>
+        <Typography variant="bodySmallBold">{t('members.renewSheet.choosePlan')}</Typography>
 
         {loading && plans.length === 0 ? (
           <Typography variant="bodySmall" color="textSecondary">
-            Loading plans...
+            {t('members.renewSheet.loadingPlans')}
           </Typography>
         ) : error ? (
           <Typography variant="bodySmall" color="error">
-            Failed to load plans.
+            {t('members.renewSheet.loadError')}
           </Typography>
         ) : plans.length === 0 ? (
           <Typography variant="bodySmall" color="textSecondary">
-            No active plans are available for this branch.
+            {t('members.renewSheet.noPlans')}
           </Typography>
         ) : (
           <View style={styles.planList}>
@@ -141,7 +143,7 @@ export function RenewMembershipBottomSheet({
                       {isCurrent ? (
                         <View style={styles.currentTag}>
                           <Typography variant="caption" style={styles.currentTagText}>
-                            CURRENT
+                            {t('members.renewSheet.currentTag')}
                           </Typography>
                         </View>
                       ) : null}
@@ -171,7 +173,7 @@ export function RenewMembershipBottomSheet({
           <View style={[styles.summary, { backgroundColor: theme.backgroundSelected }]}>
             <View style={styles.summaryRow}>
               <Typography variant="caption" color="textSecondary">
-                Current expiry
+                {t('members.renewSheet.currentExpiry')}
               </Typography>
               <Typography variant="bodySmallBold">
                 {formatMemberDate(member.expiryDate ?? member.endDate)}
@@ -179,14 +181,14 @@ export function RenewMembershipBottomSheet({
             </View>
             <View style={styles.summaryRow}>
               <Typography variant="caption" color="textSecondary">
-                New expiry
+                {t('members.renewSheet.newExpiry')}
               </Typography>
               <Typography variant="bodySmallBold" style={{ color: BrandColors.teal }}>
                 {newExpiry ? formatMemberDate(newExpiry.toISOString()) : '—'}
               </Typography>
             </View>
             <View style={[styles.summaryRow, styles.totalRow, { borderTopColor: theme.border }]}>
-              <Typography variant="bodySmallBold">Amount due</Typography>
+              <Typography variant="bodySmallBold">{t('members.renewSheet.amountDue')}</Typography>
               <Typography variant="subtitle">
                 <CurrencyValue amount={planPrice(selected)} />
               </Typography>
@@ -195,7 +197,7 @@ export function RenewMembershipBottomSheet({
         ) : null}
 
         <Button
-          label="Continue to Payment"
+          label={t('members.renewSheet.continueToPayment')}
           onPress={() => selected && onContinue(selected)}
           disabled={!selected}
           size="lg"

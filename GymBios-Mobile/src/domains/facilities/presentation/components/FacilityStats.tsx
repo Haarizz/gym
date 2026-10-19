@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { StatCard } from '@/shared/components/StatCard';
 import { BrandColors, Spacing } from '@/core/theme';
 import type { Facility } from '../../domain/Facility';
@@ -8,6 +9,7 @@ interface FacilityStatsProps {
 }
 
 export function FacilityStats({ facilities }: FacilityStatsProps) {
+  const { t } = useTranslation();
   const total = facilities.length;
   const active = facilities.filter(f => f.status === 'Active').length;
   
@@ -22,13 +24,13 @@ export function FacilityStats({ facilities }: FacilityStatsProps) {
     <View style={styles.container}>
       <View style={styles.row}>
         <StatCard
-          label="Total Facilities"
+          label={t('facilities.stats.totalFacilities')}
           value={String(total)}
           iconName="box"
           color={BrandColors.teal}
         />
         <StatCard
-          label="Active"
+          label={t('facilities.stats.active')}
           value={String(active)}
           iconName="check-circle"
           color="#10b981"
@@ -36,13 +38,13 @@ export function FacilityStats({ facilities }: FacilityStatsProps) {
       </View>
       <View style={styles.row}>
         <StatCard
-          label="Bookings (Month)"
+          label={t('facilities.stats.bookingsMonth')}
           value={String(totalBookings)}
           iconName="calendar"
           color="#3b82f6"
         />
         <StatCard
-          label="Avg Occupancy"
+          label={t('facilities.stats.avgOccupancy')}
           value={avgOccupancy > 0 ? String(avgOccupancy) : '-'}
           iconName="users"
           color="#f59e0b"

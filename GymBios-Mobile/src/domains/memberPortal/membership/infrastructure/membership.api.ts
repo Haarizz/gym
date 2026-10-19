@@ -155,13 +155,14 @@ export const membershipApi = {
 
   previewMembershipChange: async (
     planId: number,
-    reward?: { rewardPassId?: number; couponCode?: string },
+    reward?: { rewardPassId?: number; couponCode?: string; promotionId?: number },
   ): Promise<any> => {
-    const withReward = !!(reward?.rewardPassId || reward?.couponCode);
+    const withReward = !!(reward?.rewardPassId || reward?.couponCode || reward?.promotionId);
     const response = await apiClient.post<any>('/mobile/member/membership/change/preview', {
       plan_id: planId,
       reward_pass_id: reward?.rewardPassId,
       coupon_code: reward?.couponCode,
+      promotion_id: reward?.promotionId,
     }, {
       // A rejected pass/coupon is reported (and dropped) by the renew modal itself.
       skipGlobalErrorToast: withReward,
@@ -183,6 +184,7 @@ export const membershipApi = {
       plan_id: request.planId,
       reward_pass_id: request.rewardPassId,
       coupon_code: request.couponCode,
+      promotion_id: request.promotionId,
       payment_method_used: request.paymentMethodUsed,
       payment_breakdown: request.paymentBreakdown?.map((split: any) => ({
         method: split.method,

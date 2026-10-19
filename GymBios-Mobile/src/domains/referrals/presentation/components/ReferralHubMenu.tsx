@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 export interface MenuItem {
   id: string;
@@ -95,6 +96,7 @@ interface ReferralHubMenuProps {
 }
 
 export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const handlePress = (item: MenuItem) => {
@@ -108,7 +110,7 @@ export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
   return (
     <View style={styles.container}>
       <Typography variant="subtitle" style={styles.sectionTitle}>
-        Referrals Menu
+        {t('adminReferrals.menuTitle')}
       </Typography>
 
       <View style={styles.list}>
@@ -135,7 +137,7 @@ export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
 
             <View style={styles.navButton}>
               <Typography variant="bodySmall" style={styles.navButtonText}>
-                Open
+                {t('adminReferrals.open')}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </View>

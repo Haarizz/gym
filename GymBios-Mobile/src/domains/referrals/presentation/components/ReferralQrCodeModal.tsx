@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
+import { useTranslation } from 'react-i18next';
 
 interface ReferralQrCodeModalProps {
   visible: boolean;
@@ -18,6 +19,7 @@ export function ReferralQrCodeModal({
   link,
   onCopyLink,
 }: ReferralQrCodeModalProps) {
+  const { t } = useTranslation();
   if (!link) return null;
 
   const fullLink = link.startsWith('http') ? link : `https://${link}`;
@@ -28,7 +30,7 @@ export function ReferralQrCodeModal({
         <View style={styles.dialog}>
           <View style={styles.header}>
             <Typography variant="title" style={styles.title}>
-              Referral QR Code
+              {t('adminReferrals.qrCodeTitle')}
             </Typography>
             <Pressable onPress={onClose} hitSlop={8}>
               <Feather name="x" size={20} color={BrandColors.textPrimary} />
@@ -36,7 +38,7 @@ export function ReferralQrCodeModal({
           </View>
 
           <Typography variant="bodySmall" color="textSecondary" style={styles.subtitle}>
-            Scan to open the referral link
+            {t('adminReferrals.qrCodeSubtitle')}
           </Typography>
 
           <View style={styles.qrContainer}>
@@ -50,7 +52,7 @@ export function ReferralQrCodeModal({
           </Typography>
 
           <Button
-            title="Copy Link"
+            title={t('adminReferrals.copyLink')}
             variant="outline"
             onPress={() => onCopyLink(fullLink)}
             style={styles.copyBtn}
