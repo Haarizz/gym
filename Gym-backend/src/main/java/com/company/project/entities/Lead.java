@@ -159,6 +159,21 @@ public class Lead extends BaseEntity implements BranchAware {
     public List<FollowUp> getFollowUps() { return followUps; }
     public void setFollowUps(List<FollowUp> followUps) { this.followUps = followUps; }
 
+    // Marketing campaign this lead is credited to (V101): stamped from the lead form's linked
+    // campaign or the ad link's utm_campaign, or picked by staff for manually added leads.
+    @Column(name = "marketing_campaign_id")
+    private Long marketingCampaignId;
+
+    // Control-plane lead_capture_forms.id of the public form that created this lead.
+    @Column(name = "lead_form_id")
+    private Long leadFormId;
+
+    public Long getMarketingCampaignId() { return marketingCampaignId; }
+    public void setMarketingCampaignId(Long marketingCampaignId) { this.marketingCampaignId = marketingCampaignId; }
+
+    public Long getLeadFormId() { return leadFormId; }
+    public void setLeadFormId(Long leadFormId) { this.leadFormId = leadFormId; }
+
     @Column(name = "branch_id")
     private Long branchId;
 

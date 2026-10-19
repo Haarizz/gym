@@ -37,6 +37,11 @@ export interface LeadResponse {
   budget?: number;
   preferredContactMethod?: 'email' | 'phone' | 'whatsapp' | 'sms';
   leadScore?: number;
+  /** Marketing campaign this lead is credited to (Promotions & Campaigns › Campaigns). */
+  marketingCampaignId?: number;
+  marketingCampaignName?: string;
+  /** Public lead form that created this lead. */
+  leadFormId?: number;
   interactions: LeadInteraction[];
   followUps?: FollowUpResponse[];
   createdAt: string;
@@ -61,6 +66,8 @@ export interface LeadRequest {
   budget?: number;
   preferredContactMethod?: string;
   leadScore?: number;
+  /** Campaign to credit; 0 clears it, undefined leaves it unchanged. */
+  marketingCampaignId?: number;
 }
 
 export interface LeadStats {
@@ -109,6 +116,9 @@ function mapToLeadResponse(l: any): LeadResponse {
     budget: l.budget,
     preferredContactMethod: l.preferred_contact_method || l.preferredContactMethod,
     leadScore: l.lead_score || l.leadScore,
+    marketingCampaignId: l.marketing_campaign_id ?? l.marketingCampaignId ?? undefined,
+    marketingCampaignName: l.marketing_campaign_name ?? l.marketingCampaignName ?? undefined,
+    leadFormId: l.lead_form_id ?? l.leadFormId ?? undefined,
     interactions: l.interactions || [],
     followUps: l.follow_ups || l.followUps || [],
     createdAt: l.created_at || l.createdAt,
@@ -127,6 +137,8 @@ export const leadService = {
     source?: string;
     priority?: string;
     search?: string;
+    /** 'exclude' = leads still being worked on; 'only' = converted / registered (Converted tab). */
+    converted?: 'exclude' | 'only';
   }): Promise<LeadPage> {
     const p = new URLSearchParams();
     if (params?.page)     p.set('page', String(params.page));
@@ -135,6 +147,7 @@ export const leadService = {
     if (params?.source)   p.set('source', params.source);
     if (params?.priority) p.set('priority', params.priority);
     if (params?.search)   p.set('search', params.search);
+    if (params?.converted) p.set('converted', params.converted);
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads?${p}`);
     if (!res.ok) throw new Error('Failed to fetch leads');
     const raw = await res.json();
@@ -190,6 +203,7 @@ export const leadService = {
       budget: request.budget,
       preferred_contact_method: request.preferredContactMethod,
       lead_score: request.leadScore,
+      marketing_campaign_id: request.marketingCampaignId,
     };
 
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads`, {
@@ -219,6 +233,7 @@ export const leadService = {
       budget: request.budget,
       preferred_contact_method: request.preferredContactMethod,
       lead_score: request.leadScore,
+      marketing_campaign_id: request.marketingCampaignId,
     };
 
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/leads/${id}`, {

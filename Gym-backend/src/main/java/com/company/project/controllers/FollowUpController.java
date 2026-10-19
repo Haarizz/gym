@@ -32,8 +32,11 @@ public class FollowUpController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String assignedStaff,
-            @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(followUpService.getFollowUps(page, size, status, type, priority, assignedStaff, search));
+            @RequestParam(required = false) String search,
+            // true hides follow-ups whose lead is already registered as a member
+            @RequestParam(defaultValue = "false") boolean excludeRegistered) {
+        return ResponseEntity.ok(followUpService.getFollowUps(page, size, status, type, priority, assignedStaff, search,
+                excludeRegistered));
     }
 
     /** GET /api/follow-ups/stats */

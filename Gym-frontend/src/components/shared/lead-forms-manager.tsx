@@ -8,7 +8,7 @@ import { Switch } from '../ui/switch';
 import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Copy, ExternalLink, Edit, Trash2, Plus, Link2, Loader2 } from 'lucide-react';
+import { Copy, ExternalLink, Edit, Trash2, Plus, Link2, Loader2, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useBranch } from '../../utils/branch-context';
@@ -17,6 +17,7 @@ import {
   leadFormService, leadFormErrorMessage, publicLeadFormUrl,
   type LeadForm, type LeadFormRequest, type LeadFormSource,
 } from '../../utils/supabase/lead-form-service';
+import { marketingCampaignService } from '../../utils/supabase/marketing-campaign-service';
 
 const SOURCE_LABELS: Record<LeadFormSource, string> = {
   'social-media': 'Social Media',
@@ -72,9 +73,15 @@ export function LeadFormsManager({ open, onOpenChange, staffMembers }: LeadForms
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<LeadForm | null>(null);
+  // Form id -> names of the campaigns it feeds (Promotions & Campaigns › Campaigns).
+  const [formCampaigns, setFormCampaigns] = useState<Record<number, string[]>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Needs PROMOTIONS_CAMPAIGN_VIEW; without it the forms just show no campaign.
+    marketingCampaignService.leadForms()
+      .then(list => setFormCampaigns(Object.fromEntries(list.map(f => [f.id, f.campaigns]))))
+      .catch(() => setFormCampaigns({}));
     try {
       setForms(await leadFormService.list());
     } catch (err) {
@@ -229,6 +236,11 @@ export function LeadFormsManager({ open, onOpenChange, staffMembers }: LeadForms
                           <span className="font-semibold">{f.name}</span>
                           <Badge variant="outline">{SOURCE_LABELS[f.source] || f.source}</Badge>
                           {!f.active && <Badge variant="secondary">Paused</Badge>}
+                          {(formCampaigns[f.id] ?? []).map(name => (
+                            <Badge key={name} variant="outline" title="Leads from this form are credited to this campaign">
+                              <Megaphone className="h-3 w-3" style={{ marginRight: 4 }} />{name}
+                            </Badge>
+                          ))}
                         </div>
                         <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
                           {f.branchName || `Branch #${f.branchId}`}
@@ -271,8 +283,9 @@ export function LeadFormsManager({ open, onOpenChange, staffMembers }: LeadForms
           )}
 
           <div className="bg-muted text-xs text-muted-foreground" style={{ borderRadius: 8, padding: 12 }}>
-            <span className="font-semibold">Tip:</span> add <span className="font-mono">?utm_source=instagram&amp;utm_campaign=diwali</span> to
-            the end of a link to see which platform and campaign each lead came from. Facebook, Instagram and Google are detected automatically.
+            <span className="font-semibold">Tip:</span> link a form to a campaign in Promotions &amp; Campaigns › Campaigns to track its spend,
+            leads and conversions. Adding <span className="font-mono">?utm_campaign=&lt;tracking code&gt;</span> to a link credits that campaign
+            even from a shared form; Facebook, Instagram and Google sources are detected automatically.
           </div>
         </DialogContent>
       </Dialog>
