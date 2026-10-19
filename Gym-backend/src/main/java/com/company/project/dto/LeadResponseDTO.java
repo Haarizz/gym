@@ -31,6 +31,9 @@ public class LeadResponseDTO {
     private BigDecimal budget;
     private String preferredContactMethod;
     private Integer leadScore;
+    private Long marketingCampaignId;
+    private String marketingCampaignName;
+    private Long leadFormId;
     private List<LeadInteractionDTO> interactions;
     private List<FollowUpResponseDTO> followUps;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -98,6 +101,15 @@ public class LeadResponseDTO {
 
     public Integer getLeadScore() { return leadScore; }
     public void setLeadScore(Integer leadScore) { this.leadScore = leadScore; }
+
+    public Long getMarketingCampaignId() { return marketingCampaignId; }
+    public void setMarketingCampaignId(Long marketingCampaignId) { this.marketingCampaignId = marketingCampaignId; }
+
+    public String getMarketingCampaignName() { return marketingCampaignName; }
+    public void setMarketingCampaignName(String marketingCampaignName) { this.marketingCampaignName = marketingCampaignName; }
+
+    public Long getLeadFormId() { return leadFormId; }
+    public void setLeadFormId(Long leadFormId) { this.leadFormId = leadFormId; }
 
     public List<LeadInteractionDTO> getInteractions() { return interactions; }
     public void setInteractions(List<LeadInteractionDTO> interactions) { this.interactions = interactions; }

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { leadService, type LeadResponse } from '../utils/supabase/lead-service';
 import { staffService } from '../utils/supabase/staff-service';
 import { LeadFormsManager } from '../components/shared/lead-forms-manager';
+import { marketingCampaignService, type CampaignOption } from '../utils/supabase/marketing-campaign-service';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '../utils/currency';
 import { Button } from "../components/ui/button";
@@ -62,6 +63,7 @@ import {
   ArrowRight, 
   ArrowLeft, 
   ChevronDown, 
+  Megaphone,
   SortAsc, 
   SortDesc, 
   Layers, 
@@ -107,6 +109,8 @@ interface Lead {
   budget?: number;
   preferredContactMethod: 'email' | 'phone' | 'whatsapp' | 'sms';
   leadScore?: number; // 1-100, set explicitly — not auto-calculated
+  marketingCampaignId?: number;
+  marketingCampaignName?: string;
   interactions: LeadInteraction[];
   followUps: LeadFollowUp[];
   avatar?: string;
@@ -150,6 +154,8 @@ function clampNumberInput(raw: string, min: number, max: number): string {
   return String(Math.min(max, Math.max(min, n)));
 }
 
+const NO_CAMPAIGN = '__no_campaign__';
+
 export function Leads() {
   const { currencyCode } = useCurrency();
   const [activeView, setActiveView] = useState<'table' | 'kanban'>('table');
@@ -158,6 +164,9 @@ export function Leads() {
   const [showLeadDetail, setShowLeadDetail] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  // Active = still being worked on; Converted = converted or already registered as a member.
+  const [leadsTab, setLeadsTab] = useState<'active' | 'converted'>('active');
+  const [tabCounts, setTabCounts] = useState<{ active: number; converted: number } | null>(null);
   const [sourceFilter, setSourceFilter] = useState('all');
   const [staffFilter, setStaffFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -170,10 +179,10 @@ export function Leads() {
 
   // API state
   const [apiLeads, setApiLeads] = useState<LeadResponse[]>([]);
-  const [newLead, setNewLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '' });
+  const [newLead, setNewLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '', campaignId: '' });
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showEditLead, setShowEditLead] = useState(false);
-  const [editLead, setEditLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', status: 'new', assignedStaff: '', nextFollowUp: '', membershipInterest: '', interestLevel: '5', leadScore: '50' });
+  const [editLead, setEditLead] = useState({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', status: 'new', assignedStaff: '', nextFollowUp: '', membershipInterest: '', interestLevel: '5', leadScore: '50', campaignId: '' });
   const [showAddInteraction, setShowAddInteraction] = useState(false);
   const [interactionLeadId, setInteractionLeadId] = useState<string | null>(null);
   const [newInteraction, setNewInteraction] = useState({ type: 'call', staffMember: '', notes: '', outcome: 'positive', duration: '' });
@@ -187,10 +196,27 @@ export function Leads() {
 
   const loadLeads = useCallback(async () => {
     try {
-      const data = await leadService.getLeads({ size: 200, status: statusFilter !== 'all' ? statusFilter : undefined, source: sourceFilter !== 'all' ? sourceFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, search: searchTerm || undefined });
+      const data = await leadService.getLeads({ size: 200, converted: leadsTab === 'converted' ? 'only' : 'exclude', status: statusFilter !== 'all' ? statusFilter : undefined, source: sourceFilter !== 'all' ? sourceFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, search: searchTerm || undefined });
       setApiLeads(data.leads);
     } catch { /* keep mock data */ }
-  }, [statusFilter, sourceFilter, priorityFilter, searchTerm]);
+  }, [statusFilter, sourceFilter, priorityFilter, searchTerm, leadsTab]);
+
+  // Tab badges: one cheap request each (size 1, only the total is read).
+  const refreshTabCounts = useCallback(() => {
+    Promise.all([
+      leadService.getLeads({ size: 1, converted: 'exclude' }),
+      leadService.getLeads({ size: 1, converted: 'only' }),
+    ]).then(([a, c]) => setTabCounts({ active: a.pagination.totalItems, converted: c.pagination.totalItems }))
+      .catch(() => setTabCounts(null));
+  }, []);
+  useEffect(() => { refreshTabCounts(); }, [refreshTabCounts, apiLeads]);
+
+  const switchLeadsTab = (tab: 'active' | 'converted') => {
+    setLeadsTab(tab);
+    setStatusFilter('all');
+    setSelectedLeads([]);
+    if (tab === 'converted') setActiveView('table');
+  };
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
@@ -206,6 +232,12 @@ export function Leads() {
     staffService.getStaff({}, 1, 100)
       .then(res => setStaffMembers(res.items.map(s => ({ id: String(s.id), name: s.name }))))
       .catch(console.error);
+  }, []);
+
+  // Marketing campaigns a lead can be credited to (Promotions & Campaigns › Campaigns).
+  const [campaignOptions, setCampaignOptions] = useState<CampaignOption[]>([]);
+  useEffect(() => {
+    marketingCampaignService.options().then(setCampaignOptions).catch(() => setCampaignOptions([]));
   }, []);
 
 
@@ -242,6 +274,8 @@ export function Leads() {
     budget: l.budget,
     preferredContactMethod: (l.preferredContactMethod as Lead['preferredContactMethod']) || 'email',
     leadScore: l.leadScore ?? undefined,
+    marketingCampaignId: l.marketingCampaignId,
+    marketingCampaignName: l.marketingCampaignName,
     interactions: (l.interactions || []).map(i => ({
       id: String(i.id),
       type: i.type as LeadInteraction['type'],
@@ -305,7 +339,12 @@ export function Leads() {
       const matchesStaff = staffFilter === 'all' || lead.assignedStaff === staffFilter;
       const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
       
-      return matchesSearch && matchesStatus && matchesSource && matchesStaff && matchesPriority;
+      // The server already splits the tabs; this keeps a lead that was just converted
+      // from lingering in the active list until the next reload.
+      const isConverted = !!lead.memberId || lead.status === 'converted';
+      const matchesTab = leadsTab === 'converted' ? isConverted : !isConverted;
+
+      return matchesSearch && matchesStatus && matchesSource && matchesStaff && matchesPriority && matchesTab;
     });
 
     // Sort leads
@@ -323,7 +362,7 @@ export function Leads() {
     });
 
     return filtered;
-  }, [displayLeads, searchTerm, statusFilter, sourceFilter, staffFilter, priorityFilter, sortField, sortDirection]);
+  }, [displayLeads, searchTerm, statusFilter, sourceFilter, staffFilter, priorityFilter, sortField, sortDirection, leadsTab]);
 
   // Group leads by status for kanban view
   const leadsByStatus = useMemo(() => {
@@ -445,6 +484,7 @@ export function Leads() {
       membershipInterest: lead.membershipInterest || '',
       interestLevel: lead.interestLevel != null ? String(lead.interestLevel) : '',
       leadScore: lead.leadScore != null ? String(lead.leadScore) : '',
+      campaignId: lead.marketingCampaignId != null ? String(lead.marketingCampaignId) : '',
     });
     setShowEditLead(true);
   }, []);
@@ -588,6 +628,18 @@ export function Leads() {
         </Card>
       </div>
 
+      {/* Active / Converted */}
+      <Tabs value={leadsTab} onValueChange={(v) => switchLeadsTab(v as 'active' | 'converted')}>
+        <TabsList className="w-full flex">
+          <TabsTrigger value="active" className="flex-1">
+            Leads{tabCounts ? ` (${tabCounts.active})` : ''}
+          </TabsTrigger>
+          <TabsTrigger value="converted" className="flex-1">
+            Converted{tabCounts ? ` (${tabCounts.converted})` : ''}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters and Search */}
       <Card className={cardShell}>
         <CardContent className="p-4">
@@ -607,19 +659,21 @@ export function Leads() {
 
             {/* Filters */}
             <div className="flex gap-2 flex-wrap">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="new">New</SelectItem>
-                  <SelectItem value="contacted">Contacted</SelectItem>
-                  <SelectItem value="follow-up">Follow-up</SelectItem>
-                  <SelectItem value="converted">Converted</SelectItem>
-                  <SelectItem value="lost">Lost</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Converted leads live in their own tab, so the active list has no "Converted" status. */}
+              {leadsTab === 'active' && (
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="new">New</SelectItem>
+                    <SelectItem value="contacted">Contacted</SelectItem>
+                    <SelectItem value="follow-up">Follow-up</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
 
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
                 <SelectTrigger className="w-[140px]">
@@ -661,25 +715,27 @@ export function Leads() {
               </Select>
             </div>
 
-            {/* View Toggle */}
-            <div className="flex items-center space-x-2 border rounded-lg p-1">
-              <Button
-                variant={activeView === 'table' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveView('table')}
-              >
-                <List className="h-4 w-4 mr-1" />
-                Table
-              </Button>
-              <Button
-                variant={activeView === 'kanban' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveView('kanban')}
-              >
-                <Layers className="h-4 w-4 mr-1" />
-                Kanban
-              </Button>
-            </div>
+            {/* View Toggle — the Kanban board is for leads still moving through the pipeline */}
+            {leadsTab === 'active' && (
+              <div className="flex items-center space-x-2 border rounded-lg p-1">
+                <Button
+                  variant={activeView === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('table')}
+                >
+                  <List className="h-4 w-4 mr-1" />
+                  Table
+                </Button>
+                <Button
+                  variant={activeView === 'kanban' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('kanban')}
+                >
+                  <Layers className="h-4 w-4 mr-1" />
+                  Kanban
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -717,7 +773,7 @@ export function Leads() {
         <Card className={cardShell}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Leads List ({filteredLeads.length})</span>
+              <span>{leadsTab === 'converted' ? 'Converted Leads' : 'Leads List'} ({filteredLeads.length})</span>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
@@ -799,8 +855,8 @@ export function Leads() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(lead.status)}>
-                        {lead.status}
+                      <Badge className={getStatusColor(lead.memberId ? 'converted' : lead.status)}>
+                        {lead.memberId ? 'registered' : lead.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -808,6 +864,12 @@ export function Leads() {
                         {getSourceIcon(lead.source)}
                         <span className="capitalize">{lead.source.replace('-', ' ')}</span>
                       </div>
+                      {lead.marketingCampaignName && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground" style={{ marginTop: 2 }} title="Campaign">
+                          <Megaphone className="h-3 w-3" />
+                          <span>{lead.marketingCampaignName}</span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className={getPriorityColor(lead.priority)}>
@@ -1095,6 +1157,13 @@ export function Leads() {
                     </div>
 
                     <div>
+                      <Label className="text-sm text-muted-foreground">Campaign</Label>
+                      <p className="font-medium flex items-center gap-1">
+                        {selectedLead.marketingCampaignName ? (<><Megaphone className="h-4 w-4 text-muted-foreground" />{selectedLead.marketingCampaignName}</>) : 'Not from a campaign'}
+                      </p>
+                    </div>
+
+                    <div>
                       <Label className="text-sm text-muted-foreground">Tags</Label>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {selectedLead.tags.map(tag => (
@@ -1322,6 +1391,18 @@ export function Leads() {
                 </SelectContent>
               </Select>
             </div>
+            {campaignOptions.length > 0 && (
+              <div>
+                <Label>Campaign</Label>
+                <Select value={newLead.campaignId || NO_CAMPAIGN} onValueChange={v => setNewLead(p => ({ ...p, campaignId: v === NO_CAMPAIGN ? '' : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Not from a campaign" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CAMPAIGN}>Not from a campaign</SelectItem>
+                    {campaignOptions.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="priority">Priority</Label>
               <Select value={newLead.priority} onValueChange={v => setNewLead(p => ({ ...p, priority: v }))}>
@@ -1361,9 +1442,10 @@ export function Leads() {
                   status: 'new',
                   interestLevel: newLead.interestLevel ? Number(newLead.interestLevel) : undefined,
                   leadScore: newLead.leadScore ? Number(newLead.leadScore) : undefined,
+                  marketingCampaignId: newLead.campaignId ? Number(newLead.campaignId) : undefined,
                 });
                 toast.success('Lead added successfully');
-                setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '' });
+                setNewLead({ firstName: '', lastName: '', email: '', phone: '', source: 'website', priority: 'medium', notes: '', interestLevel: '', leadScore: '', campaignId: '' });
                 setShowAddLead(false);
                 await loadLeads();
               } catch (error) {
@@ -1448,6 +1530,21 @@ export function Leads() {
                 </SelectContent>
               </Select>
             </div>
+            {(campaignOptions.length > 0 || editLead.campaignId) && (
+              <div>
+                <Label>Campaign</Label>
+                <Select value={editLead.campaignId || NO_CAMPAIGN} onValueChange={v => setEditLead(p => ({ ...p, campaignId: v === NO_CAMPAIGN ? '' : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Not from a campaign" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CAMPAIGN}>Not from a campaign</SelectItem>
+                    {editLead.campaignId && !campaignOptions.some(c => String(c.id) === editLead.campaignId) && (
+                      <SelectItem value={editLead.campaignId}>{editingLead?.marketingCampaignName || 'Current campaign'}</SelectItem>
+                    )}
+                    {campaignOptions.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Next Follow-up</Label>
               <Input type="date" value={editLead.nextFollowUp} onChange={e => setEditLead(p => ({ ...p, nextFollowUp: e.target.value }))} />
@@ -1488,6 +1585,8 @@ export function Leads() {
                   membershipInterest: editLead.membershipInterest || undefined,
                   interestLevel: editLead.interestLevel ? Number(editLead.interestLevel) : undefined,
                   leadScore: editLead.leadScore ? Number(editLead.leadScore) : undefined,
+                  // 0 clears the campaign ("Not from a campaign").
+                  marketingCampaignId: editLead.campaignId ? Number(editLead.campaignId) : 0,
                 });
                 toast.success('Lead updated');
                 setShowEditLead(false);

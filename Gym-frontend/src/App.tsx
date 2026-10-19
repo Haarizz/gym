@@ -361,6 +361,25 @@ const menuItems = [
         permission: "POST_WORKOUT_CHECKIN_VIEW",
       },
       {
+        // Members' ratings of each branch (mobile app), and "Request reviews". Member Connect
+        // permission: asking members for reviews is member outreach, and a new permission key
+        // wouldn't reach existing gyms' roles.
+        title: "Ratings",
+        icon: Star,
+        id: "ratings",
+        path: "/ratings",
+        permission: "MEMBER_CONNECT_VIEW",
+      },
+      {
+        // Members' enquiries from the mobile app (Profile → Raise Enquiry); one reply each.
+        // Member Connect permission, like Ratings.
+        title: "Enquiries",
+        icon: Inbox,
+        id: "enquiries",
+        path: "/enquiries",
+        permission: "MEMBER_CONNECT_VIEW",
+      },
+      {
         title: "Reports",
         icon: BarChart3,
         id: "member-connect-reports",
@@ -375,25 +394,6 @@ const menuItems = [
         permission: "MEMBER_CONNECT_ANALYTICS_VIEW",
       },
     ],
-  },
-  {
-    // Members' ratings of each branch (mobile app), and "Request reviews". Member Connect
-    // permission: asking members for reviews is member outreach, and a new permission key
-    // wouldn't reach existing gyms' roles.
-    title: "Ratings",
-    icon: Star,
-    id: "ratings",
-    path: "/ratings",
-    permission: "MEMBER_CONNECT_VIEW",
-  },
-  {
-    // Members' enquiries from the mobile app (Profile → Raise Enquiry); one reply each.
-    // Member Connect permission, like Ratings.
-    title: "Enquiries",
-    icon: Inbox,
-    id: "enquiries",
-    path: "/enquiries",
-    permission: "MEMBER_CONNECT_VIEW",
   },
   {
     title: "Sales & Purchases",
@@ -1124,6 +1124,8 @@ export default function App() {
         "messaging",
         "automations",
         "post-workout-checkin",
+        "ratings",
+        "enquiries",
         "member-connect-reports",
         "member-connect-analytics",
       ];

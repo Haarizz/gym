@@ -22,6 +22,8 @@ public interface LeadCaptureFormRepository extends JpaRepository<LeadCaptureForm
 
     Optional<LeadCaptureForm> findByIdAndTenantSlug(Long id, String tenantSlug);
 
+    List<LeadCaptureForm> findByTenantSlugAndIdIn(String tenantSlug, java.util.Collection<Long> ids);
+
     // Single UPDATE rather than read-modify-write so concurrent submissions
     // (an ad going live) can't lose increments.
     @Modifying

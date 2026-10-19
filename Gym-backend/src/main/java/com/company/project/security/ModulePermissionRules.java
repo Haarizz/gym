@@ -123,6 +123,9 @@ public final class ModulePermissionRules {
         writes("/api/promotions/*/redeem", "PROMOTIONS_CAMPAIGN", "MEMBERS", "BILLING", "POINT_OF_SALE");
         writes("/api/promotions/apply-access-days", "PROMOTIONS_CAMPAIGN", "MEMBERS", "BILLING");
         writes("/api/promotions/**", "PROMOTIONS_CAMPAIGN");
+        // Campaign spend is gated for reads; the Leads page only needs the name picker.
+        gated("/api/marketing-campaigns/options", List.of("PROMOTIONS_CAMPAIGN", "LEADS"), "PROMOTIONS_CAMPAIGN");
+        gated("/api/marketing-campaigns/**", List.of("PROMOTIONS_CAMPAIGN"), "PROMOTIONS_CAMPAIGN");
         writes("/api/referral-campaigns/**", "REFERRALS");
         writes("/api/referrals/**", "REFERRALS");
         writes("/api/reward-rules/**", "REFERRALS", "PROMOTIONS_CAMPAIGN");
@@ -194,6 +197,10 @@ public final class ModulePermissionRules {
         gated("/api/expenses/**", plus(FINANCE, "DASHBOARD", "BIOS", "REPORTS"), "EXPENSES", "FINANCIALS");
         gated("/api/tax-compliance/**", FINANCE, "TAX_COMPLIANCE", "FINANCIALS");
         gated("/api/financial-reports/**", plus(FINANCE, "REPORTS"), "FINANCIAL_REPORTS", "FINANCIALS");
+        // The Financial Analytics page's P&L / cash / receivables overview. (The older
+        // /api/financial-analytics/* endpoints also feed BiOS, Financials, Sales and Community
+        // analytics, so they stay readable as before.)
+        gated("/api/financial-analytics/overview", plus(FINANCE, "REPORTS"), "FINANCIAL_ANALYTICS", "FINANCIALS");
         gated("/api/financial-audit-logs/**", FINANCE, "FINANCIALS");
         writes("/api/fiscal-periods/**", "FISCAL_PERIODS", "FINANCIALS");
         writes("/api/fiscal-years/**", "FISCAL_PERIODS", "FINANCIALS");

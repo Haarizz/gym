@@ -162,6 +162,14 @@ public class FollowUpService {
     @Transactional(readOnly = true)
     public FollowUpPageResponseDTO getFollowUps(int page, int size, String status, String type,
                                                  String priority, String assignedStaff, String search) {
+        return getFollowUps(page, size, status, type, priority, assignedStaff, search, false);
+    }
+
+    /** @param excludeRegistered hide follow-ups whose lead is already registered as a member. */
+    @Transactional(readOnly = true)
+    public FollowUpPageResponseDTO getFollowUps(int page, int size, String status, String type,
+                                                 String priority, String assignedStaff, String search,
+                                                 boolean excludeRegistered) {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("dueDate").ascending());
 
         Specification<FollowUp> spec = (root, query, cb) -> {
@@ -177,6 +185,10 @@ public class FollowUpService {
             }
             if (assignedStaff != null && !assignedStaff.isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + assignedStaff.toLowerCase() + "%"));
+            }
+            if (excludeRegistered) {
+                jakarta.persistence.criteria.Join<FollowUp, Lead> registeredJoin = root.join("lead", jakarta.persistence.criteria.JoinType.LEFT);
+                predicates.add(cb.isNull(registeredJoin.get("memberId")));
             }
             if (search != null && !search.isBlank()) {
                 String like = "%" + search.toLowerCase() + "%";

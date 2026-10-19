@@ -127,6 +127,8 @@ export const followUpService = {
     priority?: string;
     assignedStaff?: string;
     search?: string;
+    /** Hide follow-ups whose lead is already registered as a member. */
+    excludeRegistered?: boolean;
   }): Promise<FollowUpPage> {
     const p = new URLSearchParams();
     if (params?.page)          p.set('page', String(params.page));
@@ -136,6 +138,7 @@ export const followUpService = {
     if (params?.priority)      p.set('priority', params.priority);
     if (params?.assignedStaff) p.set('assignedStaff', params.assignedStaff);
     if (params?.search)        p.set('search', params.search);
+    if (params?.excludeRegistered) p.set('excludeRegistered', 'true');
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/follow-ups?${p}`);
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
     const raw = await res.json();
