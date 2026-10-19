@@ -196,6 +196,8 @@ const membership = {
       offer: 'عرض',
       coupon: 'قسيمة',
       rewardPass: 'بطاقة المكافأة',
+      offerApplied: 'تم تطبيق العرض: {{name}}',
+      removeOffer: 'إزالة العرض',
       totalPayable: 'الإجمالي المستحق',
       paymentFor: 'الدفع مقابل {{name}}',
     },

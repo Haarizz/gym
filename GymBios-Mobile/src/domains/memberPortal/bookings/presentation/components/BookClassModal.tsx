@@ -34,6 +34,8 @@ import { formatRefundDeadline, REFUND_CUTOFF_HOURS } from '../../domain/refundPo
 interface BookClassModalProps {
   visible: boolean;
   onClose: () => void;
+  /** A promotion code to fill in and apply on a priced session, e.g. from the dashboard's offer */
+  promoCode?: string;
 }
 
 const formatTime = formatClockTime;
@@ -52,7 +54,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 // select → review (discount, wallet, refund policy) → pay (shared PaymentBottomSheet).
 type Step = 'select' | 'review' | 'pay';
 
-export function BookClassModal({ visible, onClose }: BookClassModalProps) {
+export function BookClassModal({ visible, onClose, promoCode }: BookClassModalProps) {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const [step, setStep] = useState<Step>('select');
@@ -323,6 +325,7 @@ export function BookClassModal({ visible, onClose }: BookClassModalProps) {
                       onChange={setRewardSel}
                       acceptPromotions
                       validateCode={(code) => discountCodeApi.validate(code, price)}
+                      initialCode={promoCode}
                     />
 
                     <View style={styles.priceCard}>

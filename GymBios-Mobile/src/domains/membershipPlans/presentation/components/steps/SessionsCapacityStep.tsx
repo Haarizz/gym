@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
@@ -55,20 +56,24 @@ interface SessionsCapacityStepProps {
 }
 
 export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapacityStepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <FormSection title="Sessions">
+      <FormSection title={t('membershipPlans.form.capacityStep.sessionsSection')}>
         <Input
-          label="Max Sessions (leave blank for unlimited)"
+          label={t('membershipPlans.form.capacityStep.maxSessionsLabel')}
           value={values.maxSessions}
           onChangeText={(v) => onChange('maxSessions', v)}
-          placeholder="e.g. 20"
+          placeholder={t('membershipPlans.form.capacityStep.maxSessionsPlaceholder')}
           keyboardType="numeric"
         />
       </FormSection>
 
-      <FormSection title="Membership Capacity">
-        <Typography variant="bodySmallBold">Capacity Type</Typography>
+      <FormSection title={t('membershipPlans.form.capacityStep.capacitySection')}>
+        <Typography variant="bodySmallBold">
+          {t('membershipPlans.form.capacityStep.capacityTypeLabel')}
+        </Typography>
         <OptionRow
           options={CAPACITY_OPTIONS}
           selected={values.membershipCapacity || 'Unlimited'}
@@ -76,17 +81,19 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
         />
         {values.membershipCapacity === 'Limited' && (
           <Input
-            label="Max Capacity"
+            label={t('membershipPlans.form.capacityStep.maxCapacityLabel')}
             value={values.maxCapacity}
             onChangeText={(v) => onChange('maxCapacity', v)}
-            placeholder="e.g. 100"
+            placeholder={t('membershipPlans.form.capacityStep.maxCapacityPlaceholder')}
             keyboardType="numeric"
           />
         )}
       </FormSection>
 
-      <FormSection title="Attendance Limit">
-        <Typography variant="bodySmallBold">Attendance Limit</Typography>
+      <FormSection title={t('membershipPlans.form.capacityStep.attendanceSection')}>
+        <Typography variant="bodySmallBold">
+          {t('membershipPlans.form.capacityStep.attendanceLimitLabel')}
+        </Typography>
         <OptionRow
           options={ATTENDANCE_LIMITS}
           selected={values.attendanceLimit || 'None'}
@@ -95,13 +102,15 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
         {values.attendanceLimit && values.attendanceLimit !== 'None' && (
           <>
             <Input
-              label="Attendance Value"
+              label={t('membershipPlans.form.capacityStep.attendanceValueLabel')}
               value={values.attendanceValue}
               onChangeText={(v) => onChange('attendanceValue', v)}
-              placeholder="e.g. 2"
+              placeholder={t('membershipPlans.form.capacityStep.attendanceValuePlaceholder')}
               keyboardType="numeric"
             />
-            <Typography variant="bodySmallBold">Attendance Period</Typography>
+            <Typography variant="bodySmallBold">
+              {t('membershipPlans.form.capacityStep.attendancePeriodLabel')}
+            </Typography>
             <OptionRow
               options={ATTENDANCE_PERIODS}
               selected={values.attendancePeriod || 'Day'}

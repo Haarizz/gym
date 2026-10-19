@@ -1,5 +1,6 @@
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/shared/components/Card';
 import { Typography } from '@/shared/components/Typography';
@@ -13,6 +14,7 @@ interface RoleCardProps {
 }
 
 export function RoleCard({ role, onActionsPress }: RoleCardProps) {
+  const { t } = useTranslation();
   const totalPermissions = ROLE_MODULES.length * PERMISSION_ACTIONS.length;
   const permissionCount = role.permissionKeys?.length || 0;
   const isAllAccess = permissionCount === totalPermissions;
@@ -30,25 +32,31 @@ export function RoleCard({ role, onActionsPress }: RoleCardProps) {
           {role.isSystem && (
             <View style={styles.systemBadge}>
               <Feather name="lock" size={10} color={BrandColors.textSecondary} />
-              <Typography variant="caption" style={styles.systemBadgeText}>System</Typography>
+              <Typography variant="caption" style={styles.systemBadgeText}>{t('roles.system')}</Typography>
             </View>
           )}
           
           {isAllAccess && (
             <View style={styles.allAccessBadge}>
               <Feather name="zap" size={10} color={BrandColors.tealDark} />
-              <Typography variant="caption" style={styles.allAccessText}>All access</Typography>
+              <Typography variant="caption" style={styles.allAccessText}>{t('roles.allAccess')}</Typography>
             </View>
           )}
         </View>
 
         <View style={styles.metaRow}>
           <Typography variant="caption" style={styles.permCount}>
-            {isAllAccess ? 'All modules' : `${permissionCount} permission${permissionCount === 1 ? '' : 's'}`}
+            {isAllAccess
+              ? t('roles.allModules')
+              : permissionCount === 1
+                ? t('roles.permissions_one', { count: permissionCount })
+                : t('roles.permissions_other', { count: permissionCount })}
           </Typography>
           <View style={styles.dot} />
           <Typography variant="caption" color="textSecondary">
-            {role.userCount} user{role.userCount === 1 ? '' : 's'}
+            {role.userCount === 1
+              ? t('roles.users_one', { count: role.userCount })
+              : t('roles.users_other', { count: role.userCount })}
           </Typography>
         </View>
 

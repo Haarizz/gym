@@ -1,6 +1,7 @@
 import { apiClient } from '@/core/network/apiClient';
 import type {
   MemberDashboardData,
+  MemberOffer,
   MemberTodayScheduleItem,
 } from '../domain/MemberDashboardData';
 
@@ -141,6 +142,12 @@ export interface MemberDashboardApiDTO {
     startDate?: string;
     end_date?: string;
     endDate?: string;
+    category?: string;
+    maximum_discount?: number;
+    maximumDiscount?: number;
+    terms_and_conditions?: string;
+    termsAndConditions?: string;
+    personal?: boolean;
   };
   activePromotion?: {
     id?: number;
@@ -156,6 +163,12 @@ export interface MemberDashboardApiDTO {
     startDate?: string;
     end_date?: string;
     endDate?: string;
+    category?: string;
+    maximum_discount?: number;
+    maximumDiscount?: number;
+    terms_and_conditions?: string;
+    termsAndConditions?: string;
+    personal?: boolean;
   };
 }
 
@@ -170,8 +183,29 @@ function formatTime(timeStr?: string): string {
   return `${String(formattedHours).padStart(2, '0')}:${mins} ${ampm}`;
 }
 
+type ApiOffer = NonNullable<MemberDashboardApiDTO['activePromotion']> & NonNullable<MemberDashboardApiDTO['active_promotion']>;
+
+/** A server promotion as the app's offer; undefined when it's missing its id or name. */
+function mapOffer(raw?: Partial<ApiOffer> | null): MemberOffer | undefined {
+  if (raw?.id == null || !raw.name) return undefined;
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description ?? null,
+    discountType: raw.discountType ?? raw.discount_type ?? null,
+    discountValue: Number(raw.discountValue ?? raw.discount_value ?? 0),
+    maximumDiscount: raw.maximumDiscount ?? raw.maximum_discount ?? null,
+    code: raw.code || null,
+    endDate: raw.endDate ?? raw.end_date ?? null,
+    category: raw.category ?? null,
+    termsAndConditions: raw.termsAndConditions ?? raw.terms_and_conditions ?? null,
+    personal: Boolean(raw.personal),
+  };
+}
+
 export interface MemberDashboardRepository {
   getMemberDashboard(): Promise<MemberDashboardData>;
+  getOffers(): Promise<MemberOffer[]>;
 }
 
 export class ApiMemberDashboardRepository implements MemberDashboardRepository {
@@ -264,12 +298,24 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
       },
     ];
 
+    const offer = mapOffer(data.activePromotion || data.active_promotion);
+
     return {
       memberInfo,
       todaysSchedule,
       quickStats,
       checkInStatus,
+      offer,
     };
+  }
+
+  /**
+   * GET /api/mobile/member/dashboard/offers
+   * Every offer the member can use, best first (the dashboard banner shows the first).
+   */
+  async getOffers(): Promise<MemberOffer[]> {
+    const response = await apiClient.get<Partial<ApiOffer>[]>('/mobile/member/dashboard/offers');
+    return (response.data ?? []).map(mapOffer).filter((o): o is MemberOffer => !!o);
   }
 }
 

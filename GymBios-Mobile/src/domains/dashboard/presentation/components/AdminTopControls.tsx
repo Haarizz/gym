@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
@@ -15,14 +16,17 @@ interface AdminTopControlsProps {
 }
 
 export function AdminTopControls({
-  branch = 'All Branches',
-  dateText = 'Today: March 26, 2026',
+  branch,
+  dateText = '',
   hasAlerts = true,
   onSelectBranch,
   onCalendarPress,
   onRefreshPress,
   onBellPress,
 }: AdminTopControlsProps) {
+  const { t } = useTranslation();
+  const displayBranch = branch || t('dashboard.admin.allBranches');
+
   return (
     <GlassSurface radius={16} style={styles.container}>
       {/* Top Filter Row */}
@@ -31,9 +35,9 @@ export function AdminTopControls({
           style={styles.dropdown}
           onPress={onSelectBranch}
           accessibilityRole="button"
-          accessibilityLabel={`Select branch, currently ${branch}`}
+          accessibilityLabel={t('dashboard.admin.selectBranchA11y', { branch: displayBranch })}
         >
-          <Text style={styles.dropdownText}>{branch}</Text>
+          <Text style={styles.dropdownText}>{displayBranch}</Text>
           <Feather name="chevron-down" size={16} color="#6B7280" />
         </Pressable>
 
@@ -41,7 +45,7 @@ export function AdminTopControls({
           style={styles.iconButton}
           onPress={onCalendarPress}
           accessibilityRole="button"
-          accessibilityLabel="Open calendar"
+          accessibilityLabel={t('dashboard.admin.openCalendarA11y')}
         >
           <Feather name="calendar" size={18} color="#4B5563" />
         </Pressable>
@@ -50,7 +54,7 @@ export function AdminTopControls({
           style={styles.iconButton}
           onPress={onRefreshPress}
           accessibilityRole="button"
-          accessibilityLabel="Refresh dashboard"
+          accessibilityLabel={t('dashboard.admin.refreshDashboardA11y')}
         >
           <Feather name="refresh-cw" size={18} color="#4B5563" />
         </Pressable>
@@ -63,7 +67,7 @@ export function AdminTopControls({
           style={styles.bellButton}
           onPress={onBellPress}
           accessibilityRole="button"
-          accessibilityLabel="View alerts"
+          accessibilityLabel={t('dashboard.admin.viewAlertsA11y')}
         >
           <Feather name="bell" size={18} color="#4B5563" />
           {hasAlerts && <View style={styles.alertDot} />}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { SearchBar } from '@/shared/components/SearchBar';
@@ -19,6 +20,7 @@ import { RoleActionsMenu } from '../components/RoleActionsMenu';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function RolesScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const bottomInset = useTabBarBottomInset() + 80; // extra clearance for the FAB
   const { roles, loading, search, setSearch } = useRoleSearch();
@@ -42,25 +44,25 @@ export function RolesScreen() {
 
   const handleDuplicateRole = (role: Role) => {
     duplicateRole(role.id).catch(err => {
-      toast.error('Failed to duplicate role.', {
-        title: 'Error'
+      toast.error(t('roles.failedDuplicate'), {
+        title: t('common.error')
       });
     });
   };
 
   const handleDeleteRole = (role: Role) => {
     Alert.alert(
-      'Delete Role?',
-      `Are you sure you want to delete\n"${role.roleName}"?\n\nThis action cannot be undone.`,
+      t('roles.deleteRoleTitle'),
+      t('roles.deleteRoleMessage', { name: role.roleName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('roles.cancel'), style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: t('roles.delete'), 
           style: 'destructive',
           onPress: () => {
             deleteRole(role.id).catch(err => {
-              toast.error('Unable to delete role.', {
-                title: 'Error'
+              toast.error(t('roles.unableDelete'), {
+                title: t('common.error')
               });
             });
           }
@@ -76,7 +78,7 @@ export function RolesScreen() {
         <SearchBar 
           value={search}
           onChangeText={setSearch}
-          placeholder="Search roles..."
+          placeholder={t('roles.searchPlaceholder')}
         />
       </View>
 

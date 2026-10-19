@@ -4,24 +4,26 @@ import { Text, TextInput } from '@/shared/components/AppText';
 import { useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { MessagingFlowHeader } from '../components/MessagingFlowHeader';
 import { useMessagingTemplates } from '../../hooks/useMessagingHooks';
 import { CreateTemplateBottomSheet } from '../components/bottomSheets/CreateTemplateBottomSheet';
 import { MessagingColors } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const FILTERS = [
-  { id: 'all', label: 'All templates' },
-  { id: 'retention', label: 'Retention' },
-  { id: 'promotion', label: 'Promotion' },
-  { id: 'custom', label: 'Custom' },
-];
-
 export function MessagingTemplatesScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
   
+  const filters = useMemo(() => [
+    { id: 'all', label: t('messaging.templates.filters.all') },
+    { id: 'retention', label: t('messaging.templates.filters.retention') },
+    { id: 'promotion', label: t('messaging.templates.filters.promotion') },
+    { id: 'custom', label: t('messaging.templates.filters.custom') },
+  ], [t]);
+
   const { data: templates = [], isLoading } = useMessagingTemplates();
   const [isSheetVisible, setSheetVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,14 +34,14 @@ export function MessagingTemplatesScreen() {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(
-        (t) =>
-          t.name.toLowerCase().includes(lowerQuery) ||
-          t.subject.toLowerCase().includes(lowerQuery)
+        (tpl) =>
+          tpl.name.toLowerCase().includes(lowerQuery) ||
+          tpl.subject.toLowerCase().includes(lowerQuery)
       );
     }
     
     if (activeFilter !== 'all') {
-      result = result.filter(t => t.category?.toLowerCase() === activeFilter);
+      result = result.filter(tpl => tpl.category?.toLowerCase() === activeFilter);
     }
     
     return result;
@@ -48,8 +50,8 @@ export function MessagingTemplatesScreen() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <MessagingFlowHeader
-        title="Message Templates"
-        subtitle="Manage saved replies and campaigns"
+        title={t('messaging.templates.title')}
+        subtitle={t('messaging.templates.subtitle')}
         showStepper={false}
         onBack={() => router.back()}
       />
@@ -61,7 +63,7 @@ export function MessagingTemplatesScreen() {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search templates..."
+            placeholder={t('messaging.templates.searchPlaceholder')}
             placeholderTextColor={MessagingColors.faint}
           />
         </View>
@@ -74,14 +76,14 @@ export function MessagingTemplatesScreen() {
             style={styles.createButton}
           >
             <Feather name="plus" size={16} color="#ffffff" />
-            <Text style={styles.createButtonText}>Create new template</Text>
+            <Text style={styles.createButtonText}>{t('messaging.templates.createNew')}</Text>
           </LinearGradient>
         </Pressable>
       </View>
 
       <View style={styles.chipsWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
-          {FILTERS.map(f => (
+          {filters.map(f => (
             <Pressable 
               key={f.id} 
               style={[styles.chip, activeFilter === f.id && styles.chipActive]}
@@ -142,8 +144,8 @@ export function MessagingTemplatesScreen() {
           !isLoading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📂</Text>
-              <Text style={styles.emptyTitle}>No templates found</Text>
-              <Text style={styles.emptySubtitle}>Try a different search term or filter.</Text>
+              <Text style={styles.emptyTitle}>{t('messaging.templates.noTemplatesTitle')}</Text>
+              <Text style={styles.emptySubtitle}>{t('messaging.templates.noTemplatesSubtitle')}</Text>
             </View>
           ) : null
         }

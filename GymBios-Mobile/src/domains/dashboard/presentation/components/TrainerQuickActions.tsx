@@ -6,14 +6,14 @@ import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
 interface TrainerQuickActionsProps {
   onMessageMember?: () => void;
   onCreateWorkout?: () => void;
-  onTrackProgress?: () => void;
+  onCheckIn?: () => void;
   onViewLedger?: () => void;
 }
 
 export function TrainerQuickActions({
   onMessageMember,
   onCreateWorkout,
-  onTrackProgress,
+  onCheckIn,
   onViewLedger,
 }: TrainerQuickActionsProps) {
   const { t } = useTranslation();
@@ -26,12 +26,12 @@ export function TrainerQuickActions({
 
   const handleCreateWorkout = () => {
     if (onCreateWorkout) onCreateWorkout();
-    else router.push('/(trainer)/workout-feedback' as any);
+    else router.push('/(trainer)/schedule' as any);
   };
 
-  const handleTrackProgress = () => {
-    if (onTrackProgress) onTrackProgress();
-    else router.push('/(trainer)/performance' as any);
+  const handleCheckIn = () => {
+    if (onCheckIn) onCheckIn();
+    else router.push('/(trainer)/check-in' as any);
   };
 
   const handleViewLedger = () => {
@@ -42,7 +42,7 @@ export function TrainerQuickActions({
   const actions: QuickAction[] = [
     { label: t('dashboard.trainer.quickActions.messageMember'), icon: 'message-circle', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleMessage },
     { label: t('dashboard.trainer.quickActions.createWorkout'), icon: 'activity', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCreateWorkout },
-    { label: t('dashboard.trainer.quickActions.trackProgress'), icon: 'trending-up', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleTrackProgress },
+    { label: t('dashboard.trainer.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleCheckIn },
     { label: t('dashboard.trainer.quickActions.viewLedger'), icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
   ];
 

@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "भूमिकाएँ और अनुमतियाँ",
+    "createRole": "भूमिका बनाएं",
+    "editRole": "भूमिका संपादित करें",
+    "subtitle": "कर्मचारी और पेरोल",
+    "searchPlaceholder": "भूमिकाएँ खोजें...",
+    "filterModulesPlaceholder": "मॉड्यूल फ़िल्टर करें...",
+    "roleName": "भूमिका का नाम",
+    "roleNamePlaceholder": "उदा. फ्रंट डेस्क",
+    "description": "विवरण",
+    "descriptionPlaceholder": "यह भूमिका किस उद्देश्य के लिए है (वैकल्पिक)",
+    "modulePermissions": "मॉड्यूल अनुमतियाँ",
+    "selectedCount": "{{count}} चयनित",
+    "selectAll": "सभी चुनें",
+    "system": "सिस्टम",
+    "allAccess": "पूर्ण एक्सेस",
+    "allModules": "सभी मॉड्यूल",
+    "permissions_one": "{{count}} अनुमति",
+    "permissions_other": "{{count}} अनुमतियाँ",
+    "users_one": "{{count}} उपयोगकर्ता",
+    "users_other": "{{count}} उपयोगकर्ता",
+    "edit": "संपादित करें",
+    "duplicate": "डुप्लिकेट करें",
+    "delete": "हटाएं",
+    "systemRole": "सिस्टम भूमिका",
+    "customRole": "कस्टम भूमिका",
+    "noRolesFoundTitle": "कोई भूमिका नहीं मिली",
+    "noRolesFoundDesc": "\"{{query}}\" से मेल खाने वाली कोई भूमिका नहीं मिली।",
+    "clearSearch": "खोज साफ़ करें",
+    "noRolesYetTitle": "अभी तक कोई भूमिका नहीं",
+    "noRolesYetDesc": "अनुमतियाँ प्रबंधित करने के लिए अपनी पहली भूमिका बनाएं।",
+    "deleteRoleTitle": "भूमिका हटाएं?",
+    "deleteRoleMessage": "क्या आप वाकई \"{{name}}\" को हटाना चाहते हैं?\n\nइस क्रिया को पूर्ववत नहीं किया जा सकता।",
+    "cancel": "रद्द करें",
+    "saving": "सहेज रहा है...",
+    "save": "सहेजें",
+    "failedDuplicate": "भूमिका को डुप्लिकेट करने में विफल।",
+    "unableDelete": "भूमिका हटाने में असमर्थ।"
+  }
+};
+
+export default roles;

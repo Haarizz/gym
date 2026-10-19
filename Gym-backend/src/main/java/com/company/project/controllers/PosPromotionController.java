@@ -23,17 +23,21 @@ public class PosPromotionController {
         this.promotionService = promotionService;
     }
 
-    /** GET /api/pos/promotions — active, in-date promotions with a price discount. */
+    /**
+     * GET /api/pos/promotions[?memberId=12] — active, in-date promotions with a price discount that
+     * the sale's customer can use (no memberId: a walk-in, so only promotions for everyone).
+     */
     @GetMapping("/promotions")
-    public ResponseEntity<List<DiscountRule>> promotions() {
-        return ResponseEntity.ok(promotionService.activePromotions());
+    public ResponseEntity<List<DiscountRule>> promotions(@RequestParam(required = false) Long memberId) {
+        return ResponseEntity.ok(promotionService.activePromotions(memberId));
     }
 
-    /** GET /api/pos/discount-codes/lookup?code=SUMMER10&gross=250 — promotion code or referral coupon. */
+    /** GET /api/pos/discount-codes/lookup?code=SUMMER10&gross=250[&memberId=12] — promotion code or referral coupon. */
     @GetMapping("/discount-codes/lookup")
     public ResponseEntity<DiscountRule> lookupCode(@RequestParam String code,
-                                                   @RequestParam(required = false) BigDecimal gross) {
-        return ResponseEntity.ok(promotionService.lookupCode(code, gross));
+                                                   @RequestParam(required = false) BigDecimal gross,
+                                                   @RequestParam(required = false) Long memberId) {
+        return ResponseEntity.ok(promotionService.lookupCode(code, gross, memberId));
     }
 
     /** GET /api/pos/members/{id}/wallet — spendable reward-wallet balance. */

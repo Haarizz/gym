@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
@@ -22,6 +23,7 @@ export function CredentialsBottomSheet({
   onClose,
   onSetCredentials,
 }: CredentialsBottomSheetProps) {
+  const { t } = useTranslation();
   const [username, setUsername] = useState(existingUsername ?? '');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -39,27 +41,27 @@ export function CredentialsBottomSheet({
   return (
     <AppBottomSheet
       visible={visible}
-      title={existingUsername ? 'Update Credentials' : 'Grant Access'}
-      subtitle="Set app login credentials"
+      title={existingUsername ? t('members.credentialsSheet.updateTitle') : t('members.credentialsSheet.grantTitle')}
+      subtitle={t('members.credentialsSheet.subtitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
         <Input
-          label="Username"
+          label={t('members.credentialsSheet.usernameLabel')}
           value={username}
           onChangeText={setUsername}
-          placeholder="Enter app username"
+          placeholder={t('members.credentialsSheet.usernamePlaceholder')}
           autoCapitalize="none"
         />
         <Input
-          label="Password"
+          label={t('members.credentialsSheet.passwordLabel')}
           value={password}
           onChangeText={setPassword}
-          placeholder="Enter app password"
+          placeholder={t('members.credentialsSheet.passwordPlaceholder')}
           secureTextEntry
         />
         <Button
-          label={existingUsername ? 'Update Credentials' : 'Grant Access'}
+          label={existingUsername ? t('members.credentialsSheet.updateBtn') : t('members.credentialsSheet.grantBtn')}
           onPress={handleSubmit}
           loading={submitting}
           size="lg"

@@ -27,6 +27,7 @@ import { DatePickerField } from "../components/shared/DatePickerField";
 import { FormField, fieldA11y } from "../components/shared/FormField";
 import { WizardSteps, type WizardStepState } from "../components/promotions/WizardSteps";
 import promoStyles from "../components/promotions/PromotionFormDialog.module.css";
+import { MemberMultiSelect, useMemberLabels } from "../components/promotions/MemberMultiSelect";
 import {
   PROMOTION_STEPS,
   STEP_FIELD_ORDER,
@@ -218,6 +219,18 @@ const CHANNEL_OPTIONS = [
 
 const APPLICABLE_PLAN_OPTIONS = ["Standard Monthly", "Standard Annual", "Premium Monthly", "Premium Annual"];
 
+/** Names of the members a "Specific Members" promotion is limited to */
+function SpecificMemberBadges({ ids }: { ids: string[] }) {
+  const { labels } = useMemberLabels(ids);
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {ids.map(id => (
+        <Badge key={id} variant="outline" title={labels[id]?.hint || undefined}>{labels[id]?.name ?? "Loading..."}</Badge>
+      ))}
+    </div>
+  );
+}
+
 export function PromotionsCampaign() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
@@ -263,6 +276,7 @@ export function PromotionsCampaign() {
     usageLimit: "",
     usageLimitPerMember: "",
     targetAudience: "all",
+    specificMembers: [] as string[],
     channels: [] as string[],
     applicablePlans: [] as string[],
     applicableServices: [] as string[],
@@ -366,6 +380,7 @@ export function PromotionsCampaign() {
       usageLimit: "",
       usageLimitPerMember: "",
       targetAudience: "all",
+      specificMembers: [],
       channels: [],
       applicablePlans: [],
       applicableServices: [],
@@ -431,6 +446,7 @@ export function PromotionsCampaign() {
       usageLimit: promotion.usageLimit?.toString() ?? "",
       usageLimitPerMember: promotion.usageLimitPerMember?.toString() ?? "",
       targetAudience: promotion.targetAudience || "all",
+      specificMembers: promotion.specificMembers || [],
       channels: promotion.channels || [],
       applicablePlans: promotion.applicablePlans || [],
       applicableServices: promotion.applicableServices || [],
@@ -525,6 +541,8 @@ export function PromotionsCampaign() {
       applicablePlans: promotionForm.applicablePlans,
       applicableServices: promotionForm.applicableServices,
       targetAudience: promotionForm.targetAudience,
+      // Sent as [] for other audiences so a list from an earlier "Specific Members" choice is cleared
+      specificMembers: promotionForm.targetAudience === "specific" ? promotionForm.specificMembers : [],
       channels: promotionForm.channels,
       autoApply: promotionForm.autoApply,
       stackable: promotionForm.stackable,
@@ -1653,9 +1671,16 @@ export function PromotionsCampaign() {
                     <div>
                       <Label className="text-sm text-muted-foreground">Target Audience</Label>
                       <Badge variant="outline" className="capitalize">
-                        {selectedPromotion.targetAudience.replace('-', ' ')}
+                        {selectedPromotion.targetAudience === "specific" ? "Specific Members" : selectedPromotion.targetAudience.replace('-', ' ')}
                       </Badge>
                     </div>
+
+                    {selectedPromotion.targetAudience === "specific" && (selectedPromotion.specificMembers?.length ?? 0) > 0 && (
+                      <div>
+                        <Label className="text-sm text-muted-foreground">Members</Label>
+                        <SpecificMemberBadges ids={selectedPromotion.specificMembers!} />
+                      </div>
+                    )}
 
                     <div>
                       <Label className="text-sm text-muted-foreground">Distribution Channels</Label>
@@ -2074,6 +2099,20 @@ export function PromotionsCampaign() {
                       onChange={(val) => setPromotionForm(prev => ({ ...prev, targetAudience: val }))}
                     />
                   </FormField>
+                  {promotionForm.targetAudience === "specific" && (
+                    <div className={promoStyles.full}>
+                      <FormField htmlFor="promo-specificMembers" label="Choose Member(s)" required error={fieldError("specificMembers")}>
+                        <MemberMultiSelect
+                          id="promo-specificMembers"
+                          value={promotionForm.specificMembers}
+                          invalid={!!fieldError("specificMembers")}
+                          ariaDescribedBy={fieldError("specificMembers") ? "promo-specificMembers-error" : undefined}
+                          onClose={() => touchField("specificMembers")}
+                          onChange={(ids) => setPromotionForm(prev => ({ ...prev, specificMembers: ids }))}
+                        />
+                      </FormField>
+                    </div>
+                  )}
                 </div>
 
                 <fieldset className={promoStyles.subsection}>

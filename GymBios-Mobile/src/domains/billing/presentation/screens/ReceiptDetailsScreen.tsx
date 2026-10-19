@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { CurrencyValue, useCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -94,6 +95,7 @@ const SHARE_CHANNELS: {
 // presented — iOS refuses to present a new view controller over a dismissing modal.
 const SHEET_DISMISS_DELAY_MS = 350;
 export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreenProps) {
+  const { t } = useTranslation();
   const { receipt, loading, error, refresh } = useReceipt(receiptId);
   const { currencyCode } = useCurrency();
   const [busyAction, setBusyAction] = useState<'download' | 'share' | null>(null);
@@ -149,8 +151,8 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
     return (
       <ScreenLayout>
         <AppHeader
-          title="Receipt Details"
-          subtitle="Transaction Record"
+          title={t('billing.receipts.title')}
+          subtitle={t('billing.receipts.subtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
@@ -163,12 +165,12 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
     return (
       <ScreenLayout>
         <AppHeader
-          title="Receipt Details"
-          subtitle="Transaction Record"
+          title={t('billing.receipts.title')}
+          subtitle={t('billing.receipts.subtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
-        <ErrorState message="Failed to load receipt details." onRetry={refresh} />
+        <ErrorState message={t('common.error')} onRetry={refresh} />
       </ScreenLayout>
     );
   }
@@ -203,7 +205,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
           <View style={styles.heroTop}>
             <View style={styles.heroAmount}>
               <Typography variant="caption" color="textSecondary">
-                Total Amount
+                {t('billing.receipts.totalAmount')}
               </Typography>
               <MoneyText amount={receipt?.amount} variant="title" color={BrandColors.teal} />
             </View>
@@ -218,51 +220,51 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
         </View>
 
         {/* ── Receipt information ──────────────────────────────── */}
-        <BillingSection title="Receipt Information">
+        <BillingSection title={t('billing.receipts.receiptInfo')}>
           <View style={styles.infoCard}>
-            <InfoRow label="Receipt Number" value={receipt?.receiptNo} />
+            <InfoRow label={t('billing.receipts.receiptNumber')} value={receipt?.receiptNo} />
             <Divider />
-            <InfoRow label="Transaction Date" value={formatDate(receipt?.transactionDate)} />
+            <InfoRow label={t('billing.receipts.transactionDate')} value={formatDate(receipt?.transactionDate)} />
             <Divider />
-            <InfoRow label="Transaction Type" value={receipt?.transactionType} />
+            <InfoRow label={t('billing.receipts.transactionType')} value={receipt?.transactionType} />
             <Divider />
-            <InfoRow label="Subscription" value={receipt?.planName} />
+            <InfoRow label={t('billing.receipts.subscription')} value={receipt?.planName} />
             <Divider />
-            <InfoRow label="Processed By" value={receipt?.processedBy} />
+            <InfoRow label={t('billing.receipts.processedBy')} value={receipt?.processedBy} />
             {receipt?.remarks && (
               <>
                 <Divider />
-                <InfoRow label="Remarks" value={receipt.remarks} />
+                <InfoRow label={t('billing.receipts.remarks')} value={receipt.remarks} />
               </>
             )}
           </View>
         </BillingSection>
 
         {/* ── Member information ───────────────────────────────── */}
-        <BillingSection title="Member Information">
+        <BillingSection title={t('billing.receipts.memberInfo')}>
           <View style={styles.infoCard}>
-            <InfoRow label="Name" value={receipt?.memberName} />
+            <InfoRow label={t('billing.receipts.name')} value={receipt?.memberName} />
             <Divider />
-            <InfoRow label="Member ID" value={receipt?.memberId} />
+            <InfoRow label={t('billing.receipts.memberId')} value={receipt?.memberId} />
             <Divider />
-            <InfoRow label="Phone" value={receipt?.memberPhone} />
+            <InfoRow label={t('billing.receipts.phone')} value={receipt?.memberPhone} />
             <Divider />
-            <InfoRow label="Membership Type" value={receipt?.membershipType} />
+            <InfoRow label={t('billing.receipts.membershipType')} value={receipt?.membershipType} />
           </View>
         </BillingSection>
 
         {/* ── Payment details ──────────────────────────────────── */}
-        <BillingSection title="Payment Details">
+        <BillingSection title={t('billing.receipts.paymentDetails')}>
           <View style={styles.infoCard}>
-            <InfoRow label="Payment Method" value={receipt?.paymentMethod} />
+            <InfoRow label={t('billing.createReceipt.paymentMethod')} value={receipt?.paymentMethod} />
             <Divider />
-            <InfoRow label="Paid Amount" value={receipt?.paidAmount !== undefined ? <CurrencyValue amount={receipt.paidAmount} /> : undefined} />
+            <InfoRow label={t('billing.receipts.paidAmount')} value={receipt?.paidAmount !== undefined ? <CurrencyValue amount={receipt.paidAmount} /> : undefined} />
             <Divider />
-            <InfoRow label="Due Amount" value={receipt?.dueAmount !== undefined ? <CurrencyValue amount={receipt.dueAmount} /> : undefined} />
+            <InfoRow label={t('billing.receipts.dueAmount')} value={receipt?.dueAmount !== undefined ? <CurrencyValue amount={receipt.dueAmount} /> : undefined} />
             {receipt?.bankAccountName && (
               <>
                 <Divider />
-                <InfoRow label="Bank Account" value={`${receipt.bankAccountName} (${receipt.bankAccountCode ?? ''})`} />
+                <InfoRow label={t('billing.receipts.bankAccount')} value={`${receipt.bankAccountName} (${receipt.bankAccountCode ?? ''})`} />
               </>
             )}
           </View>
@@ -270,25 +272,25 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
 
         {/* ── Validity period ──────────────────────────────────── */}
         {(receipt?.validFrom || receipt?.validTill) && (
-          <BillingSection title="Validity Period">
+          <BillingSection title={t('billing.receipts.validityPeriod')}>
             <View style={styles.infoCard}>
-              <InfoRow label="Valid From" value={formatDate(receipt?.validFrom)} />
+              <InfoRow label={t('billing.receipts.validFrom')} value={formatDate(receipt?.validFrom)} />
               <Divider />
-              <InfoRow label="Valid Till" value={formatDate(receipt?.validTill)} />
+              <InfoRow label={t('billing.receipts.validTill')} value={formatDate(receipt?.validTill)} />
             </View>
           </BillingSection>
         )}
 
         {/* ── Outstanding balance ──────────────────────────────── */}
         {receipt?.balanceAfter !== undefined && (
-          <BillingSection title="Outstanding Balance">
+          <BillingSection title={t('billing.receipts.outstandingBalance')}>
             <OutstandingBalanceCard balance={receipt.balanceAfter} />
           </BillingSection>
         )}
 
         {/* ── Minor charges ────────────────────────────────────── */}
         {(receipt?.minorCharges ?? []).length > 0 && (
-          <BillingSection title="Minor Charges">
+          <BillingSection title={t('billing.receipts.minorCharges')}>
             <View style={styles.infoCard}>
               {receipt!.minorCharges!.map((charge, index) => (
                 <React.Fragment key={index}>
@@ -319,7 +321,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
 
         {/* ── Payment breakdown ────────────────────────────────── */}
         {breakdownRows.length > 0 && (
-          <BillingSection title="Payment Breakdown">
+          <BillingSection title={t('billing.receipts.paymentBreakdown')}>
             <PaymentSummaryCard
               rows={[
                 ...breakdownRows,
@@ -357,10 +359,10 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHandle} />
               <Typography variant="bodySmallBold" style={styles.sheetTitle}>
-                Share Receipt
+                {t('billing.receipts.shareReceipt')}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                Choose how to send {receipt?.receiptNo ?? `Receipt #${receiptId}`}
+                {t('billing.receipts.chooseHowToSend')} {receipt?.receiptNo ?? `Receipt #${receiptId}`}
               </Typography>
             </View>
 
@@ -390,7 +392,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
               onPress={() => setShareSheetVisible(false)}
             >
               <Typography variant="bodySmallBold" style={styles.cancelText}>
-                Cancel
+                {t('billing.receipts.cancel')}
               </Typography>
             </Pressable>
           </View>

@@ -31,12 +31,18 @@ interface RenewMembershipModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** A promotion code to fill in and apply, e.g. from the dashboard's offer */
+  promoCode?: string;
+  /** An offer without a code, claimed from the dashboard: applied by id until the member removes it */
+  offer?: { id: number; name: string };
 }
 
 export function RenewMembershipModal({
   visible,
   onClose,
   onSuccess,
+  promoCode,
+  offer: claimedOffer,
 }: RenewMembershipModalProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -51,9 +57,14 @@ export function RenewMembershipModal({
   const [showPayment, setShowPayment] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [rewardSel, setRewardSel] = useState<RewardSelection>(null);
-  const rewardFields = rewardSel?.kind === 'pass'
-    ? { rewardPassId: rewardSel.pass.id }
-    : rewardSel?.kind === 'coupon' ? { couponCode: rewardSel.coupon.code } : undefined;
+  // The claimed offer stands in for a pass/coupon (one discount per renewal); removing it brings the picker back.
+  const [removedOfferId, setRemovedOfferId] = useState<number | null>(null);
+  const offer = claimedOffer && claimedOffer.id !== removedOfferId ? claimedOffer : null;
+  const rewardFields = offer
+    ? { promotionId: offer.id }
+    : rewardSel?.kind === 'pass'
+      ? { rewardPassId: rewardSel.pass.id }
+      : rewardSel?.kind === 'coupon' ? { couponCode: rewardSel.coupon.code } : undefined;
 
   useEffect(() => {
     if (visible && currentPlanId && !selectedPlanId) {
@@ -67,7 +78,7 @@ export function RenewMembershipModal({
 
   // A pass/coupon the server rejects (e.g. it just expired) — shown inline; paying is
   // blocked until the member deselects it.
-  const rewardError = rewardSel && previewError ? previewError.message || t('membership.renew.rewardUnusable') : null;
+  const rewardError = (rewardSel || offer) && previewError ? previewError.message || t('membership.renew.rewardUnusable') : null;
   const changePlanMutation = useChangeMembershipPlan();
 
   const handlePaymentComplete = async (result: PaymentResult) => {
@@ -118,6 +129,7 @@ export function RenewMembershipModal({
   const handleClose = () => {
     setSelectedPlanId(undefined); // Clear transient state
     setRewardSel(null);
+    setRemovedOfferId(null);
     onClose();
   };
 
@@ -243,12 +255,23 @@ export function RenewMembershipModal({
                       </View>
                     )}
 
-                    <RewardPassPicker
-                      passContext="MEMBERSHIP"
-                      value={rewardSel}
-                      onChange={setRewardSel}
-                      validateCode={discountCodeApi.validate}
-                    />
+                    {offer ? (
+                      <View style={styles.offerCard}>
+                        <Text style={styles.offerTitle}>{t('membership.renew.offerApplied', { name: offer.name })}</Text>
+                        <Pressable hitSlop={8} onPress={() => setRemovedOfferId(offer.id)} accessibilityRole="button">
+                          <Text style={styles.offerRemove}>{t('membership.renew.removeOffer')}</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <RewardPassPicker
+                        passContext="MEMBERSHIP"
+                        value={rewardSel}
+                        onChange={setRewardSel}
+                        validateCode={discountCodeApi.validate}
+                        acceptPromotions
+                        initialCode={promoCode}
+                      />
+                    )}
                     {rewardError && <Text style={styles.rewardError}>{rewardError}</Text>}
 
                     {/* Price Breakdown */}
@@ -266,7 +289,7 @@ export function RenewMembershipModal({
                       {preview.rewardDiscountAmount > 0 && (
                         <View style={styles.priceRow}>
                           <Text style={styles.priceLabel}>
-                            {t(rewardSel?.kind === 'coupon' ? 'membership.renew.coupon' : 'membership.renew.rewardPass')}
+                            {offer ? offer.name : t(rewardSel?.kind === 'coupon' ? 'membership.renew.coupon' : 'membership.renew.rewardPass')}
                           </Text>
                           <Text style={styles.discountText}>-<CurrencyValue amount={preview.rewardDiscountAmount} /></Text>
                         </View>
@@ -500,6 +523,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.four,
     borderRadius: Radius.md,
     alignItems: 'center',
+  },
+  offerRemove: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#15803D',
   },
   rewardError: {
     fontSize: 12,

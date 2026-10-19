@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { CurrencyValue, formatCurrency } from '@/core/providers';
+import { getIntlLocale } from '@/core/i18n/format';
 
 /**
  * Presentation-only formatting for the Admin Dashboard. The backend returns
@@ -23,7 +24,7 @@ export function formatCompactCurrencyText(amount: number | null | undefined): st
 
 export function formatCount(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
-  return value.toLocaleString('en-IN');
+  return value.toLocaleString(getIntlLocale());
 }
 
 export function formatPercent(value: number | null | undefined): string {

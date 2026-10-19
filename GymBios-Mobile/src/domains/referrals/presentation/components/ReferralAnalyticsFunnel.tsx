@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface FunnelData {
   total: number;
@@ -15,6 +16,7 @@ interface ReferralAnalyticsFunnelProps {
 }
 
 export function ReferralAnalyticsFunnel({ data }: ReferralAnalyticsFunnelProps) {
+  const { t } = useTranslation();
   const { total, successful, paid, redeemed } = data;
 
   const successfulPct = total > 0 ? Math.round((successful / total) * 100) : 0;
@@ -31,10 +33,10 @@ export function ReferralAnalyticsFunnel({ data }: ReferralAnalyticsFunnelProps) 
   return (
     <View style={styles.card}>
       <Typography variant="subtitle" style={styles.title}>
-        Referral Conversion Funnel
+        {t('adminReferrals.funnelTitle')}
       </Typography>
       <Typography variant="caption" color="textSecondary" style={styles.subtitle}>
-        Track referral progress through conversion stages
+        {t('adminReferrals.funnelSubtitle')}
       </Typography>
 
       <View style={styles.stagesList}>

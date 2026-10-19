@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -52,6 +53,7 @@ export function MemberStatementScreen({
   onBack,
   onNavigateToPendingBills,
 }: MemberStatementScreenProps) {
+  const { t } = useTranslation();
   const { period, range, setPeriod } = useStatementFilters();
   const { statement, loading, error, refresh } = useMemberStatement(memberId, range);
 
@@ -65,8 +67,8 @@ export function MemberStatementScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title={memberName ?? 'Member Statement'}
-          subtitle="Statement of Account"
+          title={memberName ?? t('billing.statements.hubTitle')}
+          subtitle={t('billing.statements.hubSubtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
@@ -79,12 +81,12 @@ export function MemberStatementScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title={memberName ?? 'Member Statement'}
-          subtitle="Statement of Account"
+          title={memberName ?? t('billing.statements.hubTitle')}
+          subtitle={t('billing.statements.hubSubtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
-        <ErrorState message="Failed to load member statement." onRetry={refresh} />
+        <ErrorState message={t('common.error')} onRetry={refresh} />
       </ScreenLayout>
     );
   }
@@ -94,8 +96,8 @@ export function MemberStatementScreen({
   return (
     <ScreenLayout>
       <AppHeader
-        title={statement?.memberName ?? memberName ?? 'Member Statement'}
-        subtitle="Statement of Account"
+        title={statement?.memberName ?? memberName ?? t('billing.statements.hubTitle')}
+        subtitle={t('billing.statements.hubSubtitle')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -124,7 +126,7 @@ export function MemberStatementScreen({
             </Typography>
             {statement?.memberId && (
               <Typography variant="caption" color="textSecondary">
-                ID: {statement.memberId}
+                {t('billing.statements.idLabel')} {statement.memberId}
               </Typography>
             )}
             {statement?.memberPhone && (
@@ -135,7 +137,7 @@ export function MemberStatementScreen({
             {statement?.isMinor && statement.familyHeadName && (
               <View style={styles.minorTag}>
                 <Typography variant="caption" style={styles.minorTagText}>
-                  Minor · billed to {statement.familyHeadName}
+                  {t('billing.statements.minorBilledTo', { guardian: statement.familyHeadName })}
                 </Typography>
               </View>
             )}
@@ -149,7 +151,7 @@ export function MemberStatementScreen({
         <View style={styles.totalsRow}>
           <View style={styles.totalItem}>
             <Typography variant="caption" color="textSecondary">
-              Opening
+              {t('billing.statements.opening')}
             </Typography>
             <MoneyText
               amount={statement?.openingBalance}
@@ -159,7 +161,7 @@ export function MemberStatementScreen({
           <View style={styles.totalDivider} />
           <View style={styles.totalItem}>
             <Typography variant="caption" color="textSecondary">
-              Billed
+              {t('billing.statements.billed')}
             </Typography>
             <MoneyText
               amount={statement?.totalBilled}
@@ -170,7 +172,7 @@ export function MemberStatementScreen({
           <View style={styles.totalDivider} />
           <View style={styles.totalItem}>
             <Typography variant="caption" color="textSecondary">
-              Paid
+              {t('billing.statements.paid')}
             </Typography>
             <MoneyText
               amount={statement?.totalPaid}
@@ -181,7 +183,7 @@ export function MemberStatementScreen({
         </View>
 
         {/* ── Period filter chips ──────────────────────────────── */}
-        <BillingSection title="Transaction History">
+        <BillingSection title={t('billing.statements.transactionHistory')}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -210,8 +212,8 @@ export function MemberStatementScreen({
             <BillingSkeleton variant="list" count={4} />
           ) : lines.length === 0 ? (
             <EmptyBillingState
-              title="No transactions"
-              description="No transactions found for this period."
+              title={t('billing.statements.noTransactions')}
+              description={t('billing.statements.noTransactionsDesc')}
               icon="file-text"
             />
           ) : (
@@ -238,7 +240,7 @@ export function MemberStatementScreen({
           >
             <Feather name="credit-card" size={18} color="#ffffff" />
             <Typography variant="bodySmallBold" style={styles.payButtonText}>
-              Pay Outstanding Bills
+              {t('billing.statements.payOutstandingBills')}
             </Typography>
           </Pressable>
         </View>

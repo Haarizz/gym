@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
@@ -14,41 +15,44 @@ interface FreezePolicyStepProps {
 }
 
 export function FreezePolicyStep({ values, errors, onChange }: FreezePolicyStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
     <View style={styles.container}>
-      <FormSection title="Freeze Policy">
+      <FormSection title={t('membershipPlans.form.freezeStep.title')}>
         <Input
-          label="Max Freeze Days"
+          label={t('membershipPlans.form.freezeStep.maxFreezeDaysLabel')}
           value={values.maxFreezeDays}
           onChangeText={(v) => onChange('maxFreezeDays', v)}
-          placeholder="e.g. 30"
+          placeholder={t('membershipPlans.form.freezeStep.maxFreezeDaysPlaceholder')}
           keyboardType="numeric"
         />
         <Input
-          label="Max Freeze Occurrences"
+          label={t('membershipPlans.form.freezeStep.maxFreezeOccurrencesLabel')}
           value={values.maxFreezeOccurrences}
           onChangeText={(v) => onChange('maxFreezeOccurrences', v)}
-          placeholder="e.g. 2"
+          placeholder={t('membershipPlans.form.freezeStep.maxFreezeOccurrencesPlaceholder')}
           keyboardType="numeric"
         />
         <Input
-          label="Charge Per Extra Day"
+          label={t('membershipPlans.form.freezeStep.chargePerExtraDayLabel')}
           value={values.chargePerExtraDay}
           onChangeText={(v) => onChange('chargePerExtraDay', v)}
-          placeholder="0.00"
+          placeholder={t('membershipPlans.form.freezeStep.chargePerExtraDayPlaceholder')}
           keyboardType="decimal-pad"
         />
         <Input
-          label="Free Days Allowed"
+          label={t('membershipPlans.form.freezeStep.freeDaysAllowedLabel')}
           value={values.freeDaysAllowed}
           onChangeText={(v) => onChange('freeDaysAllowed', v)}
-          placeholder="e.g. 7"
+          placeholder={t('membershipPlans.form.freezeStep.freeDaysAllowedPlaceholder')}
           keyboardType="numeric"
         />
         <View style={styles.switchRow}>
-          <Typography variant="bodySmallBold">Auto Unfreeze</Typography>
+          <Typography variant="bodySmallBold">
+            {t('membershipPlans.form.freezeStep.autoUnfreezeLabel')}
+          </Typography>
           <Switch
             value={values.autoUnfreeze}
             onValueChange={(v) => onChange('autoUnfreeze', v)}

@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -31,6 +32,7 @@ function periodProgress(start?: string, end?: string): number | null {
 }
 
 export function MembershipSection({ member }: MembershipSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const expiry = getMemberExpiry(member);
@@ -41,12 +43,12 @@ export function MembershipSection({ member }: MembershipSectionProps) {
   const paymentTone = getPaymentStatusTone(member.paymentStatus);
 
   return (
-    <DetailCard title="Membership" icon="award">
+    <DetailCard title={t('members.membershipSection.title')} icon="award">
       <View style={[styles.planBox, { backgroundColor: theme.backgroundSelected }]}>
         <View style={styles.planHeader}>
           <View style={styles.planName}>
             <Typography variant="caption" color="textSecondary">
-              Current plan
+              {t('members.membershipSection.currentPlan')}
             </Typography>
             <Typography variant="bodySmallBold" numberOfLines={1}>
               {member.membershipPlanName ?? (titleCase(member.membershipType) || '—')}
@@ -75,15 +77,18 @@ export function MembershipSection({ member }: MembershipSectionProps) {
         <View style={[styles.frozenBox, { backgroundColor: `${FROZEN_COLOR}14`, borderColor: `${FROZEN_COLOR}40` }]}>
           <Feather name="pause-circle" size={14} color={FROZEN_COLOR} />
           <Typography variant="caption" style={[styles.frozenText, { color: FROZEN_COLOR }]}>
-            Frozen {formatMemberDate(member.freezeStartDate)} → {formatMemberDate(member.freezeEndDate)}
+            {t('members.membershipSection.frozenPeriod', {
+              start: formatMemberDate(member.freezeStartDate),
+              end: formatMemberDate(member.freezeEndDate),
+            })}
           </Typography>
         </View>
       ) : null}
 
       <DetailGrid>
-        <DetailField label="Membership type" value={titleCase(member.membershipType)} />
+        <DetailField label={t('members.membershipSection.membershipType')} value={titleCase(member.membershipType)} />
         <DetailField
-          label="Plan fee"
+          label={t('members.membershipSection.planFee')}
           value={
             member.membershipPlanPrice !== undefined ? (
               <Typography variant="bodySmallBold">
@@ -93,7 +98,7 @@ export function MembershipSection({ member }: MembershipSectionProps) {
           }
         />
         <DetailField
-          label="Payment status"
+          label={t('members.membershipSection.paymentStatus')}
           value={
             <Typography variant="bodySmallBold" style={{ color: paymentTone.color }}>
               {paymentTone.label}
@@ -101,7 +106,7 @@ export function MembershipSection({ member }: MembershipSectionProps) {
           }
         />
         <DetailField
-          label="Freeze days used"
+          label={t('members.membershipSection.freezeDaysUsed')}
           value={member.freezeDaysUsed !== undefined ? String(member.freezeDaysUsed) : undefined}
         />
       </DetailGrid>

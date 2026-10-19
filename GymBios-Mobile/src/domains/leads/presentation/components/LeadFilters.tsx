@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Modal,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -20,35 +21,36 @@ interface LeadFiltersProps {
   onChangeFilters: (filters: LeadFiltersType) => void;
 }
 
-const STATUS_OPTIONS = [
-  { label: 'All Statuses', value: '' },
-  { label: 'New', value: 'new' },
-  { label: 'Contacted', value: 'contacted' },
-  { label: 'Follow-up', value: 'follow-up' },
-  { label: 'Converted', value: 'converted' },
-  { label: 'Lost', value: 'lost' },
-];
-
-const PRIORITY_OPTIONS = [
-  { label: 'All Priorities', value: '' },
-  { label: 'High', value: 'high' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'Low', value: 'low' },
-];
-
-const SOURCE_OPTIONS = [
-  { label: 'All Sources', value: '' },
-  { label: 'Website', value: 'website' },
-  { label: 'Referral', value: 'referral' },
-  { label: 'Walk-in', value: 'walk-in' },
-  { label: 'Social Media', value: 'social-media' },
-  { label: 'Phone', value: 'phone' },
-  { label: 'Campaign', value: 'campaign' },
-];
-
 export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
+
+  const statusOptions = useMemo(() => [
+    { label: t('leads.filters.allStatuses'), value: '' },
+    { label: t('leads.statuses.new'), value: 'new' },
+    { label: t('leads.statuses.contacted'), value: 'contacted' },
+    { label: t('leads.statuses.followUp'), value: 'follow-up' },
+    { label: t('leads.statuses.converted'), value: 'converted' },
+    { label: t('leads.statuses.lost'), value: 'lost' },
+  ], [t]);
+
+  const priorityOptions = useMemo(() => [
+    { label: t('leads.filters.allPriorities'), value: '' },
+    { label: t('leads.priorities.high'), value: 'high' },
+    { label: t('leads.priorities.medium'), value: 'medium' },
+    { label: t('leads.priorities.low'), value: 'low' },
+  ], [t]);
+
+  const sourceOptions = useMemo(() => [
+    { label: t('leads.filters.allSources'), value: '' },
+    { label: t('leads.sources.website'), value: 'website' },
+    { label: t('leads.sources.referral'), value: 'referral' },
+    { label: t('leads.sources.walkIn'), value: 'walk-in' },
+    { label: t('leads.sources.socialMedia'), value: 'social-media' },
+    { label: t('leads.sources.phone'), value: 'phone' },
+    { label: t('leads.sources.campaign'), value: 'campaign' },
+  ], [t]);
 
   const activeFilterCount =
     (filters.status ? 1 : 0) +
@@ -83,7 +85,7 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
           <SearchBar
             value={filters.search ?? ''}
             onChangeText={handleSearchChange}
-            placeholder="Search leads by name, email, phone..."
+            placeholder={t('leads.filters.searchPlaceholder')}
           />
         </View>
 
@@ -94,7 +96,7 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
             activeFilterCount > 0 && { borderColor: BrandColors.teal },
           ]}
           onPress={() => setModalVisible(true)}
-          accessibilityLabel="Open Filters"
+          accessibilityLabel={t('leads.filters.openFiltersA11y')}
         >
           <Feather
             name="filter"
@@ -116,7 +118,7 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
         contentContainerStyle={styles.chipsScroll}
       >
         {/* Status Chips */}
-        {STATUS_OPTIONS.map(opt => {
+        {statusOptions.map(opt => {
           const isActive = (filters.status ?? '') === opt.value;
           return (
             <Pressable
@@ -155,7 +157,9 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
             onPress={e => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Filter Leads</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {t('leads.filters.filterLeads')}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
               </TouchableOpacity>
@@ -163,9 +167,11 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
 
             <ScrollView style={styles.modalBody}>
               {/* Status Section */}
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Status</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {t('leads.filters.status')}
+              </Text>
               <View style={styles.optionsWrap}>
-                {STATUS_OPTIONS.map(opt => (
+                {statusOptions.map(opt => (
                   <TouchableOpacity
                     key={opt.value}
                     style={[
@@ -189,9 +195,11 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
               </View>
 
               {/* Priority Section */}
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Priority</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {t('leads.filters.priority')}
+              </Text>
               <View style={styles.optionsWrap}>
-                {PRIORITY_OPTIONS.map(opt => (
+                {priorityOptions.map(opt => (
                   <TouchableOpacity
                     key={opt.value}
                     style={[
@@ -215,9 +223,11 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
               </View>
 
               {/* Source Section */}
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Source</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {t('leads.filters.source')}
+              </Text>
               <View style={styles.optionsWrap}>
-                {SOURCE_OPTIONS.map(opt => (
+                {sourceOptions.map(opt => (
                   <TouchableOpacity
                     key={opt.value}
                     style={[
@@ -247,7 +257,7 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
                 onPress={handleClearAll}
               >
                 <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  Reset All
+                  {t('leads.filters.resetAll')}
                 </Text>
               </TouchableOpacity>
 
@@ -255,7 +265,7 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
                 style={styles.applyBtn}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.applyBtnText}>Done</Text>
+                <Text style={styles.applyBtnText}>{t('leads.filters.done')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

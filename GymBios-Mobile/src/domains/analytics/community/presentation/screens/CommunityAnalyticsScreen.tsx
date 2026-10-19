@@ -1,15 +1,17 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Typography } from '@/shared/components';
 import { BrandColors, Spacing } from '@/core/theme';
 
 export function CommunityAnalyticsScreen() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <Typography variant="bodySmallBold" style={styles.title}>
-        Community Analytics
+        {t('analytics.community.title')}
       </Typography>
       <Typography variant="body" color="textSecondary">
-        Analytics for community engagement will appear here.
+        {t('analytics.community.emptyDescription')}
       </Typography>
     </View>
   );

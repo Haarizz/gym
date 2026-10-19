@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -35,6 +36,7 @@ export function FollowUpCard({
   onCall,
   onEmail,
 }: FollowUpCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -169,7 +171,7 @@ export function FollowUpCard({
           </View>
           <View style={[styles.badge, { backgroundColor: priorityBadge.bg }]}>
             <Text style={[styles.badgeText, { color: priorityBadge.text }]}>
-              {priorityBadge.label} Priority
+              {priorityBadge.label} {t('followUps.priority')}
             </Text>
           </View>
         </View>
@@ -188,7 +190,7 @@ export function FollowUpCard({
         <View style={styles.infoRow}>
           <Feather name="user" size={14} color={theme.textSecondary} />
           <Text style={[styles.infoText, { color: theme.textSecondary }]} numberOfLines={1}>
-            Assigned to: <Text style={{ color: theme.text, fontWeight: '600' }}>{followUp.assignedStaff}</Text>
+            {t('followUps.assignedTo')} <Text style={{ color: theme.text, fontWeight: '600' }}>{followUp.assignedStaff}</Text>
           </Text>
         </View>
       ) : null}
@@ -203,7 +205,7 @@ export function FollowUpCard({
             >
               <Feather name="phone" size={14} color={BrandColors.teal} />
               <Text style={[styles.actionChipText, { color: BrandColors.teal }]}>
-                Call
+                {t('followUps.call')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -215,7 +217,7 @@ export function FollowUpCard({
             >
               <Feather name="mail" size={14} color={BrandColors.teal} />
               <Text style={[styles.actionChipText, { color: BrandColors.teal }]}>
-                Email
+                {t('followUps.email')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -229,7 +231,7 @@ export function FollowUpCard({
                 style={[styles.primaryBtn, { backgroundColor: '#16a34a' }]}
               >
                 <Feather name="check" size={14} color="#ffffff" />
-                <Text style={styles.primaryBtnText}>Complete</Text>
+                <Text style={styles.primaryBtnText}>{t('followUps.complete')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -237,7 +239,7 @@ export function FollowUpCard({
                 style={[styles.primaryBtn, { backgroundColor: BrandColors.teal }]}
               >
                 <Feather name="clock" size={14} color="#ffffff" />
-                <Text style={styles.primaryBtnText}>Reschedule</Text>
+                <Text style={styles.primaryBtnText}>{t('followUps.reschedule')}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -246,7 +248,7 @@ export function FollowUpCard({
               style={[styles.primaryBtn, { backgroundColor: BrandColors.teal }]}
             >
               <Feather name="eye" size={14} color="#ffffff" />
-              <Text style={styles.primaryBtnText}>Details</Text>
+              <Text style={styles.primaryBtnText}>{t('followUps.details')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -268,7 +270,7 @@ export function FollowUpCard({
             }}
           >
             <Feather name="eye" size={16} color={theme.text} />
-            <Text style={[styles.menuItemText, { color: theme.text }]}>View Details</Text>
+            <Text style={[styles.menuItemText, { color: theme.text }]}>{t('followUps.viewDetails')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -279,7 +281,7 @@ export function FollowUpCard({
             }}
           >
             <Feather name="edit-2" size={16} color={theme.text} />
-            <Text style={[styles.menuItemText, { color: theme.text }]}>Edit</Text>
+            <Text style={[styles.menuItemText, { color: theme.text }]}>{t('followUps.edit')}</Text>
           </TouchableOpacity>
 
           {followUp.status !== 'cancelled' ? (
@@ -291,7 +293,7 @@ export function FollowUpCard({
               }}
             >
               <Feather name="x-circle" size={16} color="#d97706" />
-              <Text style={[styles.menuItemText, { color: '#d97706' }]}>Cancel Follow-up</Text>
+              <Text style={[styles.menuItemText, { color: '#d97706' }]}>{t('followUps.cancelFollowUp')}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -303,7 +305,7 @@ export function FollowUpCard({
             }}
           >
             <Feather name="trash-2" size={16} color="#dc2626" />
-            <Text style={[styles.menuItemText, { color: '#dc2626' }]}>Delete</Text>
+            <Text style={[styles.menuItemText, { color: '#dc2626' }]}>{t('followUps.delete')}</Text>
           </TouchableOpacity>
         </View>
       ) : null}

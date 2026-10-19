@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/core/hooks';
@@ -24,6 +25,7 @@ export function MembershipPlanCard({
   onDuplicate,
   onDelete,
 }: MembershipPlanCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isFamily = plan.planType?.toUpperCase() === 'FAMILY';
   // The plan's running offer, priced by the server.
@@ -62,6 +64,8 @@ export function MembershipPlanCard({
           {/* Overflow actions */}
           <View style={styles.actions}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('membershipPlans.card.edit')}
               style={styles.actionBtn}
               hitSlop={8}
               onPress={() => onEdit?.(plan)}
@@ -69,6 +73,8 @@ export function MembershipPlanCard({
               <Feather name="edit-2" size={16} color={theme.textSecondary} />
             </Pressable>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('membershipPlans.card.duplicate')}
               style={styles.actionBtn}
               hitSlop={8}
               onPress={() => onDuplicate?.(plan)}
@@ -76,6 +82,8 @@ export function MembershipPlanCard({
               <Feather name="copy" size={16} color={theme.textSecondary} />
             </Pressable>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('membershipPlans.card.delete')}
               style={styles.actionBtn}
               hitSlop={8}
               onPress={() => onDelete?.(plan)}
@@ -88,7 +96,9 @@ export function MembershipPlanCard({
         {/* Metrics row */}
         <View style={styles.metrics}>
           <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="caption" color="textSecondary">Price</Typography>
+            <Typography variant="caption" color="textSecondary">
+              {t('membershipPlans.card.price')}
+            </Typography>
             <Typography variant="bodySmallBold">
               <CurrencyValue amount={hasOffer ? plan.effectivePrice : plan.price} />
             </Typography>
@@ -100,7 +110,9 @@ export function MembershipPlanCard({
           </View>
 
           <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
-            <Typography variant="caption" color="textSecondary">Duration</Typography>
+            <Typography variant="caption" color="textSecondary">
+              {t('membershipPlans.card.duration')}
+            </Typography>
             <Typography variant="bodySmallBold">
               {plan.durationValue} {plan.durationType}
             </Typography>
@@ -108,12 +120,12 @@ export function MembershipPlanCard({
 
           <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
             <Typography variant="caption" color="textSecondary">
-              {isFamily ? 'Family Size' : 'Sessions'}
+              {isFamily ? t('membershipPlans.card.familySize') : t('membershipPlans.card.sessions')}
             </Typography>
             <Typography variant="bodySmallBold">
               {isFamily
                 ? plan.maxFamilyMembers
-                  ? `Up to ${plan.maxFamilyMembers}`
+                  ? t('membershipPlans.card.upToFamily', { count: plan.maxFamilyMembers })
                   : '—'
                 : plan.maxSessions !== undefined
                 ? String(plan.maxSessions)

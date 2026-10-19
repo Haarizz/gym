@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "الأدوار والصلاحيات",
+    "createRole": "إنشاء دور",
+    "editRole": "تعديل الدور",
+    "subtitle": "الموظفون وكشوف الرواتب",
+    "searchPlaceholder": "البحث في الأدوار...",
+    "filterModulesPlaceholder": "تصفية الوحدات...",
+    "roleName": "اسم الدور",
+    "roleNamePlaceholder": "مثال: موظف استقبال",
+    "description": "الوصف",
+    "descriptionPlaceholder": "الغرض من هذا الدور (اختياري)",
+    "modulePermissions": "صلاحيات الوحدات",
+    "selectedCount": "تم تحديد {{count}}",
+    "selectAll": "تحديد الكل",
+    "system": "نظام",
+    "allAccess": "وصول كامل",
+    "allModules": "جميع الوحدات",
+    "permissions_one": "صلاحية واحدة",
+    "permissions_other": "{{count}} صلاحيات",
+    "users_one": "مستخدم واحد",
+    "users_other": "{{count}} مستخدمين",
+    "edit": "تعديل",
+    "duplicate": "تكرار",
+    "delete": "حذف",
+    "systemRole": "دور النظام",
+    "customRole": "دور مخصص",
+    "noRolesFoundTitle": "لم يتم العثور على أدوار",
+    "noRolesFoundDesc": "لم نتمكن من العثور على أي أدوار تطابق \"{{query}}\".",
+    "clearSearch": "مسح البحث",
+    "noRolesYetTitle": "لا توجد أدوار حتى الآن",
+    "noRolesYetDesc": "أنشئ دورك الأول للبدء في إدارة الصلاحيات.",
+    "deleteRoleTitle": "حذف الدور؟",
+    "deleteRoleMessage": "هل أنت متأكد أنك تريد حذف\n\"{{name}}\"؟\n\nلا يمكن التراجع عن هذا الإجراء.",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ...",
+    "save": "حفظ",
+    "failedDuplicate": "فشل تكرار الدور.",
+    "unableDelete": "تعذر حذف الدور."
+  }
+};
+
+export default roles;

@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "Roles y permisos",
+    "createRole": "Crear rol",
+    "editRole": "Editar rol",
+    "subtitle": "Empleados y nómina",
+    "searchPlaceholder": "Buscar roles...",
+    "filterModulesPlaceholder": "Filtrar módulos...",
+    "roleName": "Nombre del rol",
+    "roleNamePlaceholder": "ej. Recepción",
+    "description": "Descripción",
+    "descriptionPlaceholder": "Para qué sirve este rol (opcional)",
+    "modulePermissions": "PERMISOS DE MÓDULO",
+    "selectedCount": "{{count}} seleccionado(s)",
+    "selectAll": "Seleccionar todo",
+    "system": "Sistema",
+    "allAccess": "Acceso total",
+    "allModules": "Todos los módulos",
+    "permissions_one": "{{count}} permiso",
+    "permissions_other": "{{count}} permisos",
+    "users_one": "{{count}} usuario",
+    "users_other": "{{count}} usuarios",
+    "edit": "Editar",
+    "duplicate": "Duplicar",
+    "delete": "Eliminar",
+    "systemRole": "Rol de sistema",
+    "customRole": "Rol personalizado",
+    "noRolesFoundTitle": "No se encontraron roles",
+    "noRolesFoundDesc": "No pudimos encontrar ningún rol que coincida con \"{{query}}\".",
+    "clearSearch": "Borrar búsqueda",
+    "noRolesYetTitle": "Aún no hay roles",
+    "noRolesYetDesc": "Crea tu primer rol para comenzar a gestionar permisos.",
+    "deleteRoleTitle": "¿Eliminar rol?",
+    "deleteRoleMessage": "¿Estás seguro de que deseas eliminar\n\"{{name}}\"?\n\nEsta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "saving": "Guardando...",
+    "save": "Guardar",
+    "failedDuplicate": "Error al duplicar el rol.",
+    "unableDelete": "No se pudo eliminar el rol."
+  }
+};
+
+export default roles;

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -19,13 +20,14 @@ export function SimpleBarChart({
   height = 160,
   barColor = BrandColors.teal,
 }: SimpleBarChartProps) {
+  const { t } = useTranslation();
   const maxValue = Math.max(...data.map(d => d.value), 1);
 
   if (data.length === 0) {
     return (
       <View style={[styles.empty, { height }]}>
         <Typography variant="caption" color="textSecondary">
-          No trend data available
+          {t('attendance.hub.noTrendData')}
         </Typography>
       </View>
     );

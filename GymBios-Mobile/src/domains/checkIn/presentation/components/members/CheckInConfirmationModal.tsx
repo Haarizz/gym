@@ -14,6 +14,8 @@ interface CheckInConfirmationModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  /** Confirm-button colour for check-in; defaults to brand teal. */
+  accentColor?: string;
 }
 
 export function CheckInConfirmationModal({
@@ -23,6 +25,7 @@ export function CheckInConfirmationModal({
   onConfirm,
   onCancel,
   isLoading,
+  accentColor,
 }: CheckInConfirmationModalProps) {
   const { t } = useTranslation();
   if (!member) return null;
@@ -88,7 +91,7 @@ export function CheckInConfirmationModal({
                   label={isCheckIn ? t('checkIn.members.confirmCheckInBtn') : t('checkIn.members.confirmCheckOutBtn')} 
                   variant="primary" 
                   onPress={onConfirm} 
-                  style={[styles.confirmBtn, !isCheckIn && { backgroundColor: BrandColors.danger }]} 
+                  style={[styles.confirmBtn, isCheckIn && !!accentColor && { backgroundColor: accentColor }, !isCheckIn && { backgroundColor: BrandColors.danger }]} 
                   loading={isLoading} 
                 />
               </View>

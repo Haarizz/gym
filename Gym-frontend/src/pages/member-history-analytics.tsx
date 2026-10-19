@@ -665,6 +665,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const canSubmitFreeze = canSubmitStaffFreeze(
     freezeAllowance, staffFreezeDays(freezeStartDate ?? new Date(), freezeEndDate), overrideFreezeLimits);
   const isActive = member.membership_status === 'active';
+  // Reception hasn't confirmed the payment yet — any membership action would
+  // overwrite pending_approval and start the clock before approval.
+  const isPendingApproval = member.membership_status === 'pending_approval';
+  const pendingApprovalHint = isPendingApproval ? 'Available after approval' : undefined;
   // The membership_status column is only ever set explicitly (create/freeze/
   // deactivate) — nothing flips it to "expired" when the expiry date passes,
   // so derive that here from expiry_date rather than trusting the stored value.
@@ -772,12 +776,14 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <CreditCard className="h-5 w-5 text-primary" />
               <span>Current Membership & Add-Ons</span>
             </div>
-            <div className="flex items-center space-x-2">
+            {/* Disabled buttons swallow hover, so the hint lives on the wrapper */}
+            <div className="flex items-center space-x-2" title={pendingApprovalHint}>
               <Button
                 size="sm"
                 variant="outline"
                 className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#DFF5F4]"
                 onClick={() => setIsFreezeDialogOpen(true)}
+                disabled={isPendingApproval}
               >
                 <Snowflake className="h-4 w-4 mr-2" />
                 {isFrozen ? 'Unfreeze' : 'Freeze'}
@@ -787,6 +793,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 variant="outline"
                 className="border-primary/20"
                 onClick={() => setIsTransferModalOpen(true)}
+                disabled={isPendingApproval}
               >
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Transfer
@@ -1024,10 +1031,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <Receipt className="h-4 w-4 mr-2" />
                 View Receipts
               </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })}>
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Renew / Upgrade Plan
-              </Button>
+              <div title={pendingApprovalHint}>
+                <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })} disabled={isPendingApproval}>
+                  <RefreshCcw className="h-4 w-4 mr-2" />
+                  Renew / Upgrade Plan
+                </Button>
+              </div>
               <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('plans-services-catalog')}>
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Purchase Add-On

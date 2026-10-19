@@ -104,7 +104,16 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             // nullable, receipt_vouchers.system_generated NOT NULL DEFAULT FALSE — were
             // verified present on every tenant before recording the rename.
             Map.entry("V69__members_email_nullable.sql", "V73__members_email_nullable.sql"),
-            Map.entry("V70__receipt_voucher_system_generated.sql", "V74__receipt_voucher_system_generated.sql")
+            Map.entry("V70__receipt_voucher_system_generated.sql", "V74__receipt_voucher_system_generated.sql"),
+            // b8ad116: main took V86-V94 (renewal kind, bios snapshots, POS commission, theme,
+            // addon receipts, plan status, workforce/payroll) after tenants had run these as
+            // V88-V93. Only the header comment changed.
+            Map.entry("V88__referral_codes_belong_to_members.sql", "V95__referral_codes_belong_to_members.sql"),
+            Map.entry("V89__staff_ratings.sql", "V96__staff_ratings.sql"),
+            Map.entry("V90__staff_ratings_tags_anonymous.sql", "V97__staff_ratings_tags_anonymous.sql"),
+            Map.entry("V91__gym_review_requests.sql", "V98__gym_review_requests.sql"),
+            Map.entry("V92__member_enquiries.sql", "V99__member_enquiries.sql"),
+            Map.entry("V93__attendance_workout_timer.sql", "V100__attendance_workout_timer.sql")
     );
 
     /**
@@ -121,7 +130,11 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             // 69-72 land below the relabelled V73/V74: a guarded constraint drop, an
             // idempotent status normalisation, ADD COLUMN/INDEX IF NOT EXISTS, and a
             // fully guarded community-columns migration — all re-runnable.
-            "69", "70", "71", "72");
+            "69", "70", "71", "72",
+            // 86-94 land below the relabelled V95-V100: ADD COLUMN / CREATE ... IF NOT
+            // EXISTS, receipt_id backfills guarded by IS NULL, an idempotent status
+            // normalisation, and a deduction_types seed guarded by NOT EXISTS.
+            "86", "87", "88", "89", "90", "91", "92", "93", "94");
 
     /**
      * Migrations that may have been applied by hand, outside Flyway: a query

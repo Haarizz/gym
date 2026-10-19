@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import type { ComponentProps, ReactNode } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -36,6 +37,7 @@ export function AppAccessStep({
   goToStep,
   validateStep,
 }: AppAccessStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const workingDays = Object.values(data.schedule).filter((slots) => slots?.length).length;
@@ -43,12 +45,12 @@ export function AppAccessStep({
 
   return (
     <View style={styles.container}>
-      <FormCard icon="smartphone" title="App access">
+      <FormCard icon="smartphone" title={t('hr.appAccess.title')}>
         <View style={styles.switchRow}>
           <View style={styles.switchText}>
-            <Typography variant="bodySmallBold">Allow mobile app login</Typography>
+            <Typography variant="bodySmallBold">{t('hr.appAccess.allowLogin')}</Typography>
             <Typography variant="caption" color="textSecondary">
-              Staff can sign in with the permissions of their role
+              {t('hr.appAccess.allowLoginDesc')}
             </Typography>
           </View>
           <Switch
@@ -62,30 +64,30 @@ export function AppAccessStep({
         {data.appAccessEnabled ? (
           <View style={styles.fields}>
             <Input
-              label={<RequiredLabel>Username</RequiredLabel>}
+              label={<RequiredLabel>{t('hr.appAccess.username')}</RequiredLabel>}
               value={data.username}
               onChangeText={(v) => updateField('username', v)}
-              placeholder="e.g. omar.khalid"
+              placeholder={t('hr.appAccess.usernamePlaceholder')}
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="username"
               error={errors?.username}
             />
             <Input
-              label={mode === 'create' ? <RequiredLabel>Password</RequiredLabel> : 'New password'}
+              label={mode === 'create' ? <RequiredLabel>{t('hr.appAccess.password')}</RequiredLabel> : t('hr.appAccess.newPassword')}
               value={data.password}
               onChangeText={(v) => updateField('password', v)}
-              placeholder={mode === 'create' ? 'At least 6 characters' : 'Leave blank to keep current'}
+              placeholder={mode === 'create' ? t('hr.appAccess.passwordPlaceholderCreate') : t('hr.appAccess.passwordPlaceholderEdit')}
               secureTextEntry
               textContentType="newPassword"
               autoCapitalize="none"
               error={errors?.password}
             />
             <Input
-              label={mode === 'create' ? <RequiredLabel>Confirm password</RequiredLabel> : 'Confirm new password'}
+              label={mode === 'create' ? <RequiredLabel>{t('hr.appAccess.confirmPassword')}</RequiredLabel> : t('hr.appAccess.confirmNewPassword')}
               value={data.confirmPassword}
               onChangeText={(v) => updateField('confirmPassword', v)}
-              placeholder="Re-enter password"
+              placeholder={t('hr.appAccess.confirmPasswordPlaceholder')}
               secureTextEntry
               textContentType="newPassword"
               autoCapitalize="none"
@@ -93,7 +95,7 @@ export function AppAccessStep({
             />
             {hasExistingLogin && !data.password ? (
               <Typography variant="caption" color="textSecondary">
-                This staff member already has a login. Their current password stays unchanged.
+                {t('hr.appAccess.existingLoginNotice')}
               </Typography>
             ) : null}
           </View>
@@ -101,12 +103,12 @@ export function AppAccessStep({
       </FormCard>
 
       <Typography variant="caption" color="textSecondary" style={styles.reviewHeading}>
-        REVIEW
+        {t('hr.appAccess.reviewHeading')}
       </Typography>
 
       <ReviewCard
         icon="user"
-        title="Personal"
+        title={t('hr.appAccess.personalReview')}
         step={1}
         goToStep={goToStep}
         invalid={Object.keys(validateStep(1)).length > 0}
@@ -119,7 +121,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="briefcase"
-        title="Employment"
+        title={t('hr.appAccess.employmentReview')}
         step={2}
         goToStep={goToStep}
         invalid={Object.keys(validateStep(2)).length > 0}
@@ -133,7 +135,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="dollar-sign"
-        title="Compensation"
+        title={t('hr.appAccess.compensationReview')}
         step={3}
         goToStep={goToStep}
         invalid={Object.keys(validateStep(3)).length > 0}
@@ -145,7 +147,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="calendar"
-        title="Schedule"
+        title={t('hr.appAccess.scheduleReview')}
         step={4}
         goToStep={goToStep}
         rows={[
@@ -169,6 +171,7 @@ interface ReviewCardProps {
 }
 
 function ReviewCard({ icon, title, step, rows, goToStep, invalid }: ReviewCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   return (
     <FormCard
@@ -185,7 +188,7 @@ function ReviewCard({ icon, title, step, rows, goToStep, invalid }: ReviewCardPr
         >
           <Feather name="edit-2" size={13} color={theme.primary} />
           <Typography variant="caption" style={[styles.editText, { color: theme.primary }]}>
-            Edit
+            {t('hr.appAccess.edit')}
           </Typography>
         </Pressable>
       }

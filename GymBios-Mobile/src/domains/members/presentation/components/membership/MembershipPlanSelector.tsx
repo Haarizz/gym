@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
@@ -26,6 +27,7 @@ export function MembershipPlanSelector({
   onChange,
   disabled = false,
 }: MembershipPlanSelectorProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [sheetVisible, setSheetVisible] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,7 +59,7 @@ export function MembershipPlanSelector({
   return (
     <View>
       <Typography variant="bodySmallBold" style={styles.label}>
-        Subscription
+        {t('membershipPlans.list.title')}
         <Typography variant="bodySmallBold" style={{ color: theme.error }}>
           {' *'}
         </Typography>
@@ -67,7 +69,7 @@ export function MembershipPlanSelector({
         onPress={openSheet}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel="Subscription"
+        accessibilityLabel={t('membershipPlans.list.title')}
         accessibilityState={{ disabled }}
         style={({ pressed }) => [
           styles.field,
@@ -86,14 +88,14 @@ export function MembershipPlanSelector({
             { color: selectedPlan ? theme.text : theme.textSecondary },
           ]}
         >
-          {selectedPlan ? selectedPlan.name : 'Select a subscription'}
+          {selectedPlan ? selectedPlan.name : t('membershipPlans.list.searchPlaceholder')}
         </Typography>
         <Feather name="chevron-down" size={18} color={theme.textSecondary} />
       </Pressable>
 
       <AppBottomSheet
         visible={sheetVisible}
-        title="Subscription"
+        title={t('membershipPlans.list.title')}
         onClose={() => setSheetVisible(false)}
       >
         {/* Search input */}
@@ -103,7 +105,7 @@ export function MembershipPlanSelector({
             style={[styles.searchInputText, { color: theme.text }]}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search subscriptions..."
+            placeholder={t('membershipPlans.list.searchPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -121,19 +123,19 @@ export function MembershipPlanSelector({
 
         {loading && (
           <Typography variant="bodySmall" color="textSecondary" style={styles.statusText}>
-            Loading subscriptions...
+            {t('common.pleaseWait')}
           </Typography>
         )}
 
         {!loading && error && (
           <Typography variant="bodySmall" color="error" style={styles.statusText}>
-            Failed to load subscriptions
+            {t('membershipPlans.list.loadError')}
           </Typography>
         )}
 
         {!loading && !error && filteredPlans.length === 0 && (
           <Typography variant="bodySmall" color="textSecondary" style={styles.statusText}>
-            No subscriptions found
+            {t('membershipPlans.list.noPlansFound')}
           </Typography>
         )}
 

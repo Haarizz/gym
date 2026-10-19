@@ -10,7 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { toast } from '@/shared/components/Toasts/toastStore';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { GlassBlob, GlassSurface } from '@/shared/components';
@@ -48,6 +48,20 @@ export function MemberMembershipScreen() {
   const [freezeSheetKey, setFreezeSheetKey] = useState(0);
   const [isUnfreezeModalOpen, setIsUnfreezeModalOpen] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  // The dashboard's offer opens the renewal with it applied, until the modal is closed:
+  // ?renew=1&promoCode=RENEW15, or ?renew=1&promotionId=5&offerName=… for an offer without a code
+  const { renew, promoCode, promotionId, offerName } =
+    useLocalSearchParams<{ renew?: string; promoCode?: string; promotionId?: string; offerName?: string }>();
+  const claimedOffer = useMemo(
+    () => (renew === '1' && promotionId ? { id: Number(promotionId), name: offerName ?? '' } : undefined),
+    [renew, promotionId, offerName],
+  );
+  const closeRenewModal = () => {
+    setIsRenewModalOpen(false);
+    if (renew || promoCode || promotionId) {
+      router.setParams({ renew: undefined, promoCode: undefined, promotionId: undefined, offerName: undefined });
+    }
+  };
 
   const freezeInfo = memberState?.freeze;
   const freezeMutation = useFreezeMembership();
@@ -296,9 +310,11 @@ export function MemberMembershipScreen() {
       />
 
       <RenewMembershipModal
-        visible={isRenewModalOpen}
-        onClose={() => setIsRenewModalOpen(false)}
+        visible={isRenewModalOpen || renew === '1'}
+        onClose={closeRenewModal}
         onSuccess={handleRenewSuccess}
+        promoCode={renew === '1' ? promoCode : undefined}
+        offer={claimedOffer}
       />
       </ScrollView>
     </View>

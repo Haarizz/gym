@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
@@ -51,36 +52,48 @@ const ALL_STATUSES: LeadStatus[] = [
   'lost',
 ];
 
-const STATUS_DROPDOWN_OPTIONS = [
-  { label: 'New', value: 'new' },
-  { label: 'Contacted', value: 'contacted' },
-  { label: 'Follow-up', value: 'follow-up' },
-  { label: 'Converted', value: 'converted' },
-  { label: 'Lost', value: 'lost' },
-];
-
-const PRIORITY_DROPDOWN_OPTIONS = [
-  { label: 'High', value: 'high' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'Low', value: 'low' },
-];
-
-const SOURCE_DROPDOWN_OPTIONS = [
-  { label: 'Website', value: 'website' },
-  { label: 'Referral', value: 'referral' },
-  { label: 'Walk-in', value: 'walk-in' },
-  { label: 'Social Media', value: 'social-media' },
-  { label: 'Phone', value: 'phone' },
-  { label: 'Campaign', value: 'campaign' },
-  { label: 'Other', value: 'other' },
-];
-
 export function LeadManagementScreen({
   onNavigateToDetail,
   onNavigateToCreate,
 }: LeadManagementScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { selectedBranchId } = useBranchContext();
+
+  const statusOptions = useMemo(() => [
+    { label: t('leads.statuses.new'), value: 'new' },
+    { label: t('leads.statuses.contacted'), value: 'contacted' },
+    { label: t('leads.statuses.followUp'), value: 'follow-up' },
+    { label: t('leads.statuses.converted'), value: 'converted' },
+    { label: t('leads.statuses.lost'), value: 'lost' },
+  ], [t]);
+
+  const priorityOptions = useMemo(() => [
+    { label: t('leads.priorities.high'), value: 'high' },
+    { label: t('leads.priorities.medium'), value: 'medium' },
+    { label: t('leads.priorities.low'), value: 'low' },
+  ], [t]);
+
+  const sourceOptions = useMemo(() => [
+    { label: t('leads.sources.website'), value: 'website' },
+    { label: t('leads.sources.referral'), value: 'referral' },
+    { label: t('leads.sources.walkIn'), value: 'walk-in' },
+    { label: t('leads.sources.socialMedia'), value: 'social-media' },
+    { label: t('leads.sources.phone'), value: 'phone' },
+    { label: t('leads.sources.campaign'), value: 'campaign' },
+    { label: t('leads.sources.other'), value: 'other' },
+  ], [t]);
+
+  const getStatusLabel = useCallback((status: LeadStatus) => {
+    switch (status) {
+      case 'new': return t('leads.statuses.new');
+      case 'contacted': return t('leads.statuses.contacted');
+      case 'follow-up': return t('leads.statuses.followUp');
+      case 'converted': return t('leads.statuses.converted');
+      case 'lost': return t('leads.statuses.lost');
+      default: return status;
+    }
+  }, [t]);
 
   // State
   const [filters, setFilters] = useState<LeadFiltersType>({ page: 1, size: 50 });
@@ -117,8 +130,8 @@ export function LeadManagementScreen({
       label: s.name ? `${s.name}${s.role ? ` (${s.role})` : ''}` : s.email,
       value: s.name || s.email,
     }));
-    return [{ label: 'Unassigned', value: '' }, ...options];
-  }, [staff]);
+    return [{ label: t('leads.management.unassigned'), value: '' }, ...options];
+  }, [staff, t]);
 
   const {
     data: leadsData,
@@ -155,45 +168,45 @@ export function LeadManagementScreen({
   // Direct Lead Action Handlers
   const handleCall = useCallback((lead: Lead) => {
     if (!lead.phone) {
-      toast.info('This lead does not have a phone number recorded.', {
-        title: 'No Phone Number'
+      toast.info(t('leads.actions.noPhoneMessage'), {
+        title: t('leads.actions.noPhoneTitle'),
       });
       return;
     }
     Linking.openURL(`tel:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to launch phone dialer on this device.', {
-        title: 'Error'
+      toast.error(t('leads.actions.phoneError'), {
+        title: t('common.error'),
       });
     });
-  }, []);
+  }, [t]);
 
   const handleEmail = useCallback((lead: Lead) => {
     if (!lead.email) {
-      toast.info('This lead does not have an email address recorded.', {
-        title: 'No Email Address'
+      toast.info(t('leads.actions.noEmailMessage'), {
+        title: t('leads.actions.noEmailTitle'),
       });
       return;
     }
     Linking.openURL(`mailto:${lead.email}`).catch(() => {
-      toast.error('Unable to launch mail client on this device.', {
-        title: 'Error'
+      toast.error(t('leads.actions.emailError'), {
+        title: t('common.error'),
       });
     });
-  }, []);
+  }, [t]);
 
   const handleMessage = useCallback((lead: Lead) => {
     if (!lead.phone) {
-      toast.info('This lead does not have a phone number recorded.', {
-        title: 'No Phone Number'
+      toast.info(t('leads.actions.noPhoneMessage'), {
+        title: t('leads.actions.noPhoneTitle'),
       });
       return;
     }
     Linking.openURL(`sms:${lead.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to launch SMS messaging on this device.', {
-        title: 'Error'
+      toast.error(t('leads.actions.messageError'), {
+        title: t('common.error'),
       });
     });
-  }, []);
+  }, [t]);
 
   const handleView = useCallback(
     (lead: Lead) => {
@@ -224,12 +237,14 @@ export function LeadManagementScreen({
   const handleDelete = useCallback(
     (lead: Lead) => {
       Alert.alert(
-        'Delete Lead',
-        `Are you sure you want to delete ${lead.firstName} ${lead.lastName}?`,
+        t('leads.management.deleteLeadTitle'),
+        t('leads.management.deleteLeadConfirm', {
+          name: `${lead.firstName} ${lead.lastName}`.trim() || t('leads.management.unnamedLead'),
+        }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('leads.management.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('leads.management.delete'),
             style: 'destructive',
             onPress: () => {
               deleteMutation.mutate(lead.id, {
@@ -237,8 +252,8 @@ export function LeadManagementScreen({
                   if (isSelected(lead.id)) toggleSelection(lead.id);
                 },
                 onError: err => {
-                  toast.error(err.message || 'Failed to delete lead.', {
-                    title: 'Error'
+                  toast.error(err.message || t('leads.management.deleteError'), {
+                    title: t('common.error'),
                   });
                 },
               });
@@ -247,14 +262,14 @@ export function LeadManagementScreen({
         ],
       );
     },
-    [deleteMutation, isSelected, toggleSelection],
+    [deleteMutation, isSelected, t, toggleSelection],
   );
 
   // Modal Submit Handlers
   const handleCreateSubmit = () => {
     if (!formFirstName.trim()) {
-      toast.error('First name is required.', {
-        title: 'Validation Error'
+      toast.error(t('leads.form.firstNameRequired'), {
+        title: t('leads.form.validationErrorTitle'),
       });
       return;
     }
@@ -277,8 +292,8 @@ export function LeadManagementScreen({
           resetForm();
         },
         onError: err => {
-          toast.error(err.message || 'Failed to create lead.', {
-            title: 'Error'
+          toast.error(err.message || t('leads.management.createError'), {
+            title: t('common.error'),
           });
         },
       },
@@ -288,8 +303,8 @@ export function LeadManagementScreen({
   const handleEditSubmit = () => {
     if (!selectedLead) return;
     if (!formFirstName.trim()) {
-      toast.error('First name is required.', {
-        title: 'Validation Error'
+      toast.error(t('leads.form.firstNameRequired'), {
+        title: t('leads.form.validationErrorTitle'),
       });
       return;
     }
@@ -329,18 +344,18 @@ export function LeadManagementScreen({
           resetForm();
           if (newlyConverted) {
             Alert.alert(
-              'Register as member?',
-              `${convertedLead.firstName} is marked converted. Register them now to record the sale and credit it to their staff member.`,
+              t('leads.management.registerPromptTitle'),
+              t('leads.management.registerPromptMessage', { name: convertedLead.firstName }),
               [
-                { text: 'Later', style: 'cancel' },
-                { text: 'Register', onPress: () => handleRegisterMember(convertedLead) },
+                { text: t('leads.management.registerLater'), style: 'cancel' },
+                { text: t('leads.management.registerNow'), onPress: () => handleRegisterMember(convertedLead) },
               ],
             );
           }
         },
         onError: err => {
-          toast.error(err.message || 'Failed to update lead.', {
-            title: 'Error'
+          toast.error(err.message || t('leads.management.updateError'), {
+            title: t('common.error'),
           });
         },
       },
@@ -358,16 +373,16 @@ export function LeadManagementScreen({
       );
       clearSelection();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update lead statuses.', {
-        title: 'Error'
+      toast.error(err.message || t('leads.management.bulkStatusError'), {
+        title: t('common.error'),
       });
     }
   };
 
   const handleBulkAssignApply = async () => {
     if (!bulkStaffName.trim()) {
-      toast.error('Staff member selection is required.', {
-        title: 'Validation Error'
+      toast.error(t('leads.management.selectStaffPlaceholder'), {
+        title: t('leads.form.validationErrorTitle'),
       });
       return;
     }
@@ -395,28 +410,28 @@ export function LeadManagementScreen({
       setBulkStaffName('');
       clearSelection();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to assign staff to leads.', {
-        title: 'Error'
+      toast.error(err.message || t('leads.management.bulkAssignError'), {
+        title: t('common.error'),
       });
     }
   };
 
   const handleBulkDelete = () => {
     Alert.alert(
-      'Delete Selected Leads',
-      `Are you sure you want to delete ${selectedCount} selected leads?`,
+      t('leads.management.bulkDeleteTitle'),
+      t('leads.management.bulkDeleteConfirm', { count: selectedCount }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('leads.management.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('leads.management.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await Promise.all(selectedLeadIds.map(id => deleteMutation.mutateAsync(id)));
               clearSelection();
             } catch (err: any) {
-              toast.error(err.message || 'Failed to delete some leads.', {
-                title: 'Error'
+              toast.error(err.message || t('leads.management.bulkDeleteError'), {
+                title: t('common.error'),
               });
             }
           },
@@ -439,7 +454,9 @@ export function LeadManagementScreen({
 
   const openCreateModal = () => {
     if (selectedBranchId === 'ALL') {
-      toast.error('Please select a specific branch from the header menu before creating a new lead.', { title: 'Branch Required' });
+      toast.error(t('leads.management.branchRequired'), {
+        title: t('leads.management.branchRequiredTitle'),
+      });
       return;
     }
     if (onNavigateToCreate) {
@@ -456,14 +473,16 @@ export function LeadManagementScreen({
       {/* Top Title & Add Lead Button */}
       <View style={styles.titleRow}>
         <View>
-          <Text style={[styles.screenTitle, { color: theme.text }]}>Lead Management</Text>
+          <Text style={[styles.screenTitle, { color: theme.text }]}>
+            {t('leads.management.title')}
+          </Text>
           <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-            Capture, track and convert prospect pipeline
+            {t('leads.management.subtitle')}
           </Text>
         </View>
 
         <Button
-          label="+ Lead"
+          label={t('leads.management.addLeadBtn')}
           size="md"
           onPress={openCreateModal}
         />
@@ -480,28 +499,36 @@ export function LeadManagementScreen({
             <Text style={[styles.kpiValue, { color: theme.text }]}>
               {statsData.totalLeads ?? 0}
             </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>Total Leads</Text>
+            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
+              {t('leads.management.totalLeads')}
+            </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <Text style={[styles.kpiValue, { color: '#60a5fa' }]}>
               {statsData.newLeads ?? 0}
             </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>New</Text>
+            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
+              {t('leads.management.newLeads')}
+            </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <Text style={[styles.kpiValue, { color: '#facc15' }]}>
               {statsData.contactedLeads ?? 0}
             </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>Contacted</Text>
+            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
+              {t('leads.management.contactedLeads')}
+            </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <Text style={[styles.kpiValue, { color: '#4ade80' }]}>
               {statsData.convertedLeads ?? 0}
             </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>Converted</Text>
+            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
+              {t('leads.management.convertedLeads')}
+            </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
@@ -509,7 +536,7 @@ export function LeadManagementScreen({
               {(statsData.conversionRate ?? 0).toFixed(1)}%
             </Text>
             <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              Conversion Rate
+              {t('leads.management.conversionRate')}
             </Text>
           </View>
         </ScrollView>
@@ -571,83 +598,93 @@ export function LeadManagementScreen({
             onPress={e => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Add New Lead</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {t('leads.form.addNewLead')}
+              </Text>
               <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalBody}>
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>First Name *</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.firstName')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formFirstName}
                 onChangeText={setFormFirstName}
-                placeholder="First name"
+                placeholder={t('leads.form.firstNamePlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Last Name</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.lastName')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formLastName}
                 onChangeText={setFormLastName}
-                placeholder="Last name"
+                placeholder={t('leads.form.lastNamePlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.emailLabel')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formEmail}
                 onChangeText={setFormEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholder="email@example.com"
+                placeholder={t('leads.form.emailPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Phone</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.phoneLabel')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formPhone}
                 onChangeText={setFormPhone}
                 keyboardType="phone-pad"
-                placeholder="+1 (555) 000-0000"
+                placeholder={t('leads.form.phonePlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
 
               <Dropdown
-                label="Status"
+                label={t('leads.form.status')}
                 value={formStatus}
-                options={STATUS_DROPDOWN_OPTIONS}
+                options={statusOptions}
                 onChange={val => setFormStatus(val as LeadStatus)}
               />
 
               <Dropdown
-                label="Priority"
+                label={t('leads.form.priority')}
                 value={formPriority}
-                options={PRIORITY_DROPDOWN_OPTIONS}
+                options={priorityOptions}
                 onChange={val => setFormPriority(val as LeadPriority)}
               />
 
               <Dropdown
-                label="Source"
+                label={t('leads.form.source')}
                 value={formSource}
-                options={SOURCE_DROPDOWN_OPTIONS}
+                options={sourceOptions}
                 onChange={val => setFormSource(val as LeadSource)}
               />
 
               <Dropdown
-                label="Assigned Staff"
-                placeholder="Select staff member"
+                label={t('leads.form.assignedStaff')}
+                placeholder={t('leads.management.selectStaffPlaceholder')}
                 value={formAssignedStaff}
                 options={staffOptions}
                 onChange={setFormAssignedStaff}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Notes
+                {t('leads.form.notes')}
               </Text>
               <TextInput
                 style={[
@@ -659,7 +696,7 @@ export function LeadManagementScreen({
                 onChangeText={setFormNotes}
                 multiline
                 numberOfLines={3}
-                placeholder="Additional details..."
+                placeholder={t('leads.form.notesPlaceholder')}
                 placeholderTextColor={theme.textSecondary}
               />
             </ScrollView>
@@ -670,12 +707,12 @@ export function LeadManagementScreen({
                 onPress={() => setCreateModalVisible(false)}
               >
                 <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  Cancel
+                  {t('leads.form.cancel')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.applyBtn} onPress={handleCreateSubmit}>
-                <Text style={styles.applyBtnText}>Create Lead</Text>
+                <Text style={styles.applyBtnText}>{t('leads.form.createLead')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -695,28 +732,36 @@ export function LeadManagementScreen({
             onPress={e => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Lead</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {t('leads.form.editLead')}
+              </Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalBody}>
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>First Name *</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.firstName')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formFirstName}
                 onChangeText={setFormFirstName}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Last Name</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.lastName')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formLastName}
                 onChangeText={setFormLastName}
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.emailLabel')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formEmail}
@@ -725,7 +770,9 @@ export function LeadManagementScreen({
                 autoCapitalize="none"
               />
 
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>Phone</Text>
+              <Text style={[styles.fieldLabel, { color: theme.text }]}>
+                {t('leads.form.phoneLabel')}
+              </Text>
               <TextInput
                 style={[styles.input, { color: theme.text, borderColor: theme.border }]}
                 value={formPhone}
@@ -734,36 +781,36 @@ export function LeadManagementScreen({
               />
 
               <Dropdown
-                label="Status"
+                label={t('leads.form.status')}
                 value={formStatus}
-                options={STATUS_DROPDOWN_OPTIONS}
+                options={statusOptions}
                 onChange={val => setFormStatus(val as LeadStatus)}
               />
 
               <Dropdown
-                label="Priority"
+                label={t('leads.form.priority')}
                 value={formPriority}
-                options={PRIORITY_DROPDOWN_OPTIONS}
+                options={priorityOptions}
                 onChange={val => setFormPriority(val as LeadPriority)}
               />
 
               <Dropdown
-                label="Source"
+                label={t('leads.form.source')}
                 value={formSource}
-                options={SOURCE_DROPDOWN_OPTIONS}
+                options={sourceOptions}
                 onChange={val => setFormSource(val as LeadSource)}
               />
 
               <Dropdown
-                label="Assigned Staff"
-                placeholder="Select staff member"
+                label={t('leads.form.assignedStaff')}
+                placeholder={t('leads.management.selectStaffPlaceholder')}
                 value={formAssignedStaff}
                 options={staffOptions}
                 onChange={setFormAssignedStaff}
               />
 
               <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Notes
+                {t('leads.form.notes')}
               </Text>
               <TextInput
                 style={[
@@ -784,12 +831,12 @@ export function LeadManagementScreen({
                 onPress={() => setEditModalVisible(false)}
               >
                 <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  Cancel
+                  {t('leads.form.cancel')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.applyBtn} onPress={handleEditSubmit}>
-                <Text style={styles.applyBtnText}>Save Changes</Text>
+                <Text style={styles.applyBtnText}>{t('leads.form.saveChanges')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -813,7 +860,7 @@ export function LeadManagementScreen({
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Update Status ({selectedCount} leads)
+                {t('leads.management.bulkUpdateStatusTitle', { count: selectedCount })}
               </Text>
               <TouchableOpacity onPress={() => setBulkStatusModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
@@ -831,7 +878,7 @@ export function LeadManagementScreen({
                   onPress={() => handleBulkStatusApply(statusOption)}
                 >
                   <Text style={[styles.statusSelectOptionText, { color: theme.text }]}>
-                    Set as &quot;{statusOption}&quot;
+                    {t('leads.management.setAsStatus', { status: getStatusLabel(statusOption) })}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -857,7 +904,7 @@ export function LeadManagementScreen({
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Assign Staff ({selectedCount} leads)
+                {t('leads.management.bulkAssignStaffTitle', { count: selectedCount })}
               </Text>
               <TouchableOpacity onPress={() => setBulkAssignModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
@@ -866,8 +913,8 @@ export function LeadManagementScreen({
 
             <View style={styles.modalBody}>
               <Dropdown
-                label="Assign Staff Member"
-                placeholder="Select staff member"
+                label={t('leads.details.staffMember')}
+                placeholder={t('leads.management.selectStaffPlaceholder')}
                 value={bulkStaffName}
                 options={staffOptions}
                 onChange={setBulkStaffName}
@@ -880,12 +927,12 @@ export function LeadManagementScreen({
                 onPress={() => setBulkAssignModalVisible(false)}
               >
                 <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  Cancel
+                  {t('leads.management.cancel')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.applyBtn} onPress={handleBulkAssignApply}>
-                <Text style={styles.applyBtnText}>Assign</Text>
+                <Text style={styles.applyBtnText}>{t('leads.management.assignBtn')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

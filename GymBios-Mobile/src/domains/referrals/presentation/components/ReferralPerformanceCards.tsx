@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { CurrencyValue } from '@/core/providers';
+import { useTranslation } from 'react-i18next';
 
 interface MonthlyPerformanceData {
   thisMonthCount: number;
@@ -18,6 +19,7 @@ interface ReferralPerformanceCardsProps {
 }
 
 export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps) {
+  const { t } = useTranslation();
   const {
     thisMonthCount,
     monthGrowthPct,
@@ -30,16 +32,16 @@ export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps
   return (
     <View style={styles.card}>
       <Typography variant="subtitle" style={styles.title}>
-        Monthly Performance
+        {t('adminReferrals.monthlyPerformance')}
       </Typography>
       <Typography variant="caption" color="textSecondary" style={styles.subtitle}>
-        Referral program performance metrics
+        {t('adminReferrals.monthlyPerformanceSubtitle')}
       </Typography>
 
       <View style={styles.grid}>
         <View style={[styles.box, { backgroundColor: '#dbeafe' }]}>
           <Typography variant="caption" style={{ color: '#1e40af', fontSize: 11 }}>
-            This Month
+            {t('adminReferrals.thisMonth')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#1d4ed8', fontSize: 20, fontWeight: '700' }}>
             {thisMonthCount}
@@ -49,19 +51,19 @@ export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps
             style={{ color: monthGrowthPct >= 0 ? '#15803d' : '#b91c1c', fontSize: 10 }}
           >
             {monthGrowthPct >= 0 ? '+' : ''}
-            {monthGrowthPct}% from last month
+            {monthGrowthPct} {t('adminReferrals.pctFromLastMonth')}
           </Typography>
         </View>
 
         <View style={[styles.box, { backgroundColor: '#f3e8ff' }]}>
           <Typography variant="caption" style={{ color: '#6b21a8', fontSize: 11 }}>
-            Rewards Paid
+            {t('adminReferrals.rewardsPaid')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#7e22ce', fontSize: 18, fontWeight: '700' }}>
             <CurrencyValue amount={rewardsPaid} />
           </Typography>
           <Typography variant="caption" style={{ color: '#6b21a8', fontSize: 10 }}>
-            {redeemedCount} redeemed
+            {redeemedCount} {t('adminReferrals.redeemed')}
           </Typography>
         </View>
       </View>
@@ -69,25 +71,25 @@ export function ReferralPerformanceCards({ data }: ReferralPerformanceCardsProps
       <View style={styles.grid}>
         <View style={[styles.box, { backgroundColor: '#dcfce7' }]}>
           <Typography variant="caption" style={{ color: '#166534', fontSize: 11 }}>
-            Avg. Value
+            {t('adminReferrals.avgValue')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#15803d', fontSize: 18, fontWeight: '700' }}>
             <CurrencyValue amount={avgValue} />
           </Typography>
           <Typography variant="caption" style={{ color: '#166534', fontSize: 10 }}>
-            per successful referral
+            {t('adminReferrals.perSuccessfulReferral')}
           </Typography>
         </View>
 
         <View style={[styles.box, { backgroundColor: '#ffedd5' }]}>
           <Typography variant="caption" style={{ color: '#9a3412', fontSize: 11 }}>
-            Redemption Rate
+            {t('adminReferrals.redemptionRate')}
           </Typography>
           <Typography variant="subtitle" style={{ color: '#c2410c', fontSize: 20, fontWeight: '700' }}>
             {redemptionRate}%
           </Typography>
           <Typography variant="caption" style={{ color: '#9a3412', fontSize: 10 }}>
-            of successful referrals
+            {t('adminReferrals.ofSuccessfulReferrals')}
           </Typography>
         </View>
       </View>

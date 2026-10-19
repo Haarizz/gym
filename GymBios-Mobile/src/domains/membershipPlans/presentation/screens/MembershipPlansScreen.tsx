@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -23,6 +24,7 @@ export function MembershipPlansScreen({
   onNavigateToCreate,
   onNavigateToEdit,
 }: MembershipPlansScreenProps) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
 
@@ -57,13 +59,13 @@ export function MembershipPlansScreen({
 
   const handleCreatePress = useCallback(() => {
     if (selectedBranchId === 'ALL') {
-      toast.error('Please select a specific branch from the header menu before creating a new subscription.', {
-        title: 'Branch Required'
+      toast.error(t('membershipPlans.list.branchRequiredMsg'), {
+        title: t('membershipPlans.list.branchRequiredTitle'),
       });
       return;
     }
     onNavigateToCreate();
-  }, [selectedBranchId, onNavigateToCreate]);
+  }, [selectedBranchId, onNavigateToCreate, t]);
 
   const handleEdit = useCallback(
     (plan: MembershipPlan) => {
@@ -77,30 +79,30 @@ export function MembershipPlansScreen({
       try {
         await duplicatePlan(plan.id);
       } catch {
-        toast.error('Failed to duplicate subscription. Please try again.', {
-          title: 'Error'
+        toast.error(t('membershipPlans.list.duplicateErrorMsg'), {
+          title: t('membershipPlans.list.duplicateErrorTitle'),
         });
       }
     },
-    [duplicatePlan],
+    [duplicatePlan, t],
   );
 
   const handleDelete = useCallback(
     (plan: MembershipPlan) => {
       Alert.alert(
-        'Delete Subscription',
-        `Are you sure you want to delete "${plan.name}"? This action cannot be undone.`,
+        t('membershipPlans.list.deleteTitle'),
+        t('membershipPlans.list.deleteConfirm', { name: plan.name }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('membershipPlans.list.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('membershipPlans.list.delete'),
             style: 'destructive',
             onPress: async () => {
               try {
                 await deletePlan(plan.id);
               } catch {
-                toast.error('Failed to delete subscription.', {
-                  title: 'Error'
+                toast.error(t('membershipPlans.list.deleteError'), {
+                  title: t('membershipPlans.list.duplicateErrorTitle'),
                 });
               }
             },
@@ -108,7 +110,7 @@ export function MembershipPlansScreen({
         ],
       );
     },
-    [deletePlan],
+    [deletePlan, t],
   );
 
   // Must be an element, not a component: a component whose identity changes on
@@ -119,10 +121,10 @@ export function MembershipPlansScreen({
         {/* Page title */}
         <View style={styles.titleRow}>
           <Typography variant="subtitle" style={styles.title}>
-            Subscriptions
+            {t('membershipPlans.list.title')}
           </Typography>
           <Button
-            label="+ New Subscription"
+            label={t('membershipPlans.list.newSubscriptionBtn')}
             onPress={handleCreatePress}
             size="md"
           />
@@ -132,14 +134,14 @@ export function MembershipPlansScreen({
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search subscriptions by name or type..."
+          placeholder={t('membershipPlans.list.searchPlaceholder')}
         />
 
         {/* Status filter chips */}
         <MembershipPlanFilter selected={statusFilter} onSelect={setStatusFilter} />
       </View>
     ),
-    [search, statusFilter, handleCreatePress],
+    [search, statusFilter, handleCreatePress, t],
   );
 
   return (

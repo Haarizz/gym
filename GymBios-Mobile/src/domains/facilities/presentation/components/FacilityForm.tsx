@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, StyleSheet, ScrollView, Switch, TouchableOpacity } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/shared/components/Input';
 import { Button } from '@/shared/components/Button';
@@ -18,6 +19,7 @@ interface FacilityFormProps {
 const RATE_TYPES = ['Per Hour', 'Per Half Day', 'Per Full Day', 'Per Month'];
 
 export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFormProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
@@ -88,18 +90,18 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
   return (
     <ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomInset }]} showsVerticalScrollIndicator={false}>
       <Input
-        label="Facility Name"
+        label={t('facilities.facilityName')}
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Yoga Studio"
+        placeholder={t('facilities.facilityNamePlaceholder')}
         error={errors.name}
       />
 
       <Input
-        label="Description"
+        label={t('facilities.description')}
         value={description}
         onChangeText={setDescription}
-        placeholder="Brief description of the facility"
+        placeholder={t('facilities.descriptionPlaceholder')}
         multiline
         style={styles.textArea}
       />
@@ -107,31 +109,31 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
       <View style={styles.row}>
         <View style={styles.flex1}>
           <Input
-            label="Occupancy Limit"
+            label={t('facilities.occupancyLimit')}
             value={occupancyLimit}
             onChangeText={setOccupancyLimit}
-            placeholder="e.g. 20"
+            placeholder={t('facilities.occupancyLimitPlaceholder')}
             keyboardType="numeric"
             error={errors.occupancyLimit}
           />
         </View>
         <View style={styles.flex1}>
           <Input
-            label="Icon Name (Feather)"
+            label={t('facilities.iconName')}
             value={iconName}
             onChangeText={setIconName}
-            placeholder="e.g. box, map-pin"
+            placeholder={t('facilities.iconNamePlaceholder')}
           />
         </View>
       </View>
 
       <View style={styles.section}>
         <Typography variant="bodySmallBold" style={styles.label}>
-          Status
+          {t('facilities.status')}
         </Typography>
         <View style={styles.switchRow}>
           <Typography variant="body" color={isActive ? 'text' : 'textSecondary'}>
-            {isActive ? 'Active' : 'Inactive'}
+            {isActive ? t('facilities.active') : t('facilities.inactive')}
           </Typography>
           <Switch
             value={isActive}
@@ -144,7 +146,7 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
 
       <View style={styles.section}>
         <Typography variant="bodySmallBold" style={styles.label}>
-          Pricing Configuration
+          {t('facilities.pricingConfiguration')}
         </Typography>
         {RATE_TYPES.map(type => {
           const isEnabled = rates[type] !== undefined;
@@ -162,7 +164,7 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
               {isEnabled && (
                 <View style={styles.rateInputContainer}>
                   <Input
-                    placeholder="Rate (e.g. 50)"
+                    placeholder={t('facilities.ratePlaceholder')}
                     value={rates[type]}
                     onChangeText={(val) => handleRateChange(type, val)}
                     keyboardType="numeric"
@@ -175,7 +177,7 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
       </View>
 
       <Button
-        label={initialData ? "Save Changes" : "Create Facility"}
+        label={initialData ? t('facilities.saveChanges') : t('facilities.createFacility')}
         onPress={handleSubmit}
         loading={isSubmitting}
         style={styles.submitBtn}

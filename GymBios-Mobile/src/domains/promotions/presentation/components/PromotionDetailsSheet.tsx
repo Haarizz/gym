@@ -6,6 +6,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -34,6 +35,7 @@ export function PromotionDetailsSheet({
   onClose,
   onEdit,
 }: PromotionDetailsSheetProps) {
+  const { t } = useTranslation();
   const deleteMutation = useDeletePromotion();
   const duplicateMutation = useDuplicatePromotion();
 
@@ -120,7 +122,7 @@ export function PromotionDetailsSheet({
       <View style={styles.content}>
         {/* Discount highlight */}
         <View style={styles.highlightBanner}>
-          <Text style={styles.highlightLabel}>Discount Value</Text>
+          <Text style={styles.highlightLabel}>{t('promotions.discountValue')}</Text>
           <Text style={styles.highlightText}>
             {promotion.discountType === 'fixed'
               ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix=" OFF" />
@@ -130,40 +132,40 @@ export function PromotionDetailsSheet({
 
         {/* SECTION: Promotion Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Promotion Details</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.detailsTitle')}</Text>
 
           {!!promotion.description && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Description</Text>
+              <Text style={styles.label}>{t('promotions.description')}</Text>
               <Text style={styles.value}>{promotion.description}</Text>
             </View>
           )}
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Category</Text>
+              <Text style={styles.label}>{t('promotions.category')}</Text>
               <Text style={styles.value}>{promotion.category || 'N/A'}</Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Code</Text>
+              <Text style={styles.label}>{t('promotions.code')}</Text>
               <Text style={styles.codeValue}>{promotion.code || 'None'}</Text>
             </View>
           </View>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Start Date</Text>
+              <Text style={styles.label}>{t('promotions.startDate')}</Text>
               <Text style={styles.value}>{formatDate(promotion.startDate)}</Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>End Date</Text>
+              <Text style={styles.label}>{t('promotions.endDate')}</Text>
               <Text style={styles.value}>{formatDate(promotion.endDate)}</Text>
             </View>
           </View>
 
           {promotion.tags && promotion.tags.length > 0 && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Tags</Text>
+              <Text style={styles.label}>{t('promotions.tags')}</Text>
               <View style={styles.tagsContainer}>
                 {promotion.tags.map((tag, idx) => (
                   <View key={idx} style={styles.tagChip}>
@@ -176,7 +178,7 @@ export function PromotionDetailsSheet({
 
           {!!promotion.termsAndConditions && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Terms & Conditions</Text>
+              <Text style={styles.label}>{t('promotions.terms')}</Text>
               <Text style={styles.termsText}>{promotion.termsAndConditions}</Text>
             </View>
           )}
@@ -184,34 +186,34 @@ export function PromotionDetailsSheet({
 
         {/* SECTION: Usage & Limits */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Usage & Limits</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.usageAndLimits')}</Text>
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Usage Count</Text>
+              <Text style={styles.label}>{t('promotions.usageCount')}</Text>
               <Text style={styles.statValue}>{promotion.usageCount ?? 0}</Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Usage Limit</Text>
+              <Text style={styles.label}>{t('promotions.usageLimit')}</Text>
               <Text style={styles.statValue}>
                 {promotion.usageLimit !== null && promotion.usageLimit !== undefined
                   ? promotion.usageLimit
-                  : 'Unlimited'}
+                  : t('promotions.unlimited')}
               </Text>
             </View>
           </View>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Per Member Limit</Text>
+              <Text style={styles.label}>{t('promotions.perMemberLimit')}</Text>
               <Text style={styles.value}>
                 {promotion.usageLimitPerMember !== null &&
                 promotion.usageLimitPerMember !== undefined
                   ? promotion.usageLimitPerMember
-                  : 'Unlimited'}
+                  : t('promotions.unlimited')}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Min Purchase</Text>
+              <Text style={styles.label}>{t('promotions.minPurchase')}</Text>
               <Text style={styles.value}>
                 {promotion.minimumPurchase !== null &&
                 promotion.minimumPurchase !== undefined
@@ -224,16 +226,16 @@ export function PromotionDetailsSheet({
 
         {/* SECTION: Performance Analytics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Performance Analytics</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.performanceAnalytics')}</Text>
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Total Revenue</Text>
+              <Text style={styles.label}>{t('promotions.totalRevenue')}</Text>
               <Text style={[styles.statValue, { color: '#059669' }]}>
                 <CurrencyValue amount={promotion.totalRevenue ?? 0} />
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Total Savings</Text>
+              <Text style={styles.label}>{t('promotions.totalSavings')}</Text>
               <Text style={[styles.statValue, { color: '#EA580C' }]}>
                 <CurrencyValue amount={promotion.totalSavings ?? 0} />
               </Text>
@@ -242,13 +244,13 @@ export function PromotionDetailsSheet({
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Avg Order Value</Text>
+              <Text style={styles.label}>{t('promotions.avgOrderValue')}</Text>
               <Text style={styles.value}>
                 <CurrencyValue amount={promotion.averageOrderValue ?? 0} decimals={2} />
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Redemption Rate</Text>
+              <Text style={styles.label}>{t('promotions.redemptionRate')}</Text>
               <Text style={styles.value}>
                 {promotion.usageLimit
                   ? `${promotion.redemptionRate ?? 0}%`
@@ -260,35 +262,35 @@ export function PromotionDetailsSheet({
 
         {/* SECTION: Targeting & Distribution */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Targeting & Distribution</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.targetingAndDistribution')}</Text>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Target Audience</Text>
+              <Text style={styles.label}>{t('promotions.targetAudience')}</Text>
               <Text style={styles.value}>
                 {promotion.targetAudience || 'All Members'}
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Created By</Text>
+              <Text style={styles.label}>{t('promotions.createdBy')}</Text>
               <Text style={styles.value}>{promotion.createdBy || 'System'}</Text>
             </View>
           </View>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Auto Apply</Text>
+              <Text style={styles.label}>{t('promotions.autoApplyLabel')}</Text>
               <Text style={styles.value}>{promotion.autoApply ? 'Yes' : 'No'}</Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Stackable</Text>
+              <Text style={styles.label}>{t('promotions.stackable')}</Text>
               <Text style={styles.value}>{promotion.stackable ? 'Yes' : 'No'}</Text>
             </View>
           </View>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Priority</Text>
+              <Text style={styles.label}>{t('promotions.priority')}</Text>
               <Text style={styles.value}>
                 {promotion.priority !== null && promotion.priority !== undefined
                   ? promotion.priority
@@ -296,21 +298,21 @@ export function PromotionDetailsSheet({
               </Text>
             </View>
             <View style={styles.gridCol}>
-              <Text style={styles.label}>Public</Text>
+              <Text style={styles.label}>{t('promotions.public')}</Text>
               <Text style={styles.value}>{promotion.isPublic ? 'Yes' : 'No'}</Text>
             </View>
           </View>
 
           {promotion.channels && promotion.channels.length > 0 && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Distribution Channels</Text>
+              <Text style={styles.label}>{t('promotions.distributionChannels')}</Text>
               <Text style={styles.value}>{promotion.channels.join(', ')}</Text>
             </View>
           )}
 
           {promotion.applicablePlans && promotion.applicablePlans.length > 0 && (
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Applicable Subscriptions</Text>
+              <Text style={styles.label}>{t('promotions.applicableSubscriptions')}</Text>
               <Text style={styles.value}>{promotion.applicablePlans.join(', ')}</Text>
             </View>
           )}
@@ -318,7 +320,7 @@ export function PromotionDetailsSheet({
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>{t('promotions.quickActions')}</Text>
 
           <View style={styles.actionGrid}>
             <Pressable
@@ -330,7 +332,7 @@ export function PromotionDetailsSheet({
               disabled={isMutating}
             >
               <Feather name="edit-2" size={16} color={BrandColors.teal} />
-              <Text style={styles.actionButtonText}>Edit</Text>
+              <Text style={styles.actionButtonText}>{t('promotions.edit')}</Text>
             </Pressable>
 
             {!!promotion.code && (
@@ -340,7 +342,7 @@ export function PromotionDetailsSheet({
                 disabled={isMutating}
               >
                 <Feather name="share-2" size={16} color={BrandColors.teal} />
-                <Text style={styles.actionButtonText}>Share Code</Text>
+                <Text style={styles.actionButtonText}>{t('promotions.shareCode')}</Text>
               </Pressable>
             )}
 
@@ -350,7 +352,7 @@ export function PromotionDetailsSheet({
               disabled={isMutating}
             >
               <Feather name="copy" size={16} color={BrandColors.teal} />
-              <Text style={styles.actionButtonText}>Duplicate</Text>
+              <Text style={styles.actionButtonText}>{t('promotions.duplicate')}</Text>
             </Pressable>
 
             <Pressable
@@ -359,7 +361,7 @@ export function PromotionDetailsSheet({
               disabled={isMutating}
             >
               <Feather name="trash-2" size={16} color="#DC2626" />
-              <Text style={styles.deleteActionText}>Delete</Text>
+              <Text style={styles.deleteActionText}>{t('promotions.delete')}</Text>
             </Pressable>
           </View>
         </View>

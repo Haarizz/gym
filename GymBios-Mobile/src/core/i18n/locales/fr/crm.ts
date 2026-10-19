@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "Offres et promotions",
+    "subtitle": "Promotions actives, réductions et offres spéciales",
+    "activeOffers": "Offres actives",
+    "totalRedemptions": "Utilisations totales",
+    "viewAll": "Voir tout",
+    "failedLoadOffers": "Échec du chargement des offres.",
+    "noActiveOffers": "Aucune offre active trouvée.",
+    "failedLoadPromoOffers": "Échec du chargement des offres à code promo.",
+    "failedLoadPlanOffers": "Échec du chargement des offres d’abonnement.",
+    "planOffer": "OFFRE D’ABONNEMENT",
+    "plan": "Abonnement :",
+    "price": "Prix :",
+    "validUntil": "Valable jusqu’au :",
+    "applies": "S’applique :",
+    "autoNoCode": "Automatiquement, aucun code requis",
+    "promoCode": "Code promo",
+    "branches": "Salles :",
+    "usage": "Utilisation :",
+    "noUsageLimit": "Aucune limite d’utilisation définie",
+    "referralCodes": "Codes de parrainage",
+    "failedLoadReferrals": "Échec du chargement des parrainages.",
+    "noReferralCodes": "Aucun code de parrainage trouvé.",
+    "status": "Statut",
+    "date": "Date",
+    "reward": "Récompense",
+    "createNewOffer": "Créer une nouvelle offre",
+    "revenueFromDeals": "Revenus des offres",
+    "newMembers": "Nouveaux membres",
+    "thisMonthsImpact": "Impact de ce mois",
+    "failedLoadImpact": "Échec du chargement de l'impact de ce mois.",
+    "noExpiry": "Pas d'expiration",
+    "copiedPromoCode": "Code promo {{code}} copié dans le presse-papiers.",
+    "failedCopyPromoCode": "Impossible de copier le code promo.",
+    "shareMessage": "{{name}} : utilisez le code {{code}} pour obtenir {{discount}}.",
+    "unknownBranch": "Succursale inconnue",
+    "unknown": "Inconnu",
+    "planOfferSuffix": "Offre {{name}}"
+  }
+};
+
+export default crm;

@@ -269,7 +269,7 @@ public class PosCheckoutService {
         }
         // ── Promotion / coupon code: on the basket left after the bill discount ─
         BigDecimal promoBase = billBase.subtract(billDiscount);
-        PosPromotionService.Applied promo = promotionService.preview(trimToNull(req.discountCode()), req.promotionId(), promoBase);
+        PosPromotionService.Applied promo = promotionService.preview(trimToNull(req.discountCode()), req.promotionId(), promoBase, member);
         BigDecimal promoDiscount = promo != null ? promo.discount() : BigDecimal.ZERO;
         spreadBillDiscount(lines, billDiscount.add(promoDiscount), billBase);
 

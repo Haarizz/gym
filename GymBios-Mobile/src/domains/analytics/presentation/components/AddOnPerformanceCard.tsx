@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -14,14 +15,15 @@ interface AddOnPerformanceCardProps {
 }
 
 export function AddOnPerformanceCard({ data }: AddOnPerformanceCardProps) {
+  const { t } = useTranslation();
   const items = data ?? [];
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Add-on Performance</Text>
+      <Text style={styles.title}>{t('analytics.cards.addOnPerformance')}</Text>
 
       {items.length === 0 && (
-        <Text style={styles.emptyText}>No add-on sales this month</Text>
+        <Text style={styles.emptyText}>{t('analytics.cards.noAddOnSales')}</Text>
       )}
 
       {items.map((item, index) => (

@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -18,21 +19,22 @@ interface StaffCardProps {
   onMessage?: (staff: Staff) => void;
 }
 
-const STATUS_STYLES: Record<StaffPerformanceStatus | 'INACTIVE', { label: string; color: string }> = {
-  EXCELLENT: { label: 'Excellent', color: '#16a34a' },
-  ON_TRACK: { label: 'On Track', color: '#2563eb' },
-  AT_RISK: { label: 'At Risk', color: '#ea580c' },
-  NO_TARGET: { label: 'No Target', color: '#6b7280' },
-  INACTIVE: { label: 'Inactive', color: '#6b7280' },
-};
-
 export const StaffCard = memo(function StaffCard({
   staff,
   performance,
   onPress,
   onMessage,
 }: StaffCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
+
+  const statusStyles: Record<StaffPerformanceStatus | 'INACTIVE', { label: string; color: string }> = {
+    EXCELLENT: { label: t('hr.card.excellent'), color: '#16a34a' },
+    ON_TRACK: { label: t('hr.card.onTrack'), color: '#2563eb' },
+    AT_RISK: { label: t('hr.card.atRisk'), color: '#ea580c' },
+    NO_TARGET: { label: t('hr.card.noTarget'), color: '#6b7280' },
+    INACTIVE: { label: t('hr.card.inactive'), color: '#6b7280' },
+  };
 
   const initials = staff.name
     .split(' ')
@@ -43,7 +45,7 @@ export const StaffCard = memo(function StaffCard({
 
   const isActive = staff.status?.toUpperCase() === 'ACTIVE';
   const badgeKey = !isActive ? 'INACTIVE' : performance?.performanceStatus;
-  const badge = badgeKey ? STATUS_STYLES[badgeKey] : undefined;
+  const badge = badgeKey ? statusStyles[badgeKey] : undefined;
 
   const target = performance?.revenueTarget || staff.monthlyTarget;
   const achievedText = performance
@@ -93,7 +95,7 @@ export const StaffCard = memo(function StaffCard({
             <View style={styles.metricLabelRow}>
               <Feather name="target" size={12} color={theme.textSecondary} />
               <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
-                Target Achievement
+                {t('hr.card.targetAchievement')}
               </Typography>
             </View>
             <Typography variant="bodySmallBold" numberOfLines={1}>
@@ -104,7 +106,7 @@ export const StaffCard = memo(function StaffCard({
             <View style={styles.metricLabelRow}>
               <Feather name="trending-up" size={12} color={theme.textSecondary} />
               <Typography variant="caption" color="textSecondary" style={styles.metricLabel}>
-                Conversion
+                {t('hr.card.conversion')}
               </Typography>
             </View>
             <Typography variant="bodySmallBold">
@@ -118,13 +120,13 @@ export const StaffCard = memo(function StaffCard({
           <View style={styles.stat}>
             <Feather name="calendar" size={12} color={theme.textSecondary} />
             <Typography variant="caption" color="textSecondary">
-              PT: {performance ? performance.ptSessions : '—'}
+              {t('hr.card.pt')} {performance ? performance.ptSessions : '—'}
             </Typography>
           </View>
           <View style={styles.stat}>
             <Feather name="user-check" size={12} color={theme.textSecondary} />
             <Typography variant="caption" color="textSecondary">
-              Attendance: {performance ? `${performance.attendanceRate}%` : '—'}
+              {t('hr.card.attendance')} {performance ? `${performance.attendanceRate}%` : '—'}
             </Typography>
           </View>
           <View style={styles.stat}>
@@ -147,7 +149,7 @@ export const StaffCard = memo(function StaffCard({
             accessibilityRole="button"
           >
             <Typography variant="bodySmallBold" style={{ color: theme.primaryText }}>
-              View Details
+              {t('hr.card.viewDetails')}
             </Typography>
           </Pressable>
           <Pressable

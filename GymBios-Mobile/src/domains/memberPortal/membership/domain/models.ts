@@ -177,7 +177,9 @@ export interface MembershipChangeRequest {
   planId: number;
   paymentMethodUsed: string;
   paymentBreakdown: any[]; // Matches PaymentResult.breakdown
-  // At most one: a MEMBERSHIP_DISCOUNT Reward Pass or a shareable referral coupon.
+  // At most one: a MEMBERSHIP_DISCOUNT Reward Pass, a promotion / referral coupon code,
+  // or a promotion picked by id (an offer without a code, claimed from the dashboard).
   rewardPassId?: number;
   couponCode?: string;
+  promotionId?: number;
 }

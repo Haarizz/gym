@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -31,6 +32,7 @@ const billingService = new BillingService(new ApiBillingRepository());
  * Analytics summary, breakdown charts/bars, period selectors, and export capabilities.
  */
 export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps) {
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<ReportPeriod>('Monthly');
   const { stats, loading, error, refresh } = useBillingStats();
 
@@ -71,8 +73,8 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
     return (
       <ScreenLayout>
         <AppHeader
-          title="Collection Reports"
-          subtitle="Financial Analytics & Reports"
+          title={t('billing.reports.title')}
+          subtitle={t('billing.reports.subtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
@@ -85,12 +87,12 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
     return (
       <ScreenLayout>
         <AppHeader
-          title="Collection Reports"
-          subtitle="Financial Analytics & Reports"
+          title={t('billing.reports.title')}
+          subtitle={t('billing.reports.subtitle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
-        <ErrorState message="Failed to load collection stats." onRetry={refresh} />
+        <ErrorState message={t('common.error')} onRetry={refresh} />
       </ScreenLayout>
     );
   }
@@ -98,8 +100,8 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
   return (
     <ScreenLayout>
       <AppHeader
-        title="Collection Reports"
-        subtitle="Financial Analytics & Revenue"
+        title={t('billing.reports.title')}
+        subtitle={t('billing.reports.subtitle')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -128,7 +130,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
                 variant="caption"
                 style={[styles.periodTabText, period === p && styles.periodTabTextActive]}
               >
-                {p} Report
+                {p} {t('billing.reports.report')}
               </Typography>
             </Pressable>
           ))}
@@ -138,13 +140,13 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
         <View style={styles.cardRow}>
           <View style={styles.statCard}>
             <Typography variant="caption" color="textSecondary">
-              Total Collection ({period})
+              {t('billing.reports.totalCollection')} ({period})
             </Typography>
             <MoneyText amount={monthlyCollection} variant="bodySmallBold" color={BrandColors.teal} />
           </View>
           <View style={styles.statCard}>
             <Typography variant="caption" color="textSecondary">
-              Collection Rate
+              {t('billing.reports.collectionRate')}
             </Typography>
             <Typography variant="bodySmallBold" style={styles.greenText}>
               {collectionRate.toFixed(1)}%
@@ -155,13 +157,13 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
         <View style={styles.cardRow}>
           <View style={styles.statCard}>
             <Typography variant="caption" color="textSecondary">
-              Outstanding Dues
+              {t('billing.reports.outstandingDues')}
             </Typography>
             <MoneyText amount={overdueAmount} variant="bodySmallBold" color="#b91c1c" />
           </View>
           <View style={styles.statCard}>
             <Typography variant="caption" color="textSecondary">
-              Target Progress
+              {t('billing.reports.targetProgress')}
             </Typography>
             <Typography variant="bodySmallBold" style={styles.blueText}>
               85%
@@ -172,10 +174,10 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
         {/* Payment Method Breakdown Section */}
         <View style={styles.sectionCard}>
           <Typography variant="bodySmallBold" style={styles.sectionTitle}>
-            Collection by Payment Method
+            {t('billing.reports.byPaymentMethod')}
           </Typography>
           <Typography variant="caption" color="textSecondary" style={styles.sectionSubtitle}>
-            Breakdown for current period
+            {t('billing.reports.byPaymentMethodDesc')}
           </Typography>
 
           <View style={styles.breakdownList}>
@@ -204,7 +206,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
         {/* Action / Export Buttons */}
         <View style={styles.exportSection}>
           <Typography variant="bodySmallBold" style={styles.exportTitle}>
-            Export Reports
+            {t('billing.reports.exportReports')}
           </Typography>
 
           <View style={styles.exportButtonsRow}>
@@ -219,7 +221,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
                 ? <ActivityIndicator size="small" color={BrandColors.teal} />
                 : <Feather name="file-text" size={16} color={BrandColors.teal} />}
               <Typography variant="caption" style={styles.exportBtnText}>
-                Export CSV
+                {t('billing.reports.exportCsv')}
               </Typography>
             </Pressable>
           </View>

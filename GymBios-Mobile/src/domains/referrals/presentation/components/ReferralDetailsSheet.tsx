@@ -13,6 +13,7 @@ import {
 import type { Referral } from '../../domain/Referral';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 interface ReferralDetailsSheetProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export function ReferralDetailsSheet({
   referral,
   onSuccess,
 }: ReferralDetailsSheetProps) {
+  const { t } = useTranslation();
   const markSuccessfulMutation = useMarkReferralSuccessful();
   const markExpiredMutation = useMarkReferralExpired();
 
@@ -79,7 +81,7 @@ export function ReferralDetailsSheet({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Typography variant="title" style={styles.title}>
-              Referral Details
+              {t('adminReferrals.detailsTitle')}
             </Typography>
             <Pressable onPress={onClose} hitSlop={8}>
               <Feather name="x" size={22} color={BrandColors.textPrimary} />
@@ -90,7 +92,7 @@ export function ReferralDetailsSheet({
             <View style={styles.gridRow}>
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Referrer
+                  {t('adminReferrals.referrer')}
                 </Typography>
                 <Typography variant="subtitle" style={styles.valueText}>
                   {referral.referrerName || '—'}
@@ -99,7 +101,7 @@ export function ReferralDetailsSheet({
 
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Referee
+                  {t('adminReferrals.referee')}
                 </Typography>
                 <Typography variant="subtitle" style={styles.valueText}>
                   {referral.refereeName || '—'}
@@ -110,7 +112,7 @@ export function ReferralDetailsSheet({
             <View style={styles.gridRow}>
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Email
+                  {t('adminReferrals.email')}
                 </Typography>
                 <Typography variant="bodySmall" style={styles.valueText}>
                   {referral.refereeEmail || '—'}
@@ -119,7 +121,7 @@ export function ReferralDetailsSheet({
 
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Phone
+                  {t('adminReferrals.phone')}
                 </Typography>
                 <Typography variant="bodySmall" style={styles.valueText}>
                   {referral.refereePhone || '—'}
@@ -130,7 +132,7 @@ export function ReferralDetailsSheet({
             <View style={styles.gridRow}>
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Status
+                  {t('adminReferrals.status')}
                 </Typography>
                 <View style={{ marginTop: 4 }}>
                   <ReferralStatusBadge status={referral.status} />
@@ -139,7 +141,7 @@ export function ReferralDetailsSheet({
 
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Reward
+                  {t('adminReferrals.reward')}
                 </Typography>
                 <Typography variant="subtitle" style={[styles.valueText, { color: BrandColors.teal }]}>
                   <CurrencyValue amount={rewardVal} />
@@ -150,7 +152,7 @@ export function ReferralDetailsSheet({
             <View style={styles.gridRow}>
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Referral Code
+                  {t('adminReferrals.referralCode')}
                 </Typography>
                 <Typography variant="bodySmall" style={styles.codeText}>
                   {referral.referralCode || '—'}
@@ -159,7 +161,7 @@ export function ReferralDetailsSheet({
 
               <View style={styles.gridCol}>
                 <Typography variant="caption" color="textSecondary">
-                  Date
+                  {t('adminReferrals.date')}
                 </Typography>
                 <Typography variant="bodySmall" style={styles.valueText}>
                   {referral.date || referral.createdAt || '—'}
@@ -170,7 +172,7 @@ export function ReferralDetailsSheet({
             {referral.notes ? (
               <View style={styles.notesBox}>
                 <Typography variant="caption" color="textSecondary">
-                  Notes
+                  {t('adminReferrals.notes')}
                 </Typography>
                 <Typography variant="bodySmall" style={styles.notesText}>
                   {referral.notes}
@@ -183,13 +185,13 @@ export function ReferralDetailsSheet({
           {isPending ? (
             <View style={styles.actionsFooter}>
               <Button
-                title="Mark Successful"
+                title={t('adminReferrals.markSuccessful')}
                 onPress={handleMarkSuccessful}
                 loading={isLoading}
                 style={{ flex: 1, backgroundColor: '#16a34a', marginRight: Spacing.two }}
               />
               <Button
-                title="Mark Expired"
+                title={t('adminReferrals.markExpired')}
                 variant="outline"
                 onPress={handleMarkExpired}
                 loading={isLoading}
@@ -198,7 +200,7 @@ export function ReferralDetailsSheet({
             </View>
           ) : (
             <View style={styles.footer}>
-              <Button title="Close" variant="outline" onPress={onClose} style={{ flex: 1 }} />
+              <Button title={t('adminReferrals.close')} variant="outline" onPress={onClose} style={{ flex: 1 }} />
             </View>
           )}
         </View>

@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "Rollen & Berechtigungen",
+    "createRole": "Rolle erstellen",
+    "editRole": "Rolle bearbeiten",
+    "subtitle": "Mitarbeiter & Gehaltsabrechnung",
+    "searchPlaceholder": "Rollen suchen...",
+    "filterModulesPlaceholder": "Module filtern...",
+    "roleName": "Rollenname",
+    "roleNamePlaceholder": "z.B. Empfang",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Wofür diese Rolle dient (optional)",
+    "modulePermissions": "MODULBERECHTIGUNGEN",
+    "selectedCount": "{{count}} ausgewählt",
+    "selectAll": "Alle auswählen",
+    "system": "System",
+    "allAccess": "Vollzugriff",
+    "allModules": "Alle Module",
+    "permissions_one": "{{count}} Berechtigung",
+    "permissions_other": "{{count}} Berechtigungen",
+    "users_one": "{{count}} Benutzer",
+    "users_other": "{{count}} Benutzer",
+    "edit": "Bearbeiten",
+    "duplicate": "Duplizieren",
+    "delete": "Löschen",
+    "systemRole": "Systemrolle",
+    "customRole": "Benutzerdefinierte Rolle",
+    "noRolesFoundTitle": "Keine Rollen gefunden",
+    "noRolesFoundDesc": "Es wurden keine Rollen für \"{{query}}\" gefunden.",
+    "clearSearch": "Suche löschen",
+    "noRolesYetTitle": "Noch keine Rollen vorhanden",
+    "noRolesYetDesc": "Erstellen Sie Ihre erste Rolle, um Berechtigungen zu verwalten.",
+    "deleteRoleTitle": "Rolle löschen?",
+    "deleteRoleMessage": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden.",
+    "cancel": "Abbrechen",
+    "saving": "Wird gespeichert...",
+    "save": "Speichern",
+    "failedDuplicate": "Rolle konnte nicht dupliziert werden.",
+    "unableDelete": "Rolle konnte nicht gelöscht werden."
+  }
+};
+
+export default roles;

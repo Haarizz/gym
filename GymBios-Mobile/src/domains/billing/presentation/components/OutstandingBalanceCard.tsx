@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { useTranslation } from 'react-i18next';
+
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { MoneyText } from './MoneyText';
@@ -17,9 +19,11 @@ interface OutstandingBalanceCardProps {
  */
 export function OutstandingBalanceCard({
   balance = 0,
-  label = 'Outstanding Balance',
+  label,
 }: OutstandingBalanceCardProps) {
+  const { t } = useTranslation();
   const isOwed = (balance ?? 0) > 0;
+  const displayLabel = label ?? t('billing.dues.outstandingAmount');
 
   return (
     <View style={[styles.card, isOwed && styles.cardAlert]}>
@@ -32,7 +36,7 @@ export function OutstandingBalanceCard({
       </View>
       <View style={styles.text}>
         <Typography variant="caption" color="textSecondary">
-          {label}
+          {displayLabel}
         </Typography>
         <MoneyText
           amount={Math.abs(balance ?? 0)}
@@ -43,7 +47,7 @@ export function OutstandingBalanceCard({
       {isOwed && (
         <View style={styles.owedChip}>
           <Typography variant="caption" style={styles.owedText}>
-            Amount Due
+            {t('billing.cards.amountDue')}
           </Typography>
         </View>
       )}

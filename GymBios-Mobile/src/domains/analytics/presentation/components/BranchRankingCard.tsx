@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
@@ -18,6 +19,7 @@ interface BranchRankingCardProps {
 }
 
 export function BranchRankingCard({ data }: BranchRankingCardProps) {
+  const { t } = useTranslation();
   if (!data || data.length === 0) return null;
 
   const getRankColor = (index: number) => {
@@ -28,7 +30,7 @@ export function BranchRankingCard({ data }: BranchRankingCardProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Branch Rankings</Text>
+      <Text style={styles.title}>{t('analytics.cards.branchRankings')}</Text>
       
       <View style={styles.listContainer}>
         {data.map((branch, index) => (
@@ -49,11 +51,11 @@ export function BranchRankingCard({ data }: BranchRankingCardProps) {
             
             <View style={styles.statsGrid}>
               <View style={styles.statCol}>
-                <Text style={styles.statLabel}>Revenue</Text>
+                <Text style={styles.statLabel}>{t('analytics.cards.revenue')}</Text>
                 <Text style={styles.statValue}><CurrencyValue amount={branch.revenue} compact /></Text>
               </View>
               <View style={styles.statCol}>
-                <Text style={styles.statLabel}>Members</Text>
+                <Text style={styles.statLabel}>{t('analytics.cards.members')}</Text>
                 <Text style={styles.statValue}>{branch.members}</Text>
               </View>
             </View>

@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -20,6 +21,7 @@ interface StaffAttendanceCardProps {
 export const StaffAttendanceCard = memo(function StaffAttendanceCard({
   record,
 }: StaffAttendanceCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -47,23 +49,23 @@ export const StaffAttendanceCard = memo(function StaffAttendanceCard({
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="log-in" size={12} color="#16a34a" />
           <Typography variant="caption" color="textSecondary">
-            Clock In
+            {t('attendance.staff.clockIn')}
           </Typography>
           <Typography variant="bodySmallBold">{formatTime(record.clockInTime)}</Typography>
         </View>
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="log-out" size={12} color="#dc2626" />
           <Typography variant="caption" color="textSecondary">
-            Clock Out
+            {t('attendance.staff.clockOut')}
           </Typography>
           <Typography variant="bodySmallBold">
-            {record.clockOutTime ? formatTime(record.clockOutTime) : 'Still working'}
+            {record.clockOutTime ? formatTime(record.clockOutTime) : t('attendance.staff.stillWorking')}
           </Typography>
         </View>
         <View style={[styles.metricBox, { backgroundColor: theme.backgroundElement }]}>
           <Feather name="clock" size={12} color={BrandColors.teal} />
           <Typography variant="caption" color="textSecondary">
-            Duration
+            {t('attendance.staff.duration')}
           </Typography>
           <Typography variant="bodySmallBold">
             {record.formattedDuration || '—'}

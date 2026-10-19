@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
@@ -52,6 +53,7 @@ export function FollowUpFilters({
   filters,
   onChangeFilters,
 }: FollowUpFiltersProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -136,7 +138,7 @@ export function FollowUpFilters({
           <Feather name="search" size={18} color={theme.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Search member, email, subject..."
+            placeholder={t('followUps.searchPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             value={filters.search || ''}
             onChangeText={handleSearchChange}
@@ -184,7 +186,7 @@ export function FollowUpFilters({
             onPress={e => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Filter Follow-ups</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('followUps.filterTitle')}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Feather name="x" size={22} color={theme.text} />
               </TouchableOpacity>
@@ -192,28 +194,28 @@ export function FollowUpFilters({
 
             <ScrollView style={styles.modalBody}>
               <Dropdown
-                label="Status"
+                label={t('followUps.status')}
                 value={localStatus}
                 options={STATUS_OPTIONS}
                 onChange={setLocalStatus}
               />
 
               <Dropdown
-                label="Type"
+                label={t('followUps.type')}
                 value={localType}
                 options={TYPE_OPTIONS}
                 onChange={setLocalType}
               />
 
               <Dropdown
-                label="Priority"
+                label={t('followUps.priority')}
                 value={localPriority}
                 options={PRIORITY_OPTIONS}
                 onChange={setLocalPriority}
               />
 
               <Dropdown
-                label="Assigned Staff"
+                label={t('followUps.assignedStaff')}
                 value={localStaff}
                 options={staffOptions}
                 onChange={setLocalStaff}
@@ -226,7 +228,7 @@ export function FollowUpFilters({
                 onPress={handleReset}
               >
                 <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  Reset All
+                  {t('followUps.resetAll')}
                 </Text>
               </TouchableOpacity>
 
@@ -234,7 +236,7 @@ export function FollowUpFilters({
                 style={[styles.applyBtn, { backgroundColor: BrandColors.teal }]}
                 onPress={handleApply}
               >
-                <Text style={styles.applyBtnText}>Apply Filters</Text>
+                <Text style={styles.applyBtnText}>{t('followUps.applyFilters')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

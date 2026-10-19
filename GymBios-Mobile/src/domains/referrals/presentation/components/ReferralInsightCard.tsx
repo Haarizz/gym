@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface InsightData {
   conversionRate: number;
@@ -19,6 +20,7 @@ interface ReferralInsightCardProps {
 }
 
 export function ReferralInsightCard({ data }: ReferralInsightCardProps) {
+  const { t } = useTranslation();
   const {
     conversionRate,
     successfulCount,
@@ -58,10 +60,10 @@ export function ReferralInsightCard({ data }: ReferralInsightCardProps) {
   return (
     <View style={styles.card}>
       <Typography variant="subtitle" style={styles.title}>
-        Performance Insights
+        {t('adminReferrals.insightsTitle')}
       </Typography>
       <Typography variant="caption" color="textSecondary" style={styles.subtitle}>
-        Program insights and recommendations
+        {t('adminReferrals.insightsSubtitle')}
       </Typography>
 
       <View style={styles.list}>

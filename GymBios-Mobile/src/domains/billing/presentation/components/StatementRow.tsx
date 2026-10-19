@@ -2,6 +2,8 @@ import React, { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { useTranslation } from 'react-i18next';
+
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { StatementLine } from '../../domain/Statement';
@@ -35,6 +37,7 @@ export const StatementRow = memo(function StatementRow({
   line,
   isLast,
 }: StatementRowProps) {
+  const { t } = useTranslation();
   const isPayment = line.type === StatementLineType.Payment;
   const iconName: keyof typeof Feather.glyphMap = isPayment
     ? 'arrow-down-circle'
@@ -63,7 +66,7 @@ export const StatementRow = memo(function StatementRow({
             </Typography>
             {line.receiptNo && (
               <Typography variant="caption" color="textSecondary">
-                Ref: {line.receiptNo}
+                {t('billing.cards.refPrefix')} {line.receiptNo}
               </Typography>
             )}
           </View>
@@ -72,7 +75,7 @@ export const StatementRow = memo(function StatementRow({
             {(line.debit ?? 0) > 0 && (
               <View style={styles.amountRow}>
                 <Typography variant="caption" color="textSecondary">
-                  Dr{' '}
+                  {t('billing.cards.debit')}{' '}
                 </Typography>
                 <MoneyText
                   amount={line.debit}
@@ -84,7 +87,7 @@ export const StatementRow = memo(function StatementRow({
             {(line.credit ?? 0) > 0 && (
               <View style={styles.amountRow}>
                 <Typography variant="caption" color="textSecondary">
-                  Cr{' '}
+                  {t('billing.cards.credit')}{' '}
                 </Typography>
                 <MoneyText
                   amount={line.credit}
@@ -95,7 +98,7 @@ export const StatementRow = memo(function StatementRow({
             )}
             <View style={[styles.amountRow, styles.balanceRow]}>
               <Typography variant="caption" color="textSecondary">
-                Bal{' '}
+                {t('billing.cards.balance')}{' '}
               </Typography>
               <MoneyText
                 amount={line.balance}

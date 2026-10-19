@@ -6,10 +6,12 @@ export * from './hooks/useStaffDashboard';
 export * from './hooks/useTrainerDashboard';
 export * from './hooks/useAdminDashboard';
 export * from './hooks/useMemberDashboard';
+export * from './hooks/useMemberOffers';
 export { StaffDashboardScreen, StaffDashboardScreen as StaffHomeScreen } from './presentation/screens/StaffDashboardScreen';
 export { TrainerDashboardScreen, TrainerDashboardScreen as TrainerHomeScreen } from './presentation/screens/TrainerDashboardScreen';
 export { AdminDashboardScreen, AdminDashboardScreen as AdminHomeScreen } from './presentation/screens/AdminDashboardScreen';
 export { MemberDashboardScreen, MemberDashboardScreen as MemberHomeScreen } from './presentation/screens/MemberDashboardScreen';
+export { MemberOffersScreen } from './presentation/screens/MemberOffersScreen';
 
 // Staff components
 export * from './presentation/components/StaffWelcomeCard';

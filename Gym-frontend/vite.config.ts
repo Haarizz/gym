@@ -57,5 +57,13 @@
     server: {
       port: 3000,
       open: true,
+      // Without a .env, axios falls back to the relative '/api' base — forward it to
+      // the backend instead of letting Vite's SPA fallback answer with index.html.
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
     },
   });

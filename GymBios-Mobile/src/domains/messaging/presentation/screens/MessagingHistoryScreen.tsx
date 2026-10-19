@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { useRouter, useSegments } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { AppHeader } from '@/shared/components/AppHeader';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { BrandColors, Spacing, TypographyScale, Radius } from '@/core/theme';
 import { useMessagingHistory } from '../../hooks/useMessagingHooks';
 
 export function MessagingHistoryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const segments = useSegments();
   const roleGroup = segments[0] || '(admin)';
@@ -24,8 +26,8 @@ export function MessagingHistoryScreen() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <AppHeader
-        title="Message History"
-        subtitle="View sent & scheduled messages"
+        title={t('messaging.history.title')}
+        subtitle={t('messaging.history.subtitle')}
         colors={headerColors}
         onBack={() => router.back()}
       />
@@ -41,19 +43,21 @@ export function MessagingHistoryScreen() {
               <StatusBadge status={item.status} />
             </View>
             
-            <Text style={styles.type}>Channel: {item.type.toUpperCase()}</Text>
+            <Text style={styles.type}>
+              {t('messaging.history.channel', { type: item.type.toUpperCase() })}
+            </Text>
             
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Text style={styles.statLabel}>Recipients</Text>
+                <Text style={styles.statLabel}>{t('messaging.history.recipients')}</Text>
                 <Text style={styles.statValue}>{item.recipientCount}</Text>
               </View>
               <View style={styles.stat}>
-                <Text style={styles.statLabel}>Open Rate</Text>
+                <Text style={styles.statLabel}>{t('messaging.history.openRate')}</Text>
                 <Text style={styles.statValue}>{item.openRate.toFixed(1)}%</Text>
               </View>
               <View style={styles.stat}>
-                <Text style={styles.statLabel}>Sent Date</Text>
+                <Text style={styles.statLabel}>{t('messaging.history.sentDate')}</Text>
                 <Text style={styles.statValue}>
                   {new Date(item.sentDate).toLocaleDateString()}
                 </Text>
@@ -64,7 +68,7 @@ export function MessagingHistoryScreen() {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No message history found.</Text>
+              <Text style={styles.emptyText}>{t('messaging.history.noHistory')}</Text>
             </View>
           ) : null
         }

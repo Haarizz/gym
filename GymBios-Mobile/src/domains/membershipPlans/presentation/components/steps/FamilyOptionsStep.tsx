@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
@@ -32,6 +33,7 @@ interface FamilyOptionsStepProps {
 }
 
 export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const isCouple = values.planType === 'Couple';
   const modes = isCouple ? COUPLE_BILLING_MODES : FAMILY_BILLING_MODES;
@@ -41,8 +43,16 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
 
   return (
     <View style={styles.container}>
-      <FormSection title={isCouple ? 'Couple Billing' : 'Family Billing'}>
-        <Typography variant="bodySmallBold">Billing Mode</Typography>
+      <FormSection
+        title={
+          isCouple
+            ? t('membershipPlans.form.familyStep.coupleBillingTitle')
+            : t('membershipPlans.form.familyStep.familyBillingTitle')
+        }
+      >
+        <Typography variant="bodySmallBold">
+          {t('membershipPlans.form.familyStep.billingModeLabel')}
+        </Typography>
         {modes.map((mode) => {
           const isActive = values.familyBillingMode === mode.value;
           return (
@@ -66,10 +76,10 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
         })}
 
         <Input
-          label="Price Per Member"
+          label={t('membershipPlans.form.familyStep.pricePerMemberLabel')}
           value={values.pricePerMember}
           onChangeText={(v) => onChange('pricePerMember', v)}
-          placeholder="e.g. 100.00"
+          placeholder={t('membershipPlans.form.familyStep.pricePerMemberPlaceholder')}
           keyboardType="decimal-pad"
         />
         <Typography variant="caption" color="textSecondary">
@@ -82,42 +92,50 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
       </FormSection>
 
       {!isCouple && (
-        <FormSection title="Family Members">
+        <FormSection title={t('membershipPlans.form.familyStep.familyMembersSection')}>
           <Input
-            label="Max Family Members (blank = unlimited)"
+            label={t('membershipPlans.form.familyStep.maxFamilyMembersLabel')}
             value={values.maxFamilyMembers}
             onChangeText={(v) => onChange('maxFamilyMembers', v)}
-            placeholder="e.g. 5"
+            placeholder={t('membershipPlans.form.familyStep.maxFamilyMembersPlaceholder')}
             keyboardType="numeric"
           />
           <Input
-            label="Max Adult Members (blank = unlimited)"
+            label={t('membershipPlans.form.familyStep.maxAdultMembersLabel')}
             value={values.maxAdultMembers}
             onChangeText={(v) => onChange('maxAdultMembers', v)}
-            placeholder="e.g. 2"
+            placeholder={t('membershipPlans.form.familyStep.maxAdultMembersPlaceholder')}
             keyboardType="numeric"
           />
           <Input
-            label="Max Child Members (blank = unlimited)"
+            label={t('membershipPlans.form.familyStep.maxChildMembersLabel')}
             value={values.maxChildMembers}
             onChangeText={(v) => onChange('maxChildMembers', v)}
-            placeholder="e.g. 3"
+            placeholder={t('membershipPlans.form.familyStep.maxChildMembersPlaceholder')}
             keyboardType="numeric"
           />
           <Typography variant="caption" color="textSecondary">
-            Family and adult limits include the member who buys the subscription.
+            {t('membershipPlans.form.familyStep.familyLimitsNote')}
           </Typography>
         </FormSection>
       )}
 
-      <FormSection title={isCouple ? 'Invoice' : 'Additional Members'}>
+      <FormSection
+        title={
+          isCouple
+            ? t('membershipPlans.form.familyStep.invoiceSection')
+            : t('membershipPlans.form.familyStep.additionalMembersSection')
+        }
+      >
         {!isCouple && (
           <>
             <View style={styles.switchRow}>
               <View style={styles.switchText}>
-                <Typography variant="bodySmallBold">Allow Additional Members</Typography>
+                <Typography variant="bodySmallBold">
+                  {t('membershipPlans.form.familyStep.allowAdditionalMembers')}
+                </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Let a family exceed Max Family Members, billed at the additional member price
+                  {t('membershipPlans.form.familyStep.allowAdditionalMembersDesc')}
                 </Typography>
               </View>
               <Switch
@@ -129,10 +147,10 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
             </View>
             {values.allowAdditionalMembers && (
               <Input
-                label="Additional Member Price (blank = Price Per Member)"
+                label={t('membershipPlans.form.familyStep.additionalMemberPriceLabel')}
                 value={values.additionalMemberPrice}
                 onChangeText={(v) => onChange('additionalMemberPrice', v)}
-                placeholder="e.g. 75.00"
+                placeholder={t('membershipPlans.form.familyStep.additionalMemberPricePlaceholder')}
                 keyboardType="decimal-pad"
               />
             )}
@@ -140,9 +158,11 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
         )}
         <View style={styles.switchRow}>
           <View style={styles.switchText}>
-            <Typography variant="bodySmallBold">Auto Calculate Total</Typography>
+            <Typography variant="bodySmallBold">
+              {t('membershipPlans.form.familyStep.autoCalculateTotal')}
+            </Typography>
             <Typography variant="caption" color="textSecondary">
-              Compute the {isCouple ? 'couple' : 'family'} invoice as Price Per Member × member count
+              {t('membershipPlans.form.familyStep.autoCalculateTotalDesc')}
             </Typography>
           </View>
           <Switch
@@ -156,7 +176,9 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
         {isFamilyHead && (
           <View style={[styles.preview, { borderColor: theme.primary }]}>
             <Typography variant="bodySmallBold">
-              {isCouple ? 'Couple Head billing preview' : 'Family Head billing preview'}
+              {isCouple
+                ? t('membershipPlans.form.familyStep.coupleBillingPreview')
+                : t('membershipPlans.form.familyStep.familyBillingPreview')}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               {values.autoCalculateTotal && pricePerMember > 0

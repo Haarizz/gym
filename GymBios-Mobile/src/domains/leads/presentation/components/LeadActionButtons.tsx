@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import type { Lead } from '../../domain/Lead';
@@ -24,6 +25,8 @@ export function LeadActionButtons({
   onEdit,
   onDelete,
 }: LeadActionButtonsProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {onCall && (
@@ -31,7 +34,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onCall(lead)}
           hitSlop={8}
-          accessibilityLabel="Call Lead"
+          accessibilityLabel={t('leads.actions.callA11y')}
         >
           <Feather name="phone" size={17} color="#94a3b8" />
         </Pressable>
@@ -41,7 +44,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onEmail(lead)}
           hitSlop={8}
-          accessibilityLabel="Email Lead"
+          accessibilityLabel={t('leads.actions.emailA11y')}
         >
           <Feather name="mail" size={17} color="#94a3b8" />
         </Pressable>
@@ -51,7 +54,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onMessage(lead)}
           hitSlop={8}
-          accessibilityLabel="Message Lead"
+          accessibilityLabel={t('leads.actions.messageA11y')}
         >
           <Feather name="message-square" size={17} color="#94a3b8" />
         </Pressable>
@@ -61,7 +64,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onView(lead)}
           hitSlop={8}
-          accessibilityLabel="View Lead Details"
+          accessibilityLabel={t('leads.actions.viewA11y')}
         >
           <Feather name="eye" size={17} color="#94a3b8" />
         </Pressable>
@@ -71,7 +74,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onEdit(lead)}
           hitSlop={8}
-          accessibilityLabel="Edit Lead"
+          accessibilityLabel={t('leads.actions.editA11y')}
         >
           <Feather name="edit-2" size={17} color="#94a3b8" />
         </Pressable>
@@ -81,7 +84,7 @@ export function LeadActionButtons({
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           onPress={() => onDelete(lead)}
           hitSlop={8}
-          accessibilityLabel="Delete Lead"
+          accessibilityLabel={t('leads.actions.deleteA11y')}
         >
           <Feather name="trash-2" size={17} color="#f87171" />
         </Pressable>

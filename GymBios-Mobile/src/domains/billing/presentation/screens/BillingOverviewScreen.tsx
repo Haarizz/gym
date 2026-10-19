@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -50,6 +51,7 @@ export function BillingOverviewScreen({
   onNavigateToCollectionReports,
   onNavigateToCreateReceipt,
 }: BillingOverviewScreenProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { stats, loading: statsLoading, error: statsError, refresh: refreshStats } = useBillingStats();
   const { receipts, loading: receiptsLoading, error: receiptsError, refresh: refreshReceipts } = useReceipts({ limit: 3, page: 1 });
@@ -82,8 +84,8 @@ export function BillingOverviewScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Billing Hub"
-          subtitle="Financial Overview & Workflows"
+          title={t('billing.overview.title')}
+          subtitle={t('billing.overview.subtitle')}
           colors={['#327f74', '#2a6b62']}
         />
         <BillingSkeleton variant="overview" count={4} />
@@ -95,11 +97,11 @@ export function BillingOverviewScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title="Billing Hub"
-          subtitle="Financial Overview & Workflows"
+          title={t('billing.overview.title')}
+          subtitle={t('billing.overview.subtitle')}
           colors={['#327f74', '#2a6b62']}
         />
-        <ErrorState message="Failed to load billing data." onRetry={handleRefresh} />
+        <ErrorState message={t('common.error')} onRetry={handleRefresh} />
       </ScreenLayout>
     );
   }
@@ -124,10 +126,10 @@ export function BillingOverviewScreen({
         <View style={styles.heroBanner}>
           <View style={styles.heroTextGroup}>
             <Typography variant="bodySmallBold" style={styles.heroTitle}>
-              Collect Member Payment
+              {t('billing.overview.collectPaymentTitle')}
             </Typography>
             <Typography variant="caption" style={styles.heroSubtitle}>
-              Search member, select pending bills, and generate receipt.
+              {t('billing.overview.collectPaymentDesc')}
             </Typography>
           </View>
 
@@ -138,22 +140,22 @@ export function BillingOverviewScreen({
           >
             <Feather name="plus-circle" size={16} color="#ffffff" />
             <Typography variant="bodySmallBold" style={styles.createReceiptText}>
-              Create Receipt
+              {t('billing.overview.createReceipt')}
             </Typography>
           </Pressable>
         </View>
 
         {/* ── Top Summary Cards ───────────────────────────────────── */}
-        <BillingSection title="Financial Overview">
+        <BillingSection title={t('billing.overview.financialOverview')}>
           <View style={styles.statsRow}>
             <BillingSummaryCard
-              label="Collection"
+              label={t('billing.overview.collection')}
               value={stats?.monthlyCollection ?? 0}
               iconName="trending-up"
               iconBg={BrandColors.teal}
             />
             <BillingSummaryCard
-              label="Outstanding"
+              label={t('billing.overview.outstanding')}
               value={stats?.overdueAmount ?? 0}
               iconName="alert-circle"
               iconBg="#f59e0b"
@@ -162,14 +164,14 @@ export function BillingOverviewScreen({
           </View>
           <View style={styles.statsRow}>
             <BillingSummaryCard
-              label="Overdue Members"
+              label={t('billing.overview.overdueMembers')}
               value={stats?.overdueCount ?? 0}
               iconName="users"
               iconBg="#ef4444"
               isPercent={false}
             />
             <BillingSummaryCard
-              label="Collection Rate"
+              label={t('billing.overview.collectionRate')}
               value={stats?.collectionRate ?? 0}
               iconName="percent"
               iconBg="#8b5cf6"
@@ -190,10 +192,10 @@ export function BillingOverviewScreen({
               </View>
               <View>
                 <Typography variant="bodySmallBold" style={styles.featureTitle}>
-                  Receipt Management
+                  {t('billing.overview.receiptManagementTitle')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Transaction history & receipt verification
+                  {t('billing.overview.receiptManagementDesc')}
                 </Typography>
               </View>
             </View>
@@ -203,7 +205,7 @@ export function BillingOverviewScreen({
               accessibilityRole="button"
             >
               <Typography variant="caption" style={styles.viewAllText}>
-                View All
+                {t('billing.overview.viewAll')}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </Pressable>
@@ -232,10 +234,10 @@ export function BillingOverviewScreen({
               </View>
               <View>
                 <Typography variant="bodySmallBold" style={styles.featureTitle}>
-                  Outstanding Dues
+                  {t('billing.overview.outstandingDuesTitle')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  {dues.length} member{dues.length !== 1 ? 's' : ''} with pending payments
+                  {t('billing.overview.outstandingDuesDesc', { count: dues.length })}
                 </Typography>
               </View>
             </View>
@@ -245,7 +247,7 @@ export function BillingOverviewScreen({
               accessibilityRole="button"
             >
               <Typography variant="caption" style={styles.viewAllText}>
-                View All
+                {t('billing.overview.viewAll')}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </Pressable>
@@ -274,10 +276,10 @@ export function BillingOverviewScreen({
               </View>
               <View>
                 <Typography variant="bodySmallBold" style={styles.featureTitle}>
-                  Member Statements
+                  {t('billing.overview.memberStatementsTitle')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Generate & view running balances & timeline
+                  {t('billing.overview.memberStatementsDesc')}
                 </Typography>
               </View>
             </View>
@@ -287,7 +289,7 @@ export function BillingOverviewScreen({
               accessibilityRole="button"
             >
               <Typography variant="caption" style={styles.viewAllText}>
-                Open
+                {t('billing.overview.open')}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </Pressable>
@@ -303,10 +305,10 @@ export function BillingOverviewScreen({
               </View>
               <View>
                 <Typography variant="bodySmallBold" style={styles.featureTitle}>
-                  Collection Reports
+                  {t('billing.overview.collectionReportsTitle')}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Daily, monthly, custom analytics & exports
+                  {t('billing.overview.collectionReportsDesc')}
                 </Typography>
               </View>
             </View>
@@ -316,7 +318,7 @@ export function BillingOverviewScreen({
               accessibilityRole="button"
             >
               <Typography variant="caption" style={styles.viewAllText}>
-                Open
+                {t('billing.overview.open')}
               </Typography>
               <Feather name="arrow-right" size={14} color={BrandColors.teal} />
             </Pressable>

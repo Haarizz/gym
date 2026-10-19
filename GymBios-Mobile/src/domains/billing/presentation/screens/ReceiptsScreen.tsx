@@ -18,6 +18,7 @@ import {
 } from '../components';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 interface ReceiptsScreenProps {
   onBack: () => void;
@@ -32,6 +33,7 @@ const STATUS_OPTIONS = ['All', 'Paid', 'Pending', 'Partial', 'Overdue'];
  * Displays search, filters, pull-to-refresh, receipt list, empty state, skeleton, and Export CSV.
  */
 export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenProps) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
@@ -74,8 +76,8 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
   return (
     <ScreenLayout>
       <AppHeader
-        title="Receipt Management"
-        subtitle={pagination ? `${pagination.total} Total Receipts` : 'Payment Receipts & History'}
+        title={t('billing.receipts.title')}
+        subtitle={pagination ? `${pagination.total} ${t('billing.receipts.title')}` : t('billing.receipts.subtitle')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -87,7 +89,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
             <Feather name="search" size={16} color={BrandColors.textSecondary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search receipt #, member name..."
+              placeholder={t('billing.receipts.searchPlaceholder')}
               placeholderTextColor={BrandColors.textSecondary}
               value={search}
               onChangeText={setSearch}
@@ -103,7 +105,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
           <Pressable onPress={handleExportCSV} style={styles.exportBtn} accessibilityRole="button">
             <Feather name="download" size={14} color={BrandColors.teal} />
             <Typography variant="caption" style={styles.exportBtnText}>
-              Export
+              {t('billing.receipts.export')}
             </Typography>
           </Pressable>
         </View>
@@ -111,7 +113,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
         {/* Filters */}
         <View style={styles.filtersSection}>
           <Typography variant="caption" color="textSecondary" style={styles.filterLabel}>
-            Type:
+            {t('billing.receipts.typeFilter')}
           </Typography>
           <FlatList
             horizontal
@@ -135,7 +137,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
           />
 
           <Typography variant="caption" color="textSecondary" style={styles.filterLabel}>
-            Status:
+            {t('billing.receipts.statusFilter')}
           </Typography>
           <FlatList
             horizontal
@@ -163,7 +165,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
         {loading && !receipts.length ? (
           <BillingSkeleton variant="list" count={5} />
         ) : error && !receipts.length ? (
-          <ErrorState message="Failed to load receipts." onRetry={refresh} />
+          <ErrorState message={t('common.error')} onRetry={refresh} />
         ) : (
           <FlatList
             data={receipts}
@@ -180,8 +182,8 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
             }
             ListEmptyComponent={
               <EmptyBillingState
-                title="No receipts found"
-                description="Try adjusting your search query or status filters."
+                title={t('billing.receipts.noReceipts')}
+                description={t('billing.receipts.noReceiptsDesc')}
                 icon="file-text"
               />
             }

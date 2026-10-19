@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -33,6 +34,7 @@ const CATEGORY_OPTIONS: Option[] = [
 ];
 
 export function BasicInfoStep({ values, onChange }: StepProps) {
+  const { t } = useTranslation();
   const startDate = parseFormDate(values.startDate);
   const endDate = parseFormDate(values.endDate);
 
@@ -54,15 +56,15 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
   return (
     <View style={stepStyles.container}>
       <Input
-        label="Promotion Name *"
-        placeholder="Enter promotion name"
+        label={t('promotions.nameRequired')}
+        placeholder={t('promotions.namePlaceholder')}
         value={values.name}
         onChangeText={(val) => onChange('name', val)}
       />
 
       <Dropdown
-        label="Promotion Type"
-        placeholder="Select type"
+        label={t('promotions.promoType')}
+        placeholder={t('promotions.selectType')}
         required
         options={TYPE_OPTIONS}
         value={values.type}
@@ -70,8 +72,8 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
       />
 
       <Input
-        label="Description"
-        placeholder="Describe your promotion"
+        label={t('promotions.description')}
+        placeholder={t('promotions.descriptionPlaceholder')}
         value={values.description}
         onChangeText={(val) => onChange('description', val)}
         multiline
@@ -81,13 +83,13 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
       <View style={stepStyles.gridRow}>
         <DatePicker
           style={stepStyles.gridCol}
-          label="Start Date"
+          label={t('promotions.startDate')}
           value={startDate}
           onChange={handleStartDateChange}
         />
         <DatePicker
           style={stepStyles.gridCol}
-          label="End Date"
+          label={t('promotions.endDate')}
           value={endDate}
           minimumDate={startDate ?? undefined}
           onChange={(date) => onChange('endDate', formatFormDate(date))}
@@ -95,16 +97,16 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
       </View>
 
       <Dropdown
-        label="Category"
-        placeholder="Select category"
+        label={t('promotions.category')}
+        placeholder={t('promotions.selectCategory')}
         options={CATEGORY_OPTIONS}
         value={values.category}
         onChange={(val) => onChange('category', val)}
       />
 
       <Input
-        label="Promotion Code (Optional)"
-        placeholder="e.g., NEWYEAR2024"
+        label={t('promotions.codeOptional')}
+        placeholder={t('promotions.codePlaceholder')}
         autoCapitalize="characters"
         autoCorrect={false}
         value={values.code}

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -35,6 +36,7 @@ export function DuesScreen({
   onNavigateToMemberStatement,
   onCollectPayment,
 }: DuesScreenProps) {
+  const { t } = useTranslation();
   const { stats, loading: statsLoading, refresh: refreshStats } = useBillingStats();
   const { dues, loading: duesLoading, error, refresh: refreshDues } = useMemberDues();
 
@@ -94,8 +96,8 @@ export function DuesScreen({
   return (
     <ScreenLayout>
       <AppHeader
-        title="Outstanding Dues"
-        subtitle={`${dues.length} Member${dues.length !== 1 ? 's' : ''} Pending`}
+        title={t('billing.dues.title')}
+        subtitle={t('billing.dues.members', { count: dues.length })}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -105,26 +107,26 @@ export function DuesScreen({
         <View style={styles.summaryHeader}>
           <View style={styles.summaryItem}>
             <Typography variant="caption" color="textSecondary">
-              Outstanding Amount
+              {t('billing.dues.outstandingAmount')}
             </Typography>
             <MoneyText amount={totalOutstanding} variant="bodySmallBold" color="#b91c1c" />
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryItem}>
             <Typography variant="caption" color="textSecondary">
-              Overdue
+              {t('billing.dues.overdue')}
             </Typography>
             <Typography variant="bodySmallBold" style={styles.overdueCountText}>
-              {overdueCount} members
+              {t('billing.dues.members', { count: overdueCount })}
             </Typography>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryItem}>
             <Typography variant="caption" color="textSecondary">
-              Due Soon
+              {t('billing.dues.dueSoon')}
             </Typography>
             <Typography variant="bodySmallBold" style={styles.dueSoonCountText}>
-              {dueSoonCount} members
+              {t('billing.dues.members', { count: dueSoonCount })}
             </Typography>
           </View>
         </View>
@@ -137,7 +139,7 @@ export function DuesScreen({
                 <Feather name="refresh-cw" size={16} color={BrandColors.teal} />
               </View>
               <Typography variant="caption" style={styles.actionCardText}>
-                Refresh
+                {t('billing.dues.refresh')}
               </Typography>
             </Pressable>
 
@@ -151,7 +153,7 @@ export function DuesScreen({
                 <Feather name="send" size={16} color="#0284c7" />
               </View>
               <Typography variant="caption" style={styles.actionCardText}>
-                Send Reminders
+                {t('billing.dues.sendReminders')}
               </Typography>
             </Pressable>
           </View>
@@ -166,7 +168,7 @@ export function DuesScreen({
                 <Feather name="credit-card" size={16} color="#16a34a" />
               </View>
               <Typography variant="caption" style={styles.actionCardText}>
-                Collect Payment
+                {t('billing.dues.collectPayment')}
               </Typography>
             </Pressable>
 
@@ -175,7 +177,7 @@ export function DuesScreen({
                 <Feather name="download" size={16} color="#d97706" />
               </View>
               <Typography variant="caption" style={styles.actionCardText}>
-                Export Overdue
+                {t('billing.dues.exportOverdue')}
               </Typography>
             </Pressable>
           </View>
@@ -185,7 +187,7 @@ export function DuesScreen({
         {loading && !dues.length ? (
           <BillingSkeleton variant="list" count={5} />
         ) : error && !dues.length ? (
-          <ErrorState message="Failed to load member dues." onRetry={handleRefresh} />
+          <ErrorState message={t('common.error')} onRetry={handleRefresh} />
         ) : (
           <FlatList
             data={dues}
@@ -202,8 +204,8 @@ export function DuesScreen({
             }
             ListEmptyComponent={
               <EmptyBillingState
-                title="No outstanding dues"
-                description="All members are up to date with their payments."
+                title={t('billing.dues.noDues')}
+                description={t('billing.dues.noDuesDesc')}
                 icon="check-circle"
               />
             }

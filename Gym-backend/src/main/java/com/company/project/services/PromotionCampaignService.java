@@ -368,11 +368,16 @@ public class PromotionCampaignService {
     }
 
     /**
-     * Increment the usage count when a promotion is successfully redeemed.
+     * Increment the usage count when a promotion is successfully redeemed. Every redemption
+     * comes through here, so this is where the target audience is enforced: `memberId` is
+     * who is using it (null for a walk-in).
      */
     public PromotionCampaignResponseDTO redeemPromotion(Long id, BigDecimal revenue, BigDecimal savings, Long memberId) {
         PromotionCampaign promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Promotion not found: " + id));
+        Member member = memberId == null ? null : memberRepository.findById(memberId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        PromotionAudience.require(promotion, PromotionAudience.Buyer.of(member));
 
         PromotionRedemption redemption = new PromotionRedemption();
         redemption.setPromotionId(promotion.getId());

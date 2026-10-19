@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,6 +34,7 @@ export function AdminStaffScreen({
   onNavigateToDetail,
   onNavigateToCreate,
 }: AdminStaffScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { staff, loading, refresh, page, totalPages, setPage } = useStaff();
@@ -105,14 +107,14 @@ export function AdminStaffScreen({
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search staff by name or role..."
+          placeholder={t('hr.searchPlaceholder')}
         />
 
         <View style={styles.summaryRow}>
           {[
-            { label: 'Total Staff', value: summary?.totalStaff, color: theme.text },
-            { label: 'Present', value: summary?.presentToday, color: PRESENT_COLOR },
-            { label: 'Absent', value: summary?.absentToday, color: ABSENT_COLOR },
+            { label: t('hr.totalStaff'), value: summary?.totalStaff, color: theme.text },
+            { label: t('hr.presentToday'), value: summary?.presentToday, color: PRESENT_COLOR },
+            { label: t('hr.absentToday'), value: summary?.absentToday, color: ABSENT_COLOR },
           ].map((kpi) => (
             <View
               key={kpi.label}
@@ -129,25 +131,25 @@ export function AdminStaffScreen({
         </View>
       </View>
     ),
-    [search, summary, theme],
+    [search, summary, theme, t],
   );
 
   const renderEmpty = useCallback(
     () =>
       !loading ? (
         <EmptyState
-          title="No Staff Found"
+          title={t('hr.noStaffFound')}
           description={
             search
-              ? 'Try adjusting your search query.'
-              : 'Add your first staff member to get started.'
+              ? t('hr.noStaffSearchDesc')
+              : t('hr.noStaffEmptyDesc')
           }
           icon="users"
-          buttonLabel={!search ? 'Add Staff' : undefined}
+          buttonLabel={!search ? t('hr.addStaff') : undefined}
           onPress={!search ? handleCreate : undefined}
         />
       ) : null,
-    [loading, search, handleCreate],
+    [loading, search, handleCreate, t],
   );
 
   const renderFooter = useCallback(() => {
@@ -167,13 +169,13 @@ export function AdminStaffScreen({
           >
             <Feather name="plus" size={18} color={BrandColors.white} />
             <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
-              Add New Staff Member
+              {t('hr.addNewStaffMember')}
             </Typography>
           </Pressable>
         ) : null}
       </View>
     );
-  }, [loading, staff.length, page, totalPages, setPage, handleCreate]);
+  }, [loading, staff.length, page, totalPages, setPage, handleCreate, t]);
 
   return (
     <ScreenLayout edges={TAB_SCREEN_EDGES}>

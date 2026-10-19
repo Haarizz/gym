@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -36,6 +37,7 @@ import { RescheduleFollowUpSheet } from '../components/RescheduleFollowUpSheet';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function FollowUpManagementScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // State
@@ -266,15 +268,15 @@ export function FollowUpManagementScreen() {
       <View style={styles.titleRow}>
         <View style={styles.titleTextContainer}>
           <Text style={[styles.screenTitle, { color: theme.text }]}>
-            Follow-ups Management
+            {t('followUps.title')}
           </Text>
           <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-            Comprehensive member management and operations.
+            {t('followUps.subtitle')}
           </Text>
         </View>
 
         <Button
-          label="+ Follow-up"
+          label={t('followUps.addFollowUp')}
           size="md"
           onPress={() => {
             setEditingFollowUp(null);
@@ -292,92 +294,92 @@ export function FollowUpManagementScreen() {
         >
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: BrandColors.teal }]}>Total</Text>
+              <Text style={[styles.kpiTitle, { color: BrandColors.teal }]}>{t('followUps.total')}</Text>
               <Feather name="users" size={14} color={BrandColors.teal} />
             </View>
             <Text style={[styles.kpiValue, { color: theme.text }]}>
               {statsData.totalFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              All follow-ups
+              {t('followUps.allFollowUps')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#2563eb' }]}>Pending</Text>
+              <Text style={[styles.kpiTitle, { color: '#2563eb' }]}>{t('followUps.pending')}</Text>
               <Feather name="clock" size={14} color="#2563eb" />
             </View>
             <Text style={[styles.kpiValue, { color: '#2563eb' }]}>
               {statsData.pendingFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Awaiting action
+              {t('followUps.awaitingAction')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#dc2626' }]}>Overdue</Text>
+              <Text style={[styles.kpiTitle, { color: '#dc2626' }]}>{t('followUps.overdue')}</Text>
               <Feather name="alert-triangle" size={14} color="#dc2626" />
             </View>
             <Text style={[styles.kpiValue, { color: '#dc2626' }]}>
               {statsData.overdueFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Past due date
+              {t('followUps.pastDueDate')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#ea580c' }]}>Completed</Text>
+              <Text style={[styles.kpiTitle, { color: '#ea580c' }]}>{t('followUps.completed')}</Text>
               <Feather name="check-circle" size={14} color="#ea580c" />
             </View>
             <Text style={[styles.kpiValue, { color: '#ea580c' }]}>
               {statsData.completedFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Finished tasks
+              {t('followUps.finishedTasks')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#d97706' }]}>Rescheduled</Text>
+              <Text style={[styles.kpiTitle, { color: '#d97706' }]}>{t('followUps.rescheduled')}</Text>
               <Feather name="calendar" size={14} color="#d97706" />
             </View>
             <Text style={[styles.kpiValue, { color: '#d97706' }]}>
               {statsData.rescheduledFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Moved dates
+              {t('followUps.movedDates')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#6b7280' }]}>Cancelled</Text>
+              <Text style={[styles.kpiTitle, { color: '#6b7280' }]}>{t('followUps.cancelled')}</Text>
               <Feather name="x-circle" size={14} color="#6b7280" />
             </View>
             <Text style={[styles.kpiValue, { color: '#6b7280' }]}>
               {statsData.cancelledFollowUps ?? 0}
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Cancelled tasks
+              {t('followUps.cancelledTasks')}
             </Text>
           </View>
 
           <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
             <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#16a34a' }]}>Success Rate</Text>
+              <Text style={[styles.kpiTitle, { color: '#16a34a' }]}>{t('followUps.successRate')}</Text>
               <Feather name="trending-up" size={14} color="#16a34a" />
             </View>
             <Text style={[styles.kpiValue, { color: '#16a34a' }]}>
               {(statsData.completionRate ?? 0).toFixed(1)}%
             </Text>
             <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              Completion rate
+              {t('followUps.completionRate')}
             </Text>
           </View>
         </ScrollView>

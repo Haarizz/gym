@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
@@ -33,6 +34,7 @@ export function PromotionForm({
   onSuccess,
   onCancel,
 }: PromotionFormProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
@@ -128,7 +130,7 @@ export function PromotionForm({
             ]}
           >
             <Typography variant="bodySmallBold" style={styles.draftButtonText}>
-              Save as Draft
+              {t('promotions.saveAsDraft')}
             </Typography>
           </Pressable>
         </View>
@@ -185,16 +187,16 @@ export function PromotionForm({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Typography variant="subtitle" color="text">
-              Discard changes?
+              {t('promotions.discardChangesTitle')}
             </Typography>
             <View style={styles.modalSpacer} />
             <Typography variant="body" color="textSecondary">
-              All entered promotion information will be lost.
+              {t('promotions.discardChangesMessage')}
             </Typography>
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label="Keep Editing"
+                  label={t('common.keepEditing', 'Keep Editing')}
                   variant="secondary"
                   onPress={handleKeepEditing}
                   size="lg"
@@ -204,7 +206,7 @@ export function PromotionForm({
               <View style={styles.modalButtonSpacer} />
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label="Discard"
+                  label={t('common.discard', 'Discard')}
                   variant="primary"
                   onPress={handleDiscard}
                   size="lg"

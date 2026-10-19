@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
@@ -18,6 +19,7 @@ const repository = new ApiFacilityRepository();
 
 export function FacilityFormScreen({ mode }: { mode: 'create' | 'edit' }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id?: string }>();
   
   const { createFacility, updateFacility } = useFacilityActions();
@@ -28,25 +30,20 @@ export function FacilityFormScreen({ mode }: { mode: 'create' | 'edit' }) {
 
   useEffect(() => {
     if (mode === 'edit' && id) {
-      // Fetch single facility - since we don't have a get by id endpoint in the requirements, 
-      // we can fetch the list and find it, or if there is an endpoint, call it. 
-      // The requirement says: "Do not invent GET /api/facilities/{id} unless those endpoints actually exist."
-      // The backend controller snippet DOES NOT have GET /api/facilities/{id}.
-      // It only has GET /api/facilities. So we must fetch the list and filter.
       repository.getFacilities().then(facilities => {
         const facility = facilities.find(f => f.id === id || String(f.id) === id);
         if (facility) {
           setInitialData(facility);
         } else {
-          setError('Facility not found');
+          setError(t('facilities.notFound'));
         }
         setIsLoading(false);
       }).catch(err => {
-        setError(err.message || 'Failed to load facility');
+        setError(err.message || t('facilities.failedLoadSingle'));
         setIsLoading(false);
       });
     }
-  }, [mode, id]);
+  }, [mode, id, t]);
 
   const handleSubmit = (request: FacilityRequest) => {
     if (mode === 'create') {
@@ -69,8 +66,8 @@ export function FacilityFormScreen({ mode }: { mode: 'create' | 'edit' }) {
   return (
     <ScreenLayout>
       <AppHeader
-        title={mode === 'create' ? "Add Facility" : "Edit Facility"}
-        subtitle="Configure physical space"
+        title={mode === 'create' ? t('facilities.addFacility') : t('facilities.editFacility')}
+        subtitle={t('facilities.subtitle')}
         colors={FACILITIES_COLORS}
         onBack={() => router.back()}
       />

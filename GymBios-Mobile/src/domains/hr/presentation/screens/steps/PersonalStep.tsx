@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Spacing } from '@/core/theme';
 import { Input } from '@/shared/components/Input';
@@ -7,33 +8,35 @@ import { MemberPhotoCard } from '@/domains/members/presentation/components/form/
 import type { StaffStepProps } from './stepTypes';
 
 export function PersonalStep({ data, updateField, errors }: StaffStepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       <MemberPhotoCard
         data={data}
         updateField={updateField}
         errors={errors}
-        hint="Optional · shown on the staff profile and schedules"
+        hint={t('hr.personal.photoHint')}
       />
 
-      <FormCard icon="user" title="Basic details">
+      <FormCard icon="user" title={t('hr.personal.basicDetails')}>
         <Input
-          label={<RequiredLabel>Full name</RequiredLabel>}
+          label={<RequiredLabel>{t('hr.personal.fullName')}</RequiredLabel>}
           value={data.name}
           onChangeText={(v) => updateField('name', v)}
-          placeholder="e.g. Omar Khalid"
+          placeholder={t('hr.personal.fullNamePlaceholder')}
           autoCapitalize="words"
           textContentType="name"
           error={errors?.name}
         />
       </FormCard>
 
-      <FormCard icon="phone" title="Contact" description="Used for payroll, alerts and login recovery">
+      <FormCard icon="phone" title={t('hr.personal.contact')} description={t('hr.personal.contactDesc')}>
         <Input
-          label={<RequiredLabel>Email</RequiredLabel>}
+          label={<RequiredLabel>{t('hr.email')}</RequiredLabel>}
           value={data.email}
           onChangeText={(v) => updateField('email', v)}
-          placeholder="name@example.com"
+          placeholder={t('hr.personal.emailPlaceholder')}
           keyboardType="email-address"
           textContentType="emailAddress"
           autoCapitalize="none"
@@ -41,19 +44,19 @@ export function PersonalStep({ data, updateField, errors }: StaffStepProps) {
           error={errors?.email}
         />
         <Input
-          label={<RequiredLabel>Phone</RequiredLabel>}
+          label={<RequiredLabel>{t('hr.phone')}</RequiredLabel>}
           value={data.phone}
           onChangeText={(v) => updateField('phone', v)}
-          placeholder="e.g. +971 50 123 4567"
+          placeholder={t('hr.personal.phonePlaceholder')}
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           error={errors?.phone}
         />
         <Input
-          label="Address"
+          label={t('hr.address')}
           value={data.address}
           onChangeText={(v) => updateField('address', v)}
-          placeholder="Street, area, city"
+          placeholder={t('hr.personal.addressPlaceholder')}
           multiline
           style={styles.multiline}
         />

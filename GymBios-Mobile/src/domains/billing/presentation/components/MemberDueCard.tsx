@@ -2,6 +2,8 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
+import { useTranslation } from 'react-i18next';
+
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { MemberDue } from '../../domain/MemberDue';
@@ -35,6 +37,7 @@ export const MemberDueCard = memo(function MemberDueCard({
   due,
   onPress,
 }: MemberDueCardProps) {
+  const { t } = useTranslation();
   const isOverdue = due.status === DueStatus.Overdue || due.daysOverdue > 0;
 
   return (
@@ -57,7 +60,7 @@ export const MemberDueCard = memo(function MemberDueCard({
           {due.memberName ?? '—'}
         </Typography>
         <Typography variant="caption" color="textSecondary">
-          Due {formatDate(due.dueDate)}
+          {t('billing.cards.due')} {formatDate(due.dueDate)}
         </Typography>
         {due.membership && (
           <Typography variant="caption" color="textSecondary">
@@ -76,13 +79,13 @@ export const MemberDueCard = memo(function MemberDueCard({
         {isOverdue ? (
           <View style={styles.overdueChip}>
             <Typography variant="caption" style={styles.overdueText}>
-              {due.daysOverdue}d overdue
+              {t('billing.cards.overdueDays', { count: due.daysOverdue })}
             </Typography>
           </View>
         ) : (
           <View style={styles.dueSoonChip}>
             <Typography variant="caption" style={styles.dueSoonText}>
-              Due soon
+              {t('billing.cards.dueSoon')}
             </Typography>
           </View>
         )}

@@ -201,6 +201,8 @@ const membership = {
       offer: 'Oferta',
       coupon: 'Cupón',
       rewardPass: 'Reward Pass',
+      offerApplied: 'Oferta aplicada: {{name}}',
+      removeOffer: 'Quitar oferta',
       totalPayable: 'Total a pagar',
       paymentFor: 'Pago de {{name}}',
     },

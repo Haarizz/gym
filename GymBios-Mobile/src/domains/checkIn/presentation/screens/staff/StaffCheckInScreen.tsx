@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { Text } from '@/shared/components/AppText';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -23,12 +23,14 @@ import { useCheckout } from '@/domains/attendance/hooks/useAttendanceActions';
 import { useTranslation } from 'react-i18next';
 import { useProfile } from '@/domains/profile';
 import { isOpenVisit } from '../../../domain';
-
-const CHECK_IN_COLORS: [string, string] = ['#155c4c', '#0f4a3d'];
+import { useCheckInTheme } from '../../hooks/useCheckInTheme';
 
 export function StaffCheckInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  // Shared by the staff and trainer apps — keep walk-in navigation inside the current role group.
+  const roleGroup = useSegments()[0] ?? '(staff)';
+  const theme = useCheckInTheme();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { profile } = useProfile();
   const branchName = profile?.branch || t('checkIn.staff.allBranches');
@@ -117,7 +119,7 @@ export function StaffCheckInScreen() {
       <AppHeader
         title={t('checkIn.staff.title')}
         subtitle={t('checkIn.staff.headerSubtitle', { branch: branchName })}
-        colors={CHECK_IN_COLORS}
+        colors={theme.headerColors}
         onBack={() => router.back()}
         rightAction={
           <Pressable onPress={handleRefresh} style={styles.refreshBtn}>
@@ -133,7 +135,7 @@ export function StaffCheckInScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor="#1c6e5a"
+              tintColor={theme.accent}
             />
           }
         >
@@ -149,7 +151,7 @@ export function StaffCheckInScreen() {
             </View>
             <Pressable 
               style={styles.walkInBtnWrapper}
-              onPress={() => router.push('/(staff)/check-in/register')}
+              onPress={() => router.push(`/${roleGroup}/check-in/register` as any)}
             >
               <LinearGradient
                 colors={['#f2a53a', '#e08a1f']}
@@ -165,7 +167,7 @@ export function StaffCheckInScreen() {
           
           <View style={styles.filterRow}>
             <Pressable 
-              style={[styles.chip, listFilter === 'all' && styles.chipActive]} 
+              style={[styles.chip, listFilter === 'all' && [styles.chipActive, { backgroundColor: theme.accentDark, borderColor: theme.accentDark }]]} 
               onPress={() => setListFilter('all')}
             >
               <Text style={[styles.chipText, listFilter === 'all' && styles.chipTextActive]}>{t('checkIn.staff.filterAll')}</Text>
@@ -174,7 +176,7 @@ export function StaffCheckInScreen() {
               </View>
             </Pressable>
             <Pressable 
-              style={[styles.chip, listFilter === 'checked-in' && styles.chipActive]} 
+              style={[styles.chip, listFilter === 'checked-in' && [styles.chipActive, { backgroundColor: theme.accentDark, borderColor: theme.accentDark }]]} 
               onPress={() => setListFilter('checked-in')}
             >
               <Text style={[styles.chipText, listFilter === 'checked-in' && styles.chipTextActive]}>{t('checkIn.staff.filterCheckedIn')}</Text>
@@ -183,7 +185,7 @@ export function StaffCheckInScreen() {
               </View>
             </Pressable>
             <Pressable 
-              style={[styles.chip, listFilter === 'not-checked-in' && styles.chipActive]} 
+              style={[styles.chip, listFilter === 'not-checked-in' && [styles.chipActive, { backgroundColor: theme.accentDark, borderColor: theme.accentDark }]]} 
               onPress={() => setListFilter('not-checked-in')}
             >
               <Text style={[styles.chipText, listFilter === 'not-checked-in' && styles.chipTextActive]}>{t('checkIn.staff.filterNotCheckedIn')}</Text>
@@ -216,6 +218,7 @@ export function StaffCheckInScreen() {
         onConfirm={confirmAction}
         onCancel={() => setSelectedPerson(null)}
         isLoading={isPendingAction}
+        accentColor={theme.accent}
       />
     </ScreenLayout>
   );

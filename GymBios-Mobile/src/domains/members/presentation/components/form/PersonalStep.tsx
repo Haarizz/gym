@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -13,18 +14,19 @@ import { MemberPhotoCard } from './MemberPhotoCard';
 import type { MemberStepProps } from './stepTypes';
 
 export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
     <View style={styles.container}>
       <MemberPhotoCard data={data} updateField={updateField} errors={errors} />
 
-      <FormCard icon="user" title="Basic details">
+      <FormCard icon="user" title={t('members.form.personalStep.basicDetails')}>
         <Input
-          label={<RequiredLabel>Full name</RequiredLabel>}
+          label={<RequiredLabel>{t('members.form.personalStep.fullName')}</RequiredLabel>}
           value={data.name}
           onChangeText={(v) => updateField('name', v)}
-          placeholder="e.g. Sara Ahmed"
+          placeholder={t('members.form.personalStep.fullNamePlaceholder')}
           autoCapitalize="words"
           textContentType="name"
           returnKeyType="next"
@@ -33,7 +35,7 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
 
         <View>
           <Typography variant="bodySmallBold" style={styles.label}>
-            Gender
+            {t('members.form.personalStep.gender')}
           </Typography>
           <View style={styles.chips}>
             {GENDERS.map((option) => {
@@ -66,8 +68,8 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
         </View>
 
         <DatePicker
-          label="Date of birth"
-          placeholder="Select date of birth"
+          label={t('members.form.personalStep.dob')}
+          placeholder={t('members.form.personalStep.dobPlaceholder')}
           value={data.dateOfBirth}
           onChange={(d) => updateField('dateOfBirth', d)}
           initialView="year"
@@ -77,29 +79,33 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
         />
 
         <Input
-          label="Nationality"
+          label={t('members.form.personalStep.nationality')}
           value={data.nationality}
           onChangeText={(v) => updateField('nationality', v)}
-          placeholder="e.g. UAE"
+          placeholder={t('members.form.personalStep.nationalityPlaceholder')}
           autoCapitalize="words"
         />
       </FormCard>
 
-      <FormCard icon="phone" title="Contact" description="Used for reminders, receipts and login recovery">
+      <FormCard
+        icon="phone"
+        title={t('members.form.personalStep.contact')}
+        description={t('members.form.personalStep.contactDescription')}
+      >
         <Input
-          label={<RequiredLabel>Phone</RequiredLabel>}
+          label={<RequiredLabel>{t('members.form.personalStep.phone')}</RequiredLabel>}
           value={data.phone}
           onChangeText={(v) => updateField('phone', v)}
-          placeholder="e.g. +971 50 123 4567"
+          placeholder={t('members.form.personalStep.phonePlaceholder')}
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           error={errors?.phone}
         />
         <Input
-          label="Email"
+          label={t('members.form.personalStep.email')}
           value={data.email}
           onChangeText={(v) => updateField('email', v)}
-          placeholder="name@example.com"
+          placeholder={t('members.form.personalStep.emailPlaceholder')}
           keyboardType="email-address"
           textContentType="emailAddress"
           autoCapitalize="none"
@@ -107,10 +113,10 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
           error={errors?.email}
         />
         <Input
-          label="Address"
+          label={t('members.form.personalStep.address')}
           value={data.address}
           onChangeText={(v) => updateField('address', v)}
-          placeholder="Street, area, city"
+          placeholder={t('members.form.personalStep.addressPlaceholder')}
           multiline
           style={styles.multiline}
         />

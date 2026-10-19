@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
@@ -18,6 +19,8 @@ export function PromotionSearch({
   onOpenFilter,
   hasActiveFilters = false,
 }: PromotionSearchProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       {/* Search Input Box */}
@@ -25,7 +28,7 @@ export function PromotionSearch({
         <Feather name="search" size={18} color="#94A3B8" style={styles.searchIcon} />
         <TextInput
           style={styles.input}
-          placeholder="Search by name, code, tags..."
+          placeholder={t('promotions.searchPlaceholder')}
           placeholderTextColor="#94A3B8"
           value={value}
           onChangeText={onChangeText}

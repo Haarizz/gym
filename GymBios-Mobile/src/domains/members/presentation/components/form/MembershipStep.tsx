@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { format, isBefore, startOfDay } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -34,19 +35,20 @@ export function MembershipStep({
   showProcessedBy = false,
   allowPastDates = false,
 }: MembershipStepProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { plans, loading, error } = useMembershipPlans();
   const { staff } = useStaff(STAFF_FILTERS);
 
   const staffOptions = useMemo(
     () => [
-      { label: 'None', value: '' },
+      { label: t('members.form.membershipStep.noneOption'), value: '' },
       ...staff.map((s) => ({
         label: s.role ? `${s.name} (${s.role})` : s.name,
         value: String(s.id),
       })),
     ],
-    [staff],
+    [staff, t],
   );
 
   // A converted lead's sale belongs to the staff member who worked it — preselect them
@@ -87,7 +89,11 @@ export function MembershipStep({
 
   return (
     <View style={styles.container}>
-      <FormCard icon="layers" title="Membership type" description="Who this membership covers">
+      <FormCard
+        icon="layers"
+        title={t('members.form.membershipStep.typeTitle')}
+        description={t('members.form.membershipStep.typeDescription')}
+      >
         <MemberTypeSelector
           value={data.membershipType}
           onChange={(v) => updateField('membershipType', v)}
@@ -99,7 +105,7 @@ export function MembershipStep({
         ) : null}
       </FormCard>
 
-      <FormCard icon="credit-card" title="Plan">
+      <FormCard icon="credit-card" title={t('members.form.membershipStep.planTitle')}>
         <MembershipPlanSelector
           value={data.membershipPlanId}
           plans={plans}
@@ -117,12 +123,12 @@ export function MembershipStep({
 
       <FormCard
         icon="calendar"
-        title="Dates"
-        description={allowPastDates ? undefined : 'New memberships start today or later'}
+        title={t('members.form.membershipStep.datesTitle')}
+        description={allowPastDates ? undefined : t('members.form.membershipStep.datesDescriptionNew')}
       >
         <DatePicker
-          label="Joining date"
-          placeholder="Select joining date"
+          label={t('members.form.membershipStep.joiningDate')}
+          placeholder={t('members.form.membershipStep.joiningDatePlaceholder')}
           value={data.joinDate}
           onChange={handleJoinDateChange}
           minimumDate={minimumDate}
@@ -131,8 +137,8 @@ export function MembershipStep({
         />
 
         <DatePicker
-          label="Membership start date"
-          placeholder="Select start date"
+          label={t('members.form.membershipStep.startDate')}
+          placeholder={t('members.form.membershipStep.startDatePlaceholder')}
           value={data.startDate}
           onChange={(d) => applyStartDate(d)}
           minimumDate={data.joinDate && !allowPastDates ? startOfDay(data.joinDate) : minimumDate}
@@ -144,7 +150,7 @@ export function MembershipStep({
           <View style={[styles.endDateRow, { backgroundColor: theme.backgroundSelected }]}>
             <Feather name="flag" size={14} color={theme.textSecondary} />
             <Typography variant="bodySmall" color="textSecondary">
-              Membership ends on{' '}
+              {t('members.form.membershipStep.endsOn')}{' '}
               <Typography variant="bodySmallBold">{format(data.endDate, 'd MMM yyyy')}</Typography>
             </Typography>
           </View>
@@ -152,10 +158,14 @@ export function MembershipStep({
       </FormCard>
 
       {showProcessedBy && (
-        <FormCard icon="award" title="Sale credit" description="Counts toward this staff member's target">
+        <FormCard
+          icon="award"
+          title={t('members.form.membershipStep.saleCreditTitle')}
+          description={t('members.form.membershipStep.saleCreditDescription')}
+        >
           <Dropdown
-            label="Processed by"
-            placeholder="Select staff member (optional)"
+            label={t('members.form.membershipStep.processedBy')}
+            placeholder={t('members.form.membershipStep.processedByPlaceholder')}
             value={data.processedByStaffId}
             options={staffOptions}
             onChange={(v) => updateField('processedByStaffId', v)}

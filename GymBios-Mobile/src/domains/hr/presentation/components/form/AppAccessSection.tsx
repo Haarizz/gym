@@ -1,4 +1,5 @@
 import { Switch, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Spacing } from '@/core/theme';
@@ -23,12 +24,13 @@ export function AppAccessSection({
   onChangePassword,
   onChangeAppAccess,
 }: AppAccessSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
-    <FormSection title="App Access">
+    <FormSection title={t('hr.appAccess.title')}>
       <View style={styles.switchRow}>
-        <Typography variant="bodySmallBold">Enable App Access</Typography>
+        <Typography variant="bodySmallBold">{t('hr.appAccess.enableAppAccess')}</Typography>
         <Switch
           value={appAccessEnabled}
           onValueChange={onChangeAppAccess}
@@ -39,17 +41,17 @@ export function AppAccessSection({
       {appAccessEnabled && (
         <>
           <Input
-            label="Username"
+            label={t('hr.appAccess.username')}
             value={username}
             onChangeText={onChangeUsername}
-            placeholder="Enter username"
+            placeholder={t('hr.appAccess.usernamePlaceholder')}
             autoCapitalize="none"
           />
           <Input
-            label="Password"
+            label={t('hr.appAccess.password')}
             value={password}
             onChangeText={onChangePassword}
-            placeholder="Enter password"
+            placeholder={t('hr.appAccess.passwordPlaceholderCreate')}
             secureTextEntry
           />
         </>

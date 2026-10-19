@@ -3,6 +3,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { Avatar } from '@/shared/components/Avatar';
+import { useTranslation } from 'react-i18next';
 import { TypographyScale } from '@/core/theme';
 import { MessagingRecipient } from '../../domain/MessagingModels';
 import { getRecipientKey } from '../../domain/utils';
@@ -18,8 +19,14 @@ interface RecipientListItemProps {
 }
 
 export function RecipientListItem({ recipient, isSelected, onToggle, index }: RecipientListItemProps) {
+  const { t } = useTranslation();
   const avatarColor = AV[index % AV.length];
-  const typeLabel = recipient.type === 'prospect' ? 'Prospect' : recipient.type === 'staff' ? 'Staff' : 'Member';
+  const typeLabel =
+    recipient.type === 'prospect'
+      ? t('messaging.recipients.types.prospect')
+      : recipient.type === 'staff'
+        ? t('messaging.recipients.types.staff')
+        : t('messaging.recipients.types.member');
   const status = recipient.membershipStatus?.toLowerCase();
   const isActive = status === 'active';
 
@@ -49,7 +56,7 @@ export function RecipientListItem({ recipient, isSelected, onToggle, index }: Re
             </Text>
           )}
           {recipient.isVip && (
-            <Text style={[styles.tag, styles.vipTag]}>VIP</Text>
+            <Text style={[styles.tag, styles.vipTag]}>{t('messaging.recipients.filters.vip')}</Text>
           )}
         </View>
       </View>

@@ -235,8 +235,10 @@ export const posApi = {
     request<CreditPayment>("POST", "/pos/credit/payments", body),
 
   // Promotions, coupons, wallet
-  promotions: () => request<DiscountRule[]>("GET", "/pos/promotions"),
-  lookupCode: (code: string, gross?: number) => request<DiscountRule>("GET", `/pos/discount-codes/lookup${qs({ code, gross })}`),
+  /** Promotions the sale's customer can use; no memberId = a walk-in (only promotions for everyone). */
+  promotions: (memberId?: number | null) => request<DiscountRule[]>("GET", `/pos/promotions${qs({ memberId })}`),
+  lookupCode: (code: string, gross?: number, memberId?: number | null) =>
+    request<DiscountRule>("GET", `/pos/discount-codes/lookup${qs({ code, gross, memberId })}`),
   wallet: (memberId: number) => request<WalletBalance>("GET", `/pos/members/${memberId}/wallet`),
 
   // Reports

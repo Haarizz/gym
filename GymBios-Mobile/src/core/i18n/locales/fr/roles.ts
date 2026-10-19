@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "Rôles et autorisations",
+    "createRole": "Créer un rôle",
+    "editRole": "Modifier le rôle",
+    "subtitle": "Employés et paie",
+    "searchPlaceholder": "Rechercher des rôles...",
+    "filterModulesPlaceholder": "Filtrer les modules...",
+    "roleName": "Nom du rôle",
+    "roleNamePlaceholder": "ex. Accueil",
+    "description": "Description",
+    "descriptionPlaceholder": "Rôle et responsabilités (facultatif)",
+    "modulePermissions": "AUTORISATIONS DU MODULE",
+    "selectedCount": "{{count}} sélectionné(s)",
+    "selectAll": "Tout sélectionner",
+    "system": "Système",
+    "allAccess": "Accès total",
+    "allModules": "Tous les modules",
+    "permissions_one": "{{count}} autorisation",
+    "permissions_other": "{{count}} autorisations",
+    "users_one": "{{count}} utilisateur",
+    "users_other": "{{count}} utilisateurs",
+    "edit": "Modifier",
+    "duplicate": "Dupliquer",
+    "delete": "Supprimer",
+    "systemRole": "Rôle système",
+    "customRole": "Rôle personnalisé",
+    "noRolesFoundTitle": "Aucun rôle trouvé",
+    "noRolesFoundDesc": "Aucun rôle ne correspond à « {{query}} ».",
+    "clearSearch": "Effacer la recherche",
+    "noRolesYetTitle": "Aucun rôle pour le moment",
+    "noRolesYetDesc": "Créez votre premier rôle pour commencer à gérer les autorisations.",
+    "deleteRoleTitle": "Supprimer le rôle ?",
+    "deleteRoleMessage": "Voulez-vous vraiment supprimer « {{name}} » ?\n\nCette action est irréversible.",
+    "cancel": "Annuler",
+    "saving": "Enregistrement...",
+    "save": "Enregistrer",
+    "failedDuplicate": "Échec de la duplication du rôle.",
+    "unableDelete": "Impossible de supprimer le rôle."
+  }
+};
+
+export default roles;

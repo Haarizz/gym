@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
@@ -58,28 +59,30 @@ interface BasicInformationStepProps {
 }
 
 export function BasicInformationStep({ values, errors, onChange }: BasicInformationStepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
-      <FormSection title="Basic Information">
+      <FormSection title={t('membershipPlans.form.basicStep.title')}>
         <Input
-          label="Subscription Name *"
+          label={t('membershipPlans.form.basicStep.nameLabel')}
           value={values.name}
           onChangeText={(v) => onChange('name', v)}
-          placeholder="e.g. Monthly Premium"
+          placeholder={t('membershipPlans.form.basicStep.namePlaceholder')}
           error={errors.name}
         />
         <Input
-          label="Description"
+          label={t('membershipPlans.form.basicStep.descriptionLabel')}
           value={values.description}
           onChangeText={(v) => onChange('description', v)}
-          placeholder="Describe this subscription"
+          placeholder={t('membershipPlans.form.basicStep.descriptionPlaceholder')}
           multiline
           numberOfLines={3}
           style={styles.multiline}
         />
 
         <Typography variant="bodySmallBold" style={styles.label}>
-          Plan Type *
+          {t('membershipPlans.form.basicStep.planTypeLabel')}
         </Typography>
         <OptionRow
           options={PLAN_TYPES}
@@ -88,7 +91,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
         />
 
         <Typography variant="bodySmallBold" style={styles.label}>
-          Membership Type
+          {t('membershipPlans.form.basicStep.membershipTypeLabel')}
         </Typography>
         <OptionRow
           options={MEMBERSHIP_TYPES}
@@ -97,7 +100,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
         />
 
         <Typography variant="bodySmallBold" style={styles.label}>
-          Status
+          {t('membershipPlans.form.basicStep.statusLabel')}
         </Typography>
         <OptionRow
           options={STATUSES}

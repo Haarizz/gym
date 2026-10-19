@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
@@ -15,14 +16,15 @@ interface ClassUtilizationCardProps {
 import { LinearGradient } from 'expo-linear-gradient';
 
 export function ClassUtilizationCard({ data }: ClassUtilizationCardProps) {
+  const { t } = useTranslation();
   const items = data ?? [];
 
   return (
     <LinearGradient colors={['#F5C742', '#F59E0B']} style={styles.card}>
-      <Text style={styles.title}>Class Utilization</Text>
+      <Text style={styles.title}>{t('analytics.cards.classUtilization')}</Text>
 
       {items.length === 0 && (
-        <Text style={styles.emptyText}>No classes scheduled this month</Text>
+        <Text style={styles.emptyText}>{t('analytics.cards.noClassesScheduled')}</Text>
       )}
 
       {items.map((item, index) => (

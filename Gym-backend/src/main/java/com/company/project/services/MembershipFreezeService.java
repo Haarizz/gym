@@ -263,6 +263,8 @@ public class MembershipFreezeService {
     public MemberResponseDTO freezeByStaff(Long memberId, FreezeRequestDTO request, StaffActor actor) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
+        // Checked up front, before closeOpenFreeze touches any freeze records.
+        memberService.requireApproved(member, "Freeze");
         if (request.isOverrideLimits() && (actor == null || !actor.canOverrideLimits())) {
             throw new BusinessRuleViolationException("Only a manager can override the plan's freeze limits.");
         }

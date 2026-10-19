@@ -14,8 +14,10 @@ import { Typography } from '@/shared/components/Typography';
 import { CurrencyValue } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useReferralRules } from '../../hooks/useReferrals';
+import { useTranslation } from 'react-i18next';
 
 export function RewardRulesScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: rules, isLoading, refetch } = useReferralRules();
   const [refreshing, setRefreshing] = useState(false);
@@ -31,8 +33,8 @@ export function RewardRulesScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Reward Rules"
-        subtitle="Manage referral reward rules and conditions"
+        title={t('adminReferrals.rulesTitle')}
+        subtitle={t('adminReferrals.rulesSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -50,21 +52,21 @@ export function RewardRulesScreen() {
       >
         <View style={styles.body}>
           <Typography variant="subtitle" style={styles.sectionTitle}>
-            Active Reward Rules
+            {t('adminReferrals.activeRewardRules')}
           </Typography>
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={BrandColors.teal} />
               <Typography variant="bodySmall" color="textSecondary" style={{ marginTop: 8 }}>
-                Loading reward rules...
+                {t('adminReferrals.loadingRewardRules')}
               </Typography>
             </View>
           ) : ruleList.length === 0 ? (
             <View style={styles.emptyCard}>
               <Feather name="sliders" size={32} color={BrandColors.textSecondary} style={{ opacity: 0.5 }} />
               <Typography variant="bodySmall" color="textSecondary" style={{ marginTop: 8 }}>
-                No reward rules configured yet.
+                {t('adminReferrals.noRewardRules')}
               </Typography>
             </View>
           ) : (
@@ -76,7 +78,7 @@ export function RewardRulesScreen() {
                       {rule.name}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      Target: {rule.eligibility || 'Referrer'} • Trigger: {rule.conditionTrigger || 'Payment'}
+                      {t('adminReferrals.targetLabel')} {rule.eligibility || 'Referrer'} {t('adminReferrals.triggerLabel')} {rule.conditionTrigger || 'Payment'}
                     </Typography>
                   </View>
 
@@ -101,7 +103,7 @@ export function RewardRulesScreen() {
                 <View style={styles.ruleDetails}>
                   <View style={styles.detailCol}>
                     <Typography variant="caption" color="textSecondary">
-                      Reward Type
+                      {t('adminReferrals.rewardTypeLabel')}
                     </Typography>
                     <Typography variant="bodySmall" style={styles.detailVal}>
                       {rule.type}
@@ -110,7 +112,7 @@ export function RewardRulesScreen() {
 
                   <View style={styles.detailCol}>
                     <Typography variant="caption" color="textSecondary">
-                      Value
+                      {t('adminReferrals.valueHeader')}
                     </Typography>
                     <Typography variant="subtitle" style={[styles.detailVal, { color: BrandColors.teal }]}>
                       {rule.unit === '%' ? (

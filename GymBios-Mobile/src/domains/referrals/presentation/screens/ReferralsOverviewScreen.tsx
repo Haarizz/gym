@@ -12,10 +12,12 @@ import { ReferralDetailsSheet } from '../components/ReferralDetailsSheet';
 import { useReferrals } from '../../hooks/useReferrals';
 import { useFixReferralRewards, useMarkReferralSuccessful } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
+import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralsOverviewScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: referralsPage, isLoading, refetch } = useReferrals({ size: 1000 });
   const fixRewardsMutation = useFixReferralRewards();
@@ -70,8 +72,8 @@ export function ReferralsOverviewScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Referrals Overview"
-        subtitle="Referral leaderboard and quick management"
+        title={t('adminReferrals.overviewTitle')}
+        subtitle={t('adminReferrals.overviewSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -80,7 +82,7 @@ export function ReferralsOverviewScreen() {
           {/* Quick Actions */}
           <View style={styles.sectionCard}>
             <Typography variant="subtitle" style={styles.sectionTitle}>
-              Quick Actions
+              {t('adminReferrals.quickActions')}
             </Typography>
             <View style={styles.quickActionsGrid}>
               <Pressable style={styles.actionCard} onPress={() => setShowAddModal(true)}>
@@ -88,7 +90,7 @@ export function ReferralsOverviewScreen() {
                   <Feather name="plus-circle" size={20} color="#2563eb" />
                 </View>
                 <Typography variant="bodySmall" style={styles.actionText}>
-                  Add Referral
+                  {t('adminReferrals.addReferral')}
                 </Typography>
               </Pressable>
 
@@ -97,7 +99,7 @@ export function ReferralsOverviewScreen() {
                   <Feather name="refresh-cw" size={20} color="#16a34a" />
                 </View>
                 <Typography variant="bodySmall" style={styles.actionText}>
-                  Refresh Data
+                  {t('adminReferrals.refreshData')}
                 </Typography>
               </Pressable>
 
@@ -106,7 +108,7 @@ export function ReferralsOverviewScreen() {
                   <Feather name="download" size={20} color="#9333ea" />
                 </View>
                 <Typography variant="bodySmall" style={styles.actionText}>
-                  Export CSV
+                  {t('adminReferrals.exportCsv')}
                 </Typography>
               </Pressable>
 
@@ -118,7 +120,7 @@ export function ReferralsOverviewScreen() {
                   <Feather name="settings" size={20} color="#475569" />
                 </View>
                 <Typography variant="bodySmall" style={styles.actionText}>
-                  Settings
+                  {t('adminReferrals.settings')}
                 </Typography>
               </Pressable>
             </View>
@@ -131,11 +133,11 @@ export function ReferralsOverviewScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
               <Typography variant="subtitle" style={styles.sectionTitle}>
-                Recent Activity
+                {t('adminReferrals.recentActivity')}
               </Typography>
               <Pressable onPress={() => router.push('/(admin)/referrals/activity')}>
                 <Typography variant="caption" style={styles.viewAllText}>
-                  View All →
+                  {t('adminReferrals.viewAll')}
                 </Typography>
               </Pressable>
             </View>

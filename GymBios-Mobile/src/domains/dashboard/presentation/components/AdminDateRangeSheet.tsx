@@ -1,4 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { format, subDays, startOfMonth } from 'date-fns';
@@ -17,22 +19,28 @@ function iso(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
-function buildPresets(): Array<{ label: string; range: AdminDashboardDateRange }> {
+function buildPresets(t: TFunction): Array<{ label: string; range: AdminDashboardDateRange }> {
   const today = new Date();
   return [
-    { label: 'Today', range: { from: iso(today), to: iso(today) } },
-    { label: 'Yesterday', range: { from: iso(subDays(today, 1)), to: iso(subDays(today, 1)) } },
-    { label: 'Last 7 Days', range: { from: iso(subDays(today, 6)), to: iso(today) } },
-    { label: 'Last 30 Days', range: { from: iso(subDays(today, 29)), to: iso(today) } },
-    { label: 'This Month', range: { from: iso(startOfMonth(today)), to: iso(today) } },
+    { label: t('dashboard.admin.dateRangeSheet.presets.today'), range: { from: iso(today), to: iso(today) } },
+    { label: t('dashboard.admin.dateRangeSheet.presets.yesterday'), range: { from: iso(subDays(today, 1)), to: iso(subDays(today, 1)) } },
+    { label: t('dashboard.admin.dateRangeSheet.presets.last7Days'), range: { from: iso(subDays(today, 6)), to: iso(today) } },
+    { label: t('dashboard.admin.dateRangeSheet.presets.last30Days'), range: { from: iso(subDays(today, 29)), to: iso(today) } },
+    { label: t('dashboard.admin.dateRangeSheet.presets.thisMonth'), range: { from: iso(startOfMonth(today)), to: iso(today) } },
   ];
 }
 
 export function AdminDateRangeSheet({ visible, range, onSelect, onClose }: AdminDateRangeSheetProps) {
-  const presets = buildPresets();
+  const { t } = useTranslation();
+  const presets = buildPresets(t);
 
   return (
-    <AppBottomSheet visible={visible} title="Select Period" subtitle="Choose the dashboard's date range" onClose={onClose}>
+    <AppBottomSheet
+      visible={visible}
+      title={t('dashboard.admin.dateRangeSheet.title')}
+      subtitle={t('dashboard.admin.dateRangeSheet.subtitle')}
+      onClose={onClose}
+    >
       <View style={styles.list}>
         {presets.map((preset) => {
           const isSelected = preset.range.from === range.from && preset.range.to === range.to;

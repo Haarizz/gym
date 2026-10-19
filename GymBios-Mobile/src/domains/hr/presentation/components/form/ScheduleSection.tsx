@@ -1,5 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -17,6 +18,7 @@ interface ScheduleSectionProps {
 }
 
 export function ScheduleSection({ schedule, onChange }: ScheduleSectionProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const addTimeRange = (day: string) => {
@@ -44,7 +46,7 @@ export function ScheduleSection({ schedule, onChange }: ScheduleSectionProps) {
   };
 
   return (
-    <FormSection title="Weekly Schedule">
+    <FormSection title={t('hr.scheduleStep.weeklySchedule')}>
       {DAYS.map((day) => {
         const timeRanges = schedule[day] ?? [];
         return (
@@ -57,7 +59,7 @@ export function ScheduleSection({ schedule, onChange }: ScheduleSectionProps) {
                 <Input
                   value={range}
                   onChangeText={(value) => updateTimeRange(day, index, value)}
-                  placeholder="e.g. 09:00-12:00"
+                  placeholder={t('hr.scheduleStep.timePlaceholder')}
                   style={styles.timeInput}
                 />
                 <Pressable
@@ -70,7 +72,7 @@ export function ScheduleSection({ schedule, onChange }: ScheduleSectionProps) {
               </View>
             ))}
             <Button
-              label="+ Add Time Range"
+              label={t('hr.scheduleStep.addTimeRange')}
               variant="ghost"
               onPress={() => addTimeRange(day)}
             />

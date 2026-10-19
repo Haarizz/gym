@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Dropdown } from '@/shared/components/Dropdown';
 import { CheckboxGroup, stepStyles, type Option, type StepProps } from './formControls';
@@ -28,25 +29,27 @@ const PLAN_OPTIONS: Option[] = [
 ];
 
 export function TargetingStep({ values, onChange }: StepProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={stepStyles.container}>
       <Dropdown
-        label="Target Audience"
-        placeholder="Select target audience"
+        label={t('promotions.targetAudience')}
+        placeholder={t('promotions.selectTargetAudience')}
         options={AUDIENCE_OPTIONS}
         value={values.targetAudience}
         onChange={(val) => onChange('targetAudience', val)}
       />
 
       <CheckboxGroup
-        label="Distribution Channels"
+        label={t('promotions.distributionChannels')}
         options={CHANNEL_OPTIONS}
         selected={values.channels}
         onChange={(next) => onChange('channels', next)}
       />
 
       <CheckboxGroup
-        label="Applicable Subscriptions"
+        label={t('promotions.applicableSubscriptions')}
         options={PLAN_OPTIONS}
         selected={values.applicablePlans}
         onChange={(next) => onChange('applicablePlans', next)}

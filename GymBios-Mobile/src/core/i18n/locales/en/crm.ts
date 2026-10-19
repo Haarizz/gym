@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "Deals & Offers",
+    "subtitle": "Active promotions, discounts & special deals",
+    "activeOffers": "Active Offers",
+    "totalRedemptions": "Total Redemptions",
+    "viewAll": "View All",
+    "failedLoadOffers": "Failed to load offers.",
+    "noActiveOffers": "No active offers found.",
+    "failedLoadPromoOffers": "Failed to load promo code offers.",
+    "failedLoadPlanOffers": "Failed to load plan offers.",
+    "planOffer": "PLAN OFFER",
+    "plan": "Plan:",
+    "price": "Price:",
+    "validUntil": "Valid Until:",
+    "applies": "Applies:",
+    "autoNoCode": "Automatically, no code needed",
+    "promoCode": "Promo Code",
+    "branches": "Branches:",
+    "usage": "Usage:",
+    "noUsageLimit": "No usage limit set",
+    "referralCodes": "Referral Codes",
+    "failedLoadReferrals": "Failed to load referrals.",
+    "noReferralCodes": "No referral codes found.",
+    "status": "Status",
+    "date": "Date",
+    "reward": "Reward",
+    "createNewOffer": "Create New Offer",
+    "revenueFromDeals": "Revenue from Deals",
+    "newMembers": "New Members",
+    "thisMonthsImpact": "This Month's Impact",
+    "failedLoadImpact": "Failed to load this month's impact.",
+    "noExpiry": "No Expiry",
+    "copiedPromoCode": "Promo code {{code}} copied to clipboard.",
+    "failedCopyPromoCode": "Could not copy the promo code.",
+    "shareMessage": "{{name}}: use code {{code}} to get {{discount}}.",
+    "unknownBranch": "Unknown Branch",
+    "unknown": "Unknown",
+    "planOfferSuffix": "{{name}} Offer"
+  }
+};
+
+export default crm;

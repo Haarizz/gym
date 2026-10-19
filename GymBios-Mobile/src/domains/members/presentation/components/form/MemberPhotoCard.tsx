@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -46,6 +47,7 @@ export function MemberPhotoCard({
   errors,
   hint = 'Optional · helps staff recognise the member at check-in',
 }: PhotoCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { takePhoto, chooseFromGallery } = usePhotoPicker();
   // Guards against a slow earlier upload overwriting a newer pick.
@@ -126,7 +128,7 @@ export function MemberPhotoCard({
       </View>
 
       <View style={styles.body}>
-        <Typography variant="bodySmallBold">Profile photo</Typography>
+        <Typography variant="bodySmallBold">{t('members.form.personalStep.profilePhoto')}</Typography>
         <Typography
           variant="caption"
           style={{ color: failed || errors?.photoUrl ? theme.error : theme.textSecondary }}

@@ -1,0 +1,43 @@
+const roles = {
+  "roles": {
+    "title": "Roles & Permissions",
+    "createRole": "Create Role",
+    "editRole": "Edit Role",
+    "subtitle": "Employees & Payroll",
+    "searchPlaceholder": "Search roles...",
+    "filterModulesPlaceholder": "Filter modules...",
+    "roleName": "Role name",
+    "roleNamePlaceholder": "e.g. Front Desk",
+    "description": "Description",
+    "descriptionPlaceholder": "What this role is for (optional)",
+    "modulePermissions": "MODULE PERMISSIONS",
+    "selectedCount": "{{count}} selected",
+    "selectAll": "Select all",
+    "system": "System",
+    "allAccess": "All access",
+    "allModules": "All modules",
+    "permissions_one": "{{count}} permission",
+    "permissions_other": "{{count}} permissions",
+    "users_one": "{{count}} user",
+    "users_other": "{{count}} users",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "systemRole": "System Role",
+    "customRole": "Custom Role",
+    "noRolesFoundTitle": "No roles found",
+    "noRolesFoundDesc": "We couldn't find any roles matching \"{{query}}\".",
+    "clearSearch": "Clear Search",
+    "noRolesYetTitle": "No Roles Yet",
+    "noRolesYetDesc": "Create your first role to start managing permissions.",
+    "deleteRoleTitle": "Delete Role?",
+    "deleteRoleMessage": "Are you sure you want to delete\n\"{{name}}\"?\n\nThis action cannot be undone.",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "save": "Save",
+    "failedDuplicate": "Failed to duplicate role.",
+    "unableDelete": "Unable to delete role."
+  }
+};
+
+export default roles;

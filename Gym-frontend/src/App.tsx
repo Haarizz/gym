@@ -1039,7 +1039,17 @@ export default function App() {
         returnTo = sessionStorage.getItem(RETURN_TO_KEY);
         sessionStorage.removeItem(RETURN_TO_KEY);
       } catch { /* ignore */ }
-      navigate(returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login') ? returnTo : '/dashboard', { replace: true });
+      // The saved page may belong to whoever was signed in before (same tab) or be a
+      // browser-autocompleted URL, so only return there if *this* user can open it —
+      // e.g. a gym admin must not land on GymBios admin's /platform-ratings.
+      const returnPath = returnTo?.split(/[?#]/)[0] ?? '';
+      // Drill-down pages (/platform-ratings/:slug/...) aren't in the map; gate them like their list page.
+      const requiredPermission = routePermissionMap[returnPath.startsWith('/platform-ratings/') ? '/platform-ratings' : returnPath];
+      const canOpenReturnTo = !!returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
+        && (isGymbiosAdmin
+          ? isGymbiosAdminPath(returnPath)
+          : !requiredPermission || hasPermission(requiredPermission));
+      navigate(canOpenReturnTo ? returnTo! : '/dashboard', { replace: true });
     }
   }, [isAuthenticated, isLoading, isEmergencyRoute, location.pathname, location.search, navigate]);
 

@@ -1,5 +1,6 @@
 import { StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { CurrencyIcon } from '@/shared/components/CurrencyIcon';
 
 import { Card } from '@/shared/components/Card';
@@ -15,6 +16,7 @@ interface FacilityCardProps {
 }
 
 export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: FacilityCardProps) {
+  const { t } = useTranslation();
   const isActive = facility.status === 'Active';
 
   return (
@@ -30,7 +32,7 @@ export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: F
             <Typography variant="body" style={{ fontWeight: '700' }}>{facility.name}</Typography>
             {facility.facilityId && (
               <Typography variant="caption" color="textSecondary">
-                ID: {facility.facilityId}
+                {t('facilities.id', { id: facility.facilityId })}
               </Typography>
             )}
           </View>
@@ -52,7 +54,7 @@ export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: F
           <View style={styles.detailItem}>
             <Feather name="users" size={14} color={BrandColors.textSecondary} />
             <Typography variant="caption" color="textSecondary">
-              Limit: {facility.occupancyLimit}
+              {t('facilities.limit')} {facility.occupancyLimit}
             </Typography>
           </View>
         )}
@@ -61,7 +63,7 @@ export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: F
           <View style={styles.detailItem}>
             <CurrencyIcon size={14} color={BrandColors.textSecondary} />
             <Typography variant="caption" color="textSecondary">
-              {Object.keys(facility.rates).length} Rates Configured
+              {t('facilities.ratesConfigured', { count: Object.keys(facility.rates).length })}
             </Typography>
           </View>
         )}
@@ -70,7 +72,7 @@ export function FacilityCard({ facility, onEdit, onToggleStatus, isToggling }: F
       <View style={styles.footer}>
         <View style={styles.statusContainer}>
           <Typography variant="caption" color={isActive ? 'primary' : 'textSecondary'}>
-            {isActive ? 'Active' : 'Inactive'}
+            {isActive ? t('facilities.active') : t('facilities.inactive')}
           </Typography>
           <Switch
             value={isActive}

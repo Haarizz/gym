@@ -13,8 +13,10 @@ import { useRedeemReferralReward } from '../../hooks/useReferralActions';
 import type { Member } from '@/domains/members';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useTranslation } from 'react-i18next';
 
 export function MyRewardsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { members, loading: isMembersLoading } = useMembers();
   const redeemMutation = useRedeemReferralReward();
@@ -49,8 +51,8 @@ export function MyRewardsScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="My Rewards"
-        subtitle="Search a member to view and action their referral rewards"
+        title={t('adminReferrals.myRewardsTitle')}
+        subtitle={t('adminReferrals.myRewardsSubtitle')}
         onBack={() => router.back()}
       />
 
@@ -58,13 +60,13 @@ export function MyRewardsScreen() {
         <View style={styles.body}>
           {/* Search Bar */}
           <Typography variant="bodySmall" style={styles.fieldLabel}>
-            Search Member
+            {t('adminReferrals.searchMember')}
           </Typography>
           <View style={styles.searchRow}>
             <Feather name="search" size={16} color={BrandColors.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by Member ID, Name, or Phone"
+              placeholder={t('adminReferrals.searchMemberPlaceholder')}
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
@@ -109,7 +111,7 @@ export function MyRewardsScreen() {
                     {selectedMember.name}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
-                    ID: {selectedMember.memberId || selectedMember.id}
+                    {t('adminReferrals.idLabel')} {selectedMember.memberId || selectedMember.id}
                   </Typography>
                 </View>
                 <View style={styles.activeBadge}>
@@ -122,7 +124,7 @@ export function MyRewardsScreen() {
               <View style={styles.memberInfoGrid}>
                 <View style={styles.infoCol}>
                   <Typography variant="caption" color="textSecondary">
-                    Plan
+                    {t('adminReferrals.planLabel')}
                   </Typography>
                   <Typography variant="bodySmall" style={styles.infoVal}>
                     {selectedMember.membershipPlanName || selectedMember.membershipType || 'Standard'}
@@ -130,7 +132,7 @@ export function MyRewardsScreen() {
                 </View>
                 <View style={styles.infoCol}>
                   <Typography variant="caption" color="textSecondary">
-                    Phone
+                    {t('adminReferrals.phone')}
                   </Typography>
                   <Typography variant="bodySmall" style={styles.infoVal}>
                     {selectedMember.phone || '—'}
@@ -146,10 +148,10 @@ export function MyRewardsScreen() {
                 <Feather name="gift" size={32} color={BrandColors.teal} />
               </View>
               <Typography variant="subtitle" style={styles.placeholderTitle}>
-                Search for a member to view their rewards
+                {t('adminReferrals.searchPromptTitle')}
               </Typography>
               <Typography variant="bodySmall" color="textSecondary" style={styles.placeholderSubtitle}>
-                Use the search bar above to select a member by name, ID, or phone.
+                {t('adminReferrals.searchPromptDesc')}
               </Typography>
             </View>
           ) : (
@@ -158,7 +160,7 @@ export function MyRewardsScreen() {
               <View style={styles.walletCard}>
                 <View style={styles.walletHeader}>
                   <Typography variant="caption" color="textSecondary">
-                    Wallet Balance
+                    {t('adminReferrals.walletBalance')}
                   </Typography>
                   <View style={styles.walletIcon}>
                     <Feather name="credit-card" size={16} color="#16a34a" />
@@ -168,23 +170,23 @@ export function MyRewardsScreen() {
                   <CurrencyValue amount={150.00} decimals={2} />
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  Available referral credits for {selectedMember.name}
+                  {t('adminReferrals.availableCreditsFor')} {selectedMember.name}
                 </Typography>
               </View>
 
               {/* Earned Rewards List */}
               <Typography variant="subtitle" style={styles.sectionHeader}>
-                Earned Referral Rewards
+                {t('adminReferrals.earnedRewards')}
               </Typography>
 
               <View style={styles.rewardCard}>
                 <View style={styles.rewardTop}>
                   <View style={{ flex: 1 }}>
                     <Typography variant="subtitle" style={styles.rewardName}>
-                      Wallet Credit Reward
+                      {t('adminReferrals.walletCreditReward')}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      Generated: 2026-08-01 • Expires: 2026-11-01
+                      {t('referralsScreen.expires', { date: '2026-11-01' })}
                     </Typography>
                   </View>
                   <Typography variant="subtitle" style={styles.rewardAmount}>
@@ -193,7 +195,7 @@ export function MyRewardsScreen() {
                 </View>
                 <View style={styles.rewardActionRow}>
                   <Button
-                    title="Claim Credit"
+                    title={t('adminReferrals.claimCredit')}
                     onPress={() => handleRedeem(1, 'Wallet credit')}
                     loading={redeemMutation.isPending}
                     style={styles.claimBtn}
@@ -205,21 +207,21 @@ export function MyRewardsScreen() {
                 <View style={styles.rewardTop}>
                   <View style={{ flex: 1 }}>
                     <Typography variant="subtitle" style={styles.rewardName}>
-                      Free Personal Training Session
+                      {t('adminReferrals.freePtSession')}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      Generated: 2026-08-05 • Expires: 2026-09-05
+                      {t('referralsScreen.expires', { date: '2026-09-05' })}
                     </Typography>
                   </View>
                   <View style={styles.typeTag}>
                     <Typography variant="caption" style={styles.typeTagText}>
-                      Free PT
+                      {t('adminReferrals.freePt')}
                     </Typography>
                   </View>
                 </View>
                 <View style={styles.rewardActionRow}>
                   <Button
-                    title="Book PT Session"
+                    title={t('adminReferrals.bookPtSession')}
                     onPress={() => handleRedeem(2, 'PT Session')}
                     loading={redeemMutation.isPending}
                     style={styles.claimBtn}

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppHeader } from '@/shared/components/AppHeader';
 import { ScreenLayout, useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
@@ -22,6 +23,7 @@ const FACILITIES_COLORS: [string, string] = [BrandColors.teal, '#0f766e'];
 
 export function FacilitiesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
 
   const [search, setSearch] = useState('');
@@ -49,12 +51,12 @@ export function FacilitiesScreen() {
 
   const handleDelete = (facility: Facility) => {
     Alert.alert(
-      'Delete Facility',
+      t('facilities.deleteFacility', 'Delete Facility'),
       `Are you sure you want to delete ${facility.name}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: t('common.delete', 'Delete'), 
           style: 'destructive',
           onPress: () => deleteFacility.mutate(Number(facility.id))
         },
@@ -78,8 +80,8 @@ export function FacilitiesScreen() {
     if (error) {
       return (
         <View style={styles.centerContainer}>
-          <Typography variant="body" color="error">Failed to load facilities.</Typography>
-          <Button label="Retry" onPress={() => refetch()} variant="secondary" style={{ marginTop: Spacing.two }} />
+          <Typography variant="body" color="error">{t('facilities.failedLoad')}</Typography>
+          <Button label={t('facilities.retry')} onPress={() => refetch()} variant="secondary" style={{ marginTop: Spacing.two }} />
         </View>
       );
     }
@@ -87,10 +89,10 @@ export function FacilitiesScreen() {
     if (facilities.length === 0) {
       return (
         <EmptyState
-          title="No Facilities Found"
-          description={search || apiStatus ? 'Try adjusting your filters.' : 'Add your first facility to get started.'}
+          title={t('facilities.noFacilitiesFound')}
+          description={search || apiStatus ? t('facilities.adjustFiltersHint') : t('facilities.addFirstHint')}
           icon="box"
-          buttonLabel="Clear Filters"
+          buttonLabel={t('facilities.clearFilters')}
           onPress={() => {
             setSearch('');
             setStatus('All');
@@ -128,7 +130,7 @@ export function FacilitiesScreen() {
         }
       >
         <Button
-          label="+ Add Facility"
+          label={t('facilities.addFacility')}
           onPress={() => router.push('/(admin)/facilities/create')}
           style={styles.addButton}
         />
@@ -139,7 +141,7 @@ export function FacilitiesScreen() {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search facilities..."
+            placeholder={t('facilities.searchPlaceholder')}
           />
           <FacilityFilters status={status} onChangeStatus={setStatus} />
         </View>

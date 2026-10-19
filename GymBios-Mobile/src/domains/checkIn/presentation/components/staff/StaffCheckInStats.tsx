@@ -5,24 +5,26 @@ import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRecentCheckIns } from '../../hooks/useRecentCheckIns';
 import { Spacing } from '@/core/theme';
+import { useCheckInTheme } from '../../hooks/useCheckInTheme';
 
 export function StaffCheckInStats() {
   const { t } = useTranslation();
   const { summary } = useRecentCheckIns();
+  const theme = useCheckInTheme();
 
   const occupancy = Math.round((summary.active / 150) * 100) || 0;
 
   return (
     <View style={styles.statsGrid}>
       <View style={styles.row}>
-        <View style={[styles.statCard, styles.highlight]}>
+        <View style={[styles.statCard, styles.highlight, { borderColor: theme.accent }]}>
           <View style={styles.statTop}>
             <Text style={styles.statLabel}>{t('checkIn.staff.todaysCheckIns')}</Text>
-            <View style={[styles.statIcon, styles.iconTeal]}>
-              <Feather name="log-in" size={14} color="#1c6e5a" />
+            <View style={[styles.statIcon, { backgroundColor: theme.accentSoft }]}>
+              <Feather name="log-in" size={14} color={theme.accent} />
             </View>
           </View>
-          <Text style={[styles.statValue, styles.textTeal]}>{summary.total}</Text>
+          <Text style={[styles.statValue, { color: theme.accent }]}>{summary.total}</Text>
           <Text style={styles.statSub}>{t('checkIn.hub.stats.totalVisitsToday')}</Text>
         </View>
 
@@ -42,8 +44,8 @@ export function StaffCheckInStats() {
         <View style={styles.statCard}>
           <View style={styles.statTop}>
             <Text style={styles.statLabel}>{t('checkIn.staff.occupancyRate')}</Text>
-            <View style={[styles.statIcon, styles.iconTeal]}>
-              <Feather name="activity" size={14} color="#1c6e5a" />
+            <View style={[styles.statIcon, { backgroundColor: theme.accentSoft }]}>
+              <Feather name="activity" size={14} color={theme.accent} />
             </View>
           </View>
           <Text style={styles.statValue}>{occupancy}%</Text>
@@ -90,7 +92,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   highlight: {
-    borderColor: '#1c6e5a',
     borderWidth: 1.5,
   },
   statTop: {
@@ -111,9 +112,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconTeal: {
-    backgroundColor: '#e7f3ef',
-  },
   iconGreen: {
     backgroundColor: '#e7f6ef',
   },
@@ -125,9 +123,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 26,
     color: '#173a32',
-  },
-  textTeal: {
-    color: '#1c6e5a',
   },
   textBlue: {
     color: '#3d6fd6',

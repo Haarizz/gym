@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { MessagingColors } from '../theme';
 
 interface MessageTypeSelectorProps {
@@ -10,10 +11,12 @@ interface MessageTypeSelectorProps {
 }
 
 export function MessageTypeSelector({ selectedType, onSelectType }: MessageTypeSelectorProps) {
+  const { t } = useTranslation();
+
   const types = [
-    { id: 'email', label: 'Email', icon: 'mail', color: MessagingColors.dark, tint: MessagingColors.tint, border: MessagingColors.accent },
-    { id: 'sms', label: 'SMS', icon: 'message-circle', color: MessagingColors.sms, tint: MessagingColors.smsTint, border: MessagingColors.sms },
-    { id: 'in-app', label: 'Push', icon: 'bell', color: MessagingColors.push, tint: MessagingColors.pushTint, border: MessagingColors.push },
+    { id: 'email', label: t('messaging.compose.types.email'), icon: 'mail', color: MessagingColors.dark, tint: MessagingColors.tint, border: MessagingColors.accent },
+    { id: 'sms', label: t('messaging.compose.types.sms'), icon: 'message-circle', color: MessagingColors.sms, tint: MessagingColors.smsTint, border: MessagingColors.sms },
+    { id: 'in-app', label: t('messaging.compose.types.inApp'), icon: 'bell', color: MessagingColors.push, tint: MessagingColors.pushTint, border: MessagingColors.push },
   ] as const;
 
   return (

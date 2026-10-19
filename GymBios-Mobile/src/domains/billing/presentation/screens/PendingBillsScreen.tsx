@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppHeader } from '@/shared/components/AppHeader';
@@ -40,6 +41,7 @@ export function PendingBillsScreen({
   onBack,
   onProceedToPayment,
 }: PendingBillsScreenProps) {
+  const { t } = useTranslation();
   const { bills, loading, error, refresh } = usePendingBills(memberId);
   const {
     selectedIds,
@@ -85,8 +87,8 @@ export function PendingBillsScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title={memberName ?? 'Pending Bills'}
-          subtitle="Select Bills to Settle"
+          title={memberName ?? t('billing.pendingBills.title')}
+          subtitle={t('billing.pendingBills.selectBillsToSettle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
@@ -99,12 +101,12 @@ export function PendingBillsScreen({
     return (
       <ScreenLayout>
         <AppHeader
-          title={memberName ?? 'Pending Bills'}
-          subtitle="Select Bills to Settle"
+          title={memberName ?? t('billing.pendingBills.title')}
+          subtitle={t('billing.pendingBills.selectBillsToSettle')}
           colors={['#327f74', '#2a6b62']}
           onBack={onBack}
         />
-        <ErrorState message="Failed to load pending bills." onRetry={refresh} />
+        <ErrorState message={t('common.error')} onRetry={refresh} />
       </ScreenLayout>
     );
   }
@@ -112,8 +114,8 @@ export function PendingBillsScreen({
   return (
     <ScreenLayout>
       <AppHeader
-        title={memberName ?? 'Pending Bills'}
-        subtitle={bills.length > 0 ? `${bills.length} bill${bills.length !== 1 ? 's' : ''} outstanding` : 'No outstanding bills'}
+        title={memberName ?? t('billing.pendingBills.title')}
+        subtitle={bills.length > 0 ? t('billing.createReceipt.pendingBillsCount', { count: bills.length }) : t('billing.pendingBills.noBills')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -130,13 +132,13 @@ export function PendingBillsScreen({
               {allSelected && <Feather name="check" size={12} color="#ffffff" />}
             </View>
             <Typography variant="caption" style={styles.selectAllText}>
-              {allSelected ? 'Deselect All' : 'Select All'}
+              {allSelected ? t('billing.pendingBills.deselectAll') : t('billing.pendingBills.selectAll')}
             </Typography>
           </Pressable>
 
           {selectedCount > 0 && (
             <Typography variant="caption" color="textSecondary">
-              {selectedCount} selected
+              {selectedCount} {t('billing.pendingBills.selected')}
             </Typography>
           )}
         </View>
@@ -157,8 +159,8 @@ export function PendingBillsScreen({
         }
         ListEmptyComponent={
           <EmptyBillingState
-            title="No pending bills"
-            description="This member has no outstanding bills at the moment."
+            title={t('billing.pendingBills.noBills')}
+            description={t('billing.pendingBills.noBillsDesc')}
             icon="check-circle"
           />
         }
@@ -171,7 +173,7 @@ export function PendingBillsScreen({
         <View style={styles.footer}>
           <View style={styles.footerSummary}>
             <Typography variant="caption" color="textSecondary">
-              {selectedCount} bill{selectedCount !== 1 ? 's' : ''} · Total
+              {t('billing.pendingBills.billCountTotal', { count: selectedCount })}
             </Typography>
             <MoneyText
               amount={totalSelected}
@@ -185,7 +187,7 @@ export function PendingBillsScreen({
             accessibilityRole="button"
           >
             <Typography variant="bodySmallBold" style={styles.proceedText}>
-              Proceed to Payment
+              {t('billing.pendingBills.proceedToPayment')}
             </Typography>
             <Feather name="arrow-right" size={18} color="#ffffff" />
           </Pressable>

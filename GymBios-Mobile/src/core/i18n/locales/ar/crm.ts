@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "الصفقات والعروض",
+    "subtitle": "العروض الترويجية النشطة والخصومات والصفقات الخاصة",
+    "activeOffers": "العروض النشطة",
+    "totalRedemptions": "إجمالي مرات الاسترداد",
+    "viewAll": "عرض الكل",
+    "failedLoadOffers": "فشل تحميل العروض.",
+    "noActiveOffers": "لم يتم العثور على عروض نشطة.",
+    "failedLoadPromoOffers": "فشل تحميل عروض الرمز الترويجي.",
+    "failedLoadPlanOffers": "فشل تحميل عروض الخطط.",
+    "planOffer": "عرض الخطة",
+    "plan": "الخطة:",
+    "price": "السعر:",
+    "validUntil": "صالح حتى:",
+    "applies": "يطبق:",
+    "autoNoCode": "تلقائياً، لا يلزم رمز",
+    "promoCode": "الرمز الترويجي",
+    "branches": "الفروع:",
+    "usage": "الاستخدام:",
+    "noUsageLimit": "لم يتم تعيين حد للاستخدام",
+    "referralCodes": "رموز الإحالة",
+    "failedLoadReferrals": "فشل تحميل الإحالات.",
+    "noReferralCodes": "لم يتم العثور على رموز إحالة.",
+    "status": "الحالة",
+    "date": "التاريخ",
+    "reward": "المكافأة",
+    "createNewOffer": "إنشاء عرض جديد",
+    "revenueFromDeals": "الإيرادات من الصفقات",
+    "newMembers": "أعضاء جدد",
+    "thisMonthsImpact": "تأثير هذا الشهر",
+    "failedLoadImpact": "فشل تحميل تأثير هذا الشهر.",
+    "noExpiry": "لا تنتهي صلاحيته",
+    "copiedPromoCode": "تم نسخ الرمز الترويجي {{code}} إلى الحافظة.",
+    "failedCopyPromoCode": "تعذر نسخ الرمز الترويجي.",
+    "shareMessage": "{{name}}: استخدم الرمز {{code}} للحصول على {{discount}}.",
+    "unknownBranch": "فرع غير معروف",
+    "unknown": "غير معروف",
+    "planOfferSuffix": "عرض {{name}}"
+  }
+};
+
+export default crm;

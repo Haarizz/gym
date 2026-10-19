@@ -1,7 +1,8 @@
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
-import { format } from 'date-fns';
+import { formatDate } from '@/core/i18n/format';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet/AppBottomSheet';
 import type { AdminReportType } from '../../domain/AdminDashboardData';
@@ -14,15 +15,15 @@ interface AdminReportDetailSheetProps {
   onClose: () => void;
 }
 
-const REPORT_TITLES: Record<string, string> = {
-  'total-collections': 'Total Collections Report',
-  'membership-sales': 'Membership Sales Report',
-  'pos-revenue': 'POS Revenue Report',
-  'pt-sales': 'PT Sales Report',
-  'day-pass': 'Day Pass Revenue Report',
-  'active-members': 'Active Members Report',
-  'churn-rate': 'Churn Rate Analysis',
-  'retention-rate': 'Retention Rate Analysis',
+const REPORT_I18N_KEYS: Record<string, string> = {
+  'total-collections': 'dashboard.admin.reportDetailSheet.reports.totalCollections',
+  'membership-sales': 'dashboard.admin.reportDetailSheet.reports.membershipSales',
+  'pos-revenue': 'dashboard.admin.reportDetailSheet.reports.posRevenue',
+  'pt-sales': 'dashboard.admin.reportDetailSheet.reports.ptSales',
+  'day-pass': 'dashboard.admin.reportDetailSheet.reports.dayPass',
+  'active-members': 'dashboard.admin.reportDetailSheet.reports.activeMembers',
+  'churn-rate': 'dashboard.admin.reportDetailSheet.reports.churnRate',
+  'retention-rate': 'dashboard.admin.reportDetailSheet.reports.retentionRate',
 };
 
 export function AdminReportDetailSheet({
@@ -30,46 +31,49 @@ export function AdminReportDetailSheet({
   range,
   onClose,
 }: AdminReportDetailSheetProps) {
+  const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useAdminReport(selectedReport, range);
 
   if (!selectedReport) return null;
 
-  const title = REPORT_TITLES[selectedReport] ?? 'Report Detail';
+  const title = REPORT_I18N_KEYS[selectedReport]
+    ? (t(REPORT_I18N_KEYS[selectedReport] as any) as string)
+    : (t('dashboard.admin.reportDetailSheet.title') as string);
   const columns = data?.columns ?? [];
   const rows = data?.rows ?? [];
   const reportDateLabel = data
     ? data.from === data.to
-      ? format(new Date(`${data.from}T00:00:00`), 'MMM d, yyyy')
-      : `${format(new Date(`${data.from}T00:00:00`), 'MMM d')} – ${format(new Date(`${data.to}T00:00:00`), 'MMM d, yyyy')}`
+      ? formatDate(new Date(`${data.from}T00:00:00`), 'MMM d, yyyy')
+      : `${formatDate(new Date(`${data.from}T00:00:00`), 'MMM d')} – ${formatDate(new Date(`${data.to}T00:00:00`), 'MMM d, yyyy')}`
     : '';
 
   return (
     <AppBottomSheet
       visible={!!selectedReport}
       title={title}
-      subtitle="Detailed breakdown and insights"
+      subtitle={t('dashboard.admin.reportDetailSheet.subtitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
         {isLoading && (
           <View style={styles.stateBox}>
             <ActivityIndicator color={BrandColors.teal} />
-            <Text style={styles.stateText}>Loading report...</Text>
+            <Text style={styles.stateText}>{t('dashboard.admin.reportDetailSheet.loading')}</Text>
           </View>
         )}
 
         {!isLoading && isError && (
           <View style={styles.stateBox}>
-            <Text style={styles.stateText}>Couldn&apos;t load this report.</Text>
+            <Text style={styles.stateText}>{t('dashboard.admin.reportDetailSheet.loadError')}</Text>
             <Text style={styles.retryText} onPress={() => refetch()}>
-              Tap to retry
+              {t('dashboard.admin.tapToRetry')}
             </Text>
           </View>
         )}
 
         {!isLoading && !isError && rows.length === 0 && (
           <View style={styles.stateBox}>
-            <Text style={styles.stateText}>No data for this period.</Text>
+            <Text style={styles.stateText}>{t('dashboard.admin.reportDetailSheet.noData')}</Text>
           </View>
         )}
 
@@ -111,7 +115,7 @@ export function AdminReportDetailSheet({
               end={{ x: 1, y: 1 }}
               style={styles.summaryCard}
             >
-              <Text style={styles.summaryLabel}>Total Entries</Text>
+              <Text style={styles.summaryLabel}>{t('dashboard.admin.reportDetailSheet.totalEntries')}</Text>
               <Text style={styles.summaryValue}>{data?.total_entries ?? 0}</Text>
             </LinearGradient>
 
@@ -121,7 +125,7 @@ export function AdminReportDetailSheet({
               end={{ x: 1, y: 1 }}
               style={styles.summaryCard}
             >
-              <Text style={styles.summaryLabel}>Report Period</Text>
+              <Text style={styles.summaryLabel}>{t('dashboard.admin.reportDetailSheet.reportPeriod')}</Text>
               <Text style={styles.summaryValueDate}>{reportDateLabel}</Text>
             </LinearGradient>
           </View>

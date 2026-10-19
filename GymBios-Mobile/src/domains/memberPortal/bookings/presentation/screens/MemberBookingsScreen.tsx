@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Trans, useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { formatDate, i18n, tOr } from '@/core/i18n';
@@ -60,6 +61,7 @@ function toBookingItem(b: MemberBookingData): BookingItemData {
 }
 
 export function MemberBookingsScreen() {
+  const router = useRouter();
   const { formatCurrency } = useCurrency();
   const { t } = useTranslation();
   const {
@@ -86,6 +88,12 @@ export function MemberBookingsScreen() {
   const cancelMutation = useCancelBooking();
 
   const [isBookModalVisible, setIsBookModalVisible] = useState(false);
+  // The dashboard's offer opens booking with its code (?promoCode=PT20) until the modal is closed
+  const { promoCode } = useLocalSearchParams<{ promoCode?: string }>();
+  const closeBookModal = () => {
+    setIsBookModalVisible(false);
+    if (promoCode) router.setParams({ promoCode: undefined });
+  };
   const [selectedBookingForDetails, setSelectedBookingForDetails] = useState<BookingItemData | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<BookingItemData | null>(null);
 
@@ -224,8 +232,9 @@ export function MemberBookingsScreen() {
 
       {/* Booking Modal */}
       <BookClassModal
-        visible={isBookModalVisible}
-        onClose={() => setIsBookModalVisible(false)}
+        visible={isBookModalVisible || !!promoCode}
+        onClose={closeBookModal}
+        promoCode={promoCode}
       />
 
       <CancelBookingSheet

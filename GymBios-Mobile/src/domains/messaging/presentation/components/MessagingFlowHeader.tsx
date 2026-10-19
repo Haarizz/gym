@@ -3,6 +3,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 import { MessagingColors } from '../theme';
 
 interface MessagingFlowHeaderProps {
@@ -20,6 +21,8 @@ export function MessagingFlowHeader({
   onBack,
   showStepper = true,
 }: MessagingFlowHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <LinearGradient
       colors={[MessagingColors.accent, MessagingColors.accent2]}
@@ -48,8 +51,8 @@ export function MessagingFlowHeader({
             </View>
           </View>
           <View style={styles.stepLabels}>
-            <Text style={styles.stepLabel}>1 · Recipients</Text>
-            <Text style={styles.stepLabel}>2 · Message</Text>
+            <Text style={styles.stepLabel}>{t('messaging.flow.stepRecipients')}</Text>
+            <Text style={styles.stepLabel}>{t('messaging.flow.stepMessage')}</Text>
           </View>
         </>
       )}

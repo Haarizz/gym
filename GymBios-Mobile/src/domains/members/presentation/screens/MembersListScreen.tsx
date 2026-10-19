@@ -2,6 +2,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -17,7 +18,7 @@ import { MemberCard } from '../components/MemberCard';
 import {
   EMPTY_MEMBER_FILTERS,
   FilterChip,
-  MEMBER_STATUS_OPTIONS,
+  getMemberStatusOptions,
   MemberFilterSheet,
   type MemberListFilters,
 } from '../components/MemberFilterSheet';
@@ -38,6 +39,7 @@ export function MembersListScreen({
   onNavigateToDetail,
   onNavigateToCreate,
 }: MembersListScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { selectedBranchId } = useBranchContext();
@@ -46,6 +48,8 @@ export function MembersListScreen({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState<MemberListFilters>(EMPTY_MEMBER_FILTERS);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+
+  const statusOptions = useMemo(() => getMemberStatusOptions(t), [t]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -76,23 +80,23 @@ export function MembersListScreen({
 
   const handleCreate = useCallback(() => {
     if (selectedBranchId === 'ALL') {
-      toast.error('Please select a specific branch from the header menu before creating a new member.', { title: 'Branch Required' });
+      toast.error(t('members.list.branchRequiredMsg'), { title: t('members.list.branchRequiredTitle') });
       return;
     }
     onNavigateToCreate();
-  }, [selectedBranchId, onNavigateToCreate]);
+  }, [selectedBranchId, onNavigateToCreate, t]);
 
   const handleCall = useCallback((member: Member) => {
     if (!member.phone) {
-      toast.info('This member does not have a phone number recorded.', {
-        title: 'No Phone Number',
+      toast.info(t('members.list.noPhoneMsg'), {
+        title: t('members.list.noPhoneTitle'),
       });
       return;
     }
     Linking.openURL(`tel:${member.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to start a call on this device.', { title: 'Error' });
+      toast.error(t('members.list.callErrorMsg'), { title: t('members.list.callErrorTitle') });
     });
-  }, []);
+  }, [t]);
 
   const handleClearFilters = useCallback(() => {
     setFilters(EMPTY_MEMBER_FILTERS);
@@ -116,7 +120,7 @@ export function MembersListScreen({
             <SearchBar
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by name, ID or phone..."
+              placeholder={t('members.list.searchPlaceholder')}
             />
           </View>
           <Pressable
@@ -127,7 +131,7 @@ export function MembersListScreen({
             ]}
             onPress={() => setFilterSheetVisible(true)}
             accessibilityRole="button"
-            accessibilityLabel="Open filters"
+            accessibilityLabel={t('members.list.openFiltersA11y')}
           >
             <Feather
               name="sliders"
@@ -149,7 +153,7 @@ export function MembersListScreen({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
         >
-          {MEMBER_STATUS_OPTIONS.map((opt) => (
+          {statusOptions.map((opt) => (
             <FilterChip
               key={opt.value || 'all'}
               label={opt.label}
@@ -165,12 +169,12 @@ export function MembersListScreen({
               {totalElements}
             </Typography>
             <Typography variant="caption" color="textSecondary">
-              {isFiltered ? 'matching members' : 'members'}
+              {isFiltered ? t('members.list.matchingMembers') : t('members.list.membersCount')}
             </Typography>
             {isFiltered ? (
               <Pressable onPress={handleClearFilters} hitSlop={8} accessibilityRole="button">
                 <Typography variant="caption" style={styles.clearLink}>
-                  Clear
+                  {t('members.list.clear')}
                 </Typography>
               </Pressable>
             ) : null}
@@ -182,13 +186,13 @@ export function MembersListScreen({
           >
             <Feather name="plus" size={16} color={BrandColors.white} />
             <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
-              Add Member
+              {t('members.list.addMemberBtn')}
             </Typography>
           </Pressable>
         </View>
       </View>
     ),
-    [search, filters, activeFilterCount, isFiltered, totalElements, theme, handleCreate, handleClearFilters],
+    [search, filters, activeFilterCount, isFiltered, totalElements, theme, handleCreate, handleClearFilters, statusOptions, t],
   );
 
   const renderEmpty = useCallback(() => {
@@ -196,26 +200,26 @@ export function MembersListScreen({
     if (error) {
       return (
         <EmptyState
-          title="Failed to Load Members"
-          description="Something went wrong. Pull to refresh to try again."
+          title={t('members.list.loadErrorTitle')}
+          description={t('members.list.loadErrorDesc')}
           icon="alert-circle"
         />
       );
     }
     return (
       <EmptyState
-        title="No Members Found"
+        title={t('members.list.emptyTitle')}
         description={
           isFiltered
-            ? 'Try adjusting your search or filters.'
-            : 'Add your first member to get started.'
+            ? t('members.list.emptyFilteredDesc')
+            : t('members.list.emptyUnfilteredDesc')
         }
         icon="users"
-        buttonLabel={isFiltered ? 'Clear Filters' : 'Add Member'}
+        buttonLabel={isFiltered ? t('members.list.clearFiltersBtn') : t('members.list.addMemberBtn')}
         onPress={isFiltered ? handleClearFilters : handleCreate}
       />
     );
-  }, [loading, error, isFiltered, handleCreate, handleClearFilters]);
+  }, [loading, error, isFiltered, handleCreate, handleClearFilters, t]);
 
   const renderFooter = useCallback(() => {
     if (members.length === 0) return null;

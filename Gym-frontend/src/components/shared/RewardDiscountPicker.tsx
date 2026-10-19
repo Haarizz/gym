@@ -17,9 +17,21 @@ export type RewardDiscountSelection =
 /** The discount a selection gives on `gross` — mirrors the backend's calculation. */
 export function selectionDiscount(sel: RewardDiscountSelection, gross: number): number {
   if (!sel) return 0;
-  return sel.kind === 'pass'
-    ? rewardDiscount(sel.pass.rewardUnit, sel.pass.rewardValue, gross)
+  if (sel.kind === 'pass') return rewardDiscount(sel.pass.rewardUnit, sel.pass.rewardValue, gross);
+  return sel.coupon.source === 'PROMOTION'
+    ? promotionDiscount(sel.coupon, gross)
     : rewardDiscount(sel.coupon.discountType, sel.coupon.discountValue, gross);
+}
+
+/** DiscountCodeService.promotionDiscount: percentage (capped), free = all of it, else flat; 0 under the minimum. */
+function promotionDiscount(promo: DiscountCode, gross: number): number {
+  const base = Math.max(gross, 0);
+  if (promo.minimumPurchase != null && base < promo.minimumPurchase) return 0;
+  let d = promo.discountType === 'free' ? base
+    : promo.discountType === 'fixed' ? promo.discountValue
+    : (base * promo.discountValue) / 100;
+  if (promo.maximumDiscount != null && promo.maximumDiscount > 0) d = Math.min(d, promo.maximumDiscount);
+  return Math.round(Math.max(0, Math.min(d, base)) * 100) / 100;
 }
 
 /** The renewal request fields for a selection (the fee sent alongside must be the pre-discount fee). */
@@ -37,8 +49,8 @@ interface Props {
 }
 
 /**
- * Renewal-time picker for a MEMBERSHIP_DISCOUNT Reward Pass or a shareable referral
- * coupon code. Promotion codes aren't accepted here — renewals don't run promotions.
+ * Renewal-time picker for a MEMBERSHIP_DISCOUNT Reward Pass, or a promotion / shareable
+ * referral coupon code (a promotion's target audience is checked for this member).
  */
 export function RewardDiscountPicker({ memberId, value, onChange, currency = '' }: Props) {
   const [passes, setPasses] = useState<ReferralReward[]>([]);
@@ -59,11 +71,9 @@ export function RewardDiscountPicker({ memberId, value, onChange, currency = '' 
     setChecking(true);
     setError(null);
     try {
-      const resolved = await discountCodeService.validate(code.trim());
-      if (resolved.source !== 'COUPON') {
-        setError("Promotion codes can't be used on renewals");
-        return;
-      }
+      // Only a numeric (database) id can be checked against a promotion's audience; redemption checks it anyway.
+      const dbId = Number(memberId);
+      const resolved = await discountCodeService.validate(code.trim(), Number.isInteger(dbId) && dbId > 0 ? { memberId: dbId } : {});
       onChange({ kind: 'coupon', coupon: resolved });
     } catch (e: any) {
       setError(e.message || 'Invalid code');
@@ -97,7 +107,7 @@ export function RewardDiscountPicker({ memberId, value, onChange, currency = '' 
       )}
 
       <div>
-        <Label>Coupon Code</Label>
+        <Label>Promo or Coupon Code</Label>
         {value?.kind === 'coupon' ? (
           <div className="mt-1 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
             <span>{value.coupon.code} applied</span>
@@ -106,7 +116,7 @@ export function RewardDiscountPicker({ memberId, value, onChange, currency = '' 
         ) : (
           <div className="mt-1 flex gap-2">
             <Input
-              placeholder="Referral coupon code"
+              placeholder="Promotion or referral coupon code"
               value={code}
               disabled={value?.kind === 'pass'}
               onChange={(e) => setCode(e.target.value.toUpperCase())}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CurrencyValue } from '@/core/providers';
 import { View, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -18,6 +19,7 @@ import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function AdminAnalyticsScreen() {
+  const { t } = useTranslation();
   const { data: analytics, isLoading, isError } = useAdminAnalytics();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const insets = useSafeAreaInsets();
@@ -33,7 +35,7 @@ export function AdminAnalyticsScreen() {
   if (isError || !analytics) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>Failed to load analytics data.</Text>
+        <Text style={styles.errorText}>{t('analytics.failedToLoad')}</Text>
       </View>
     );
   }
@@ -42,17 +44,17 @@ export function AdminAnalyticsScreen() {
     <>
       <View style={styles.metricsRow}>
         <MetricCard
-          title="Revenue Growth"
+          title={t('analytics.metrics.revenueGrowth')}
           value={`+${analytics.overview.revenueGrowth}%`}
-          subtitle="vs last month"
+          subtitle={t('analytics.metrics.vsLastMonth')}
           icon="trending-up"
           iconColor="#16a34a"
           iconBgColor="#dcfce7"
         />
         <MetricCard
-          title="Member Growth"
+          title={t('analytics.metrics.memberGrowth')}
           value={`+${analytics.overview.memberGrowth}%`}
-          subtitle="vs last month"
+          subtitle={t('analytics.metrics.vsLastMonth')}
           icon="users"
           iconColor="#2563eb"
           iconBgColor="#dbeafe"
@@ -60,18 +62,18 @@ export function AdminAnalyticsScreen() {
       </View>
       <View style={styles.metricsRow}>
         <MetricCard
-          title="Churn Rate"
+          title={t('analytics.metrics.churnRate')}
           value={`${analytics.overview.churnRate}%`}
-          subtitle={`${analytics.overview.churnImprovement}% improvement`}
+          subtitle={t('analytics.metrics.improvement', { value: analytics.overview.churnImprovement })}
           icon="trending-down"
           iconColor="#ea580c"
           iconBgColor="#ffedd5"
           subtitleColor="#16a34a"
         />
         <MetricCard
-          title="Avg Revenue"
+          title={t('analytics.metrics.avgRevenue')}
           value={<CurrencyValue amount={analytics.overview.averageRevenuePerMember} compact />}
-          subtitle="per member"
+          subtitle={t('analytics.metrics.perMember')}
           icon="dollar-sign"
           iconColor="#9333ea"
           iconBgColor="#f3e8ff"
@@ -98,7 +100,7 @@ export function AdminAnalyticsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen options={{ title: 'Analytics', headerShadowVisible: false }} />
+      <Stack.Screen options={{ title: t('analytics.title'), headerShadowVisible: false }} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[

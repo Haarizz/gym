@@ -22,10 +22,12 @@ import {
   useMarkReferralSuccessful,
 } from '../../hooks/useReferralActions';
 import type { Referral } from '../../domain/Referral';
+import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 export function ReferralActivityScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'successful' | 'expired'>(
     'all'
@@ -105,8 +107,8 @@ export function ReferralActivityScreen() {
   return (
     <View style={styles.screen}>
       <ReferralHeader
-        title="Referral Activity"
-        subtitle="Track and manage referral activity and logs"
+        title={t('adminReferrals.activityTitle')}
+        subtitle={t('adminReferrals.activitySubtitle')}
         onBack={() => router.back()}
       />
 
@@ -146,7 +148,7 @@ export function ReferralActivityScreen() {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={BrandColors.teal} />
               <Typography variant="bodySmall" color="textSecondary" style={{ marginTop: 8 }}>
-                Loading referral activity...
+                {t('adminReferrals.loadingActivity')}
               </Typography>
             </View>
           ) : (

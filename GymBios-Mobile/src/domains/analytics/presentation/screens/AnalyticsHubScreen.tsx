@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { useRouter } from 'expo-router';
@@ -16,27 +17,28 @@ type AnalyticsModule = {
   description?: string;
 };
 
-const analyticsModules: AnalyticsModule[] = [
-  { id: 'community', title: 'Community', icon: 'users', route: '/(admin)/analytics/community', description: 'Social feed & challenges' },
-  { id: 'member-connect', title: 'Member Connect', icon: 'message-square', route: '/(admin)/analytics/member-connect', description: 'Engagement metrics' },
-  { id: 'membership', title: 'Membership', icon: 'credit-card', route: '/(admin)/analytics/membership', description: 'Subscriptions' },
-  { id: 'attendance', title: 'Attendance', icon: 'calendar', route: '/(admin)/analytics/attendance', description: 'Check-ins & trends' },
-  { id: 'facilities', title: 'Facilities', icon: 'map-pin', route: '/(admin)/analytics/facilities', description: 'Usage & bookings' },
-  { id: 'sales-purchases', title: 'Sales & Purchases', icon: 'shopping-cart', route: '/(admin)/analytics/sales-purchases', description: 'POS & revenue' },
-  { id: 'financials', title: 'Financials', icon: 'dollar-sign', route: '/(admin)/analytics/financials', description: 'Accounting & ledger' },
-  { id: 'hr-payroll', title: 'HR & Payroll', icon: 'briefcase', route: '/(admin)/analytics/hr-payroll', description: 'Staff performance' },
-  { id: 'assets', title: 'Assets', icon: 'box', route: '/(admin)/analytics/assets', description: 'Equipment lifecycle' },
-];
-
 export function AnalyticsHubScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
+
+  const analyticsModules: AnalyticsModule[] = [
+    { id: 'community', title: t('analytics.modules.community.title'), icon: 'users', route: '/(admin)/analytics/community', description: t('analytics.modules.community.description') },
+    { id: 'member-connect', title: t('analytics.modules.memberConnect.title'), icon: 'message-square', route: '/(admin)/analytics/member-connect', description: t('analytics.modules.memberConnect.description') },
+    { id: 'membership', title: t('analytics.modules.membership.title'), icon: 'credit-card', route: '/(admin)/analytics/membership', description: t('analytics.modules.membership.description') },
+    { id: 'attendance', title: t('analytics.modules.attendance.title'), icon: 'calendar', route: '/(admin)/analytics/attendance', description: t('analytics.modules.attendance.description') },
+    { id: 'facilities', title: t('analytics.modules.facilities.title'), icon: 'map-pin', route: '/(admin)/analytics/facilities', description: t('analytics.modules.facilities.description') },
+    { id: 'sales-purchases', title: t('analytics.modules.salesPurchases.title'), icon: 'shopping-cart', route: '/(admin)/analytics/sales-purchases', description: t('analytics.modules.salesPurchases.description') },
+    { id: 'financials', title: t('analytics.modules.financials.title'), icon: 'dollar-sign', route: '/(admin)/analytics/financials', description: t('analytics.modules.financials.description') },
+    { id: 'hr-payroll', title: t('analytics.modules.hrPayroll.title'), icon: 'briefcase', route: '/(admin)/analytics/hr-payroll', description: t('analytics.modules.hrPayroll.description') },
+    { id: 'assets', title: t('analytics.modules.assets.title'), icon: 'box', route: '/(admin)/analytics/assets', description: t('analytics.modules.assets.description') },
+  ];
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Analytics Hub</Text>
-          <Text style={styles.headerSubtitle}>Cross-module performance & insights</Text>
+          <Text style={styles.headerTitle}>{t('analytics.hub.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('analytics.hub.subtitle')}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>

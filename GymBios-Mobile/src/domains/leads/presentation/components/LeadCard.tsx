@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -33,6 +34,7 @@ export function LeadCard({
   onDelete,
   onPressCard,
 }: LeadCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   const initials = useMemo(() => {
@@ -41,22 +43,22 @@ export function LeadCard({
     return `${first}${last}`.toUpperCase() || 'L';
   }, [lead.firstName, lead.lastName]);
 
-  const fullName = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || 'Unnamed Lead';
+  const fullName = `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || t('leads.card.unnamedLead');
 
   const formattedFollowUp = useMemo(() => {
-    if (!lead.nextFollowUp) return 'Not scheduled';
+    if (!lead.nextFollowUp) return t('leads.card.notScheduled');
     try {
       const date = new Date(lead.nextFollowUp);
-      if (isNaN(date.getTime())) return 'Not scheduled';
+      if (isNaN(date.getTime())) return t('leads.card.notScheduled');
       return date.toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       });
     } catch {
-      return 'Not scheduled';
+      return t('leads.card.notScheduled');
     }
-  }, [lead.nextFollowUp]);
+  }, [lead.nextFollowUp, t]);
 
   const priorityStyle = getPriorityBadgeStyle(lead.priority);
   const score = lead.leadScore ?? 50;
@@ -82,7 +84,7 @@ export function LeadCard({
               style={styles.checkboxTouch}
               onPress={() => onToggleSelect(lead.id)}
               hitSlop={6}
-              accessibilityLabel="Select lead"
+              accessibilityLabel={t('leads.card.selectLeadA11y')}
             >
               <Feather
                 name={isSelected ? 'check-square' : 'square'}
@@ -143,14 +145,14 @@ export function LeadCard({
         {!!lead.priority && (
           <View style={[styles.priorityBadge, priorityStyle.bg]}>
             <Text style={[styles.priorityBadgeText, priorityStyle.text]}>
-              {lead.priority} priority
+              {t('leads.card.priorityLabel', { priority: lead.priority })}
             </Text>
           </View>
         )}
 
         <View style={[styles.scoreContainer, { backgroundColor: theme.muted }]}>
           <Text style={[styles.scoreText, { color: theme.textSecondary }]}>
-            score {score}
+            {t('leads.card.score', { score })}
           </Text>
           <View style={[styles.scoreTrack, { backgroundColor: theme.border }]}>
             <View
@@ -169,15 +171,17 @@ export function LeadCard({
       {/* Footer Info: Assigned & Next Follow-Up */}
       <View style={styles.footerRow}>
         <View style={styles.footerCol}>
-          <Text style={[styles.footerLabel, { color: theme.textSecondary }]}>Assigned</Text>
+          <Text style={[styles.footerLabel, { color: theme.textSecondary }]}>
+            {t('leads.card.assigned')}
+          </Text>
           <Text style={[styles.footerValue, { color: theme.text }]} numberOfLines={1}>
-            {lead.assignedStaff || 'Unassigned'}
+            {lead.assignedStaff || t('leads.management.unassigned')}
           </Text>
         </View>
 
         <View style={[styles.footerCol, styles.footerColRight]}>
           <Text style={[styles.footerLabel, { color: theme.textSecondary }]}>
-            Next Follow-up
+            {t('leads.card.nextFollowUp')}
           </Text>
           <Text style={[styles.footerValue, { color: theme.text }]} numberOfLines={1}>
             {formattedFollowUp}

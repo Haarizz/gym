@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Text } from '@/shared/components/AppText';
+import { useTranslation } from 'react-i18next';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
@@ -48,6 +49,7 @@ export function FollowUpList({
   onEmail,
   ListHeaderComponent,
 }: FollowUpListProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (loading && followUps.length === 0) {
@@ -56,7 +58,7 @@ export function FollowUpList({
         {ListHeaderComponent}
         <ActivityIndicator size="large" color={BrandColors.teal} style={styles.spinner} />
         <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-          Loading follow-ups...
+          {t('followUps.loadingFollowUps')}
         </Text>
       </View>
     );
@@ -68,7 +70,7 @@ export function FollowUpList({
         {ListHeaderComponent}
         <Feather name="alert-circle" size={48} color="#dc2626" />
         <Text style={[styles.errorTitle, { color: theme.text }]}>
-          Failed to load follow-ups
+          {t('followUps.failedLoadFollowUps')}
         </Text>
         <Text style={[styles.errorSubtitle, { color: theme.textSecondary }]}>
           {error.message || 'An unexpected network error occurred.'}
@@ -79,7 +81,7 @@ export function FollowUpList({
             onPress={onRefresh}
           >
             <Feather name="refresh-cw" size={16} color="#ffffff" />
-            <Text style={styles.retryBtnText}>Retry</Text>
+            <Text style={styles.retryBtnText}>{t('followUps.retry')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -91,9 +93,9 @@ export function FollowUpList({
       <View style={[styles.emptyIconBg, { backgroundColor: BrandColors.teal + '15' }]}>
         <Feather name="check-square" size={36} color={BrandColors.teal} />
       </View>
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>No follow-ups found</Text>
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('followUps.noFollowUpsFound')}</Text>
       <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-        There are no follow-up tasks matching your current search or filter criteria.
+        {t('followUps.noFollowUpsFoundDesc')}
       </Text>
     </View>
   );

@@ -1,0 +1,43 @@
+const crm = {
+  "crm": {
+    "title": "特惠与促销",
+    "subtitle": "有效促销活动、折扣与特别优惠",
+    "activeOffers": "有效优惠",
+    "totalRedemptions": "总兑换量",
+    "viewAll": "查看全部",
+    "failedLoadOffers": "加载优惠失败。",
+    "noActiveOffers": "未找到有效优惠。",
+    "failedLoadPromoOffers": "加载促销码优惠失败。",
+    "failedLoadPlanOffers": "加载套餐优惠失败。",
+    "planOffer": "套餐特惠",
+    "plan": "套餐：",
+    "price": "价格：",
+    "validUntil": "有效期至：",
+    "applies": "适用方式：",
+    "autoNoCode": "自动应用，无需优惠码",
+    "promoCode": "促销码",
+    "branches": "适用场馆：",
+    "usage": "使用情况：",
+    "noUsageLimit": "未设使用次数上限",
+    "referralCodes": "推荐码",
+    "failedLoadReferrals": "加载推荐失败。",
+    "noReferralCodes": "未找到推荐码。",
+    "status": "状态",
+    "date": "日期",
+    "reward": "奖励",
+    "createNewOffer": "创建新优惠",
+    "revenueFromDeals": "活动收入",
+    "newMembers": "新会员",
+    "thisMonthsImpact": "本月成效",
+    "failedLoadImpact": "无法加载本月成效。",
+    "noExpiry": "无到期日",
+    "copiedPromoCode": "优惠码 {{code}} 已复制到剪贴板。",
+    "failedCopyPromoCode": "无法复制优惠码。",
+    "shareMessage": "{{name}}：使用代码 {{code}} 获取 {{discount}}。",
+    "unknownBranch": "未知分店",
+    "unknown": "未知",
+    "planOfferSuffix": "{{name}} 优惠"
+  }
+};
+
+export default crm;

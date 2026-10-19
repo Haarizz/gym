@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Typography } from '@/shared/components/Typography';
 import { Spacing, BrandColors } from '@/core/theme';
 
@@ -7,13 +8,15 @@ interface RolePermissionSummaryProps {
 }
 
 export function RolePermissionSummary({ selectedCount }: RolePermissionSummaryProps) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.container}>
       <Typography variant="caption" style={styles.title}>
-        MODULE PERMISSIONS
+        {t('roles.modulePermissions')}
       </Typography>
       <Typography variant="caption" style={styles.count}>
-        {selectedCount} selected
+        {t('roles.selectedCount', { count: selectedCount })}
       </Typography>
     </View>
   );
