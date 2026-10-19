@@ -145,6 +145,8 @@ interface MembersProps {
   initialTab?: string;
 }
 
+/** Rows per page in the Member Directory table (paged on the server). */
+const MEMBERS_PAGE_SIZE = 20;
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
   const navigate = useNavigate();
@@ -390,7 +392,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
       const pagination = {
         page: currentPage,
-        limit: 20
+        limit: MEMBERS_PAGE_SIZE
       };
 
       if (authState.isDemoMode) {
@@ -402,8 +404,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       }
 
       const response = await membersService.getMembers(filters, pagination);
+      const pages = Math.max(1, response.pagination.totalPages);
+      // A delete or a status change can leave us past the last page — step back to it.
+      if (currentPage > pages) {
+        setCurrentPage(pages);
+        return;
+      }
       setMembers(response.members);
-      setTotalPages(response.pagination.totalPages);
+      setTotalPages(pages);
       setTotalMembers(response.pagination.total);
     } catch (err) {
       console.error('Failed to load members:', err);
@@ -1490,11 +1498,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       placeholder="Search members..."
                       className="pl-10"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                     />
                   </div>
                 </div>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select value={selectedStatus} onValueChange={(v) => { setSelectedStatus(v); setCurrentPage(1); }}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -2027,7 +2035,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * 20) + 1} to {Math.min(currentPage * 20, totalMembers)} of {totalMembers} members
+                    Showing {((currentPage - 1) * MEMBERS_PAGE_SIZE) + 1} to {Math.min(currentPage * MEMBERS_PAGE_SIZE, totalMembers)} of {totalMembers} members
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
