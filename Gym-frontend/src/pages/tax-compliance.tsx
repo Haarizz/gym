@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
+import { useBranch } from '../utils/branch-context';
 import { taxComplianceService, TaxComplianceItem, TaxComplianceCreateRequest } from '../utils/supabase/tax-compliance-service';
 import { financialReportsService, TaxSummaryData } from '../utils/supabase/financial-reports-service';
 import { taxCodeService, TaxCode, TaxCodeRequest } from '../utils/supabase/tax-code-service';
-import { getVatRate, DEFAULT_VAT_RATE } from '../utils/tax';
+import { getTaxDefaults, TaxDefaults } from '../utils/supabase/tax-defaults-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -18,8 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import {
   FileText, Plus, Edit, Trash2, Download, Calendar as CalendarIcon,
   AlertCircle, CheckCircle, Clock, Filter, Search, FileSpreadsheet,
-  FileCode, Eye, Settings, Building2, Receipt, DollarSign, BarChart3,
-  ChevronRight, Bell
+  Settings, Building2, Receipt, DollarSign, BarChart3,
+  ChevronRight, Bell, Percent, Truck, BadgeCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -84,6 +86,27 @@ function getStatusIcon(status: string) {
     case "OVERDUE": return <AlertCircle className="h-4 w-4 text-red-600" />;
     default: return <Clock className="h-4 w-4 text-gray-400" />;
   }
+}
+
+function formatRate(rate: number | null | undefined): string {
+  return rate == null ? 'Not set' : `${Number(rate).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+}
+
+function money(n: number): string {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Downloads rows as a CSV file (opens in Excel). */
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows
+    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function daysUntil(dateStr: string): number {
@@ -164,7 +187,6 @@ export function TaxCompliance() {
   const [annualTaxSummary, setAnnualTaxSummary] = useState<TaxSummaryData | null>(null);
   const [quarterlyTaxSummary, setQuarterlyTaxSummary] = useState<TaxSummaryData | null>(null);
   const [taxSummaryLoading, setTaxSummaryLoading] = useState(false);
-  const [vatRatePercent, setVatRatePercent] = useState(DEFAULT_VAT_RATE);
 
   const loadTaxSummary = useCallback(async () => {
     setTaxSummaryLoading(true);
@@ -173,21 +195,137 @@ export function TaxCompliance() {
       const yearStart = new Date(today.getFullYear(), 0, 1);
       const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
       const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
-      const toIso = (d: Date) => d.toISOString().slice(0, 10);
+      const toIso = (d: Date) => format(d, 'yyyy-MM-dd');
 
-      const [annual, quarterly, rate] = await Promise.all([
+      const [annual, quarterly] = await Promise.all([
         financialReportsService.getTaxSummary(toIso(yearStart), toIso(today)),
         financialReportsService.getTaxSummary(toIso(quarterStart), toIso(today)),
-        getVatRate(),
       ]);
       setAnnualTaxSummary(annual);
       setQuarterlyTaxSummary(quarterly);
-      setVatRatePercent(rate);
     } catch { /* silently degrade — Reports cards fall back to a loading/empty state */ }
     finally { setTaxSummaryLoading(false); }
   }, []);
 
   useEffect(() => { loadTaxSummary(); }, [loadTaxSummary]);
+
+  // The branch's configured rates — Settings › Tax Configuration (VAT registration,
+  // TRN, Default VAT on sales, Purchase Tax). The same policy the server applies
+  // to every sale and purchase, so this page never shows a rate of its own.
+  const navigate = useNavigate();
+  const { activeBranchId } = useBranch();
+  const [taxDefaults, setTaxDefaults] = useState<TaxDefaults | null>(null);
+  const [taxDefaultsLoading, setTaxDefaultsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTaxDefaultsLoading(true);
+    getTaxDefaults(true)
+      .then(d => { if (!cancelled) setTaxDefaults(d); })
+      .catch(() => { if (!cancelled) setTaxDefaults(null); })
+      .finally(() => { if (!cancelled) setTaxDefaultsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeBranchId]);
+
+  const vatRegistered = taxDefaults?.vatRegistered ?? true;
+  const salesRateLabel = taxDefaults?.vatRegistered && taxDefaults.salesRate != null ? ` (${formatRate(taxDefaults.salesRate)})` : '';
+  const purchaseRateLabel = taxDefaults?.vatRegistered && taxDefaults.purchaseRate != null ? ` (${formatRate(taxDefaults.purchaseRate)})` : '';
+
+  const exportCorporateTax = () => {
+    const s = annualTaxSummary;
+    if (!s) return;
+    downloadCsv(`corporate-tax-${s.periodFrom}-to-${s.periodTo}.csv`, [
+      ['Corporate Tax Summary', `${s.periodFrom} to ${s.periodTo}`],
+      ['Currency', currencyCode],
+      ['Total Revenue', s.totalRevenue.toFixed(2)],
+      ['Deductions', s.deductions.toFixed(2)],
+      ['Taxable Profit', s.taxableProfit.toFixed(2)],
+      ['0% threshold', s.corporateTaxZeroRateThreshold.toFixed(2)],
+      ['Tax rate above threshold (%)', (s.corporateTaxRate * 100).toFixed(2)],
+      ['Corporate Tax Payable', s.corporateTaxPayable.toFixed(2)],
+    ]);
+  };
+
+  const exportVatReturn = () => {
+    const s = quarterlyTaxSummary;
+    if (!s) return;
+    downloadCsv(`vat-return-${s.periodFrom}-to-${s.periodTo}.csv`, [
+      ['VAT Return', `${s.periodFrom} to ${s.periodTo}`],
+      ['Currency', currencyCode],
+      ['VAT registered', vatRegistered ? 'Yes' : 'No'],
+      ['TRN', taxDefaults?.trn ?? ''],
+      ['Default VAT rate (sales)', formatRate(taxDefaults?.salesRate)],
+      ['Purchase tax rate', formatRate(taxDefaults?.purchaseRate)],
+      ['Output VAT', s.outputVat.toFixed(2)],
+      ['Input VAT', s.inputVat.toFixed(2)],
+      ['Net VAT Payable', s.netVatPayable.toFixed(2)],
+      ...(s.taxByCode.length ? [[], ['Tax Code', 'Name', 'Type', 'Output', 'Input']] : []),
+      ...s.taxByCode.map(t => [t.taxCode, t.name, t.taxType, t.outputAmount.toFixed(2), t.inputAmount.toFixed(2)]),
+    ]);
+  };
+
+  const configuredRatesCard = (
+    <Card className="bg-white border border-gray-100 shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Percent className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+            Configured Tax Rates
+          </CardTitle>
+          <CardDescription>From Settings › Tax Configuration for the active branch.</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/settings?tab=tax')}>
+          <Settings className="mr-2 h-4 w-4" />
+          Edit in Settings
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {taxDefaultsLoading ? (
+          <div className="text-center py-6 text-muted-foreground">Loading...</div>
+        ) : !taxDefaults ? (
+          <div className="text-center py-6 text-muted-foreground">Couldn't load the tax configuration.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-start gap-3">
+              <BadgeCheck className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
+              <div className="min-w-0">
+                <div className="text-sm text-muted-foreground">VAT Registration</div>
+                <Badge className={taxDefaults.vatRegistered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                  {taxDefaults.vatRegistered ? 'Registered' : 'Not registered'}
+                </Badge>
+                {taxDefaults.vatRegistered && (
+                  <div className="text-sm mt-1">
+                    TRN: <span className="font-mono font-medium">{taxDefaults.trn || 'Not set'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Receipt className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
+              <div>
+                <div className="text-sm text-muted-foreground">Default VAT (sales)</div>
+                <div className="text-xl font-bold">{taxDefaults.vatRegistered ? formatRate(taxDefaults.salesRate) : '0%'}</div>
+                <div className="text-xs text-muted-foreground">Output VAT on POS sales and sales invoices</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Truck className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--primary)' }} />
+              <div>
+                <div className="text-sm text-muted-foreground">Purchase Tax</div>
+                <div className="text-xl font-bold">{taxDefaults.vatRegistered ? formatRate(taxDefaults.purchaseRate) : '0%'}</div>
+                <div className="text-xs text-muted-foreground">Input VAT on purchase orders and supplier bills</div>
+              </div>
+            </div>
+          </div>
+        )}
+        {taxDefaults && !taxDefaults.vatRegistered && (
+          <p className="text-xs text-muted-foreground mt-4">
+            This branch is not VAT registered, so no VAT or purchase tax is charged on its sales or purchases.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -358,7 +496,7 @@ export function TaxCompliance() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Tax Compliance Dashboard</h1>
-          <p className="text-gray-600 mt-1">Manage Corporate Tax, VAT, and Excise Tax compliance in one centralized interface</p>
+          <p className="text-gray-600 mt-1">VAT and Corporate Tax figures from your posted ledger, at the rates configured in Settings</p>
         </div>
         <Button
           size="sm"
@@ -428,6 +566,8 @@ export function TaxCompliance() {
 
         {/* ── Overview Tab ── */}
         <TabsContent value="overview" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {configuredRatesCard}
+
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">Loading...</div>
           ) : uniqueTaxTypes.length === 0 ? (
@@ -563,6 +703,8 @@ export function TaxCompliance() {
 
         {/* ── Configuration Tab — Tax Codes ── */}
         <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {configuredRatesCard}
+
           <Card className="bg-white border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -630,34 +772,7 @@ export function TaxCompliance() {
 
         {/* ── Reports Tab — derived from the posted ledger, see FinancialReportService.getTaxSummary ── */}
         <TabsContent value="reports" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
-                  Corporate Tax Summary
-                </CardTitle>
-                <CardDescription>
-                  Year to date ({annualTaxSummary?.periodFrom ?? '—'} to {annualTaxSummary?.periodTo ?? '—'})
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.deductions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.taxableProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable ({annualTaxSummary ? (annualTaxSummary.corporateTaxRate * 100).toFixed(0) : 9}%)</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : annualTaxSummary.corporateTaxPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                </div>
-                <p className="text-xs text-gray-400">
-                  UAE Corporate Tax: 0% on the first <CurrencyGlyph /> {annualTaxSummary?.corporateTaxZeroRateThreshold.toLocaleString() ?? '375,000'} of taxable profit, 9% above it.
-                </p>
-                <div className="flex gap-2">
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileText className="mr-2 h-4 w-4" />PDF</Button>
-                </div>
-              </CardContent>
-            </Card>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -670,41 +785,68 @@ export function TaxCompliance() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.outputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT ({vatRatePercent}%)</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.inputVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : quarterlyTaxSummary.netVatPayable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Output VAT{salesRateLabel}</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : money(quarterlyTaxSummary.outputVat)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Input VAT{purchaseRateLabel}</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : money(quarterlyTaxSummary.inputVat)}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Net VAT Payable</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !quarterlyTaxSummary ? '—' : money(quarterlyTaxSummary.netVatPayable)}</span></div>
                 </div>
+                {quarterlyTaxSummary && quarterlyTaxSummary.taxByCode.length > 0 && (
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead>Tax Code</TableHead>
+                        <TableHead className="text-right">Output</TableHead>
+                        <TableHead className="text-right">Input</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {quarterlyTaxSummary.taxByCode.map(t => (
+                        <TableRow key={t.taxCode}>
+                          <TableCell><span className="font-mono text-sm">{t.taxCode}</span> <span className="text-muted-foreground text-xs">{t.name}</span></TableCell>
+                          <TableCell className="text-right">{money(t.outputAmount)}</TableCell>
+                          <TableCell className="text-right">{money(t.inputAmount)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
                 <p className="text-xs text-gray-400">
-                  Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills.
+                  {vatRegistered
+                    ? 'Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills. Rates are set in Settings › Tax Configuration.'
+                    : 'This branch is not VAT registered (Settings › Tax Configuration), so its sales and purchases carry no VAT.'}
                 </p>
-                <div className="flex gap-2">
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"><FileCode className="mr-2 h-4 w-4" />XML</Button>
-                </div>
+                <Button className="w-full bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"
+                  onClick={exportVatReturn} disabled={taxSummaryLoading || !quarterlyTaxSummary}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Download CSV
+                </Button>
               </CardContent>
             </Card>
 
             <Card className="bg-white border-0 shadow-sm hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" style={{ color: 'var(--primary)' }} />
-                  Excise Tax Report
+                  <Building2 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                  Corporate Tax Summary
                 </CardTitle>
-                <CardDescription>Tax on specific goods/services</CardDescription>
+                <CardDescription>
+                  Year to date ({annualTaxSummary?.periodFrom ?? '—'} to {annualTaxSummary?.periodTo ?? '—'})
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Excisable Goods Value</span><span className="font-medium"><CurrencyGlyph /> 0.00</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium">—</span></div>
-                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Excise Tax Payable</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> 0.00</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total Revenue</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : money(annualTaxSummary.totalRevenue)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Deductions</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : money(annualTaxSummary.deductions)}</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">Taxable Profit</span><span className="font-medium"><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : money(annualTaxSummary.taxableProfit)}</span></div>
+                  <div className="flex justify-between pt-2 border-t"><span className="font-medium">Tax Payable{annualTaxSummary ? ` (${formatRate(annualTaxSummary.corporateTaxRate * 100)})` : ''}</span><span className="font-bold" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {taxSummaryLoading || !annualTaxSummary ? '—' : money(annualTaxSummary.corporateTaxPayable)}</span></div>
                 </div>
-                <p className="text-xs text-gray-400">
-                  No products are flagged as excisable yet (e.g. energy drinks, tobacco) — this app doesn't track excise category or rate per product, so this will read zero until that's built.
-                </p>
-                <div className="flex gap-2">
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm" disabled><FileSpreadsheet className="mr-2 h-4 w-4" />Excel</Button>
-                  <Button className="flex-1 bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm" disabled><FileText className="mr-2 h-4 w-4" />PDF</Button>
-                </div>
+                {annualTaxSummary && (
+                  <p className="text-xs text-gray-400">
+                    UAE Corporate Tax: 0% on the first <CurrencyGlyph /> {annualTaxSummary.corporateTaxZeroRateThreshold.toLocaleString()} of taxable profit, {formatRate(annualTaxSummary.corporateTaxRate * 100)} above it.
+                  </p>
+                )}
+                <Button className="w-full bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"
+                  onClick={exportCorporateTax} disabled={taxSummaryLoading || !annualTaxSummary}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Download CSV
+                </Button>
               </CardContent>
             </Card>
           </div>

@@ -114,6 +114,7 @@ import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, a
 import { cn } from "../components/ui/utils";
 import { promotionsService, PromotionApi, PromotionRequest } from "../utils/supabase/promotions-service";
 import { authService } from "../utils/supabase/auth-service";
+import { MarketingCampaigns } from "../components/campaigns/MarketingCampaigns";
 
 interface Promotion {
   id: number;
@@ -234,6 +235,15 @@ function SpecificMemberBadges({ ids }: { ids: string[] }) {
 export function PromotionsCampaign() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
+  // Promotions (offers members redeem) vs Campaigns (social-media pushes linked to lead forms).
+  // ?tab=campaigns deep-links straight to the Campaigns tab.
+  const [pageTab, setPageTab] = useState<'promotions' | 'campaigns'>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('tab') === 'campaigns' ? 'campaigns' : 'promotions';
+    } catch {
+      return 'promotions';
+    }
+  });
   const [activeView, setActiveView] = useState<'grid' | 'table'>('grid');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
@@ -967,17 +977,26 @@ export function PromotionsCampaign() {
         <div>
           <h1 className="text-3xl font-bold">Promotions & Campaigns</h1>
           <p className="text-muted-foreground mt-2">
-            Create, manage, and track promotional campaigns to boost member engagement and revenue
+            Run member promotions, and track every social-media campaign from ad spend to leads, conversions and revenue
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Button onClick={openCreatePromotion}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Promotion
-          </Button>
-        </div>
+        {pageTab === 'promotions' && (
+          <div className="flex space-x-3">
+            <Button onClick={openCreatePromotion}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Promotion
+            </Button>
+          </div>
+        )}
       </div>
 
+      <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as 'promotions' | 'campaigns')} className="space-y-6">
+        <TabsList className="w-full flex">
+          <TabsTrigger value="promotions" className="flex-1">Promotions</TabsTrigger>
+          <TabsTrigger value="campaigns" className="flex-1">Campaigns</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="promotions" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
       {/* Analytics KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         <Card className={cardShell}>
@@ -1504,6 +1523,12 @@ export function PromotionsCampaign() {
           </Card>
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="campaigns" className="animate-in fade-in-0 zoom-in-95 duration-200">
+          <MarketingCampaigns />
+        </TabsContent>
+      </Tabs>
 
       {/* Promotion Detail Sheet */}
       <Sheet open={showPromotionDetail} onOpenChange={setShowPromotionDetail}>

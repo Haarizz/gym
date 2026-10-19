@@ -23,8 +23,18 @@ public class LeadRequestDTO {
     private BigDecimal budget;
     private String preferredContactMethod;
     private Integer leadScore;
+    // Marketing campaign to credit; 0 clears it, null leaves it unchanged.
+    private Long marketingCampaignId;
+    // Set by public lead-form submissions only (not mapped from client edits).
+    private Long leadFormId;
 
     // Getters & Setters
+
+    public Long getMarketingCampaignId() { return marketingCampaignId; }
+    public void setMarketingCampaignId(Long marketingCampaignId) { this.marketingCampaignId = marketingCampaignId; }
+
+    public Long getLeadFormId() { return leadFormId; }
+    public void setLeadFormId(Long leadFormId) { this.leadFormId = leadFormId; }
 
     public String getFirstName() { return firstName; }
     public void setFirstName(String firstName) { this.firstName = firstName; }

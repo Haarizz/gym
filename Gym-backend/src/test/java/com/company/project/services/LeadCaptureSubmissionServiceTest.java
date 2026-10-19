@@ -37,6 +37,7 @@ class LeadCaptureSubmissionServiceTest {
     @Mock private LeadInteractionRepository interactionRepository;
     @Mock private BranchRepository branchRepository;
     @Mock private GymRepository gymRepository;
+    @Mock private MarketingCampaignService campaignService;
 
     private LeadCaptureSubmissionService service;
     private LeadCaptureForm form;
@@ -45,7 +46,7 @@ class LeadCaptureSubmissionServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new LeadCaptureSubmissionService(leadService, followUpService, notificationService, planService,
-                leadRepository, interactionRepository, branchRepository, gymRepository);
+                leadRepository, interactionRepository, branchRepository, gymRepository, campaignService);
 
         form = new LeadCaptureForm();
         form.setId(7L);
@@ -105,6 +106,55 @@ class LeadCaptureSubmissionServiceTest {
 
         verify(notificationService).notifyRoles(eq(List.of("ADMIN")), anyString(), anyString(),
                 anyString(), anyString(), eq("LEADS"), eq(42L), eq("/leads"), anyString());
+    }
+
+    @Test
+    void newLeadIsCreditedToTheFormsCampaign() {
+        PublicLeadSubmissionDTO req = validRequest();
+        req.setUtmCampaign("diwali");
+        when(campaignService.resolveCampaignForSubmission(7L, 1L, "diwali")).thenReturn(11L);
+
+        service.submit(form, req);
+
+        ArgumentCaptor<LeadRequestDTO> lead = ArgumentCaptor.forClass(LeadRequestDTO.class);
+        verify(leadService).createLead(lead.capture());
+        assertEquals(11L, lead.getValue().getMarketingCampaignId());
+        assertEquals(7L, lead.getValue().getLeadFormId());
+    }
+
+    @Test
+    void campaignLookupFailureStillSavesTheLead() {
+        when(campaignService.resolveCampaignForSubmission(anyLong(), anyLong(), any()))
+                .thenThrow(new IllegalStateException("db hiccup"));
+
+        service.submit(form, validRequest());
+
+        ArgumentCaptor<LeadRequestDTO> lead = ArgumentCaptor.forClass(LeadRequestDTO.class);
+        verify(leadService).createLead(lead.capture());
+        assertNull(lead.getValue().getMarketingCampaignId());
+        assertEquals(7L, lead.getValue().getLeadFormId());
+    }
+
+    @Test
+    void repeatSubmissionCreditsAnUncreditedLeadButKeepsAnExistingCampaign() {
+        when(campaignService.resolveCampaignForSubmission(anyLong(), anyLong(), any())).thenReturn(11L);
+        Lead uncredited = new Lead();
+        uncredited.setId(5L);
+        uncredited.setFirstName("Asha");
+        uncredited.setStatus("new");
+        when(leadRepository.findLatestByBranchAndPhoneDigits(1L, "9876543210")).thenReturn(Optional.of(uncredited));
+        service.submit(form, validRequest());
+        assertEquals(11L, uncredited.getMarketingCampaignId());
+        assertEquals(7L, uncredited.getLeadFormId());
+
+        Lead credited = new Lead();
+        credited.setId(6L);
+        credited.setFirstName("Asha");
+        credited.setStatus("new");
+        credited.setMarketingCampaignId(3L);
+        when(leadRepository.findLatestByBranchAndPhoneDigits(1L, "9876543210")).thenReturn(Optional.of(credited));
+        service.submit(form, validRequest());
+        assertEquals(3L, credited.getMarketingCampaignId(), "first touch keeps the credit");
     }
 
     @Test

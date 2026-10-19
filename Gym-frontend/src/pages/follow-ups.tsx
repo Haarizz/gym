@@ -200,7 +200,8 @@ export function FollowUps() {
 
   const loadFollowUps = useCallback(async () => {
     try {
-      const data = await followUpService.getFollowUps({ size: 200, status: statusFilter !== 'all' ? statusFilter : undefined, type: typeFilter !== 'all' ? typeFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, assignedStaff: staffFilter !== 'all' ? staffFilter : undefined, search: searchTerm || undefined });
+      // A lead already registered as a member needs no more follow-ups — leave them out.
+      const data = await followUpService.getFollowUps({ size: 200, excludeRegistered: true, status: statusFilter !== 'all' ? statusFilter : undefined, type: typeFilter !== 'all' ? typeFilter : undefined, priority: priorityFilter !== 'all' ? priorityFilter : undefined, assignedStaff: staffFilter !== 'all' ? staffFilter : undefined, search: searchTerm || undefined });
       setApiFollowUps(data.followUps);
     } catch { /* keep mock data */ }
   }, [statusFilter, typeFilter, priorityFilter, staffFilter, searchTerm]);
@@ -209,7 +210,7 @@ export function FollowUps() {
 
   useEffect(() => {
     leadService.getLeads({ size: 1000 }).then(res => {
-      setLeadsList(res.leads.map(l => ({ id: String(l.id), name: `${l.firstName} ${l.lastName}`.trim() })));
+      setLeadsList(res.leads.filter(l => !l.memberId).map(l => ({ id: String(l.id), name: `${l.firstName} ${l.lastName}`.trim() })));
     }).catch(console.error);
     
     staffService.getStaff({}, 1, 100).then(res => {
@@ -258,7 +259,7 @@ export function FollowUps() {
   }, [location.state]);
 
 
-  const displayFollowUps: FollowUp[] = apiFollowUps.map(f => ({
+  const displayFollowUps: FollowUp[] = apiFollowUps.filter(f => !f.leadMemberId).map(f => ({
     id: String(f.id),
     leadId: f.leadId,
     leadName: f.leadName,

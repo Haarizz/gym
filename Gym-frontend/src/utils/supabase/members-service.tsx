@@ -196,6 +196,21 @@ export interface MemberNote {
   created_at: string;
 }
 
+// The API sends `pagination.total_pages` (global SNAKE_CASE); callers read `totalPages`.
+function toMembersResponse(raw: any): MembersResponse {
+  const pg = raw?.pagination ?? {};
+  const members = raw?.members ?? [];
+  return {
+    members,
+    pagination: {
+      page: Number(pg.page ?? 1),
+      limit: Number(pg.limit ?? members.length),
+      total: Number(pg.total ?? members.length),
+      totalPages: Number(pg.total_pages ?? pg.totalPages ?? 1),
+    },
+  };
+}
+
 class MembersService {
 
   async getMembers(filters: MemberFilters = {}, pagination: PaginationParams = {}): Promise<MembersResponse> {
@@ -212,7 +227,7 @@ class MembersService {
     );
 
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch members: ${response.status}`));
-    return response.json();
+    return toMembersResponse(await response.json());
   }
 
   async getMemberById(id: string): Promise<Member> {
@@ -277,7 +292,7 @@ class MembersService {
       `${backendBaseUrl}/members/pending-approvals?${params.toString()}`
     );
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch pending approvals: ${response.status}`));
-    return response.json();
+    return toMembersResponse(await response.json());
   }
 
   // Mobile purchases staff already approved or rejected — Approvals > History tab.
@@ -295,7 +310,7 @@ class MembersService {
       `${backendBaseUrl}/members/approval-history?${params.toString()}`
     );
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch approval history: ${response.status}`));
-    return response.json();
+    return toMembersResponse(await response.json());
   }
 
   async getApprovalHistorySummary(): Promise<{ approved: number; rejected: number }> {

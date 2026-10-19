@@ -30,8 +30,10 @@ public class LeadController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String priority,
-            @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(leadService.getLeads(page, size, status, source, priority, search));
+            @RequestParam(required = false) String search,
+            // "exclude" = still being worked on, "only" = converted / registered as a member (Converted tab)
+            @RequestParam(required = false) String converted) {
+        return ResponseEntity.ok(leadService.getLeads(page, size, status, source, priority, search, converted));
     }
 
     /** GET /api/leads/stats */

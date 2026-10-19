@@ -59,6 +59,7 @@ public class LeadCaptureSubmissionService {
     private final LeadInteractionRepository interactionRepository;
     private final BranchRepository branchRepository;
     private final GymRepository gymRepository;
+    private final MarketingCampaignService campaignService;
 
     public LeadCaptureSubmissionService(LeadService leadService,
                                         FollowUpService followUpService,
@@ -67,7 +68,8 @@ public class LeadCaptureSubmissionService {
                                         LeadRepository leadRepository,
                                         LeadInteractionRepository interactionRepository,
                                         BranchRepository branchRepository,
-                                        GymRepository gymRepository) {
+                                        GymRepository gymRepository,
+                                        MarketingCampaignService campaignService) {
         this.leadService = leadService;
         this.followUpService = followUpService;
         this.notificationService = notificationService;
@@ -76,6 +78,7 @@ public class LeadCaptureSubmissionService {
         this.interactionRepository = interactionRepository;
         this.branchRepository = branchRepository;
         this.gymRepository = gymRepository;
+        this.campaignService = campaignService;
     }
 
     @Transactional(readOnly = true)
@@ -137,11 +140,12 @@ public class LeadCaptureSubmissionService {
         if (contactMethod != null && !CONTACT_METHODS.contains(contactMethod)) contactMethod = null;
         String message = clean(req.getMessage(), MAX_MESSAGE_LENGTH);
         String campaign = clean(req.getUtmCampaign(), 100);
+        Long campaignId = resolveCampaign(form, branch, campaign);
 
         String last10 = phoneDigits.length() > 10 ? phoneDigits.substring(phoneDigits.length() - 10) : phoneDigits;
         Lead existing = leadRepository.findLatestByBranchAndPhoneDigits(branch.getId(), last10).orElse(null);
         if (existing != null) {
-            recordRepeatSubmission(existing, form, email, interest, message, campaign);
+            recordRepeatSubmission(existing, form, email, interest, message, campaign, campaignId);
             return;
         }
 
@@ -161,6 +165,8 @@ public class LeadCaptureSubmissionService {
         List<String> tags = new ArrayList<>(List.of("web-form", "form:" + form.getName()));
         if (campaign != null) tags.add("campaign:" + campaign);
         lead.setTags(tags);
+        lead.setLeadFormId(form.getId());
+        lead.setMarketingCampaignId(campaignId);
 
         LeadResponseDTO created = leadService.createLead(lead);
 
@@ -203,7 +209,7 @@ public class LeadCaptureSubmissionService {
      * instead of creating a duplicate, and reopen it if it had been marked lost.
      */
     private void recordRepeatSubmission(Lead lead, LeadCaptureForm form, String email,
-                                        String interest, String message, String campaign) {
+                                        String interest, String message, String campaign, Long campaignId) {
         StringBuilder note = new StringBuilder("Submitted the \"").append(form.getName())
                 .append("\" lead form again and agreed to be contacted (").append(LocalDateTime.now().withNano(0)).append(").");
         if (interest != null) note.append(" Interested in: ").append(interest).append('.');
@@ -221,6 +227,11 @@ public class LeadCaptureSubmissionService {
         if (lead.getEmail() == null && email != null) lead.setEmail(email);
         if (lead.getMembershipInterest() == null && interest != null) lead.setMembershipInterest(interest);
         if ("lost".equals(lead.getStatus())) lead.setStatus("new");
+        // First touch wins: a lead already credited to a campaign keeps it.
+        if (lead.getMarketingCampaignId() == null && campaignId != null) {
+            lead.setMarketingCampaignId(campaignId);
+            if (lead.getLeadFormId() == null) lead.setLeadFormId(form.getId());
+        }
         leadRepository.save(lead);
 
         notificationService.notifyRoles(
@@ -231,6 +242,16 @@ public class LeadCaptureSubmissionService {
                 lead.getId(), "/leads",
                 "LEAD_FORM_REPEAT_" + interaction.getId()
         );
+    }
+
+    /** Attribution must never cost the gym its lead: on any failure the lead is just uncredited. */
+    private Long resolveCampaign(LeadCaptureForm form, Branch branch, String utmCampaign) {
+        try {
+            return campaignService.resolveCampaignForSubmission(form.getId(), branch.getId(), utmCampaign);
+        } catch (RuntimeException e) {
+            log.warn("Could not resolve marketing campaign for lead form {}", form.getFormKey(), e);
+            return null;
+        }
     }
 
     /** A recognised utm_source on the ad link beats the form's default source. */

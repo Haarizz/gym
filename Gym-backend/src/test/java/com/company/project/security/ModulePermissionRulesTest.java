@@ -86,6 +86,24 @@ class ModulePermissionRulesTest {
         assertTrue(allowed("POST", "/api/promotions/apply-access-days", "MEMBERS_EDIT"));
         assertFalse(allowed("POST", "/api/promotions", "MEMBERS_EDIT", "MEMBERS_CREATE"));
         assertTrue(allowed("POST", "/api/promotions", "PROMOTIONS_CAMPAIGN_CREATE"));
+
+        // Financial Analytics overview is finance-only; the older endpoints other pages use stay open.
+        assertFalse(allowed("GET", "/api/financial-analytics/overview", "MEMBERS_VIEW"));
+        assertTrue(allowed("GET", "/api/financial-analytics/overview", "FINANCIAL_ANALYTICS_VIEW"));
+        assertTrue(allowed("GET", "/api/financial-analytics/overview", "REPORTS_VIEW"));
+        assertTrue(allowed("GET", "/api/financial-analytics/dashboard", "MEMBERS_VIEW"));
+
+        // Marketing campaigns: spend/ROI reads are gated; the Leads page only needs the picker.
+        assertFalse(allowed("GET", "/api/marketing-campaigns", "LEADS_VIEW"));
+        assertTrue(allowed("GET", "/api/marketing-campaigns", "PROMOTIONS_CAMPAIGN_VIEW"));
+        assertTrue(allowed("GET", "/api/marketing-campaigns/options", "LEADS_VIEW"));
+        assertFalse(allowed("GET", "/api/marketing-campaigns/5", "LEADS_VIEW"));
+        assertTrue(allowed("POST", "/api/marketing-campaigns", "PROMOTIONS_CAMPAIGN_CREATE"));
+        assertFalse(allowed("POST", "/api/marketing-campaigns", "PROMOTIONS_CAMPAIGN_EDIT"));
+        assertTrue(allowed("PUT", "/api/marketing-campaigns/5/lead-forms", "PROMOTIONS_CAMPAIGN_EDIT"));
+        assertTrue(allowed("POST", "/api/marketing-campaigns/5/spends", "PROMOTIONS_CAMPAIGN_EDIT"));
+        assertFalse(allowed("DELETE", "/api/marketing-campaigns/5", "PROMOTIONS_CAMPAIGN_EDIT"));
+        assertTrue(allowed("DELETE", "/api/marketing-campaigns/5", "PROMOTIONS_CAMPAIGN_DELETE"));
         // Read-like POST.
         assertTrue(allowed("POST", "/api/members/4/family-plan-change/quote", "MEMBERS_VIEW"));
     }

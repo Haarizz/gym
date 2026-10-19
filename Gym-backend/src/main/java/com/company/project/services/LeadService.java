@@ -14,6 +14,7 @@ import com.company.project.entities.FollowUp;
 import com.company.project.entities.Staff;
 import com.company.project.repositories.LeadInteractionRepository;
 import com.company.project.repositories.LeadRepository;
+import com.company.project.repositories.MarketingCampaignRepository;
 import com.company.project.repositories.StaffRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
@@ -28,7 +29,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,13 +43,16 @@ public class LeadService {
     private final LeadInteractionRepository interactionRepository;
     private final NotificationService notificationService;
     private final StaffRepository staffRepository;
+    private final MarketingCampaignRepository campaignRepository;
 
     public LeadService(LeadRepository leadRepository, LeadInteractionRepository interactionRepository,
-                       NotificationService notificationService, StaffRepository staffRepository) {
+                       NotificationService notificationService, StaffRepository staffRepository,
+                       MarketingCampaignRepository campaignRepository) {
         this.leadRepository = leadRepository;
         this.interactionRepository = interactionRepository;
         this.notificationService = notificationService;
         this.staffRepository = staffRepository;
+        this.campaignRepository = campaignRepository;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -54,6 +61,7 @@ public class LeadService {
         Lead lead = new Lead();
         mapRequestToEntity(req, lead);
         lead.setStatus(req.getStatus() != null ? normalizeStatus(req.getStatus()) : "new");
+        lead.setLeadFormId(req.getLeadFormId());
 
         Lead saved = leadRepository.save(lead);
 
@@ -159,6 +167,17 @@ public class LeadService {
 
     @Transactional(readOnly = true)
     public LeadPageResponseDTO getLeads(int page, int size, String status, String source, String priority, String search) {
+        return getLeads(page, size, status, source, priority, search, null);
+    }
+
+    /**
+     * @param converted "exclude" hides leads that are converted or already registered as a member
+     *                  (the Leads page's main list), "only" returns just those (its Converted tab),
+     *                  anything else returns every lead.
+     */
+    @Transactional(readOnly = true)
+    public LeadPageResponseDTO getLeads(int page, int size, String status, String source, String priority, String search,
+                                        String converted) {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
 
         Specification<Lead> spec = (root, query, cb) -> {
@@ -176,6 +195,12 @@ public class LeadService {
             if (priority != null && !priority.isBlank()) {
                 predicates.add(cb.equal(root.get("priority"), priority));
             }
+            if ("exclude".equalsIgnoreCase(converted)) {
+                predicates.add(cb.isNull(root.get("memberId")));
+                predicates.add(cb.or(cb.isNull(root.get("status")), cb.notEqual(root.get("status"), "converted")));
+            } else if ("only".equalsIgnoreCase(converted)) {
+                predicates.add(cb.or(cb.isNotNull(root.get("memberId")), cb.equal(root.get("status"), "converted")));
+            }
             if (search != null && !search.isBlank()) {
                 String like = "%" + search.toLowerCase() + "%";
                 predicates.add(cb.or(
@@ -190,7 +215,8 @@ public class LeadService {
         };
 
         Page<Lead> result = leadRepository.findAll(spec, pageable);
-        List<LeadResponseDTO> dtos = result.getContent().stream().map(this::toDTO).collect(Collectors.toList());
+        Map<Long, String> campaignNames = campaignNames(result.getContent());
+        List<LeadResponseDTO> dtos = result.getContent().stream().map(l -> toDTO(l, campaignNames)).collect(Collectors.toList());
 
         PaginationDTO pagination = new PaginationDTO();
         pagination.setPage(page);
@@ -277,9 +303,32 @@ public class LeadService {
         if (req.getBudget() != null) lead.setBudget(req.getBudget());
         if (req.getPreferredContactMethod() != null) lead.setPreferredContactMethod(req.getPreferredContactMethod());
         if (req.getLeadScore() != null) lead.setLeadScore(req.getLeadScore());
+        if (req.getMarketingCampaignId() != null) {
+            if (req.getMarketingCampaignId() <= 0) {
+                lead.setMarketingCampaignId(null);
+            } else {
+                // findById goes through the branch filter, so only this branch's campaigns resolve.
+                campaignRepository.findById(req.getMarketingCampaignId())
+                        .orElseThrow(() -> new IllegalArgumentException("Campaign not found: " + req.getMarketingCampaignId()));
+                lead.setMarketingCampaignId(req.getMarketingCampaignId());
+            }
+        }
+    }
+
+    /** Campaign id -> name for these leads, in one query. */
+    private Map<Long, String> campaignNames(Collection<Lead> leads) {
+        List<Long> ids = leads.stream().map(Lead::getMarketingCampaignId).filter(Objects::nonNull).distinct()
+                .collect(Collectors.toList());
+        if (ids.isEmpty()) return Map.of();
+        return campaignRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(c -> c.getId(), c -> c.getName(), (a, b) -> a));
     }
 
     private LeadResponseDTO toDTO(Lead lead) {
+        return toDTO(lead, campaignNames(List.of(lead)));
+    }
+
+    private LeadResponseDTO toDTO(Lead lead, Map<Long, String> campaignNames) {
         LeadResponseDTO dto = new LeadResponseDTO();
         dto.setId(lead.getId());
         dto.setLeadId(lead.getLeadId());
@@ -301,6 +350,9 @@ public class LeadService {
         dto.setBudget(lead.getBudget());
         dto.setPreferredContactMethod(lead.getPreferredContactMethod());
         dto.setLeadScore(lead.getLeadScore());
+        dto.setMarketingCampaignId(lead.getMarketingCampaignId());
+        dto.setMarketingCampaignName(lead.getMarketingCampaignId() == null ? null : campaignNames.get(lead.getMarketingCampaignId()));
+        dto.setLeadFormId(lead.getLeadFormId());
         dto.setInteractions(lead.getInteractions().stream().map(this::toInteractionDTO).collect(Collectors.toList()));
         if (lead.getFollowUps() != null) {
             dto.setFollowUps(lead.getFollowUps().stream().map(this::toFollowUpDTO).collect(Collectors.toList()));
