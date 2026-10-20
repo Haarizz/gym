@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The queries behind each Day Report section. Each public method runs in its own
+ * The queries behind each Day Report section (one day or a date range). Each public method runs in its own
  * read-only transaction (the branch filter is enabled per transaction), so a section
  * that fails can't poison the queries of the sections after it.
  */
@@ -88,15 +88,16 @@ public class DayReportSections {
         return rows;
     }
 
-    public List<Map<String, Object>> salesInvoices(LocalDate date) {
+    public List<Map<String, Object>> salesInvoices(LocalDate from, LocalDate to) {
         List<SalesInvoice> list = em.createQuery(
-                        "SELECT i FROM SalesInvoice i WHERE i.invoiceDate = :d ORDER BY i.id", SalesInvoice.class)
-                .setParameter("d", date).getResultList();
+                        "SELECT i FROM SalesInvoice i WHERE i.invoiceDate BETWEEN :f AND :t ORDER BY i.invoiceDate, i.id", SalesInvoice.class)
+                .setParameter("f", from).setParameter("t", to).getResultList();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (SalesInvoice i : list) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", i.getId());
             m.put("number", i.getInvoiceNumber());
+            m.put("date", str(i.getInvoiceDate()));
             m.put("customer", i.getCustomerName());
             m.put("total", nz(i.getTotalAmount()));
             m.put("paid", nz(i.getAmountPaid()));
@@ -107,15 +108,16 @@ public class DayReportSections {
         return rows;
     }
 
-    public List<Map<String, Object>> supplierBills(LocalDate date) {
+    public List<Map<String, Object>> supplierBills(LocalDate from, LocalDate to) {
         List<SupplierBill> list = em.createQuery(
-                        "SELECT b FROM SupplierBill b WHERE b.billDate = :d ORDER BY b.id", SupplierBill.class)
-                .setParameter("d", date).getResultList();
+                        "SELECT b FROM SupplierBill b WHERE b.billDate BETWEEN :f AND :t ORDER BY b.billDate, b.id", SupplierBill.class)
+                .setParameter("f", from).setParameter("t", to).getResultList();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (SupplierBill b : list) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", b.getId());
             m.put("number", b.getBillNumber());
+            m.put("date", str(b.getBillDate()));
             m.put("supplierInvoice", b.getInvoiceNumber());
             m.put("supplier", b.getSupplierName());
             m.put("total", nz(b.getTotalAmount()));
@@ -144,14 +146,15 @@ public class DayReportSections {
         return rows;
     }
 
-    public List<Map<String, Object>> expenses(LocalDate date) {
+    public List<Map<String, Object>> expenses(LocalDate from, LocalDate to) {
         List<Expense> list = em.createQuery(
-                        "SELECT x FROM Expense x WHERE x.date = :d ORDER BY x.id", Expense.class)
-                .setParameter("d", date).getResultList();
+                        "SELECT x FROM Expense x WHERE x.date BETWEEN :f AND :t ORDER BY x.date, x.id", Expense.class)
+                .setParameter("f", from).setParameter("t", to).getResultList();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Expense x : list) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", x.getId());
+            m.put("date", str(x.getDate()));
             m.put("vendor", x.getVendorName());
             m.put("category", x.getCategory());
             m.put("amount", nz(x.getTotalAmount()));
@@ -163,15 +166,16 @@ public class DayReportSections {
         return rows;
     }
 
-    public List<Map<String, Object>> paymentVouchers(LocalDate date) {
+    public List<Map<String, Object>> paymentVouchers(LocalDate from, LocalDate to) {
         List<PaymentVoucher> list = em.createQuery(
-                        "SELECT v FROM PaymentVoucher v WHERE v.paymentDate = :d ORDER BY v.id", PaymentVoucher.class)
-                .setParameter("d", date).getResultList();
+                        "SELECT v FROM PaymentVoucher v WHERE v.paymentDate BETWEEN :f AND :t ORDER BY v.paymentDate, v.id", PaymentVoucher.class)
+                .setParameter("f", from).setParameter("t", to).getResultList();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (PaymentVoucher v : list) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", v.getId());
             m.put("number", v.getVoucherNo());
+            m.put("date", str(v.getPaymentDate()));
             m.put("payee", v.getSupplierName());
             m.put("billNo", v.getBillNo());
             m.put("amount", nz(v.getAmount()));
@@ -182,7 +186,7 @@ public class DayReportSections {
         return rows;
     }
 
-    public Map<String, Object> membership(LocalDate date, LocalDateTime start, LocalDateTime end) {
+    public Map<String, Object> membership(LocalDateTime start, LocalDateTime end) {
         List<Member> joined = em.createQuery(
                         "SELECT m FROM Member m WHERE m.joinDate >= :s AND m.joinDate < :e ORDER BY m.joinDate", Member.class)
                 .setParameter("s", start).setParameter("e", end).getResultList();
@@ -216,6 +220,8 @@ public class DayReportSections {
             row.put("memberName", m.getName());
             row.put("memberId", m.getMemberId());
             row.put("action", started ? "Freeze" : "Unfreeze");
+            LocalDateTime at = started ? f.getFreezeStart() : f.getEndedAt();
+            row.put("date", at != null ? at.toLocalDate().toString() : null);
             row.put("plannedEnd", f.getPlannedEnd() != null ? f.getPlannedEnd().toLocalDate().toString() : null);
             row.put("days", f.getRequestedDays());
             row.put("reason", f.getReason());
@@ -230,16 +236,23 @@ public class DayReportSections {
         return out;
     }
 
-    public Map<String, Object> attendance(LocalDateTime start, LocalDateTime end) {
+    public Map<String, Object> attendance(LocalDate from, LocalDate to) {
+        LocalDateTime start = from.atStartOfDay();
+        LocalDateTime end = to.plusDays(1).atStartOfDay();
         List<Attendance> list = em.createQuery(
                         "SELECT a FROM Attendance a WHERE a.checkInTime >= :s AND a.checkInTime < :e", Attendance.class)
                 .setParameter("s", start).setParameter("e", end).getResultList();
         int[] byHour = new int[24];
+        Map<LocalDate, Integer> perDay = new LinkedHashMap<>();
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) perDay.put(d, 0);
         int walkIns = 0;
         Set<Long> uniqueMembers = new HashSet<>();
         BigDecimal walkInAmount = BigDecimal.ZERO;
         for (Attendance a : list) {
-            if (a.getCheckInTime() != null) byHour[a.getCheckInTime().getHour()]++;
+            if (a.getCheckInTime() != null) {
+                byHour[a.getCheckInTime().getHour()]++;
+                perDay.merge(a.getCheckInTime().toLocalDate(), 1, Integer::sum);
+            }
             boolean walkIn = a.getMember() == null || "walk-in".equalsIgnoreCase(a.getType()) || "walkin".equalsIgnoreCase(a.getType());
             if (walkIn) {
                 walkIns++;
@@ -255,12 +268,20 @@ public class DayReportSections {
             m.put("checkIns", byHour[h]);
             hours.add(m);
         }
+        List<Map<String, Object>> days = new ArrayList<>();
+        perDay.forEach((d, n) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("date", d.toString());
+            m.put("checkIns", n);
+            days.add(m);
+        });
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("total", list.size());
         out.put("uniqueMembers", uniqueMembers.size());
         out.put("walkIns", walkIns);
         out.put("walkInAmount", walkInAmount);
         out.put("byHour", hours);
+        out.put("byDay", days);
         return out;
     }
 
@@ -279,6 +300,7 @@ public class DayReportSections {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", l.getId());
             m.put("name", ((l.getFirstName() != null ? l.getFirstName() : "") + " " + (l.getLastName() != null ? l.getLastName() : "")).trim());
+            m.put("time", l.getCreatedAt() != null ? l.getCreatedAt().toString() : null);
             m.put("source", l.getSource());
             m.put("status", l.getStatus());
             rows.add(m);
@@ -298,10 +320,16 @@ public class DayReportSections {
         row.put("memberId", m.getMemberId());
         row.put("name", m.getName());
         row.put("phone", m.getPhone());
+        row.put("joinDate", str(m.getJoinDate()));
+        row.put("expiryDate", str(m.getExpiryDate() != null ? m.getExpiryDate() : m.getMembershipEndDate()));
         row.put("plan", m.getMembershipPlan());
         row.put("membershipType", m.getMembershipType());
         row.put("status", m.getMembershipStatus());
         return row;
+    }
+
+    private static String str(Object v) {
+        return v != null ? v.toString() : null;
     }
 
     private static BigDecimal nz(BigDecimal v) {

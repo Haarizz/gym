@@ -1,10 +1,13 @@
-import React, { useState } from "react";
-import { format, isValid, parseISO, subDays } from "date-fns";
+import React, { useMemo, useRef, useState } from "react";
+import { endOfMonth, format, parseISO, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
 import {
-  AlertCircle, BarChart3, CalendarDays, ClipboardList, CreditCard, Download, FileText, Loader2, Printer,
+  AlertCircle, BarChart3, CalendarDays, ClipboardList, Copy, CreditCard, Download, FileText, Loader2, Printer,
   Receipt, ShoppingBag, ShoppingCart, Snowflake, TrendingDown, TrendingUp, UserCheck, UserPlus, Users, Wallet,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar, BarChart, CartesianGrid, Cell as PieCell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer,
+  Tooltip, XAxis, YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -14,45 +17,54 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { DatePickerField } from "../shared/DatePickerField";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
-import { buildXlsx, downloadBlob, type XlsxCell } from "../../utils/xlsx-export";
+import { buildXlsx, downloadBlob } from "../../utils/xlsx-export";
+import {
+  type Block, type DayReportData, type Row, blocksToText, blocksToXlsx, buildBlocks, cellText, hourLabel,
+  money, num, periodLabel, rightAligned, sum,
+} from "./dayReportBlocks";
+import styles from "./DayReport.module.css";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 const TEAL = "#0F766E";
 const CHART_COLORS = ["#0F766E", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981"];
+const VIEW_KEY = "dayReport.view";
 
-type Row = Record<string, any>;
-interface DayReportData {
-  date: string;
-  revenue: any | null;
-  receipts: Row[] | null;
-  posSales: Row[] | null;
-  salesInvoices: Row[] | null;
-  supplierBills: Row[] | null;
-  purchaseOrders: Row[] | null;
-  expenses: Row[] | null;
-  paymentVouchers: Row[] | null;
-  membership: { newMembers: Row[]; expired: Row[]; renewals: number; freezes: Row[] } | null;
-  attendance: { total: number; uniqueMembers: number; walkIns: number; walkInAmount: number; byHour: { hour: number; checkIns: number }[] } | null;
-  leads: { created: Row[]; followUpsDue: number; followUpsCompleted: number } | null;
-  errors: Record<string, string>;
+type Preset = "today" | "yesterday" | "last7" | "thisWeek" | "thisMonth" | "lastMonth" | "custom";
+type View = "graph" | "text";
+
+const PRESETS: { id: Exclude<Preset, "custom">; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "last7", label: "Last 7 days" },
+  { id: "thisWeek", label: "This week" },
+  { id: "thisMonth", label: "This month" },
+  { id: "lastMonth", label: "Last month" },
+];
+
+const ymd = (d: Date) => format(d, "yyyy-MM-dd");
+
+function presetRange(p: Exclude<Preset, "custom">): [string, string] {
+  const today = new Date();
+  switch (p) {
+    case "today": return [ymd(today), ymd(today)];
+    case "yesterday": return [ymd(subDays(today, 1)), ymd(subDays(today, 1))];
+    case "last7": return [ymd(subDays(today, 6)), ymd(today)];
+    case "thisWeek": return [ymd(startOfWeek(today, { weekStartsOn: 1 })), ymd(today)];
+    case "thisMonth": return [ymd(startOfMonth(today)), ymd(today)];
+    case "lastMonth": {
+      const last = subMonths(today, 1);
+      return [ymd(startOfMonth(last)), ymd(endOfMonth(last))];
+    }
+  }
 }
 
-const num = (v: unknown) => {
-  const n = Number(v ?? 0);
-  return Number.isFinite(n) ? n : 0;
+const readView = (): View => {
+  try { return localStorage.getItem(VIEW_KEY) === "text" ? "text" : "graph"; } catch { return "graph"; }
 };
-const money = (v: unknown) => num(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const time = (v?: string | null) => {
-  if (!v) return "—";
-  const d = parseISO(v);
-  return isValid(d) ? format(d, "hh:mm a") : "—";
-};
-const sum = (rows: Row[] | null | undefined, key: string) => (rows || []).reduce((s, r) => s + num(r[key]), 0);
-const hourLabel = (h: number) => format(new Date(2000, 0, 1, h), "h a");
 
 const Money = ({ v }: { v: unknown }) => <><CurrencyGlyph /> {money(v)}</>;
 
-/** A titled card holding one section's table, with count/total and its own empty and error states */
+/** A titled card holding one section, with count/total and its own error state */
 function Section({
   title, icon: Icon, description, count, total, error, children,
 }: {
@@ -88,36 +100,160 @@ function Section({
   );
 }
 
-const Empty = ({ text = "Nothing recorded on this day." }: { text?: string }) => (
-  <p className="text-sm text-muted-foreground py-4 text-center">{text}</p>
+const Empty = ({ text }: { text?: string }) => (
+  <p className="text-sm text-muted-foreground py-4 text-center">{text || "Nothing recorded."}</p>
 );
 
+/** Graphical view: one detail block as a card with a styled table */
+function BlockCard({ block, icon }: { block: Block; icon: React.ElementType }) {
+  const right = rightAligned(block);
+  return (
+    <Section title={block.title} icon={icon} description={block.description} count={block.count} total={block.amount} error={block.error}>
+      {block.rows.length === 0 ? <Empty text={block.empty} /> : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              {block.header.map((h, i) => (
+                <TableHead key={h} className={right[i] ? "text-right" : undefined}>{h}</TableHead>
+              ))}
+            </TableRow></TableHeader>
+            <TableBody>
+              {block.rows.map((r, ri) => (
+                <TableRow key={ri}>
+                  {block.header.map((_, i) => (
+                    <TableCell key={i} className={right[i] ? "text-right" : undefined}>{cellText(r[i])}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** Text view: the whole report as plain tables of numbers and words */
+function TextReport({ title, subtitle, blocks }: { title: string; subtitle: string; blocks: Block[] }) {
+  return (
+    <div className={styles.doc}>
+      <h2 className={styles.docTitle}>{title}</h2>
+      <p className={styles.docMeta}>{subtitle}</p>
+      {blocks.map((b) => {
+        const right = rightAligned(b);
+        return (
+          <section key={b.id} className={styles.section}>
+            <h3 className={styles.sectionTitle}>{b.title}</h3>
+            {b.description && <p className={styles.sectionNote}>{b.description}</p>}
+            {b.error ? <p className={styles.plain}>{b.error}</p>
+              : b.rows.length === 0 ? <p className={styles.plain}>{b.empty}</p>
+              : (
+                <div className={styles.tableWrap}>
+                  <table className={`${styles.table} ${b.id === "summary" ? styles.summary : ""}`}>
+                    <thead><tr>{b.header.map((h, i) => <th key={h} className={right[i] ? styles.num : undefined}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {b.rows.map((r, ri) => (
+                        <tr key={ri}>
+                          {b.header.map((h, i) => (
+                            <td key={i} className={right[i] ? styles.num : h === "Notes" || h === "Reason" ? styles.wrap : undefined}>
+                              {cellText(r[i])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                    {b.total && (
+                      <tfoot><tr>{b.total.map((c, i) => <td key={i} className={right[i] ? styles.num : undefined}>{cellText(c)}</td>)}</tr></tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
- * Reports → Day Report: pick a date and generate everything that happened that day —
- * collections, member receipts, POS sales, invoices, purchases, expenses, payments out,
- * membership activity, attendance and leads. Printable and exportable to Excel.
+ * Reports → Day Report: pick a day (today, yesterday, any date) or a range (last 7 days,
+ * this/last month, custom) and see everything that happened — collections, member receipts,
+ * POS sales, invoices, purchases, expenses, payments out, membership activity, attendance
+ * and leads. Graphical view (charts) or Text view (numbers and words only); printable,
+ * copyable as text and exportable to Excel.
  */
 export function DayReport() {
   const { currencyCode } = useCurrency();
-  const [date, setDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const today = ymd(new Date());
+  const [preset, setPreset] = useState<Preset>("today");
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const [view, setViewState] = useState<View>(readView);
   const [data, setData] = useState<DayReportData | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestId = useRef(0);
 
-  const generate = async () => {
-    if (!date) { toast.error("Pick a date first"); return; }
+  const setView = (v: View) => {
+    setViewState(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* per-viewer convenience only */ }
+  };
+
+  const generate = async (f = from, t = to) => {
+    if (!f || !t) { toast.error("Pick the dates first"); return; }
+    if (t < f) { toast.error("The end date is before the start date"); return; }
+    const id = ++requestId.current;
     setLoading(true);
     try {
-      const res = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/reports/day?date=${date}`);
-      if (!res.ok) throw new Error(res.status === 500 ? "The server couldn't build this report (is the backend up to date?)" : `Request failed (${res.status})`);
-      const body = await res.json();
-      setData(body.data as DayReportData);
+      const res = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/reports/day?from=${f}&to=${t}`);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(typeof body?.data === "string" ? body.data
+          : res.status === 500 ? "The server couldn't build this report (is the backend up to date?)" : `Request failed (${res.status})`);
+      }
+      if (id === requestId.current) setData(body.data as DayReportData);
     } catch (e: any) {
-      toast.error("Failed to generate the day report", { description: e?.message });
+      if (id === requestId.current) toast.error("Failed to generate the report", { description: e?.message });
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
+  const pickPreset = (p: Exclude<Preset, "custom">) => {
+    const [f, t] = presetRange(p);
+    setPreset(p); setFrom(f); setTo(t);
+    generate(f, t);
+  };
+
+  const blocks = useMemo(() => (data ? buildBlocks(data) : []), [data]);
+  const block = (id: string) => blocks.find((b) => b.id === id)!;
+
+  const range = !!data && (data.from || data.date) !== (data.to || data.date);
+  const period = data ? periodLabel(data) : "";
+  const reportTitle = range ? `Report — ${period}` : `Day Report — ${period}`;
+  const subtitle = `Generated ${format(new Date(), "dd/MM/yyyy hh:mm a")} · Amounts in ${currencyCode}`;
+  const fileBase = data ? (range ? `report-${data.from}_to_${data.to}` : `day-report-${data.from || data.date}`) : "day-report";
+
+  const exportExcel = () => {
+    if (!data) return;
+    const { rows, bold } = blocksToXlsx(range ? "Report" : "Day Report", period, currencyCode, blocks);
+    const blob = buildXlsx("Day Report", rows, { boldRows: bold, columnWidths: [22, 22, 24, 16, 16, 14, 14, 14, 14, 16, 16] });
+    downloadBlob(blob, `${fileBase}.xlsx`);
+    toast.success("Report exported");
+  };
+  const plainText = () => blocksToText(reportTitle, subtitle, blocks);
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(plainText());
+      toast.success("Report copied as text");
+    } catch {
+      toast.error("Couldn't copy — use Download .txt instead");
+    }
+  };
+  const downloadText = () => {
+    downloadBlob(new Blob([plainText()], { type: "text/plain;charset=utf-8" }), `${fileBase}.txt`);
+  };
+
+  // ── Graphical view data ──
   const err = (k: string) => data?.errors?.[k];
   const rev = data?.revenue;
   const collection = num(rev?.totalCollection?.total);
@@ -125,14 +261,22 @@ export function DayReport() {
   const purchasesTotal = sum(data?.supplierBills, "total");
   const paymentsOut = sum(data?.paymentVouchers, "amount");
   const net = collection - expensesTotal;
-  const dateLabel = data ? format(parseISO(data.date), "EEEE, dd MMMM yyyy") : "";
+  const periodWord = range ? "period" : "day";
 
+  const hourCollection = data?.collectionByHour || (range ? [] : (rev?.trend || []).map((t: Row, h: number) => ({ hour: h, collection: t.revenue })));
   const hourly = data
     ? Array.from({ length: 24 }, (_, h) => ({
         hour: hourLabel(h),
-        Collection: num(rev?.trend?.[h]?.revenue),
+        Collection: num(hourCollection[h]?.collection),
         "Check-ins": num(data.attendance?.byHour?.[h]?.checkIns),
-      })).filter((_, h) => h >= 5 || num(rev?.trend?.[h]?.revenue) > 0 || num(data.attendance?.byHour?.[h]?.checkIns) > 0)
+      })).filter((x, h) => h >= 5 || x.Collection > 0 || x["Check-ins"] > 0)
+    : [];
+  const checkInsByDay = new Map((data?.attendance?.byDay || []).map((d) => [d.date, num(d.checkIns)]));
+  const daily = range
+    ? (rev?.trend || []).map((t: Row) => {
+        const d = String(t.start || "").slice(0, 10);
+        return { day: t.label, Collection: num(t.revenue), Expenses: num(t.expenses), "Check-ins": checkInsByDay.get(d) ?? 0 };
+      })
     : [];
   const methods = (rev?.paymentMethods || []).map((m: Row) => ({ name: m.name, value: num(m.amount) })).filter((m: Row) => m.value > 0);
   const streams = rev?.streams
@@ -144,49 +288,6 @@ export function DayReport() {
         { stream: "Equipment", amount: num(rev.streams.equipment?.total) },
       ]
     : [];
-
-  const exportExcel = () => {
-    if (!data) return;
-    const rows: XlsxCell[][] = [["Day Report", dateLabel], ["Currency", currencyCode], []];
-    const bold: number[] = [0];
-    const add = (title: string, header: string[], body: XlsxCell[][]) => {
-      rows.push([title]); bold.push(rows.length - 1);
-      rows.push(header); bold.push(rows.length - 1);
-      if (body.length === 0) rows.push(["Nothing recorded"]); else rows.push(...body);
-      rows.push([]);
-    };
-    add("Summary", ["Metric", "Value"], [
-      ["Total Collection", collection], ["Expenses", expensesTotal], ["Net (collection − expenses)", net],
-      ["Purchases (supplier bills)", purchasesTotal], ["Payments Out (vouchers)", paymentsOut],
-      ["Member Receipts", (data.receipts || []).length], ["POS Sales", (data.posSales || []).length],
-      ["Check-ins", num(data.attendance?.total)], ["New Members", (data.membership?.newMembers || []).length],
-      ["Renewals", num(data.membership?.renewals)],
-    ]);
-    add("Member Receipts", ["Time", "Receipt No", "Member", "Type", "Plan", "Amount", "Paid", "Method", "Status", "Processed By"],
-      (data.receipts || []).map((r) => [time(r.time), r.receiptNo, r.memberName, r.type, r.plan, num(r.amount), num(r.paid), r.method, r.status, r.processedBy]));
-    add("POS Sales", ["Time", "Number", "Customer", "Subtotal", "Discount", "Tax", "Total", "Method", "Status"],
-      (data.posSales || []).map((r) => [time(r.time), r.number, r.customer, num(r.subtotal), num(r.discount), num(r.tax), num(r.total), r.method, r.status]));
-    add("Sales Invoices", ["Number", "Customer", "Total", "Paid", "Method", "Status"],
-      (data.salesInvoices || []).map((r) => [r.number, r.customer, num(r.total), num(r.paid), r.method, r.status]));
-    add("Purchases — Supplier Bills", ["Bill No", "Supplier Invoice", "Supplier", "Total", "Paid", "Status"],
-      (data.supplierBills || []).map((r) => [r.number, r.supplierInvoice, r.supplier, num(r.total), num(r.paid), r.status]));
-    add("Purchase Orders", ["PO No", "Supplier", "Total", "Status"],
-      (data.purchaseOrders || []).map((r) => [r.number, r.supplier, num(r.total), r.status]));
-    add("Expenses", ["Vendor", "Category", "Amount", "Status", "Payment", "Notes"],
-      (data.expenses || []).map((r) => [r.vendor, r.category, num(r.amount), r.status, r.paymentStatus, r.notes]));
-    add("Payment Vouchers", ["Voucher No", "Payee", "Bill No", "Amount", "Method", "Status"],
-      (data.paymentVouchers || []).map((r) => [r.number, r.payee, r.billNo, num(r.amount), r.method, r.status]));
-    add("New Members", ["Member ID", "Name", "Phone", "Plan", "Status"],
-      (data.membership?.newMembers || []).map((r) => [r.memberId, r.name, r.phone, r.plan, r.status]));
-    add("Memberships Expiring Today", ["Member ID", "Name", "Phone", "Plan", "Status"],
-      (data.membership?.expired || []).map((r) => [r.memberId, r.name, r.phone, r.plan, r.status]));
-    add("Freezes", ["Member ID", "Name", "Action", "Until", "Days", "Reason"],
-      (data.membership?.freezes || []).map((r) => [r.memberId, r.memberName, r.action, r.plannedEnd, r.days, r.reason]));
-    add("Leads Created", ["Name", "Source", "Status"], (data.leads?.created || []).map((r) => [r.name, r.source, r.status]));
-    const blob = buildXlsx("Day Report", rows, { boldRows: bold, columnWidths: [22, 22, 24, 16, 16, 14, 14, 14, 14, 16] });
-    downloadBlob(blob, `day-report-${data.date}.xlsx`);
-    toast.success("Day report exported");
-  };
 
   return (
     <div className="space-y-6" id="day-report-print">
@@ -206,21 +307,57 @@ export function DayReport() {
       {/* Controls */}
       <Card className="border-primary/10 shadow-md" data-print-hide>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" />Day Report</CardTitle>
-          <CardDescription>Everything that happened on a single day — sales, purchases, expenses, members, attendance and more</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" />Day Report</CardTitle>
+              <CardDescription>Everything that happened on a day or over a period — sales, purchases, expenses, members, attendance and more</CardDescription>
+            </div>
+            <div className={styles.segmented} role="group" aria-label="Report view">
+              <button type="button" aria-pressed={view === "graph"} onClick={() => setView("graph")}>
+                <BarChart3 className="h-4 w-4" />Graphical
+              </button>
+              <button type="button" aria-pressed={view === "text"} onClick={() => setView("text")}>
+                <FileText className="h-4 w-4" />Text
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-3">
-            <div style={{ width: 220 }}>
-              <Label className="mb-2 block">Date</Label>
-              <DatePickerField value={date} onChange={setDate} max={format(new Date(), "yyyy-MM-dd")} clearable={false} />
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setDate(format(new Date(), "yyyy-MM-dd"))}>Today</Button>
-            <Button variant="outline" size="sm" onClick={() => setDate(format(subDays(new Date(), 1), "yyyy-MM-dd"))}>Yesterday</Button>
-            <Button onClick={generate} disabled={loading || !date} className="bg-primary text-white">
-              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BarChart3 className="h-4 w-4 mr-2" />}
-              Generate Report
+          <div className={styles.presets}>
+            {PRESETS.map((p) => (
+              <Button key={p.id} size="sm" variant={preset === p.id ? "default" : "outline"}
+                className={preset === p.id ? "bg-primary text-white" : undefined}
+                onClick={() => pickPreset(p.id)} disabled={loading}>
+                {p.label}
+              </Button>
+            ))}
+            <Button size="sm" variant={preset === "custom" ? "default" : "outline"}
+              className={preset === "custom" ? "bg-primary text-white" : undefined}
+              onClick={() => setPreset("custom")}>
+              Custom range
             </Button>
+          </div>
+
+          <div className={styles.controlsRow}>
+            {preset === "custom" && (
+              <>
+                <div style={{ width: 200 }}>
+                  <Label className="mb-2 block">From</Label>
+                  <DatePickerField value={from} onChange={(v) => { setFrom(v); if (v > to) setTo(v); }} max={today} clearable={false} />
+                </div>
+                <div style={{ width: 200 }}>
+                  <Label className="mb-2 block">To</Label>
+                  <DatePickerField value={to} onChange={setTo} min={from} max={today} clearable={false} />
+                </div>
+                <Button onClick={() => generate()} disabled={loading || !from || !to} className="bg-primary text-white">
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BarChart3 className="h-4 w-4 mr-2" />}
+                  Generate Report
+                </Button>
+              </>
+            )}
+            {preset !== "custom" && loading && (
+              <span className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading…</span>
+            )}
             {data && (
               <>
                 <Button variant="outline" onClick={() => window.print()}>
@@ -229,6 +366,16 @@ export function DayReport() {
                 <Button variant="outline" onClick={exportExcel}>
                   <Download className="h-4 w-4 mr-2" />Export Excel
                 </Button>
+                {view === "text" && (
+                  <>
+                    <Button variant="outline" onClick={copyText}>
+                      <Copy className="h-4 w-4 mr-2" />Copy Text
+                    </Button>
+                    <Button variant="outline" onClick={downloadText}>
+                      <FileText className="h-4 w-4 mr-2" />Download .txt
+                    </Button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -239,14 +386,16 @@ export function DayReport() {
         <Card className="border-primary/10 shadow-md">
           <CardContent className="py-16 text-center text-muted-foreground">
             <CalendarDays className="h-10 w-10 mx-auto mb-3 text-primary" />
-            <p>Pick a date and click <strong>Generate Report</strong> to see everything for that day.</p>
+            <p>Pick <strong>Today</strong>, <strong>Yesterday</strong> or another period above — or a <strong>Custom range</strong> — to see the report.</p>
           </CardContent>
         </Card>
+      ) : view === "text" ? (
+        <TextReport title={reportTitle} subtitle={subtitle} blocks={blocks} />
       ) : (
         <>
           <div>
-            <h2 className="text-xl font-bold">Day Report — {dateLabel}</h2>
-            <p className="text-sm text-muted-foreground">Generated {format(new Date(), "dd/MM/yyyy hh:mm a")} · Currency {currencyCode}</p>
+            <h2 className="text-xl font-bold">{reportTitle}</h2>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
 
           {/* Headline figures */}
@@ -254,7 +403,7 @@ export function DayReport() {
             {[
               { label: "Total Collection", value: <Money v={collection} />, sub: `${num(rev?.totalCollection?.count)} transactions`, icon: Wallet, tone: "text-emerald-700", chip: "bg-emerald-50" },
               { label: "Expenses", value: <Money v={expensesTotal} />, sub: `${(data.expenses || []).length} expenses`, icon: TrendingDown, tone: "text-red-700", chip: "bg-red-50" },
-              { label: "Net (Collection − Expenses)", value: <Money v={net} />, sub: net >= 0 ? "Profit for the day" : "Loss for the day", icon: TrendingUp, tone: net >= 0 ? "text-teal-700" : "text-red-700", chip: "bg-teal-50" },
+              { label: "Net (Collection − Expenses)", value: <Money v={net} />, sub: net >= 0 ? `Profit for the ${periodWord}` : `Loss for the ${periodWord}`, icon: TrendingUp, tone: net >= 0 ? "text-teal-700" : "text-red-700", chip: "bg-teal-50" },
               { label: "Purchases", value: <Money v={purchasesTotal} />, sub: `${(data.supplierBills || []).length} bills · ${(data.purchaseOrders || []).length} POs`, icon: ShoppingCart, tone: "text-amber-700", chip: "bg-amber-50" },
               { label: "Payments Out", value: <Money v={paymentsOut} />, sub: `${(data.paymentVouchers || []).length} vouchers`, icon: CreditCard, tone: "text-purple-700", chip: "bg-purple-50" },
               { label: "Check-ins", value: num(data.attendance?.total), sub: `${num(data.attendance?.uniqueMembers)} members · ${num(data.attendance?.walkIns)} walk-ins`, icon: UserCheck, tone: "text-blue-700", chip: "bg-blue-50" },
@@ -275,8 +424,26 @@ export function DayReport() {
           </div>
 
           {/* Charts */}
+          {range && (
+            <Section title="Collection, Expenses & Check-ins by Day" icon={CalendarDays} error={err("revenue") || err("attendance")}>
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={daily}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} minTickGap={8} />
+                  <YAxis yAxisId="money" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="count" orientation="right" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: any, name: any) => (name === "Check-ins" ? v : `${currencyCode} ${money(v)}`)} />
+                  <Legend />
+                  <Bar yAxisId="money" dataKey="Collection" fill={TEAL} isAnimationActive={false} />
+                  <Bar yAxisId="money" dataKey="Expenses" fill="#F59E0B" isAnimationActive={false} />
+                  <Line yAxisId="count" type="monotone" dataKey="Check-ins" stroke="#3B82F6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </Section>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Section title="Collection & Check-ins by Hour" icon={BarChart3} error={err("revenue") || err("attendance")}>
+            <Section title={range ? "Busiest Hours (all days combined)" : "Collection & Check-ins by Hour"} icon={BarChart3} error={err("revenue") || err("attendance")}>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={hourly}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -290,24 +457,22 @@ export function DayReport() {
                 </BarChart>
               </ResponsiveContainer>
             </Section>
-            <div className="grid grid-cols-1 gap-6">
-              <Section title="Payment Methods" icon={Wallet} error={err("revenue")}>
-                {methods.length === 0 ? <Empty text="No payments received on this day." /> : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie data={methods} dataKey="value" nameKey="name" outerRadius={70} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} isAnimationActive={false}>
-                        {methods.map((_: Row, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => `${currencyCode} ${money(v)}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </Section>
-            </div>
+            <Section title="Payment Methods" icon={Wallet} error={err("revenue")}>
+              {methods.length === 0 ? <Empty text={`No payments received in this ${periodWord}.`} /> : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={methods} dataKey="value" nameKey="name" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} isAnimationActive={false}>
+                      {methods.map((_: Row, i: number) => <PieCell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: any) => `${currencyCode} ${money(v)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </Section>
           </div>
 
           <Section title="Revenue by Stream" icon={TrendingUp} error={err("revenue")}>
-            {streams.every((s) => s.amount === 0) ? <Empty text="No revenue recorded on this day." /> : (
+            {streams.every((s) => s.amount === 0) ? <Empty text={`No revenue recorded in this ${periodWord}.`} /> : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={streams}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -321,209 +486,25 @@ export function DayReport() {
           </Section>
 
           {/* Sales */}
-          <Section title="Member Receipts" icon={Receipt} description="Memberships, renewals, add-ons, day passes and balance payments"
-            count={(data.receipts || []).length} total={sum(data.receipts, "paid")} error={err("receipts")}>
-            {(data.receipts || []).length === 0 ? <Empty /> : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Time</TableHead><TableHead>Receipt No</TableHead><TableHead>Member</TableHead><TableHead>Type</TableHead>
-                    <TableHead>Plan</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Paid</TableHead>
-                    <TableHead>Method</TableHead><TableHead>Status</TableHead><TableHead>Processed By</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.receipts || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{time(r.time)}</TableCell>
-                        <TableCell className="font-mono text-sm">{r.receiptNo}</TableCell>
-                        <TableCell><div className="font-medium">{r.memberName}</div><div className="text-xs text-muted-foreground">{r.memberId}</div></TableCell>
-                        <TableCell><Badge variant="outline">{r.type || "—"}</Badge></TableCell>
-                        <TableCell>{r.plan || "—"}</TableCell>
-                        <TableCell className="text-right"><Money v={r.amount} /></TableCell>
-                        <TableCell className="text-right text-emerald-700 font-medium"><Money v={r.paid} /></TableCell>
-                        <TableCell>{r.method || "—"}</TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                        <TableCell>{r.processedBy || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </Section>
-
+          <BlockCard block={block("receipts")} icon={Receipt} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Section title="POS Sales" icon={ShoppingBag} count={(data.posSales || []).length} total={sum(data.posSales, "total")} error={err("posSales")}>
-              {(data.posSales || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Time</TableHead><TableHead>Number</TableHead><TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead><TableHead>Method</TableHead><TableHead>Status</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.posSales || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{time(r.time)}</TableCell>
-                        <TableCell className="font-mono text-sm">{r.number}</TableCell>
-                        <TableCell>{r.customer || "Walk-in"}</TableCell>
-                        <TableCell className="text-right font-medium"><Money v={r.total} /></TableCell>
-                        <TableCell>{r.method || "—"}</TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
-
-            <Section title="Sales Invoices" icon={FileText} count={(data.salesInvoices || []).length} total={sum(data.salesInvoices, "total")} error={err("salesInvoices")}>
-              {(data.salesInvoices || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Number</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.salesInvoices || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">{r.number}</TableCell>
-                        <TableCell>{r.customer || "—"}</TableCell>
-                        <TableCell className="text-right"><Money v={r.total} /></TableCell>
-                        <TableCell className="text-right"><Money v={r.paid} /></TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
+            <BlockCard block={block("posSales")} icon={ShoppingBag} />
+            <BlockCard block={block("salesInvoices")} icon={FileText} />
           </div>
 
           {/* Purchases & spending */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Section title="Purchases — Supplier Bills" icon={ShoppingCart} count={(data.supplierBills || []).length} total={purchasesTotal} error={err("supplierBills")}>
-              {(data.supplierBills || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Bill No</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead><TableHead>Status</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.supplierBills || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">{r.number}{r.supplierInvoice ? <div className="text-xs text-muted-foreground">Inv {r.supplierInvoice}</div> : null}</TableCell>
-                        <TableCell>{r.supplier || "—"}</TableCell>
-                        <TableCell className="text-right"><Money v={r.total} /></TableCell>
-                        <TableCell className="text-right"><Money v={r.paid} /></TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
-
-            <Section title="Purchase Orders" icon={ClipboardList} count={(data.purchaseOrders || []).length} total={sum(data.purchaseOrders, "total")} error={err("purchaseOrders")}>
-              {(data.purchaseOrders || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>PO No</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.purchaseOrders || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">{r.number}</TableCell>
-                        <TableCell>{r.supplier || "—"}</TableCell>
-                        <TableCell className="text-right"><Money v={r.total} /></TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
-
-            <Section title="Expenses" icon={TrendingDown} count={(data.expenses || []).length} total={expensesTotal} error={err("expenses")}>
-              {(data.expenses || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Vendor</TableHead><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Status</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.expenses || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.vendor || "—"}{r.notes ? <div className="text-xs text-muted-foreground truncate max-w-[220px]">{r.notes}</div> : null}</TableCell>
-                        <TableCell>{r.category || "—"}</TableCell>
-                        <TableCell className="text-right text-red-700"><Money v={r.amount} /></TableCell>
-                        <TableCell>{r.status || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
-
-            <Section title="Payment Vouchers (Money Out)" icon={CreditCard} count={(data.paymentVouchers || []).length} total={paymentsOut} error={err("paymentVouchers")}>
-              {(data.paymentVouchers || []).length === 0 ? <Empty /> : (
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Voucher No</TableHead><TableHead>Payee</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Method</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {(data.paymentVouchers || []).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">{r.number}</TableCell>
-                        <TableCell>{r.payee || "—"}{r.billNo ? <div className="text-xs text-muted-foreground">Bill {r.billNo}</div> : null}</TableCell>
-                        <TableCell className="text-right"><Money v={r.amount} /></TableCell>
-                        <TableCell>{r.method || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </Section>
+            <BlockCard block={block("supplierBills")} icon={ShoppingCart} />
+            <BlockCard block={block("purchaseOrders")} icon={ClipboardList} />
+            <BlockCard block={block("expenses")} icon={TrendingDown} />
+            <BlockCard block={block("paymentVouchers")} icon={CreditCard} />
           </div>
 
           {/* Members */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Section title="New Members" icon={UserPlus} count={(data.membership?.newMembers || []).length} error={err("membership")}>
-              {(data.membership?.newMembers || []).length === 0 ? <Empty text="No new members on this day." /> : (
-                <ul className="space-y-2">
-                  {(data.membership?.newMembers || []).map((m) => (
-                    <li key={m.id} className="flex items-center justify-between text-sm">
-                      <span><span className="font-medium">{m.name}</span> <span className="text-muted-foreground text-xs">{m.memberId}</span></span>
-                      <Badge variant="outline">{m.plan || "—"}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
-
-            <Section title="Memberships Ending" icon={AlertCircle} description="Memberships whose expiry date is this day" count={(data.membership?.expired || []).length} error={err("membership")}>
-              {(data.membership?.expired || []).length === 0 ? <Empty text="No memberships end on this day." /> : (
-                <ul className="space-y-2">
-                  {(data.membership?.expired || []).map((m) => (
-                    <li key={m.id} className="flex items-center justify-between text-sm">
-                      <span><span className="font-medium">{m.name}</span> <span className="text-muted-foreground text-xs">{m.phone || m.memberId}</span></span>
-                      <Badge variant="outline">{m.status || "—"}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
-
-            <Section title="Freezes / Unfreezes" icon={Snowflake} count={(data.membership?.freezes || []).length} error={err("membership")}>
-              {(data.membership?.freezes || []).length === 0 ? <Empty text="No freezes on this day." /> : (
-                <ul className="space-y-2">
-                  {(data.membership?.freezes || []).map((f, i) => (
-                    <li key={i} className="flex items-center justify-between text-sm">
-                      <span><span className="font-medium">{f.memberName}</span>{f.reason ? <span className="text-muted-foreground text-xs"> · {f.reason}</span> : null}</span>
-                      <Badge className={f.action === "Freeze" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}>{f.action}{f.action === "Freeze" && f.days ? ` ${f.days}d` : ""}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
+            <BlockCard block={block("newMembers")} icon={UserPlus} />
+            <BlockCard block={block("ending")} icon={AlertCircle} />
+            <BlockCard block={block("freezes")} icon={Snowflake} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -545,22 +526,15 @@ export function DayReport() {
               </ResponsiveContainer>
             </Section>
 
-            <Section title="Leads & Follow-ups" icon={Users} count={(data.leads?.created || []).length} error={err("leads")}>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Follow-ups due</div><div className="text-xl font-bold">{num(data.leads?.followUpsDue)}</div></div>
-                <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Follow-ups completed</div><div className="text-xl font-bold">{num(data.leads?.followUpsCompleted)}</div></div>
-              </div>
-              {(data.leads?.created || []).length === 0 ? <Empty text="No new leads on this day." /> : (
-                <ul className="space-y-2">
-                  {(data.leads?.created || []).map((l) => (
-                    <li key={l.id} className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{l.name || "—"}</span>
-                      <span className="flex gap-2"><Badge variant="outline">{l.source || "—"}</Badge><Badge variant="secondary">{l.status || "—"}</Badge></span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
+            <div className="space-y-6">
+              <Section title="Follow-ups" icon={Users} error={err("leads")}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Follow-ups due</div><div className="text-xl font-bold">{num(data.leads?.followUpsDue)}</div></div>
+                  <div className="rounded-lg border p-3"><div className="text-xs text-muted-foreground">Follow-ups completed</div><div className="text-xl font-bold">{num(data.leads?.followUpsCompleted)}</div></div>
+                </div>
+              </Section>
+              <BlockCard block={block("leads")} icon={Users} />
+            </div>
           </div>
         </>
       )}

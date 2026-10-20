@@ -1,0 +1,150 @@
+/* Day Report — Text view: a plain statement of numbers and words, no charts or colour */
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--card);
+  color: var(--foreground);
+  border: 0;
+  cursor: pointer;
+}
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--primary);
+  color: #fff;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.controlsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.doc {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px 28px;
+  font-variant-numeric: tabular-nums;
+}
+.docTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+.docMeta {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 2px 0 0;
+}
+
+.section {
+  margin-top: 26px;
+  break-inside: avoid-page;
+}
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 2px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--foreground);
+}
+.sectionNote {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin: 6px 0 0;
+}
+.plain {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 8px 0 0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th,
+.table td {
+  padding: 5px 10px 5px 0;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.table th {
+  font-weight: 600;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+.table td {
+  border-bottom: 1px dotted var(--border);
+}
+.table td.wrap {
+  white-space: normal;
+  min-width: 160px;
+}
+.table .num {
+  text-align: right;
+}
+.table tfoot td {
+  font-weight: 700;
+  border-top: 1px solid var(--foreground);
+  border-bottom: 0;
+}
+
+/* The summary reads as a two-column statement, not a wide grid */
+.summary {
+  width: auto;
+  min-width: min(100%, 520px);
+}
+.summary td:first-child {
+  padding-right: 32px;
+}
+
+@media (max-width: 640px) {
+  .doc {
+    padding: 16px;
+  }
+}
+
+@media print {
+  .doc {
+    border: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+  }
+  .table th,
+  .docMeta,
+  .sectionNote,
+  .plain {
+    color: #444;
+  }
+}
