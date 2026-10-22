@@ -79,6 +79,10 @@ export interface WalkInCheckInRequest {
   // Which staff member actually handled this walk-in — credited toward their
   // revenue target regardless of which account is logged in.
   processed_by_staff_id?: number;
+  // The visitor's own pending self-registration (QR sign-up) this payment is for —
+  // confirmed by the backend, which also credits the staff whose QR was scanned
+  // when processed_by_staff_id is left empty.
+  self_registration_id?: number;
 }
 
 // ── Service ──────────────────────────────────────────────────────────────────

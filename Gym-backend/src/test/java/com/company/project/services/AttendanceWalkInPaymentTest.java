@@ -3,6 +3,7 @@ package com.company.project.services;
 import com.company.project.dto.PaymentSplitDTO;
 import com.company.project.dto.WalkInCheckInRequest;
 import com.company.project.entities.Attendance;
+import com.company.project.entities.WalkInRegistration;
 import com.company.project.repositories.AttendanceReportSettingsRepository;
 import com.company.project.repositories.AttendanceRepository;
 import com.company.project.repositories.MemberRepository;
@@ -17,11 +18,13 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceWalkInPaymentTest {
@@ -31,6 +34,7 @@ class AttendanceWalkInPaymentTest {
     @Mock private ReceiptService receiptService;
     @Mock private AttendanceReportSettingsRepository reportSettingsRepository;
     @Mock private BranchSettingsResolver branchSettingsResolver;
+    @Mock private WalkInRegistrationService walkInRegistrationService;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -110,5 +114,52 @@ class AttendanceWalkInPaymentTest {
     void freeWalkInCreatesNoReceipt() {
         attendanceService.walkInCheckIn(request("0"));
         verify(receiptService, never()).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void selfRegistrationIsConfirmedAndCreditsTheStaffWhoseQrWasScanned() {
+        WalkInRegistration pending = new WalkInRegistration();
+        pending.setReferredByStaffId(7L);
+        when(walkInRegistrationService.claimPending(42L)).thenReturn(pending);
+        WalkInCheckInRequest req = request("50");
+        req.setPaidAmount(new BigDecimal("50"));
+        req.setPaymentMethod("Cash");
+        req.setSelfRegistrationId(42L);
+
+        attendanceService.walkInCheckIn(req);
+
+        verify(receiptService).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), eq(7L));
+        verify(walkInRegistrationService).markConfirmed(eq(pending), any());
+    }
+
+    @Test
+    void anExplicitProcessedByWinsOverTheQrReferrer() {
+        WalkInRegistration pending = new WalkInRegistration();
+        pending.setReferredByStaffId(7L);
+        when(walkInRegistrationService.claimPending(42L)).thenReturn(pending);
+        WalkInCheckInRequest req = request("50");
+        req.setPaidAmount(new BigDecimal("50"));
+        req.setSelfRegistrationId(42L);
+        req.setProcessedByStaffId(9L);
+
+        attendanceService.walkInCheckIn(req);
+
+        verify(receiptService).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), eq(9L));
+    }
+
+    @Test
+    void anAlreadyHandledSelfRegistrationGrantsNothing() {
+        when(walkInRegistrationService.claimPending(42L))
+                .thenThrow(new IllegalArgumentException("already checked in"));
+        WalkInCheckInRequest req = request("50");
+        req.setSelfRegistrationId(42L);
+
+        assertThrows(IllegalArgumentException.class, () -> attendanceService.walkInCheckIn(req));
+
+        verify(attendanceRepository, never()).save(any());
+        verify(receiptService, never()).createWalkInReceipt(any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any());
     }
 }

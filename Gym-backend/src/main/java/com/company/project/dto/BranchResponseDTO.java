@@ -27,6 +27,7 @@ public class BranchResponseDTO {
     private Integer establishedYear;
     private List<String> acceptedPaymentMethods;
     private boolean bnplEnabled;
+    private boolean walkInSelfRegistration;
     private String bnplProvider;
     private BigDecimal taxPercentage;
     private boolean taxInclusive;
@@ -96,6 +97,9 @@ public class BranchResponseDTO {
 
     public List<String> getAcceptedPaymentMethods() { return acceptedPaymentMethods; }
     public void setAcceptedPaymentMethods(List<String> acceptedPaymentMethods) { this.acceptedPaymentMethods = acceptedPaymentMethods; }
+
+    public boolean isWalkInSelfRegistration() { return walkInSelfRegistration; }
+    public void setWalkInSelfRegistration(boolean walkInSelfRegistration) { this.walkInSelfRegistration = walkInSelfRegistration; }
 
     public boolean isBnplEnabled() { return bnplEnabled; }
     public void setBnplEnabled(boolean bnplEnabled) { this.bnplEnabled = bnplEnabled; }

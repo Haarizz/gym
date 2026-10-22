@@ -94,6 +94,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/public/lead-forms/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/public/lead-forms/*/submit").permitAll()
 
+                // Walk-in self-registration (/w/{tenant}/{branch}, from the gym's or a
+                // staff member's QR). Only answers for branches that switched it on, and
+                // a submission just queues the visitor for staff to take payment
+                // (PublicWalkInController); rate-limited and honeypot-checked like above.
+                .requestMatchers(HttpMethod.GET, "/api/public/walk-in/*/*").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/walk-in/*/*/submit").permitAll()
+
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on
                 // any of these operational routes, so it is deliberately absent from all of

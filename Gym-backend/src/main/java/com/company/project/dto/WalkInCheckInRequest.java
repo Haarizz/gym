@@ -29,6 +29,10 @@ public class WalkInCheckInRequest {
     private String notes;
     // Which staff member actually handled this walk-in — see MemberRequestDTO.processedByStaffId.
     private Long processedByStaffId;
+    // The visitor's own pending self-registration (public QR page) this payment is for —
+    // confirmed in the same transaction, and its referring staff credited when
+    // processedByStaffId is left empty.
+    private Long selfRegistrationId;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -71,4 +75,7 @@ public class WalkInCheckInRequest {
 
     public Long getProcessedByStaffId() { return processedByStaffId; }
     public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
+
+    public Long getSelfRegistrationId() { return selfRegistrationId; }
+    public void setSelfRegistrationId(Long selfRegistrationId) { this.selfRegistrationId = selfRegistrationId; }
 }

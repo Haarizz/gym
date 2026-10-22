@@ -27,6 +27,7 @@ import {
   CalendarClock,
   RefreshCw,
   Briefcase,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { membersService, type Member } from '../utils/supabase/members-service';
@@ -41,6 +42,8 @@ import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
+import { walkInRegistrationService, type MyWalkInLink, type PendingWalkInRegistration } from '../utils/supabase/walk-in-registration-service';
+import { WalkInQr } from '../components/shared/WalkInQr';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -123,6 +126,11 @@ export function CheckIn() {
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
   const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
   const [processedByStaffId, setProcessedByStaffId] = useState('');
+  // QR self-registrations waiting for payment; selfRegistration is the one loaded into the form.
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingWalkInRegistration[]>([]);
+  const [selfRegistration, setSelfRegistration] = useState<PendingWalkInRegistration | null>(null);
+  const [walkInLink, setWalkInLink] = useState<MyWalkInLink | null>(null);
+  const [walkInQrOpen, setWalkInQrOpen] = useState(false);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,9 +223,52 @@ export function CheckIn() {
     }
   }, [walkInsLoaded]);
 
+  const loadPendingRegistrations = useCallback(async () => {
+    try {
+      setPendingRegistrations(await walkInRegistrationService.listPending());
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false));
-  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns]);
+    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false));
+  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns, loadPendingRegistrations]);
+
+  // Visitors sign up from their own phones — keep the pending list fresh while the desk is on this tab.
+  useEffect(() => {
+    if (activeTab !== 'daily') return;
+    const timer = window.setInterval(loadPendingRegistrations, 30_000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, loadPendingRegistrations]);
+
+  const openWalkInQr = () => {
+    setWalkInQrOpen(true);
+    walkInRegistrationService.myLink().then(setWalkInLink).catch(() => toast.error('Could not load the walk-in QR'));
+  };
+
+  // Loads a self-registered visitor into the form; payment then goes through the normal Grant Access.
+  const takeSelfRegistrationPayment = (r: PendingWalkInRegistration) => {
+    resetDailyForm();
+    setSelfRegistration(r);
+    setVisitorName(r.name);
+    setVisitorMobile(r.phone);
+    if (r.plan_id && walkInPlans.some(p => p.id === r.plan_id)) setSelectedPlan(String(r.plan_id));
+    if (r.referred_by_staff_id && staffOptions.some(st => String(st.id) === String(r.referred_by_staff_id))) {
+      setProcessedByStaffId(String(r.referred_by_staff_id));
+    }
+  };
+
+  const dismissSelfRegistration = async (r: PendingWalkInRegistration) => {
+    try {
+      await walkInRegistrationService.dismiss(r.id);
+      setPendingRegistrations(prev => prev.filter(p => p.id !== r.id));
+      if (selfRegistration?.id === r.id) resetDailyForm();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not dismiss this visitor');
+      loadPendingRegistrations();
+    }
+  };
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
@@ -417,8 +468,10 @@ export function CheckIn() {
         device_id: 'WEB',
         notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentSummary}, Amount: ${currencyCode} ${walkInCharge}`,
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
+        self_registration_id: selfRegistration?.id,
       };
       const resp = await checkInService.walkInCheckIn(req);
+      if (selfRegistration) setPendingRegistrations(prev => prev.filter(p => p.id !== selfRegistration.id));
 
       const visitor = {
         id: resp.attendance_id,
@@ -443,6 +496,7 @@ export function CheckIn() {
       resetDailyForm();
     } catch (err: any) {
       toast.error(err.message || 'Walk-in check-in failed');
+      if (selfRegistration) loadPendingRegistrations();
     } finally {
       setGrantingAccess(false);
     }
@@ -450,7 +504,7 @@ export function CheckIn() {
 
   const resetDailyForm = () => {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
-    setSelectedPlan(''); setProcessedByStaffId('');
+    setSelectedPlan(''); setProcessedByStaffId(''); setSelfRegistration(null);
     walkInPaymentManager.clearLines();
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
@@ -473,11 +527,15 @@ export function CheckIn() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false)); }}
+            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false)); }}
             className="border-primary/30"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button variant="outline" className="border-primary/30" onClick={openWalkInQr}>
+            <QrCode className="mr-2 h-4 w-4" />
+            Walk-in QR
           </Button>
           <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Hardware device required">
             <QrCode className="mr-2 h-4 w-4" />
@@ -709,6 +767,45 @@ export function CheckIn() {
 
         {/* ── Daily Visitor tab ── */}
         <TabsContent value="daily" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {pendingRegistrations.length > 0 && (
+            <Card className="border-amber-200 shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-600" />
+                  Self-registered — awaiting payment
+                  <Badge className="bg-amber-100 text-amber-800 border-0">{pendingRegistrations.length}</Badge>
+                </CardTitle>
+                <CardDescription>Visitors who signed up with the walk-in QR. They get in only after you take payment.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {pendingRegistrations.map(r => (
+                  <div
+                    key={r.id}
+                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border ${selfRegistration?.id === r.id ? 'border-primary bg-gradient-light' : 'border-primary/10'}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-primary truncate">{r.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.phone}
+                        {r.plan_name ? ` · ${r.plan_name}` : ''}
+                        {r.referred_by_staff_name ? ` · via ${r.referred_by_staff_name}` : ''}
+                        {' · '}{new Date(r.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="btn-primary" onClick={() => takeSelfRegistrationPayment(r)}>
+                        Take payment
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => dismissSelfRegistration(r)} title="Visitor left or signed up twice">
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-primary text-white">
@@ -719,6 +816,14 @@ export function CheckIn() {
                 <CardDescription className="text-white/80">Register and grant temporary access</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
+                {selfRegistration && (
+                  <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm">
+                    <span className="text-amber-900">
+                      Taking payment for <strong>{selfRegistration.name}</strong>, who signed up with the walk-in QR.
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={resetDailyForm}><X className="h-4 w-4" /></Button>
+                  </div>
+                )}
                 {/* Visitor info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-primary flex items-center">
@@ -971,6 +1076,31 @@ export function CheckIn() {
           </DialogContent>
         </Dialog>
       )}
+      <Dialog open={walkInQrOpen} onOpenChange={setWalkInQrOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Walk-in QR</DialogTitle>
+            <DialogDescription>
+              {walkInLink?.staff_name
+                ? `Your personal code — sign-ups through it count toward ${walkInLink.staff_name}'s walk-in target.`
+                : 'Visitors scan this to sign themselves up, then pay here.'}
+            </DialogDescription>
+          </DialogHeader>
+          {!walkInLink ? (
+            <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+          ) : !walkInLink.enabled ? (
+            <p className="text-sm text-muted-foreground py-4">
+              Self-registration is off for {walkInLink.branch_name || 'this branch'}. Turn it on under Settings › Branch › Walk-in Self-Registration.
+            </p>
+          ) : (
+            <WalkInQr
+              path={walkInLink.path}
+              title={walkInLink.branch_name || 'Walk-in registration'}
+              subtitle={walkInLink.staff_name ? `Scan to register — ${walkInLink.staff_name}` : undefined}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

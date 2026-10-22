@@ -5,7 +5,9 @@ import com.company.project.dto.AttendanceStatsDTO;
 import com.company.project.dto.CheckInResponse;
 import com.company.project.dto.CheckOutResponse;
 import com.company.project.dto.WalkInCheckInRequest;
+import com.company.project.dto.WalkInSelfRegistrationDTOs;
 import com.company.project.services.AttendanceService;
+import com.company.project.services.WalkInRegistrationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,9 +19,12 @@ import java.util.Map;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final WalkInRegistrationService walkInRegistrationService;
 
-    public AttendanceController(AttendanceService attendanceService) {
+    public AttendanceController(AttendanceService attendanceService,
+                                WalkInRegistrationService walkInRegistrationService) {
         this.attendanceService = attendanceService;
+        this.walkInRegistrationService = walkInRegistrationService;
     }
 
     /**
@@ -123,5 +128,34 @@ public class AttendanceController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * Today's self-registered walk-ins waiting for staff to take payment. Paying goes
+     * through POST /walkin with self_registration_id.
+     *
+     * GET /api/attendance/walkin-registrations
+     */
+    @GetMapping("/walkin-registrations")
+    public ResponseEntity<List<WalkInSelfRegistrationDTOs.Pending>> getPendingWalkInRegistrations() {
+        return ResponseEntity.ok(walkInRegistrationService.listPending());
+    }
+
+    /** POST /api/attendance/walkin-registrations/{id}/dismiss — visitor left / duplicate. */
+    @PostMapping("/walkin-registrations/{id}/dismiss")
+    public ResponseEntity<Void> dismissWalkInRegistration(@PathVariable Long id) {
+        walkInRegistrationService.dismiss(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * The caller's walk-in QR link — personal (?s=code) for staff, so scans count
+     * toward their target.
+     *
+     * GET /api/attendance/walkin/my-link
+     */
+    @GetMapping("/walkin/my-link")
+    public ResponseEntity<WalkInSelfRegistrationDTOs.MyLink> getMyWalkInLink() {
+        return ResponseEntity.ok(walkInRegistrationService.myLink());
     }
 }

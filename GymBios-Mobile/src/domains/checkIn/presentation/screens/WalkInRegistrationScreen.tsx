@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import { useRouter, useSegments } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +14,12 @@ import { PaymentBottomSheet } from '@/shared/payment';
 import type { PaymentResult } from '@/shared/payment/types';
 
 import { WalkInForm } from '../components/walkIn/WalkInForm';
+import { PendingSelfRegistrations } from '../components/walkIn/PendingSelfRegistrations';
+import { WalkInQrModal } from '../components/walkIn/WalkInQrModal';
 import { useWalkInForm } from '../hooks/useWalkInForm';
+import { useWalkInPlans } from '../hooks/useWalkInPlans';
+import { usePendingWalkInRegistrations } from '../hooks/useWalkInSelfRegistrations';
+import type { PendingWalkInRegistration } from '../../infrastructure/WalkInApi';
 import { checkInKeys } from '../../hooks/checkInKeys';
 
 const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
@@ -24,6 +30,9 @@ const CHECK_IN_COLORS: [string, string] = [BrandColors.teal, '#1a7a47'];
  * Collects visitor information, lets the user select a Daily Plan,
  * then opens the shared PaymentBottomSheet.
  * On successful payment, submits the walk-in check-in to the backend.
+ *
+ * Visitors who signed up with the walk-in QR are listed on top; tapping one
+ * loads them into the form, and paying confirms their self-registration.
  */
 export function WalkInRegistrationScreen() {
   const { t } = useTranslation();
@@ -32,6 +41,9 @@ export function WalkInRegistrationScreen() {
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const queryClient = useQueryClient();
   const [isPaymentVisible, setIsPaymentVisible] = useState(false);
+  const [isQrVisible, setIsQrVisible] = useState(false);
+  const { plans } = useWalkInPlans();
+  const { pending, dismiss } = usePendingWalkInRegistrations();
 
   const {
     fullName,
@@ -44,11 +56,24 @@ export function WalkInRegistrationScreen() {
     selectedPlanName,
     selectedPlanPrice,
     selectPlan,
+    selfRegistration,
+    loadSelfRegistration,
     handlePaymentComplete,
     isSubmitting,
     isFormValid,
     reset,
   } = useWalkInForm();
+
+  const handleSelectPending = (registration: PendingWalkInRegistration) => {
+    loadSelfRegistration(registration);
+    const plan = plans.find((p) => String(p.id) === String(registration.planId));
+    if (plan) selectPlan(String(plan.id), plan.name, plan.price);
+  };
+
+  const handleDismissPending = (registration: PendingWalkInRegistration) => {
+    if (selfRegistration?.id === registration.id) reset();
+    dismiss.mutate(registration.id);
+  };
 
   const handleProceedToPayment = () => {
     if (isFormValid) {
@@ -87,6 +112,16 @@ export function WalkInRegistrationScreen() {
         subtitle={t('checkIn.walkIn.registerScreenSubtitle')}
         colors={CHECK_IN_COLORS}
         onBack={() => router.back()}
+        rightAction={
+          <Pressable
+            onPress={() => setIsQrVisible(true)}
+            style={styles.headerAction}
+            accessibilityRole="button"
+            accessibilityLabel={t('checkIn.walkIn.qrTitle')}
+          >
+            <Feather name="grid" size={18} color="#ffffff" />
+          </Pressable>
+        }
       />
 
       <ScrollView
@@ -94,6 +129,13 @@ export function WalkInRegistrationScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset }]}
         keyboardShouldPersistTaps="handled"
       >
+        <PendingSelfRegistrations
+          pending={pending}
+          selectedId={selfRegistration?.id}
+          onSelect={handleSelectPending}
+          onDismiss={handleDismissPending}
+        />
+
         <WalkInForm
           fullName={fullName}
           onChangeFullName={setFullName}
@@ -139,11 +181,21 @@ export function WalkInRegistrationScreen() {
         onClose={handlePaymentClose}
         onComplete={handlePaymentDone}
       />
+
+      <WalkInQrModal visible={isQrVisible} onClose={() => setIsQrVisible(false)} />
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  headerAction: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
   scroll: {
     padding: Spacing.three,
     gap: Spacing.four,

@@ -48,20 +48,20 @@ export function Input({
 
   const inputStyle = isGlass
     ? [
-        styles.authInput,
-        styles.glassInput,
-        focused && !error && styles.authInputFocused,
-        error && styles.authInputError,
-        style,
-      ]
+      styles.authInput,
+      styles.glassInput,
+      focused && !error && styles.authInputFocused,
+      error && styles.authInputError,
+      style,
+    ]
     : isAuth
-    ? [
+      ? [
         styles.authInput,
         focused && !error && styles.authInputFocused,
         error && styles.authInputError,
         style,
       ]
-    : [
+      : [
         styles.input,
         {
           color: theme.text,

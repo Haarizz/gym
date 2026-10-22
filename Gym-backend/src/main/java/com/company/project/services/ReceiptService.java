@@ -137,7 +137,9 @@ public class ReceiptService {
      */
     public String resolveProcessedByName(Long processedByStaffId) {
         if (processedByStaffId == null) return "Admin";
-        return staffRepository.findById(processedByStaffId).map(Staff::getName).orElse("Admin");
+        // Name only, not the Staff entity: a staff member assigned to several branches
+        // may be credited here while another branch is active (see BranchSecurityListener).
+        return staffRepository.findNameById(processedByStaffId).stream().filter(Objects::nonNull).findFirst().orElse("Admin");
     }
 
     // ── Read ────────────────────────────────────────────────────────────────

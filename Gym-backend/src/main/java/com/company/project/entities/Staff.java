@@ -119,6 +119,14 @@ public class Staff extends BaseEntity implements BranchAware {
     @Column(name = "branch_id")
     private Long branchId;
 
+    // Random code in this staff member's personal walk-in QR (?s=CODE); see
+    // WalkInRegistrationService. Generated on first use.
+    @Column(name = "walk_in_code", length = 16, unique = true)
+    private String walkInCode;
+
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+
+    public String getWalkInCode() { return walkInCode; }
+    public void setWalkInCode(String walkInCode) { this.walkInCode = walkInCode; }
 }

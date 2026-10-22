@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { useAuthStore, useRestoreSession } from '@/domains/auth';
+import { getRoleHomeHref } from '@/domains/auth/presentation/navigation/routes';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
 
 import { ProfileHubScreen } from './ProfileHubScreen';
@@ -68,9 +69,12 @@ export function ProfileScreen() {
   const handleClose = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => {
-      router.back();
+      // No history after a cold load (web reload / app restored after being killed),
+      // so go to this role's own home rather than wherever back() falls through to.
+      if (router.canGoBack()) router.back();
+      else if (appRole) router.replace(getRoleHomeHref(appRole));
     }, SLIDE_DURATION);
-  }, [router]);
+  }, [router, appRole]);
 
   const handleLogout = useCallback(() => {
     logout();

@@ -320,6 +320,7 @@ public class BranchService {
             branch.setAcceptedPaymentMethods(String.join(",", request.getAcceptedPaymentMethods()));
         }
         if (request.getBnplEnabled() != null) branch.setBnplEnabled(request.getBnplEnabled());
+        if (request.getWalkInSelfRegistration() != null) branch.setWalkInSelfRegistration(request.getWalkInSelfRegistration());
         if (request.getBnplProvider() != null) branch.setBnplProvider(request.getBnplProvider());
         if (request.getTaxPercentage() != null) branch.setTaxPercentage(request.getTaxPercentage());
         if (request.getTaxInclusive() != null) branch.setTaxInclusive(request.getTaxInclusive());
@@ -355,6 +356,7 @@ public class BranchService {
                     .collect(Collectors.toList()));
         }
         dto.setBnplEnabled(branch.isBnplEnabled());
+        dto.setWalkInSelfRegistration(branch.isWalkInSelfRegistration());
         dto.setBnplProvider(branch.getBnplProvider());
         dto.setTaxPercentage(branch.getTaxPercentage());
         dto.setTaxInclusive(branch.isTaxInclusive());

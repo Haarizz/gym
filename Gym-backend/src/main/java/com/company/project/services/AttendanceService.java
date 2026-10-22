@@ -27,19 +27,22 @@ public class AttendanceService {
     private final com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository;
     private final BranchSettingsResolver branchSettingsResolver;
     private final AttendanceSessionService sessionService;
+    private final WalkInRegistrationService walkInRegistrationService;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              MemberRepository memberRepository,
                              @org.springframework.context.annotation.Lazy ReceiptService receiptService,
                              com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository,
                              BranchSettingsResolver branchSettingsResolver,
-                             AttendanceSessionService sessionService) {
+                             AttendanceSessionService sessionService,
+                             WalkInRegistrationService walkInRegistrationService) {
         this.attendanceRepository = attendanceRepository;
         this.memberRepository     = memberRepository;
         this.receiptService       = receiptService;
         this.reportSettingsRepository = reportSettingsRepository;
         this.branchSettingsResolver = branchSettingsResolver;
         this.sessionService = sessionService;
+        this.walkInRegistrationService = walkInRegistrationService;
     }
 
     // ── Automated report settings (one row per branch — gym floor capacity ─────
@@ -188,6 +191,14 @@ public class AttendanceService {
         if (!StringUtils.hasText(req.getName()) || !StringUtils.hasText(req.getPhone())) {
             throw new IllegalArgumentException("Name and phone are required for walk-in");
         }
+        // A self-registered visitor only gets in once staff take payment here; lock
+        // their pending row first so two desks can't both check them in.
+        com.company.project.entities.WalkInRegistration selfRegistration = req.getSelfRegistrationId() != null
+                ? walkInRegistrationService.claimPending(req.getSelfRegistrationId())
+                : null;
+        Long processedByStaffId = req.getProcessedByStaffId() != null || selfRegistration == null
+                ? req.getProcessedByStaffId()
+                : selfRegistration.getReferredByStaffId();
 
         Attendance record = new Attendance();
         record.setType("walk_in");
@@ -229,7 +240,10 @@ public class AttendanceService {
                     charge, paidNow,
                     req.getPaymentMethod(), req.getPaymentBreakdown(),
                     req.getBankAccountCode(), req.getBankAccountName(),
-                    req.getNotes(), req.getProcessedByStaffId());
+                    req.getNotes(), processedByStaffId);
+        }
+        if (selfRegistration != null) {
+            walkInRegistrationService.markConfirmed(selfRegistration, record.getId());
         }
 
         CheckInResponse resp = new CheckInResponse();

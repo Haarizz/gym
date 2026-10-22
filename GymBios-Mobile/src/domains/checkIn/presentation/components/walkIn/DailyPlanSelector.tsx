@@ -168,8 +168,11 @@ const styles = StyleSheet.create({
   sheetSubtitle: {
     marginBottom: Spacing.three,
   },
+  // flex: 1 collapses to 0 height on native because the sheet only has a maxHeight;
+  // let the list size to its content and shrink/scroll when it hits the cap.
   planList: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
   },
   planListContent: {
     gap: Spacing.two,

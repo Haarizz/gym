@@ -14,6 +14,7 @@ import {
   Loader2,
   CalendarDays,
   CreditCard,
+  QrCode,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -25,6 +26,8 @@ import { Checkbox } from "../components/ui/checkbox";
 import { TabsContent } from "../components/ui/tabs";
 import { branchApi, BranchDTO, BranchImageDTO } from "../utils/supabase/branch-service";
 import { SettingsSaveBar } from "../components/settings/SettingsSaveBar";
+import { WalkInQr } from "../components/shared/WalkInQr";
+import { walkInRegistrationService } from "../utils/supabase/walk-in-registration-service";
 
 const CENTER_TYPES = ["Gym", "Fitness Center", "Wellness Center", "Studio"];
 const ACCESS_TYPES = ["Mixed", "Ladies Only", "Men Only"];
@@ -58,6 +61,7 @@ interface DiscoveryFormState {
   tax_percentage: string;
   tax_inclusive: boolean;
   terms_and_policies: string;
+  walk_in_self_registration: boolean;
 }
 
 function toFormState(branch: BranchDTO): DiscoveryFormState {
@@ -75,6 +79,7 @@ function toFormState(branch: BranchDTO): DiscoveryFormState {
     tax_percentage: branch.tax_percentage != null ? String(branch.tax_percentage) : "",
     tax_inclusive: branch.tax_inclusive || false,
     terms_and_policies: branch.terms_and_policies || "",
+    walk_in_self_registration: branch.walk_in_self_registration || false,
   };
 }
 
@@ -100,6 +105,7 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [walkInPath, setWalkInPath] = useState<string | null>(null);
 
   const loadBranch = useCallback(async () => {
     try {
@@ -134,7 +140,12 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
     setImages([]);
     loadBranch();
     loadImages();
-  }, [id, loadBranch, loadImages]);
+    setWalkInPath(null);
+    // The poster link for the active branch — the only one this tab edits outside read-only mode.
+    if (!readOnly) {
+      walkInRegistrationService.myLink().then(link => setWalkInPath(link.branch_path)).catch(() => {});
+    }
+  }, [id, readOnly, loadBranch, loadImages]);
 
   const updateForm = (patch: Partial<DiscoveryFormState>) => {
     setForm((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -175,6 +186,7 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
         tax_percentage: form.tax_percentage ? Number(form.tax_percentage) : undefined,
         tax_inclusive: form.tax_inclusive,
         terms_and_policies: form.terms_and_policies || undefined,
+        walk_in_self_registration: form.walk_in_self_registration,
       });
       toast.success("Branch settings saved");
       setIsDirty(false);
@@ -589,6 +601,42 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
             </CardContent>
           </Card>
         </div>
+
+        {/* Walk-in self-registration */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              <CardTitle>Walk-in Self-Registration</CardTitle>
+            </div>
+            <CardDescription>
+              Visitors scan a QR code and sign themselves up for a Walk-In pass. They still pay at reception —
+              they appear under Check In › Walk-In / Daily until staff take payment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col md:flex-row gap-6 md:items-start md:justify-between">
+            <label htmlFor="walk_in_self_registration" className="flex items-start gap-3 cursor-pointer max-w-md">
+              <Checkbox
+                id="walk_in_self_registration"
+                checked={form.walk_in_self_registration}
+                onCheckedChange={(v) => updateForm({ walk_in_self_registration: v === true })}
+              />
+              <span className="text-sm">
+                <span className="font-medium text-gray-700 block">Allow walk-in self-registration</span>
+                <span className="text-muted-foreground">
+                  Staff also get a personal QR in the mobile app (Check In › Walk-In) — sign-ups through it count toward their walk-in target.
+                </span>
+              </span>
+            </label>
+            {branch.walk_in_self_registration && walkInPath && (
+              <WalkInQr
+                path={walkInPath}
+                title={branch.branch_name}
+                subtitle="Scan to register as a walk-in visitor"
+              />
+            )}
+          </CardContent>
+        </Card>
 
         {/* Profile, Hours, Payment Methods and Policies share one form and save together.
             Images save immediately on upload, so they aren't part of this. */}

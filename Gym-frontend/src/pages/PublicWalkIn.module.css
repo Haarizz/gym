@@ -1,0 +1,114 @@
+/* Walk-in self-registration (/w/{tenant}/{branch}). Extends PublicLeadForm.module.css,
+   whose --lf-* tokens are defined on .page. */
+
+.plans {
+  display: grid;
+  gap: 10px;
+}
+
+.plan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--lf-line);
+  border-radius: var(--lf-radius-field);
+  background: var(--lf-field);
+  cursor: pointer;
+  transition: border-color 0.15s var(--lf-ease), box-shadow 0.15s var(--lf-ease);
+}
+
+.plan:hover {
+  border-color: var(--lf-line-strong);
+}
+
+.plan:has(input:checked) {
+  border-color: var(--lf-brand);
+  box-shadow: 0 0 0 3px var(--lf-brand-soft);
+}
+
+.plan:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px var(--lf-brand-soft);
+}
+
+.plan input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--lf-brand);
+}
+
+.planBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.planName {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lf-ink);
+}
+
+.planMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--lf-muted);
+}
+
+.planPrice {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--lf-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.staffNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--lf-brand);
+  background: var(--lf-brand-soft);
+}
+
+.staffNote svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The ticket the visitor shows at reception. */
+.ticket {
+  margin: 20px auto 0;
+  max-width: 320px;
+  padding: 16px;
+  border: 1px dashed var(--lf-line-strong);
+  border-radius: 14px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--lf-text);
+}
+
+.ticketRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ticketRow span:first-child {
+  color: var(--lf-muted);
+}
+
+.ticketRow span:last-child {
+  font-weight: 600;
+  color: var(--lf-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
