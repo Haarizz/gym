@@ -7,6 +7,10 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -28,11 +32,12 @@ import {
   RefreshCw,
   Briefcase,
   Clock,
+  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { staffService, type Staff } from '../utils/supabase/staff-service';
-import { checkInService, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
+import { checkInService, MinVisitNotReachedError, type CheckInSettings, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
 import { staffAttendanceService } from '../utils/supabase/staff-attendance-service';
 import { attendanceService } from '../utils/supabase/attendance-service';
 import { plansService, type Plan } from '../utils/supabase/plans-service';
@@ -56,6 +61,9 @@ interface PersonEntry {
   role: string;        // membership type for members, role for staff
   status: string;
   photoUrl?: string;
+  // Membership suspended by staff — check-in is refused until it's resumed.
+  suspended?: boolean;
+  suspendedReason?: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,6 +85,8 @@ function memberToPerson(m: Member): PersonEntry {
     role: m.membership_type || 'Member',
     status: m.membership_status,
     photoUrl: m.photo_url,
+    suspended: !!m.membership_suspended,
+    suspendedReason: m.suspended_reason ?? null,
   };
 }
 
@@ -144,6 +154,38 @@ export function CheckIn() {
       .then(settings => { if (settings.gym_capacity) setGymCapacity(settings.gym_capacity); })
       .catch(() => {});
   }, []);
+
+  // Check-in timing rules for this branch (Configuration tab). Enforced by the backend.
+  const [savedSettings, setSavedSettings] = useState<CheckInSettings | null>(null);
+  const [settingsForm, setSettingsForm] = useState<CheckInSettings | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  // A check-out the backend held back for the minimum visit time, awaiting the desk's override.
+  const [earlyCheckOut, setEarlyCheckOut] = useState<{ attendanceId: number; name: string; message: string } | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'configuration' || savedSettings) return;
+    checkInService.getSettings()
+      .then(settings => { setSavedSettings(settings); setSettingsForm(settings); })
+      .catch(() => toast.error('Could not load check-in settings'));
+  }, [activeTab, savedSettings]);
+
+  const settingsDirty = !!settingsForm && !!savedSettings
+    && (Object.keys(settingsForm) as (keyof CheckInSettings)[]).some(k => settingsForm[k] !== savedSettings[k]);
+
+  const saveSettings = async () => {
+    if (!settingsForm) return;
+    setSavingSettings(true);
+    try {
+      const saved = await checkInService.updateSettings(settingsForm);
+      setSavedSettings(saved);
+      setSettingsForm(saved);
+      toast.success('Check-in settings saved');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save check-in settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   // Daily/walk-in passes are now real plans configured in Manage Plans under the
   // "Walk-In / Daily Visitor" membership type, instead of a hardcoded list.
@@ -298,14 +340,18 @@ export function CheckIn() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleCheckOut = async (attendanceId: number, memberName: string) => {
+  const handleCheckOut = async (attendanceId: number, memberName: string, force = false) => {
     setCheckingOutId(attendanceId);
     try {
-      const res = await checkInService.checkout(attendanceId);
+      const res = await checkInService.checkout(attendanceId, force);
       toast.success(`${memberName} checked out — ${res.formatted_duration}`);
       await loadTodayAttendance();
     } catch (err: any) {
-      toast.error(err.message || 'Checkout failed');
+      if (err instanceof MinVisitNotReachedError) {
+        setEarlyCheckOut({ attendanceId, name: memberName, message: err.message });
+      } else {
+        toast.error(err.message || 'Checkout failed');
+      }
     } finally {
       setCheckingOutId(null);
     }
@@ -623,6 +669,10 @@ export function CheckIn() {
           <TabsTrigger value="daily" className="flex-1">
             <UserPlus className="h-4 w-4 mr-2" />
             Walk-In / Daily
+          </TabsTrigger>
+          <TabsTrigger value="configuration" className="flex-1">
+            <Settings className="h-4 w-4 mr-2" />
+            Configuration
           </TabsTrigger>
         </TabsList>
 
@@ -1025,6 +1075,57 @@ export function CheckIn() {
             </Card>
           </div>
         </TabsContent>
+
+        {/* ── Configuration tab ── */}
+        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden max-w-3xl">
+            <CardHeader className="bg-gradient-light border-b border-primary/10">
+              <CardTitle className="text-primary">Check-in Configuration</CardTitle>
+              <CardDescription>Timing rules for member check-ins at this branch. Set 0 to turn a rule off.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {!settingsForm ? (
+                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+              ) : (
+                <div className="space-y-6">
+                  <SettingField
+                    label="Minimum time between check-in and check-out"
+                    hint="Members can't check themselves out sooner. Staff can still check them out here after confirming."
+                    value={settingsForm.min_visit_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, min_visit_minutes: v })}
+                  />
+                  <Separator className="bg-primary/10" />
+                  <SettingField
+                    label="Quick break time"
+                    hint="Length of a break during a visit. Members tap Take Break in the app and stay checked in; break time isn't counted as gym time. 0 turns Take Break off."
+                    value={settingsForm.break_grace_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, break_grace_minutes: v })}
+                  />
+                  <Separator className="bg-primary/10" />
+                  <SettingField
+                    label="Next check-in time after a check-out"
+                    hint="After any check-out, how long a member must wait before checking in again."
+                    value={settingsForm.cooldown_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, cooldown_minutes: v })}
+                  />
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="border-primary/30"
+                      onClick={() => setSettingsForm(savedSettings)}
+                      disabled={!settingsDirty || savingSettings}
+                    >
+                      Reset
+                    </Button>
+                    <Button className="btn-primary" onClick={saveSettings} disabled={!settingsDirty || savingSettings}>
+                      {savingSettings ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Confirm check-in dialog */}
@@ -1076,6 +1177,25 @@ export function CheckIn() {
           </DialogContent>
         </Dialog>
       )}
+      <AlertDialog open={!!earlyCheckOut} onOpenChange={open => { if (!open) setEarlyCheckOut(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check out {earlyCheckOut?.name} early?</AlertDialogTitle>
+            <AlertDialogDescription>{earlyCheckOut?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep checked in</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (earlyCheckOut) handleCheckOut(earlyCheckOut.attendanceId, earlyCheckOut.name, true);
+                setEarlyCheckOut(null);
+              }}
+            >
+              Check out anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Dialog open={walkInQrOpen} onOpenChange={setWalkInQrOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1105,6 +1225,33 @@ export function CheckIn() {
   );
 }
 
+// ── SettingField sub-component ────────────────────────────────────────────────
+
+function SettingField({ label, hint, value, onChange }: {
+  label: string;
+  hint: string;
+  value: number;
+  onChange: (minutes: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-primary">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          max={1440}
+          value={value}
+          onChange={e => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+          className="w-28 border-primary/20 focus:border-primary"
+        />
+        <span className="text-sm text-muted-foreground">minutes</span>
+      </div>
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
 // ── PersonRow sub-component ───────────────────────────────────────────────────
 
 function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaffClockOut, isChecking, isCheckedIn, isClockedIn, isActing }: {
@@ -1119,11 +1266,12 @@ function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaf
   isActing: boolean;
 }) {
   const isMember  = person.kind === 'member';
-  const isActive  = person.status?.toLowerCase() === 'active';
+  const isSuspended = isMember && !!person.suspended;
+  const isActive  = person.status?.toLowerCase() === 'active' && !isSuspended;
 
   const statusColor = isActive
     ? 'bg-green-100 text-green-800'
-    : person.status === 'suspended'
+    : isSuspended || person.status === 'suspended'
     ? 'bg-red-100 text-red-800'
     : 'bg-gray-100 text-gray-700';
 
@@ -1149,7 +1297,12 @@ function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaf
         </div>
       </div>
       <div className="flex items-center space-x-2">
-        <Badge className={`${statusColor} border-0 text-xs capitalize`}>{person.status}</Badge>
+        <Badge
+          className={`${statusColor} border-0 text-xs capitalize`}
+          title={isSuspended ? `Membership suspended${person.suspendedReason ? `: ${person.suspendedReason}` : ''}` : undefined}
+        >
+          {isSuspended ? 'Suspended' : person.status}
+        </Badge>
         {isMember ? (
           isCheckedIn ? (
             <Button

@@ -132,8 +132,14 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            // Members sign in with their GymBios account only. An old gym-only member login
+            // (in a gym's own database) is moved over by the account migration; one that
+            // hasn't been yet is refused rather than half-working.
+            if (loginTenantSlug != null && userDetails.isMemberOnly()) {
+                throw new BusinessRuleViolationException(UserDetailsImpl.GYM_LOGIN_MOVED_MESSAGE);
+            }
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // Clear any previous branch context (from an old session's JWT) so that fetching the new user's profile doesn't fail
             com.company.project.security.BranchContextHolder.clear();
@@ -175,12 +181,6 @@ public class AuthService {
                     .map(com.company.project.dto.BranchResponseDTO::getId)
                     .findFirst()
                     .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
-
-            if (defaultBranchId == null && roles.contains("ROLE_MEMBER")) {
-                defaultBranchId = memberRepository.findByUserId(userDetails.getId())
-                        .map(com.company.project.entities.Member::getBranchId)
-                        .orElse(null);
-            }
 
             String staffName = staffRepository.findByUserId(userDetails.getId())
                     .map(com.company.project.entities.Staff::getName)
@@ -232,12 +232,6 @@ public class AuthService {
                 .map(com.company.project.dto.BranchResponseDTO::getId)
                 .findFirst()
                 .orElse(accessibleBranches.isEmpty() ? null : accessibleBranches.get(0).getId());
-
-        if (defaultBranchId == null && roles.contains("ROLE_MEMBER")) {
-            defaultBranchId = memberRepository.findByUserId(userDetails.getId())
-                    .map(com.company.project.entities.Member::getBranchId)
-                    .orElse(null);
-        }
 
         String staffName = staffRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.Staff::getName)
@@ -302,40 +296,15 @@ public class AuthService {
     }
 
     private Boolean deriveProfileCompleted(UserDetailsImpl userDetails) {
-        // A gym-created login already has the gym's details on its members row (the app
-        // profile is filled from it), so it never needs the profile-completion screen.
-        com.company.project.entities.Member member = gymMember(userDetails);
-        if (member != null && hasText(member.getName()) && hasText(member.getPhone())) {
-            return true;
-        }
         return userProfileRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.UserProfile::isProfileCompleted)
                 .orElse(true);
     }
 
-    // The members row is the web panel's record of a gym-created login, so its name wins.
     private String resolveFullName(UserDetailsImpl userDetails) {
-        com.company.project.entities.Member member = gymMember(userDetails);
-        if (member != null && hasText(member.getName())) {
-            return member.getName();
-        }
         return userProfileRepository.findByUserId(userDetails.getId())
                 .map(com.company.project.entities.UserProfile::getFullName)
                 .orElse(null);
-    }
-
-    /** The members row of a gym-created (non-global) member login, else null. */
-    private com.company.project.entities.Member gymMember(UserDetailsImpl userDetails) {
-        boolean isMember = userDetails.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"));
-        if (userDetails.isGlobal() || !isMember) {
-            return null;
-        }
-        return memberRepository.findByUserId(userDetails.getId()).orElse(null);
-    }
-
-    private static boolean hasText(String s) {
-        return s != null && !s.isBlank();
     }
 
     private List<com.company.project.dto.BranchResponseDTO> fetchAccessibleBranches(UserDetailsImpl userDetails) {
@@ -356,17 +325,10 @@ public class AuthService {
         } else {
             List<Long> branchIds = new java.util.ArrayList<>(userBranchRepository.findBranchIdsByUserId(userDetails.getId()));
             
-            if (userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_MEMBER"))) {
-                java.util.Optional<com.company.project.entities.Member> memberOpt = userDetails.isGlobal()
-                    ? memberRepository.findByGlobalUserId(userDetails.getId())
-                    : memberRepository.findByUserId(userDetails.getId());
-                
-                // Fallback for stale tokens
-                if (memberOpt.isEmpty() && userDetails.isGlobal()) {
-                    memberOpt = memberRepository.findByUserId(userDetails.getId());
-                }
-                
-                memberOpt.map(com.company.project.entities.Member::getBranchId)
+            // A member's own branch (members sign in with their GymBios account only).
+            if (userDetails.isGlobal()) {
+                memberRepository.findByGlobalUserId(userDetails.getId())
+                        .map(com.company.project.entities.Member::getBranchId)
                         .ifPresent(branchId -> {
                             if (!branchIds.contains(branchId)) {
                                 branchIds.add(branchId);

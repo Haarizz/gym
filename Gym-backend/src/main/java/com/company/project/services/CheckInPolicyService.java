@@ -1,6 +1,7 @@
 package com.company.project.services;
 
 import com.company.project.entities.Attendance;
+import com.company.project.entities.CheckInSettings;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -24,8 +25,9 @@ import java.util.Objects;
  *     with attendanceValue per attendancePeriod ("Payment" / "Week" / "Month" / "Year").
  *     "Unlimited" (or no plan) skips this rule.
  *  2. Daily cap — at most {@link #MAX_CHECK_INS_PER_DAY} check-ins per calendar day.
- *  3. Cooldown — at least {@link #COOLDOWN_MINUTES} between the last check-out and
- *     the next check-in.
+ *  3. Cooldown — at least the branch's cooldown_minutes (CheckInSettings) between the
+ *     last check-out and the next check-in.
+ *    Any check-out ends the visit — there is no re-entry into the same visit.
  *
  * Walk-ins are not members and are not subject to these rules.
  */
@@ -33,17 +35,19 @@ import java.util.Objects;
 public class CheckInPolicyService {
 
     public static final int MAX_CHECK_INS_PER_DAY = 3;
-    public static final int COOLDOWN_MINUTES = 120;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("h:mm a");
 
     private final AttendanceRepository attendanceRepository;
     private final MembershipPlanRepository membershipPlanRepository;
+    private final CheckInSettingsService checkInSettingsService;
 
     public CheckInPolicyService(AttendanceRepository attendanceRepository,
-                                MembershipPlanRepository membershipPlanRepository) {
+                                MembershipPlanRepository membershipPlanRepository,
+                                CheckInSettingsService checkInSettingsService) {
         this.attendanceRepository = attendanceRepository;
         this.membershipPlanRepository = membershipPlanRepository;
+        this.checkInSettingsService = checkInSettingsService;
     }
 
     /**
@@ -77,6 +81,7 @@ public class CheckInPolicyService {
 
     public Allowance evaluate(Member member) {
         LocalDateTime now = LocalDateTime.now();
+        CheckInSettings settings = checkInSettingsService.forMember(member);
         LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
 
         MembershipPlan plan = resolvePlan(member);
@@ -95,9 +100,10 @@ public class CheckInPolicyService {
                 .count();
 
         // Cooldown is measured from the latest check-out, which may be yesterday evening.
-        LocalDateTime nextAllowed = attendanceRepository
+        int cooldown = settings.getCooldownMinutes();
+        LocalDateTime nextAllowed = cooldown <= 0 ? null : attendanceRepository
                 .findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(member.getId())
-                .map(a -> a.getCheckOutTime().plusMinutes(COOLDOWN_MINUTES))
+                .map(a -> a.getCheckOutTime().plusMinutes(cooldown))
                 .filter(t -> t.isAfter(now))
                 .orElse(null);
 

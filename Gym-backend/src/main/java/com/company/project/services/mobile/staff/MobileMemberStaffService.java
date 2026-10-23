@@ -1,5 +1,6 @@
 package com.company.project.services.mobile.staff;
 
+import com.company.project.dto.CenterTrainerDTO;
 import com.company.project.dto.mobile.staff.*;
 import com.company.project.entities.Member;
 import com.company.project.entities.Staff;
@@ -63,6 +64,37 @@ public class MobileMemberStaffService {
         return activeStaff(branchId).stream()
                 .map(s -> toCard(s, counts.get(s.getId()), myRatings.get(s.getId())))
                 .sorted(Comparator.comparing(MemberStaffCardDTO::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Public view of a branch's active staff for the center detail screen. Callers must
+     * have set the tenant context; no member is required.
+     */
+    public List<CenterTrainerDTO> getCenterTrainers(Long branchId) {
+        Map<Long, long[]> counts = countsByStaff(branchId);
+        return activeStaff(branchId).stream()
+                .map(s -> {
+                    CenterTrainerDTO dto = new CenterTrainerDTO();
+                    dto.setId(s.getId());
+                    dto.setName(s.getName());
+                    dto.setRole(s.getRole());
+                    dto.setDepartment(s.getDepartment());
+                    dto.setPhotoUrl(s.getPhotoUrl());
+                    long[] c = counts.get(s.getId());
+                    long total = 0;
+                    long sum = 0;
+                    if (c != null) {
+                        for (int i = 0; i < 5; i++) {
+                            total += c[i];
+                            sum += c[i] * (i + 1);
+                        }
+                    }
+                    dto.setRatingCount(total);
+                    dto.setAverageRating(total == 0 ? null : Math.round(sum * 10.0 / total) / 10.0);
+                    return dto;
+                })
+                .sorted(Comparator.comparing(CenterTrainerDTO::getName, String.CASE_INSENSITIVE_ORDER))
                 .collect(Collectors.toList());
     }
 

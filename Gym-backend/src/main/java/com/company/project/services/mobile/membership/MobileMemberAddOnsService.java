@@ -42,7 +42,7 @@ public class MobileMemberAddOnsService {
     }
 
     public MobileAddOnsResponseDTO getAddOns(UserDetailsImpl principal, int page, int limit) {
-        java.util.Optional<Member> memberOpt = memberRepository.findByEmail(principal.getEmail());
+        java.util.Optional<Member> memberOpt = findOwnMember(principal);
 
         // 1. Available Add-ons (Paginated)
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.ASC, "name"));
@@ -101,7 +101,7 @@ public class MobileMemberAddOnsService {
 
     @Transactional
     public MobileActiveAddOnDTO purchaseAddOn(UserDetailsImpl principal, Long addonId, com.company.project.dto.mobile.membership.MobileAddOnPurchaseRequestDTO request) {
-        Member member = memberRepository.findByEmail(principal.getEmail())
+        Member member = findOwnMember(principal)
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
         AddonPlan addonPlan = addonPlanRepository.findById(addonId)
@@ -153,5 +153,17 @@ public class MobileMemberAddOnsService {
         dto.setStatus(created.getStatus());
         
         return dto;
+    }
+
+    // By account, like the dashboard — a GymBios account may have no email (created at a
+    // gym's desk), and an email lookup could then match an unrelated email-less member.
+    private java.util.Optional<Member> findOwnMember(UserDetailsImpl principal) {
+        java.util.Optional<Member> member = principal.isGlobal()
+                ? memberRepository.findByGlobalUserId(principal.getId())
+                : memberRepository.findByUserId(principal.getId());
+        if (member.isEmpty() && principal.getEmail() != null) {
+            member = memberRepository.findByEmail(principal.getEmail());
+        }
+        return member;
     }
 }

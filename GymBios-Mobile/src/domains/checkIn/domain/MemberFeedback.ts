@@ -19,10 +19,13 @@ export interface MemberCheckInStatus {
   canCheckIn?: boolean;
   /** Why a check-in would be refused right now (quota, daily cap or cooldown). */
   blockedReason?: string | null;
-  /** Workout timer on the current visit — start while running, minutes once ended. */
-  workoutStartTime?: string | null;
-  workoutEndTime?: string | null;
-  workoutMinutes?: number | null;
+  /** Running Take Break (null when not on a break) and minutes of finished breaks — left out of the visit time. */
+  breakStartTime?: string | null;
+  breakMinutes?: number;
+  /** Branch's quick break length in minutes — the Take Break countdown. 0 turns Take Break off. */
+  breakAllowanceMinutes?: number;
+  /** While checked in: when the branch's minimum visit time is up. Null once check-out is allowed. */
+  checkOutAvailableAt?: string | null;
   /**
    * A visit from an earlier day that was never checked out. The member isn't
    * checked in; the next check-in closes it at unclosedAutoCloseTime.
@@ -32,11 +35,10 @@ export interface MemberCheckInStatus {
   unclosedAutoCloseTime?: string | null;
 }
 
-export interface MemberWorkoutResponse {
+export interface MemberBreakResponse {
   attendanceId?: number;
-  workoutStartTime?: string | null;
-  workoutEndTime?: string | null;
-  workoutMinutes?: number | null;
+  breakStartTime?: string | null;
+  breakMinutes?: number;
 }
 
 export interface MemberCheckInResponse {
@@ -60,7 +62,6 @@ export interface MemberCheckOutResponse {
   check_out_time?: string;
   durationMinutes?: number;
   duration_minutes?: number;
-  workoutMinutes?: number | null;
   message?: string;
 }
 

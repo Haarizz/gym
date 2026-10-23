@@ -1,7 +1,12 @@
 # Global Accounts for Gym-Created Members — Plan
 
 **Status:** Proposed, not started. Interim fixes are in place (see "Interim fixes").
-Membership suspension (section 5) is agreed and goes first.
+Membership suspension (section 5, step 0) is implemented on `changes_anandu`
+(migration `V103__membership_suspension.sql`), not yet released.
+Steps 1–7 are implemented on `changes_anandu`, not yet released (the app isn't in
+production) — see "Steps 1–7 — what's built". Members now sign in with GymBios accounts
+only: run the step 6 migration on every database that still has gym-only member logins
+(dry run first), or those members are refused at sign-in.
 **Scope:** Gym-backend (tenant DBs, main DB, control plane), Gym-frontend (Add Member,
 member details), GymBios-Mobile (login, invite claim).
 **Related:** [mobile-multi-membership-switcher-plan.md](mobile-multi-membership-switcher-plan.md)
@@ -289,11 +294,11 @@ These act on gym logins today and need the global-account versions:
 5. **What a gym can block.** Decided: a gym can only suspend its own membership
    (section 5); it can never lock the person's account or their access to Community,
    gym discovery or other gyms.
-6. **Profile edits by staff.** Recommended: staff edits to identity fields copy back to
-   the global profile. Alternative: identity fields are read-only on the web once the
-   account is linked.
-7. **Existing gym-created logins.** Recommended: migrate with username and password
-   hash copied; clashes go through link confirmation. Alternative: leave them as they
+6. **Profile edits by staff.** Implemented as recommended: staff edits to identity
+   fields copy back to the global profile. Alternative still open: identity fields
+   read-only on the web once the account is linked.
+7. **Existing gym-created logins.** Built as recommended (step 6, not yet run): migrate
+   with username and password hash copied; clashes go through link confirmation. Alternative: leave them as they
    are and only create global accounts for new members (keeps two kinds of login
    indefinitely).
 8. **Usernames.** Global login accepts username or email. Recommended: keep it so;
@@ -315,6 +320,93 @@ These act on gym logins today and need the global-account versions:
 5. Staff tool switch-over (section 6).
 6. Migration: dry-run report on QA, review, then run on QA, then production.
 7. After production shows no gym-created logins left, simplify the interim branches.
+
+## Steps 1–7 — what's built
+
+- **Clean-up (step 7):** done before any production run, since the app isn't live. A
+  member-only login in a gym's own database is refused at sign-in ("This login has
+  moved to a GymBios account…") and its old tokens are rejected
+  (`UserDetailsImpl.isMemberOnly`, `AuthService.login`, `JwtAuthenticationFilter`). Gone:
+  the gym-login branches in `TenantContextFilter`, `MobileProfileService` (gym record
+  read/write), `AuthService` (name, profile-completed, branch lookups by `user_id`), and
+  staff password reset for gym logins (`set-credentials` only creates accounts now; web
+  and mobile admin offer Create/Link instead). Creating or linking an account for a
+  member with an old gym login retires that login (`MemberAppAccountService.retireGymLogin`),
+  which is also how staff fix the migration's BLOCKED_USERNAME members. Kept on purpose:
+  the `isGlobal()` id-space guards in purchase, review and referral endpoints — a
+  non-global sign-in is now always staff. Single-database mode (tenant routing off) is
+  unaffected.
+
+- **Migration (step 6), not yet run:** `GymLoginMigrationService`, platform-admin only.
+  `POST /api/platform/account-migration/dry-run[?tenantSlug=…]` reports, per gym, what
+  would happen to each member with a gym-only login and changes nothing.
+  `POST /api/platform/account-migration/run` with `{"tenantSlug": "…", "confirm": "MIGRATE"}`
+  (omit tenantSlug for all gyms) does it. Outcomes: MIGRATE (new GymBios account, same
+  username and password hash, details copied, gym login retired), LINK_REQUEST (email
+  already has an account — request sent, gym login kept), ALREADY_REQUESTED,
+  RETIRE_GYM_LOGIN (already linked), BLOCKED_USERNAME (username used in the main DB —
+  decide by hand), SKIPPED_STAFF_LOGIN, SKIPPED_MISSING_LOGIN, FAILED. Re-runnable;
+  an interrupted MIGRATE resumes. Retiring disables the gym `users` row (rows elsewhere
+  still reference it) and removes its `user_directory` entry, rather than deleting.
+  Re-run after members accept link requests to retire their gym logins.
+- **Signed-out handling (for step 6):** the backend now rejects tokens of disabled
+  logins and answers 401 (not 403) when there's no valid sign-in; the app and the web
+  sign out on a 401, so migrated members simply sign in again.
+
+- **Staff tools (step 5):** the mobile admin member screen matches the web card —
+  account status (none / gym login / linked / awaiting confirmation), Create account,
+  Link existing, Cancel request; the Add Member wizard's toggle creates a GymBios
+  account. Staff can no longer set or reset a GymBios account's password anywhere;
+  `set-credentials` survives only to create an account (older clients) and to reset an
+  old gym-only login's password until step 6 moves it over.
+
+- **Profile sync (step 4):** one field mapping, `IdentityField` (name, phone, date of
+  birth, gender, nationality, address, emergency contact/phone, blood type, medical
+  conditions, allergies, medications, chronic illnesses, health notes, height, weight,
+  photo). An app edit copies the changed fields to the member's record at every linked
+  gym (`MemberProfileSyncService`, replacing the photo-only sync). A staff edit of a
+  linked member copies the changed fields to the account profile after the gym's save
+  commits (decision 6, recommended option); it does not reach the member's other gyms
+  until the person next edits that field in the app. Desk sign-up copies the whole gym
+  record onto the new account; accepting a link fills empty fields both ways and
+  overwrites nothing. Email is never copied — the account owns it.
+
+- **App (step 3):** `domains/account` — Profile → Account (email add/change, verify with
+  a code, link requests); a sheet in the member layout asks about pending link requests
+  (accept switches the app to that gym); "Forgot password?" on sign-in opens
+  `(auth)/forgot-password` (email → code + new password). Strings in en, ar, de, es,
+  fr, hi, zh.
+
+- **Web (step 2):** Add Member has a "Member has no email" checkbox (email required
+  otherwise) and its App Account section creates a GymBios account, warning when the
+  member has no email. Edit Member and the member profile page show `MemberAppAccountCard`:
+  create account / link existing account / pending request with cancel / linked account
+  (username, email, verified) — no password change except for old gym-only logins.
+
+- **Schema:** `V104__optional_account_email.sql` — `users.email` optional,
+  `users.email_verified` (existing rows true; desk-created false). Local dev applies the
+  email change through `DatabaseFixer`. Control plane `V10__account_links_and_codes.sql`
+  — `account_link_requests`, `account_codes`.
+- **Desk sign-up:** Add Member and `set-credentials` (create branch) now create a GymBios
+  account and link it (`MemberAppAccountService.createForMember`). Refused when the
+  username or email is already any login (GymBios account, gym login in
+  `user_directory`, or a pending in-app sign-up). Old gym logins keep their
+  change-password path until the migration.
+- **Staff endpoints:** `GET /api/members/{id}/app-account` (NONE / GYM_LOGIN / LINKED /
+  AWAITING_CONFIRMATION), `POST /api/members/{id}/app-account`,
+  `POST|DELETE /api/members/{id}/app-account/link`. Link requests last 14 days and email
+  the owner when their email is verified.
+- **App endpoints (strictly global):** `GET /api/mobile/account`,
+  `PUT /api/mobile/account/email`, `POST /api/mobile/account/email/send-code`,
+  `POST /api/mobile/account/email/verify`, `GET /api/mobile/account/link-requests`,
+  `POST /api/mobile/account/link-requests/{id}/accept|decline`.
+- **Forgotten password (public):** `POST /api/mobile/auth/password-reset/request`
+  (same answer whether or not the email has an account) and `/confirm`. Verified,
+  member-only accounts only. The code is never in the response unless
+  `account.password-reset.dev-return-code=true` (local testing only).
+- **Known gaps:** a person whose email a gym typed by mistake can't sign up with it until
+  support frees it (follow-up: a verified sign-up should take an address only held
+  unverified); creating a gym login (staff) doesn't yet check GymBios usernames.
 
 ## Risks
 

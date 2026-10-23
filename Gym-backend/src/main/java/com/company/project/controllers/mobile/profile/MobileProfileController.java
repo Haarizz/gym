@@ -5,9 +5,10 @@ import com.company.project.dto.mobile.profile.MobileLinkedGymDTO;
 import com.company.project.dto.mobile.profile.MobileProfileDTO;
 import com.company.project.dto.mobile.profile.MobileStaffContactUpdateDTO;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.accounts.IdentityField;
 import com.company.project.services.GlobalMembershipService;
 import com.company.project.services.StaffService;
-import com.company.project.services.mobile.profile.MemberPhotoSyncService;
+import com.company.project.services.mobile.profile.MemberProfileSyncService;
 import com.company.project.services.mobile.profile.MobileProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,15 +22,15 @@ public class MobileProfileController {
 
     private final MobileProfileService mobileProfileService;
     private final StaffService staffService;
-    private final MemberPhotoSyncService memberPhotoSyncService;
+    private final MemberProfileSyncService memberProfileSyncService;
     private final GlobalMembershipService globalMembershipService;
 
     public MobileProfileController(MobileProfileService mobileProfileService, StaffService staffService,
-                                   MemberPhotoSyncService memberPhotoSyncService,
+                                   MemberProfileSyncService memberProfileSyncService,
                                    GlobalMembershipService globalMembershipService) {
         this.mobileProfileService = mobileProfileService;
         this.staffService = staffService;
-        this.memberPhotoSyncService = memberPhotoSyncService;
+        this.memberProfileSyncService = memberProfileSyncService;
         this.globalMembershipService = globalMembershipService;
     }
 
@@ -40,11 +41,11 @@ public class MobileProfileController {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        MobileProfileDTO profile = mobileProfileService.getProfileByUserId(principal.getId(), principal.isGlobal());
+        MobileProfileDTO profile = mobileProfileService.getProfileByUserId(principal.getId());
         // BG_82: heal members created before the photo was copied at purchase time —
         // fills the selected gym's photo only when it has none.
         if (principal.isGlobal()) {
-            memberPhotoSyncService.syncToGym(principal.getId(), tenantSlug, profile.getPhotoUrl(), true);
+            memberProfileSyncService.fillMissingPhoto(principal.getId(), tenantSlug, profile.getPhotoUrl());
         }
         return ResponseEntity.ok(profile);
     }
@@ -74,10 +75,12 @@ public class MobileProfileController {
         if (principal == null) {
             return ResponseEntity.status(401).build();
         }
-        MobileProfileDTO updated = mobileProfileService.updateProfile(principal.getId(), request, principal.isGlobal());
-        // BG_82: a new photo also shows in the Member Directory of every gym they belong to.
-        if (principal.isGlobal() && request.getPhotoUrl() != null) {
-            memberPhotoSyncService.syncToAllGyms(principal.getId(), tenantSlug, updated.getPhotoUrl());
+        MobileProfileDTO updated = mobileProfileService.updateProfile(principal.getId(), request);
+        // The person owns these details (plan §3): every field they changed — photo, name,
+        // phone, health details… — also shows on their record at every gym they belong to.
+        if (principal.isGlobal()) {
+            memberProfileSyncService.syncToAllGyms(principal.getId(), tenantSlug,
+                    mobileProfileService.identityValues(principal.getId()), IdentityField.changedBy(request));
         }
         return ResponseEntity.ok(updated);
     }

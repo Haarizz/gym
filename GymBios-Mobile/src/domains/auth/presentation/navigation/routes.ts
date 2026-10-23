@@ -11,4 +11,5 @@ export const ROLE_SELECTION_HREF = '/role-selection' as Href;
 export const ROLE_LOGIN_HREF = '/(auth)/login' as Href;
 export const MEMBER_AUTH_HREF = '/(auth)/member' as Href;
 export const VERIFY_EMAIL_HREF = '/(auth)/verify-email' as Href;
+export const FORGOT_PASSWORD_HREF = '/(auth)/forgot-password' as Href;
 export const SOCIAL_USERNAME_HREF = '/(auth)/social-username' as Href;

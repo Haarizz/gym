@@ -118,6 +118,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Only members of your selected gym can comment.',
         APP_ACCESS_PENDING: 'You can comment once your membership is approved.',
+        MEMBERSHIP_SUSPENDED: "Your membership at this gym is suspended, so you can't comment as its member.",
         GYM_CONTEXT_REQUIRED: 'Select one of your gyms to comment.',
         MEMBERSHIP_UNDETERMINED: "Your membership couldn't be confirmed.",
       },
@@ -151,6 +152,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Only members of your selected gym can post. Switch to one of your gyms to post.',
         APP_ACCESS_PENDING: 'You can post once your membership is approved.',
+        MEMBERSHIP_SUSPENDED: "Your membership at this gym is suspended. Switch to another of your gyms to post.",
         GYM_CONTEXT_REQUIRED: 'Select one of your gyms to post.',
         MEMBERSHIP_UNDETERMINED: "Your membership couldn't be confirmed.",
         PLATFORM_CANNOT_POST: "Platform accounts can't post in the Community.",

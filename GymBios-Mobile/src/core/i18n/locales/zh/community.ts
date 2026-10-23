@@ -120,6 +120,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: '只有所选健身房的会员才能发表评论。',
         APP_ACCESS_PENDING: '会员资格审核通过后即可发表评论。',
+        MEMBERSHIP_SUSPENDED: "您在此健身房的会员资格已暂停，因此无法以会员身份评论。",
         GYM_CONTEXT_REQUIRED: '请选择你的健身房后再发表评论。',
         MEMBERSHIP_UNDETERMINED: '无法确认你的会员资格。',
       },
@@ -153,6 +154,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: '只有所选健身房的会员才能发帖。请切换到你的健身房再发帖。',
         APP_ACCESS_PENDING: '会员资格审核通过后即可发帖。',
+        MEMBERSHIP_SUSPENDED: "您在此健身房的会员资格已暂停。请切换到您的其他健身房后发布。",
         GYM_CONTEXT_REQUIRED: '请选择你的健身房后再发帖。',
         MEMBERSHIP_UNDETERMINED: '无法确认你的会员资格。',
         PLATFORM_CANNOT_POST: '平台账号无法在社区发帖。',

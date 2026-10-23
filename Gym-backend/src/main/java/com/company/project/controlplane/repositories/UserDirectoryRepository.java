@@ -8,5 +8,7 @@ import java.util.Optional;
 public interface UserDirectoryRepository extends JpaRepository<UserDirectoryEntry, Long> {
     Optional<UserDirectoryEntry> findByUsernameOrEmail(String username, String email);
     boolean existsByUsername(String username);
+    boolean existsByEmail(String email);
+    Optional<UserDirectoryEntry> findByUsername(String username);
     java.util.List<UserDirectoryEntry> findByTenantSlug(String tenantSlug);
 }

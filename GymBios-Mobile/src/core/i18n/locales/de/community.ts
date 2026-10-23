@@ -120,6 +120,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Nur Mitglieder deines ausgewählten Studios können kommentieren.',
         APP_ACCESS_PENDING: 'Du kannst kommentieren, sobald deine Mitgliedschaft freigegeben ist.',
+        MEMBERSHIP_SUSPENDED: "Deine Mitgliedschaft in diesem Studio ist ausgesetzt, daher kannst du nicht als Mitglied kommentieren.",
         GYM_CONTEXT_REQUIRED: 'Wähle eines deiner Studios, um zu kommentieren.',
         MEMBERSHIP_UNDETERMINED: 'Deine Mitgliedschaft konnte nicht bestätigt werden.',
       },
@@ -153,6 +154,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Nur Mitglieder deines ausgewählten Studios können posten. Wechsle zu einem deiner Studios, um zu posten.',
         APP_ACCESS_PENDING: 'Du kannst posten, sobald deine Mitgliedschaft freigegeben ist.',
+        MEMBERSHIP_SUSPENDED: "Deine Mitgliedschaft in diesem Studio ist ausgesetzt. Wechsle zu einem anderen deiner Studios, um zu posten.",
         GYM_CONTEXT_REQUIRED: 'Wähle eines deiner Studios, um zu posten.',
         MEMBERSHIP_UNDETERMINED: 'Deine Mitgliedschaft konnte nicht bestätigt werden.',
         PLATFORM_CANNOT_POST: 'Plattform-Konten können nicht in der Community posten.',

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gym detail</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F7FC; --card:#fff; --ink:#1B2430; --muted:#5F6B7A; --line:#ECEEF5;
+  --gold1:#F8CB52; --gold2:#F59E0B; --goldInk:#4A3410; --goldSoft:#FFF4D6;
+  --teal:#2F6B5E; --tealSoft:#E3F0EC; --violet:#8B5CF6; --violetSoft:#EFE9FE;
+  --shadow:0 6px 20px rgba(60,72,110,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:Inter,system-ui,sans-serif;background:#E9ECF5;color:var(--ink)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible{outline:2px solid var(--gold2);outline-offset:2px}
+.app{position:relative;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden}
+.scroll{height:100%;overflow-y:auto;padding-bottom:110px}
+
+/* hero */
+.hero{position:relative;height:220px;border-radius:0 0 28px 28px;overflow:hidden;
+  background:linear-gradient(160deg,#2c3a35 0%,#2F6B5E 55%,#F59E0B 130%)}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(20,26,24,.78),rgba(20,26,24,.05) 65%)}
+.hero .blob{position:absolute;right:-70px;top:-70px;width:240px;height:240px;border-radius:50%;background:rgba(248,203,82,.22)}
+.round{position:absolute;top:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;z-index:2;box-shadow:var(--shadow)}
+.round svg{width:20px;height:20px}
+.hero-info{position:absolute;left:20px;right:20px;bottom:18px;z-index:2;color:#fff}
+.hero-info h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.rate{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:13px;opacity:.9}
+.dots{position:absolute;right:20px;bottom:22px;display:flex;gap:5px;z-index:2}
+.dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.5)}
+.dots i:first-child{width:18px;background:var(--gold1)}
+
+/* location row */
+.loc{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 4px}
+.loc div{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:var(--muted)}
+.loc svg{width:18px;height:18px;stroke:var(--teal)}
+.call{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:var(--tealSoft);color:var(--teal);font-weight:600;font-size:13px}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin:14px 16px 0;padding:5px;background:#fff;border-radius:18px;box-shadow:var(--shadow);position:sticky;top:10px;z-index:5}
+.tab{flex:1;padding:10px 0;border-radius:14px;font-size:13px;font-weight:600;color:var(--muted);transition:background .2s,color .2s}
+.tab[aria-selected=true]{background:linear-gradient(135deg,var(--gold1),var(--gold2));color:var(--goldInk);box-shadow:0 4px 12px rgba(245,158,11,.35)}
+
+/* cards */
+.panel{padding:16px 16px 0;display:none}
+.panel.on{display:block}
+.card{background:var(--card);border-radius:24px;padding:20px;box-shadow:var(--shadow);margin-bottom:14px}
+.card h3{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;margin-bottom:8px}
+.card h3 svg{width:18px;height:18px;stroke:var(--teal)}
+.card p{font-size:14px;line-height:1.55;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{padding:7px 12px;border-radius:999px;background:var(--tealSoft);color:var(--teal);font-size:13px;font-weight:600}
+.empty{font-size:14px;color:var(--muted)}
+
+/* plan cards */
+.plan{position:relative;width:100%;text-align:left;display:block;background:#fff;border-radius:24px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+.plan:active{transform:scale(.99)}
+.plan.feat{background:linear-gradient(135deg,#FFE9A8,#F9C74F);color:var(--goldInk)}
+.plan.feat::after{content:"";position:absolute;right:-50px;top:-60px;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.28)}
+.plan-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1}
+.plan-name{font-size:18px;font-weight:800}
+.plan-dur{font-size:13px;color:var(--muted);margin-top:2px}
+.feat .plan-dur{color:rgba(74,52,16,.75)}
+.price{text-align:right}
+.price b{font-size:22px;font-weight:800}
+.price small{display:block;font-size:12px;color:var(--muted);text-decoration:line-through}
+.feat .price small{color:rgba(74,52,16,.6)}
+.badge{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--goldSoft);color:#9A6200;border:1px solid rgba(245,158,11,.35)}
+.feat .badge{background:rgba(255,255,255,.55)}
+.perks{margin-top:12px;display:flex;flex-direction:column;gap:6px;position:relative;z-index:1}
+.perks span{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.feat .perks span{color:var(--goldInk)}
+.perks svg{width:16px;height:16px;stroke:var(--teal);flex:none}
+.more{display:flex;align-items:center;gap:4px;margin-top:14px;font-size:13px;font-weight:700;color:var(--teal);position:relative;z-index:1}
+.feat .more{color:var(--goldInk)}
+
+/* info */
+.pay{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.pay div{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--bg);font-size:14px;font-weight:500}
+.pay div.ok{background:var(--tealSoft);color:var(--teal)}
+.pay div.no{color:#A5AEBB}
+.pay em{margin-left:auto;font-style:normal;font-weight:700}
+
+/* bottom bar */
+.bar{position:absolute;left:0;right:0;bottom:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 70%,rgba(246,247,252,0));z-index:8}
+.cta{width:100%;padding:16px;border-radius:20px;font-size:16px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--gold1),var(--gold2));box-shadow:0 8px 20px rgba(245,158,11,.4);text-shadow:0 1px 2px rgba(120,70,0,.25)}
+
+/* sheet */
+.scrim{position:absolute;inset:0;background:rgba(20,26,40,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:88%;display:flex;flex-direction:column;background:var(--bg);border-radius:28px 28px 0 0;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);z-index:21;box-shadow:0 -10px 40px rgba(20,26,40,.2)}
+.sheet.on{transform:none}
+.sheet.drag{transition:none}
+.grab{padding:10px 0 6px;cursor:grab;touch-action:none}
+.grab i{display:block;width:44px;height:5px;border-radius:3px;background:#CDD2DE;margin:0 auto}
+.sh-head{padding:6px 20px 14px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sh-head h2{font-size:22px;font-weight:800}
+.sh-head p{font-size:13px;color:var(--muted);margin-top:2px}
+.x{width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:var(--shadow);flex:none}
+.x svg{width:16px;height:16px}
+.sh-body{overflow-y:auto;padding:0 16px 8px}
+.sh-foot{padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+
+.hl{border-radius:22px;padding:18px 20px;background:linear-gradient(135deg,#FFE9A8,#F9C74F);color:var(--goldInk);margin-bottom:14px;position:relative;overflow:hidden}
+.hl::after{content:"";position:absolute;right:-40px;top:-50px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.28)}
+.hl .row{display:flex;justify-content:space-between;align-items:flex-end;position:relative;z-index:1}
+.hl .lab{font-size:12px;font-weight:500;opacity:.8}
+.hl .big{font-size:30px;font-weight:800;line-height:1.1}
+.hl .big s{font-size:14px;font-weight:500;opacity:.65;margin-left:6px}
+.hl .r{text-align:right}
+.hl .r b{font-size:17px;font-weight:800;display:block}
+
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.fact{background:#fff;border-radius:18px;padding:12px 14px;box-shadow:var(--shadow)}
+.fact span{display:block;font-size:12px;color:var(--muted)}
+.fact b{display:block;font-size:15px;font-weight:700;margin-top:2px}
+
+.sec{background:#fff;border-radius:22px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
+.sec h4{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin-bottom:10px}
+.sec h4 .ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center}
+.sec h4 svg{width:16px;height:16px}
+.ic.t{background:var(--tealSoft)} .ic.t svg{stroke:var(--teal)}
+.ic.g{background:var(--goldSoft)} .ic.g svg{stroke:#C27A00}
+.ic.v{background:var(--violetSoft)} .ic.v svg{stroke:var(--violet)}
+.kv{display:flex;justify-content:space-between;padding:9px 0;font-size:14px;border-bottom:1px solid var(--line)}
+.kv:last-child{border:0}
+.kv span{color:var(--muted)} .kv b{font-weight:600}
+.stream{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border-radius:14px;background:var(--bg);margin-top:8px;font-size:14px;font-weight:500}
+.stream em{font-style:normal;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--goldSoft);color:#9A6200}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.auto{display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--tealSoft);color:var(--teal);font-size:13px;font-weight:600}
+.auto svg{width:16px;height:16px;stroke:var(--teal)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="scroll" id="scroll">
+    <div class="hero">
+      <div class="blob"></div>
+      <button class="round" style="left:16px" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="#1B2430" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="hero-info">
+        <h1>Fitzone New - Branch 1</h1>
+        <div class="rate"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F8CB52"><path d="M12 2l3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z"/></svg>No reviews yet</div>
+      </div>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </div>
+
+    <div class="loc">
+      <div><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Chirayinkeezhu</div>
+      <button class="call"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>Call</button>
+    </div>
+
+    <div class="tabs" role="tablist" id="tabs"></div>
+
+    <section class="panel on" id="p-overview">
+      <div class="card"><h3>About</h3><p>This center has not added a description yet.</p></div>
+      <div class="card"><h3><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timings</h3><p>Timings not listed yet.</p></div>
+      <div class="card"><h3>Facilities</h3><p>No facilities listed for this center yet.</p></div>
+    </section>
+    <section class="panel" id="p-plans"></section>
+    <section class="panel" id="p-trainers"><div class="card"><p>No trainers listed for this center yet.</p></div></section>
+    <section class="panel" id="p-info">
+      <div class="card"><h3>Payment options</h3>
+        <div class="pay">
+          <div class="ok">Cash<em>Accepted</em></div>
+          <div class="ok">Card<em>Accepted</em></div>
+          <div class="no">BNPL<em>Not available</em></div>
+        </div></div>
+      <div class="card"><h3><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>Terms &amp; policies</h3><p>This center has not listed any terms or policies yet.</p></div>
+    </section>
+  </div>
+
+  <div class="bar"><button class="cta" id="mainCta">Subscribe</button></div>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+    <div class="grab" id="grab"><i></i></div>
+    <div class="sh-head">
+      <div><h2 id="shTitle"></h2><p id="shSub"></p></div>
+      <button class="x" id="close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="#1B2430" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="sh-body" id="shBody"></div>
+    <div class="sh-foot"><button class="cta" id="shCta"></button></div>
+  </div>
+</div>
+
+<script>
+const PLANS=[
+ {name:"Golden Premium",group:"Membership",type:"Individual",dur:4,unit:"monthly",price:50,was:80,offer:"Offer price",sessions:null,trainers:["John Smith","Sarah Wilson"],
+  desc:"Full-access plan with training streams, facility access and flexible freezing.",
+  attend:"Unlimited",perUnit:null,capacity:"No limit",
+  streams:[{n:"Personal Training Part",p:5000}],
+  fac:["Debitis quam aliquid"],
+  freeze:{max:30,free:10,occ:2,extra:5,auto:true},perks:["Good service","Freeze up to 30 days"],feat:true},
+ {name:"Platinum",group:"Membership",type:"Individual",dur:3,unit:"monthly",price:50,sessions:null,trainers:[],
+  desc:"Standard membership for regular gym use.",attend:"Unlimited",capacity:"No limit",
+  streams:[],fac:["Debitis quam aliquid"],freeze:{max:30,free:10,occ:2,extra:5,auto:true},perks:["Freeze up to 30 days"]},
+ {name:"Silver",group:"Membership",type:"Individual",dur:1,unit:"monthly",price:50,sessions:8,trainers:["Sarah Wilson"],
+  desc:"Entry plan with 8 guided sessions included.",attend:"3 times",perUnit:"per week",capacity:"30 members",
+  streams:[{n:"Personal Training Part",p:5000}],fac:[],freeze:{max:15,free:5,occ:1,extra:5,auto:false},perks:["8 sessions included"]}
+];
+const I={
+ chk:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+ key:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></svg>',
+ bld:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h2M13 8h2M9 12h2M13 12h2M10 21v-4h4v4"/></svg>',
+ snow:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/></svg>',
+ usr:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/></svg>',
+ chev:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
+};
+const $=id=>document.getElementById(id);
+const durText=p=>p.dur+" "+(p.dur>1?"months":"month");
+
+// tabs
+const TABS=[["overview","Overview"],["plans","Plans"],["trainers","Trainers"],["info","Info"]];
+$("tabs").innerHTML=TABS.map(([k,l],i)=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${i==0}">${l}</button>`).join("");
+$("tabs").onclick=e=>{const b=e.target.closest(".tab");if(!b)return;
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected",t==b));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.id=="p-"+b.dataset.k));
+  $("scroll").scrollTo({top:0});};
+
+// plan list
+$("p-plans").innerHTML=PLANS.map((p,i)=>`
+ <button class="plan ${p.feat?"feat":""}" data-i="${i}">
+  <div class="plan-top">
+   <div><div class="plan-name">${p.name}</div><div class="plan-dur">${durText(p)}</div>${p.was?'<span class="badge">Limited offer</span>':""}</div>
+   <div class="price"><b>AED ${p.price}</b>${p.was?`<small>AED ${p.was}</small>`:""}</div>
+  </div>
+  <div class="perks">${p.perks.map(t=>`<span><span style="display:contents">${I.chk.replace("<svg","<svg stroke=\"currentColor\"")}</span>${t}</span>`).join("")}</div>
+  <div class="more">View details ${I.chev}</div>
+ </button>`).join("");
+
+// sheet
+const sheet=$("sheet"),scrim=$("scrim");
+function openPlan(i){
+  const p=PLANS[i],f=p.freeze;
+  $("shTitle").textContent=p.name;
+  $("shSub").textContent=p.group+" · "+p.type;
+  $("shCta").textContent="Subscribe · AED "+p.price;
+  $("shBody").innerHTML=`
+   <div class="hl"><div class="row">
+     <div><div class="lab">Price</div><div class="big">AED ${p.price}${p.was?`<s>AED ${p.was}</s>`:""}</div></div>
+     <div class="r"><div class="lab">Duration</div><b>${durText(p)}</b></div>
+   </div></div>
+   <div class="facts">
+     <div class="fact"><span>Plan group</span><b>${p.group}</b></div>
+     <div class="fact"><span>Membership type</span><b>${p.type}</b></div>
+     <div class="fact"><span>Duration type</span><b>${p.unit[0].toUpperCase()+p.unit.slice(1)}</b></div>
+     <div class="fact"><span>Max sessions</span><b>${p.sessions??"Not limited"}</b></div>
+   </div>
+   <div class="sec"><h4>About this plan</h4><p style="font-size:14px;line-height:1.55;color:var(--muted)">${p.desc}</p></div>
+   ${p.trainers.length?`<div class="sec"><h4><span class="ic v">${I.usr}</span>Assignable trainers</h4><div class="chips">${p.trainers.map(t=>`<span class="chip">${t}</span>`).join("")}</div></div>`:""}
+   <div class="sec"><h4><span class="ic t">${I.key}</span>Access to training</h4>
+     <div class="kv"><span>Attendance</span><b>${p.attend}${p.perUnit?" "+p.perUnit:""}</b></div>
+     <div class="kv"><span>Membership capacity</span><b>${p.capacity}</b></div>
+     ${p.streams.length?p.streams.map(s=>`<div class="stream">${s.n}<em>AED ${s.p}</em></div>`).join("")+'<p class="hint">Priced streams can also be bought as add-ons.</p>':'<p class="hint">No training streams included.</p>'}
+   </div>
+   <div class="sec"><h4><span class="ic g">${I.bld}</span>Access to facilities</h4>
+     ${p.fac.length?`<div class="chips" style="margin-top:0">${p.fac.map(t=>`<span class="chip">${t}</span>`).join("")}</div>`:'<p class="hint" style="margin:0">No facilities included.</p>'}
+   </div>
+   <div class="sec"><h4><span class="ic t">${I.snow}</span>Freeze policy</h4>
+     <div class="kv"><span>Max freeze days</span><b>${f.max} days</b></div>
+     <div class="kv"><span>Free freeze days</span><b style="color:var(--teal)">${f.free} days</b></div>
+     <div class="kv"><span>Max occurrences</span><b>${f.occ} ${f.occ>1?"times":"time"}</b></div>
+     <div class="kv"><span>Extra day charge</span><b>AED ${f.extra} / day</b></div>
+     <div class="auto">${I.chk.replace("<svg","<svg stroke=\"currentColor\"")}${f.auto?"Auto unfreeze on end date":"Manual unfreeze only"}</div>
+   </div>`;
+  $("shBody").scrollTop=0;
+  sheet.style.transform="";
+  sheet.classList.add("on");scrim.classList.add("on");
+  $("close").focus();
+}
+function closeSheet(){sheet.classList.remove("on");scrim.classList.remove("on");sheet.style.transform=""}
+$("p-plans").onclick=e=>{const b=e.target.closest(".plan");if(b)openPlan(+b.dataset.i)};
+$("close").onclick=closeSheet;scrim.onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+$("mainCta").onclick=()=>document.querySelector('[data-k="plans"]').click();
+
+// drag to dismiss
+let y0=null;const grab=$("grab");
+grab.onpointerdown=e=>{y0=e.clientY;grab.setPointerCapture(e.pointerId);sheet.classList.add("drag")};
+grab.onpointermove=e=>{if(y0===null)return;const d=Math.max(0,e.clientY-y0);sheet.style.transform=`translateY(${d}px)`};
+grab.onpointerup=e=>{if(y0===null)return;const d=e.clientY-y0;y0=null;sheet.classList.remove("drag");
+  if(d>110)closeSheet();else sheet.style.transform=""};
+</script>
+</body>
+</html>

@@ -120,6 +120,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'يمكن لأعضاء صالتك المختارة فقط التعليق.',
         APP_ACCESS_PENDING: 'يمكنك التعليق بعد الموافقة على عضويتك.',
+        MEMBERSHIP_SUSPENDED: "عضويتك في هذه الصالة موقوفة، لذا لا يمكنك التعليق كعضو فيها.",
         GYM_CONTEXT_REQUIRED: 'اختر إحدى صالاتك للتعليق.',
         MEMBERSHIP_UNDETERMINED: 'تعذّر تأكيد عضويتك.',
       },
@@ -153,6 +154,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'يمكن لأعضاء صالتك المختارة فقط النشر. انتقل إلى إحدى صالاتك للنشر.',
         APP_ACCESS_PENDING: 'يمكنك النشر بعد الموافقة على عضويتك.',
+        MEMBERSHIP_SUSPENDED: "عضويتك في هذه الصالة موقوفة. انتقل إلى صالة أخرى من صالاتك للنشر.",
         GYM_CONTEXT_REQUIRED: 'اختر إحدى صالاتك للنشر.',
         MEMBERSHIP_UNDETERMINED: 'تعذّر تأكيد عضويتك.',
         PLATFORM_CANNOT_POST: 'لا يمكن لحسابات المنصة النشر في المجتمع.',

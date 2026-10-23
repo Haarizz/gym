@@ -5,7 +5,9 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Avatar, AvatarFallback } from '../ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Textarea } from '../ui/textarea';
+import { toast } from 'sonner';
 import { InfoRow } from './info-row';
 import {
   ArrowLeft,
@@ -23,7 +25,8 @@ import {
   Printer,
   Smartphone,
   ShieldCheck,
-  ShieldOff,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import { Member, membersService } from '../../utils/supabase/members-service';
 import { calculateHealthRisk, getRiskBadgeConfig, formatEmergencyData } from '../../utils/health-risk';
@@ -39,23 +42,43 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('profile');
   const [showQRModal, setShowQRModal] = useState(false);
-  const [appAccessEnabled, setAppAccessEnabled] = useState<boolean | null>(
-    member.app_access_enabled ?? null
-  );
-  const [isTogglingAccess, setIsTogglingAccess] = useState(false);
+  const [membershipSuspended, setMembershipSuspended] = useState(!!member.membership_suspended);
+  const [suspendedReason, setSuspendedReason] = useState(member.suspended_reason ?? null);
+  const [isUpdatingAccess, setIsUpdatingAccess] = useState(false);
+  const [showSuspendDialog, setShowSuspendDialog] = useState(false);
+  const [suspendReasonDraft, setSuspendReasonDraft] = useState('');
+  const hasAppAccount = !!member.user_id || !!member.global_user_id;
   const displayEmail = member.email && !member.email.includes('@family.local') ? member.email : 'Not added';
 
-  const handleToggleAccess = async () => {
-    if (!member.user_id) return;
-    const newState = !appAccessEnabled;
-    setIsTogglingAccess(true);
+  // Suspending closes this gym's member features in the app only — the member keeps
+  // their app account, the Community and gym discovery.
+  const handleSuspend = async () => {
+    setIsUpdatingAccess(true);
     try {
-      await membersService.toggleMemberAccess(member.id, newState);
-      setAppAccessEnabled(newState);
+      const updated = await membersService.suspendMembership(member.id, suspendReasonDraft.trim() || undefined);
+      setMembershipSuspended(true);
+      setSuspendedReason(updated.suspended_reason ?? null);
+      setShowSuspendDialog(false);
+      setSuspendReasonDraft('');
+      toast.success('Membership suspended');
     } catch (err) {
-      console.error('Failed to toggle app access', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to suspend membership');
     } finally {
-      setIsTogglingAccess(false);
+      setIsUpdatingAccess(false);
+    }
+  };
+
+  const handleResume = async () => {
+    setIsUpdatingAccess(true);
+    try {
+      await membersService.resumeMembership(member.id);
+      setMembershipSuspended(false);
+      setSuspendedReason(null);
+      toast.success('Membership resumed');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resume membership');
+    } finally {
+      setIsUpdatingAccess(false);
     }
   };
 
@@ -229,42 +252,64 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
                   <span>App Access</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {member.user_id ? (
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Username: <span className="font-mono">{member.app_username}</span></p>
-                      <div className="flex items-center space-x-2">
-                        {appAccessEnabled ? (
-                          <Badge className="bg-emerald-100 text-emerald-700">
-                            <ShieldCheck className="h-3 w-3 mr-1" /> Enabled
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-rose-100 text-rose-700">
-                            <ShieldOff className="h-3 w-3 mr-1" /> Disabled
-                          </Badge>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {appAccessEnabled ? 'Member can log into the app.' : 'Member is blocked from the app.'}
-                        </span>
-                      </div>
+              <CardContent className="space-y-4">
+                {hasAppAccount ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {member.app_username
+                        ? <>Username: <span className="font-mono">{member.app_username}</span></>
+                        : 'GymBios account (self sign-up)'}
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <Badge className="bg-emerald-100 text-emerald-700">
+                        <ShieldCheck className="h-3 w-3 mr-1" /> Linked
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        The account belongs to the member — the gym can't block it.
+                      </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleToggleAccess}
-                      disabled={isTogglingAccess}
-                      className={appAccessEnabled
-                        ? 'border-rose-300 text-rose-600 hover:bg-rose-50'
-                        : 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
-                      }
-                    >
-                      {isTogglingAccess ? 'Updating...' : (appAccessEnabled ? 'Disable Access' : 'Enable Access')}
-                    </Button>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">No app account created for this member.</p>
                 )}
+
+                {/* Membership access: what this gym's membership opens in the app */}
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Membership access</p>
+                    <div className="flex items-center space-x-2">
+                      {membershipSuspended ? (
+                        <Badge className="bg-amber-100 text-amber-700">
+                          <PauseCircle className="h-3 w-3 mr-1" /> Suspended
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-emerald-100 text-emerald-700">
+                          <PlayCircle className="h-3 w-3 mr-1" /> Active
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {membershipSuspended
+                          ? 'Check-in and app member features are closed; Community and gym browsing still work.'
+                          : "This gym's member features are open in the app."}
+                      </span>
+                    </div>
+                    {membershipSuspended && suspendedReason && (
+                      <p className="text-xs text-muted-foreground">Reason: {suspendedReason}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={membershipSuspended ? handleResume : () => setShowSuspendDialog(true)}
+                    disabled={isUpdatingAccess}
+                    className={membershipSuspended
+                      ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+                      : 'border-rose-300 text-rose-600 hover:bg-rose-50'
+                    }
+                  >
+                    {isUpdatingAccess ? 'Updating...' : (membershipSuspended ? 'Resume' : 'Suspend')}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -475,6 +520,39 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Suspend Membership Modal */}
+      <Dialog open={showSuspendDialog} onOpenChange={setShowSuspendDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <PauseCircle className="h-5 w-5 text-amber-600" />
+              <span>Suspend membership</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {member.name} won't be able to use this gym's member features in the app (bookings,
+              membership, payments) or check in at the gym. They can still sign in, use the Community
+              and browse gyms.
+            </p>
+            <Textarea
+              placeholder="Reason (shown to the member, optional)"
+              value={suspendReasonDraft}
+              onChange={(e) => setSuspendReasonDraft(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSuspendDialog(false)} disabled={isUpdatingAccess}>
+              Cancel
+            </Button>
+            <Button onClick={handleSuspend} disabled={isUpdatingAccess} className="bg-red-600 hover:bg-red-700 text-white">
+              {isUpdatingAccess ? 'Suspending...' : 'Suspend'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* QR Code Modal */}
       <Dialog open={showQRModal} onOpenChange={setShowQRModal}>

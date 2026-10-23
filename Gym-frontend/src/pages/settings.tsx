@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
   Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned, Stamp,
-  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent,
+  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent, FileText,
 } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
@@ -18,9 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { BranchSettingsTab, BRANCH_SETTINGS_TAB } from "./branch-settings";
 import { SettingsSaveBar } from "../components/settings/SettingsSaveBar";
 import { BranchTaxSettings } from "../components/settings/BranchTaxSettings";
+import { BranchTermsSettings } from "../components/settings/BranchTermsSettings";
 import "../styles/settings-page.css";
 
-const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax"] as const;
+const SETTINGS_TABS = ["currency", "company", BRANCH_SETTINGS_TAB, "tax", "terms"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const CURRENCY_USAGES = [
@@ -201,6 +202,7 @@ export function AppSettings() {
     { value: "company", label: "Company Details", hint: "Name, contact & logo", icon: Building },
     { value: BRANCH_SETTINGS_TAB, label: "Branch Settings", hint: "Profile, images & policies", icon: Building2 },
     { value: "tax", label: "Tax Configuration", hint: "Default VAT & purchase tax", icon: Percent },
+    { value: "terms", label: "Terms & Conditions", hint: "Shown in the mobile app", icon: FileText },
   ] as const;
   const activeTabIndex = Math.max(tabs.findIndex((t) => t.value === activeTab), 0);
 
@@ -538,6 +540,11 @@ export function AppSettings() {
         {/* Tax Configuration */}
         <TabsContent value="tax">
           {settingsBranchId != null && <BranchTaxSettings branchId={settingsBranchId} readOnly={isAllBranches} />}
+        </TabsContent>
+
+        {/* Branch Terms & Conditions */}
+        <TabsContent value="terms">
+          {settingsBranchId != null && <BranchTermsSettings branchId={settingsBranchId} readOnly={isAllBranches} />}
         </TabsContent>
       </Tabs>
     </div>

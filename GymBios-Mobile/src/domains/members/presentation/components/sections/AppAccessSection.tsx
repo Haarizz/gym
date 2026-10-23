@@ -6,119 +6,159 @@ import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { Member } from '../../../domain/Member';
+import type { MemberAppAccount } from '../../../application/access/MemberAccessRepository';
 import type { Tone } from '../../utils/memberDisplay';
 import { TonePill } from '../TonePill';
 import { DetailCard, DetailField, DetailGrid } from './DetailCard';
 
 interface AppAccessSectionProps {
   member: Member;
-  /** Opens the credentials sheet — creates a login, or resets the password of an existing one. */
-  onSetCredentials: () => void;
-  onToggleAccess: (enabled: boolean) => void;
+  /** The member's app account; null while loading. */
+  account: MemberAppAccount | null;
+  /** Opens the sheet that creates the member's own GymBios account. */
+  onCreateAccount: () => void;
+  /** Opens the sheet that asks the owner of an existing GymBios account to link it. */
+  onLinkAccount: () => void;
+  onCancelLink: () => void;
+  /** Suspends or resumes this gym's membership. The app account itself is never blocked. */
+  onSetSuspended: (suspended: boolean) => void;
   busy?: boolean;
 }
 
-type AccessState = 'none' | 'enabled' | 'blocked';
-
-function getAccessState(member: Member): AccessState {
-  const hasLogin = member.userId !== undefined || member.globalUserId !== undefined;
-  if (!hasLogin) return 'none';
-  return member.appAccessEnabled === false ? 'blocked' : 'enabled';
-}
+type AccountStatus = MemberAppAccount['status'];
 
 export function AppAccessSection({
   member,
-  onSetCredentials,
-  onToggleAccess,
+  account,
+  onCreateAccount,
+  onLinkAccount,
+  onCancelLink,
+  onSetSuspended,
   busy = false,
 }: AppAccessSectionProps) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const state = getAccessState(member);
-  // GymBios accounts manage their own password; only local logins can be reset here.
-  const isGlobalAccount = member.globalUserId !== undefined && member.userId === undefined;
+  const status: AccountStatus | null = account?.status ?? null;
 
-  const username = member.appUsername ?? (isGlobalAccount ? member.email : undefined);
-
-  const stateTones: Record<AccessState, Tone> = {
-    none: { label: t('members.appAccessSection.noLoginState'), color: '#6b7280' },
-    enabled: { label: t('members.appAccessSection.enabledState'), color: '#16a34a' },
-    blocked: { label: t('members.appAccessSection.blockedState'), color: '#dc2626' },
+  const statusTones: Record<AccountStatus, Tone> = {
+    NONE: { label: t('members.appAccessSection.noLoginState'), color: '#6b7280' },
+    GYM_LOGIN: { label: t('members.appAccessSection.gymLoginState'), color: '#d97706' },
+    LINKED: { label: t('members.appAccessSection.linkedState'), color: '#16a34a' },
+    AWAITING_CONFIRMATION: { label: t('members.appAccessSection.awaitingState'), color: '#d97706' },
   };
-
-  const stateHints: Record<AccessState, string> = {
-    none: t('members.appAccessSection.noLoginHint'),
-    enabled: t('members.appAccessSection.enabledHint'),
-    blocked: t('members.appAccessSection.blockedHint'),
+  const statusHints: Record<AccountStatus, string> = {
+    NONE: t('members.appAccessSection.noLoginHint'),
+    GYM_LOGIN: t('members.appAccessSection.gymLoginHint'),
+    LINKED: t('members.appAccessSection.managedNote'),
+    AWAITING_CONFIRMATION: t('members.appAccessSection.awaitingHint'),
   };
+  const suspended = member.membershipSuspended === true;
+  const membershipTone: Tone = suspended
+    ? { label: t('members.appAccessSection.membershipSuspended'), color: '#d97706' }
+    : { label: t('members.appAccessSection.membershipActive'), color: '#16a34a' };
 
   return (
-    <DetailCard title={t('members.appAccessSection.title')} icon="smartphone" right={<TonePill tone={stateTones[state]} />}>
-      <Typography variant="caption" color="textSecondary" style={styles.hint}>
-        {stateHints[state]}
-      </Typography>
+    <DetailCard
+      title={t('members.appAccessSection.title')}
+      icon="smartphone"
+      right={status ? <TonePill tone={statusTones[status]} /> : undefined}
+    >
+      {status ? (
+        <Typography variant="caption" color="textSecondary" style={styles.hint}>
+          {statusHints[status]}
+        </Typography>
+      ) : null}
 
-      {state !== 'none' ? (
+      {status === 'LINKED' ? (
         <DetailGrid>
+          <DetailField label={t('members.appAccessSection.gymBiosAccount')} value={account?.username} />
           <DetailField
-            label={isGlobalAccount ? t('members.appAccessSection.gymBiosAccount') : t('members.appAccessSection.username')}
-            value={username}
-          />
-          <DetailField
-            label={t('members.appAccessSection.loginType')}
-            value={isGlobalAccount ? t('members.appAccessSection.selfSignUp') : t('members.appAccessSection.createdByGym')}
+            label={t('members.appAccessSection.email')}
+            value={account?.email
+              ? `${account.email} · ${account.emailVerified
+                ? t('members.appAccessSection.emailVerified')
+                : t('members.appAccessSection.emailNotVerified')}`
+              : t('members.appAccessSection.noEmail')}
           />
         </DetailGrid>
       ) : null}
 
-      {state !== 'none' && isGlobalAccount ? (
-        <View style={[styles.note, { backgroundColor: theme.backgroundSelected }]}>
-          <Feather name="info" size={14} color={theme.textSecondary} />
-          <Typography variant="caption" color="textSecondary" style={styles.noteText}>
-            {t('members.appAccessSection.managedNote')}
-          </Typography>
+      {status === 'GYM_LOGIN' ? (
+        <DetailGrid>
+          <DetailField label={t('members.appAccessSection.username')} value={account?.username} />
+        </DetailGrid>
+      ) : null}
+
+      {status === 'AWAITING_CONFIRMATION' ? (
+        <>
+          <DetailGrid>
+            <DetailField label={t('members.appAccessSection.requestSentTo')} value={account?.linkRequestedAccount} />
+          </DetailGrid>
+          <View style={styles.actions}>
+            <ActionButton
+              icon="x"
+              label={t('members.appAccessSection.cancelRequest')}
+              color={theme.text}
+              disabled={busy}
+              onPress={onCancelLink}
+            />
+          </View>
+        </>
+      ) : null}
+
+      {status === 'NONE' || status === 'GYM_LOGIN' ? (
+        <View style={styles.actions}>
+          <ActionButton
+            icon="user-plus"
+            label={t('members.appAccessSection.createAccount')}
+            primary
+            disabled={busy}
+            onPress={onCreateAccount}
+          />
+          <ActionButton
+            icon="link"
+            label={t('members.appAccessSection.linkAccount')}
+            color={theme.text}
+            disabled={busy}
+            onPress={onLinkAccount}
+          />
         </View>
       ) : null}
 
-      <View style={styles.actions}>
-        {state === 'none' ? (
-          <ActionButton
-            icon="user-plus"
-            label={t('members.appAccessSection.createLogin')}
-            primary
-            disabled={busy}
-            onPress={onSetCredentials}
-          />
-        ) : (
-          <>
-            {state === 'enabled' ? (
-              <ActionButton
-                icon="slash"
-                label={t('members.appAccessSection.blockAccess')}
-                color={BrandColors.danger}
-                disabled={busy}
-                onPress={() => onToggleAccess(false)}
-              />
-            ) : (
-              <ActionButton
-                icon="unlock"
-                label={t('members.appAccessSection.restoreAccess')}
-                primary
-                disabled={busy}
-                onPress={() => onToggleAccess(true)}
-              />
-            )}
-            {!isGlobalAccount ? (
-              <ActionButton
-                icon="key"
-                label={t('members.appAccessSection.resetPassword')}
-                color={theme.text}
-                disabled={busy}
-                onPress={onSetCredentials}
-              />
-            ) : null}
-          </>
-        )}
+      <View style={[styles.membership, { borderTopColor: theme.backgroundSelected }]}>
+        <View style={styles.membershipHeader}>
+          <Typography variant="bodySmallBold">{t('members.appAccessSection.membershipTitle')}</Typography>
+          <TonePill tone={membershipTone} />
+        </View>
+        <Typography variant="caption" color="textSecondary">
+          {suspended
+            ? t('members.appAccessSection.membershipSuspendedHint')
+            : t('members.appAccessSection.membershipActiveHint')}
+        </Typography>
+        {suspended && member.suspendedReason ? (
+          <DetailGrid>
+            <DetailField label={t('members.appAccessSection.suspendedReason')} value={member.suspendedReason} />
+          </DetailGrid>
+        ) : null}
+        <View style={styles.actions}>
+          {suspended ? (
+            <ActionButton
+              icon="play-circle"
+              label={t('members.appAccessSection.resumeMembership')}
+              primary
+              disabled={busy}
+              onPress={() => onSetSuspended(false)}
+            />
+          ) : (
+            <ActionButton
+              icon="pause-circle"
+              label={t('members.appAccessSection.suspendMembership')}
+              color={BrandColors.danger}
+              disabled={busy}
+              onPress={() => onSetSuspended(true)}
+            />
+          )}
+        </View>
       </View>
     </DetailCard>
   );
@@ -159,16 +199,16 @@ const styles = StyleSheet.create({
   hint: {
     marginBottom: Spacing.md,
   },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
+  membership: {
     marginTop: Spacing.three,
-    padding: Spacing.two,
-    borderRadius: Radius.sm,
+    paddingTop: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.two,
   },
-  noteText: {
-    flex: 1,
+  membershipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   actions: {
     flexDirection: 'row',

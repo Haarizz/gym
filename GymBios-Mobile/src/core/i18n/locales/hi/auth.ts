@@ -20,8 +20,7 @@ const auth = {
     enterPassword: 'अपना पासवर्ड दर्ज करें',
     rememberMe: 'मुझे याद रखें',
     forgotPassword: 'पासवर्ड भूल गए?',
-    comingSoonTitle: 'जल्द आ रहा है',
-    forgotPasswordSoon: 'पासवर्ड रीसेट की सुविधा जल्द उपलब्ध होगी।',
+    sessionExpired: "आपका सत्र समाप्त हो गया है। कृपया फिर से साइन इन करें।",
     signIn: 'साइन इन करें',
     newToGymBios: 'GymBios पर नए हैं? <link>खाता बनाएँ</link>',
 
@@ -162,6 +161,23 @@ const auth = {
       checkIns: 'चेक-इन',
       streak: 'स्ट्रीक',
     },
+  },
+  passwordReset: {
+    title: "पासवर्ड रीसेट करें",
+    emailSubtitle: "अपने खाते का ईमेल दर्ज करें। यदि वह सत्यापित है, तो हम उस पर कोड भेजेंगे।",
+    email: "ईमेल",
+    sendCode: "कोड भेजें",
+    noEmailNote: "आपके खाते में कोई सत्यापित ईमेल नहीं है? GymBios सहायता से संपर्क करें — आपका जिम इसे रीसेट नहीं कर सकता।",
+    codeSubtitle: "{{email}} पर भेजा गया कोड दर्ज करें और नया पासवर्ड चुनें।",
+    code: "कोड",
+    newPassword: "नया पासवर्ड",
+    confirmPassword: "नए पासवर्ड की पुष्टि करें",
+    reset: "पासवर्ड रीसेट करें",
+    resend: "नया कोड भेजें",
+    mismatch: "पासवर्ड मेल नहीं खाते",
+    done: "पासवर्ड रीसेट हो गया। नए पासवर्ड से साइन इन करें।",
+    devCode: "डेव कोड: {{code}}",
+    backToSignIn: "साइन इन पर वापस जाएँ",
   },
 } satisfies LocaleResource;
 

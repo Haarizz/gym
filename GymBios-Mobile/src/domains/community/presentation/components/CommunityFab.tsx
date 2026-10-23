@@ -2,12 +2,9 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Height of the CommunityBottomNav bar so the FAB sits above it.
-const BOTTOM_NAV_HEIGHT = 74;
+import { useCommunityNavInset } from './CommunityBottomNav';
 
 interface CommunityFabProps {
   onPress: () => void;
@@ -20,11 +17,7 @@ interface CommunityFabProps {
 export function CommunityFab({ onPress }: CommunityFabProps) {
   const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
-  const insets = useSafeAreaInsets();
-  const bottomOffset =
-    BOTTOM_NAV_HEIGHT +
-    (insets.bottom > 0 ? insets.bottom : Platform.OS === 'android' ? 8 : 12) +
-    8;
+  const bottomOffset = useCommunityNavInset() + 12;
 
   return (
     <Pressable

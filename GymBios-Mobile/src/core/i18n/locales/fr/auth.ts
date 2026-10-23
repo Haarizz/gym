@@ -20,8 +20,7 @@ const auth = {
     enterPassword: 'Saisissez votre mot de passe',
     rememberMe: 'Se souvenir de moi',
     forgotPassword: 'Mot de passe oublié ?',
-    comingSoonTitle: 'Bientôt disponible',
-    forgotPasswordSoon: 'La réinitialisation du mot de passe sera bientôt disponible.',
+    sessionExpired: "Votre session a expiré. Veuillez vous reconnecter.",
     signIn: 'Se connecter',
     newToGymBios: 'Nouveau sur GymBios ? <link>Créer un compte</link>',
 
@@ -162,6 +161,23 @@ const auth = {
       checkIns: 'Enregistrements',
       streak: 'Série',
     },
+  },
+  passwordReset: {
+    title: "Réinitialiser le mot de passe",
+    emailSubtitle: "Saisissez l'e-mail de votre compte. S'il est vérifié, nous y enverrons un code.",
+    email: "E-mail",
+    sendCode: "Envoyer le code",
+    noEmailNote: "Pas d'e-mail vérifié sur votre compte ? Contactez le support GymBios — votre salle ne peut pas le réinitialiser.",
+    codeSubtitle: "Saisissez le code envoyé à {{email}} et choisissez un nouveau mot de passe.",
+    code: "Code",
+    newPassword: "Nouveau mot de passe",
+    confirmPassword: "Confirmer le nouveau mot de passe",
+    reset: "Réinitialiser le mot de passe",
+    resend: "Envoyer un nouveau code",
+    mismatch: "Les mots de passe ne correspondent pas",
+    done: "Mot de passe réinitialisé. Connectez-vous avec le nouveau mot de passe.",
+    devCode: "Code de dev : {{code}}",
+    backToSignIn: "Retour à la connexion",
   },
 } satisfies LocaleResource;
 

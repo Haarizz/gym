@@ -41,6 +41,7 @@ interface ProfileHubScreenProps {
   onNavigateToWallet: () => void;
   onNavigateToEnquiries: () => void;
   onNavigateToSettings: () => void;
+  onNavigateToAccount: () => void;
   onLogout?: () => void;
 }
 
@@ -53,6 +54,7 @@ export function ProfileHubScreen({
   onNavigateToWallet,
   onNavigateToEnquiries,
   onNavigateToSettings,
+  onNavigateToAccount,
   onLogout,
 }: ProfileHubScreenProps) {
   const { t } = useTranslation();
@@ -197,6 +199,17 @@ export function ProfileHubScreen({
                 iconBgColor="#f3e8ff"
                 iconColor="#7c3aed"
                 onPress={onNavigateToTransactions}
+              />
+            )}
+
+            {isMember && (
+              <ProfileNavigationRow
+                icon="shield"
+                title={t('profileHub.account')}
+                subtitle={t('profileHub.accountSubtitle')}
+                iconBgColor="#e0f2fe"
+                iconColor="#0284c7"
+                onPress={onNavigateToAccount}
               />
             )}
 

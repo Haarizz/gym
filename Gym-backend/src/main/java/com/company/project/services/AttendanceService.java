@@ -28,6 +28,7 @@ public class AttendanceService {
     private final BranchSettingsResolver branchSettingsResolver;
     private final AttendanceSessionService sessionService;
     private final WalkInRegistrationService walkInRegistrationService;
+    private final CheckInSettingsService checkInSettingsService;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              MemberRepository memberRepository,
@@ -35,7 +36,8 @@ public class AttendanceService {
                              com.company.project.repositories.AttendanceReportSettingsRepository reportSettingsRepository,
                              BranchSettingsResolver branchSettingsResolver,
                              AttendanceSessionService sessionService,
-                             WalkInRegistrationService walkInRegistrationService) {
+                             WalkInRegistrationService walkInRegistrationService,
+                             CheckInSettingsService checkInSettingsService) {
         this.attendanceRepository = attendanceRepository;
         this.memberRepository     = memberRepository;
         this.receiptService       = receiptService;
@@ -43,6 +45,7 @@ public class AttendanceService {
         this.branchSettingsResolver = branchSettingsResolver;
         this.sessionService = sessionService;
         this.walkInRegistrationService = walkInRegistrationService;
+        this.checkInSettingsService = checkInSettingsService;
     }
 
     // ── Automated report settings (one row per branch — gym floor capacity ─────
@@ -161,12 +164,16 @@ public class AttendanceService {
     // ── Checkout ──────────────────────────────────────────────────────────────
 
     @Transactional
-    public CheckOutResponse checkout(Long attendanceId) {
+    public CheckOutResponse checkout(Long attendanceId, boolean force) {
         Attendance record = attendanceRepository.findById(attendanceId)
                 .orElseThrow(() -> new RuntimeException("Attendance record not found: " + attendanceId));
 
         if (!"active".equals(record.getStatus())) {
             throw new RuntimeException("Already checked out");
+        }
+        // Before the minimum visit time the desk gets a warning and can confirm (force).
+        if (!force && record.getMember() != null) {
+            checkInSettingsService.enforceMinVisit(record, record.getMember());
         }
 
         // A visit left open from an earlier day is closed at the capped length.

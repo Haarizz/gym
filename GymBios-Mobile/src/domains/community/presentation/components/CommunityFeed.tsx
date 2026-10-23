@@ -8,6 +8,10 @@ import { EmptyState, Loader } from '@/shared/components';
 
 import type { CommunityPost } from '../../domain/community.types';
 import { CommunityPostCard } from './CommunityPostCard';
+import { useCommunityNavInset } from './CommunityBottomNav';
+
+// Extra room under the last post so it clears the create-post FAB too.
+const FAB_CLEARANCE = 80;
 
 interface CommunityFeedProps {
   posts: CommunityPost[];
@@ -35,6 +39,7 @@ export function CommunityFeed({
   const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const theme = useTheme();
+  const navInset = useCommunityNavInset();
 
   if (isLoading && posts.length === 0) {
     return (
@@ -68,6 +73,7 @@ export function CommunityFeed({
       )}
       contentContainerStyle={[
         styles.list,
+        { paddingBottom: navInset + FAB_CLEARANCE },
         posts.length === 0 && styles.emptyList,
       ]}
       ListEmptyComponent={
@@ -111,7 +117,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingTop: 14,
-    paddingBottom: 100,
     gap: 12,
   },
   emptyList: {

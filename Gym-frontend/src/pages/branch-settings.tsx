@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import {
   Building2,
   Image as ImageIcon,
-  Shield,
   MapPin,
   Clock,
   Tag,
@@ -60,7 +59,6 @@ interface DiscoveryFormState {
   bnpl_provider: string;
   tax_percentage: string;
   tax_inclusive: boolean;
-  terms_and_policies: string;
   walk_in_self_registration: boolean;
 }
 
@@ -78,7 +76,6 @@ function toFormState(branch: BranchDTO): DiscoveryFormState {
     bnpl_provider: branch.bnpl_provider || "",
     tax_percentage: branch.tax_percentage != null ? String(branch.tax_percentage) : "",
     tax_inclusive: branch.tax_inclusive || false,
-    terms_and_policies: branch.terms_and_policies || "",
     walk_in_self_registration: branch.walk_in_self_registration || false,
   };
 }
@@ -185,7 +182,6 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
         // pass the stored values through so saving doesn't wipe them.
         tax_percentage: form.tax_percentage ? Number(form.tax_percentage) : undefined,
         tax_inclusive: form.tax_inclusive,
-        terms_and_policies: form.terms_and_policies || undefined,
         walk_in_self_registration: form.walk_in_self_registration,
       });
       toast.success("Branch settings saved");
@@ -547,8 +543,7 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
           </Card>
         </div>
 
-        {/* Payment Methods + Policies */}
-        <div className="sp-grid sp-grid--1-2 sp-stretch">
+        {/* Payment Methods (branch terms live in the Settings › Terms & Conditions tab) */}
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -576,31 +571,6 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                <CardTitle>Policies</CardTitle>
-              </div>
-              <CardDescription>
-                Refund, freeze, transfer and enrollment terms shown to members before they join.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="terms_and_policies">Terms &amp; Policies</Label>
-                <Textarea
-                  id="terms_and_policies"
-                  rows={6}
-                  placeholder="e.g. No refund after 7 days of activation. Membership freeze available twice per year (max 30 days each). Non-transferable. Photo ID mandatory for enrollment."
-                  value={form.terms_and_policies}
-                  onChange={(e) => updateForm({ terms_and_policies: e.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Walk-in self-registration */}
         <Card className="border-0 shadow-sm">

@@ -11,6 +11,9 @@ import type { MembershipPlan } from '@/domains/membershipPlans';
 import { PaymentBottomSheet, type PaymentResult } from '@/shared/payment';
 import { showDeleteMemberDialog } from '../components/DeleteMemberDialog';
 import { CredentialsBottomSheet } from '../components/bottomSheets/CredentialsBottomSheet';
+import { LinkAccountBottomSheet } from '../components/bottomSheets/LinkAccountBottomSheet';
+import { useMemberAppAccount } from '../../hooks/useMemberAppAccount';
+import { SuspendMembershipBottomSheet } from '../components/bottomSheets/SuspendMembershipBottomSheet';
 import { FamilyMemberBottomSheet } from '../components/bottomSheets/FamilyMemberBottomSheet';
 import { FreezeMembershipBottomSheet } from '../components/bottomSheets/FreezeMembershipBottomSheet';
 import {
@@ -29,7 +32,6 @@ import { useMemberFamily } from '../../hooks/useMemberFamily';
 import type { Member } from '../../domain/Member';
 import type { AddFamilyMemberRequest } from '../../application/family/MemberFamilyRepository';
 import type { FreezeRequest } from '../../application/freeze/MemberFreezeRepository';
-import type { SetCredentialsRequest } from '../../application/access/MemberAccessRepository';
 import { toRenewalPayment } from '../utils/renewalPayment';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
@@ -61,8 +63,7 @@ export function MemberDetailsScreen({
     freezeMember,
     unfreezeMember,
     getFreezeAllowance,
-    setCredentials,
-    toggleAccess,
+    setMembershipSuspended,
   } = useMemberActions();
 
   // Only family memberships have a family group; asking for anyone else's just 404s.
@@ -70,11 +71,14 @@ export function MemberDetailsScreen({
     selectedMember?.membershipType?.toUpperCase() === 'FAMILY' || !!selectedMember?.familyHeadId;
   const { family, addFamilyMember: addFamilyMemberHook } =
     useMemberFamily(memberId, isFamilyMember);
+  const { account, createAccount, requestLink, cancelLink } = useMemberAppAccount(memberId);
 
   const [renewVisible, setRenewVisible] = useState(false);
   const [freezeVisible, setFreezeVisible] = useState(false);
   const [familyMemberVisible, setFamilyMemberVisible] = useState(false);
-  const [credentialsVisible, setCredentialsVisible] = useState(false);
+  const [createAccountVisible, setCreateAccountVisible] = useState(false);
+  const [linkVisible, setLinkVisible] = useState(false);
+  const [suspendVisible, setSuspendVisible] = useState(false);
   // Plan chosen in the renew sheet, awaiting payment in the shared payment sheet.
   const [renewPlan, setRenewPlan] = useState<MembershipPlan | null>(null);
   const [paymentVisible, setPaymentVisible] = useState(false);
@@ -175,26 +179,46 @@ export function MemberDetailsScreen({
     [addFamilyMemberHook],
   );
 
-  const handleSetCredentials = useCallback(
-    async (id: number, request: SetCredentialsRequest) => {
-      await setCredentials(id, request);
-      loadMember(id);
+  // The member's own GymBios account (replaces an old gym-only login, if any).
+  const handleCreateAccount = useCallback(
+    async (username: string, password: string) => {
+      if (!selectedMember) return;
+      await createAccount(username, password);
+      toast.success(t('members.details.accountCreatedToast'));
+      loadMember(selectedMember.id).catch(() => {});
     },
-    [setCredentials, loadMember],
+    [selectedMember, createAccount, loadMember, t],
   );
 
-  const handleToggleAccess = useCallback(
-    async (enabled: boolean) => {
+  const handleRequestLink = useCallback(
+    async (identifier: string) => {
+      await requestLink(identifier);
+      toast.success(t('members.details.linkRequestedToast'));
+    },
+    [requestLink, t],
+  );
+
+  const handleCancelLink = useCallback(async () => {
+    try {
+      await cancelLink();
+      toast.success(t('members.details.linkCancelledToast'));
+    } catch {
+      // Toasted by the API client.
+    }
+  }, [cancelLink, t]);
+
+  const handleSetSuspended = useCallback(
+    async (suspended: boolean, reason?: string) => {
       if (!selectedMember) return;
       try {
-        await toggleAccess(selectedMember.id, enabled);
-        toast.success(enabled ? t('members.details.accessRestored') : t('members.details.accessBlocked'));
+        await setMembershipSuspended(selectedMember.id, suspended, reason);
+        toast.success(suspended ? t('members.details.membershipSuspendedToast') : t('members.details.membershipResumedToast'));
         loadMember(selectedMember.id).catch(() => {});
       } catch {
         // Toasted by the API client.
       }
     },
-    [selectedMember, toggleAccess, loadMember, t],
+    [selectedMember, setMembershipSuspended, loadMember, t],
   );
 
   const header = (
@@ -246,8 +270,11 @@ export function MemberDetailsScreen({
 
         <AppAccessSection
           member={selectedMember}
-          onSetCredentials={() => setCredentialsVisible(true)}
-          onToggleAccess={handleToggleAccess}
+          account={account}
+          onCreateAccount={() => setCreateAccountVisible(true)}
+          onLinkAccount={() => setLinkVisible(true)}
+          onCancelLink={handleCancelLink}
+          onSetSuspended={(suspended) => (suspended ? setSuspendVisible(true) : handleSetSuspended(false))}
           busy={submitting}
         />
 
@@ -292,11 +319,23 @@ export function MemberDetailsScreen({
       />
 
       <CredentialsBottomSheet
-        visible={credentialsVisible}
-        memberId={selectedMember.id}
-        existingUsername={selectedMember.appUsername}
-        onClose={() => setCredentialsVisible(false)}
-        onSetCredentials={handleSetCredentials}
+        visible={createAccountVisible}
+        memberEmail={selectedMember.email && !selectedMember.email.includes('@family.local') ? selectedMember.email : undefined}
+        onClose={() => setCreateAccountVisible(false)}
+        onSubmit={handleCreateAccount}
+      />
+
+      <LinkAccountBottomSheet
+        visible={linkVisible}
+        onClose={() => setLinkVisible(false)}
+        onSubmit={handleRequestLink}
+      />
+
+      <SuspendMembershipBottomSheet
+        visible={suspendVisible}
+        memberName={selectedMember.name}
+        onClose={() => setSuspendVisible(false)}
+        onSuspend={(reason) => handleSetSuspended(true, reason)}
       />
     </ScreenLayout>
   );

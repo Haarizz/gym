@@ -18,8 +18,7 @@ const auth = {
     enterPassword: 'Enter your password',
     rememberMe: 'Remember me',
     forgotPassword: 'Forgot password?',
-    comingSoonTitle: 'Coming Soon',
-    forgotPasswordSoon: 'Forgot password flow will be available soon.',
+    sessionExpired: "Your session has ended. Please sign in again.",
     signIn: 'Sign in',
     newToGymBios: 'New to GymBios? <link>Create an account</link>',
 
@@ -160,6 +159,23 @@ const auth = {
       checkIns: 'Check-ins',
       streak: 'Streak',
     },
+  },
+  passwordReset: {
+    title: "Reset password",
+    emailSubtitle: "Enter your account's email. If it's verified, we'll send it a code.",
+    email: "Email",
+    sendCode: "Send code",
+    noEmailNote: "No verified email on your account? Contact GymBios support — your gym can't reset it.",
+    codeSubtitle: "Enter the code sent to {{email}} and choose a new password.",
+    code: "Code",
+    newPassword: "New password",
+    confirmPassword: "Confirm new password",
+    reset: "Reset password",
+    resend: "Send a new code",
+    mismatch: "Passwords don't match",
+    done: "Password reset. Sign in with your new password.",
+    devCode: "Dev code: {{code}}",
+    backToSignIn: "Back to sign in",
   },
 };
 

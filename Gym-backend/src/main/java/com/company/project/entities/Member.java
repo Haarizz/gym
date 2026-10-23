@@ -213,6 +213,21 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    // Staff suspended this gym's membership (web/mobile member page). Only ever
+    // written by MemberService.suspendMembership/resumeMembership — never by payment
+    // approval — and never touches the person's app account. See MemberAccessState.
+    @Column(name = "membership_suspended", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private boolean membershipSuspended;
+
+    @Column(name = "suspended_reason", columnDefinition = "TEXT")
+    private String suspendedReason;
+
+    @Column(name = "suspended_by")
+    private String suspendedBy;
+
+    @Column(name = "suspended_at")
+    private LocalDateTime suspendedAt;
+
     public Member() {}
 
     // ── Getters & Setters ───────────────────────────────────────────────────
@@ -394,6 +409,18 @@ public class Member extends BaseEntity implements BranchAware {
 
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
+    public boolean isMembershipSuspended() { return membershipSuspended; }
+    public void setMembershipSuspended(boolean membershipSuspended) { this.membershipSuspended = membershipSuspended; }
+
+    public String getSuspendedReason() { return suspendedReason; }
+    public void setSuspendedReason(String suspendedReason) { this.suspendedReason = suspendedReason; }
+
+    public String getSuspendedBy() { return suspendedBy; }
+    public void setSuspendedBy(String suspendedBy) { this.suspendedBy = suspendedBy; }
+
+    public LocalDateTime getSuspendedAt() { return suspendedAt; }
+    public void setSuspendedAt(LocalDateTime suspendedAt) { this.suspendedAt = suspendedAt; }
 
     @Column(name = "global_user_id")
     private Long globalUserId;

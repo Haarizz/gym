@@ -25,6 +25,12 @@ const payments = {
     noReason: '未提供原因。请联系健身房了解详情。',
     rejectedInfo: '请联系健身房前台处理付款问题，或重新购买套餐。',
     browseGyms: '浏览健身房',
+
+    suspendedTitle: "会员资格已暂停",
+    suspendedAtGym: "您在{{gym}}的会员资格已被健身房暂停。",
+    suspendedGeneric: "您的会员资格已被健身房暂停。",
+    suspendedInfo: "您的 GymBios 账户仍可正常使用：您可以浏览社区并查找健身房。请联系健身房前台恢复会员资格，然后下拉重新检查。",
+    openCommunity: "打开社区",
   },
 
   outstanding: {

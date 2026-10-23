@@ -7,6 +7,7 @@ import com.company.project.dto.CheckOutResponse;
 import com.company.project.dto.WalkInCheckInRequest;
 import com.company.project.dto.WalkInSelfRegistrationDTOs;
 import com.company.project.services.AttendanceService;
+import com.company.project.services.CheckInSettingsService;
 import com.company.project.services.WalkInRegistrationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,14 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
     private final WalkInRegistrationService walkInRegistrationService;
+    private final CheckInSettingsService checkInSettingsService;
 
     public AttendanceController(AttendanceService attendanceService,
-                                WalkInRegistrationService walkInRegistrationService) {
+                                WalkInRegistrationService walkInRegistrationService,
+                                CheckInSettingsService checkInSettingsService) {
         this.attendanceService = attendanceService;
         this.walkInRegistrationService = walkInRegistrationService;
+        this.checkInSettingsService = checkInSettingsService;
     }
 
     /**
@@ -70,13 +74,20 @@ public class AttendanceController {
      * Check out a member by their attendance record ID.
      * Sets checkOutTime = now, calculates duration, status → completed.
      *
+     * Before the branch's minimum visit time this answers 409 MIN_VISIT_NOT_REACHED;
+     * the desk confirms and repeats with force=true.
+     *
      * POST /api/attendance/{id}/checkout
      */
     @PostMapping("/{id}/checkout")
-    public ResponseEntity<?> checkout(@PathVariable Long id) {
+    public ResponseEntity<?> checkout(@PathVariable Long id,
+                                      @RequestParam(defaultValue = "false") boolean force) {
         try {
-            CheckOutResponse resp = attendanceService.checkout(id);
+            CheckOutResponse resp = attendanceService.checkout(id, force);
             return ResponseEntity.ok(resp);
+        } catch (com.company.project.exceptions.MinVisitNotReachedException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                    .body(Map.of("error", e.getMessage(), "code", "MIN_VISIT_NOT_REACHED"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -103,6 +114,21 @@ public class AttendanceController {
     public ResponseEntity<com.company.project.dto.AttendanceReportSettingsDTO> updateReportSettings(
             @RequestBody com.company.project.dto.AttendanceReportSettingsDTO request) {
         return ResponseEntity.ok(attendanceService.updateReportSettings(request));
+    }
+
+    /** GET/PUT the branch's check-in timing rules (Check In page › Configuration). */
+    @GetMapping("/check-in-settings")
+    public ResponseEntity<com.company.project.dto.CheckInSettingsDTO> getCheckInSettings() {
+        return ResponseEntity.ok(checkInSettingsService.get());
+    }
+
+    @PutMapping("/check-in-settings")
+    public ResponseEntity<?> updateCheckInSettings(@RequestBody com.company.project.dto.CheckInSettingsDTO request) {
+        try {
+            return ResponseEntity.ok(checkInSettingsService.update(request));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @GetMapping("/reports")

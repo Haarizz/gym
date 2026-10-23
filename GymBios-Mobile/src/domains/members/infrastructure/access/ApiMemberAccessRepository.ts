@@ -1,6 +1,6 @@
 import type {
   MemberAccessRepository,
-  SetCredentialsRequest,
+  MemberAppAccount,
 } from '../../application/access/MemberAccessRepository';
 import type { Member } from '../../domain/Member';
 
@@ -42,35 +42,42 @@ interface MemberResponse {
   user_id?: number | null;
   app_username?: string | null;
   app_access_enabled: boolean;
+  membership_suspended?: boolean | null;
+  suspended_reason?: string | null;
 
   created_at?: string;
   updated_at?: string;
 }
 
 export class ApiMemberAccessRepository implements MemberAccessRepository {
-  async setCredentials(
-    id: number,
-    request: SetCredentialsRequest,
-  ): Promise<Member> {
-    const response = await apiClient.post<MemberResponse>(
-      `/members/${id}/set-credentials`,
-      {
-        appUsername: request.appUsername,
-        appPassword: request.appPassword,
-      },
-    );
+  async getAppAccount(id: number): Promise<MemberAppAccount> {
+    const response = await apiClient.get<any>(`/members/${id}/app-account`);
+    return toAppAccount(response.data);
+  }
 
+  async createAppAccount(id: number, username: string, password: string): Promise<Member> {
+    const response = await apiClient.post<MemberResponse>(`/members/${id}/app-account`, { username, password });
     return this.toDomain(response.data);
   }
 
-  async toggleAccess(
+  async requestAccountLink(id: number, identifier: string): Promise<MemberAppAccount> {
+    const response = await apiClient.post<any>(`/members/${id}/app-account/link`, { identifier });
+    return toAppAccount(response.data);
+  }
+
+  async cancelAccountLink(id: number): Promise<MemberAppAccount> {
+    const response = await apiClient.delete<any>(`/members/${id}/app-account/link`);
+    return toAppAccount(response.data);
+  }
+
+  async setMembershipSuspended(
     id: number,
-    enabled: boolean,
+    suspended: boolean,
+    reason?: string,
   ): Promise<Member> {
-    const response = await apiClient.patch<MemberResponse>(
-      `/members/${id}/toggle-access`,
-      { enabled },
-    );
+    const response = suspended
+      ? await apiClient.post<MemberResponse>(`/members/${id}/suspend`, { reason })
+      : await apiClient.post<MemberResponse>(`/members/${id}/resume`);
 
     return this.toDomain(response.data);
   }
@@ -110,9 +117,22 @@ export class ApiMemberAccessRepository implements MemberAccessRepository {
       userId: response.user_id ?? undefined,
       appUsername: response.app_username ?? undefined,
       appAccessEnabled: response.app_access_enabled,
+      membershipSuspended: response.membership_suspended ?? undefined,
+      suspendedReason: response.suspended_reason ?? undefined,
 
       createdAt: response.created_at,
       updatedAt: response.updated_at,
     };
   }
+}
+
+function toAppAccount(d: any): MemberAppAccount {
+  return {
+    status: d?.status ?? 'NONE',
+    username: d?.username ?? undefined,
+    email: d?.email ?? undefined,
+    emailVerified: d?.email_verified ?? undefined,
+    linkRequestedAccount: d?.link_requested_account ?? undefined,
+    linkRequestExpiresAt: d?.link_request_expires_at ?? undefined,
+  };
 }

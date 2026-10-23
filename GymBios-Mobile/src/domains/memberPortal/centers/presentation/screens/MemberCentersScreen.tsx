@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import {
+  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput } from '@/shared/components/AppText';
 import { tOr } from '@/core/i18n';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandColors, Glass, Radius, Spacing, TypographyScale, heroTint } from '@/core/theme';
@@ -28,8 +29,8 @@ import {
 } from '../components/PriceRangeSlider';
 import { useCenters, type CenterSummary } from '@/domains/discovery';
 import { useNearbyDistance } from '../hooks/useNearbyDistance';
+import { useCentersReturnEntrance } from '../hooks/useCentersReturnEntrance';
 import { getDistanceKm } from '../../utils/distance';
-import { ClaimReferralSheet } from '@/domains/member-referrals/presentation/components/ClaimReferralSheet';
 
 export function MemberCentersScreen({
   initialDeepLink,
@@ -39,9 +40,7 @@ export function MemberCentersScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  // Set by AuthBootstrap right after profile completion: ask for a referral code once.
-  const { claimReferral } = useLocalSearchParams<{ claimReferral?: string }>();
-  const [isReferralSheetOpen, setIsReferralSheetOpen] = useState(claimReferral === '1');
+  const returnEntranceStyle = useCentersReturnEntrance();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<CenterFilters>(DEFAULT_CENTER_FILTERS);
   const [sortBy, setSortBy] = useState('Distance');
@@ -179,7 +178,7 @@ export function MemberCentersScreen({
 
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, returnEntranceStyle]}>
       {/* Colour wash behind the glass panels, same recipe as the member dashboard */}
       <View style={styles.blobLayer} pointerEvents="none">
         <GlassBlob color={BrandColors.memberGold} size={340} opacity={0.42} top={-90} right={-60} />
@@ -358,15 +357,7 @@ export function MemberCentersScreen({
         onReset={handleResetFilters}
         onClose={() => setIsFiltersOpen(false)}
       />
-
-      <ClaimReferralSheet
-        visible={isReferralSheetOpen}
-        onClose={() => {
-          setIsReferralSheetOpen(false);
-          router.setParams({ claimReferral: undefined });
-        }}
-      />
-    </View>
+    </Animated.View>
   );
 }
 

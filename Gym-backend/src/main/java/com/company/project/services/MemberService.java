@@ -81,6 +81,7 @@ public class MemberService {
     private final com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository;
     private final GlobalMembershipService globalMembershipService;
     private final MemberPaymentApprovalNotifier paymentApprovalNotifier;
+    private final com.company.project.services.accounts.MemberAppAccountService appAccountService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -103,7 +104,8 @@ public class MemberService {
                          @Lazy DiscountCodeService discountCodeService,
                          com.company.project.repositories.SalesInvoiceRepository salesInvoiceRepository,
                          GlobalMembershipService globalMembershipService,
-                         MemberPaymentApprovalNotifier paymentApprovalNotifier) {
+                         MemberPaymentApprovalNotifier paymentApprovalNotifier,
+                         com.company.project.services.accounts.MemberAppAccountService appAccountService) {
         this.memberRepository          = memberRepository;
         this.planRepository            = planRepository;
         this.receiptService            = receiptService;
@@ -123,6 +125,7 @@ public class MemberService {
         this.salesInvoiceRepository    = salesInvoiceRepository;
         this.globalMembershipService   = globalMembershipService;
         this.paymentApprovalNotifier   = paymentApprovalNotifier;
+        this.appAccountService         = appAccountService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -774,36 +777,12 @@ public class MemberService {
             createBilledToHeadRecord(fm, saved, billedFeeByMember.get(fm));
         }
 
-        // Auto-create app login account if credentials were provided
+        // Staff-assisted sign-up: credentials typed at the desk create the member's own
+        // GymBios account, linked at once — not a gym-only login (plan §1). Done last, so
+        // a refused username/email rolls the whole registration back.
         if (request.getAppUsername() != null && !request.getAppUsername().isBlank()
                 && request.getAppPassword() != null && !request.getAppPassword().isBlank()) {
-            if (userRepository.existsByUsername(request.getAppUsername())) {
-                throw new BusinessRuleViolationException("Username already taken: " + request.getAppUsername());
-            }
-            User user = new User();
-            user.setUsername(request.getAppUsername());
-            user.setEmail(saved.getEmail());
-            user.setPasswordHash(passwordEncoder.encode(request.getAppPassword()));
-            user.setEnabled(true);
-            user.setUserRoles(new java.util.HashSet<>());
-            user = userRepository.save(user);
-
-            Role memberRole = roleRepository.findByRoleName("MEMBER")
-                    .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
-            userRoleRepository.save(new UserRole(null, user, memberRole));
-            
-            if (saved.getBranchId() != null) {
-                userBranchRepository.save(new UserBranch(user.getId(), saved.getBranchId()));
-            }
-
-            if (TenantContextHolder.getCurrentTenant() != null) {
-                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
-            }
-
-            saved.setUserId(user.getId());
-            saved.setAppUsername(request.getAppUsername());
-            saved.setAppAccessEnabled(true);
-            saved = memberRepository.save(saved);
+            saved = appAccountService.createForMember(saved, request.getAppUsername(), request.getAppPassword(), null);
         }
 
         notificationService.notifyRoles(
@@ -846,42 +825,9 @@ public class MemberService {
             throw new BusinessRuleViolationException("Global mobile accounts manage their own credentials");
         }
 
-        if (member.getUserId() != null) {
-            // Already has an account — just update the password
-            User user = userRepository.findById(member.getUserId())
-                    .orElseThrow(() -> new EntityNotFoundException("Linked user account not found"));
-            user.setPasswordHash(passwordEncoder.encode(appPassword));
-            userRepository.save(user);
-        } else {
-            // No account yet — create one
-            if (userRepository.existsByUsername(appUsername)) {
-                throw new BusinessRuleViolationException("Username already taken: " + appUsername);
-            }
-            User user = new User();
-            user.setUsername(appUsername);
-            user.setEmail(member.getEmail());
-            user.setPasswordHash(passwordEncoder.encode(appPassword));
-            user.setEnabled(true);
-            user.setUserRoles(new java.util.HashSet<>());
-            user = userRepository.save(user);
-
-            Role memberRole = roleRepository.findByRoleName("MEMBER")
-                    .orElseThrow(() -> new EntityNotFoundException("MEMBER role not found"));
-            userRoleRepository.save(new UserRole(null, user, memberRole));
-
-            if (member.getBranchId() != null) {
-                userBranchRepository.save(new UserBranch(user.getId(), member.getBranchId()));
-            }
-
-            if (TenantContextHolder.getCurrentTenant() != null) {
-                userDirectoryRepository.save(new UserDirectoryEntry(user.getUsername(), user.getEmail(), TenantContextHolder.getCurrentTenant()));
-            }
-
-            member.setUserId(user.getId());
-            member.setAppUsername(appUsername);
-            member.setAppAccessEnabled(true);
-            memberRepository.save(member);
-        }
+        // Creates the member's own GymBios account (plan §1), replacing an old gym-only
+        // login if there is one — those no longer sign in, so there's no password to reset.
+        appAccountService.createForMember(member, appUsername, appPassword, null);
 
         return MemberResponseDTO.fromEntity(memberRepository.findById(id).orElseThrow());
     }
@@ -899,27 +845,38 @@ public class MemberService {
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
     }
 
-    public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled) {
+    /**
+     * Suspends this gym's membership: the member keeps their app account (sign-in,
+     * profile, Community, gym discovery, other gyms) but this gym's member features are
+     * refused until resumed (MemberAccessState, TenantContextFilter). Independent of
+     * payment approval, which can't lift it.
+     */
+    public MemberResponseDTO suspendMembership(Long id, String reason, String suspendedBy) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
-        if (member.getGlobalUserId() != null && member.getUserId() == null) {
-            // Global mobile accounts have no local User row to enable/disable — the
-            // member flag alone gates them (TenantContextFilter rejects FALSE).
-            if (enabled && "pending_approval".equalsIgnoreCase(member.getMembershipStatus())) {
-                throw new BusinessRuleViolationException(
-                        "Access is locked until the pending payment is approved");
-            }
-            return setAppAccessEnabled(id, enabled);
-        }
-        if (member.getUserId() == null) {
-            throw new EntityNotFoundException("This member has no linked app account");
-        }
-        User user = userRepository.findById(member.getUserId())
-                .orElseThrow(() -> new EntityNotFoundException("Linked user account not found"));
-        user.setEnabled(enabled);
-        userRepository.save(user);
-        member.setAppAccessEnabled(enabled);
+        member.setMembershipSuspended(true);
+        member.setSuspendedReason(reason != null && !reason.isBlank() ? reason.trim() : null);
+        member.setSuspendedBy(suspendedBy);
+        member.setSuspendedAt(LocalDateTime.now());
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
+    }
+
+    public MemberResponseDTO resumeMembership(Long id) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
+        member.setMembershipSuspended(false);
+        member.setSuspendedReason(null);
+        member.setSuspendedBy(null);
+        member.setSuspendedAt(null);
+        return MemberResponseDTO.fromEntity(memberRepository.save(member));
+    }
+
+    /**
+     * Former "App Access" toggle, kept for app versions that still call it. It now
+     * suspends/resumes the membership only — a gym never disables the person's login.
+     */
+    public MemberResponseDTO toggleMemberAccess(Long id, boolean enabled, String changedBy) {
+        return enabled ? resumeMembership(id) : suspendMembership(id, null, changedBy);
     }
 
     /**
@@ -1135,7 +1092,11 @@ public class MemberService {
             requireApproved(member, "Changing the membership status");
         }
         applyRequest(request, member);
-        return MemberResponseDTO.fromEntity(memberRepository.save(member));
+        Member saved = memberRepository.save(member);
+        // The member's own details also go to their GymBios account (plan §3), so the app
+        // shows the gym's correction. Gym-only fields (plan, fees, status…) never do.
+        appAccountService.copyToAccountAfterCommit(saved, com.company.project.services.accounts.IdentityField.changedBy(request));
+        return MemberResponseDTO.fromEntity(saved);
     }
 
     /**

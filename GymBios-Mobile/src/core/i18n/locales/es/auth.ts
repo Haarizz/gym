@@ -20,8 +20,7 @@ const auth = {
     enterPassword: 'Introduce tu contraseña',
     rememberMe: 'Recordarme',
     forgotPassword: '¿Olvidaste tu contraseña?',
-    comingSoonTitle: 'Próximamente',
-    forgotPasswordSoon: 'La recuperación de contraseña estará disponible pronto.',
+    sessionExpired: "Tu sesión ha terminado. Vuelve a iniciar sesión.",
     signIn: 'Iniciar sesión',
     newToGymBios: '¿Nuevo en GymBios? <link>Crea una cuenta</link>',
 
@@ -162,6 +161,23 @@ const auth = {
       checkIns: 'Accesos',
       streak: 'Racha',
     },
+  },
+  passwordReset: {
+    title: "Restablecer contraseña",
+    emailSubtitle: "Introduce el correo de tu cuenta. Si está verificado, te enviaremos un código.",
+    email: "Correo",
+    sendCode: "Enviar código",
+    noEmailNote: "¿Tu cuenta no tiene un correo verificado? Contacta con el soporte de GymBios — tu gimnasio no puede restablecerla.",
+    codeSubtitle: "Introduce el código enviado a {{email}} y elige una nueva contraseña.",
+    code: "Código",
+    newPassword: "Nueva contraseña",
+    confirmPassword: "Confirmar nueva contraseña",
+    reset: "Restablecer contraseña",
+    resend: "Enviar un código nuevo",
+    mismatch: "Las contraseñas no coinciden",
+    done: "Contraseña restablecida. Inicia sesión con la nueva contraseña.",
+    devCode: "Código de desarrollo: {{code}}",
+    backToSignIn: "Volver a iniciar sesión",
   },
 } satisfies LocaleResource;
 

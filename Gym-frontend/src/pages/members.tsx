@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -188,6 +189,15 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [analyticsMember, setAnalyticsMember] = useState<Member | null>(null);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
+  // Membership access (suspend/resume) in the profile dialog. Suspending closes this
+  // gym's member features and check-in; the member's app account is never blocked.
+  const [suspendReasonDraft, setSuspendReasonDraft] = useState('');
+  const [isSuspendFormOpen, setIsSuspendFormOpen] = useState(false);
+  const [isUpdatingMembershipAccess, setIsUpdatingMembershipAccess] = useState(false);
+  useEffect(() => {
+    setIsSuspendFormOpen(false);
+    setSuspendReasonDraft('');
+  }, [profileMember?.id]);
   const [profileRewards, setProfileRewards] = useState<ReferralReward[]>([]);
   const [profileWallet, setProfileWallet] = useState<RewardWallet | null>(null);
   const [profileRewardsLoading, setProfileRewardsLoading] = useState(false);
@@ -778,6 +788,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
 
   const getComputedStatus = (member: Member) => {
+    // Staff suspension wins over everything, as on the backend (MemberAccessState).
+    if (member.membership_suspended) return 'Suspended';
     if (member.membership_status === 'pending_approval') return 'pending_approval';
     // Frozen/suspended are deliberate overrides of the membership timeline —
     // they must win over an expiry-date check, otherwise a frozen member whose
@@ -1985,6 +1997,98 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                           </div>
                         </div>
                       )}
+                      {/* Membership access */}
+                      <div className="border-t pt-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Membership access</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            {profileMember.membership_suspended ? (
+                              <Badge className="bg-amber-100 text-amber-800">Suspended</Badge>
+                            ) : (
+                              <Badge className="bg-green-100 text-green-800">Active</Badge>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {profileMember.membership_suspended
+                                ? 'Check-in and app member features are closed. The member can still sign in, use the Community and browse gyms.'
+                                : "This gym's member features and check-in are open."}
+                            </p>
+                            {profileMember.membership_suspended && profileMember.suspended_reason && (
+                              <p className="text-xs">Reason: {profileMember.suspended_reason}</p>
+                            )}
+                          </div>
+                          {profileMember.membership_suspended ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-green-300 text-green-700 hover:bg-green-50 shrink-0"
+                              disabled={isUpdatingMembershipAccess}
+                              onClick={async () => {
+                                setIsUpdatingMembershipAccess(true);
+                                try {
+                                  const updated = await membersService.resumeMembership(profileMember.id);
+                                  setProfileMember({ ...profileMember, ...updated });
+                                  loadMembers();
+                                  toast.success('Membership resumed');
+                                } catch (e: any) {
+                                  toast.error(e.message || 'Failed to resume membership');
+                                } finally { setIsUpdatingMembershipAccess(false); }
+                              }}
+                            >
+                              Resume
+                            </Button>
+                          ) : !isSuspendFormOpen && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-300 text-red-600 hover:bg-red-50 shrink-0"
+                              onClick={() => setIsSuspendFormOpen(true)}
+                            >
+                              Suspend
+                            </Button>
+                          )}
+                        </div>
+                        {!profileMember.membership_suspended && isSuspendFormOpen && (
+                          <div className="mt-3 space-y-2">
+                            <Textarea
+                              placeholder="Reason (shown to the member in the app, optional)"
+                              value={suspendReasonDraft}
+                              onChange={(e) => setSuspendReasonDraft(e.target.value)}
+                              rows={2}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isUpdatingMembershipAccess}
+                                onClick={() => { setIsSuspendFormOpen(false); setSuspendReasonDraft(''); }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                disabled={isUpdatingMembershipAccess}
+                                onClick={async () => {
+                                  setIsUpdatingMembershipAccess(true);
+                                  try {
+                                    const updated = await membersService.suspendMembership(
+                                      profileMember.id, suspendReasonDraft.trim() || undefined);
+                                    setProfileMember({ ...profileMember, ...updated });
+                                    setIsSuspendFormOpen(false);
+                                    setSuspendReasonDraft('');
+                                    loadMembers();
+                                    toast.success('Membership suspended');
+                                  } catch (e: any) {
+                                    toast.error(e.message || 'Failed to suspend membership');
+                                  } finally { setIsUpdatingMembershipAccess(false); }
+                                }}
+                              >
+                                {isUpdatingMembershipAccess ? 'Suspending...' : 'Suspend membership'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       {/* Rewards & Wallet */}
                       <div className="border-t pt-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Rewards & Wallet</p>

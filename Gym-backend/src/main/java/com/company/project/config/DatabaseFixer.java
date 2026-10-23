@@ -26,6 +26,14 @@ public class DatabaseFixer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        // V104 for local dev (spring.flyway.enabled=false there): ddl-auto=update adds
+        // users.email_verified but never drops the old NOT NULL on users.email.
+        try {
+            jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN email DROP NOT NULL");
+        } catch (Exception e) {
+            System.err.println("Failed to make users.email optional: " + e.getMessage());
+        }
+
         try {
             jdbcTemplate.execute("ALTER TABLE account_heads DROP CONSTRAINT IF EXISTS uk_1k3bm2m00cs30hbnyil2ka8m7");
             jdbcTemplate.execute("ALTER TABLE account_heads DROP CONSTRAINT IF EXISTS account_heads_code_key");

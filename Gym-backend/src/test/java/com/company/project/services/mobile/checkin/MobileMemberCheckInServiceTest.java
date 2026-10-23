@@ -3,7 +3,7 @@ package com.company.project.services.mobile.checkin;
 import com.company.project.dto.mobile.checkin.MemberCheckInResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckInStatusResponseDTO;
 import com.company.project.dto.mobile.checkin.MemberCheckOutResponseDTO;
-import com.company.project.dto.mobile.checkin.MemberWorkoutResponseDTO;
+import com.company.project.dto.mobile.checkin.MemberBreakResponseDTO;
 import com.company.project.entities.Attendance;
 import com.company.project.entities.Member;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -14,6 +14,8 @@ import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.AttendanceSessionService;
 import com.company.project.services.CheckInPolicyService;
+import com.company.project.services.CheckInSettingsService;
+import com.company.project.exceptions.MinVisitNotReachedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,9 @@ class MobileMemberCheckInServiceTest {
     @Mock
     private StaffAttendanceRepository staffAttendanceRepository;
 
+    @Mock
+    private CheckInSettingsService checkInSettingsService;
+
     private MobileMemberCheckInService checkInService;
 
     private UserDetailsImpl testPrincipal;
@@ -55,7 +60,7 @@ class MobileMemberCheckInServiceTest {
     @BeforeEach
     void setUp() {
         checkInService = new MobileMemberCheckInService(memberRepository, attendanceRepository, checkInPolicyService,
-                new AttendanceSessionService(attendanceRepository, staffAttendanceRepository));
+                new AttendanceSessionService(attendanceRepository, staffAttendanceRepository), checkInSettingsService);
 
         testPrincipal = new UserDetailsImpl(
                 101L,
@@ -78,6 +83,8 @@ class MobileMemberCheckInServiceTest {
         testMember.setExpiryDate(LocalDateTime.now().plusMonths(10));
         testMember.setTotalVisits(10);
 
+        lenient().when(checkInSettingsService.forMember(any(Member.class)))
+                .thenReturn(new com.company.project.entities.CheckInSettings());
         lenient().when(checkInPolicyService.evaluate(any(Member.class))).thenReturn(
                 new CheckInPolicyService.Allowance(null, null, null, null, 0, 3, null, null));
     }
@@ -143,6 +150,23 @@ class MobileMemberCheckInServiceTest {
     }
 
     @Test
+    @DisplayName("Should refuse check-in for a staff-suspended membership, with staff's reason")
+    void testStaffSuspendedMembershipCheckInFails() {
+        testMember.setMembershipSuspended(true);
+        testMember.setSuspendedReason("Unpaid locker fees");
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+
+        BusinessRuleViolationException exception = assertThrows(
+                BusinessRuleViolationException.class,
+                () -> checkInService.checkIn(testPrincipal)
+        );
+
+        assertTrue(exception.getMessage().contains("membership is suspended"));
+        assertTrue(exception.getMessage().contains("Unpaid locker fees"));
+        verify(attendanceRepository, never()).saveAndFlush(any(Attendance.class));
+    }
+
+    @Test
     @DisplayName("Should throw BusinessRuleViolationException when membership has expired")
     void testExpiredMembershipCheckInFails() {
         testMember.setExpiryDate(LocalDateTime.now().minusDays(5));
@@ -183,6 +207,25 @@ class MobileMemberCheckInServiceTest {
         assertNotNull(activeAttendance.getCheckOutTime());
         assertEquals(response.getDurationMinutes(), activeAttendance.getTotalMinutes());
         verify(attendanceRepository, times(1)).save(activeAttendance);
+    }
+
+    @Test
+    @DisplayName("Check-out before the minimum visit time is refused for members")
+    void testCheckOutBeforeMinimumVisitFails() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+
+        Attendance activeAttendance = new Attendance();
+        activeAttendance.setId(906L);
+        activeAttendance.setMember(testMember);
+        activeAttendance.setStatus("active");
+        activeAttendance.setCheckInTime(LocalDateTime.now().minusMinutes(5));
+        stubOpenVisit(activeAttendance);
+        doThrow(new MinVisitNotReachedException("Minimum visit time is 30 min"))
+                .when(checkInSettingsService).enforceMinVisit(activeAttendance, testMember);
+
+        assertThrows(MinVisitNotReachedException.class, () -> checkInService.checkOut(testPrincipal));
+        assertEquals("active", activeAttendance.getStatus());
+        verify(attendanceRepository, never()).save(any(Attendance.class));
     }
 
     @Test
@@ -347,53 +390,70 @@ class MobileMemberCheckInServiceTest {
         assertEquals(yesterday.plusMinutes(AttendanceSessionService.STALE_SESSION_MAX_MINUTES), status.getUnclosedAutoCloseTime());
     }
 
-    // ── Workout timer ────────────────────────────────────────────────────────
+    // ── Take Break ───────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Workout starts once per visit and records its minutes when ended")
-    void testWorkoutStartAndEnd() {
+    @DisplayName("Take Break pauses the visit; break time is left out of the visit length")
+    void testBreakAndResume() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        Attendance current = visit(LocalDateTime.now().minusMinutes(5));
+        com.company.project.entities.CheckInSettings settings = new com.company.project.entities.CheckInSettings();
+        settings.setBreakGraceMinutes(5);
+        when(checkInSettingsService.forMember(testMember)).thenReturn(settings);
+        Attendance current = visit(LocalDateTime.now().minusMinutes(60));
         stubOpenVisit(current);
 
-        MemberWorkoutResponseDTO started = checkInService.startWorkout(testPrincipal);
-        assertNotNull(started.getWorkoutStartTime());
-        assertNull(started.getWorkoutEndTime());
-        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.resumeFromBreak(testPrincipal));
+        MemberBreakResponseDTO onBreak = checkInService.startBreak(testPrincipal);
+        assertNotNull(onBreak.getBreakStartTime());
+        assertEquals("active", current.getStatus()); // still checked in
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startBreak(testPrincipal));
 
-        current.setWorkoutStartTime(LocalDateTime.now().minusMinutes(30));
-        MemberWorkoutResponseDTO ended = checkInService.endWorkout(testPrincipal);
-        assertNotNull(ended.getWorkoutEndTime());
-        assertTrue(ended.getWorkoutMinutes() >= 29 && ended.getWorkoutMinutes() <= 31);
+        current.setBreakStartTime(LocalDateTime.now().minusMinutes(10));
+        MemberBreakResponseDTO resumed = checkInService.resumeFromBreak(testPrincipal);
+        assertNull(resumed.getBreakStartTime());
+        assertEquals(10, resumed.getBreakMinutes());
 
-        BusinessRuleViolationException again = assertThrows(BusinessRuleViolationException.class,
-                () -> checkInService.startWorkout(testPrincipal));
-        assertTrue(again.getMessage().contains("already logged"));
+        // A break still running at check-out is closed and left out too
+        current.setBreakStartTime(LocalDateTime.now().minusMinutes(5));
+        MemberCheckOutResponseDTO out = checkInService.checkOut(testPrincipal);
+        assertNull(current.getBreakStartTime());
+        assertTrue(out.getDurationMinutes() >= 44 && out.getDurationMinutes() <= 46); // 60 − 10 − 5
     }
 
     @Test
-    @DisplayName("Workout can't start without a check-in today")
-    void testWorkoutRequiresCurrentVisit() {
+    @DisplayName("Take Break is refused when the branch has no quick break time")
+    void testBreakDisabled() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
-        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+        when(checkInSettingsService.forMember(testMember)).thenReturn(new com.company.project.entities.CheckInSettings());
+        Attendance current = visit(LocalDateTime.now().minusMinutes(30));
+        stubOpenVisit(current);
+
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startBreak(testPrincipal));
+        assertNull(current.getBreakStartTime());
+    }
+
+    @Test
+    @DisplayName("Take Break needs a check-in today")
+    void testBreakRequiresCurrentVisit() {
+        when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startBreak(testPrincipal));
 
         stubOpenVisit(visit(LocalDate.now().minusDays(1).atTime(9, 0)));
-        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startWorkout(testPrincipal));
+        assertThrows(BusinessRuleViolationException.class, () -> checkInService.startBreak(testPrincipal));
         verify(attendanceRepository, never()).saveAndFlush(any(Attendance.class));
     }
 
     @Test
-    @DisplayName("Checking out ends a running workout")
-    void testCheckOutEndsRunningWorkout() {
+    @DisplayName("Checking out still ends a workout left running from before Start Workout was removed")
+    void testCheckOutEndsLegacyWorkout() {
         when(memberRepository.findByUserId(101L)).thenReturn(Optional.of(testMember));
         Attendance current = visit(LocalDateTime.now().minusMinutes(60));
         current.setWorkoutStartTime(LocalDateTime.now().minusMinutes(40));
         stubOpenVisit(current);
 
-        MemberCheckOutResponseDTO response = checkInService.checkOut(testPrincipal);
+        checkInService.checkOut(testPrincipal);
 
         assertEquals(current.getCheckOutTime(), current.getWorkoutEndTime());
-        assertTrue(response.getWorkoutMinutes() >= 39 && response.getWorkoutMinutes() <= 41);
     }
 
     private Attendance visit(LocalDateTime checkInTime) {

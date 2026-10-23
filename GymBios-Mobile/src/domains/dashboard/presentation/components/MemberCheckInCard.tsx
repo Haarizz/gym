@@ -11,12 +11,12 @@ import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { formatDate } from '@/core/i18n/format';
 import {
   checkInKeys,
-  useEndWorkout,
   useMemberCheckIn,
   useMemberCheckInStatus,
   useMemberCheckOut,
-  useStartWorkout,
+  useResumeFromBreak,
   useSubmitWorkoutFeedback,
+  useTakeBreak,
 } from '@/domains/checkIn';
 import { useMemberDashboard, dashboardKeys } from '@/domains/dashboard';
 import { PostWorkoutFeedbackSheet } from '@/domains/checkIn/presentation/components/members/PostWorkoutFeedbackSheet';
@@ -39,8 +39,8 @@ export function MemberCheckInCard() {
 
   const checkInMutation = useMemberCheckIn();
   const checkOutMutation = useMemberCheckOut();
-  const startWorkoutMutation = useStartWorkout();
-  const endWorkoutMutation = useEndWorkout();
+  const breakMutation = useTakeBreak();
+  const resumeMutation = useResumeFromBreak();
   const feedbackMutation = useSubmitWorkoutFeedback();
 
   const [overrideCheckedIn, setOverrideCheckedIn] = useState<boolean | null>(null);
@@ -79,13 +79,25 @@ export function MemberCheckInCard() {
   const checkInTime = isCheckedIn
     ? statusData?.checkInTime ?? dashboardData?.checkInStatus?.checkInTime ?? null
     : null;
-  const workoutStartTime = isCheckedIn ? statusData?.workoutStartTime ?? null : null;
-  const workoutEndTime = isCheckedIn ? statusData?.workoutEndTime ?? null : null;
-  const isWorkoutRunning = !!workoutStartTime && !workoutEndTime;
-  const isWorkoutDone = !!workoutStartTime && !!workoutEndTime;
+  // Take Break pauses the visit (still checked in). Needs the branch's quick break time.
+  const breakStartTime = isCheckedIn ? statusData?.breakStartTime ?? null : null;
+  const isOnBreak = !!breakStartTime;
+  const breakAllowanceMinutes = statusData?.breakAllowanceMinutes ?? 0;
+  const breaksEnabled = breakAllowanceMinutes > 0;
 
-  const visitSeconds = useElapsedSeconds(checkInTime, null);
-  const workoutSeconds = useElapsedSeconds(workoutStartTime, workoutEndTime);
+  const now = useNow(!!checkInTime);
+  const breakSeconds = secondsBetween(breakStartTime, null, now);
+  // Visit time leaves out finished breaks and freezes during the current one.
+  const visitSeconds = Math.max(
+    0,
+    secondsBetween(checkInTime, null, now) - (statusData?.breakMinutes ?? 0) * 60 - breakSeconds,
+  );
+  const breakSecondsLeft = isOnBreak ? breakAllowanceMinutes * 60 - breakSeconds : 0;
+  const isBreakOver = isOnBreak && breakSecondsLeft <= 0;
+
+  // Branch minimum visit time — check-out is held back until then.
+  const checkOutAvailableAt = isCheckedIn ? statusData?.checkOutAvailableAt ?? null : null;
+  const isCheckOutTooSoon = !!checkOutAvailableAt && new Date(checkOutAvailableAt).getTime() > now;
 
   // Re-check status when the cooldown ends so the card unlocks on its own.
   const nextAllowedAt = statusData?.nextCheckInAllowedAt;
@@ -99,7 +111,7 @@ export function MemberCheckInCard() {
 
   const isActionPending =
     checkInMutation.isPending || checkOutMutation.isPending;
-  const isWorkoutPending = startWorkoutMutation.isPending || endWorkoutMutation.isPending;
+  const isBreakPending = breakMutation.isPending || resumeMutation.isPending;
 
   const runCheckIn = () => {
     checkInMutation.mutate(undefined, {
@@ -157,6 +169,12 @@ export function MemberCheckInCard() {
 
   const handleCheckOut = () => {
     if (isActionPending) return;
+    if (isCheckOutTooSoon) {
+      toast.info(t('memberHome.checkIn.checkOutFrom', { time: formatDate(checkOutAvailableAt!, 'p') }), {
+        title: t('memberHome.checkIn.checkOutTooSoonTitle'),
+      });
+      return;
+    }
     checkOutMutation.mutate(undefined, {
       onSuccess: (resp) => {
         setOverrideCheckedIn(false);
@@ -173,6 +191,12 @@ export function MemberCheckInCard() {
         const msg =
           err?.response?.data?.message || err?.message || t('memberHome.checkIn.checkOutFailed');
 
+        if (typeof msg === 'string' && msg.toLowerCase().includes('minimum visit time')) {
+          // Branch rule changed since the last status load — pick up the new time.
+          queryClient.invalidateQueries({ queryKey: checkInKeys.all });
+          toast.info(msg, { title: t('memberHome.checkIn.checkOutTooSoonTitle') });
+          return;
+        }
         if (
           status === 409 ||
           (typeof msg === 'string' && msg.toLowerCase().includes('no active check-in'))
@@ -186,10 +210,9 @@ export function MemberCheckInCard() {
     });
   };
 
-  const handleWorkout = () => {
-    if (isWorkoutPending || isWorkoutDone) return;
-    const mutation = isWorkoutRunning ? endWorkoutMutation : startWorkoutMutation;
-    mutation.mutate(undefined, {
+  const handleBreak = () => {
+    if (isBreakPending) return;
+    (isOnBreak ? resumeMutation : breakMutation).mutate(undefined, {
       onError: () => {
         // The global toast already shows the reason; resync in case the visit changed.
         queryClient.invalidateQueries({ queryKey: checkInKeys.all });
@@ -232,13 +255,9 @@ export function MemberCheckInCard() {
     />
   );
 
-  // ── Checked in: visit timer + workout timer + check-out ────────────────────
+  // ── Checked in: visit timer + Take Break + check-out ───────────────────────
   if (isCheckedIn) {
-    const workoutLabel = isWorkoutRunning
-      ? t('memberHome.checkIn.endWorkout')
-      : isWorkoutDone
-        ? t('memberHome.checkIn.workoutDone')
-        : t('memberHome.checkIn.startWorkout');
+    const breakLabel = isOnBreak ? t('memberHome.checkIn.resumeVisit') : t('memberHome.checkIn.takeBreak');
 
     return (
       <>
@@ -271,51 +290,66 @@ export function MemberCheckInCard() {
               </Text>
             </View>
 
+            {breaksEnabled || isOnBreak ? (
+              <View style={styles.actionsRow}>
+                <Pressable
+                  onPress={handleBreak}
+                  disabled={isBreakPending}
+                  style={({ pressed }) => [
+                    styles.actionBtn,
+                    isBreakOver ? styles.breakBtnOver : isOnBreak ? styles.breakBtnActive : styles.breakBtn,
+                    pressed && styles.pressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={breakLabel}
+                >
+                  {isBreakPending ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Feather name={isOnBreak ? 'play' : 'coffee'} size={14} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.actionText} numberOfLines={1}>{breakLabel}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {isOnBreak ? (
+              <View style={[styles.breakStrip, isBreakOver && styles.breakStripOver]}>
+                <Feather name="coffee" size={13} color="#FFFFFF" />
+                <Text style={styles.breakStripText} numberOfLines={1}>
+                  {isBreakOver
+                    ? t('memberHome.checkIn.breakOver')
+                    : t('memberHome.checkIn.breakTimeLeft', { time: formatElapsed(breakSecondsLeft) })}
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.actionsRow}>
               <Pressable
-                onPress={handleWorkout}
-                disabled={isWorkoutPending || isWorkoutDone}
+                onPress={handleCheckOut}
+                disabled={isActionPending}
                 style={({ pressed }) => [
                   styles.actionBtn,
-                  isWorkoutRunning ? styles.workoutBtnRunning : styles.workoutBtn,
+                  styles.checkOutBtn,
+                  isCheckOutTooSoon && styles.checkOutBtnWaiting,
                   pressed && styles.pressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  workoutStartTime
-                    ? `${workoutLabel}, ${t('memberHome.checkIn.workoutTimerA11y', { duration: formatElapsed(workoutSeconds) })}`
-                    : workoutLabel
+                  isCheckOutTooSoon
+                    ? t('memberHome.checkIn.checkOutFrom', { time: formatDate(checkOutAvailableAt!, 'p') })
+                    : t('memberHome.checkIn.checkOutA11y')
                 }
-              >
-                {isWorkoutPending ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Feather
-                    name={isWorkoutRunning ? 'square' : isWorkoutDone ? 'check' : 'play'}
-                    size={14}
-                    color="#FFFFFF"
-                  />
-                )}
-                <Text style={styles.actionText} numberOfLines={1}>{workoutLabel}</Text>
-                {workoutStartTime ? (
-                  <Text style={styles.workoutTimer}>{formatElapsed(workoutSeconds)}</Text>
-                ) : null}
-              </Pressable>
-
-              <Pressable
-                onPress={handleCheckOut}
-                disabled={isActionPending}
-                style={({ pressed }) => [styles.actionBtn, styles.checkOutBtn, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel={t('memberHome.checkIn.checkOutA11y')}
               >
                 {isActionPending ? (
                   <ActivityIndicator color={ACTIVE_END} size="small" />
                 ) : (
-                  <Feather name="log-out" size={14} color={ACTIVE_END} />
+                  <Feather name={isCheckOutTooSoon ? 'clock' : 'log-out'} size={14} color={ACTIVE_END} />
                 )}
                 <Text style={[styles.actionText, styles.checkOutText]} numberOfLines={1}>
-                  {t('memberHome.checkIn.checkOut')}
+                  {isCheckOutTooSoon
+                    ? t('memberHome.checkIn.checkOutFrom', { time: formatDate(checkOutAvailableAt!, 'p') })
+                    : t('memberHome.checkIn.checkOut')}
                 </Text>
               </Pressable>
             </View>
@@ -422,23 +456,27 @@ export function MemberCheckInCard() {
 }
 
 /**
- * Seconds since `start` (until `end` when given), ticking every second while
- * running and the screen is focused. Counts from server timestamps, so it is
- * right after an app restart or a check-in made on the web.
+ * Current time, ticking every second while `active` and the screen is focused.
+ * Timers count from server timestamps, so they are right after an app restart
+ * or a check-in made on the web.
  */
-function useElapsedSeconds(start: string | null, end: string | null): number {
+function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
-  const running = !!start && !end;
 
   useFocusEffect(
     useCallback(() => {
-      if (!running) return;
+      if (!active) return;
       setNow(Date.now());
       const id = setInterval(() => setNow(Date.now()), 1000);
       return () => clearInterval(id);
-    }, [running]),
+    }, [active]),
   );
 
+  return now;
+}
+
+/** Whole seconds from `start` to `end` (or `now` while still running); 0 without a start. */
+function secondsBetween(start: string | null, end: string | null, now: number): number {
   if (!start) return 0;
   const from = new Date(start).getTime();
   const to = end ? new Date(end).getTime() : now;
@@ -569,19 +607,47 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: Spacing.two,
   },
-  workoutBtn: {
+  breakBtn: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
-  workoutBtnRunning: {
+  breakBtnActive: {
     backgroundColor: 'rgba(18,63,53,0.55)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
+  breakBtnOver: {
+    backgroundColor: 'rgba(27,90,76,0.95)',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
   checkOutBtn: {
     backgroundColor: '#FFFFFF',
   },
+  checkOutBtnWaiting: {
+    opacity: 0.7,
+  },
+  breakStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+  },
+  breakStripOver: {
+    backgroundColor: 'rgba(27,90,76,0.85)',
+  },
+  breakStripText: {
+    flex: 1,
+    fontSize: TypographyScale.small,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+  },
+
   actionText: {
     fontSize: TypographyScale.body,
     fontWeight: '700',
@@ -590,12 +656,6 @@ const styles = StyleSheet.create({
   },
   checkOutText: {
     color: ACTIVE_END,
-  },
-  workoutTimer: {
-    fontSize: TypographyScale.body,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    fontVariant: ['tabular-nums'],
   },
   unclosedStrip: {
     flexDirection: 'row',

@@ -40,10 +40,11 @@ export const useClaimReferral = () => {
   });
 };
 
-export const useMyReferralClaim = () => {
+export const useMyReferralClaim = (enabled = true) => {
   return useQuery({
     queryKey: referralsKeys.myClaim(),
     queryFn: () => referralsService.getMyClaim(),
+    enabled,
   });
 };
 

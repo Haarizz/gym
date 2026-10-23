@@ -25,6 +25,12 @@ const payments = {
     noReason: 'No reason was given. Please contact the gym for details.',
     rejectedInfo: "Please contact the gym's reception to sort out the payment, or purchase a plan again.",
     browseGyms: 'Browse Gyms',
+
+    suspendedTitle: "Membership Suspended",
+    suspendedAtGym: "Your membership at {{gym}} has been suspended by the gym.",
+    suspendedGeneric: "Your membership has been suspended by the gym.",
+    suspendedInfo: "Your GymBios account still works: you can browse the Community and find gyms. Contact the gym's reception to restore your membership, then pull down to check again.",
+    openCommunity: "Open Community",
   },
 
   outstanding: {

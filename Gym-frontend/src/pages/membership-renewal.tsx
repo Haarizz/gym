@@ -90,7 +90,8 @@ interface RawMember {
   monthly_fee?: number; monthlyFee?: number;
   outstanding_balance?: number; outstandingBalance?: number;
   total_visits?: number; totalVisits?: number;
-  app_access_enabled?: boolean; appAccessEnabled?: boolean;
+  membership_suspended?: boolean; membershipSuspended?: boolean;
+  suspended_reason?: string | null; suspendedReason?: string | null;
   payment_status?: string; paymentStatus?: string;
 }
 
@@ -113,7 +114,8 @@ const buildMembershipData = (raw: RawMember) => {
   const endDate = raw.membership_end_date ?? raw.membershipEndDate ?? null;
   const fee = Number(raw.membership_fee ?? raw.membershipFee ?? raw.monthly_fee ?? raw.monthlyFee ?? 0);
   const outstanding = Number(raw.outstanding_balance ?? raw.outstandingBalance ?? 0);
-  const appEnabled = raw.app_access_enabled ?? raw.appAccessEnabled ?? false;
+  const suspended = raw.membership_suspended ?? raw.membershipSuspended ?? false;
+  const suspendedReason = raw.suspended_reason ?? raw.suspendedReason ?? null;
   const paymentStatus = raw.payment_status ?? raw.paymentStatus ?? "pending";
   const daysLeft = calcDaysLeft(endDate);
   const usedPct = calcUsedPct(startDate, endDate);
@@ -140,7 +142,14 @@ const buildMembershipData = (raw: RawMember) => {
       ? [{ id: 1, type: "Outstanding Balance", description: `Balance due`, amount: outstanding, dueDate: endDate ?? "", status: paymentStatus }]
       : [] as any[],
     totalDue: outstanding,
-    accessDeviceStatus: { enabled: appEnabled, validUntil: endDate ?? "" },
+    // Gym access follows the membership: active, not past its end date, not suspended by staff.
+    accessDeviceStatus: {
+      enabled: !suspended && status.toLowerCase() === "active"
+        && (!endDate || new Date(endDate).getTime() >= Date.now()),
+      suspended,
+      suspendedReason,
+      validUntil: endDate ?? "",
+    },
   };
 };
 
@@ -615,15 +624,31 @@ export function MembershipRenewal({ onNavigate }: MembershipRenewalProps = {}) {
             </div>
 
             {/* Access Status Banner */}
+            {data.accessDeviceStatus.suspended && (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Ban className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <p className="font-semibold text-amber-900">Membership suspended</p>
+                    <p className="text-sm text-amber-700">
+                      Check-in and app member features are closed until it's resumed from the member's page.
+                      {data.accessDeviceStatus.suspendedReason && ` Reason: ${data.accessDeviceStatus.suspendedReason}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {data.accessDeviceStatus.enabled && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <div>
                     <p className="font-semibold text-green-900">Access Enabled</p>
-                    <p className="text-sm text-green-700">
-                      Valid until: {new Date(data.accessDeviceStatus.validUntil).toLocaleDateString()}
-                    </p>
+                    {data.accessDeviceStatus.validUntil && (
+                      <p className="text-sm text-green-700">
+                        Valid until: {new Date(data.accessDeviceStatus.validUntil).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Zap className="h-8 w-8 text-green-600 opacity-20" />

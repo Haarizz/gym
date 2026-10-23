@@ -68,6 +68,15 @@ public class Attendance extends BaseEntity implements BranchAware {
     @Column(name = "workout_minutes")
     private Integer workoutMinutes;
 
+    // Breaks during the visit (Take Break / Resume in the member app; the member stays
+    // checked in): the start of the running break, and the minutes of finished ones,
+    // which totalMinutes leaves out.
+    @Column(name = "break_start_time")
+    private LocalDateTime breakStartTime;
+
+    @Column(name = "break_minutes", nullable = false, columnDefinition = "integer default 0")
+    private Integer breakMinutes = 0;
+
     // Walk-in visitor fields (null for regular members)
     @Column(name = "walk_in_name")
     private String walkInName;
@@ -139,6 +148,12 @@ public class Attendance extends BaseEntity implements BranchAware {
 
     public Integer getWorkoutMinutes() { return workoutMinutes; }
     public void setWorkoutMinutes(Integer workoutMinutes) { this.workoutMinutes = workoutMinutes; }
+
+    public LocalDateTime getBreakStartTime() { return breakStartTime; }
+    public void setBreakStartTime(LocalDateTime breakStartTime) { this.breakStartTime = breakStartTime; }
+
+    public Integer getBreakMinutes() { return breakMinutes; }
+    public void setBreakMinutes(Integer breakMinutes) { this.breakMinutes = breakMinutes; }
 
     public String getWalkInName() { return walkInName; }
     public void setWalkInName(String walkInName) { this.walkInName = walkInName; }

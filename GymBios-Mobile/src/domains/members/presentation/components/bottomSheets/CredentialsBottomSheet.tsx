@@ -6,43 +6,47 @@ import { Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
-import type { SetCredentialsRequest } from '../../../application/access/MemberAccessRepository';
+import { Typography } from '@/shared/components/Typography';
 
+/** Creates the member's own GymBios account — it belongs to them afterwards. */
 interface CredentialsBottomSheetProps {
   visible: boolean;
-  memberId: number;
-  existingUsername?: string;
+  /** The member record's email the account will get, if any. */
+  memberEmail?: string;
   onClose: () => void;
-  onSetCredentials: (id: number, request: SetCredentialsRequest) => Promise<void>;
+  onSubmit: (username: string, password: string) => Promise<void>;
 }
 
 export function CredentialsBottomSheet({
   visible,
-  memberId,
-  existingUsername,
+  memberEmail,
   onClose,
-  onSetCredentials,
+  onSubmit,
 }: CredentialsBottomSheetProps) {
   const { t } = useTranslation();
-  const [username, setUsername] = useState(existingUsername ?? '');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(async () => {
     try {
       setSubmitting(true);
-      await onSetCredentials(memberId, { appUsername: username, appPassword: password });
+      await onSubmit(username, password);
+      setUsername('');
+      setPassword('');
       onClose();
+    } catch {
+      // Toasted by the API client; keep the sheet open to fix and retry.
     } finally {
       setSubmitting(false);
     }
-  }, [username, password, memberId, onSetCredentials, onClose]);
+  }, [username, password, onSubmit, onClose]);
 
   return (
     <AppBottomSheet
       visible={visible}
-      title={existingUsername ? t('members.credentialsSheet.updateTitle') : t('members.credentialsSheet.grantTitle')}
-      subtitle={t('members.credentialsSheet.subtitle')}
+      title={t('members.credentialsSheet.createTitle')}
+      subtitle={t('members.credentialsSheet.createSubtitle')}
       onClose={onClose}
     >
       <View style={styles.container}>
@@ -60,10 +64,16 @@ export function CredentialsBottomSheet({
           placeholder={t('members.credentialsSheet.passwordPlaceholder')}
           secureTextEntry
         />
+        <Typography variant="caption" color="textSecondary" style={memberEmail ? undefined : styles.warning}>
+          {memberEmail
+            ? t('members.credentialsSheet.emailNote', { email: memberEmail })
+            : t('members.credentialsSheet.noEmailNote')}
+        </Typography>
         <Button
-          label={existingUsername ? t('members.credentialsSheet.updateBtn') : t('members.credentialsSheet.grantBtn')}
+          label={t('members.credentialsSheet.createBtn')}
           onPress={handleSubmit}
           loading={submitting}
+          disabled={!username.trim() || password.length < 6}
           size="lg"
         />
       </View>
@@ -74,5 +84,8 @@ export function CredentialsBottomSheet({
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
+  },
+  warning: {
+    color: '#b45309',
   },
 });

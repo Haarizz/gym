@@ -80,7 +80,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     ((UserDetailsImpl) userDetails).setGlobal(isGlobal);
                 }
 
-                if (jwtService.isTokenValid(jwt, userDetails)) {
+                // A disabled login's old tokens stop working at once — e.g. a gym login the
+                // account migration retired (its member signs in again and reaches their
+                // GymBios account), or a staff login switched off.
+                // A token for an old gym-only member login (tenant claim, not global, member
+                // role only) isn't honoured either: members use their GymBios account.
+                boolean gymMemberLogin = tenantContextSetHere && !isGlobal
+                        && userDetails instanceof UserDetailsImpl impl && impl.isMemberOnly();
+                if (jwtService.isTokenValid(jwt, userDetails) && userDetails.isEnabled() && !gymMemberLogin) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

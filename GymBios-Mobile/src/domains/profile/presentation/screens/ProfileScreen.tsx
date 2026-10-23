@@ -15,6 +15,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { LanguageSelectScreen } from './LanguageSelectScreen';
 import { WalletScreen } from '@/domains/memberPortal/wallet/WalletScreen';
 import { EnquiriesScreen } from '@/domains/memberPortal/enquiries/presentation/EnquiriesScreen';
+import { AccountScreen } from '@/domains/account';
 
 const SLIDE_DURATION = 320;
 
@@ -27,9 +28,10 @@ export type ProfileView =
   | 'wallet'
   | 'enquiries'
   | 'settings'
-  | 'language';
+  | 'language'
+  | 'account';
 
-const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'enquiries', 'settings', 'language'];
+const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'enquiries', 'settings', 'language', 'account'];
 
 export function ProfileScreen() {
   const router = useRouter();
@@ -50,7 +52,7 @@ export function ProfileScreen() {
     if (view && (VALID_VIEWS as string[]).includes(view)) {
       if (view === 'my-performance' && !isEmployee) return;
       if (view === 'referrals' && isEmployee) return;
-      if ((view === 'wallet' || view === 'enquiries') && appRole !== 'member') return;
+      if ((view === 'wallet' || view === 'enquiries' || view === 'account') && appRole !== 'member') return;
       setActiveView(view as ProfileView);
     }
   }, [view, isEmployee, appRole]);
@@ -111,6 +113,9 @@ export function ProfileScreen() {
         />
       );
       break;
+    case 'account':
+      content = <AccountScreen onBack={() => setActiveView('hub')} />;
+      break;
     case 'settings':
       content = (
         <SettingsScreen
@@ -142,6 +147,7 @@ export function ProfileScreen() {
           onNavigateToWallet={() => setActiveView('wallet')}
           onNavigateToEnquiries={() => setActiveView('enquiries')}
           onNavigateToSettings={() => setActiveView('settings')}
+          onNavigateToAccount={() => setActiveView('account')}
           onLogout={handleLogout}
         />
       );

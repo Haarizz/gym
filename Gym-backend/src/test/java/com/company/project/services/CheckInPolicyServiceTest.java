@@ -1,6 +1,7 @@
 package com.company.project.services;
 
 import com.company.project.entities.Attendance;
+import com.company.project.entities.CheckInSettings;
 import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
@@ -34,11 +35,15 @@ class CheckInPolicyServiceTest {
     @Mock
     private MembershipPlanRepository membershipPlanRepository;
 
+    @Mock
+    private CheckInSettingsService checkInSettingsService;
+
     @InjectMocks
     private CheckInPolicyService policy;
 
     private Member member;
     private MembershipPlan plan;
+    private CheckInSettings settings;
 
     @BeforeEach
     void setUp() {
@@ -54,6 +59,8 @@ class CheckInPolicyServiceTest {
         plan.setDurationValue("1");
         plan.setDurationType("months");
 
+        settings = new CheckInSettings(); // cooldown 120, no minimum visit
+        lenient().when(checkInSettingsService.forMember(any())).thenReturn(settings);
         lenient().when(membershipPlanRepository.findByName("Gold")).thenReturn(Optional.of(plan));
         lenient().when(attendanceRepository.findMemberAttendanceSince(eq(50L), any())).thenReturn(Collections.emptyList());
         lenient().when(attendanceRepository.findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(50L))
@@ -114,7 +121,31 @@ class CheckInPolicyServiceTest {
     @Test
     @DisplayName("Check-in after the cooldown has passed is allowed")
     void cooldownElapsedAllowed() {
-        Attendance last = visit(LocalDateTime.now().minusMinutes(CheckInPolicyService.COOLDOWN_MINUTES + 90), 60);
+        Attendance last = visit(LocalDateTime.now().minusMinutes(120 + 90), 60);
+        when(attendanceRepository.findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(50L))
+                .thenReturn(Optional.of(last));
+
+        assertTrue(policy.evaluate(member).canCheckIn());
+    }
+
+    @Test
+    @DisplayName("Any check-out starts the cooldown — a workout break length doesn't open a re-entry window")
+    void noReEntryAfterCheckOut() {
+        settings.setBreakGraceMinutes(15);
+        Attendance last = visit(LocalDateTime.now().minusMinutes(25), 20); // checked out 5 min ago
+        when(attendanceRepository.findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(50L))
+                .thenReturn(Optional.of(last));
+
+        CheckInPolicyService.Allowance a = policy.evaluate(member);
+        assertFalse(a.canCheckIn());
+        assertNotNull(a.nextCheckInAllowedAt());
+    }
+
+    @Test
+    @DisplayName("The branch's cooldown setting replaces the 120-min default")
+    void configuredCooldown() {
+        settings.setCooldownMinutes(30);
+        Attendance last = visit(LocalDateTime.now().minusMinutes(100), 60); // checked out 40 min ago
         when(attendanceRepository.findFirstByMember_IdAndCheckOutTimeIsNotNullOrderByCheckOutTimeDesc(50L))
                 .thenReturn(Optional.of(last));
 

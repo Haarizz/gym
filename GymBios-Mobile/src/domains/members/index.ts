@@ -41,7 +41,6 @@ export { MemberFreezeService } from './application/freeze/MemberFreezeService';
 // Application — Access
 export type {
   MemberAccessRepository,
-  SetCredentialsRequest,
 } from './application/access/MemberAccessRepository';
 export { MemberAccessService } from './application/access/MemberAccessService';
 

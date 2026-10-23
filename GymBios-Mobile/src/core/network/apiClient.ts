@@ -43,6 +43,16 @@ export function setApiClientBranch(branchId: number | 'ALL') {
   }
 }
 
+// Set by AuthBootstrap: what to do when the backend rejects this sign-in (401) — the
+// token expired, or the login behind it was disabled (e.g. an old gym-only login moved
+// to a GymBios account). Kept here as a callback so the network layer doesn't depend on
+// the auth domain.
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 export function setApiClientTenant(tenant: string | null) {
   if (tenant) {
     apiClient.defaults.headers.common['X-Tenant-ID'] = tenant;
@@ -56,6 +66,13 @@ apiClient.interceptors.response.use(
   (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status ?? 0;
     const body = error.response?.data;
+    // Only a signed-in request's 401 means the session is gone (login itself answers
+    // 401 for a wrong password with no token attached).
+    const sentToken = !!error.config?.headers?.Authorization;
+    if (status === 401 && sentToken && unauthorizedHandler) {
+      unauthorizedHandler();
+      return Promise.reject(new ApiError('Session expired', status, body));
+    }
     // Some controllers (e.g. member access) return the reason as a plain-text body.
     const rawBody: unknown = body;
     const textBody = typeof rawBody === 'string' && rawBody.trim() ? rawBody : undefined;

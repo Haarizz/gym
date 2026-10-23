@@ -7,7 +7,9 @@ import {
   type Href,
   type SitemapType,
 } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { setUnauthorizedHandler } from '@/core/network/apiClient';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { i18n, useLanguageStore } from '@/core/i18n';
 import { Loader } from '@/shared/components';
@@ -68,7 +70,7 @@ interface AuthBootstrapProps {
 }
 
 export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProps) {
-  const { restore, isHydrated, isRestoring, isAuthenticated, session } = useRestoreSession();
+  const { restore, isHydrated, isRestoring, isAuthenticated, session, logout } = useRestoreSession();
 
   const isLanguageHydrated = useLanguageStore((s) => s.isHydrated);
   const hasChosenLanguage = useLanguageStore((s) => s.hasChosen);
@@ -90,6 +92,22 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
   useEffect(() => {
     restore();
   }, [restore]);
+
+  // The backend rejected this sign-in: sign out once (several requests may fail
+  // together) and let the guard below send the person to sign in again.
+  const signingOut = useRef(false);
+  useEffect(() => {
+    if (session) signingOut.current = false;
+  }, [session]);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (signingOut.current) return;
+      signingOut.current = true;
+      toast.error(i18n.t('auth.sessionExpired'));
+      logout();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [logout]);
 
   useEffect(() => {
     hydrateLanguage();

@@ -3,10 +3,13 @@ package com.company.project.controllers;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.dto.MembersPageResponseDTO;
+import com.company.project.community.global.identity.TenantDataSources;
+import com.company.project.security.TenantContextHolder;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.LeadService;
 import com.company.project.services.MemberService;
 import com.company.project.services.MembershipFreezeService;
+import com.company.project.services.accounts.MemberAppAccountService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,14 +23,20 @@ public class MemberController {
     private final MembershipFreezeService freezeService;
     private final LeadService leadService;
     private final com.company.project.services.FamilyPlanChangeService familyPlanChangeService;
+    private final TenantDataSources tenantDataSources;
+    private final MemberAppAccountService appAccountService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
                             LeadService leadService,
-                            com.company.project.services.FamilyPlanChangeService familyPlanChangeService) {
+                            com.company.project.services.FamilyPlanChangeService familyPlanChangeService,
+                            TenantDataSources tenantDataSources,
+                            MemberAppAccountService appAccountService) {
         this.memberService = memberService;
         this.freezeService = freezeService;
         this.leadService = leadService;
         this.familyPlanChangeService = familyPlanChangeService;
+        this.tenantDataSources = tenantDataSources;
+        this.appAccountService = appAccountService;
     }
 
     /**
@@ -127,16 +136,23 @@ public class MemberController {
             return ResponseEntity.status(401).body("Not authenticated");
         }
         try {
+            MemberResponseDTO me;
             if (principal.isGlobal()) {
                 try {
-                    return ResponseEntity.ok(memberService.getMemberByGlobalUserId(principal.getId()));
+                    me = memberService.getMemberByGlobalUserId(principal.getId());
                 } catch (RuntimeException e) {
                     // Fallback for stale tokens with IS_GLOBAL_CLAIM=true but no globalUserId record
-                    return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+                    me = memberService.getMemberByUserId(principal.getId());
                 }
             } else {
-                return ResponseEntity.ok(memberService.getMemberByUserId(principal.getId()));
+                me = memberService.getMemberByUserId(principal.getId());
             }
+            // The app's pending/rejected/suspended screens name the gym this membership is at.
+            String tenant = TenantContextHolder.getCurrentTenant();
+            if (tenant != null) {
+                me.setGymName(tenantDataSources.gymName(tenant).orElse(null));
+            }
+            return ResponseEntity.ok(me);
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body("No membership record found for this account.");
         }
@@ -318,7 +334,9 @@ public class MemberController {
     /**
      * POST /api/members/{id}/set-credentials
      * Body: { "appUsername": "...", "appPassword": "..." }
-     * Creates app login if none exists, or updates password if one does.
+     * Kept for older clients: creates the member's own GymBios account, the same as
+     * POST /app-account (replacing an old gym-only login if any). A GymBios account →
+     * refused: it belongs to the member, who resets it themselves.
      */
     @PostMapping("/{id}/set-credentials")
     public ResponseEntity<?> setMemberCredentials(
@@ -337,20 +355,85 @@ public class MemberController {
     }
 
     /**
+     * GET /api/members/{id}/app-account
+     * NONE | GYM_LOGIN | LINKED | AWAITING_CONFIRMATION, with the account's username/email.
+     */
+    @GetMapping("/{id}/app-account")
+    public ResponseEntity<MemberAppAccountService.AppAccountStatus> getAppAccount(@PathVariable Long id) {
+        return ResponseEntity.ok(appAccountService.status(id));
+    }
+
+    /**
+     * POST /api/members/{id}/app-account
+     * Body: { "username", "password", "email" (optional — defaults to the member's) }
+     * Creates the member's own GymBios account at the desk and links it. The gym can't
+     * change or reset it afterwards.
+     */
+    @PostMapping("/{id}/app-account")
+    public ResponseEntity<MemberResponseDTO> createAppAccount(@PathVariable Long id,
+                                                              @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(appAccountService.createAccount(id, body.get("username"), body.get("password"),
+                body.get("email")));
+    }
+
+    /**
+     * POST /api/members/{id}/app-account/link
+     * Body: { "identifier": "username or email" }
+     * Asks the owner of an existing GymBios account to link it; they accept in their app.
+     */
+    @PostMapping("/{id}/app-account/link")
+    public ResponseEntity<MemberAppAccountService.AppAccountStatus> requestAccountLink(
+            @PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(appAccountService.requestLink(id, body.get("identifier")));
+    }
+
+    /** DELETE /api/members/{id}/app-account/link — withdraws a pending link request. */
+    @DeleteMapping("/{id}/app-account/link")
+    public ResponseEntity<MemberAppAccountService.AppAccountStatus> cancelAccountLink(@PathVariable Long id) {
+        return ResponseEntity.ok(appAccountService.cancelLink(id));
+    }
+
+    /**
+     * POST /api/members/{id}/suspend
+     * Body: { "reason": "..." } (optional)
+     * Suspends this gym's membership. The member can still sign in to the app and use
+     * Community and gym discovery; only this gym's member features are refused.
+     */
+    @PostMapping("/{id}/suspend")
+    public ResponseEntity<MemberResponseDTO> suspendMembership(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String reason = body != null ? body.get("reason") : null;
+        String by = principal != null ? principal.getUsername() : "Admin";
+        return ResponseEntity.ok(memberService.suspendMembership(id, reason, by));
+    }
+
+    /**
+     * POST /api/members/{id}/resume
+     */
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<MemberResponseDTO> resumeMembership(@PathVariable Long id) {
+        return ResponseEntity.ok(memberService.resumeMembership(id));
+    }
+
+    /**
      * PATCH /api/members/{id}/toggle-access
      * Body: { "enabled": true/false }
-     * Enables or disables the member's mobile app login account.
+     * Deprecated alias of suspend/resume for older app builds — never disables the login.
      */
     @PatchMapping("/{id}/toggle-access")
     public ResponseEntity<?> toggleMemberAccess(
             @PathVariable Long id,
-            @RequestBody java.util.Map<String, Boolean> body) {
+            @RequestBody java.util.Map<String, Boolean> body,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
         try {
             Boolean enabled = body.get("enabled");
             if (enabled == null) {
                 return ResponseEntity.badRequest().body("Missing 'enabled' field");
             }
-            return ResponseEntity.ok(memberService.toggleMemberAccess(id, enabled));
+            String by = principal != null ? principal.getUsername() : "Admin";
+            return ResponseEntity.ok(memberService.toggleMemberAccess(id, enabled, by));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
