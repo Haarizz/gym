@@ -8,23 +8,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { ShoppingCart, Package, TrendingUp, TrendingDown, CreditCard, Filter, Download, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
+import { salesInvoiceService, SalesInvoice } from '../utils/supabase/sales-invoice-service';
 import { purchaseService, PurchaseOrder } from '../utils/supabase/purchase-service';
 
+/** What an invoice sold, net of anything returned through POS returns. */
+const invoiceNet = (inv: SalesInvoice) => (Number(inv.totalAmount) || 0) - (Number(inv.returnedAmount) || 0);
+
 export function SalesPurchases() {
-  const { currencyCode } = useCurrency();
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const { currencyCode, currencyPrefix } = useCurrency();
+  // Sales = confirmed sales invoices: back-office invoices plus the mirror of every POS sale.
+  // Membership receipts are not retail sales — they live in Billing (this page used to count them).
+  const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [receiptsResp, poResp] = await Promise.all([
-        receiptsService.getReceipts({}, { page: 1, limit: 5000 }).catch(() => ({ receipts: [] as Receipt[], pagination: {} as any })),
+      const [invoiceList, poResp] = await Promise.all([
+        salesInvoiceService.getAllInvoices({ status: 'CONFIRMED' }).catch(() => [] as SalesInvoice[]),
         purchaseService.getOrders({ size: 500 }).catch(() => ({ orders: [] as PurchaseOrder[], pagination: {} as any })),
       ]);
-      setReceipts((receiptsResp as any).receipts ?? []);
+      setInvoices(invoiceList);
       setPurchaseOrders(poResp.orders ?? []);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load data');
@@ -50,15 +55,15 @@ export function SalesPurchases() {
       months.push({ label, key });
     }
     return months.map(({ label, key }) => {
-      const sales = receipts
-        .filter(r => (r.transaction_date || '').split('T')[0].startsWith(key))
-        .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const sales = invoices
+        .filter(inv => (inv.invoiceDate || '').startsWith(key))
+        .reduce((s, inv) => s + invoiceNet(inv), 0);
       const purchases = purchaseOrders
         .filter(po => (po.orderDate || '').split('T')[0].startsWith(key))
         .reduce((s, po) => s + (Number(po.totalAmount) || 0), 0);
       return { month: label, sales: Math.round(sales), purchases: Math.round(purchases), profit: Math.round(sales - purchases) };
     });
-  }, [receipts, purchaseOrders]);
+  }, [invoices, purchaseOrders]);
 
   const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
@@ -70,10 +75,10 @@ export function SalesPurchases() {
 
   // KPIs for current month (with month-over-month change)
   const kpis = useMemo(() => {
-    const monthReceipts = receipts.filter(r => (r.transaction_date || '').split('T')[0].startsWith(currentMonthKey));
-    const prevMonthReceipts = receipts.filter(r => (r.transaction_date || '').split('T')[0].startsWith(prevMonthKey));
-    const monthlySales = monthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const prevMonthlySales = prevMonthReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const monthInvoices = invoices.filter(inv => (inv.invoiceDate || '').startsWith(currentMonthKey));
+    const prevMonthInvoices = invoices.filter(inv => (inv.invoiceDate || '').startsWith(prevMonthKey));
+    const monthlySales = monthInvoices.reduce((s, inv) => s + invoiceNet(inv), 0);
+    const prevMonthlySales = prevMonthInvoices.reduce((s, inv) => s + invoiceNet(inv), 0);
 
     const monthlyPurchases = purchaseOrders
       .filter(po => (po.orderDate || '').split('T')[0].startsWith(currentMonthKey))
@@ -85,8 +90,8 @@ export function SalesPurchases() {
     const grossProfit = monthlySales - monthlyPurchases;
     const prevGrossProfit = prevMonthlySales - prevMonthlyPurchases;
 
-    const avgTransaction = monthReceipts.length > 0 ? monthlySales / monthReceipts.length : 0;
-    const prevAvgTransaction = prevMonthReceipts.length > 0 ? prevMonthlySales / prevMonthReceipts.length : 0;
+    const avgTransaction = monthInvoices.length > 0 ? monthlySales / monthInvoices.length : 0;
+    const prevAvgTransaction = prevMonthInvoices.length > 0 ? prevMonthlySales / prevMonthInvoices.length : 0;
 
     return {
       monthlySales, monthlyPurchases, grossProfit, avgTransaction,
@@ -95,14 +100,20 @@ export function SalesPurchases() {
       profitChange: pctChange(grossProfit, prevGrossProfit),
       avgChange: pctChange(avgTransaction, prevAvgTransaction),
     };
-  }, [receipts, purchaseOrders, currentMonthKey, prevMonthKey]);
+  }, [invoices, purchaseOrders, currentMonthKey, prevMonthKey]);
 
-  // Recent sales (latest 20 receipts sorted by date)
+  // Recent sales (latest 20 invoices)
   const recentSales = useMemo(() => {
-    return [...receipts]
-      .sort((a, b) => new Date(b.transaction_date || b.created_at).getTime() - new Date(a.transaction_date || a.created_at).getTime())
+    return [...invoices]
+      .sort((a, b) => (b.invoiceDate || '').localeCompare(a.invoiceDate || '') || (b.createdAt || '').localeCompare(a.createdAt || ''))
       .slice(0, 20);
-  }, [receipts]);
+  }, [invoices]);
+
+  const itemsSummary = (inv: SalesInvoice) => {
+    const first = inv.items?.[0]?.productName;
+    if (!first) return '—';
+    return inv.items.length > 1 ? `${first} +${inv.items.length - 1} more` : first;
+  };
 
   // Recent purchase orders (latest 20)
   const recentPOs = useMemo(() => {
@@ -114,7 +125,7 @@ export function SalesPurchases() {
   const getStatusColor = (status: string) => {
     const s = (status || '').toLowerCase();
     if (s === 'completed' || s === 'paid' || s === 'received') return 'bg-green-100 text-green-800';
-    if (s === 'pending' || s === 'pending_approval' || s === 'approved' || s === 'ordered') return 'bg-yellow-100 text-yellow-800';
+    if (s === 'pending' || s === 'unpaid' || s === 'pending_approval' || s === 'approved' || s === 'ordered') return 'bg-yellow-100 text-yellow-800';
     if (s === 'cancelled' || s === 'refunded') return 'bg-red-100 text-red-800';
     if (s === 'partially_received' || s === 'partial') return 'bg-blue-100 text-blue-800';
     return 'bg-gray-100 text-gray-800';
@@ -215,7 +226,7 @@ export function SalesPurchases() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-700"><CurrencyGlyph /> {Math.round(kpis.avgTransaction).toLocaleString()}</div>
-            {loading ? <p className="text-xs text-muted-foreground mt-1">Per receipt this month</p> : renderTrend(kpis.avgChange)}
+            {loading ? <p className="text-xs text-muted-foreground mt-1">Per invoice this month</p> : renderTrend(kpis.avgChange)}
           </CardContent>
         </Card>
       </div>
@@ -240,7 +251,7 @@ export function SalesPurchases() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                    <Tooltip formatter={(v: number) => `${currencyPrefix}${v.toLocaleString()}`} />
                     <Legend />
                     <Bar dataKey="sales" fill="#8884d8" name="Sales" />
                     <Bar dataKey="purchases" fill="#82ca9d" name="Purchases" />
@@ -260,7 +271,7 @@ export function SalesPurchases() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                    <Tooltip formatter={(v: number) => `${currencyPrefix}${v.toLocaleString()}`} />
                     <Line type="monotone" dataKey="profit" stroke="#8884d8" strokeWidth={2} name="Profit" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -275,7 +286,7 @@ export function SalesPurchases() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Recent Sales</CardTitle>
-                  <CardDescription>Latest sales transactions ({receipts.length.toLocaleString()} total)</CardDescription>
+                  <CardDescription>Latest sales invoices, including Point of Sale sales ({invoices.length.toLocaleString()} total)</CardDescription>
                 </div>
                 <Button variant="outline" size="sm">
                   <Download className="mr-2 h-4 w-4" />
@@ -287,32 +298,32 @@ export function SalesPurchases() {
               {loading ? (
                 <div className="py-8 text-center text-muted-foreground">Loading...</div>
               ) : recentSales.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">No sales records found.</div>
+                <div className="py-8 text-center text-muted-foreground">No sales yet. Point of Sale sales and sales invoices appear here.</div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Receipt No.</TableHead>
+                      <TableHead>Invoice No.</TableHead>
                       <TableHead>Customer</TableHead>
-                      <TableHead>Plan / Item</TableHead>
+                      <TableHead>Items</TableHead>
                       <TableHead>Payment Method</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentSales.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.transaction_date ? r.transaction_date.split('T')[0] : '—'}</TableCell>
-                        <TableCell className="font-medium">{r.receipt_no || r.id.slice(0, 8)}</TableCell>
-                        <TableCell>{r.member_name || '—'}</TableCell>
-                        <TableCell>{r.plan_name || r.transaction_type || '—'}</TableCell>
-                        <TableCell>{r.payment_method || '—'}</TableCell>
+                    {recentSales.map((inv) => (
+                      <TableRow key={inv.id}>
+                        <TableCell>{inv.invoiceDate || '—'}</TableCell>
+                        <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
+                        <TableCell>{inv.customerName || '—'}</TableCell>
+                        <TableCell>{itemsSummary(inv)}</TableCell>
+                        <TableCell>{inv.paymentMethod || '—'}</TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(r.status || '')}>{r.status || '—'}</Badge>
+                          <Badge className={getStatusColor(inv.paymentStatus || '')}>{inv.paymentStatus || '—'}</Badge>
                         </TableCell>
-                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {Number(r.amount).toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium"><CurrencyGlyph /> {invoiceNet(inv).toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

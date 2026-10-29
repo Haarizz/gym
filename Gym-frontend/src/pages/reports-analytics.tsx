@@ -261,7 +261,7 @@ function getPeriodBuckets(start: Date, end: Date): { key: string; label: string;
 }
 
 export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const statCardShell =
     "bg-white border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
   const panelCardShell = "bg-white border-0 shadow-sm";
@@ -445,7 +445,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const revenueReportKpis = [
     {
       title: "Total Revenue",
-      value: `${currencyCode} ${Math.round(totalRevenuePeriod).toLocaleString()}`,
+      value: `${currencyPrefix}${Math.round(totalRevenuePeriod).toLocaleString()}`,
       change: hasComparison ? pctChange(totalRevenuePeriod, prevTotalRevenue) : null,
       icon: DollarSign,
       iconShell: "bg-emerald-50",
@@ -453,7 +453,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     },
     {
       title: "Avg Per Transaction",
-      value: `${currencyCode} ${Math.round(avgPerTransaction).toLocaleString()}`,
+      value: `${currencyPrefix}${Math.round(avgPerTransaction).toLocaleString()}`,
       change: hasComparison ? pctChange(avgPerTransaction, prevAvgPerTransaction) : null,
       icon: TrendingUp,
       iconShell: "bg-blue-50",
@@ -461,7 +461,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     },
     {
       title: "Membership Revenue",
-      value: `${currencyCode} ${Math.round(membershipRevenue).toLocaleString()}`,
+      value: `${currencyPrefix}${Math.round(membershipRevenue).toLocaleString()}`,
       change: hasComparison ? pctChange(membershipRevenue, prevMembershipRevenue) : null,
       icon: Users,
       iconShell: "bg-purple-50",
@@ -469,7 +469,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     },
     {
       title: "Training Revenue",
-      value: `${currencyCode} ${Math.round(trainingRevenue).toLocaleString()}`,
+      value: `${currencyPrefix}${Math.round(trainingRevenue).toLocaleString()}`,
       change: hasComparison ? pctChange(trainingRevenue, prevTrainingRevenue) : null,
       icon: Activity,
       iconShell: "bg-amber-50",
@@ -608,7 +608,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       },
       {
         title: "Avg Revenue / Member",
-        value: `${currencyCode} ${Math.round(arpm).toLocaleString()}`,
+        value: `${currencyPrefix}${Math.round(arpm).toLocaleString()}`,
         change: arpmChange,
         description: `vs previous period`,
         icon: DollarSign,

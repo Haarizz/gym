@@ -132,7 +132,7 @@ export function POSMode() {
       price: 28.00,
       category: "Smoothies",
       prepTime: "3 min",
-      modifiers: ["Extra Protein (+AED 8)", "Sugar-free", "Add Banana (+AED 3)"]
+      modifiers: ["Extra Protein (+\u20C38)", "Sugar-free", "Add Banana (+\u20C33)"]
     },
     {
       id: 2,
@@ -140,7 +140,7 @@ export function POSMode() {
       price: 18.00,
       category: "Beverages",
       prepTime: "2 min",
-      modifiers: ["Large Size (+AED 5)", "Add Ice", "No Sugar"]
+      modifiers: ["Large Size (+\u20C35)", "Add Ice", "No Sugar"]
     },
     {
       id: 3,
@@ -148,7 +148,7 @@ export function POSMode() {
       price: 42.00,
       category: "Meals",
       prepTime: "8 min",
-      modifiers: ["Extra Chicken (+AED 12)", "No Dressing", "Add Avocado (+AED 8)"]
+      modifiers: ["Extra Chicken (+\u20C312)", "No Dressing", "Add Avocado (+\u20C38)"]
     },
     {
       id: 4,
@@ -164,7 +164,7 @@ export function POSMode() {
       price: 32.00,
       category: "Smoothies",
       prepTime: "4 min",
-      modifiers: ["BCAA Boost (+AED 10)", "Creatine (+AED 6)", "Berry Flavor"]
+      modifiers: ["BCAA Boost (+\u20C310)", "Creatine (+\u20C36)", "Berry Flavor"]
     },
     {
       id: 6,
@@ -172,7 +172,7 @@ export function POSMode() {
       price: 12.00,
       category: "Beverages",
       prepTime: "3 min",
-      modifiers: ["Honey (+AED 2)", "Lemon", "Iced Version"]
+      modifiers: ["Honey (+\u20C32)", "Lemon", "Iced Version"]
     }
   ];
 

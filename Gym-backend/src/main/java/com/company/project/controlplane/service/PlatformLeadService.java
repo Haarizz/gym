@@ -60,6 +60,16 @@ public class PlatformLeadService {
         if (req.getBusinessName() == null || req.getBusinessName().isBlank()) {
             throw new BusinessRuleViolationException("Business name is required");
         }
+        // BG_123: mirrors the onboarding form — optional, but when given must be well-formed.
+        if (hasText(req.getContactName()) && !req.getContactName().trim().matches("^\\p{L}[\\p{L}\\s.'-]*$")) {
+            throw new BusinessRuleViolationException("Contact person name can contain only letters, spaces and . ' -");
+        }
+        if (hasText(req.getContactPhone()) && !req.getContactPhone().trim().matches("^\\+?\\d{7,15}$")) {
+            throw new BusinessRuleViolationException("Phone number must contain only digits (7–15)");
+        }
+        if (hasText(req.getContactWhatsapp()) && !req.getContactWhatsapp().trim().matches("^\\+?\\d{7,15}$")) {
+            throw new BusinessRuleViolationException("WhatsApp number must contain only digits (7–15)");
+        }
 
         PlatformLead lead = new PlatformLead();
         lead.setStage(PlatformLead.STAGE_LEAD);
@@ -209,6 +219,10 @@ public class PlatformLeadService {
     private PlatformLead findOrThrow(Long id) {
         return platformLeadRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Platform lead not found: " + id));
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String truncate(String value, int maxLength, String fallback) {

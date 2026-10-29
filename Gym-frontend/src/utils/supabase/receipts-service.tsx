@@ -85,23 +85,89 @@ export interface ReceiptsResponse {
   };
 }
 
+/** Whole-result counts and totals for a receipts filter (GET /receipts/summary). */
+export interface ReceiptsSummary {
+  total: number;
+  paid: number;
+  partial: number;
+  pending: number;
+  overdue: number;
+  /** Money actually received (rejected mobile purchases excluded) */
+  received: number;
+  /** Unpaid remainder on Partial receipts */
+  partial_due: number;
+}
+
+export interface ReceiptFilters {
+  search?: string;
+  transactionType?: string;
+  status?: string;
+  /** Transaction date window: from inclusive, to exclusive (any time zone; sent as UTC) */
+  from?: Date;
+  to?: Date;
+}
+
+// The backend stores transaction dates in UTC without an offset.
+const toUtcParam = (d: Date) => d.toISOString().slice(0, 19);
+
+function filterParams(filters: ReceiptFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.search)          params.append('search',           filters.search);
+  if (filters.transactionType) params.append('transaction_type', filters.transactionType);
+  if (filters.status)          params.append('status',           filters.status);
+  if (filters.from)            params.append('from',             toUtcParam(filters.from));
+  if (filters.to)              params.append('to',               toUtcParam(filters.to));
+  return params;
+}
+
 class ReceiptsService {
   async getReceipts(
-    filters: { search?: string; transactionType?: string; status?: string } = {},
+    filters: ReceiptFilters = {},
     pagination: { page?: number; limit?: number } = {}
   ): Promise<ReceiptsResponse> {
-    const params = new URLSearchParams();
+    const params = filterParams(filters);
     if (pagination.page)              params.append('page',             String(pagination.page));
     if (pagination.limit)             params.append('limit',            String(pagination.limit));
-    if (filters.search)               params.append('search',           filters.search);
-    if (filters.transactionType)      params.append('transaction_type', filters.transactionType);
-    if (filters.status)               params.append('status',           filters.status);
 
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/receipts?${params.toString()}`
     );
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch receipts: ${response.status}`));
     return response.json();
+  }
+
+  /** How many receipts match, without fetching them. */
+  async countReceipts(filters: ReceiptFilters = {}): Promise<number> {
+    const res = await this.getReceipts(filters, { page: 1, limit: 1 });
+    return Number(res.pagination?.total ?? 0);
+  }
+
+  /** Status counts and money totals for every receipt matching the filters (status is ignored). */
+  async getSummary(filters: ReceiptFilters = {}): Promise<ReceiptsSummary> {
+    const params = filterParams({ ...filters, status: undefined });
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/receipts/summary?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to fetch receipt summary: ${response.status}`));
+    const s = await response.json();
+    return {
+      total: Number(s.total ?? 0), paid: Number(s.paid ?? 0), partial: Number(s.partial ?? 0),
+      pending: Number(s.pending ?? 0), overdue: Number(s.overdue ?? 0),
+      received: Number(s.received ?? 0), partial_due: Number(s.partial_due ?? 0),
+    };
+  }
+
+  /**
+   * Every receipt matching the filters, fetched page by page — for exports only;
+   * lists should page through getReceipts instead.
+   */
+  async getAllReceipts(filters: ReceiptFilters = {}): Promise<Receipt[]> {
+    const all: Receipt[] = [];
+    for (let page = 1; ; page++) {
+      const res = await this.getReceipts(filters, { page, limit: 500 });
+      all.push(...res.receipts);
+      if (res.receipts.length < 500) return all;
+    }
   }
 
   async getReceiptById(id: string): Promise<Receipt> {

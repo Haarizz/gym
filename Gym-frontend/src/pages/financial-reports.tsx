@@ -263,7 +263,7 @@ const reportDefinitions: ReportDefinition[] = [
 ];
 
 export function FinancialReports() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const { activeBranchName } = useBranch();
   const navigate = useNavigate();
 
@@ -685,7 +685,7 @@ export function FinancialReports() {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={nameKey} tick={{ fontSize: 11 }} interval={0} angle={data.length > 5 ? -20 : 0} textAnchor={data.length > 5 ? "end" : "middle"} height={data.length > 5 ? 50 : 30} />
         <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+        <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} />
         <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} fill={CHART_COLORS[0]}>
           {colorful && data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
         </Bar>
@@ -699,7 +699,7 @@ export function FinancialReports() {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={nameKey} tick={{ fontSize: 11 }} />
         <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+        <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} />
         <Line type="monotone" dataKey={dataKey} stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 2 }} />
       </LineChart>
     </ResponsiveContainer>
@@ -990,8 +990,8 @@ export function FinancialReports() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead className="font-semibold text-primary">Account</TableHead>
-                                <TableHead className="font-semibold text-primary text-right">Current Period ({currencyCode})</TableHead>
-                                <TableHead className="font-semibold text-primary text-right">Prior Period ({currencyCode})</TableHead>
+                                <TableHead className="font-semibold text-primary text-right">Current Period ({currencySymbol})</TableHead>
+                                <TableHead className="font-semibold text-primary text-right">Prior Period ({currencySymbol})</TableHead>
                                 <TableHead className="font-semibold text-primary text-right">Variance (%)</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -1075,7 +1075,7 @@ export function FinancialReports() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="font-semibold text-primary">Account</TableHead>
-                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencyCode})</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencySymbol})</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1110,7 +1110,7 @@ export function FinancialReports() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="font-semibold text-primary">Account</TableHead>
-                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencyCode})</TableHead>
+                                  <TableHead className="font-semibold text-primary text-right">Amount ({currencySymbol})</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1165,8 +1165,8 @@ export function FinancialReports() {
                             <TableRow>
                               <TableHead className="font-semibold text-primary">Code</TableHead>
                               <TableHead className="font-semibold text-primary">Account</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Debit ({currencyCode})</TableHead>
-                              <TableHead className="font-semibold text-primary text-right">Credit ({currencyCode})</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Debit ({currencySymbol})</TableHead>
+                              <TableHead className="font-semibold text-primary text-right">Credit ({currencySymbol})</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>

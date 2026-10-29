@@ -1,11 +1,13 @@
 package com.company.project.controllers;
 
 import com.company.project.dto.FiscalPeriodResponseDTO;
+import com.company.project.entities.FiscalPeriod;
 import com.company.project.services.FiscalPeriodService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -18,14 +20,21 @@ public class FiscalPeriodController {
         this.fiscalPeriodService = fiscalPeriodService;
     }
 
+    /** With fiscal_year_id, each period also carries its journal-entry count. */
     @GetMapping
     public ResponseEntity<List<FiscalPeriodResponseDTO>> getAll(
             @RequestParam(name = "fiscal_year_id", required = false) Long fiscalYearId) {
-        List<FiscalPeriodResponseDTO> periods = (fiscalYearId != null
-                ? fiscalPeriodService.findByFiscalYear(fiscalYearId)
-                : fiscalPeriodService.findAll())
-                .stream().map(FiscalPeriodResponseDTO::fromEntity).collect(Collectors.toList());
-        return ResponseEntity.ok(periods);
+        if (fiscalYearId == null) {
+            return ResponseEntity.ok(fiscalPeriodService.findAll().stream()
+                    .map(FiscalPeriodResponseDTO::fromEntity).collect(Collectors.toList()));
+        }
+        List<FiscalPeriod> periods = fiscalPeriodService.findByFiscalYear(fiscalYearId);
+        Map<Long, Long> counts = fiscalPeriodService.voucherCounts(periods);
+        return ResponseEntity.ok(periods.stream().map(p -> {
+            FiscalPeriodResponseDTO dto = FiscalPeriodResponseDTO.fromEntity(p);
+            dto.setVoucherCount(counts.get(p.getId()));
+            return dto;
+        }).collect(Collectors.toList()));
     }
 
     @PatchMapping("/{id}/close")

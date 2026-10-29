@@ -66,7 +66,7 @@ import {
   DollarSign,
   AlertCircle,
 } from 'lucide-react';
-import { RenewalTransactionHistory } from "../components/members/RenewalTransactionHistory";
+import { RenewalTransactionHistory, RenewalSummaryCards } from "../components/members/RenewalTransactionHistory";
 import { DueForRenewalList } from "../components/members/DueForRenewalList";
 import { MemberAnalyticsDialog } from "../components/members/MemberAnalyticsDialog";
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
@@ -150,7 +150,7 @@ const MEMBERS_PAGE_SIZE = 20;
 
 export function Members({ onNavigate, initialTab = "members" }: MembersProps = {}) {
   const navigate = useNavigate();
-  const { currencyCode, formatCurrency } = useCurrency();
+  const { currencyCode, formatCurrency, currencySymbol, currencyPrefix } = useCurrency();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Only gates the full-page skeleton on first mount. Search/filter/pagination
@@ -181,6 +181,17 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  // Member Directory "More Filters" popover — applied on the server like search/status.
+  const [moreFilters, setMoreFilters] = useState({ membershipType: 'all', plan: 'all', expiring: 'any', dues: 'all' });
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [filterPlanNames, setFilterPlanNames] = useState<string[]>([]);
+  const activeMoreFilterCount =
+    (moreFilters.membershipType !== 'all' ? 1 : 0) + (moreFilters.plan !== 'all' ? 1 : 0)
+    + (moreFilters.expiring !== 'any' ? 1 : 0) + (moreFilters.dues !== 'all' ? 1 : 0);
+  const updateMoreFilter = (key: keyof typeof moreFilters, value: string) => {
+    setMoreFilters((f) => ({ ...f, [key]: value }));
+    setCurrentPage(1);
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
@@ -253,12 +264,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     let cancelled = false;
     setReportCounts({});
     const set = (key: string) => (n: number) => { if (!cancelled) setReportCounts(prev => ({ ...prev, [key]: n })); };
-    receiptsService.getReceipts({}, { limit: 2000 })
-      .then(res => {
-        // Same "Last 30 Days" rule as handleGenerateReport
-        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        return res.receipts.filter(r => r.transaction_date && new Date(r.transaction_date) >= cutoff).length;
-      })
+    // Same "Last 30 Days" rule as handleGenerateReport, counted on the server
+    receiptsService.countReceipts({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) })
       .then(set("membership"))
       .catch(() => {});
     (["renewals", "joined", "expiring", "expired"] as LifecycleReportType[]).forEach(type => {
@@ -342,6 +349,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [renewalHistoryKey, setRenewalHistoryKey] = useState(0);
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // BG_126: true once a finished search came back empty — drives the "No members found" message
+  const [renewalNoMatch, setRenewalNoMatch] = useState(false);
+  // Latest search request, so a slow earlier response can't overwrite a newer one
+  const renewalSearchSeq = React.useRef(0);
   const [selectedMemberForRenewal, setSelectedMemberForRenewal] = useState<any>(null);
   const [selectedNewPlan, setSelectedNewPlan] = useState<any>(null);
   const [operationType, setOperationType] = useState<"renewal" | "upgrade" | "downgrade" | null>(null);
@@ -387,7 +398,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
       const filters = {
         search: searchTerm || undefined,
-        status: selectedStatus !== 'all' ? selectedStatus : undefined
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
+        membership_type: moreFilters.membershipType !== 'all' ? moreFilters.membershipType : undefined,
+        plan: moreFilters.plan !== 'all' ? moreFilters.plan : undefined,
+        expiring_within: moreFilters.expiring !== 'any' ? Number(moreFilters.expiring) : undefined,
+        dues: moreFilters.dues !== 'all' ? (moreFilters.dues as 'due' | 'clear') : undefined,
       };
 
       const pagination = {
@@ -432,25 +447,26 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }
   };
 
-  // Fetch ALL members (no status/search filter, high limit) to compute accurate
-  // KPI status counts independent of the current page/filter.
+  // KPI status counts, independent of the current page/filter. The backend's status
+  // filter already applies the same date-derived rule as getComputedStatus (a member
+  // past their end date counts as Expired), so each card is one count query —
+  // no need to download every member.
   const loadStatusCounts = async () => {
     try {
       const isDemoMode = authService.isDemoMode();
-      const fetcher = isDemoMode
-        ? membersService.getDemoMembersData({}, { limit: 10000 })
-        : membersService.getMembers({}, { limit: 10000 });
-      // The unfiltered list leaves out purchases awaiting approval (they aren't
-      // members yet), so that card is counted with the explicit filter.
-      const [res, pendingRes] = await Promise.all([
-        fetcher,
-        isDemoMode ? null : membersService.getMembers({ status: 'pending_approval' }, { limit: 1 }).catch(() => null),
-      ]);
-      const all = res.members;
-      // Use the same date-derived status the Member Directory table shows
-      // (getComputedStatus) rather than the raw membership_status column —
-      // that column is never auto-flipped to "expired" when the expiry date
-      // passes, so counting it directly undercounts the Expired KPI.
+      if (!isDemoMode) {
+        const count = (status?: string) =>
+          membersService.getMembers(status ? { status } : {}, { page: 1, limit: 1 })
+            .then(r => Number(r.pagination?.total ?? 0));
+        const [total, active, inactive, expired, frozen, suspended, pendingApproval] = await Promise.all([
+          count(), count('active'), count('inactive'), count('expired'), count('frozen'), count('suspended'),
+          count('pending_approval').catch(() => 0),
+        ]);
+        setStatusCounts({ total, active, inactive, expired, frozen, suspended, pendingApproval });
+        return;
+      }
+      // Demo data lives in the browser: count it with the same rule the directory uses.
+      const all = (await membersService.getDemoMembersData({}, { limit: 10000 })).members;
       setStatusCounts({
         total: all.length,
         active: all.filter((m: Member) => getComputedStatus(m) === 'Active').length,
@@ -458,7 +474,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         expired: all.filter((m: Member) => getComputedStatus(m) === 'Expired').length,
         frozen: all.filter((m: Member) => getComputedStatus(m) === 'Frozen').length,
         suspended: all.filter((m: Member) => getComputedStatus(m) === 'Suspended').length,
-        pendingApproval: pendingRes?.pagination.total ?? 0,
+        pendingApproval: 0,
       });
     } catch (e) {
       console.error('Failed to load status counts:', e);
@@ -475,11 +491,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       loadMembers();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedStatus, currentPage]);
+  }, [searchTerm, selectedStatus, currentPage, moreFilters]);
 
   // Load active plans for Renewals tab
   useEffect(() => {
     plansService.getPlans('Active').then(setApiPlans).catch(() => { });
+  }, []);
+
+  // Every plan (inactive ones too — members can still be on them) for the Plan filter
+  useEffect(() => {
+    plansService.getPlans()
+      .then((plans) => setFilterPlanNames(
+        Array.from(new Set(plans.map((p) => p.name).filter(Boolean))).sort((a, b) => a.localeCompare(b))))
+      .catch(() => { });
   }, []);
 
   // Load active add-ons so the directory table can show "+ addon" under Plan Type
@@ -576,12 +600,23 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         filters.transactionType = typeMap[transactionType] || transactionType;
       }
 
-      const res = await receiptsService.getReceipts(filters, { limit: 2000 });
-      let receipts = res.receipts;
-
-      // Apply date range filter
+      // Apply date range filter — the window's start goes to the server so only
+      // the receipts that can match are fetched (all of them, page by page); the
+      // exact day rules below still run on what comes back.
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dayMs = 24 * 60 * 60 * 1000;
+      const serverFrom: Record<string, Date | undefined> = {
+        "today": startOfToday,
+        "yesterday": new Date(startOfToday.getTime() - dayMs),
+        "last-7-days": new Date(today.getTime() - 7 * dayMs),
+        "last-30-days": new Date(today.getTime() - 30 * dayMs),
+        "last-90-days": new Date(today.getTime() - 90 * dayMs),
+        "last-12-months": new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()),
+        "custom": customDateFrom && customDateTo ? customDateFrom : undefined,
+      };
+      let receipts = await receiptsService.getAllReceipts({ ...filters, from: serverFrom[dateRange] });
+
       const inDay = (r: { transaction_date?: string }, day: Date) => {
         if (!r.transaction_date) return false;
         const d = new Date(r.transaction_date);
@@ -777,6 +812,30 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const getMembershipStartDate = (member: Member) => member.membership_start_date || member.join_date;
   const getMembershipEndDate = (member: Member) => member.membership_end_date || member.expiry_date || '';
 
+  // Calendar days until the membership ends (the end date itself still counts as
+  // active, matching getComputedStatus), coloured by urgency for the directory.
+  const getExpiryCountdown = (member: Member): { text: string; className: string } | null => {
+    const endDateStr = getMembershipEndDate(member);
+    if (!endDateStr) return null;
+    const end = new Date(endDateStr);
+    if (isNaN(end.getTime())) return null;
+    const now = new Date();
+    const days = Math.round(
+      (new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime()
+        - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000
+    );
+    const status = (member.membership_status || '').toLowerCase();
+    const paused = status === 'frozen' || status === 'suspended';
+    const plural = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+    if (days < 0) return { text: `Expired ${plural(-days)} ago`, className: 'text-red-600' };
+    if (days === 0) return { text: 'Expires today', className: paused ? 'text-slate-500' : 'text-red-600' };
+    const text = `${plural(days)} left`;
+    if (paused) return { text, className: 'text-slate-500' };
+    if (days <= 7) return { text, className: 'text-orange-600' };
+    if (days <= 30) return { text, className: 'text-amber-600' };
+    return { text, className: 'text-emerald-600' };
+  };
+
   const getComputedStatus = (member: Member) => {
     if (member.membership_status === 'pending_approval') return 'pending_approval';
     // Frozen/suspended are deliberate overrides of the membership timeline —
@@ -853,6 +912,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     return member.membership_type || 'Individual';
   };
 
+  // Pill colours for the membership type shown in the directory's Membership column.
+  const getMembershipCategoryBadgeClass = (category: string): string => {
+    switch (category.toLowerCase()) {
+      case 'family': return 'bg-purple-100 text-purple-700';
+      case 'couple': return 'bg-orange-100 text-orange-700';
+      case 'corporate': return 'bg-teal-100 text-teal-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
+  };
+
   // Helper function to get plan type
   const getPlanDetails = (member: Member) => {
     const plan = getMembershipPlan(member);
@@ -880,23 +949,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // minor, plus any adult dependent under a family_head-billing-mode Family plan.
   const isBilledToGuardian = (member: Member): boolean =>
     Boolean((member as any).is_minor || (member as any).billed_to_head);
-
-  // Helper function to get payment due date
-  const getPaymentDueDate = (member: Member): string => {
-    if (member.next_payment_date) {
-      try {
-        return new Date(member.next_payment_date).toLocaleDateString('en-GB');
-      } catch (e) {
-        console.error('Invalid date:', member.next_payment_date);
-      }
-    }
-    if (member.payment_status === 'overdue' || member.payment_status === 'pending') {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
-      return dueDate.toLocaleDateString('en-GB');
-    }
-    return '';
-  };
 
   // Function to open member history/analytics. member.id is the internal
   // numeric database id (not the human-readable "MBR-..." member_id) — same
@@ -944,7 +996,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   // client-side only, so the server's status filter never sees them — hide them
   // unless the filter would include a "Pending Approval" row.
   const combinedMembers = React.useMemo(() => {
-    const showPending = selectedStatus === 'all' || selectedStatus === 'pending_approval';
+    // Drafts are merged in client-side, so they'd ignore the server-side More Filters.
+    const showPending = (selectedStatus === 'all' || selectedStatus === 'pending_approval') && activeMoreFilterCount === 0;
     const pending = (showPending ? pendingMembers : []).map(pm => ({
       id: pm.memberId,
       name: pm.fullName,
@@ -965,19 +1018,38 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     }));
 
     return [...pending, ...members];
-  }, [pendingMembers, members, selectedStatus]);
+  }, [pendingMembers, members, selectedStatus, activeMoreFilterCount]);
 
   // Renewals & Upgrades helper functions
   const handleRenewalSearch = (value: string) => {
     setRenewalSearchTerm(value);
+    setRenewalNoMatch(false);
 
+    // BG_126: editing the search abandons the member picked earlier — otherwise their
+    // card stayed on screen under a search that no longer matches them.
+    if (selectedMemberForRenewal && value !== selectedMemberForRenewal.name) {
+      setSelectedMemberForRenewal(null);
+      setSelectedNewPlan(null);
+      setOperationType(null);
+      renewalPaymentManager.clearLines();
+      setDiscountAmount("");
+      setRenewalReward(null);
+    }
+
+    const seq = ++renewalSearchSeq.current;
     if (value.trim().length > 0) {
       membersService.searchMembers(value)
         .then(results => {
+          if (seq !== renewalSearchSeq.current) return;
           setSearchSuggestions(results.slice(0, 5));
           setShowSuggestions(results.length > 0);
+          setRenewalNoMatch(results.length === 0);
         })
-        .catch(() => setSearchSuggestions([]));
+        .catch(() => {
+          if (seq !== renewalSearchSeq.current) return;
+          setSearchSuggestions([]);
+          setShowSuggestions(false);
+        });
     } else {
       setSearchSuggestions([]);
       setShowSuggestions(false);
@@ -1305,11 +1377,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
             { key: "due30", label: "Expiring in 30 Days", value: dueStats?.due30 ?? null, sub: "Due within a month", icon: CalendarClock, tone: "blue" },
             {
               key: "renewals", label: "Renewals", value: renewalStats?.renewals ?? null, icon: RefreshCw, tone: "green",
-              sub: renewalStats ? `${money(renewalStats.renewalsCollected)} collected` : "Same-plan renewals",
+              sub: renewalStats ? `${money(renewalStats.renewalsCollected)} collected · all time` : "Same-plan renewals",
             },
             {
               key: "changes", label: "Upgrades & Downgrades", value: renewalStats?.changes ?? null, icon: ArrowUpDown, tone: "purple",
-              sub: renewalStats ? `${money(renewalStats.changesCollected)} collected` : "Plan changes",
+              sub: renewalStats ? `${money(renewalStats.changesCollected)} collected · all time` : "Plan changes",
             },
           ],
           activeKey: renewalCardFilter,
@@ -1393,7 +1465,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         return {
           cards: [
             { key: "membership", label: "Transactions", value: reportCounts.membership ?? null, sub: "Last 30 days", icon: FileText, tone: "primary" },
-            { key: "renewals", label: "Renewals", value: reportCounts.renewals ?? null, sub: "Last 30 days", icon: RefreshCw, tone: "green" },
+            // Counts every renewal receipt, upgrades/downgrades included — the report splits them
+            { key: "renewals", label: "Renewals & Upgrades", value: reportCounts.renewals ?? null, sub: "Last 30 days", icon: RefreshCw, tone: "green" },
             { key: "joined", label: "New Joiners", value: reportCounts.joined ?? null, sub: "Last 30 days", icon: UserRoundPlus, tone: "blue" },
             { key: "expiring", label: "Expiring Soon", value: reportCounts.expiring ?? null, sub: "Next 30 days", icon: Hourglass, tone: "amber" },
             { key: "expired", label: "Expired", value: reportCounts.expired ?? null, sub: "Last 30 days", icon: CalendarX, tone: "red" },
@@ -1521,30 +1594,116 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     <SelectItem value="pending_approval">Pending Approval</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline">
-                  <Filter className="mr-2 h-4 w-4" />
-                  More Filters
-                </Button>
+                <Popover open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline">
+                      <Filter className="mr-2 h-4 w-4" />
+                      More Filters
+                      {activeMoreFilterCount > 0 && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-primary text-white">
+                          {activeMoreFilterCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Filters</span>
+                      {activeMoreFilterCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-primary"
+                          onClick={() => { setMoreFilters({ membershipType: 'all', plan: 'all', expiring: 'any', dues: 'all' }); setCurrentPage(1); }}
+                        >
+                          Clear all
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Membership Type</Label>
+                      <Select value={moreFilters.membershipType} onValueChange={(v) => updateMoreFilter('membershipType', v)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          <SelectItem value="individual">Individual</SelectItem>
+                          <SelectItem value="family">Family</SelectItem>
+                          <SelectItem value="couple">Couple</SelectItem>
+                          <SelectItem value="corporate">Corporate</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Plan</Label>
+                      <Select value={moreFilters.plan} onValueChange={(v) => updateMoreFilter('plan', v)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Plans</SelectItem>
+                          {filterPlanNames.map((name) => (
+                            <SelectItem key={name} value={name}>{name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Expiring</Label>
+                      <Select value={moreFilters.expiring} onValueChange={(v) => updateMoreFilter('expiring', v)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">Any Time</SelectItem>
+                          <SelectItem value="0">Today</SelectItem>
+                          <SelectItem value="7">Within 7 days</SelectItem>
+                          <SelectItem value="15">Within 15 days</SelectItem>
+                          <SelectItem value="30">Within 30 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Amount Due</Label>
+                      <Select value={moreFilters.dues} onValueChange={(v) => updateMoreFilter('dues', v)}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Members</SelectItem>
+                          <SelectItem value="due">Has amount due</SelectItem>
+                          <SelectItem value="clear">No dues</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <style>{`
                 .member-row:hover {
                   background-color: #f8fafc;
                 }
+                /* Compact spacing so the directory fits one more column: headers like
+                   "Expiry Date" may wrap to two lines (still inside the h-10 header)
+                   instead of forcing their column wider than its values. Phones use the
+                   card layout from responsive.css, so this stays at tablet width and up. */
+                @media (min-width: 768px) {
+                  .member-directory-table th,
+                  .member-directory-table td {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                  }
+                  .member-directory-table th {
+                    white-space: normal;
+                  }
+                }
               `}</style>
-              <Table>
+              <Table className="member-directory-table">
                 <TableHeader className="bg-slate-50/50">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Member</TableHead>
-                    <TableHead>Contact</TableHead>
+                    {/* width 1% = shrink to content, so spare table width goes to the other columns */}
+                    <TableHead style={{ width: '1%' }}>Member</TableHead>
+                    <TableHead style={{ width: '1%' }}>Contact</TableHead>
                     <TableHead>Membership</TableHead>
-                    <TableHead>Membership Type</TableHead>
-                    <TableHead>Family Head</TableHead>
-                    <TableHead>Plan Type</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Join Date</TableHead>
+                    <TableHead>Start Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
                     <TableHead>Amount Due</TableHead>
-                    <TableHead>Payment Due Date</TableHead>
                     <TableHead>Visits</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -1552,7 +1711,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 <TableBody>
                   {combinedMembers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-8">
+                      <TableCell colSpan={10} className="text-center py-8">
                         <p className="text-muted-foreground">No members found.</p>
                         <Button className="mt-4" onClick={handleAddMember}>
                           <Plus className="mr-2 h-4 w-4" />
@@ -1564,8 +1723,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                     combinedMembers.map((member) => {
                       const planDetails = getPlanDetails(member);
                       const amountDue = getAmountDue(member);
-                      const paymentDueDate = getPaymentDueDate(member);
                       const membershipCategory = getMembershipCategory(member);
+                      const isFamilyMembership = ['family', 'couple'].includes(member.membership_type?.toLowerCase() ?? '');
+                      const familyHeadLabel = (member as any).family_head_name || member.family_head_id;
+                      const expiryCountdown = getExpiryCountdown(member);
 
                       return (
                         <TableRow
@@ -1592,9 +1753,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               </Avatar>
                             </button>
                             <div>
-                              <div className="font-medium">{member.name}</div>
+                              <div className="font-medium">
+                                {member.name}
+                                {isFamilyMembership && member.is_family_head && (
+                                  <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Head</span>
+                                )}
+                              </div>
                               <div className="text-sm text-muted-foreground">
                                 ID: {getMemberId(member)}
+                                {isFamilyMembership && !member.is_family_head && (familyHeadLabel || member.relationship_to_head) && (
+                                  <> · {familyHeadLabel
+                                    ? (member.relationship_to_head ? `${member.relationship_to_head} of ${familyHeadLabel}` : `Head: ${familyHeadLabel}`)
+                                    : member.relationship_to_head}</>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -1612,44 +1783,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="font-medium">{getMembershipPlan(member)}</div>
-                            <div className="text-sm text-muted-foreground">
-                              <CurrencyGlyph /> {getDisplayFee(member)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="capitalize text-sm font-medium text-slate-700">
-                              {membershipCategory}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {member.membership_type?.toLowerCase() === 'family' || member.membership_type?.toLowerCase() === 'couple' ? (
-                              member.is_family_head ? (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Head</span>
-                              ) : (
-                                <div className="text-xs">
-                                  <div className="font-medium text-slate-700">
-                                    {(member as any).family_head_name || member.family_head_id || '—'}
-                                  </div>
-                                  {member.relationship_to_head && (
-                                    <div className="text-slate-500">({member.relationship_to_head})</div>
-                                  )}
-                                </div>
-                              )
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700">
-                                {planDetails.plan}
-                              </span>
+                            <div className="font-medium">
+                              {planDetails.plan}
                               {planDetails.addons.length > 0 && (
-                                <span className="text-xs text-slate-500">
-                                  + {planDetails.addons.join(', ')}
+                                <span className="text-xs font-normal text-slate-500">
+                                  {' '}+ {planDetails.addons.join(', ')}
                                 </span>
                               )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <CurrencyGlyph /> {getDisplayFee(member)}
+                              <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${getMembershipCategoryBadgeClass(membershipCategory)}`}>
+                                {membershipCategory.charAt(0).toUpperCase() + membershipCategory.slice(1)}
+                              </span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1660,8 +1806,22 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                             </span>
                           </TableCell>
                           <TableCell>
+                            {member.join_date ?
+                              new Date(member.join_date).toLocaleDateString('en-GB') : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {/* The membership's own start (dependents carry theirs) — never join_date. */}
+                            {member.membership_start_date ?
+                              new Date(member.membership_start_date).toLocaleDateString('en-GB') : '—'}
+                          </TableCell>
+                          <TableCell>
                             {getMembershipEndDate(member) ?
                               new Date(getMembershipEndDate(member)).toLocaleDateString('en-GB') : '—'}
+                            {expiryCountdown && (
+                              <div className={`text-xs font-medium ${expiryCountdown.className}`}>
+                                {expiryCountdown.text}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             {(() => {
@@ -1678,7 +1838,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                   )}
                                   {(!guardian || salesDue > 0) && (
                                     <span className={`font-medium ${total > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                      {`${currencyCode} ${total.toFixed(2)}`}
+                                      {`${currencyPrefix}${total.toFixed(2)}`}
                                     </span>
                                   )}
                                   {salesDue > 0 && (
@@ -1690,9 +1850,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                 </div>
                               );
                             })()}
-                          </TableCell>
-                          <TableCell>
-                            {paymentDueDate ? paymentDueDate : '—'}
                           </TableCell>
                           <TableCell>
                             <span className="text-slate-600 font-medium">{getTotalVisits(member)}</span>
@@ -2072,6 +2229,9 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         </TabsContent>
 
         <TabsContent value="renewals" className="space-y-5">
+          {/* Renewal totals + payment-method split (computed by the history below) */}
+          <RenewalSummaryCards stats={renewalStats} />
+
           {/* Step 1: Search Member Section */}
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="border-b bg-slate-50/50 py-4">
@@ -2142,6 +2302,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </Card>
                 )}
               </div>
+
+              {renewalNoMatch && !selectedMemberForRenewal && (
+                <div className="mt-6 rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                  No members found matching "{renewalSearchTerm.trim()}"
+                </div>
+              )}
 
               {/* Selected Member Snapshot */}
               {selectedMemberForRenewal && (
@@ -2443,7 +2609,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 {/* Discount & Coupon */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="discount">Apply Discount ({currencyCode})</Label>
+                    <Label htmlFor="discount">Apply Discount ({currencySymbol})</Label>
                     <Input
                       id="discount"
                       type="number"
@@ -2458,7 +2624,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                       memberId={selectedMemberForRenewal.id}
                       value={renewalReward}
                       onChange={setRenewalReward}
-                      currency={currencyCode}
+                      currency={currencyPrefix}
                     />
                   )}
                 </div>

@@ -83,7 +83,7 @@ const emptyForm = () => ({
 });
 
 export function Facilities({ onNavigate, embedded, summaryContainer }: FacilitiesProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [facilities, setFacilities] = useState<FacilityApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -578,7 +578,7 @@ export function Facilities({ onNavigate, embedded, summaryContainer }: Facilitie
                       </div>
                       {formData.selectedRateTypes.includes(rateType) && (
                         <div className="flex items-center gap-2">
-                          <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencyCode}):</Label>
+                          <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencySymbol}):</Label>
                           <Input
                             type="text"
                             placeholder="0.00"
@@ -913,7 +913,7 @@ export function Facilities({ onNavigate, embedded, summaryContainer }: Facilitie
                     </div>
                     {formData.selectedRateTypes.includes(rateType) && (
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencyCode}):</Label>
+                        <Label className="text-sm text-muted-foreground whitespace-nowrap">Rate ({currencySymbol}):</Label>
                         <Input
                           type="text"
                           placeholder="0.00"

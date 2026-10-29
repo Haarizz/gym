@@ -34,6 +34,16 @@ export interface MarkFiledRequest {
   filingReference?: string;
 }
 
+/** The server message (e.g. a validation rule) when there is one. */
+async function fail(res: Response, fallback: string): Promise<never> {
+  let message = fallback;
+  try {
+    const body = await res.json();
+    if (body && typeof body.message === "string" && body.message) message = body.message;
+  } catch { /* not JSON */ }
+  throw new Error(message);
+}
+
 function mapItem(r: any): TaxComplianceItem {
   return {
     id: r.id,
@@ -62,7 +72,7 @@ class TaxComplianceService {
       `${BASE_URL}/tax-compliance${qs ? "?" + qs : ""}`,
       { method: "GET" }
     );
-    if (!res.ok) throw new Error("Failed to fetch tax compliance");
+    if (!res.ok) await fail(res, "Couldn't load tax filings");
     return (await res.json()).map(mapItem);
   }
 
@@ -80,7 +90,7 @@ class TaxComplianceService {
         document_url: req.documentUrl ?? null,
       }),
     });
-    if (!res.ok) throw new Error("Failed to create tax compliance item");
+    if (!res.ok) await fail(res, "Couldn't create the filing");
     return mapItem(await res.json());
   }
 
@@ -98,7 +108,7 @@ class TaxComplianceService {
         document_url: req.documentUrl ?? null,
       }),
     });
-    if (!res.ok) throw new Error("Failed to update tax compliance item");
+    if (!res.ok) await fail(res, "Couldn't update the filing");
     return mapItem(await res.json());
   }
 
@@ -115,7 +125,7 @@ class TaxComplianceService {
         body: JSON.stringify(body),
       }
     );
-    if (!res.ok) throw new Error("Failed to mark as filed");
+    if (!res.ok) await fail(res, "Couldn't mark the return as filed");
     return mapItem(await res.json());
   }
 
@@ -124,7 +134,7 @@ class TaxComplianceService {
       `${BASE_URL}/tax-compliance/${id}`,
       { method: "DELETE" }
     );
-    if (!res.ok) throw new Error("Failed to delete tax compliance item");
+    if (!res.ok) await fail(res, "Couldn't delete the filing");
   }
 }
 

@@ -76,6 +76,21 @@ class AttendanceService {
     return Array.isArray(body) ? body : (body?.items ?? []);
   }
 
+  /**
+   * Check-ins between two dates (yyyy-MM-dd, inclusive) plus the total count. Pass size=1 to
+   * read only the total (the envelope's `total` counts every matching row, not just the page).
+   */
+  async getAttendanceRange(startDate: string, endDate: string, size = 20000): Promise<{ items: AttendanceRecord[]; total: number }> {
+    const params = new URLSearchParams({ startDate, endDate, size: String(size) });
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/attendance?${params.toString()}`
+    );
+    if (!response.ok) throw new Error(`Failed to fetch attendance: ${response.status}`);
+    const body = await response.json();
+    const items: AttendanceRecord[] = Array.isArray(body) ? body : (body?.items ?? []);
+    return { items, total: Array.isArray(body) ? body.length : Number(body?.total ?? items.length) };
+  }
+
   async checkIn(memberId: string, memberName: string): Promise<AttendanceRecord> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/attendance/checkin`,

@@ -52,7 +52,7 @@ function periodLabel(t: StaffTarget): string {
 }
 
 export function MyTargets() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm";
   const statCardShell =
     "bg-white border-0 shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
@@ -195,7 +195,7 @@ export function MyTargets() {
         type: "warning" as const,
         icon: <Clock className="h-5 w-5" />,
         title: "Time Running Out!",
-        message: `Only ${daysLeft} day${daysLeft === 1 ? "" : "s"} left! You need ${currencyCode} ${dailyRequired.toLocaleString()}/day to reach your target.`
+        message: `Only ${daysLeft} day${daysLeft === 1 ? "" : "s"} left! You need ${currencyPrefix}${dailyRequired.toLocaleString()}/day to reach your target.`
       };
     } else {
       return {

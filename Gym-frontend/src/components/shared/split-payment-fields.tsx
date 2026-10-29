@@ -2,7 +2,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { CurrencyGlyph } from "../../utils/currency";
+import { CurrencyGlyph, CURRENCIES } from "../../utils/currency";
 import type { AccountHead } from "../../utils/supabase/account-heads-service";
 import { FaMoneyBillWave, FaCreditCard, FaFileLines, FaBuilding, FaMobileScreen, FaCheck, FaXmark, FaDollarSign } from "react-icons/fa6";
 
@@ -139,6 +139,8 @@ export function SplitPaymentFields({
   bankAccounts = [],
   currencyCode = ""
 }: SplitPaymentFieldsProps) {
+  // On-screen symbol for the code passed in (the Dirham sign for AED); unknown codes show as-is.
+  const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.displayPrefix.trim() ?? currencyCode;
   const valid = isSplitPaymentValid(value, total);
   const detailsValid = isSplitPaymentDetailsValid(value, details);
   const sum = (value.cash || 0) + (value.card || 0) + (value.cheque || 0) + (value.bankTransfer || 0) + (value.online || 0);
@@ -153,7 +155,7 @@ export function SplitPaymentFields({
       <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
         <Label htmlFor="splitCash" className="flex items-center space-x-2">
           <FaMoneyBillWave className="h-4 w-4 text-green-600" />
-          <span>Cash Amount {currencyCode && `(${currencyCode})`}</span>
+          <span>Cash Amount {currencyCode && `(${currencySymbol})`}</span>
         </Label>
         <Input
           id="splitCash"
@@ -170,7 +172,7 @@ export function SplitPaymentFields({
       <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
         <Label htmlFor="splitCard" className="flex items-center space-x-2">
           <FaCreditCard className="h-4 w-4 text-blue-600" />
-          <span>Card Amount {currencyCode && `(${currencyCode})`}</span>
+          <span>Card Amount {currencyCode && `(${currencySymbol})`}</span>
         </Label>
         <Input
           id="splitCard"
@@ -209,7 +211,7 @@ export function SplitPaymentFields({
       <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
         <Label htmlFor="splitCheque" className="flex items-center space-x-2">
           <FaFileLines className="h-4 w-4 text-gray-600" />
-          <span>Cheque Amount {currencyCode && `(${currencyCode})`}</span>
+          <span>Cheque Amount {currencyCode && `(${currencySymbol})`}</span>
         </Label>
         <Input
           id="splitCheque"
@@ -257,7 +259,7 @@ export function SplitPaymentFields({
       <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
         <Label htmlFor="splitBankTransfer" className="flex items-center space-x-2">
           <FaBuilding className="h-4 w-4 text-teal-600" />
-          <span>Bank Transfer Amount {currencyCode && `(${currencyCode})`}</span>
+          <span>Bank Transfer Amount {currencyCode && `(${currencySymbol})`}</span>
         </Label>
         <Input
           id="splitBankTransfer"
@@ -303,7 +305,7 @@ export function SplitPaymentFields({
       <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
         <Label htmlFor="splitOnline" className="flex items-center space-x-2">
           <FaMobileScreen className="h-4 w-4 text-red-600" />
-          <span>Online Payment Amount {currencyCode && `(${currencyCode})`}</span>
+          <span>Online Payment Amount {currencyCode && `(${currencySymbol})`}</span>
         </Label>
         <Input
           id="splitOnline"

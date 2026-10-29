@@ -20,7 +20,7 @@ const shiftDays = (iso: string, d: number) => {
 };
 
 export function AnalyticsView() {
-  const { go, company, template, currencyCode } = usePos();
+  const { go, company, template, currencyCode, currencySymbol } = usePos();
   const [to, setTo] = useState(todayIso());
   const [from, setFrom] = useState(shiftDays(todayIso(), -29));
   const [data, setData] = useState<Analytics | null>(null);
@@ -117,7 +117,7 @@ export function AnalyticsView() {
         <>
           <div className={s.grid2}>
             <div className={s.panel}>
-              <div className={s.panelHead}><div className={s.panelTitle}>Daily sales</div><div className={s.panelSub}>{currencyCode}</div></div>
+              <div className={s.panelHead}><div className={s.panelTitle}>Daily sales</div><div className={s.panelSub}>{currencySymbol}</div></div>
               <div className={s.panelBody} style={{ height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={daily} margin={{ left: 0, right: 10, top: 10 }}>

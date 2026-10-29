@@ -47,7 +47,11 @@ Thumbs.db
 # Files users upload at runtime (branch images, member photos) belong on the
 # server's disk, not in git. The few already tracked are left in place.
 /uploads/
+# Gym imports staged by the super admin (old-system SQL exports + member photos).
+/data/
 
 ### Local debug scripts (hardcoded local DB credentials) ###
 /src/main/java/com/company/project/AuditDB.java
 /src/test/java/com/company/project/AuditDBTest.java
+# Member/webcam photos captured at runtime — never commit (in addition to /uploads/ above)
+/uploads/photos/

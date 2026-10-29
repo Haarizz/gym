@@ -72,6 +72,9 @@ interface PosContextValue {
   refreshTerminal: () => Promise<PosTerminal | null>;
   company: CompanyDetails | null;
   currencyCode: CurrencyCode;
+  /** On-screen symbol / amount prefix (see useCurrency) — printed documents keep currencyCode. */
+  currencySymbol: string;
+  currencyPrefix: string;
   printCtx: PrintContext;
   /** Prints a sale receipt in the given (or default) format; reports outcome via toast. */
   printSale: (sale: Sale, opts?: { reprint?: boolean; format?: "80mm" | "58mm" | "A4"; openDrawer?: boolean; copies?: number }) => Promise<PrintOutcome | null>;
@@ -106,7 +109,7 @@ function reportOutcome(o: PrintOutcome | null) {
 }
 
 export function PosProvider({ children }: { children: React.ReactNode }) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [view, setView] = useState<PosView>("dashboard");
   const [xSessionId, setXSessionId] = useState<number | null>(null);
   const showXReport = useCallback((id?: number | null) => { setXSessionId(id ?? null); setView("x-report"); }, []);
@@ -298,7 +301,7 @@ export function PosProvider({ children }: { children: React.ReactNode }) {
   const value: PosContextValue = {
     view, go: setView, xSessionId, showXReport, zReportDate, showZReport, loading, setupError, retrySetup, settings, setSettings, template, session, refreshSession, setSession,
     dayStatus, refreshDayStatus,
-    printers, refreshPrinters, terminalName: effectiveTerminalName, setTerminalName, company, currencyCode, printCtx,
+    printers, refreshPrinters, terminalName: effectiveTerminalName, setTerminalName, company, currencyCode, currencySymbol, currencyPrefix, printCtx,
     printSale, printReturn, printDoc, openDrawer, terminal, terminalError, refreshTerminal,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

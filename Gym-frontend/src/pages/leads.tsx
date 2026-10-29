@@ -157,7 +157,7 @@ function clampNumberInput(raw: string, min: number, max: number): string {
 const NO_CAMPAIGN = '__no_campaign__';
 
 export function Leads() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [activeView, setActiveView] = useState<'table' | 'kanban'>('table');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAddLead, setShowAddLead] = useState(false);
@@ -1147,7 +1147,7 @@ export function Leads() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Budget</Label>
-                        <p className="font-medium">{selectedLead.budget ? `${currencyCode} ${selectedLead.budget}` : 'Not specified'}</p>
+                        <p className="font-medium">{selectedLead.budget ? `${currencyPrefix}${selectedLead.budget}` : 'Not specified'}</p>
                       </div>
                     </div>
                     

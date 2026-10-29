@@ -319,7 +319,7 @@ public class DashboardService {
     }
 
     public List<MembershipDistribution> getMembershipDistribution() {
-        List<Object[]> results = memberRepository.countActiveMembersByType();
+        List<Object[]> results = memberRepository.countActiveMembersByType(LocalDate.now().atStartOfDay());
         List<MembershipDistribution> dist = new ArrayList<>();
         String[] colors = {"#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899"};
         int i = 0;

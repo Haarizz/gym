@@ -128,8 +128,11 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Query("SELECT COUNT(m) FROM Member m WHERE m.membershipStatus = :status AND m.joinDate >= :startDate")
     long countByMembershipStatusAndJoinDateAfter(@Param("status") String status, @Param("startDate") LocalDateTime startDate);
 
-    @Query("SELECT m.membershipType, COUNT(m), SUM(m.membershipFee) FROM Member m WHERE m.membershipStatus = 'active' GROUP BY m.membershipType")
-    List<Object[]> countActiveMembersByType();
+    // Same "effectively active" rule as countEffectivelyActive (the Active Members KPI),
+    // so the per-type breakdown always adds up to that total (BG_124).
+    @Query("SELECT m.membershipType, COUNT(m), SUM(m.membershipFee) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE
+            + " GROUP BY m.membershipType")
+    List<Object[]> countActiveMembersByType(@Param("asOf") LocalDateTime asOf);
 
     List<Member> findTop5ByOrderByJoinDateDesc();
 

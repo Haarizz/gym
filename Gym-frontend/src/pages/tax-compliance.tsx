@@ -133,7 +133,7 @@ const defaultMarkFiledForm = {
 };
 
 export function TaxCompliance() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [filings, setFilings] = useState<TaxComplianceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -681,7 +681,7 @@ export function TaxCompliance() {
                           <div className="flex items-center gap-4">
                             <div className="text-right">
                               <div className="text-sm font-medium">
-                                {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
+                                {f.filingAmount != null ? `${currencyPrefix}${f.filingAmount.toLocaleString()}` : '—'}
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 Due: {format(new Date(f.dueDate), "dd MMM yyyy")}
@@ -893,7 +893,7 @@ export function TaxCompliance() {
                         <TableCell>{f.taxPeriod}</TableCell>
                         <TableCell>{format(new Date(f.dueDate), "dd MMM yyyy")}</TableCell>
                         <TableCell>{f.filedDate ? format(new Date(f.filedDate), "dd MMM yyyy") : '—'}</TableCell>
-                        <TableCell>{f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}</TableCell>
+                        <TableCell>{f.filingAmount != null ? `${currencyPrefix}${f.filingAmount.toLocaleString()}` : '—'}</TableCell>
                         <TableCell>{f.filingReference ?? '—'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(f.status)}>
@@ -999,7 +999,7 @@ export function TaxCompliance() {
                                 <div>
                                   <span className="text-muted-foreground">Amount:</span>
                                   <div className="font-medium" style={{ color: 'var(--primary)' }}>
-                                    {f.filingAmount != null ? `${currencyCode} ${f.filingAmount.toLocaleString()}` : '—'}
+                                    {f.filingAmount != null ? `${currencyPrefix}${f.filingAmount.toLocaleString()}` : '—'}
                                   </div>
                                 </div>
                                 <div>
@@ -1070,7 +1070,7 @@ export function TaxCompliance() {
               <Input type="date" value={filingForm.dueDate} onChange={e => setFilingForm(f => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Filing Amount ({currencyCode})</Label>
+              <Label>Filing Amount ({currencySymbol})</Label>
               <Input type="number" placeholder="0.00" value={filingForm.filingAmount} onChange={e => setFilingForm(f => ({ ...f, filingAmount: e.target.value }))} />
             </div>
             <div className="space-y-2">
@@ -1116,7 +1116,7 @@ export function TaxCompliance() {
               <Input type="date" value={markFiledForm.filedDate} onChange={e => setMarkFiledForm(f => ({ ...f, filedDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Filing Amount ({currencyCode})</Label>
+              <Label>Filing Amount ({currencySymbol})</Label>
               <Input type="number" placeholder="0.00" value={markFiledForm.filingAmount} onChange={e => setMarkFiledForm(f => ({ ...f, filingAmount: e.target.value }))} />
             </div>
             <div className="space-y-2">

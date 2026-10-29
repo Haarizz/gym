@@ -36,7 +36,7 @@ import { useEffect, useState } from 'react';
 import { payrollAnalyticsService, PayrollDashboardData } from '../utils/supabase/payroll-analytics-service';
 
 export function PayrollEmployees() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [data, setData] = useState<PayrollDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -274,7 +274,7 @@ export function PayrollEmployees() {
                 <YAxis />
                 <Tooltip 
                   formatter={(value, name) => {
-                    if (name === 'payroll') return [`${currencyCode} ${value.toLocaleString()}`, 'Payroll'];
+                    if (name === 'payroll') return [`${currencyPrefix}${value.toLocaleString()}`, 'Payroll'];
                     return [value, name === 'classes' ? 'Active Classes' : 'Bookings'];
                   }} 
                 />
@@ -298,7 +298,7 @@ export function PayrollEmployees() {
                   dataKey="payroll" 
                   stroke="#8b5cf6" 
                   strokeWidth={3}
-                  name={`Payroll (${currencyCode})`}
+                  name={`Payroll (${currencySymbol})`}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -369,7 +369,7 @@ export function PayrollEmployees() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="category" />
               <YAxis />
-              <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, 'Payroll']} />
+              <Tooltip formatter={(value) => [`${currencyPrefix}${value.toLocaleString()}`, 'Payroll']} />
               <Bar dataKey="amount" fill="#8b5cf6" />
             </BarChart>
           </ResponsiveContainer>

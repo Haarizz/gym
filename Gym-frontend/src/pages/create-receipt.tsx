@@ -56,7 +56,7 @@ interface CreateReceiptProps {
 }
 
 export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const isModal = layout === "modal";
   const panelCardClass = "border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-white";
   const location = useLocation();
@@ -219,7 +219,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     }
 
     setPaymentAmounts(newPayments);
-    toast.success(`${currencyCode} ${amountToApply.toFixed(2)} auto-applied using FIFO method`, {
+    toast.success(`${currencyPrefix}${amountToApply.toFixed(2)} auto-applied using FIFO method`, {
       description: "Amount distributed to oldest bills first"
     });
   };
@@ -286,7 +286,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
       setReceiptGenerated(true);
       setShowReceiptModal(true);
       toast.success("Receipt Generated Successfully!", {
-        description: `Receipt ${result.receipt_no} created for ${currencyCode} ${calculateTotalPayment().toFixed(2)}`
+        description: `Receipt ${result.receipt_no} created for ${currencyPrefix}${calculateTotalPayment().toFixed(2)}`
       });
     } catch (err: any) {
       toast.error("Failed to generate receipt", { description: err?.message });

@@ -31,7 +31,7 @@ import { ledgersService, LedgerTransaction } from '../utils/supabase/ledgers-ser
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 export function Financials() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const { activeBranchId } = useBranch();
   // ── Live data state ────────────────────────────────────────────────────────
   const [kpiData, setKpiData] = useState({
@@ -339,7 +339,7 @@ export function Financials() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
+                <Tooltip formatter={(value) => [`${currencyPrefix}${value.toLocaleString()}`, '']} />
                 <Legend />
                 <Line 
                   type="monotone" 
@@ -397,7 +397,7 @@ export function Financials() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
+                <Tooltip formatter={(value) => [`${currencyPrefix}${value.toLocaleString()}`, '']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>

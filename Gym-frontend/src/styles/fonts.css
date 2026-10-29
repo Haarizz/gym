@@ -4,8 +4,36 @@
  * .font-sans) everywhere; this file is unlayered so it wins over the precompiled theme layer.
  * Arabic and emoji fall through to the system fonts after it.
  */
+/*
+ * UAE Dirham sign (U+20C3). System fonts don't carry it yet, so a one-glyph font supplies it,
+ * scoped by unicode-range: every other character falls through to the fonts after it. This is
+ * what lets plain-text amounts (formatCurrency, toasts, chart tooltips, select items) show the
+ * symbol instead of "AED". Registered both as its own family (first in --font-sans) and inside
+ * the Plus Jakarta family, so text that names that font directly picks it up too.
+ */
+@font-face {
+  font-family: "GymBios Dirham";
+  src: url("../assets/fonts/gymbios-dirham.otf") format("opentype");
+  font-weight: 100 900;
+  font-display: block;
+  unicode-range: U+20C3;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans Variable";
+  src: url("../assets/fonts/gymbios-dirham.otf") format("opentype");
+  font-weight: 100 900;
+  font-display: block;
+  unicode-range: U+20C3;
+}
+
+/* Toasts (sonner) set their own system font stack; keep it, with the Dirham sign in front. */
+html [data-sonner-toaster] {
+  font-family: "GymBios Dirham", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
 :root {
-  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+  --font-sans: "GymBios Dirham", "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Noto Sans Arabic", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 

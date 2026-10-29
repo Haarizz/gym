@@ -42,6 +42,9 @@ public class ReceiptService {
     private final VoucherNumberService voucherNumberService;
     private final StaffRepository staffRepository;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
@@ -145,8 +148,15 @@ public class ReceiptService {
     @Transactional(readOnly = true)
     public ReceiptsPageResponseDTO getReceipts(String search, String transactionType,
                                                String status, int page, int limit) {
-        Specification<Receipt> spec = buildSpec(search, transactionType, status);
-        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return getReceipts(search, transactionType, status, null, null, page, limit);
+    }
+
+    public ReceiptsPageResponseDTO getReceipts(String search, String transactionType, String status,
+                                               LocalDateTime from, LocalDateTime to, int page, int limit) {
+        Specification<Receipt> spec = buildSpec(search, transactionType, status, from, to);
+        // Newest transaction first — the order (and the date) the receipt lists show.
+        Pageable pageable = PageRequest.of(Math.max(page, 1) - 1, Math.max(limit, 1),
+                Sort.by(Sort.Order.desc("transactionDate"), Sort.Order.desc("id")));
         Page<Receipt> receiptPage = receiptRepository.findAll(spec, pageable);
 
         List<ReceiptResponseDTO> dtos = receiptPage.getContent().stream()
@@ -1090,9 +1100,70 @@ public class ReceiptService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private Specification<Receipt> buildSpec(String search, String transactionType, String status) {
+    /**
+     * Status counts and money totals for every receipt matching the list filters,
+     * computed in one grouped query: { total, paid, partial, pending, overdue,
+     * received, partial_due }. received leaves out rejected mobile purchases;
+     * partial_due counts later settlements against each Partial bill.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getSummary(String search, String transactionType,
+                                          LocalDateTime from, LocalDateTime to) {
+        jakarta.persistence.criteria.CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        jakarta.persistence.criteria.CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+        jakarta.persistence.criteria.Root<Receipt> root = cq.from(Receipt.class);
+
+        jakarta.persistence.criteria.Expression<BigDecimal> zero = cb.literal(BigDecimal.ZERO);
+        jakarta.persistence.criteria.Expression<BigDecimal> paid = cb.coalesce(root.get("paidAmount"), zero);
+        jakarta.persistence.criteria.Expression<BigDecimal> received = cb.<BigDecimal>selectCase()
+                .when(cb.equal(root.get("approvalStatus"), "REJECTED"), zero)
+                .otherwise(paid);
+        jakarta.persistence.criteria.Expression<BigDecimal> paidToDate =
+                cb.coalesce(root.<BigDecimal>get("totalPaidToDate"), paid);
+        jakarta.persistence.criteria.Expression<BigDecimal> partialDue = cb.<BigDecimal>selectCase()
+                .when(cb.equal(root.get("status"), "Partial"),
+                        cb.diff(cb.coalesce(root.<BigDecimal>get("amount"), zero), paidToDate))
+                .otherwise(zero);
+
+        Predicate where = buildSpec(search, transactionType, null, from, to).toPredicate(root, cq, cb);
+        cq.multiselect(root.get("status"), cb.count(root), cb.sum(received), cb.sum(partialDue));
+        if (where != null) cq.where(where);
+        cq.groupBy(root.get("status"));
+
+        long total = 0;
+        Map<String, Long> byStatus = new HashMap<>();
+        BigDecimal receivedTotal = BigDecimal.ZERO;
+        BigDecimal partialDueTotal = BigDecimal.ZERO;
+        for (Object[] row : entityManager.createQuery(cq).getResultList()) {
+            long n = ((Number) row[1]).longValue();
+            total += n;
+            byStatus.merge(row[0] == null ? "" : (String) row[0], n, Long::sum);
+            if (row[2] != null) receivedTotal = receivedTotal.add((BigDecimal) row[2]);
+            if (row[3] != null) partialDueTotal = partialDueTotal.add(((BigDecimal) row[3]).max(BigDecimal.ZERO));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", total);
+        result.put("paid", byStatus.getOrDefault("Paid", 0L));
+        result.put("partial", byStatus.getOrDefault("Partial", 0L));
+        result.put("pending", byStatus.getOrDefault("Pending", 0L));
+        result.put("overdue", byStatus.getOrDefault("Overdue", 0L));
+        result.put("received", receivedTotal);
+        result.put("partial_due", partialDueTotal);
+        return result;
+    }
+
+    private Specification<Receipt> buildSpec(String search, String transactionType, String status,
+                                             LocalDateTime from, LocalDateTime to) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("transactionDate"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThan(root.get("transactionDate"), to));
+            }
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";

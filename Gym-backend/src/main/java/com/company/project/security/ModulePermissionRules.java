@@ -89,6 +89,7 @@ public final class ModulePermissionRules {
         skip("/api/administration/**");
         skip("/api/branches/**");
         skip("/api/gyms/**");
+        skip("/api/gym-imports/**");   // platform: gated by GYM_MANAGEMENT_CREATE on the controller
         skip("/api/platform-leads/**");
         skip("/api/platform/**");
         skip("/api/gymos/**");
@@ -192,8 +193,7 @@ public final class ModulePermissionRules {
         gated("/api/receipt-vouchers/**", FINANCE, "RECEIPT_VOUCHER", "FINANCIALS");
         gated("/api/contra-vouchers/**", FINANCE, "JOURNAL_VOUCHER", "LEDGERS", "FINANCIALS");
         gated("/api/credit-notes/**", FINANCE, "JOURNAL_VOUCHER", "LEDGERS", "FINANCIALS");
-        gated("/api/debit-notes/**", FINANCE, "JOURNAL_VOUCHER", "LEDGERS", "FINANCIALS");
-        gated("/api/bank-reconciliations/**", FINANCE, "BANK_RECONCILIATIONS", "FINANCIALS");
+        gated("/api/debit-notes/**", FINANCE, "JOURNAL_VOUCHER", "LEDGERS", "FINANCIALS");        gated("/api/bank-reconciliations/**", FINANCE, "BANK_RECONCILIATIONS", "FINANCIALS");
         gated("/api/expenses/**", plus(FINANCE, "DASHBOARD", "BIOS", "REPORTS"), "EXPENSES", "FINANCIALS");
         gated("/api/tax-compliance/**", FINANCE, "TAX_COMPLIANCE", "FINANCIALS");
         gated("/api/financial-reports/**", plus(FINANCE, "REPORTS"), "FINANCIAL_REPORTS", "FINANCIALS");

@@ -37,6 +37,8 @@ const SLOTS = ["Morning (6am–12pm)", "Afternoon (12pm–5pm)", "Evening (5pm�
 const FALLBACK_ROLES = ["Receptionist", "Trainer", "Accountant", "Manager"];
 /** Red focus-style ring for a field with a validation error (fields here are borderless). */
 const ERROR_RING: React.CSSProperties = { boxShadow: "0 0 0 2px rgb(220 38 38 / 0.55)" };
+// BG_120: residential address lines are capped (the profile JSON column itself is unbounded).
+const MAX_ADDRESS_LINE_LENGTH = 255;
 
 const DOC_TYPES = ["Emirates ID", "Passport", "Visa / Residency", "Work Permit", "Labour Card", "Employment Contract", "Other"];
 
@@ -141,7 +143,7 @@ const roleLabel = (name: string) =>
   name === name.toUpperCase() ? name.toLowerCase().replace(/(^|[_\s])(\w)/g, (_m, sep, c) => sep + c.toUpperCase()) : name;
 
 export function EmployeeForm({ mode, employee, assignableRoles, branches, departments, staffList, onCancel, onSaved, onNavigate }: Props) {
-  const { currencyCode, formatCurrency } = useCurrency();
+  const { currencyCode, formatCurrency, currencySymbol } = useCurrency();
   const money = (n: number) => formatCurrency(n, { maximumFractionDigits: 2 });
   const isEdit = mode === "edit" && !!employee;
 
@@ -206,13 +208,17 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
 
   // ── Validation ────────────────────────────────────────────────────────────
   const FIELD_SECTION: Record<string, SectionId> = {
-    first_name: "personal", email: "contact", role: "employment", branch: "employment", username: "additional", password: "additional",
+    first_name: "personal", email: "contact", address_line1: "contact", address_line2: "contact",
+    role: "employment", branch: "employment", username: "additional", password: "additional",
   };
   const validate = () => {
     const e: Record<string, string> = {};
     if (!profile.personal.first_name.trim()) e.first_name = "First name is required";
     if (!core.email.trim()) e.email = "Work email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(core.email.trim())) e.email = "Enter a valid email address";
+    // maxLength stops typing past the cap, but older records may already exceed it.
+    if (profile.contact.address_line1.length > MAX_ADDRESS_LINE_LENGTH) e.address_line1 = `Address line 1 must be at most ${MAX_ADDRESS_LINE_LENGTH} characters`;
+    if (profile.contact.address_line2.length > MAX_ADDRESS_LINE_LENGTH) e.address_line2 = `Address line 2 must be at most ${MAX_ADDRESS_LINE_LENGTH} characters`;
     if (!core.role) e.role = "Select a role";
     if (!core.branch) e.branch = "Select a branch";
     if (!isEdit) {
@@ -394,8 +400,14 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
         <hr className={s.divider} />
         <span className={s.sectionLabel}>Residential address</span>
         <div className={s.grid2}>
-          <Field label="Address line 1"><Input value={profile.contact.address_line1} placeholder="Building / street" onChange={e => set("contact", { address_line1: e.target.value })} /></Field>
-          <Field label="Address line 2"><Input value={profile.contact.address_line2} placeholder="Area / landmark" onChange={e => set("contact", { address_line2: e.target.value })} /></Field>
+          <Field label="Address line 1" error={errors.address_line1} hint={`${profile.contact.address_line1.length}/${MAX_ADDRESS_LINE_LENGTH}`}>
+            <Input value={profile.contact.address_line1} placeholder="Building / street" maxLength={MAX_ADDRESS_LINE_LENGTH} style={errors.address_line1 ? ERROR_RING : undefined}
+              onChange={e => { clearError("address_line1"); set("contact", { address_line1: e.target.value }); }} />
+          </Field>
+          <Field label="Address line 2" error={errors.address_line2} hint={`${profile.contact.address_line2.length}/${MAX_ADDRESS_LINE_LENGTH}`}>
+            <Input value={profile.contact.address_line2} placeholder="Area / landmark" maxLength={MAX_ADDRESS_LINE_LENGTH} style={errors.address_line2 ? ERROR_RING : undefined}
+              onChange={e => { clearError("address_line2"); set("contact", { address_line2: e.target.value }); }} />
+          </Field>
           <Field label="City"><Input value={profile.contact.city} placeholder="e.g. Dubai" onChange={e => set("contact", { city: e.target.value })} /></Field>
           <Field label="Emirate / State"><Input value={profile.contact.state} onChange={e => set("contact", { state: e.target.value })} /></Field>
           <Field label="Country"><Input value={profile.contact.country} placeholder="e.g. UAE" onChange={e => set("contact", { country: e.target.value })} /></Field>
@@ -434,7 +446,7 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
           <Field label="Contract start"><Input type="date" value={profile.employment.contract_start} onChange={e => set("employment", { contract_start: e.target.value })} /></Field>
           <Field label="Contract end"><Input type="date" value={profile.employment.contract_end} onChange={e => set("employment", { contract_end: e.target.value })} /></Field>
           <Field label="Probation ends"><Input type="date" value={profile.employment.probation_end} onChange={e => set("employment", { probation_end: e.target.value })} /></Field>
-          <Field label={`Monthly sales target (${currencyCode})`} hint="Fine-tune per month in Target & Commission">
+          <Field label={`Monthly sales target (${currencySymbol})`} hint="Fine-tune per month in Target & Commission">
             <Input type="number" min={0} value={core.monthly_target} placeholder="0" onChange={e => setCore(c => ({ ...c, monthly_target: e.target.value }))} />
           </Field>
         </div>
@@ -538,7 +550,7 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
       <div className={s.stack}>
         <span className={s.sectionLabel}>Salary</span>
         <div className={s.grid2}>
-          <Field label={`Basic salary (${currencyCode})`} hint="Monthly; payroll's per-day and overtime rates come from it">
+          <Field label={`Basic salary (${currencySymbol})`} hint="Monthly; payroll's per-day and overtime rates come from it">
             <Input type="number" min={0} value={core.base_salary} placeholder="e.g. 8000" onChange={e => setCore(c => ({ ...c, base_salary: e.target.value }))} />
           </Field>
           <Field label="Pay frequency">{sel(profile.payroll.pay_frequency, v => set("payroll", { pay_frequency: v }), ["Monthly"])}</Field>

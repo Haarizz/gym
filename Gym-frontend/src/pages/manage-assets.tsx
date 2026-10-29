@@ -124,7 +124,7 @@ export const conditionColors = {
 
 export function ManageAssets() {
   const navigate = useNavigate();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -1197,7 +1197,7 @@ export function ManageAssets() {
                 </Select>
               </div>
               <div>
-                <Label>Purchase Price ({currencyCode})</Label>
+                <Label>Purchase Price ({currencySymbol})</Label>
                 <Input
                   type="number"
                   placeholder="0"

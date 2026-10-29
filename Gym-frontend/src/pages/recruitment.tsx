@@ -106,7 +106,7 @@ interface Interview {
 }
 
 export function Recruitment() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [currentView, setCurrentView] = useState<'dashboard' | 'kanban' | 'calendar'>('dashboard');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -130,7 +130,7 @@ export function Recruitment() {
       status: 'active',
       applicants: 18,
       postedDate: '2024-01-15',
-      salary: 'AED 5,000 - 8,000',
+      salary: '\u20C35,000 - 8,000',
       description: 'We are looking for an experienced fitness trainer to join our growing team.',
       requirements: ['Certified Trainer', '2+ years experience', 'CPR Certified'],
       priority: 'high'
@@ -144,7 +144,7 @@ export function Recruitment() {
       status: 'active',
       applicants: 24,
       postedDate: '2024-01-20',
-      salary: 'AED 4,000 - 6,000',
+      salary: '\u20C34,000 - 6,000',
       description: 'Seeking a motivated sales executive to drive membership growth.',
       requirements: ['Sales Experience', 'Customer Service', 'English Speaking'],
       priority: 'high'
@@ -158,7 +158,7 @@ export function Recruitment() {
       status: 'active',
       applicants: 12,
       postedDate: '2024-02-01',
-      salary: 'AED 3,500 - 4,500',
+      salary: '\u20C33,500 - 4,500',
       description: 'Friendly receptionist needed for member check-in and support.',
       requirements: ['Customer Service', 'Computer Skills', 'Organized'],
       priority: 'medium'
@@ -172,7 +172,7 @@ export function Recruitment() {
       status: 'active',
       applicants: 8,
       postedDate: '2024-02-05',
-      salary: 'AED 150 per session',
+      salary: '\u20C3150 per session',
       description: 'Experienced yoga instructor for group classes.',
       requirements: ['Yoga Certification', 'Group Class Experience'],
       priority: 'medium'
@@ -186,7 +186,7 @@ export function Recruitment() {
       status: 'paused',
       applicants: 15,
       postedDate: '2024-01-10',
-      salary: 'AED 6,000 - 9,000',
+      salary: '\u20C36,000 - 9,000',
       description: 'Certified nutritionist to provide dietary consultations.',
       requirements: ['Nutrition Degree', 'DHA License', '3+ years experience'],
       priority: 'high'
@@ -200,7 +200,7 @@ export function Recruitment() {
       status: 'closed',
       applicants: 6,
       postedDate: '2024-01-05',
-      salary: 'AED 3,000 - 4,000',
+      salary: '\u20C33,000 - 4,000',
       description: 'Responsible for equipment maintenance and facility upkeep.',
       requirements: ['Technical Skills', 'Equipment Knowledge'],
       priority: 'low'
@@ -1169,7 +1169,7 @@ export function Recruitment() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Salary Range *</Label>
-                <Input placeholder={`e.g., ${currencyCode} 5,000 - 8,000`} />
+                <Input placeholder={`e.g., ${currencyPrefix}5,000 - 8,000`} />
               </div>
               <div>
                 <Label>Priority *</Label>

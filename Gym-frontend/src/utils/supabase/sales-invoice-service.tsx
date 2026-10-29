@@ -270,6 +270,16 @@ class SalesInvoiceService {
     };
   }
 
+  /** Every invoice matching the filters (not a capped first page) — for totals and charts. */
+  async getAllInvoices(filters?: { status?: string; search?: string }): Promise<SalesInvoice[]> {
+    const all: SalesInvoice[] = [];
+    for (let page = 1; ; page++) {
+      const res = await this.getInvoices({ ...filters, page, size: 500 });
+      all.push(...res.invoices);
+      if (res.invoices.length < 500) return all;
+    }
+  }
+
   async getInvoiceById(id: number): Promise<SalesInvoice> {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/sales-invoices/${id}`);
     if (!res.ok) throw new Error(await parseApiError(res, `Failed to fetch sales invoice: ${res.status}`));

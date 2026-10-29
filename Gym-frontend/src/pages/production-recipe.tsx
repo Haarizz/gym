@@ -68,7 +68,7 @@ function emptyRecipeForm(): RecipeRequest & { _items: IngredientRow[] } {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ProductionRecipe() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   // data
   const [recipes, setRecipes]           = useState<Recipe[]>([]);
   const [orders, setOrders]             = useState<ProductionOrder[]>([]);
@@ -705,7 +705,7 @@ export function ProductionRecipe() {
                     <TableHead>Recipe</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead>Scheduled</TableHead>
-                    <TableHead className="text-right">Cost ({currencyCode})</TableHead>
+                    <TableHead className="text-right">Cost ({currencySymbol})</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Output Product</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -1002,7 +1002,7 @@ export function ProductionRecipe() {
                     <Input value={ingUnit} onChange={e => setIngUnit(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Unit Cost ({currencyCode})</Label>
+                    <Label className="text-xs">Unit Cost ({currencySymbol})</Label>
                     <Input type="number" min={0} step="0.01" value={ingUnitCost}
                       onChange={e => setIngUnitCost(Number(e.target.value))} />
                   </div>

@@ -153,7 +153,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
   { invoice, allInvoices, warehouses, products, staffNames, branchName, stockCheckEnabled, saving, onSave, onPrint, onRecordPayment, onRefreshProducts },
   ref,
 ) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const readOnly = !!invoice && invoice.status !== 'DRAFT';
   const initial = useMemo(() => (invoice ? formFromInvoice(invoice) : blankForm()), [invoice?.id, invoice?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [form, setForm] = useState<Form>(initial);
@@ -935,7 +935,7 @@ export const SalesInvoiceEditor = forwardRef<SalesInvoiceEditorHandle, Props>(fu
         <div className={styles.actionBarMeta}>
           <span className={cx(styles.pill, statusLabel.cls)}>{statusLabel.label}</span>
           <span>Invoice No: <strong>{invoice?.invoiceNumber ?? '—'}</strong></span>
-          <span>Net: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencyCode})</span></span>
+          <span>Net: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencySymbol})</span></span>
         </div>
         <div className={styles.headerActions}>
           {!readOnly && (

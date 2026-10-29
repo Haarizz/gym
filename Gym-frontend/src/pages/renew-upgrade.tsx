@@ -34,7 +34,7 @@ const members = [
     expiryDate: "2024-01-15",
     status: "Expiring Soon",
     monthsRemaining: 0.5,
-    totalPaid: "AED 1,440",
+    totalPaid: "\u20C31,440",
     joinDate: "2023-01-15"
   },
   {
@@ -46,7 +46,7 @@ const members = [
     expiryDate: "2024-02-20",
     status: "Active",
     monthsRemaining: 1.8,
-    totalPaid: "AED 2,880",
+    totalPaid: "\u20C32,880",
     joinDate: "2022-06-20"
   },
   {
@@ -58,7 +58,7 @@ const members = [
     expiryDate: "2024-12-31",
     status: "Active",
     monthsRemaining: 11.2,
-    totalPaid: "AED 2,400",
+    totalPaid: "\u20C32,400",
     joinDate: "2023-12-31"
   },
   {
@@ -70,7 +70,7 @@ const members = [
     expiryDate: "2023-12-10",
     status: "Expired",
     monthsRemaining: -0.3,
-    totalPaid: "AED 1,920",
+    totalPaid: "\u20C31,920",
     joinDate: "2022-11-10"
   },
   {
@@ -82,7 +82,7 @@ const members = [
     expiryDate: "2023-12-25",
     status: "Expired",
     monthsRemaining: -0.5,
-    totalPaid: "AED 3,600",
+    totalPaid: "\u20C33,600",
     joinDate: "2022-12-25"
   },
   {
@@ -94,17 +94,17 @@ const members = [
     expiryDate: "2024-01-18",
     status: "Expiring Soon",
     monthsRemaining: 0.7,
-    totalPaid: "AED 1,200",
+    totalPaid: "\u20C31,200",
     joinDate: "2023-03-18"
   }
 ];
 
 const membershipPlans = [
-  { id: "basic-monthly", name: "Basic Monthly", price: "AED 120", duration: "1 month", features: ["Gym Access", "Locker"] },
-  { id: "premium-monthly", name: "Premium Monthly", price: "AED 240", duration: "1 month", features: ["Gym Access", "Locker", "Group Classes", "Pool"] },
-  { id: "basic-annual", name: "Basic Annual", price: "AED 1,200", duration: "12 months", features: ["Gym Access", "Locker", "10% Discount"] },
-  { id: "premium-annual", name: "Premium Annual", price: "AED 2,400", duration: "12 months", features: ["Gym Access", "Locker", "Group Classes", "Pool", "15% Discount"] },
-  { id: "vip-annual", name: "VIP Annual", price: "AED 3,600", duration: "12 months", features: ["Gym Access", "Locker", "All Classes", "Pool", "Spa", "Personal Trainer", "20% Discount"] }
+  { id: "basic-monthly", name: "Basic Monthly", price: "\u20C3120", duration: "1 month", features: ["Gym Access", "Locker"] },
+  { id: "premium-monthly", name: "Premium Monthly", price: "\u20C3240", duration: "1 month", features: ["Gym Access", "Locker", "Group Classes", "Pool"] },
+  { id: "basic-annual", name: "Basic Annual", price: "\u20C31,200", duration: "12 months", features: ["Gym Access", "Locker", "10% Discount"] },
+  { id: "premium-annual", name: "Premium Annual", price: "\u20C32,400", duration: "12 months", features: ["Gym Access", "Locker", "Group Classes", "Pool", "15% Discount"] },
+  { id: "vip-annual", name: "VIP Annual", price: "\u20C33,600", duration: "12 months", features: ["Gym Access", "Locker", "All Classes", "Pool", "Spa", "Personal Trainer", "20% Discount"] }
 ];
 
 interface RenewUpgradeProps {
