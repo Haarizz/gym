@@ -65,6 +65,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
+import { useLocation, useNavigate } from "react-router-dom";
 import { referralService, ReferralResponse } from "../utils/supabase/referral-service";
 import { walletService } from "../utils/supabase/reward-service";
 import { membersService, Member as ApiMember } from "../utils/supabase/members-service";
@@ -230,7 +231,7 @@ const EMPTY_PLAN_FORM = {
 
 
 export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilterChange, onStats }: MemberAddonsProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -433,6 +434,29 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
   // BG_105: each search bumps this id so a slower, older type-ahead response can't
   // reopen the results list over a member that was already picked.
   const memberSearchSeq = React.useRef(0);
+
+  // BG_119: Member details > Quick Actions > Purchase Add-On lands here with the
+  // member's id; open the purchase modal with that member already selected.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const { purchaseAddonFor, ...rest } = (location.state as { purchaseAddonFor?: string } | null) ?? {};
+    if (!purchaseAddonFor) return;
+    // Drop the trigger so remounting this tab doesn't reopen the modal.
+    navigate(location.pathname, { replace: true, state: rest });
+    membersService.getMemberById(String(purchaseAddonFor))
+      .then(m => {
+        memberSearchSeq.current++;
+        setSelectedMember(toLocalMember(m));
+        setSearchQuery(m.name);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+        setFilterCategory("all");
+        setIsPurchaseModalOpen(true);
+      })
+      .catch(() => toast.error("Could not load the member for this add-on purchase."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   const handleMemberSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -833,7 +857,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                     <TableHead>Add-on Name</TableHead>
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Expiry Date</TableHead>
-                    <TableHead>Amount ({currencyCode})</TableHead>
+                    <TableHead>Amount ({currencySymbol})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -1181,7 +1205,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="amount" className="text-xs font-medium">Amount ({currencyCode})</Label>
+                  <Label htmlFor="amount" className="text-xs font-medium">Amount ({currencySymbol})</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -1200,7 +1224,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold text-emerald-900">
-                      Referral reward available: {currencyCode} {availableReward.rewardAmount}
+                      Referral reward available: {currencyPrefix}{availableReward.rewardAmount}
                     </p>
                     <p className="text-[11px] text-emerald-800">
                       {rewardApplied ? "Applied to this purchase." : `From referring ${availableReward.refereeName}.`}
@@ -1219,10 +1243,10 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold text-blue-900">
-                      Wallet balance available: {currencyCode} {memberWalletBalance}
+                      Wallet balance available: {currencyPrefix}{memberWalletBalance}
                     </p>
                     <p className="text-[11px] text-blue-800">
-                      {walletAmountApplied > 0 ? `${currencyCode} ${walletAmountApplied} applied to this purchase.` : "Use it toward this purchase."}
+                      {walletAmountApplied > 0 ? `${currencyPrefix}${walletAmountApplied} applied to this purchase.` : "Use it toward this purchase."}
                     </p>
                   </div>
                   {walletAmountApplied === 0 && customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) > 0 && (
@@ -1238,7 +1262,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                 <div className="flex items-center justify-between px-4 py-2 bg-muted/20 border rounded-xl">
                   <span className="text-sm font-medium">Balance to Pay</span>
                   <span className="text-sm font-bold text-primary">
-                    {currencyCode} {Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied).toFixed(2)}
+                    {currencyPrefix}{Math.max(0, customAmount - (rewardApplied && availableReward ? availableReward.rewardAmount : 0) - walletAmountApplied).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -1354,7 +1378,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
           <div className="px-8 py-6 space-y-2">
             {[
               { label: "Add-on", value: selectedAddon?.name },
-              { label: "Amount", value: `${currencyCode} ${customAmount}` },
+              { label: "Amount", value: `${currencyPrefix}${customAmount}` },
               ...(selectedMember?.billedToHead
                 ? [{ label: "Billed To", value: selectedMember.familyHeadName || "Family Head" }]
                 : [{ label: "Payment", value: lastCreatedAddon?.payment_mode ?? "" }]),
@@ -1493,7 +1517,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Price ({currencyCode})</Label>
+                    <Label className="text-xs">Price ({currencySymbol})</Label>
                     <Input
                       type="number"
                       min={0}

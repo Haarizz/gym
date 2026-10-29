@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -79,8 +81,15 @@ public class ReceiptVoucherService {
             String sourceCategory, LocalDate from, LocalDate to) {
         Specification<ReceiptVoucher> spec = buildSpec(search, status, branch, sourceCategory, from, to);
         List<ReceiptVoucher> all = receiptVoucherRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date", "id"));
+        // One lookup for every voucher's journal entry, not one query per row.
+        Map<Long, Long> journalIds = new HashMap<>();
+        if (!all.isEmpty()) {
+            journalEntrySourceRepository.findBySourceEntityTypeAndSourceEntityIdIn(
+                            "ReceiptVoucher", all.stream().map(ReceiptVoucher::getId).toList())
+                    .forEach(s -> journalIds.put(s.getSourceEntityId(), s.getJournalVoucherId()));
+        }
         return all.stream()
-                .map(this::toResponseDTO)
+                .map(rv -> ReceiptVoucherResponseDTO.fromEntity(rv, journalIds.get(rv.getId())))
                 .collect(Collectors.toList());
     }
 

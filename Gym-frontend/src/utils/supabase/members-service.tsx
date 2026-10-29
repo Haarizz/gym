@@ -170,6 +170,11 @@ export interface MemberFilters {
   status?: string;
   membership_type?: string;
   payment_status?: string;
+  plan?: string;
+  /** Membership ends within this many days from today (frozen/suspended excluded). */
+  expiring_within?: number;
+  /** 'due' = has an amount due (membership balance or unpaid sales invoice), 'clear' = none. */
+  dues?: 'due' | 'clear';
 }
 
 export interface PaginationParams {
@@ -221,6 +226,9 @@ class MembersService {
     if (filters.status)           params.append('status',          filters.status);
     if (filters.membership_type)  params.append('membership_type', filters.membership_type);
     if (filters.payment_status)   params.append('payment_status',  filters.payment_status);
+    if (filters.plan)             params.append('plan',            filters.plan);
+    if (filters.expiring_within != null) params.append('expiring_within', String(filters.expiring_within));
+    if (filters.dues)             params.append('dues',            filters.dues);
 
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members?${params.toString()}`

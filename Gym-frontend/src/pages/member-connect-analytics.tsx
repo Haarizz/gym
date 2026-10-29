@@ -88,7 +88,7 @@ import { referralService, ReferralStats } from '../utils/supabase/referral-servi
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 
 export function MemberConnectAnalytics() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('month');
   const [selectedBranch, setSelectedBranch] = useState('all');
@@ -1335,7 +1335,7 @@ export function MemberConnectAnalytics() {
                     <YAxis yAxisId="right" orientation="right" />
                     <Tooltip />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="totalRevenue" fill="#10b981" name={`Revenue (${currencyCode})`} />
+                    <Bar yAxisId="left" dataKey="totalRevenue" fill="#10b981" name={`Revenue (${currencySymbol})`} />
                     <Bar yAxisId="right" dataKey="usageCount" fill="#3b82f6" name="Redemptions" />
                   </BarChart>
                 </ResponsiveContainer>

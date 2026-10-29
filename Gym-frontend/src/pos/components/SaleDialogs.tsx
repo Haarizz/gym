@@ -13,7 +13,7 @@ import { posApi } from "../api";
 import { usePos } from "../PosContext";
 import { useApproval } from "./Approval";
 import { Empty, Money, Pill, ReceiptPreview } from "./Shared";
-import { fmtDateTime, money, r2, todayIso } from "../pricing";
+import { fmtDateTime, money, num, r2, todayIso } from "../pricing";
 import { saleReceipt } from "../print/receiptModel";
 import { receiptHtmlBody, thermalDocument } from "../print/thermalHtml";
 import type { HeldSale, RefundMethod, Sale } from "../types";
@@ -251,7 +251,7 @@ export function ReturnDialog({ sale, open, onOpenChange, bankAccounts, onReturne
   bankAccounts: AccountHead[];
   onReturned: () => void;
 }) {
-  const { session, settings, printReturn, openDrawer, currencyCode } = usePos();
+  const { session, settings, printReturn, openDrawer, currencyPrefix } = usePos();
   const { withApproval } = useApproval();
   const [qty, setQty] = useState<Record<number, number>>({});
   const [method, setMethod] = useState<RefundMethod>("ORIGINAL");
@@ -298,7 +298,7 @@ export function ReturnDialog({ sale, open, onOpenChange, bankAccounts, onReturne
         supervisorPin: pin,
       }));
       if (!ret) return;
-      toast.success(`Return ${ret.returnNumber} recorded — refund ${money(ret.totalAmount, currencyCode)}`);
+      toast.success(`Return ${ret.returnNumber} recorded — refund ${currencyPrefix}${num(ret.totalAmount)}`);
       if (ret.refundBreakdown?.some((l) => l.method === "Cash")) openDrawer(`Cash refund ${ret.returnNumber}`);
       if (print) printReturn(ret);
       onReturned();

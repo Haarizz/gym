@@ -1,3 +1,7 @@
 # Local-only design exports and scratch mockups (not part of any app)
 /GymBios Mobile App/
 /*.html
+
+# Customer data — never commit: legacy gym dumps and member/webcam photos
+/members/
+/*.sql

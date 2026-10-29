@@ -87,11 +87,32 @@ function streamFormError(f: Partial<TrainingStreamRequest>): string | null {
   if (m != null && (!Number.isInteger(m) || m < 1 || m > 2147483647)) {
     return 'Max participants must be a whole number of at least 1 (leave it empty for no limit)';
   }
-  if (f.scheduled_time && !/^d{4}-d{2}-d{2}Td{2}:d{2}/.test(f.scheduled_time)) {
+  return scheduleFormatError(f.scheduled_time);
+}
+
+function scheduleFormatError(scheduled: string | null | undefined): string | null {
+  if (scheduled && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(scheduled)) {
     return 'Enter a valid schedule date';
   }
   return null;
 }
+
+// BG_121: a new stream can't be scheduled in the past. The value is the gym's
+// local wall-clock time ("yyyy-MM-ddTHH:mm"), so compare it as local time.
+function createScheduleError(scheduled: string | null | undefined): string | null {
+  const formatError = scheduleFormatError(scheduled);
+  if (formatError || !scheduled) return formatError;
+  const when = new Date(scheduled);
+  if (Number.isNaN(when.getTime())) return 'Enter a valid schedule date';
+  if (when.getTime() < Date.now()) return "Schedule date can't be in the past";
+  return null;
+}
+
+/** yyyy-MM-dd in the user's local time zone (toISOString would shift to UTC) */
+const todayLocalIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
   const [streams, setStreams] = useState<TrainingStreamApi[]>([]);
@@ -107,6 +128,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<TrainingStreamRequest>(emptyForm());
   const [creating, setCreating] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   // Edit dialog
   const [editStream, setEditStream] = useState<TrainingStreamApi | null>(null);
@@ -184,6 +206,9 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
 
   // --- Create Stream ---
   const handleCreate = async () => {
+    const schedError = createScheduleError(createForm.scheduled_time);
+    setScheduleError(schedError);
+    if (schedError) return;
     const formError = streamFormError(createForm);
     if (formError) { alert(formError); return; }
     try {
@@ -389,7 +414,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
           </Dialog>
 
           {/* Create Stream Dialog */}
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <Dialog open={createOpen} onOpenChange={o => { setCreateOpen(o); if (!o) setScheduleError(null); }}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">
                 <Plus className="mr-2 h-4 w-4" />
@@ -444,22 +469,28 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Schedule Date</Label>
-                    <Input type="date" max="9999-12-31" onChange={e => {
-                      const time = createForm.scheduled_time?.split('T')[1] ?? '00:00';
-                      setCreateForm(f => ({ ...f, scheduled_time: e.target.value ? `${e.target.value}T${time}` : null }));
-                    }} />
+                    <Input type="date" min={todayLocalIso()} max="9999-12-31"
+                      value={createForm.scheduled_time?.split('T')[0] ?? ''}
+                      aria-invalid={!!scheduleError}
+                      onChange={e => {
+                        setScheduleError(null);
+                        const time = createForm.scheduled_time?.split('T')[1] ?? '00:00';
+                        setCreateForm(f => ({ ...f, scheduled_time: e.target.value ? `${e.target.value}T${time}` : null }));
+                      }} />
                   </div>
                   <div className="space-y-2">
                     <Label>Schedule Time</Label>
                     <TimeSelect12h
                       value={createForm.scheduled_time?.split('T')[1]?.slice(0, 5) ?? ''}
                       onChange={v => {
-                        const date = createForm.scheduled_time?.split('T')[0] ?? new Date().toISOString().split('T')[0];
+                        setScheduleError(null);
+                        const date = createForm.scheduled_time?.split('T')[0] ?? todayLocalIso();
                         setCreateForm(f => ({ ...f, scheduled_time: `${date}T${v}` }));
                       }}
                     />
                   </div>
                 </div>
+                {scheduleError && <p className="text-xs text-red-600" role="alert">{scheduleError}</p>}
                 <div className="space-y-2">
                   <Label>Description</Label>
                   <Textarea placeholder="Describe the training session..." value={createForm.description ?? ''} onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))} className="min-h-[80px]" />
@@ -473,7 +504,7 @@ export function TrainingStreams({ onNavigate }: TrainingStreamsProps = {}) {
                 </div>
               </div>
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateForm(emptyForm()); }}>Cancel</Button>
+                <Button variant="outline" onClick={() => { setCreateOpen(false); setCreateForm(emptyForm()); setScheduleError(null); }}>Cancel</Button>
                 <Button onClick={handleCreate} disabled={creating || !createForm.title || !createForm.category || !createForm.duration}>
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Create Stream

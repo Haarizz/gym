@@ -27,6 +27,15 @@ export interface TaxCodeRequest {
   secondaryTaxCode?: string;
 }
 
+/** The server message when there is one (the body is JSON {message}). */
+async function fail(res: Response, fallback: string): Promise<never> {
+  const text = await res.text().catch(() => "");
+  let message = fallback;
+  try { const b = JSON.parse(text); if (b && typeof b.message === "string" && b.message) message = b.message; }
+  catch { if (text && text.length < 200) message = text; }
+  throw new Error(message);
+}
+
 function mapTaxCode(r: any): TaxCode {
   return {
     id: String(r.id),
@@ -59,7 +68,7 @@ function toBody(req: TaxCodeRequest) {
 class TaxCodeService {
   async getAll(): Promise<TaxCode[]> {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/tax-codes`);
-    if (!res.ok) throw new Error("Failed to load tax codes");
+    if (!res.ok) await fail(res, "Couldn't load tax codes");
     const data = await res.json();
     return (data ?? []).map(mapTaxCode);
   }
@@ -69,7 +78,7 @@ class TaxCodeService {
       method: "POST",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error((await res.text()) || "Failed to create tax code");
+    if (!res.ok) await fail(res, "Couldn't create the tax code");
     return mapTaxCode(await res.json());
   }
 
@@ -78,13 +87,13 @@ class TaxCodeService {
       method: "PUT",
       body: JSON.stringify(toBody(req)),
     });
-    if (!res.ok) throw new Error((await res.text()) || "Failed to update tax code");
+    if (!res.ok) await fail(res, "Couldn't update the tax code");
     return mapTaxCode(await res.json());
   }
 
   async delete(id: string): Promise<void> {
     const res = await authService.makeAuthenticatedRequest(`${BASE_URL}/tax-codes/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error((await res.text()) || "Failed to delete tax code");
+    if (!res.ok) await fail(res, "Couldn't delete the tax code");
   }
 }
 

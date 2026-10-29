@@ -116,7 +116,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
 
     return {
       id: session.id,
-      name: session.name,
+      name: session.name || "",
       instructor: session.trainerName || "Trainer",
       date: session.date,
       startTime,
@@ -184,9 +184,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
     const result = await membersService.getMembers({}, { limit: 200 });
     const mapped = result.members.map((member: any) => ({
       id: member.id,
-      name: member.name,
-      email: member.email,
-      phone: member.phone,
+      name: member.name ?? "",
+      email: member.email ?? "",
+      phone: member.phone ?? "",
       membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
       avatar: member.photo_url || member.photoUrl || undefined
     }));
@@ -199,9 +199,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
         const result = await membersService.getMembers({}, { limit: 200 });
         const mappedMembers = result.members.map((member: any) => ({
           id: member.id,
-          name: member.name,
-          email: member.email,
-          phone: member.phone,
+          name: member.name ?? "",
+          email: member.email ?? "",
+          phone: member.phone ?? "",
           membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
           avatar: member.photo_url || member.photoUrl || undefined
         }));
@@ -220,12 +220,15 @@ export function Bookings({ onNavigate }: BookingsProps) {
     }
   }, [members]);
 
-  // Filter members based on search
+  // Filter members based on search. BG_125: members without an email/phone have
+  // null there, which crashed the page on the first keystroke — guard every field.
   const filteredMembers = useMemo(() => {
+    const lowered = searchTerm.trim().toLowerCase();
+    if (!lowered) return members;
     return members.filter(member =>
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.phone.includes(searchTerm)
+      (member.name ?? "").toLowerCase().includes(lowered) ||
+      (member.email ?? "").toLowerCase().includes(lowered) ||
+      (member.phone ?? "").includes(lowered)
     );
   }, [members, searchTerm]);
 

@@ -1,5 +1,6 @@
 package com.company.project.controllers;
 
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.dto.TaxComplianceRequestDTO;
 import com.company.project.dto.TaxComplianceResponseDTO;
 import com.company.project.services.TaxComplianceService;
@@ -46,12 +47,18 @@ public class TaxComplianceController {
     @PostMapping("/{id}/mark-filed")
     public ResponseEntity<TaxComplianceResponseDTO> markFiled(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        LocalDate filedDate = body.containsKey("filed_date")
-                ? LocalDate.parse(body.get("filed_date")) : null;
-        BigDecimal amount = body.containsKey("filing_amount")
-                ? new BigDecimal(body.get("filing_amount")) : null;
-        String reference = body.get("filing_reference");
+            @RequestBody Map<String, Object> body) {
+        String filed = text(body.get("filed_date"));
+        String amountText = text(body.get("filing_amount"));
+        LocalDate filedDate;
+        BigDecimal amount;
+        try {
+            filedDate = filed != null ? LocalDate.parse(filed) : null;
+            amount = amountText != null ? new BigDecimal(amountText) : null;
+        } catch (RuntimeException e) {
+            throw new BusinessRuleViolationException("Check the filed date and amount");
+        }
+        String reference = text(body.get("filing_reference"));
         return ResponseEntity.ok(taxComplianceService.markFiled(id, filedDate, amount, reference));
     }
 
@@ -59,5 +66,11 @@ public class TaxComplianceController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         taxComplianceService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private static String text(Object v) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() ? null : s;
     }
 }

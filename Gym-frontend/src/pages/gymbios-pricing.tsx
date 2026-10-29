@@ -38,7 +38,7 @@ import { BusinessOnboardingFullscreen } from "./business-onboarding-fullscreen";
 const plans = [
   {
     name: "Essentials",
-    price: "AED 960 / Yr.",
+    price: "\u20C3960 / Yr.",
     tagline: "💵 Affordable / entry-level",
     focus: "🎯 Basic automation & member engagement",
     features: [
@@ -59,7 +59,7 @@ const plans = [
   },
   {
     name: "Standard",
-    price: "AED 1,840 / Yr.",
+    price: "\u20C31,840 / Yr.",
     tagline: "💵 Mid-tier / upsell",
     focus: "🎯 Retention & revenue optimization",
     features: [
@@ -75,7 +75,7 @@ const plans = [
   },
   {
     name: "Professional",
-    price: "AED 3,670 / Yr. (+ AED 330 add-ons)",
+    price: "\u20C33,670 / Yr. (+ \u20C3330 add-ons)",
     tagline: "💵 Advanced / Growth-focused",
     focus: "🎯 Member retention, revenue optimization & advanced analytics",
     features: [

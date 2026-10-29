@@ -120,7 +120,7 @@ const Value = ({ v, isMoney }: { v: number; isMoney: boolean }) =>
  * broken down by stream and payment method, plus trend charts.
  */
 export function PeriodComparison() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [data, setData] = useState<Periods | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +216,7 @@ export function PeriodComparison() {
     ];
   }, [data]);
 
-  const tooltipMoney = (v: unknown) => `${currencyCode} ${money(v)}`;
+  const tooltipMoney = (v: unknown) => `${currencyPrefix}${money(v)}`;
   const d = dates;
 
   if (loading && !data) {

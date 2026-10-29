@@ -104,7 +104,7 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const navigate = useNavigate();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('today');
   const [showMemberResults, setShowMemberResults] = useState(false);
@@ -912,7 +912,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     fill="#3b82f6"
                     fillOpacity={0.1}
                     strokeWidth={3}
-                    name={`Revenue (${currencyCode})`}
+                    name={`Revenue (${currencySymbol})`}
                   />
                 </AreaChart>
               </ResponsiveContainer>

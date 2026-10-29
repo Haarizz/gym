@@ -141,7 +141,7 @@ const emptyForm: PVForm = {
 };
 
 export function PaymentVoucher() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [allVouchers, setAllVouchers] = useState<PaymentVoucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(true);
   const [totalVoucherCount, setTotalVoucherCount] = useState(0);
@@ -745,7 +745,7 @@ export function PaymentVoucher() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Amount ({currencyCode}) *</Label>
+          <Label>Amount ({currencySymbol}) *</Label>
           <Input
             type="number"
             min="0"

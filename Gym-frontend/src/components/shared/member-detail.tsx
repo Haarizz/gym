@@ -36,7 +36,7 @@ interface MemberDetailProps {
 }
 
 export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [activeTab, setActiveTab] = useState('profile');
   const [showQRModal, setShowQRModal] = useState(false);
   const [appAccessEnabled, setAppAccessEnabled] = useState<boolean | null>(
@@ -291,7 +291,7 @@ export function MemberDetail({ member, onClose, onNavigate }: MemberDetailProps)
                     label="Expiry Date"
                     value={member.expiry_date ? new Date(member.expiry_date).toLocaleDateString('en-GB') : null}
                   />
-                  <InfoRow label="Monthly Fee" value={`${currencyCode} ${member.monthly_fee || member.membership_fee}`} />
+                  <InfoRow label="Monthly Fee" value={`${currencyPrefix}${member.monthly_fee || member.membership_fee}`} />
                   <InfoRow label="Total Visits" value={member.total_visits?.toString()} />
                 </div>
               </CardContent>

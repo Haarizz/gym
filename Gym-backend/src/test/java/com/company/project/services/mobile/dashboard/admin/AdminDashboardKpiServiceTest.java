@@ -82,7 +82,7 @@ class AdminDashboardKpiServiceTest {
 
     @Test
     void activeMembersKpi_isCurrentStateSnapshot_withNoGrowthFigure() {
-        when(memberRepository.countByMembershipStatus("active")).thenReturn(500L);
+        when(memberRepository.countEffectivelyActive(any())).thenReturn(500L);
 
         AdminDashboardKpiDTO dto = kpiService.activeMembersKpi();
 

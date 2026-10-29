@@ -11,6 +11,8 @@ public class FiscalPeriodResponseDTO {
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;
+    /** Journal entries dated inside the period, all branches (null when not requested). */
+    private Long voucherCount;
 
     public FiscalPeriodResponseDTO() {}
 
@@ -39,6 +41,9 @@ public class FiscalPeriodResponseDTO {
 
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public Long getVoucherCount() { return voucherCount; }
+    public void setVoucherCount(Long voucherCount) { this.voucherCount = voucherCount; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

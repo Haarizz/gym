@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, toPlainCurrencyText } from '../../utils/currency';
 import { useBranch } from '../../utils/branch-context';
 import { usePermission } from '../../utils/permissions';
 import { staffService } from '../../utils/supabase/staff-service';
@@ -257,8 +257,8 @@ function CampaignCard({ c, money, onOpen }: { c: MarketingCampaign; money: (n: n
       <div className={styles.stats}>
         <Stat label="Leads" value={fmtNumber(m.leads)} />
         <Stat label="Converted" value={`${fmtNumber(m.converted)} · ${fmtNumber(m.conversionRate, 0)}%`} />
-        <Stat label="Spent" value={compact(m.spend)} title={money(m.spend)} />
-        <Stat label="Per lead" value={compact(m.costPerLead)} title={money(m.costPerLead)} />
+        <Stat label="Spent" value={compact(m.spend)} title={toPlainCurrencyText(money(m.spend))} />
+        <Stat label="Per lead" value={compact(m.costPerLead)} title={toPlainCurrencyText(money(m.costPerLead))} />
       </div>
 
       {(c.targetLeads || c.budget) ? (

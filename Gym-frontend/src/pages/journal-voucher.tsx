@@ -62,7 +62,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function JournalVoucherPage() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [vouchers, setVouchers] = useState<JournalVoucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -557,8 +557,8 @@ export function JournalVoucherPage() {
                 >
                   <div>Account Code</div>
                   <div>Account Name</div>
-                  <div className="text-right truncate">Debit ({currencyCode})</div>
-                  <div className="text-right truncate">Credit ({currencyCode})</div>
+                  <div className="text-right truncate">Debit ({currencySymbol})</div>
+                  <div className="text-right truncate">Credit ({currencySymbol})</div>
                   <div>Description</div>
                   <div>Cost Center</div>
                   <div></div>

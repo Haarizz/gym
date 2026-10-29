@@ -33,7 +33,7 @@ const html = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
 export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers: Supplier[]; initialSupplierId?: number }) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [supplierId, setSupplierId] = useState(initialSupplierId ? String(initialSupplierId) : '');
   const [[from, to], setRange] = useState<[string, string]>(() => presetRange('THIS_YEAR'));
   const [statement, setStatement] = useState<Statement | null>(null);
@@ -230,7 +230,7 @@ export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers:
             ].map(t => (
               <div key={t.label} style={{ background: t.bg, borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 3px rgb(0 0 0 / 0.08)' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: t.fg }}>{t.label}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: t.fg, fontVariantNumeric: 'tabular-nums' }}>{t.value} <span style={{ fontSize: 12, fontWeight: 500 }}>{currencyCode}</span></div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: t.fg, fontVariantNumeric: 'tabular-nums' }}>{t.value} <span style={{ fontSize: 12, fontWeight: 500 }}>{currencySymbol}</span></div>
                 <div className={cx(styles.tiny, styles.muted)}>{t.sub}</div>
               </div>
             ))}

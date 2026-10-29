@@ -1021,7 +1021,7 @@ export function Terminal() {
       {mode === "discount" && (
         <div className={s.bbToggle}>
           <button type="button" className={discType === "PERCENT" ? s.bbToggleOn : ""} onClick={() => setDiscType("PERCENT")}>% Percent</button>
-          <button type="button" className={discType === "AMOUNT" ? s.bbToggleOn : ""} onClick={() => setDiscType("AMOUNT")}>{pos.currencyCode} Amt</button>
+          <button type="button" className={discType === "AMOUNT" ? s.bbToggleOn : ""} onClick={() => setDiscType("AMOUNT")}>{pos.currencySymbol} Amt</button>
         </div>
       )}
       <input className={s.bbNumpadInput} value={numpadValue} placeholder="0" autoFocus inputMode="decimal"
@@ -1139,7 +1139,7 @@ export function Terminal() {
                   {mode === "discount" && focusLine && (
                     <div className={s.bbToggle} style={{ marginTop: 8, marginBottom: 0 }}>
                       <button type="button" className={discType === "PERCENT" ? s.bbToggleOn : ""} onClick={() => setDiscType("PERCENT")}>% Percent</button>
-                      <button type="button" className={discType === "AMOUNT" ? s.bbToggleOn : ""} onClick={() => setDiscType("AMOUNT")}>{pos.currencyCode} Amount</button>
+                      <button type="button" className={discType === "AMOUNT" ? s.bbToggleOn : ""} onClick={() => setDiscType("AMOUNT")}>{pos.currencySymbol} Amount</button>
                     </div>
                   )}
                   <button type="button" className={s.bbModeCancel} onClick={cancelMode}>Cancel</button>

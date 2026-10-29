@@ -225,7 +225,7 @@ const highValueAssets = [
 ];
 
 export function Assets() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const getCurrentPeriod = () => {
     return new Date().toLocaleDateString('en-GB', {
       month: 'long',
@@ -430,7 +430,7 @@ export function Assets() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({name, value}) => `${name}: ${(value/1000).toFixed(0)}K ${currencyCode}`}
+                  label={({name, value}) => `${name}: ${currencyPrefix}${(value/1000).toFixed(0)}K`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -439,7 +439,7 @@ export function Assets() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [`${(value/1000).toFixed(0)}K ${currencyCode}`, 'Value']} />
+                <Tooltip formatter={(value) => [`${currencyPrefix}${(value/1000).toFixed(0)}K`, 'Value']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>

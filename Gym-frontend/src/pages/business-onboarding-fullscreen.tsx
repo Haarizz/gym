@@ -206,6 +206,7 @@ export function BusinessOnboardingFullscreen({
       setData((prev) => ({ ...prev, plan: selectedPlan ?? prev.plan }));
       setStep(1);
       setBusinessNameError(false);
+      setContactErrors({});
     }
   }, [open, selectedPlan]);
 
@@ -241,6 +242,33 @@ export function BusinessOnboardingFullscreen({
     if (step > 1) setStep(step - 1);
   };
 
+  // BG_123: phone fields keep digits only (one leading "+" for a country code);
+  // the contact name allows letters, spaces and . ' - — so a mostly-digit name is rejected.
+  type ContactField = "contactName" | "contactPhone" | "contactWhatsApp";
+  const [contactErrors, setContactErrors] = useState<Partial<Record<ContactField, string>>>({});
+
+  const handlePhoneChange = (field: "contactPhone" | "contactWhatsApp", value: string) => {
+    const cleaned = value.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+    handleChange(field, cleaned);
+    setContactErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const validateContact = (): Partial<Record<ContactField, string>> => {
+    const errs: Partial<Record<ContactField, string>> = {};
+    const name = data.contactName.trim();
+    if (name && !/^\p{L}[\p{L}\s.'-]*$/u.test(name)) {
+      errs.contactName = "Name can contain only letters, spaces and . ' -";
+    }
+    const phoneOk = (v: string) => /^\+?\d{7,15}$/.test(v);
+    if (data.contactPhone && !phoneOk(data.contactPhone)) {
+      errs.contactPhone = "Enter a valid phone number (7–15 digits)";
+    }
+    if (data.contactWhatsApp && !phoneOk(data.contactWhatsApp)) {
+      errs.contactWhatsApp = "Enter a valid WhatsApp number (7–15 digits)";
+    }
+    return errs;
+  };
+
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -249,6 +277,14 @@ export function BusinessOnboardingFullscreen({
       toast.error("Business name is required");
       setBusinessNameError(true);
       setStep(1);
+      return;
+    }
+    const errs = validateContact();
+    if (Object.keys(errs).length > 0) {
+      setContactErrors(errs);
+      setStep(4);
+      const first = (["contactName", "contactPhone", "contactWhatsApp"] as ContactField[]).find((f) => errs[f]);
+      if (first) document.getElementById(`ob-${first}`)?.focus();
       return;
     }
     setSubmitting(true);
@@ -283,7 +319,9 @@ export function BusinessOnboardingFullscreen({
       const status = error?.response?.status;
       const description = status === 429
         ? "Too many submissions from this device — please try again in a few minutes."
-        : "Please check your connection and try again.";
+        : status === 409 && error?.response?.data?.message
+          ? error.response.data.message
+          : "Please check your connection and try again.";
       toast.error("Couldn't submit your details", { description });
     } finally {
       setSubmitting(false);
@@ -930,13 +968,22 @@ export function BusinessOnboardingFullscreen({
                                 Contact person name
                               </Label>
                               <Input
-                                className="mt-2 h-11 ob-input"
+                                id="ob-contactName"
+                                className={`mt-2 h-11 ob-input${contactErrors.contactName ? " ob-input-error" : ""}`}
                                 placeholder="Owner / Manager name"
                                 value={data.contactName}
-                                onChange={(e) =>
-                                  handleChange("contactName", e.target.value)
-                                }
+                                aria-invalid={!!contactErrors.contactName || undefined}
+                                aria-describedby={contactErrors.contactName ? "ob-contactName-error" : undefined}
+                                onChange={(e) => {
+                                  handleChange("contactName", e.target.value);
+                                  setContactErrors((prev) => ({ ...prev, contactName: undefined }));
+                                }}
                               />
+                              {contactErrors.contactName && (
+                                <p id="ob-contactName-error" className="mt-1 text-xs text-red-600">
+                                  {contactErrors.contactName}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label className="text-sm font-medium text-slate-700">
@@ -957,13 +1004,22 @@ export function BusinessOnboardingFullscreen({
                                 Phone number
                               </Label>
                               <Input
-                                className="mt-2 h-11 ob-input"
+                                id="ob-contactPhone"
+                                type="tel"
+                                inputMode="tel"
+                                maxLength={16}
+                                className={`mt-2 h-11 ob-input${contactErrors.contactPhone ? " ob-input-error" : ""}`}
                                 placeholder="Primary contact number"
                                 value={data.contactPhone}
-                                onChange={(e) =>
-                                  handleChange("contactPhone", e.target.value)
-                                }
+                                aria-invalid={!!contactErrors.contactPhone || undefined}
+                                aria-describedby={contactErrors.contactPhone ? "ob-contactPhone-error" : undefined}
+                                onChange={(e) => handlePhoneChange("contactPhone", e.target.value)}
                               />
+                              {contactErrors.contactPhone && (
+                                <p id="ob-contactPhone-error" className="mt-1 text-xs text-red-600">
+                                  {contactErrors.contactPhone}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label className="text-sm font-medium text-slate-700">
@@ -973,13 +1029,22 @@ export function BusinessOnboardingFullscreen({
                                 </span>
                               </Label>
                               <Input
-                                className="mt-2 h-11 ob-input"
+                                id="ob-contactWhatsApp"
+                                type="tel"
+                                inputMode="tel"
+                                maxLength={16}
+                                className={`mt-2 h-11 ob-input${contactErrors.contactWhatsApp ? " ob-input-error" : ""}`}
                                 placeholder="For faster coordination"
                                 value={data.contactWhatsApp}
-                                onChange={(e) =>
-                                  handleChange("contactWhatsApp", e.target.value)
-                                }
+                                aria-invalid={!!contactErrors.contactWhatsApp || undefined}
+                                aria-describedby={contactErrors.contactWhatsApp ? "ob-contactWhatsApp-error" : undefined}
+                                onChange={(e) => handlePhoneChange("contactWhatsApp", e.target.value)}
                               />
+                              {contactErrors.contactWhatsApp && (
+                                <p id="ob-contactWhatsApp-error" className="mt-1 text-xs text-red-600">
+                                  {contactErrors.contactWhatsApp}
+                                </p>
+                              )}
                             </div>
                           </div>
 

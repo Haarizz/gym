@@ -149,7 +149,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
   { bill, allBills, suppliers, warehouses, products, purchaseOrders, saving, selectSupplier, initialPurchaseOrderId, onSave, onPrint, onAddSupplier, onRecordPayment, onRefreshProducts },
   ref,
 ) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const readOnly = !!bill && bill.status !== 'DRAFT';
   const initial = useMemo(() => (bill ? formFromBill(bill) : blankForm(warehouses[0]?.id)), [bill?.id, bill?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [form, setForm] = useState<Form>(initial);
@@ -822,7 +822,7 @@ export const PurchaseInvoiceEditor = forwardRef<PurchaseInvoiceEditorHandle, Pro
         <div className={styles.actionBarMeta}>
           <span className={cx(styles.pill, statusLabel.cls)}>{statusLabel.label}</span>
           <span>Bill No: <strong>{bill?.billNumber ?? '—'}</strong></span>
-          <span>Net: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencyCode})</span></span>
+          <span>Net: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencySymbol})</span></span>
         </div>
         <div className={styles.headerActions}>
           {!readOnly && (

@@ -125,7 +125,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
   { order, allOrders, allBills, suppliers, products, defaultDeliveryAddress, saving, createdBy, selectSupplier, onSave, onPrint, onAddSupplier, onRefreshProducts },
   ref,
 ) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const readOnly = !!order && !(order.status === 'DRAFT' || order.status === 'PENDING_APPROVAL');
   const initial = useMemo(() => (order ? formFromOrder(order) : blankForm(defaultDeliveryAddress)), [order?.id, order?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [form, setForm] = useState<Form>(initial);
@@ -646,7 +646,7 @@ export const PurchaseOrderEditor = forwardRef<PurchaseOrderEditorHandle, Props>(
         <div className={styles.actionBarMeta}>
           <span className={cx(styles.pill, status.cls)}>{status.label}</span>
           <span>PO No: <strong>{order?.poNumber ?? '—'}</strong></span>
-          <span>Total: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencyCode})</span></span>
+          <span>Total: <strong><CurrencyValue amount={totals.net} options={fmt2} /></strong> <span className={styles.muted}>({currencySymbol})</span></span>
         </div>
         <div className={styles.headerActions}>
           {!readOnly && (

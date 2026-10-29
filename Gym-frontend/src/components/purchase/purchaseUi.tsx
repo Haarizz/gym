@@ -170,7 +170,7 @@ export function SupplierFormDialog({ open, supplier, initialName, onOpenChange, 
   onOpenChange: (open: boolean) => void;
   onSaved: (s: Supplier) => void;
 }) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [form, setForm] = useState<Partial<Supplier>>(emptySupplier);
   const [saving, setSaving] = useState(false);
 
@@ -255,7 +255,7 @@ export function SupplierFormDialog({ open, supplier, initialName, onOpenChange, 
               </div>
             </div>
             <div>
-              <Label>Credit Limit ({currencyCode})</Label>
+              <Label>Credit Limit ({currencySymbol})</Label>
               <Input type="number" min="0" step="100" value={form.creditLimit ?? 0}
                 onChange={e => set('creditLimit', Math.max(0, parseFloat(e.target.value) || 0))} />
             </div>

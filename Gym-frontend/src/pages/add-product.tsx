@@ -135,7 +135,7 @@ interface AddProductProps {
 const MAX_DESCRIPTION_LENGTH = 1000;
 
 export function AddProduct({ onNavigate }: AddProductProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const location = useLocation();
   const navigate = useNavigate();
   const productId = (location.state as { productId?: number } | null)?.productId;
@@ -1435,7 +1435,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="default-price">Selling Price ({currencyCode}) *</Label>
+                    <Label htmlFor="default-price">Selling Price ({currencySymbol}) *</Label>
                     <Input
                       id="default-price"
                       type="number"
@@ -1448,7 +1448,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cost-price">Cost Price ({currencyCode})</Label>
+                    <Label htmlFor="cost-price">Cost Price ({currencySymbol})</Label>
                     <Input
                       id="cost-price"
                       type="number"
@@ -1543,8 +1543,8 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                           <TableRow>
                             <TableHead className="table-header">Unit</TableHead>
                             <TableHead className="table-header">Conversion Factor</TableHead>
-                            <TableHead className="table-header">Cost Price ({currencyCode})</TableHead>
-                            <TableHead className="table-header">Selling Price ({currencyCode})</TableHead>
+                            <TableHead className="table-header">Cost Price ({currencySymbol})</TableHead>
+                            <TableHead className="table-header">Selling Price ({currencySymbol})</TableHead>
                             <TableHead className="table-header">Barcode</TableHead>
                             <TableHead className="table-header">Actions</TableHead>
                           </TableRow>
@@ -1664,7 +1664,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                               <TableHead className="table-header">Ingredient (Product)</TableHead>
                               <TableHead className="table-header">Quantity</TableHead>
                               <TableHead className="table-header">Unit</TableHead>
-                              <TableHead className="table-header">Cost Impact ({currencyCode})</TableHead>
+                              <TableHead className="table-header">Cost Impact ({currencySymbol})</TableHead>
                               <TableHead className="table-header">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -1870,7 +1870,7 @@ export function AddProduct({ onNavigate }: AddProductProps) {
                                 <TableHead className="table-header">Variant</TableHead>
                                 <TableHead className="table-header">SKU</TableHead>
                                 <TableHead className="table-header">Barcode</TableHead>
-                                <TableHead className="table-header">Price ({currencyCode})</TableHead>
+                                <TableHead className="table-header">Price ({currencySymbol})</TableHead>
                                 <TableHead className="table-header">Stock</TableHead>
                                 <TableHead className="table-header">Actions</TableHead>
                               </TableRow>

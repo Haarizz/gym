@@ -21,6 +21,7 @@ export function DenominationCounter({ values, counts, onChange, currency }: {
   values: number[];
   counts: Denominations;
   onChange: (next: Denominations) => void;
+  /** On-screen amount prefix (usePos().currencyPrefix), e.g. "$" or the Dirham sign. */
   currency: string;
 }) {
   const set = (k: string, n: number) => onChange({ ...counts, [k]: Math.max(0, Math.floor(n || 0)) });
@@ -33,7 +34,7 @@ export function DenominationCounter({ values, counts, onChange, currency }: {
           return (
             <div key={k} className={s.denom}>
               <div className={s.denomHead}>
-                <span className={s.denomValue}>{currency} {v >= 1 ? v.toLocaleString() : v.toFixed(2)}</span>
+                <span className={s.denomValue}>{currency}{v >= 1 ? v.toLocaleString() : v.toFixed(2)}</span>
                 <span className={s.mono}>{(v * c).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className={s.denomCtrl}>

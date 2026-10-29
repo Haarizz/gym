@@ -332,7 +332,7 @@ export function KPIReportDialog({
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
-                      <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyCode), '']} />
+                      <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyPrefix), '']} />
                       <Bar dataKey="revenue" fill="#0F766E" />
                       {revenueData.some((point) => point.target != null) && <Bar dataKey="target" fill="#B91C1C" />}
                     </BarChart>
@@ -393,7 +393,7 @@ export function KPIReportDialog({
                       <TableHead>Segment</TableHead>
                       <TableHead className="text-right">Count</TableHead>
                       <TableHead className="text-right">Engagement</TableHead>
-                      <TableHead className="text-right">LTV ({live.currencyCode})</TableHead>
+                      <TableHead className="text-right">LTV ({live.currencySymbol})</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

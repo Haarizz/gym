@@ -456,7 +456,7 @@ export function RevenueAnalyticsDialog({
                     <YAxis />
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                     <Legend />
-                    <Bar dataKey="revenue" fill="#0F766E" name={`Revenue (${live.currencyCode})`} />
+                    <Bar dataKey="revenue" fill="#0F766E" name={`Revenue (${live.currencySymbol})`} />
                     <Bar dataKey="transactions" fill="#3b82f6" name="Transactions" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -480,7 +480,7 @@ export function RevenueAnalyticsDialog({
                     <YAxis />
                     <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                     <Legend />
-                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name={`Revenue (${live.currencyCode})`} />
+                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name={`Revenue (${live.currencySymbol})`} />
                     <Area type="monotone" dataKey="transactions" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} name="Transactions" />
                   </AreaChart>
                 </ResponsiveContainer>

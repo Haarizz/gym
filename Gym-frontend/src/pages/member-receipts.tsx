@@ -46,7 +46,9 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { toast } from "sonner";
-import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
+import { receiptsService, Receipt, ReceiptFilters } from "../utils/supabase/receipts-service";
+import { ListPagination } from "../components/list-pagination";
+import { useDebouncedValue } from "../utils/use-debounced-value";
 import { downloadReceiptInvoice } from "../utils/receipt-invoice";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
@@ -71,6 +73,8 @@ export interface ReceiptStats {
   partialDue: number;
 }
 
+const PAGE_SIZE = 25;
+
 // Mirrors Billing → Member Receipts exactly (same data source, same table,
 // same view/download/send behavior) so the two stay visually and functionally
 // identical wherever a receipts list is shown.
@@ -88,53 +92,58 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
   const [localStatus, setLocalStatus] = useState("all");
   const selectedStatus = statusFilter ?? localStatus;
   const setSelectedStatus = onStatusFilterChange ?? setLocalStatus;
-  // Every receipt matching search + type; the status filter is applied locally so
-  // the stat-card counts and the filtered table always come from the same rows.
-  const [allReceipts, setAllReceipts] = useState<Receipt[]>([]);
+  // One page at a time from the server; the stat cards come from a summary of the
+  // whole result, so neither needs every receipt in the browser.
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const [page, setPage] = useState(1);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [totalReceipts, setTotalReceipts] = useState(0);
   const [loadingReceipts, setLoadingReceipts] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [sendingReceipt, setSendingReceipt] = useState<Receipt | null>(null);
   const [sendChannels, setSendChannels] = useState<string[]>([]);
 
-  useEffect(() => {
-    const filters: { search?: string; transactionType?: string } = {};
-    if (searchTerm) filters.search = searchTerm;
-    if (selectedTransactionType !== 'all-transactions') filters.transactionType = selectedTransactionType;
+  const filters = React.useMemo<ReceiptFilters>(() => ({
+    search: debouncedSearch || undefined,
+    transactionType: selectedTransactionType !== 'all-transactions' ? selectedTransactionType : undefined,
+    status: selectedStatus !== 'all' ? selectedStatus : undefined,
+  }), [debouncedSearch, selectedTransactionType, selectedStatus]);
 
+  // Any filter change starts again from the first page.
+  useEffect(() => { setPage(1); }, [filters]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoadingReceipts(true);
-    receiptsService.getReceipts(filters, { limit: 5000 })
-      .then(r => { if (!cancelled) setAllReceipts(r.receipts); })
+    receiptsService.getReceipts(filters, { page, limit: PAGE_SIZE })
+      .then(r => {
+        if (cancelled) return;
+        setReceipts(r.receipts);
+        setTotalReceipts(Number(r.pagination?.total ?? r.receipts.length));
+      })
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoadingReceipts(false); });
     return () => { cancelled = true; };
-  }, [searchTerm, selectedTransactionType]);
+  }, [filters, page]);
 
-  const receipts = React.useMemo(
-    () => (selectedStatus === 'all' ? allReceipts : allReceipts.filter(r => r.status === selectedStatus)),
-    [allReceipts, selectedStatus],
-  );
-
+  // Stat cards: counts per status across search + type (not the status filter itself).
   useEffect(() => {
-    if (loadingReceipts || !onStats) return;
-    const count = (s: string) => allReceipts.filter(r => r.status === s).length;
-    onStats({
-      total: allReceipts.length,
-      paid: count('Paid'),
-      partial: count('Partial'),
-      pending: count('Pending'),
-      overdue: count('Overdue'),
-      received: allReceipts
-        .filter(r => r.approval_status !== 'REJECTED')
-        .reduce((sum, r) => sum + Number(r.paid_amount ?? 0), 0),
-      partialDue: allReceipts
-        .filter(r => r.status === 'Partial')
-        // due_amount already counts later settlements against the bill.
-        .reduce((sum, r) => sum + Math.max(0, Number(r.due_amount ?? (Number(r.amount ?? 0) - Number(r.paid_amount ?? 0)))), 0),
-    });
+    if (!onStats) return;
+    let cancelled = false;
+    receiptsService.getSummary({ search: filters.search, transactionType: filters.transactionType })
+      .then(s => {
+        if (cancelled) return;
+        onStats({
+          total: s.total, paid: s.paid, partial: s.partial, pending: s.pending, overdue: s.overdue,
+          received: s.received, partialDue: s.partial_due,
+        });
+      })
+      .catch(console.error);
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allReceipts, loadingReceipts]);
+  }, [filters.search, filters.transactionType]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -171,8 +180,18 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
     setSendChannels([]);
   };
 
-  const handleExportAllReceipts = () => {
-    if (receipts.length === 0) { toast.info('No receipts to export'); return; }
+  const handleExportAllReceipts = async () => {
+    if (totalReceipts === 0) { toast.info('No receipts to export'); return; }
+    setExporting(true);
+    let receipts: Receipt[];
+    try {
+      receipts = await receiptsService.getAllReceipts(filters);
+    } catch {
+      toast.error('Could not load receipts to export');
+      return;
+    } finally {
+      setExporting(false);
+    }
     const header = 'Receipt No,Member,Member ID,Plan,Type,Amount Paid,Remaining Due,Date & Time,Payment Method,Created By,Status\n';
     const rows = receipts.map(r => {
       const paid = Number(r.paid_amount ?? 0);
@@ -221,8 +240,8 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
                 <CardDescription>All payment receipts and transaction history</CardDescription>
               </div>
               <div className="flex space-x-2">
-                <Button variant="outline" size="sm" onClick={handleExportAllReceipts}>
-                  <Download className="mr-2 h-4 w-4" />Export CSV
+                <Button variant="outline" size="sm" onClick={handleExportAllReceipts} disabled={exporting}>
+                  {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Export CSV
                 </Button>
               </div>
             </div>
@@ -267,12 +286,14 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
               </Select>
             </div>
 
-            {loadingReceipts ? (
+            {loadingReceipts && receipts.length === 0 ? (
               <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
             ) : receipts.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">No receipts found.</div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Rows of the previous page stay up (dimmed) while the next one loads. */}
+              <div className={`overflow-x-auto transition-opacity ${loadingReceipts ? 'opacity-50' : ''}`}>
               <Table>
                 <TableHeader className="bg-slate-50/50">
                   <TableRow className="hover:bg-transparent">
@@ -382,6 +403,9 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
                 </TableBody>
               </Table>
               </div>
+              <ListPagination page={page} pageSize={PAGE_SIZE} total={totalReceipts} onPageChange={setPage}
+                noun="receipts" disabled={loadingReceipts} />
+              </>
             )}
           </CardContent>
         </Card>

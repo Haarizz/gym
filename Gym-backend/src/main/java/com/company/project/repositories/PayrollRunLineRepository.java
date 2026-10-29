@@ -9,4 +9,5 @@ public interface PayrollRunLineRepository extends JpaRepository<PayrollRunLine, 
 
     java.util.List<PayrollRunLine> findByRunIdOrderByEmployeeNameAsc(Long runId);
     void deleteByRunId(Long runId);
+    java.util.List<PayrollRunLine> findByRunIdIn(java.util.Collection<Long> runIds);
 }
