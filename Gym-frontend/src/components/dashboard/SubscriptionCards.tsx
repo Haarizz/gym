@@ -12,8 +12,8 @@ interface CardDef {
   key: SubscriptionCardKey;
   title: string;
   icon: LucideIcon;
-  /** Gradient shades (Tailwind 500 / 600 / 700) — the old Quick Actions palette */
-  shades: [string, string, string];
+  /** Card gradient, deep → bright (white text stays readable on both ends) */
+  colors: [string, string];
   /** Where clicking the card goes, and with what router state */
   section: string;
   params?: Record<string, any>;
@@ -22,15 +22,15 @@ interface CardDef {
 
 // Renewals and upgrades share the Members → Renewals & Upgrades screen
 const CARDS: CardDef[] = [
-  { key: 'new', title: 'Subscriptions\n(New)', icon: UserPlus, shades: ['#3b82f6', '#2563eb', '#1d4ed8'],
+  { key: 'new', title: 'Subscriptions\n(New)', icon: UserPlus, colors: ['#0f766e', '#0d9488'],
     section: 'members', params: { tab: 'new-members' }, hint: 'See the members who joined in this period' },
-  { key: 'renew', title: 'Subscriptions\n(Renew)', icon: RotateCcw, shades: ['#22c55e', '#16a34a', '#15803d'],
+  { key: 'renew', title: 'Subscriptions\n(Renew)', icon: RotateCcw, colors: ['#1e40af', '#2563eb'],
     section: 'members', params: { tab: 'renewals' }, hint: 'Renew members who are due' },
-  { key: 'upgrade', title: 'Subscriptions\n(Upgrades)', icon: TrendingUp, shades: ['#a855f7', '#9333ea', '#7e22ce'],
+  { key: 'upgrade', title: 'Subscriptions\n(Upgrades)', icon: TrendingUp, colors: ['#86198f', '#c026d3'],
     section: 'members', params: { tab: 'renewals' }, hint: 'Upgrade a member to a higher plan' },
-  { key: 'addons', title: 'Subscriptions\n(Add-Ons)', icon: Gift, shades: ['#f97316', '#ea580c', '#c2410c'],
+  { key: 'addons', title: 'Subscriptions\n(Add-Ons)', icon: Gift, colors: ['#be123c', '#ea580c'],
     section: 'members', params: { tab: 'addons' }, hint: 'Sell an add-on' },
-  { key: 'dayPass', title: 'Day-Pass', icon: Ticket, shades: ['#6366f1', '#4f46e5', '#4338ca'],
+  { key: 'dayPass', title: 'Day-Pass', icon: Ticket, colors: ['#3730a3', '#6d28d9'],
     section: 'check-in', params: { tab: 'daily' }, hint: 'Check in a walk-in / daily visitor' },
 ];
 
@@ -83,11 +83,7 @@ export function SubscriptionCards({ period, periodLabel, refreshKey = 0, onNavig
               key={card.key}
               type="button"
               className={styles.card}
-              style={{
-                '--shade-500': card.shades[0],
-                '--shade-600': card.shades[1],
-                '--shade-700': card.shades[2],
-              } as React.CSSProperties}
+              style={{ '--c1': card.colors[0], '--c2': card.colors[1] } as React.CSSProperties}
               onClick={() => onNavigate?.(card.section, card.key === 'new'
                 ? { ...card.params, joinedPreset: JOINED_PRESET[period] ?? 'today' }
                 : card.params)}
