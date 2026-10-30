@@ -165,6 +165,13 @@ class AuthService {
         return { success: false, error: "Invalid credentials. Please try again." };
       }
 
+      // 409 = credentials were valid but the login was refused by a business rule
+      // (e.g. the gym was deactivated by the platform owner) — show the server's reason.
+      if (response.status === 409) {
+        const result = await response.json().catch(() => ({}));
+        if (result.message) return { success: false, error: result.message };
+      }
+
       return { success: false, error: "Login failed. Please try again." };
     } catch {
       return { success: false, error: "Cannot connect to server. Please check your connection." };

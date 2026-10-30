@@ -153,7 +153,7 @@ public class AuthService {
             String tenantSlug = loginTenantSlug != null ? loginTenantSlug : null;
             Long gymId = resolveGymForUser(userDetails);
             if (gymId != null && !isGymActive(gymId)) {
-                throw new BusinessRuleViolationException("This gym's access has been suspended. Please contact the platform administrator.");
+                throw new BusinessRuleViolationException("This gym is inactive. Please contact the platform administrator.");
             }
             if (tenantSlug == null && gymId != null) {
                 tenantSlug = gymRepository.findById(gymId)

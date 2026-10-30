@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { useCurrency } from "../utils/currency";
+import { useCurrency, toPlainCurrencyText } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
 import {
   financialOverviewService, overviewErrorMessage,
@@ -259,7 +259,7 @@ function Aging({ rows, ramp, money, emptyText }: { rows: AgingRow[]; ramp: strin
     <>
       <div className={styles.agingBar} role="img" aria-label="Ageing breakdown">
         {rows.map((r, i) => r.amount > 0 && (
-          <div key={r.bucket} className={styles.agingSeg} title={`${r.label}: ${money(r.amount)}`}
+          <div key={r.bucket} className={styles.agingSeg} title={toPlainCurrencyText(`${r.label}: ${money(r.amount)}`)}
             style={{ width: `${(r.amount / total) * 100}%`, ["--fill" as any]: ramp[i] }} />
         ))}
       </div>
@@ -292,7 +292,7 @@ const KIND_LABEL: Record<ActivityRow["kind"], string> = {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export function FinancialAnalytics() {
-  const { formatCurrency, currencyCode } = useCurrency();
+  const { formatCurrency, formatCurrencyText, currencyCode } = useCurrency();
   const { activeBranchId, activeBranchName, isAllBranches } = useBranch();
   const palette = usePalette();
 
@@ -395,6 +395,8 @@ export function FinancialAnalytics() {
     if (!data || !k) return;
     const w = window.open("", "_blank");
     if (!w) return toast.error("Allow pop-ups to print the report");
+    // The print window has no app fonts, so amounts use the plain currency code.
+    const money = (n: number | null | undefined) => (n == null ? "—" : formatCurrencyText(Number(n), { maximumFractionDigits: 0 }));
     const e = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
     const table = (head: string[], body: unknown[][]) =>
       `<table><thead><tr>${head.map(h => `<th>${e(h)}</th>`).join("")}</tr></thead><tbody>${body.map(r => `<tr>${r.map((c, i) => `<td class="${i ? "n" : ""}">${e(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;

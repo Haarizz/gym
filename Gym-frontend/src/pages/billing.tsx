@@ -42,7 +42,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from 'sonner';
 import { billingService, BillingStats, MemberDue, MemberStatement } from '../utils/supabase/billing-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
-import type { Receipt } from '../utils/supabase/receipts-service';
+import type { Receipt, ReceiptFilters } from '../utils/supabase/receipts-service';
+import { ListPagination } from '../components/list-pagination';
+import { useDebouncedValue } from '../utils/use-debounced-value';
 import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
@@ -99,26 +101,26 @@ const RECEIPT_DATE_PRESETS: { value: ReceiptDatePreset; label: string }[] = [
   { value: "all", label: "All" },
 ];
 
-/** Whether a receipt's transaction date (local time) falls in the preset's window */
-function receiptInPreset(transactionDate: string | undefined, preset: ReceiptDatePreset): boolean {
-  if (preset === "all") return true;
-  if (!transactionDate) return false;
-  const d = new Date(transactionDate);
-  if (Number.isNaN(d.getTime())) return false;
+/** The preset's transaction-date window in local time (from inclusive, to exclusive) */
+function presetRange(preset: ReceiptDatePreset): { from?: Date; to?: Date } {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayMs = 24 * 60 * 60 * 1000;
   switch (preset) {
+    case "all":
+      return {};
     case "today":
-      return d >= startOfToday && d < new Date(startOfToday.getTime() + dayMs);
+      return { from: startOfToday, to: new Date(startOfToday.getTime() + dayMs) };
     case "yesterday":
-      return d >= new Date(startOfToday.getTime() - dayMs) && d < startOfToday;
+      return { from: new Date(startOfToday.getTime() - dayMs), to: startOfToday };
     case "this-month":
-      return d >= new Date(now.getFullYear(), now.getMonth(), 1) && d < new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
     case "previous-month":
-      return d >= new Date(now.getFullYear(), now.getMonth() - 1, 1) && d < new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: new Date(now.getFullYear(), now.getMonth(), 1) };
   }
 }
+
+const RECEIPTS_PAGE_SIZE = 25;
 
 /** yyyy-MM-dd in the user's local time zone (toISOString would shift to UTC) */
 const toLocalIsoDate = (d: Date) =>
@@ -126,10 +128,9 @@ const toLocalIsoDate = (d: Date) =>
 
 export function Billing({ onNavigate }: BillingProps = {}) {
   const navigate = useNavigate();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
-  useGlobalSearchPrefill(setSearchTerm);
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedTransactionType, setSelectedTransactionType] = useState("all-transactions");
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
@@ -169,13 +170,28 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   // Real data state
   const [stats, setStats] = useState<BillingStats | null>(null);
   const [memberDues, setMemberDues] = useState<MemberDue[]>([]);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  // Member Receipts: one page of the selected period at a time, from the server.
+  const [visibleReceipts, setVisibleReceipts] = useState<Receipt[]>([]);
+  const [receiptsTotal, setReceiptsTotal] = useState(0);
+  const [receiptsPage, setReceiptsPage] = useState(1);
+  const [presetCounts, setPresetCounts] = useState<Partial<Record<ReceiptDatePreset, number>>>({});
+  const [exportingReceipts, setExportingReceipts] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [receiptDatePreset, setReceiptDatePreset] = useState<ReceiptDatePreset>("today");
-  const visibleReceipts = useMemo(
-    () => receipts.filter(r => receiptInPreset(r.transaction_date, receiptDatePreset)),
-    [receipts, receiptDatePreset],
-  );
+  // Opened for one record (Member details › View receipts, or Global Search): show its
+  // receipts from every date — the default "Today" window hid them all (BG_118).
+  useGlobalSearchPrefill((value) => {
+    setSearchTerm(value);
+    setReceiptDatePreset("all");
+    setBillingTab("receipts");
+  });
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  // Search + type + status, without the date window (the chips count each window).
+  const receiptBaseFilters = useMemo<ReceiptFilters>(() => ({
+    search: debouncedSearch || undefined,
+    transactionType: selectedTransactionType !== 'all-transactions' ? selectedTransactionType : undefined,
+    status: selectedStatus !== 'all' ? selectedStatus : undefined,
+  }), [debouncedSearch, selectedTransactionType, selectedStatus]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingDues, setLoadingDues] = useState(true);
   const [loadingReceipts, setLoadingReceipts] = useState(true);
@@ -260,18 +276,34 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     }
   };
 
-  useEffect(() => {
-    const filters: { search?: string; transactionType?: string; status?: string } = {};
-    if (searchTerm) filters.search = searchTerm;
-    if (selectedTransactionType !== 'all-transactions') filters.transactionType = selectedTransactionType;
-    if (selectedStatus !== 'all') filters.status = selectedStatus;
+  // A new filter or period starts again from the first page.
+  useEffect(() => { setReceiptsPage(1); }, [receiptBaseFilters, receiptDatePreset]);
 
+  useEffect(() => {
+    let cancelled = false;
     setLoadingReceipts(true);
-    receiptsService.getReceipts(filters, { limit: 1000 })
-      .then(r => setReceipts(r.receipts))
+    receiptsService.getReceipts({ ...receiptBaseFilters, ...presetRange(receiptDatePreset) },
+      { page: receiptsPage, limit: RECEIPTS_PAGE_SIZE })
+      .then(r => {
+        if (cancelled) return;
+        setVisibleReceipts(r.receipts);
+        setReceiptsTotal(Number(r.pagination?.total ?? r.receipts.length));
+      })
       .catch(console.error)
-      .finally(() => setLoadingReceipts(false));
-  }, [searchTerm, selectedTransactionType, selectedStatus]);
+      .finally(() => { if (!cancelled) setLoadingReceipts(false); });
+    return () => { cancelled = true; };
+  }, [receiptBaseFilters, receiptDatePreset, receiptsPage]);
+
+  // Chip counts: one count query per period.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(RECEIPT_DATE_PRESETS.map(p =>
+      receiptsService.countReceipts({ ...receiptBaseFilters, ...presetRange(p.value) })
+        .then(n => [p.value, n] as const)))
+      .then(entries => { if (!cancelled) setPresetCounts(Object.fromEntries(entries)); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [receiptBaseFilters]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -364,10 +396,21 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     toast.success(`Exported ${overdue.length} overdue member(s)`);
   };
 
-  const handleExportAllReceipts = () => {
-    if (visibleReceipts.length === 0) { toast.info('No visibleReceipts to export'); return; }
+  const handleExportAllReceipts = async () => {
+    if (receiptsTotal === 0) { toast.info('No receipts to export'); return; }
+    // Every receipt in the selected period and filters, not just the page on screen.
+    setExportingReceipts(true);
+    let periodReceipts: Receipt[];
+    try {
+      periodReceipts = await receiptsService.getAllReceipts({ ...receiptBaseFilters, ...presetRange(receiptDatePreset) });
+    } catch {
+      toast.error('Could not load receipts to export');
+      return;
+    } finally {
+      setExportingReceipts(false);
+    }
     const header = 'Receipt No,Member,Member ID,Plan,Type,Amount Paid,Remaining Due,Date & Time,Payment Method,Created By,Status\n';
-    const rows = visibleReceipts.map(r => {
+    const rows = periodReceipts.map(r => {
       const paid = Number(r.paid_amount ?? 0);
       const remainingDue = Number(r.balance_after ?? 0);
       return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${getDisplayStatus(r)}"`;
@@ -376,10 +419,10 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `visibleReceipts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `receipts-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${visibleReceipts.length} receipt(s)`);
+    toast.success(`Exported ${periodReceipts.length} receipt(s)`);
   };
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -552,8 +595,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <CardDescription>All payment receipts and transaction history</CardDescription>
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleExportAllReceipts}>
-                    <Download className="mr-2 h-4 w-4" />Export CSV
+                  <Button variant="outline" size="sm" onClick={handleExportAllReceipts} disabled={exportingReceipts}>
+                    {exportingReceipts ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Export CSV
                   </Button>
                 </div>
               </div>
@@ -601,7 +644,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label="Filter receipts by date">
                 {RECEIPT_DATE_PRESETS.map(p => {
                   const active = receiptDatePreset === p.value;
-                  const count = p.value === 'all' ? receipts.length : receipts.filter(r => receiptInPreset(r.transaction_date, p.value)).length;
+                  const count = presetCounts[p.value] ?? '…';
                   return (
                     <button
                       key={p.value}
@@ -632,14 +675,16 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 })}
               </div>
 
-              {loadingReceipts ? (
+              {loadingReceipts && visibleReceipts.length === 0 ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
               ) : visibleReceipts.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  {receipts.length > 0 ? 'No receipts for this period.' : 'No receipts found.'}
+                  {(presetCounts.all ?? 0) > 0 ? 'No receipts for this period.' : 'No receipts found.'}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                {/* Rows of the previous page stay up (dimmed) while the next one loads. */}
+                <div className={`overflow-x-auto transition-opacity ${loadingReceipts ? 'opacity-50' : ''}`}>
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow className="hover:bg-transparent">
@@ -752,6 +797,9 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   </TableBody>
                 </Table>
                 </div>
+                <ListPagination page={receiptsPage} pageSize={RECEIPTS_PAGE_SIZE} total={receiptsTotal}
+                  onPageChange={setReceiptsPage} noun="receipts" disabled={loadingReceipts} />
+                </>
               )}
             </CardContent>
           </Card>
@@ -1247,8 +1295,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={(v) => `${currencyCode} ${(v/1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']} />
+                    <YAxis tickFormatter={(v) => `${currencyPrefix}${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(value: number) => [`${currencyPrefix}${value.toLocaleString()}`, '']} />
                     <Legend />
                     <Bar dataKey="collected" fill="#0F766E" name="Collected" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="target"    fill="#E0F5F2" name="Target"    radius={[4, 4, 0, 0]} />
@@ -1524,7 +1572,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             </DialogTitle>
             <DialogDescription>
               {reminderMember
-                ? `Amount due: ${currencyCode} ${Number(reminderMember.amount ?? 0).toLocaleString()} · Due: ${reminderMember.due_date ?? '-'}`
+                ? `Amount due: ${currencyPrefix}${Number(reminderMember.amount ?? 0).toLocaleString()} · Due: ${reminderMember.due_date ?? '-'}`
                 : `Send a payment reminder to all ${memberDues.length} member(s) with outstanding dues`}
             </DialogDescription>
           </DialogHeader>

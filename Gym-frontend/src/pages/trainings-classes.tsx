@@ -102,7 +102,7 @@ interface ClassItem {
 }
 
 export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
@@ -158,7 +158,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     return `${parts[0].padStart(2, "0")}:00`;
   };
 
-  const formatPrice = (price: number) => `${currencyCode} ${price}`;
+  const formatPrice = (price: number) => `${currencyPrefix}${price}`;
 
   const getExperienceLabel = (joinDate?: string) => {
     if (!joinDate) return "Trainer";

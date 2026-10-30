@@ -64,6 +64,7 @@ import { StaffsTrainers } from "./pages/staffs-trainers";
 import { ManageAssets } from "./pages/manage-assets";
 import { BranchManagement } from "./pages/branch-management";
 import { GymManagement } from "./pages/gym-management";
+import { GymImport } from "./pages/gym-import";
 import { GymRatings } from "./pages/ratings";
 import { Enquiries } from "./pages/enquiries";
 import { PlatformRatings } from "./pages/platform-ratings";
@@ -189,6 +190,7 @@ import {
   Target as TargetIcon,
   Activity,
   Dumbbell,
+  DatabaseBackup,
   User as UserIcon,
   FileText,
   Briefcase,
@@ -584,13 +586,7 @@ const menuItems = [
         path: "/fiscal-periods",
         permission: "FISCAL_PERIODS_VIEW",
       },
-      {
-        title: "Settings",
-        icon: Settings,
-        id: "financial-settings",
-        path: "/financial-settings",
-        permission: "SETTINGS_VIEW",
-      },
+      // Financial Settings is hidden from the menu (2026-10-23); the /financial-settings route still works.
     ],
   },
   {
@@ -707,6 +703,14 @@ const menuItems = [
     id: "gym-management",
     path: "/gym-management",
     permission: "GYM_MANAGEMENT_VIEW",
+  },
+  {
+    // Platform admin: bring a gym over from the previous GymBios (SQL export + photos).
+    title: "Import Gym",
+    icon: DatabaseBackup,
+    id: "gym-import",
+    path: "/gym-import",
+    permission: "GYM_MANAGEMENT_CREATE",
   },
   {
     // Platform admin: every gym's member ratings.
@@ -897,8 +901,8 @@ export default function App() {
   // gym clients and prospects, not its own branch/profile, so both are hidden for
   // this role specifically rather than gated by the normal per-module permission
   // system.
-  const gymbiosAdminMenuIds = ['gym-management', 'platform-ratings', 'pending-approval', 'platform-leads', 'platform-follow-up'];
-  const gymbiosAdminPaths = ['/gym-management', '/platform-ratings', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
+  const gymbiosAdminMenuIds = ['gym-management', 'gym-import', 'platform-ratings', 'pending-approval', 'platform-leads', 'platform-follow-up'];
+  const gymbiosAdminPaths = ['/gym-management', '/gym-import', '/platform-ratings', '/pending-approval', '/platform-leads', '/platform-follow-up', '/'];
   // Also covers the platform Ratings drill-down pages (/platform-ratings/:tenantSlug/...).
   const isGymbiosAdminPath = (path: string) => gymbiosAdminPaths.includes(path) || path.startsWith('/platform-ratings/');
   const rolesRaw = sessionStorage.getItem('roles');
@@ -1278,7 +1282,7 @@ export default function App() {
       <Route path="/member-addons" element={<MemberAddons onNavigate={handleNavClick} />} />
       <Route path="/member-receipts" element={<MemberReceipts onNavigate={handleNavClick} />} />
       <Route path="/freeze-unfreeze" element={<FreezeUnfreeze onNavigate={handleNavClick} />} />
-      <Route path="/analytics" element={<CommunityAnalytics />} />
+      <Route path="/analytics" element={<CommunityAnalytics onNavigate={handleNavClick} />} />
       
       <Route path="/member-connect" element={<MemberConnect />} />
       <Route path="/promotions-campaign" element={<PromotionsCampaign />} />
@@ -1351,8 +1355,8 @@ export default function App() {
       <Route path="/shifts-schedules" element={<ShiftsSchedules onNavigate={handleNavClick} />} />
       <Route path="/staff-attendance" element={<StaffAttendance onNavigate={handleNavClick} />} />
       <Route path="/recruitment" element={<Recruitment />} />
-      <Route path="/payroll-reports" element={<PayrollReports />} />
-      <Route path="/payroll-analytics" element={<PayrollAnalytics />} />
+      <Route path="/payroll-reports" element={<PayrollReports onNavigate={handleNavClick} />} />
+      <Route path="/payroll-analytics" element={<PayrollAnalytics onNavigate={handleNavClick} />} />
       <Route path="/payroll-settings" element={
         <div className="p-6">
           <h1>Payroll Settings</h1>
@@ -1369,6 +1373,7 @@ export default function App() {
       <Route path="/manage-assets" element={<ManageAssets />} />
       <Route path="/branch-management" element={<BranchManagement />} />
       <Route path="/gym-management" element={<GymManagement />} />
+      <Route path="/gym-import" element={<GymImport />} />
       <Route path="/platform-ratings" element={<PlatformRatings />} />
       <Route path="/platform-ratings/:tenantSlug" element={<PlatformRatings />} />
       <Route path="/platform-ratings/:tenantSlug/:branchId" element={<PlatformRatings />} />

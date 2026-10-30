@@ -516,7 +516,7 @@ export function PerformanceMetricsDialog({
                           <YAxis />
                           <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                           <Legend />
-                          <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${live.currencyCode})`} />
+                          <Bar dataKey="revenue" fill="#10b981" name={`Revenue (${live.currencySymbol})`} />
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>

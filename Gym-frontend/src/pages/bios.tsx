@@ -173,7 +173,7 @@ const predictiveInsights: AIInsight[] = [
   },
   {
     insight: 'Revenue Forecast',
-    prediction: '138,500 AED next month',
+    prediction: '\u20C3138,500 next month',
     confidence: 92,
     timeframe: 'June 2024',
     action: 'Increase marketing spend',
@@ -290,7 +290,7 @@ const formatSegmentLabel = (value: string) =>
 type BiosDialog = 'kpi' | 'executive' | 'bi' | 'performance' | 'predictive' | 'revenue' | 'members' | 'reports' | 'benchmarking';
 
 export function BiOS() {
-  const { formatCurrency, currencyCode } = useCurrency();
+  const { formatCurrency, currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const { activeBranchId, isAllBranches, accessibleBranches } = useBranch();
   const [gymData, setGymData] = useState<GymDataContext | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -903,6 +903,8 @@ export function BiOS() {
   // source exists; see components/bios/bios-live.tsx.
   const live: BiosLiveData = {
     hasLiveData: hasGymData,
+    currencySymbol,
+    currencyPrefix,
     gymData,
     currencyCode,
     totalRevenue,
@@ -1588,7 +1590,7 @@ export function BiOS() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => [`${(value/1000).toFixed(0)}K ${currencyCode}`, '']} />
+                <Tooltip formatter={(value: number) => [`${currencyPrefix}${(value/1000).toFixed(0)}K`, '']} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#10b981" name="Actual Revenue" strokeWidth={2} />
                 {displayedRevenueChartData.some((point) => point.target != null) && (
@@ -1959,7 +1961,7 @@ export function BiOS() {
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bios-bm-revenue">Revenue / Member ({currencyCode})</Label>
+                  <Label htmlFor="bios-bm-revenue">Revenue / Member ({currencySymbol})</Label>
                   <Input
                     id="bios-bm-revenue"
                     type="number"

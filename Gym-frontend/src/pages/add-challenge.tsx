@@ -155,7 +155,7 @@ const exploreChallenges = [
     rewards: {
       badges: ["Step Master"],
       points: 200,
-      extras: "AED 100 gym store credit"
+      extras: "\u20C3100 gym store credit"
     },
     createdBy: "Wellness Team",
     status: "Active",
@@ -254,7 +254,7 @@ interface AddChallengeProps {
 }
 
 export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [mainTab, setMainTab] = useState<'explore' | 'my-challenges' | 'create' | 'leaderboard'>('explore');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -689,7 +689,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                                     handleJoinChallenge(challenge);
                                   }}
                                 >
-                                  {challenge.price > 0 ? `Join - ${currencyCode} ${challenge.price}` : 'Join Free'}
+                                  {challenge.price > 0 ? `Join - ${currencyPrefix}${challenge.price}` : 'Join Free'}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1054,7 +1054,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                         <div className="flex items-center gap-3">
                           <Gift className="h-8 w-8 text-green-600" />
                           <div>
-                            <p className="font-semibold text-sm">AED 100 Store Credit</p>
+                            <p className="font-semibold text-sm">{"\u20C3"}100 Store Credit</p>
                             <p className="text-xs text-gray-600">Expires: Mar 15</p>
                           </div>
                         </div>
@@ -1353,7 +1353,7 @@ export function AddChallenge({ onNavigate }: AddChallengeProps = {}) {
                 disabled={!agreedToRules}
               >
                 <CheckCircle2 className="h-5 w-5 mr-2" />
-                {selectedChallenge.price > 0 ? `Join & Pay ${currencyCode} ${selectedChallenge.price}` : 'Join Challenge'}
+                {selectedChallenge.price > 0 ? `Join & Pay ${currencyPrefix}${selectedChallenge.price}` : 'Join Challenge'}
               </Button>
             </div>
           </SheetContent>

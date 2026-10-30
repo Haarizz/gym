@@ -10,6 +10,9 @@ public class FiscalYearResponseDTO {
     private LocalDate startDate;
     private LocalDate endDate;
     private String status;
+    private int openPeriods;
+    private int closedPeriods;
+    private int lockedPeriods;
 
     public FiscalYearResponseDTO() {}
 
@@ -34,6 +37,13 @@ public class FiscalYearResponseDTO {
 
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public int getOpenPeriods() { return openPeriods; }
+    public void setOpenPeriods(int openPeriods) { this.openPeriods = openPeriods; }
+    public int getClosedPeriods() { return closedPeriods; }
+    public void setClosedPeriods(int closedPeriods) { this.closedPeriods = closedPeriods; }
+    public int getLockedPeriods() { return lockedPeriods; }
+    public void setLockedPeriods(int lockedPeriods) { this.lockedPeriods = lockedPeriods; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

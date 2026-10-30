@@ -98,7 +98,7 @@ import {
 // Mock data removed
 
 export function Ledgers() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const { activeBranchId } = useBranch();
   const [activeTab, setActiveTab] = useState('chart-of-accounts');
   
@@ -1510,7 +1510,7 @@ export function Ledgers() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Budget Amount ({currencyCode})</Label>
+                  <Label>Budget Amount ({currencySymbol})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1638,7 +1638,7 @@ export function Ledgers() {
                     <Input value={editingCostCenter.manager ?? ''} onChange={(e) => setEditingCostCenter({...editingCostCenter, manager: e.target.value})} />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label>Budget ({currencyCode})</Label>
+                    <Label>Budget ({currencySymbol})</Label>
                     <Input type="number" value={editingCostCenter.budget} onChange={(e) => setEditingCostCenter({...editingCostCenter, budget: e.target.value})} />
                   </div>
                 </div>

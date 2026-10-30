@@ -35,13 +35,17 @@ public class TaxComplianceResponseDTO {
         dto.setDueDate(t.getDueDate());
         dto.setFiledDate(t.getFiledDate());
         dto.setFilingAmount(t.getFilingAmount());
-        dto.setStatus(t.getStatus());
+        // A pending filing past its due date reads as OVERDUE straight away — the nightly sweep
+        // only reaches the primary database, so tenants would otherwise never see it flip.
+        boolean overdue = t.getDueDate() != null
+                && LocalDate.now().isAfter(t.getDueDate())
+                && ("PENDING".equalsIgnoreCase(t.getStatus()) || "OVERDUE".equalsIgnoreCase(t.getStatus()));
+        boolean open = "PENDING".equalsIgnoreCase(t.getStatus()) || "OVERDUE".equalsIgnoreCase(t.getStatus());
+        dto.setStatus(open ? (overdue ? "OVERDUE" : "PENDING") : t.getStatus());
         dto.setNotes(t.getNotes());
         dto.setFilingReference(t.getFilingReference());
         dto.setDocumentUrl(t.getDocumentUrl());
-        dto.setOverdue(t.getDueDate() != null
-                && LocalDate.now().isAfter(t.getDueDate())
-                && "PENDING".equalsIgnoreCase(t.getStatus()));
+        dto.setOverdue(overdue);
         dto.setCreatedAt(t.getCreatedAt());
         dto.setUpdatedAt(t.getUpdatedAt());
         return dto;

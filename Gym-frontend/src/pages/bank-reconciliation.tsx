@@ -126,7 +126,7 @@ function formatDate(dateStr?: string) {
 }
 
 export function BankReconciliation() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [selectedAccountName, setSelectedAccountName] = useState<string>(ALL_ACCOUNTS);
   const [allReconciliations, setAllReconciliations] = useState<ApiReconciliation[]>([]);
   const [currentReconciliation, setCurrentReconciliation] = useState<ApiReconciliation | null>(null);
@@ -504,7 +504,7 @@ export function BankReconciliation() {
       return;
     }
     if (Math.abs(currentReconciliation.difference) >= 0.01) {
-      toast.error(`Cannot finalize — bank and ledger balances differ by ${currencyCode} ${Math.abs(currentReconciliation.difference).toFixed(2)}`);
+      toast.error(`Cannot finalize — bank and ledger balances differ by ${currencyPrefix}${Math.abs(currentReconciliation.difference).toFixed(2)}`);
       return;
     }
     setCompletingRec(true);
@@ -1032,7 +1032,7 @@ export function BankReconciliation() {
                   ? "—"
                   : Math.abs(currentReconciliation.difference) < 0.01
                     ? "Balanced ✓"
-                    : `${currencyCode} ${Math.abs(currentReconciliation.difference).toFixed(2)}`}
+                    : `${currencyPrefix}${Math.abs(currentReconciliation.difference).toFixed(2)}`}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 {!currentReconciliation ? "No reconciliation" :

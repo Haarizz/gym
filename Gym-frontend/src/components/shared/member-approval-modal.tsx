@@ -63,7 +63,7 @@ export function MemberApprovalModal({
   onApprove, 
   onReject 
 }: MemberApprovalModalProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [paymentData, setPaymentData] = useState({
@@ -193,7 +193,7 @@ export function MemberApprovalModal({
       toast.success('Discount code applied: 20% off');
     } else if (code === 'SPECIAL50') {
       discount = 50; // Flat ${currencyCode} 50 off
-      toast.success(`Discount code applied: ${currencyCode} 50 off`);
+      toast.success(`Discount code applied: ${currencyPrefix}50 off`);
     } else if (code) {
       toast.error('Invalid discount code');
       return;

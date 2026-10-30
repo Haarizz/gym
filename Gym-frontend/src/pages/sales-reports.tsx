@@ -80,8 +80,8 @@ function normalizeStatus(s: string | undefined): StatusType {
 }
 
 export function SalesReports() {
-  const { currencyCode } = useCurrency();
-  const formatAED = (value: number) => `${currencyCode} ${value.toLocaleString()}`;
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
+  const formatAED = (value: number) => `${currencyPrefix}${value.toLocaleString()}`;
   const [receipts, setReceipts] = useState<ReceiptType[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -383,11 +383,11 @@ export function SalesReports() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip formatter={(v: number, name: string) => name === "sales" ? `${currencyCode} ${v.toLocaleString()}` : v} />
+                <Tooltip formatter={(v: number, name: string) => name === "sales" ? `${currencyPrefix}${v.toLocaleString()}` : v} />
                 <Legend />
-                <Area type="monotone" dataKey="sales" stroke="#2563eb" fill="url(#salesFill)" name={`Sales (${currencyCode})`} />
+                <Area type="monotone" dataKey="sales" stroke="#2563eb" fill="url(#salesFill)" name={`Sales (${currencySymbol})`} />
                 <Line type="monotone" dataKey="orders" stroke="#16a34a" strokeWidth={2} name="Orders" />
-                <Line type="monotone" dataKey="refunds" stroke="#dc2626" strokeWidth={2} name={`Refunds (${currencyCode})`} />
+                <Line type="monotone" dataKey="refunds" stroke="#dc2626" strokeWidth={2} name={`Refunds (${currencySymbol})`} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -434,7 +434,7 @@ export function SalesReports() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="method" />
                   <YAxis />
-                  <Tooltip formatter={(v: number) => `${currencyCode} ${v.toLocaleString()}`} />
+                  <Tooltip formatter={(v: number) => `${currencyPrefix}${v.toLocaleString()}`} />
                   <Bar dataKey="value" fill="#6366f1" name="Revenue" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

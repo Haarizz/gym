@@ -48,7 +48,7 @@ export function QuickAddProductDialog({ open, onOpenChange, initialName = "", on
   initialName?: string;
   onCreated: (p: Product) => void;
 }) {
-  const { currencyCode } = usePos();
+  const { currencyCode, currencySymbol } = usePos();
   const [form, setForm] = useState<Form>(EMPTY);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -150,11 +150,11 @@ export function QuickAddProductDialog({ open, onOpenChange, initialName = "", on
               <Input value={form.unit} onChange={(e) => set("unit", e.target.value)} placeholder="PCS" />
             </div>
             <div className={s.field}>
-              <Label>Selling price ({currencyCode}) *</Label>
+              <Label>Selling price ({currencySymbol}) *</Label>
               <Input type="number" min="0" step="0.01" value={form.sellingPrice} onChange={(e) => set("sellingPrice", e.target.value)} placeholder="0.00" />
             </div>
             <div className={s.field}>
-              <Label>Purchase cost ({currencyCode})</Label>
+              <Label>Purchase cost ({currencySymbol})</Label>
               <Input type="number" min="0" step="0.01" value={form.costPrice} onChange={(e) => set("costPrice", e.target.value)} placeholder="0.00" />
             </div>
             <div className={s.field}>

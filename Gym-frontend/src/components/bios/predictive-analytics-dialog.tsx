@@ -414,7 +414,7 @@ export function PredictiveAnalyticsDialog({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Target Revenue ({live.currencyCode})</Label>
+                      <Label>Target Revenue ({live.currencySymbol})</Label>
                       <Input type="number" placeholder="140000" />
                     </div>
                     <div className="space-y-2">

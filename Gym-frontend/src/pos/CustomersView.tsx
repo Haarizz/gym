@@ -19,7 +19,7 @@ import s from "./pos.module.css";
 const primaryBtn = "bg-[#2B7A78] hover:bg-[#236862] text-white";
 
 export function CustomersView() {
-  const { go, session, company, template, currencyCode, printDoc, openDrawer } = usePos();
+  const { go, session, company, template, currencyCode, printDoc, openDrawer, currencySymbol, currencyPrefix } = usePos();
   const [member, setMember] = useState<PickedMember | null>(null);
   const [credit, setCredit] = useState<CustomerCredit | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -66,7 +66,7 @@ export function CustomersView() {
         reference: reference.trim() || undefined, notes: notes.trim() || undefined,
         posSessionId: session?.id ?? null,
       });
-      toast.success(`${p.paymentNumber}: ${currencyCode} ${num(p.amount)} received from ${p.memberName}`);
+      toast.success(`${p.paymentNumber}: ${currencyPrefix}${num(p.amount)} received from ${p.memberName}`);
       if (method === "CASH") openDrawer(`Credit collection ${p.paymentNumber}`);
       const after = r2(credit.outstanding - p.amount);
       if (company) printDoc(creditPaymentDoc(p, after, company, template, currencyCode));
@@ -157,7 +157,7 @@ export function CustomersView() {
                   <div className={s.stack}>
                     <div className={s.grid2} style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                       <div className={s.field}>
-                        <Label>Amount ({currencyCode})</Label>
+                        <Label>Amount ({currencySymbol})</Label>
                         <Input type="number" step="0.01" min="0" max={outstanding} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={num(outstanding)} />
                         <button type="button" className={s.backLink} style={{ fontSize: 12 }} onClick={() => setAmount(String(outstanding))}>Pay full balance (<Money value={outstanding} />)</button>
                       </div>
@@ -183,7 +183,7 @@ export function CustomersView() {
                       <div className={s.field}><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
                     </div>
                     {method === "CASH" && !session && <div className={`${s.callout} ${s.calloutWarn}`}>Open a POS session to take cash into a drawer.</div>}
-                    {value > outstanding + 0.001 && <div className={`${s.callout} ${s.calloutBad}`}>The amount is more than the {currencyCode} {num(outstanding)} outstanding.</div>}
+                    {value > outstanding + 0.001 && <div className={`${s.callout} ${s.calloutBad}`}>The amount is more than the {currencyPrefix}{num(outstanding)} outstanding.</div>}
                     <Button className={primaryBtn} disabled={busy || value <= 0 || value > outstanding + 0.001 || (method === "ONLINE" && !bank) || (method === "CASH" && !session)} onClick={receive}>
                       {busy ? "Saving…" : <>Receive <Money value={value} /></>}
                     </Button>

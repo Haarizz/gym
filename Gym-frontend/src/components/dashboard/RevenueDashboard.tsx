@@ -142,7 +142,7 @@ interface RevenueDashboardProps {
 }
 
 export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const initial = presetRange('monthly');
   const [dateFilterType, setDateFilterType] = useState<FilterType>('monthly');
   const [dateRange, setDateRange] = useState<DateRange>(initial.range);
@@ -758,7 +758,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
                   <CardHeader>
                     <CardTitle>{TREND_TITLES[data?.granularity ?? 'daily']}</CardTitle>
                     <CardDescription>
-                      Revenue performance over time ({currencyCode}){showComparisonLine ? `, with ${comparisonName.toLowerCase()} dotted` : ''}
+                      Revenue performance over time ({currencySymbol}){showComparisonLine ? `, with ${comparisonName.toLowerCase()} dotted` : ''}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

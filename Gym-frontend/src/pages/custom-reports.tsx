@@ -80,7 +80,7 @@ function mapReceiptToRecord(r: Receipt): ReportRecord {
 }
 
 export function CustomReports({ onNavigate, embedded = false }: CustomReportsProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const panelCardShell = "bg-white border-0 shadow-sm rounded-2xl overflow-hidden";
 
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'>('month');
@@ -623,7 +623,7 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
                     <TableHead className="text-primary font-semibold">Membership Type</TableHead>
                     <TableHead className="text-primary font-semibold">Transaction</TableHead>
                     <TableHead className="text-primary font-semibold">Plan</TableHead>
-                    <TableHead className="text-primary font-semibold text-right">Amount ({currencyCode})</TableHead>
+                    <TableHead className="text-primary font-semibold text-right">Amount ({currencySymbol})</TableHead>
                     <TableHead className="text-primary font-semibold">Pay Mode</TableHead>
                     <TableHead className="text-primary font-semibold text-right">Due</TableHead>
                     <TableHead className="text-primary font-semibold">Due Date</TableHead>

@@ -180,7 +180,7 @@ function targetStatus(t: StaffTarget): 'active' | 'completed' | 'overdue' {
 }
 
 export function MyProfile({ onNavigate }: MyProfileProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const authUser = useMemo(() => authService.getCurrentUser(), []);
 
   const [activeTab, setActiveTab] = useState("personal");
@@ -1159,7 +1159,7 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
                 <Card className={panelCardShell}>
                   <CardContent className="p-4 text-center">
                     <div className="text-2xl font-bold text-green-600 mb-1">4,785</div>
-                    <div className="text-sm text-gray-600">Total Earnings ({currencyCode})</div>
+                    <div className="text-sm text-gray-600">Total Earnings ({currencySymbol})</div>
                     <div className="text-xs text-green-600">This month</div>
                   </CardContent>
                 </Card>

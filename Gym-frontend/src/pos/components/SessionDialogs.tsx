@@ -24,7 +24,7 @@ export function OpenSessionDialog({ open, onOpenChange, onOpened }: {
   onOpenChange: (o: boolean) => void;
   onOpened: (s: PosSession) => void;
 }) {
-  const { settings, terminalName, setTerminalName, currencyCode, openDrawer, terminal, dayStatus, refreshDayStatus, showZReport } = usePos();
+  const { settings, terminalName, setTerminalName, currencyCode, openDrawer, terminal, dayStatus, refreshDayStatus, showZReport, currencyPrefix } = usePos();
   const { withApproval } = useApproval();
   const [counts, setCounts] = useState<Denominations>(() => emptyDenominations(settings.denominations));
   // Today already has a Day Close (e.g. closed by mistake): offer to reopen it right here.
@@ -152,7 +152,7 @@ export function OpenSessionDialog({ open, onOpenChange, onOpened }: {
             {registered.name} is {registered.status === "PENDING" ? "waiting for approval" : registered.status.toLowerCase()} — sessions can't be opened on it.
           </div>
         )}
-        <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyCode} />
+        <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyPrefix} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button className={primaryBtn} disabled={busy || blocked || Boolean(closedDay) || Boolean(previousOpen)} onClick={start}>
@@ -170,7 +170,7 @@ export function CashMovementDialog({ open, onOpenChange, onDone, initialType = "
   onDone?: (m: CashMovement) => void;
   initialType?: "DROP_IN" | "CASH_OUT";
 }) {
-  const { session, settings, company, template, currencyCode, printDoc, openDrawer } = usePos();
+  const { session, settings, company, template, currencyCode, printDoc, openDrawer, currencySymbol, currencyPrefix } = usePos();
   const { withApproval } = useApproval();
   const [type, setType] = useState<"DROP_IN" | "CASH_OUT">(initialType);
   const [amount, setAmount] = useState("");
@@ -211,7 +211,7 @@ export function CashMovementDialog({ open, onOpenChange, onDone, initialType = "
         reference: reference.trim() || undefined, supervisorPin: pin,
       }));
       if (!mv) return;
-      toast.success(`${type === "DROP_IN" ? "Cash in" : "Cash out"} of ${currencyCode} ${value.toFixed(2)} recorded`);
+      toast.success(`${type === "DROP_IN" ? "Cash in" : "Cash out"} of ${currencyPrefix}${value.toFixed(2)} recorded`);
       openDrawer(`${type === "DROP_IN" ? "Cash in" : "Cash out"} ${value.toFixed(2)}`);
       if (printSlip && company) printDoc(cashMovementDoc(mv, session.sessionNumber, company, template, currencyCode));
       onDone?.(mv);
@@ -242,7 +242,7 @@ export function CashMovementDialog({ open, onOpenChange, onDone, initialType = "
         </div>
         <div className={s.grid2} style={{ gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div className={s.field}>
-            <Label>Amount ({currencyCode})</Label>
+            <Label>Amount ({currencySymbol})</Label>
             <Input type="number" min="0" step="0.01" autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
           </div>
           <div className={s.field}>

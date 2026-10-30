@@ -69,10 +69,10 @@ export function rewardDiscount(unit: string | undefined, value: number | undefin
   return Math.round(Math.min(d, gross) * 100) / 100;
 }
 
-/** Short label for a Reward Pass in pickers, e.g. "10% off · RWD-0000000007". */
+/** Short label for a Reward Pass in pickers, e.g. "10% off · RWD-0000000007". `currency` is an on-screen amount prefix. */
 export function passLabel(p: ReferralReward, currency = ''): string {
   const what = p.rewardType === 'MEMBERSHIP_DISCOUNT'
-    ? (p.rewardUnit === 'PERCENT' ? `${p.rewardValue}% off` : `${currency ? currency + ' ' : ''}${p.rewardValue} off`)
+    ? (p.rewardUnit === 'PERCENT' ? `${p.rewardValue}% off` : `${currency}${p.rewardValue} off`)
     : 'Free session';
   const expiry = p.expiryDate ? ` · until ${p.expiryDate}` : '';
   return `${what} · ${p.rewardCode}${expiry}`;

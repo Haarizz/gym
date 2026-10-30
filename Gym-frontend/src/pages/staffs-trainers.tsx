@@ -121,7 +121,7 @@ function PosCommissionFields({ percent, perSale, onChange }: {
 }
 
 export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [activeTab, setActiveTab] = useState('all-staff');
   const [searchQuery, setSearchQuery] = useState('');
   useGlobalSearchPrefill(setSearchQuery);
@@ -1132,7 +1132,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               </Select>
             </div>
             <div>
-              <Label>Revenue Target ({currencyCode}) <span className="text-destructive">*</span></Label>
+              <Label>Revenue Target ({currencySymbol}) <span className="text-destructive">*</span></Label>
               <Input type="number" placeholder="e.g. 50000" className="mt-1"
                 value={targetForm.revenue_target}
                 onChange={e => setTargetForm(p => ({...p, revenue_target: e.target.value}))} />
@@ -1222,7 +1222,7 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div>
-                          <Label className="text-xs text-muted-foreground mb-1 block">Revenue Target ({currencyCode})</Label>
+                          <Label className="text-xs text-muted-foreground mb-1 block">Revenue Target ({currencySymbol})</Label>
                           <Input type="number" value={targets.revenue} className="h-8 text-sm"
                             onChange={e => setRoleTargets(prev => ({ ...prev, [role]: { ...prev[role], revenue: Number(e.target.value) } }))}
                           />

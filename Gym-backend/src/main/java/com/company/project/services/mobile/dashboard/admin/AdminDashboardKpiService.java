@@ -118,7 +118,7 @@ public class AdminDashboardKpiService {
         // can't be reconstructed historically without a status-history table, so
         // this always reflects the live count regardless of the selected range,
         // consistent with how DashboardService.getKPIs() treats it today.
-        long active = memberRepository.countByMembershipStatus("active");
+        long active = memberRepository.countEffectivelyActive(java.time.LocalDate.now().atStartOfDay());
         return AdminDashboardKpiDTO.of("active-members", "Active Members", "count",
                 BigDecimal.valueOf(active), null, true);
     }

@@ -296,7 +296,7 @@ export function ExecutiveDashboardDialog({
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyCode), '']} />
+                    <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyPrefix), '']} />
                     <Area type="monotone" dataKey="actual" stroke="#0F766E" fill="#0F766E" fillOpacity={0.6} name="Actual" />
                     <Area type="monotone" dataKey="forecast" stroke="#B91C1C" fill="#B91C1C" fillOpacity={0.3} name="Forecast" strokeDasharray="5 5" />
                   </AreaChart>

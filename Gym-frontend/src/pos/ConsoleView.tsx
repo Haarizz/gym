@@ -318,7 +318,7 @@ function SecurityTab({ draft, set, canEdit }: TabProps) {
 }
 
 function CashTab({ draft, set, canEdit, saveNow }: TabProps & { saveNow: (patch: SettingsUpdate, done: string) => Promise<boolean> }) {
-  const { currencyCode, settings } = usePos();
+  const { currencyCode, settings, currencySymbol } = usePos();
   const [d, setD] = useState("");
   const [busy, setBusy] = useState(false);
   // Denominations save as soon as they change — the counting screens use them straight away.
@@ -337,7 +337,7 @@ function CashTab({ draft, set, canEdit, saveNow }: TabProps & { saveNow: (patch:
   return (
     <div className={s.grid2}>
       <div className={s.panel}>
-        <div className={s.panelHead}><div className={s.panelTitle}>Cash denominations ({currencyCode})</div></div>
+        <div className={s.panelHead}><div className={s.panelTitle}>Cash denominations ({currencySymbol})</div></div>
         <div className={s.panelBody}>
           <p className={`${s.small} ${s.muted}`} style={{ marginBottom: 10 }}>Notes and coins shown when counting the float and the closing cash. Changes are saved straight away.</p>
           <div className={s.chipList} style={{ marginBottom: 10 }}>
@@ -354,7 +354,7 @@ function CashTab({ draft, set, canEdit, saveNow }: TabProps & { saveNow: (patch:
             </div>
           )}
           <div className={s.field} style={{ marginTop: 16 }}>
-            <Label>Variance tolerance ({currencyCode})</Label>
+            <Label>Variance tolerance ({currencySymbol})</Label>
             <Input type="number" step="0.01" min="0" value={draft.cashVarianceThreshold} disabled={!canEdit} onChange={(e) => set("cashVarianceThreshold", Math.max(0, parseFloat(e.target.value) || 0))} />
             <span className={s.fieldHint}>Closing differences larger than this need written remarks{draft.requireSupervisorForVariance ? " and a supervisor's approval" : ""} (0 = any difference).</span>
           </div>

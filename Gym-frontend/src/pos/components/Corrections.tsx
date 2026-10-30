@@ -57,7 +57,7 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
   onOpenChange: (o: boolean) => void;
   onDone?: (c: Correction) => void;
 }) {
-  const { settings, currencyCode } = usePos();
+  const { settings, currencyCode, currencySymbol, currencyPrefix } = usePos();
   const [saleMode, setSaleMode] = useState<"PAYMENT_MODE" | "CUSTOMER">("PAYMENT_MODE");
   const [reason, setReason] = useState("");
   const [submitNow, setSubmitNow] = useState(true);
@@ -205,10 +205,10 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
             {saleMode === "PAYMENT_MODE" ? (
               <div className={s.stack}>
                 <div className={s.grid2} style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div className={s.field}><Label>Cash ({currencyCode})</Label><Input type="number" min="0" step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} placeholder="0.00" /></div>
-                  <div className={s.field}><Label>Card ({currencyCode})</Label><Input type="number" min="0" step="0.01" value={card} onChange={(e) => setCard(e.target.value)} placeholder="0.00" /></div>
+                  <div className={s.field}><Label>Cash ({currencySymbol})</Label><Input type="number" min="0" step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} placeholder="0.00" /></div>
+                  <div className={s.field}><Label>Card ({currencySymbol})</Label><Input type="number" min="0" step="0.01" value={card} onChange={(e) => setCard(e.target.value)} placeholder="0.00" /></div>
                   {parseFloat(card) > 0 && <div className={s.field}><Label>Card type</Label><Input value={cardType} onChange={(e) => setCardType(e.target.value)} placeholder="Visa, Mastercard…" /></div>}
-                  <div className={s.field}><Label>Online ({currencyCode})</Label><Input type="number" min="0" step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} placeholder="0.00" /></div>
+                  <div className={s.field}><Label>Online ({currencySymbol})</Label><Input type="number" min="0" step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} placeholder="0.00" /></div>
                   {parseFloat(online) > 0 && (
                     <div className={s.field}>
                       <Label>Received in</Label>
@@ -277,8 +277,8 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
               <button type="button" className={!useCounter ? s.segOn : ""} onClick={() => setUseCounter(false)}>Enter total</button>
             </div>
             {useCounter
-              ? <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyCode} />
-              : <div className={s.field}><Label>Corrected counted cash ({currencyCode})</Label><Input type="number" min="0" step="0.01" value={counted} onChange={(e) => setCounted(e.target.value)} /></div>}
+              ? <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyPrefix} />
+              : <div className={s.field}><Label>Corrected counted cash ({currencySymbol})</Label><Input type="number" min="0" step="0.01" value={counted} onChange={(e) => setCounted(e.target.value)} /></div>}
             <div className={s.rowBetween}><span className={s.muted}>Corrected count</span><span className={s.strong}><Money value={newCount} /></span></div>
           </div>
         )}

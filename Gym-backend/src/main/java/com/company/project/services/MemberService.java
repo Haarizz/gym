@@ -133,8 +133,10 @@ public class MemberService {
     @Transactional(readOnly = true)
     public MembersPageResponseDTO getMembers(String search, String status,
                                              String membershipType, String paymentStatus,
+                                             String plan, Integer expiringWithin, String dues,
                                              int page, int limit) {
-        Specification<Member> spec = buildSpec(search, status, membershipType, paymentStatus);
+        Specification<Member> spec = buildSpec(search, status, membershipType, paymentStatus,
+                plan, expiringWithin, dues);
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Member> memberPage = memberRepository.findAll(spec, pageable);
 
@@ -1888,7 +1890,8 @@ public class MemberService {
      * Only non-blank filters are added as predicates.
      */
     private Specification<Member> buildSpec(String search, String status,
-                                            String membershipType, String paymentStatus) {
+                                            String membershipType, String paymentStatus,
+                                            String plan, Integer expiringWithin, String dues) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -1949,6 +1952,41 @@ public class MemberService {
             }
             if (paymentStatus != null && !paymentStatus.isBlank()) {
                 predicates.add(cb.equal(cb.lower(root.get("paymentStatus")), paymentStatus.toLowerCase()));
+            }
+            if (plan != null && !plan.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("membershipPlan")), plan.toLowerCase()));
+            }
+            if (expiringWithin != null && expiringWithin >= 0) {
+                // Ends between today and today + N days (the end date itself still counts
+                // as active). Frozen/suspended memberships are paused, so they're left out.
+                Expression<LocalDateTime> effectiveEndDate =
+                        cb.coalesce(root.get("membershipEndDate"), root.get("expiryDate"));
+                LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+                predicates.add(cb.greaterThanOrEqualTo(effectiveEndDate, startOfToday));
+                predicates.add(cb.lessThan(effectiveEndDate, startOfToday.plusDays(expiringWithin + 1L)));
+                predicates.add(cb.or(
+                        cb.isNull(root.get("membershipStatus")),
+                        cb.not(cb.lower(root.get("membershipStatus")).in("frozen", "suspended"))));
+            }
+            if (dues != null && !dues.isBlank()) {
+                // Same money the directory's Amount Due column shows: the membership
+                // balance plus unpaid confirmed Sales Invoices (see applySalesInvoiceDue).
+                jakarta.persistence.criteria.Subquery<Long> unpaidInvoice = query.subquery(Long.class);
+                jakarta.persistence.criteria.Root<com.company.project.entities.SalesInvoice> inv =
+                        unpaidInvoice.from(com.company.project.entities.SalesInvoice.class);
+                unpaidInvoice.select(inv.get("id")).where(
+                        cb.equal(inv.get("memberId"), root.get("id")),
+                        cb.equal(inv.get("status"), "CONFIRMED"),
+                        cb.greaterThan(inv.<BigDecimal>get("totalAmount"), inv.<BigDecimal>get("amountPaid")));
+                // coalesce: a NULL balance must count as "no dues", not drop out of both filters.
+                Predicate hasDues = cb.or(
+                        cb.greaterThan(cb.coalesce(root.<BigDecimal>get("outstandingBalance"), BigDecimal.ZERO), BigDecimal.ZERO),
+                        cb.exists(unpaidInvoice));
+                if ("due".equalsIgnoreCase(dues)) {
+                    predicates.add(hasDues);
+                } else if ("clear".equalsIgnoreCase(dues)) {
+                    predicates.add(cb.not(hasDues));
+                }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

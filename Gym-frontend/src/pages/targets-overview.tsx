@@ -127,7 +127,7 @@ interface TargetsOverviewProps {
 }
 
 export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [dateFilter, setDateFilter] = useState("month");
   const [customDate, setCustomDate] = useState<Date | undefined>(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -586,8 +586,8 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                   <TableHead className="w-[50px]"></TableHead>
                   <TableHead>Staff</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>{viewMode === 'units' ? 'Target (units)' : `Target (${currencyCode})`}</TableHead>
-                  <TableHead>{viewMode === 'units' ? 'Achieved (units)' : `Achieved (${currencyCode})`}</TableHead>
+                  <TableHead>{viewMode === 'units' ? 'Target (units)' : `Target (${currencySymbol})`}</TableHead>
+                  <TableHead>{viewMode === 'units' ? 'Achieved (units)' : `Achieved (${currencySymbol})`}</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>{viewMode === 'units' ? 'Units sold' : 'Commission'}</TableHead>
                   <TableHead>Status</TableHead>
@@ -832,7 +832,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <XAxis dataKey="date" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [`${currencyCode} ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [`${currencyPrefix}${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Line 
@@ -879,7 +879,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
                 <XAxis dataKey="department" stroke="#666" />
                 <YAxis stroke="#666" />
                 <Tooltip 
-                  formatter={(value: number) => [viewMode === 'units' ? `${value.toLocaleString()} units` : `${currencyCode} ${value.toLocaleString()}`, '']}
+                  formatter={(value: number) => [viewMode === 'units' ? `${value.toLocaleString()} units` : `${currencyPrefix}${value.toLocaleString()}`, '']}
                 />
                 <Legend />
                 <Bar dataKey="target" fill={COLORS.muted} name="Target" />

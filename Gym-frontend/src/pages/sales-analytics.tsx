@@ -60,8 +60,8 @@ function categorizeReceipt(r: Receipt): string {
 }
 
 export function SalesAnalytics() {
-  const { currencyCode } = useCurrency();
-  const formatAED = (value: number) => `${currencyCode} ${value.toLocaleString()}`;
+  const { currencyCode, currencyPrefix } = useCurrency();
+  const formatAED = (value: number) => `${currencyPrefix}${value.toLocaleString()}`;
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState<{ month: string; revenue: number; expenses: number; profit: number }[]>([]);

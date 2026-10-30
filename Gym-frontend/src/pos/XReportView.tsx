@@ -18,7 +18,7 @@ import s from "./pos.module.css";
 const primaryBtn = "bg-[#2B7A78] hover:bg-[#236862] text-white";
 
 export function XReportView() {
-  const { session: mySession, xSessionId, setSession, settings, company, template, currencyCode, go, printDoc, openDrawer, refreshDayStatus } = usePos();
+  const { session: mySession, xSessionId, setSession, settings, company, template, currencyCode, go, printDoc, openDrawer, refreshDayStatus, currencyPrefix } = usePos();
   const { withApproval } = useApproval();
   const targetId = xSessionId ?? mySession?.id ?? null;
   const [x, setX] = useState<XReport | null>(null);
@@ -104,7 +104,7 @@ export function XReportView() {
         supervisorPin: pin,
       }));
       if (!closed) return;
-      toast.success(`Session ${closed.sessionNumber} closed · variance ${currencyCode} ${num(closed.cashVariance)}`);
+      toast.success(`Session ${closed.sessionNumber} closed · variance ${currencyPrefix}${num(closed.cashVariance)}`);
       if (sess.mine || mySession?.id === sess.id) setSession(null);
       refreshDayStatus();
       const fresh = await posApi.xReport(closed.id);
@@ -188,7 +188,7 @@ export function XReportView() {
           </div>
           <div className={s.panelBody}>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 20 }}>
-              <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyCode} />
+              <DenominationCounter values={settings.denominations} counts={counts} onChange={setCounts} currency={currencyPrefix} />
               <div className={s.stack}>
                 <table className={s.kv}>
                   <tbody>
@@ -204,7 +204,7 @@ export function XReportView() {
                 </table>
                 <div className={`${s.callout} ${variance === 0 ? s.calloutOk : needsRemarks ? s.calloutBad : s.calloutWarn}`}>
                   <div>
-                    <div className={s.strong}>Variance {variance > 0 ? "+" : ""}{currencyCode} {num(variance)}</div>
+                    <div className={s.strong}>Variance {variance > 0 ? "+" : ""}{currencyPrefix}{num(variance)}</div>
                     <div className={s.small}>{variance === 0 ? "Drawer balances exactly." : variance > 0 ? "More cash than expected (over)." : "Less cash than expected (short)."}{needsRemarks ? " Remarks are required." : ""}{needsRemarks && settings.requireSupervisorForVariance && !settings.currentUserIsSupervisor ? " A supervisor must approve it." : ""}</div>
                   </div>
                 </div>
@@ -229,7 +229,7 @@ export function XReportView() {
                   </div>
                 )}
                 <Button className="bg-[#E63946] hover:bg-[#d32f3d] text-white" disabled={closing} onClick={close}>
-                  <Lock className="h-4 w-4 mr-2" />{closing ? "Closing…" : `Close session with ${currencyCode} ${num(counted)}`}
+                  <Lock className="h-4 w-4 mr-2" />{closing ? "Closing…" : `Close session with ${currencyPrefix}${num(counted)}`}
                 </Button>
               </div>
             </div>

@@ -327,7 +327,7 @@ const createDocumentAttachmentForm = (): DocumentAttachmentFormState => ({
 });
 
 export function AssetTransactions() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [transactions, setTransactions] = useState<AssetTransactionRecord[]>(assetTransactionsData);
   const [selectedTransaction, setSelectedTransaction] = useState<AssetTransactionRecord | null>(null);
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
@@ -1194,7 +1194,7 @@ export function AssetTransactions() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Value ({currencyCode})</Label>
+                  <Label>Value ({currencySymbol})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1432,7 +1432,7 @@ export function AssetTransactions() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Value ({currencyCode})</Label>
+                  <Label>Value ({currencySymbol})</Label>
                   <Input
                     type="number"
                     placeholder="0.00"

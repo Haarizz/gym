@@ -101,7 +101,7 @@ function fmt(n: number) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function WastageReturns() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   // ── data state ─────────────────────────────────────────────────────────────
   const [vouchers, setVouchers]   = useState<WastageReturn[]>([]);
   const [stats, setStats]         = useState<WastageReturnStats | null>(null);
@@ -661,7 +661,7 @@ export function WastageReturns() {
                     <TableHead>Type</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead className="text-right">Items</TableHead>
-                    <TableHead className="text-right">Value ({currencyCode})</TableHead>
+                    <TableHead className="text-right">Value ({currencySymbol})</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Recorded By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -1076,7 +1076,7 @@ export function WastageReturns() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Unit Cost ({currencyCode})</Label>
+                    <Label className="text-xs">Unit Cost ({currencySymbol})</Label>
                     <Input
                       type="number" min={0} step="0.01"
                       value={productUnitCost}

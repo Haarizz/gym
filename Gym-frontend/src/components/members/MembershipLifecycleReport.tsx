@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDays, format, isValid, parseISO, startOfDay, subDays, subMonths } from "date-fns";
 import {
   AlertCircle,
+  ArrowUpDown,
   BarChart3,
   CalendarClock,
   CalendarX,
@@ -26,6 +27,7 @@ import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
 import { receiptsService, type Receipt } from "../../utils/supabase/receipts-service";
 import { downloadReceiptInvoice } from "../../utils/receipt-invoice";
+import { classifyRenewals, hasStoredRenewalKind, matchesKind, type RenewalKind } from "./RenewalTransactionHistory";
 
 export type LifecycleReportType = "transactions" | "renewals" | "expired" | "expiring" | "joined" | "freeze";
 
@@ -140,7 +142,7 @@ const defaultRangeFor = (type: LifecycleReportType): RangeKey => (type === "expi
 
 type ReportRows =
   | { kind: "freeze"; rows: FreezeRow[] }
-  | { kind: "receipts"; rows: Receipt[] }
+  | { kind: "receipts"; rows: Receipt[]; renewalKinds?: Record<string, RenewalKind> }
   | { kind: "members"; rows: MemberRow[] };
 
 /** The rows a report shows for a window — shared by the report and its stat-card count. */
@@ -149,14 +151,37 @@ async function loadReportRows(type: LifecycleReportType, window: { from: string;
     return { kind: "freeze", rows: await fetchReport<FreezeRow>(`/membership-reports/freezes?from=${window.from}&to=${window.to}`) };
   }
   if (type === "renewals" || type === "transactions") {
-    const res = await receiptsService.getReceipts(type === "renewals" ? { transactionType: "Renewal" } : {}, { page: 1, limit: 2000 });
-    const rows = (res.receipts ?? [])
+    // Only the window's receipts (local days, to inclusive), all of them — not a
+    // capped first page filtered here.
+    const from = parseISO(window.from);
+    const to = addDays(parseISO(window.to), 1);
+    const receipts = await receiptsService.getAllReceipts({
+      ...(type === "renewals" ? { transactionType: "Renewal" } : {}),
+      from: isValid(from) ? from : undefined,
+      to: isValid(to) ? to : undefined,
+    });
+    const rows = receipts
       .filter((r) => {
         const d = r.transaction_date ? format(parseISO(r.transaction_date), ISO) : "";
         return d >= window.from && d <= window.to;
       })
       .sort((a, b) => (b.transaction_date ?? "").localeCompare(a.transaction_date ?? ""));
-    return { kind: "receipts", rows };
+    if (type === "transactions") return { kind: "receipts", rows };
+
+    // BG_127: Renewal receipts include upgrades and downgrades. Classify them exactly as
+    // the Renewals & Upgrades tab does, so "Renewals" here means the same thing there.
+    // Plan-purchase history is only needed for older receipts without a stored kind.
+    let planPurchases = rows;
+    if (rows.some((r) => !hasStoredRenewalKind(r))) {
+      const [allRenewals, newReceipts] = await Promise.all([
+        receiptsService.getAllReceipts({ transactionType: "Renewal", to: isValid(to) ? to : undefined }),
+        receiptsService.getAllReceipts({ transactionType: "New", to: isValid(to) ? to : undefined }),
+      ]);
+      planPurchases = [...newReceipts, ...allRenewals];
+    }
+    const renewalKinds: Record<string, RenewalKind> = {};
+    for (const c of classifyRenewals(rows, planPurchases)) renewalKinds[String(c.receipt.id)] = c.kind;
+    return { kind: "receipts", rows, renewalKinds };
   }
   return { kind: "members", rows: await fetchReport<MemberRow>(`/membership-reports/members?type=${type}&from=${window.from}&to=${window.to}`) };
 }
@@ -205,6 +230,7 @@ export function MembershipLifecycleReport({
   const [memberRows, setMemberRows] = useState<MemberRow[]>([]);
   const [freezeRows, setFreezeRows] = useState<FreezeRow[]>([]);
   const [renewalRows, setRenewalRows] = useState<Receipt[]>([]);
+  const [renewalKinds, setRenewalKinds] = useState<Record<string, RenewalKind>>({});
   const [page, setPage] = useState(1);
 
   // Switching report type starts fresh with a sensible default window
@@ -214,6 +240,7 @@ export function MembershipLifecycleReport({
     setMemberRows([]);
     setFreezeRows([]);
     setRenewalRows([]);
+    setRenewalKinds({});
     setPage(1);
   }, [reportType]);
 
@@ -240,7 +267,10 @@ export function MembershipLifecycleReport({
     try {
       const result = await loadReportRows(reportType, window);
       if (result.kind === "freeze") setFreezeRows(result.rows);
-      else if (result.kind === "receipts") setRenewalRows(result.rows);
+      else if (result.kind === "receipts") {
+        setRenewalRows(result.rows);
+        setRenewalKinds(result.renewalKinds ?? {});
+      }
       else setMemberRows(result.rows);
       setGenerated(true);
       setPage(1);
@@ -267,8 +297,16 @@ export function MembershipLifecycleReport({
       ];
     }
     if (isReceiptReport) {
+      const kindOf = (r: Receipt) => renewalKinds[String(r.id)] ?? "Renewal";
+      const counts = reportType === "renewals"
+        ? [
+            { label: "Renewals", value: renewalRows.filter((r) => matchesKind(kindOf(r), "renewals")).length, icon: RefreshCw, color: "text-emerald-600" },
+            { label: "Upgrades & Downgrades", value: renewalRows.filter((r) => matchesKind(kindOf(r), "changes")).length, icon: ArrowUpDown, color: "text-purple-600" },
+            { label: "Total", value: renewalRows.length, icon: FileText, color: "text-slate-700" },
+          ]
+        : [{ label: "Transactions", value: renewalRows.length, icon: RefreshCw, color: "text-emerald-600" }];
       return [
-        { label: reportType === "renewals" ? "Renewals" : "Transactions", value: renewalRows.length, icon: RefreshCw, color: "text-emerald-600" },
+        ...counts,
         { label: reportType === "renewals" ? "Members Renewed" : "Members", value: new Set(renewalRows.map((r) => r.member_db_id ?? r.member_id)).size, icon: Users, color: "text-blue-600" },
         { label: "Total Amount", value: renewalRows.reduce((s, r) => s + num(r.amount), 0), icon: BarChart3, color: "text-green-600", money: true },
         { label: "Collected", value: renewalRows.reduce((s, r) => s + num(r.paid_amount ?? r.amount), 0), icon: BarChart3, color: "text-emerald-600", money: true },
@@ -283,7 +321,7 @@ export function MembershipLifecycleReport({
       { label: "Family", value: memberRows.filter((r) => (r.membershipType || "").toLowerCase() === "family").length, icon: Users, color: "text-purple-600" },
       { label: "Outstanding Due", value: memberRows.reduce((s, r) => s + num(r.outstandingBalance), 0), icon: AlertCircle, color: "text-amber-600", money: true },
     ];
-  }, [reportType, isReceiptReport, freezeRows, renewalRows, memberRows]);
+  }, [reportType, isReceiptReport, freezeRows, renewalRows, renewalKinds, memberRows]);
 
   const exportCsv = () => {
     const stamp = format(new Date(), ISO);
@@ -294,7 +332,8 @@ export function MembershipLifecycleReport({
     } else if (isReceiptReport) {
       downloadCsv(`${reportType}-report-${stamp}.csv`,
         ["Date", "Receipt No", "Type", "Member ID", "Member", "Mobile", "Plan", `Amount (${currencyCode})`, `Paid (${currencyCode})`, "Payment Method", "New Expiry", "Processed By", "Status"],
-        renewalRows.map((r) => [r.transaction_date, r.receipt_no, r.transaction_type, r.member_id, r.member_name, r.member_phone, r.plan_name, num(r.amount), num(r.paid_amount), r.payment_method, r.valid_till, r.processed_by, r.status]));
+        renewalRows.map((r) => [r.transaction_date, r.receipt_no,
+          reportType === "renewals" ? renewalKinds[String(r.id)] ?? "Renewal" : r.transaction_type, r.member_id, r.member_name, r.member_phone, r.plan_name, num(r.amount), num(r.paid_amount), r.payment_method, r.valid_till, r.processed_by, r.status]));
     } else {
       downloadCsv(`${reportType}-members-report-${stamp}.csv`,
         ["Member ID", "Member", "Mobile", "Email", "Membership Type", "Plan", "Status", "Join Date", "Start Date", "Expiry Date", reportType === "expired" ? "Days Since Expiry" : "Days Left", `Outstanding (${currencyCode})`],
@@ -434,7 +473,7 @@ export function MembershipLifecycleReport({
                           <TableHead className="w-12">#</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Receipt No.</TableHead>
-                          {reportType === "transactions" && <TableHead>Type</TableHead>}
+                          <TableHead>Type</TableHead>
                           <TableHead>Member</TableHead>
                           <TableHead>Mobile</TableHead>
                           <TableHead>Plan</TableHead>
@@ -453,7 +492,11 @@ export function MembershipLifecycleReport({
                             <TableCell>{pageStart + i + 1}</TableCell>
                             <TableCell>{fmtDate(r.transaction_date)}</TableCell>
                             <TableCell className="font-medium">{r.receipt_no}</TableCell>
-                            {reportType === "transactions" && <TableCell><Badge variant="outline">{r.transaction_type || "—"}</Badge></TableCell>}
+                            <TableCell>
+                              <Badge variant="outline">
+                                {reportType === "renewals" ? renewalKinds[String(r.id)] ?? "Renewal" : r.transaction_type || "—"}
+                              </Badge>
+                            </TableCell>
                             <TableCell>
                               <div className="font-medium">{r.member_name}</div>
                               <div className="text-xs text-muted-foreground font-mono">{r.member_id}</div>

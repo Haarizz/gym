@@ -95,6 +95,7 @@ import { referralService } from '../utils/supabase/referral-service';
 import type { ReferralResponse } from '../utils/supabase/referral-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+import s from './member-history-analytics.module.css';
 import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
 
 interface MemberHistoryAnalyticsProps {
@@ -103,6 +104,8 @@ interface MemberHistoryAnalyticsProps {
 }
 
 const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
+// Sidebar payment-method donut: brand teal + the validated categorical slots used by Analytics.
+const PAYMENT_COLORS = ['#2B7A78', '#2a78d6', '#eb6834', '#6250d6', '#b45309'];
 
 // A bare "yyyy-MM-dd" carries no time. new Date() would read it as UTC midnight
 // (5:30 AM in IST, or the previous day west of UTC), so it is parsed as a local
@@ -185,7 +188,7 @@ interface TimelineItem {
 }
 
 export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAnalyticsProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
 
   // ── Core data ──────────────────────────────────────────────────────────
   const [member, setMember] = useState<Member | null>(null);
@@ -395,7 +398,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     } else if (l.credit > 0) {
       timelineItems.push({
         date: d, dateOnly, event: 'Payment',
-        detail: `${currencyCode} ${l.credit.toLocaleString()} via ${l.payment_method || 'unknown method'}`,
+        detail: `${currencyPrefix}${l.credit.toLocaleString()} via ${l.payment_method || 'unknown method'}`,
         type: 'payment',
       });
     }
@@ -713,455 +716,351 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const isExpiredByDate = !isFrozen && daysRemaining !== null && daysRemaining < 0;
   const displayStatus = isExpiredByDate ? 'expired' : member.membership_status;
 
+  const statusTone = isExpiredByDate ? 'red'
+    : isActive ? 'green'
+      : isFrozen ? 'blue'
+        : isPendingApproval ? 'amber'
+          : 'gray';
+  const StatusIcon = isExpiredByDate ? XCircle
+    : isActive ? CheckCircle
+      : isFrozen ? Snowflake
+        : isPendingApproval ? Clock
+          : AlertCircle;
+  const planName = member.membership_plan || member.membership_type || '—';
+  const realEmail = member.email && !member.email.includes('@family.local') ? member.email : null;
+
+  // Share of the current term already used, for the progress bar.
+  const termStart = safeDate(member.membership_start_date);
+  const termEnd = safeDate(member.expiry_date);
+  const termDays = termStart && termEnd ? Math.max(1, differenceInDays(termEnd, termStart)) : null;
+  const termUsedPct = termDays !== null && daysRemaining !== null
+    ? Math.min(100, Math.max(0, ((termDays - daysRemaining) / termDays) * 100))
+    : null;
+  const termTone = isFrozen ? 'blue'
+    : daysRemaining === null ? 'gray'
+      : daysRemaining < 0 ? 'red'
+        : daysRemaining <= 7 ? 'amber'
+          : 'teal';
+  const termLeftLabel = daysRemaining === null ? 'No expiry set'
+    : isFrozen ? 'Membership frozen'
+      : daysRemaining < 0 ? `${Math.abs(daysRemaining)} days overdue`
+        : daysRemaining === 0 ? 'Expires today'
+          : `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`;
+
+  const paymentTotal = paymentPieData.reduce((sum, d) => sum + d.value, 0);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 p-6">
-      <div className="max-w-[1400px] mx-auto space-y-6">
-      {/* Header with Search */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center space-x-3">
+    <div className={s.root}>
+      <div className={s.inner}>
+      {/* Top bar: back + member switcher */}
+      <div className={s.topBar}>
+        <button type="button" className={s.back} onClick={() => onNavigate?.('members')}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Members
+        </button>
+        <div className={s.search}>
+          <Search className={s.searchIcon} />
+          <Input
+            placeholder="Switch member — name, mobile or ID"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+            onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+            className={s.searchInput}
+          />
+          {searchOpen && searchResults.length > 0 && (
+            <div className={s.searchResults}>
+              {searchResults.map((r) => (
+                <button key={r.id} type="button" className={s.searchItem} onClick={() => switchToMember(r)}>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={r.photo_url} alt={r.name} />
+                    <AvatarFallback className="bg-gradient-primary text-white text-xs">{initialsOf(r.name)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className={s.searchName}>{r.name}</p>
+                    <p className={s.searchMeta}>{r.member_id || r.id} • {r.phone}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Profile header: identity, contacts, membership actions and current term */}
+      <section className={`${s.card} ${s.hero}`}>
+        <div className={s.heroMain}>
+          <Avatar className={s.avatar}>
+            <AvatarImage src={member.photo_url} alt={member.name} />
+            <AvatarFallback className={s.avatarFallback}>{initialsOf(member.name)}</AvatarFallback>
+          </Avatar>
+          <div className={s.identity}>
+            <div className={s.nameRow}>
+              <h1 className={s.name}>{member.name}</h1>
+              <span className={s.pill} data-tone={statusTone}>
+                <StatusIcon />
+                {String(displayStatus || '').replace(/_/g, ' ')}
+              </span>
+              {member.membership_suspended && (
+                <span className={s.pill} data-tone="amber">
+                  <PauseCircle />
+                  Suspended
+                </span>
+              )}
+              <span className={s.memberId}>{member.member_id || member.id}</span>
+            </div>
+            {member.membership_suspended && (
+              <p className="text-sm text-amber-700">
+                Check-in and app member features are closed
+                {member.suspended_reason ? ` — ${member.suspended_reason}` : ''}
+              </p>
+            )}
+            <div className={s.contacts}>
+              <span className={s.contact}><Phone />{member.phone || '—'}</span>
+              <span className={s.contact}>
+                <Mail />
+                {realEmail ?? <span className={s.contactMuted}>No email</span>}
+              </span>
+              {member.family_head_name && (
+                <span className={s.contact}><Users />Family head: {member.family_head_name}</span>
+              )}
+              {member.address && <span className={s.contact}><MapPin />{member.address}</span>}
+              <span className={s.contact}><Calendar />Member since {fmtDate(member.join_date || member.membership_start_date)}</span>
+            </div>
+          </div>
+          {/* Disabled buttons swallow hover, so the hint lives on the wrapper */}
+          <div className={s.heroActions} title={pendingApprovalHint}>
             <Button
-              variant="ghost"
               size="sm"
-              onClick={() => onNavigate?.('members')}
-              className="text-gray-600 hover:text-primary"
+              className="btn-primary"
+              onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })}
+              disabled={isPendingApproval}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Members
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Renew / Upgrade
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#DFF5F4]"
+              onClick={() => setIsFreezeDialogOpen(true)}
+              disabled={isPendingApproval}
+            >
+              <Snowflake className="h-4 w-4 mr-2" />
+              {isFrozen ? 'Unfreeze' : 'Freeze'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-primary/20"
+              onClick={() => setIsTransferModalOpen(true)}
+              disabled={isPendingApproval}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Transfer
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-red-300 text-red-600 hover:bg-red-50"
+              onClick={() => setIsDeactivateModalOpen(true)}
+              disabled={!isActive && !isFrozen}
+            >
+              <UserX className="h-4 w-4 mr-2" />
+              Deactivate
+            </Button>
+            {member.membership_suspended ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-green-300 text-green-700 hover:bg-green-50"
+                onClick={handleResume}
+                disabled={savingSuspension}
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Resume
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                onClick={() => setIsSuspendModalOpen(true)}
+              >
+                <PauseCircle className="h-4 w-4 mr-2" />
+                Suspend
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Search Bar */}
-        <Card className="overflow-visible border-primary/10 shadow-sm">
-          <CardContent className="p-4 sm:p-5">
-            <div className="relative">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search member by name, mobile, or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
-                  className="pl-10 border-primary/20"
-                />
-              </div>
-              {searchOpen && searchResults.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-primary/20 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                  {searchResults.map((r) => (
-                    <button
-                      key={r.id}
-                      className="w-full text-left px-4 py-2 hover:bg-gradient-light flex items-center space-x-3"
-                      onClick={() => switchToMember(r)}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={r.photo_url} alt={r.name} />
-                        <AvatarFallback className="bg-gradient-primary text-white text-xs">{initialsOf(r.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{r.name}</p>
-                        <p className="text-xs text-gray-500">{r.member_id || r.id} • {r.phone}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+        <div className={s.planStrip}>
+          <div>
+            <p className={s.stripLabel}>Current plan</p>
+            <p className={s.stripValue} data-tone="teal">{planName}</p>
+            <div className={s.addons}>
+              {addons.length === 0
+                ? <span className={s.addonNone}>No add-ons</span>
+                : addons.map(a => <span key={a.id} className={s.addon}>{a.addon_name}</span>)}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className={s.term} data-tone={termTone}>
+            <div className={s.termDates}>
+              <div className={s.termDate}><span>Start</span><strong>{fmtDate(member.membership_start_date)}</strong></div>
+              <div className={s.termDate}><span>Expiry</span><strong className={s.termEnd}>{fmtDate(member.expiry_date)}</strong></div>
+            </div>
+            <div className={s.track}>
+              <div className={s.fill} style={{ width: `${termUsedPct ?? 0}%` }} />
+            </div>
+            <div className={s.termFoot}>
+              <span>{termDays !== null ? `${termDays}-day term` : 'Term length unknown'}</span>
+              <span className={s.termLeft}>{termLeftLabel}</span>
+            </div>
+          </div>
+          <div>
+            <p className={s.stripLabel}>Payment mode</p>
+            <p className={s.stripValue} data-tone="blue">{member.payment_method_used || '—'}</p>
+          </div>
+        </div>
+      </section>
 
-        {/* Current Member Summary Bar */}
-        <Card className="overflow-hidden mt-4 border-primary/20 bg-gradient-light shadow-sm">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-16 w-16 border-2 border-primary shadow-sm">
-                  <AvatarImage src={member.photo_url} alt={member.name} />
-                  <AvatarFallback className="bg-gradient-primary text-white">{initialsOf(member.name)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-semibold text-lg">{member.name}</h3>
-                    <Badge className={isExpiredByDate ? "bg-red-600 text-white capitalize" : "bg-gradient-primary text-white capitalize"}>{displayStatus}</Badge>
-                    {member.membership_suspended && (
-                      <Badge className="bg-amber-500 text-white">Suspended</Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600">Member ID: {member.member_id || member.id}</p>
-                  {member.membership_suspended && (
-                    <p className="text-sm text-amber-700 mt-1">
-                      Check-in and app member features are closed
-                      {member.suspended_reason ? ` — ${member.suspended_reason}` : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                  <p className="text-gray-600">Current Plan</p>
-                  <p className="font-semibold text-primary">{member.membership_plan || member.membership_type || '—'}</p>
-                </div>
-                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                  <p className="text-gray-600">Days Remaining</p>
-                  <p className="font-semibold text-orange-600">{daysRemaining !== null ? `${daysRemaining} days` : '—'}</p>
-                </div>
-                <div className="rounded-lg bg-white/70 px-3 py-2 border border-primary/10">
-                  <p className="text-gray-600">Joined</p>
-                  <p className="font-semibold">{fmtDate(member.membership_start_date || member.join_date)}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI tiles */}
+      <div className={s.kpis}>
+        <div className={`${s.card} ${s.kpi}`} data-tone="green">
+          <div className={s.kpiIcon}><Wallet /></div>
+          <div className={s.kpiBody}>
+            <span className={s.kpiLabel}>Total paid</span>
+            <span className={s.kpiValue}><CurrencyGlyph /> {totalPaid.toLocaleString()}</span>
+            <span className={s.kpiHint}>{totalTransactions} transaction{totalTransactions === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+        <div className={`${s.card} ${s.kpi}`} data-tone={outstandingDues > 0 ? 'red' : 'teal'}>
+          <div className={s.kpiIcon}><AlertCircle /></div>
+          <div className={s.kpiBody}>
+            <span className={s.kpiLabel}>Outstanding dues</span>
+            <span className={s.kpiValue} data-alert={outstandingDues > 0}><CurrencyGlyph /> {outstandingDues.toLocaleString()}</span>
+            <span className={s.kpiHint}>{outstandingDues > 0 ? 'Payment pending' : 'All settled'}</span>
+          </div>
+        </div>
+        <div className={`${s.card} ${s.kpi}`} data-tone="blue">
+          <div className={s.kpiIcon}><Activity /></div>
+          <div className={s.kpiBody}>
+            <span className={s.kpiLabel}>Total visits</span>
+            <span className={s.kpiValue}>{member.total_visits ?? attendance.length}</span>
+            <span className={s.kpiHint}>{thisMonthVisits} this month</span>
+          </div>
+        </div>
+        <div className={`${s.card} ${s.kpi}`} data-tone="amber">
+          <div className={s.kpiIcon}><Clock /></div>
+          <div className={s.kpiBody}>
+            <span className={s.kpiLabel}>Time in gym</span>
+            <span className={s.kpiValue}>{totalHours}h</span>
+            <span className={s.kpiHint}>avg {avgDurationHours}h per visit</span>
+          </div>
+        </div>
+        <div className={`${s.card} ${s.kpi}`} data-tone="violet">
+          <div className={s.kpiIcon}><Gift /></div>
+          <div className={s.kpiBody}>
+            <span className={s.kpiLabel}>Reward wallet</span>
+            <span className={s.kpiValue}><CurrencyGlyph /> {(wallet?.balance ?? 0).toLocaleString()}</span>
+            <span className={s.kpiHint}>{referrals.length} referral{referrals.length === 1 ? '' : 's'}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Membership & Add-On Overview Card */}
-      <Card className="overflow-hidden border-primary/20 mb-6">
-        <CardHeader className="bg-gradient-light border-b border-primary/10">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              <span>Current Membership & Add-Ons</span>
+      {/* Body: sidebar + tabbed history */}
+      <div className={s.layout}>
+        <aside className={s.side}>
+          <div className={`${s.card} ${s.panel}`}>
+            <div className={s.panelHead}>
+              <h2 className={s.panelTitle}><CreditCard />Payments</h2>
+              <span className={s.panelMeta}>by method</span>
             </div>
-            {/* Disabled buttons swallow hover, so the hint lives on the wrapper */}
-            <div className="flex items-center space-x-2" title={pendingApprovalHint}>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#DFF5F4]"
-                onClick={() => setIsFreezeDialogOpen(true)}
-                disabled={isPendingApproval}
-              >
-                <Snowflake className="h-4 w-4 mr-2" />
-                {isFrozen ? 'Unfreeze' : 'Freeze'}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-primary/20"
-                onClick={() => setIsTransferModalOpen(true)}
-                disabled={isPendingApproval}
-              >
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Transfer
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-300 text-red-600 hover:bg-red-50"
-                onClick={() => setIsDeactivateModalOpen(true)}
-                disabled={!isActive && !isFrozen}
-              >
-                <UserX className="h-4 w-4 mr-2" />
-                Deactivate
-              </Button>
-              {member.membership_suspended ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-green-300 text-green-700 hover:bg-green-50"
-                  onClick={handleResume}
-                  disabled={savingSuspension}
-                >
-                  <PlayCircle className="h-4 w-4 mr-2" />
-                  Resume
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                  onClick={() => setIsSuspendModalOpen(true)}
-                >
-                  <PauseCircle className="h-4 w-4 mr-2" />
-                  Suspend
-                </Button>
-              )}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Current Plan</p>
-              <p className="font-semibold text-gray-900">{member.membership_plan || member.membership_type || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Start Date</p>
-              <p className="font-semibold text-gray-900">{fmtDate(member.membership_start_date)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Expiry Date</p>
-              <p className="font-semibold text-gray-900">
-                {fmtDate(member.expiry_date)}{' '}
-                {daysRemaining !== null && (
-                  <span className={daysRemaining < 0 ? 'text-red-600 text-xs' : 'text-green-600 text-xs'}>
-                    ({daysRemaining} days {daysRemaining < 0 ? 'overdue' : 'left'})
-                  </span>
-                )}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Add-Ons</p>
-              <div className="flex flex-wrap gap-1">
-                {addons.length === 0 && <span className="text-sm text-gray-400">None</span>}
-                {addons.map(a => (
-                  <Badge key={a.id} variant="outline" className="border-primary/30 text-xs">{a.addon_name}</Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Status</p>
-              <Badge className={
-                (isActive && !isExpiredByDate) ? 'bg-green-100 text-green-700 flex items-center gap-1 w-fit'
-                  : isFrozen ? 'bg-blue-100 text-blue-700 flex items-center gap-1 w-fit'
-                    : isExpiredByDate ? 'bg-red-100 text-red-700 flex items-center gap-1 w-fit'
-                      : 'bg-gray-100 text-gray-700 flex items-center gap-1 w-fit'
-              }>
-                {(isActive && !isExpiredByDate) ? <CheckCircle className="h-3.5 w-3.5" />
-                  : isFrozen ? <Snowflake className="h-3.5 w-3.5" />
-                    : isExpiredByDate ? <XCircle className="h-3.5 w-3.5" />
-                      : <Snowflake className="h-3.5 w-3.5" />}
-                <span className="capitalize">{displayStatus}</span>
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Payment Mode</p>
-              <p className="font-semibold text-gray-900">{member.payment_method_used || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-              <p className="font-semibold text-gray-900"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Outstanding Dues</p>
-              <p className={`font-semibold ${outstandingDues > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                <CurrencyGlyph /> {outstandingDues.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Layout: Left Sidebar + Right Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Sidebar - Member Overview Panel */}
-        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-6 lg:self-start">
-          {/* Member Info Card */}
-          <Card className="overflow-hidden border-primary/20">
-            <CardHeader className="bg-gradient-light border-b border-primary/10">
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-primary" />
-                <span>Member Information</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex flex-col items-center mb-4">
-                <Avatar className="h-24 w-24 mb-3 border-4 border-primary/20">
-                  <AvatarImage src={member.photo_url} alt={member.name} />
-                  <AvatarFallback className="bg-gradient-primary text-white text-2xl">{initialsOf(member.name)}</AvatarFallback>
-                </Avatar>
-                <h3 className="font-semibold text-lg">{member.name}</h3>
-                <p className="text-sm text-gray-600">{member.member_id || member.id}</p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3 text-sm">
-                  <Mail className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">
-                    {member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <Phone className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">{member.phone || '—'}</span>
-                </div>
-                {member.address && (
-                  <div className="flex items-center space-x-3 text-sm">
-                    <MapPin className="h-4 w-4 text-primary" />
-                    <span className="text-gray-600">{member.address}</span>
-                  </div>
-                )}
-                {member.family_head_name && (
-                  <div className="flex items-center space-x-3 text-sm">
-                    <Users className="h-4 w-4 text-primary" />
-                    <span className="text-gray-600">Family Head: {member.family_head_name}</span>
-                  </div>
-                )}
-                <div className="flex items-center space-x-3 text-sm">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-gray-600">Joined: {fmtDate(member.membership_start_date || member.join_date)}</span>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Key Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Total Time</p>
-                  <p className="font-semibold text-primary">{totalHours}h</p>
-                </div>
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Total Income</p>
-                  <p className="font-semibold text-green-600"><CurrencyGlyph /> {totalPaid.toLocaleString()}</p>
-                </div>
-                <div className="bg-purple-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Total Visits</p>
-                  <p className="font-semibold text-purple-600">{member.total_visits ?? attendance.length}</p>
-                </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 mb-1">Transactions</p>
-                  <p className="font-semibold text-orange-600">{totalTransactions}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Payment Summary Card */}
-          <Card className="overflow-hidden border-primary/20">
-            <CardHeader className="bg-gradient-light border-b border-primary/10">
-              <CardTitle className="flex items-center space-x-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                <span>Payment Summary</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Transactions</span>
-                  <span className="font-semibold">{totalTransactions}</span>
-                </div>
-                {Object.entries(paymentBreakdown).map(([method, amount]) => (
-                  <div className="flex justify-between items-center" key={method}>
-                    <span className="text-sm text-gray-600 capitalize">By {method}</span>
-                    <span className="font-semibold text-blue-600"><CurrencyGlyph /> {amount.toLocaleString()}</span>
-                  </div>
-                ))}
-                {Object.keys(paymentBreakdown).length === 0 && (
-                  <p className="text-sm text-gray-400">No payments recorded yet</p>
-                )}
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-900">Outstanding Dues</span>
-                  <span className="font-semibold text-red-600"><CurrencyGlyph /> {outstandingDues.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {paymentPieData.length > 0 && (
-                <div className="mt-4">
-                  <ResponsiveContainer width="100%" height={150}>
-                    <RePieChart>
-                      <Pie
-                        data={paymentPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={60}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
+            {paymentPieData.length > 0 ? (
+              <div className={s.donutWrap}>
+                <div className={s.donut}>
+                  <RePieChart width={120} height={120}>
+                      <Pie data={paymentPieData} dataKey="value" innerRadius={44} outerRadius={58} paddingAngle={paymentPieData.length > 1 ? 3 : 0} stroke="none">
                         {paymentPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell key={entry.name} fill={PAYMENT_COLORS[index % PAYMENT_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip formatter={(v: number) => `${currencyPrefix}${v.toLocaleString()}`} />
                     </RePieChart>
-                  </ResponsiveContainer>
+                  <div className={s.donutCenter}>
+                    <strong><CurrencyGlyph /> {paymentTotal.toLocaleString()}</strong>
+                    <span>collected</span>
+                  </div>
                 </div>
-              )}
-
-              {wallet && wallet.balance > 0 && (
-                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100 flex justify-between items-center">
-                  <span className="text-sm text-purple-800">Reward Wallet Balance</span>
-                  <span className="font-semibold text-purple-700"><CurrencyGlyph /> {wallet.balance.toLocaleString()}</span>
+                <div className={s.legend}>
+                  {paymentPieData.map((d, index) => (
+                    <div key={d.name} className={s.legendRow}>
+                      <span className={s.dot} style={{ background: PAYMENT_COLORS[index % PAYMENT_COLORS.length] }} />
+                      <span className={s.legendName}>{d.name}</span>
+                      <span className={s.legendAmt}><CurrencyGlyph /> {d.value.toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            ) : (
+              <p className={s.empty}>No payments recorded yet</p>
+            )}
+            <div className={s.sumRows}>
+              <div className={s.sumRow}><span>Transactions</span><strong>{totalTransactions}</strong></div>
+              <div className={s.sumRow}>
+                <span>Outstanding dues</span>
+                <strong data-alert={outstandingDues > 0} data-good={outstandingDues === 0}><CurrencyGlyph /> {outstandingDues.toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
 
           {/* App Account: create, link, or show the member's GymBios account */}
           <MemberAppAccountCard key={member.id} memberId={String(member.id)} memberEmail={member.email} />
 
-          {/* Quick Actions */}
-          <Card className="overflow-hidden border-primary/20">
-            <CardHeader className="bg-gradient-light border-b border-primary/10">
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="h-5 w-5 text-primary" />
-                <span>Quick Actions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-2">
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('billing')}>
-                <Receipt className="h-4 w-4 mr-2" />
-                View Receipts
-              </Button>
-              <div title={pendingApprovalHint}>
-                <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })} disabled={isPendingApproval}>
-                  <RefreshCcw className="h-4 w-4 mr-2" />
-                  Renew / Upgrade Plan
-                </Button>
-              </div>
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('plans-services-catalog')}>
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Purchase Add-On
-              </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('promotions-campaign')}>
-                <Gift className="h-4 w-4 mr-2" />
-                Set Target / Offer Discount
-              </Button>
-              <Button variant="outline" className="w-full justify-start border-primary/20" onClick={() => onNavigate?.('messaging')}>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Send Message
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+          <div className={`${s.card} ${s.panel}`}>
+            <div className={s.panelHead}>
+              <h2 className={s.panelTitle}><Target />Quick actions</h2>
+            </div>
+            <div className={s.actionList}>
+              <button type="button" className={s.action} onClick={() => onNavigate?.('billing', { globalSearch: member?.member_id || member?.name })}>
+                <span className={s.actionIcon} data-tone="teal"><Receipt /></span>
+                <span className={s.actionLabel}>View receipts</span>
+                <ChevronRight className={s.chev} />
+              </button>
+              <button type="button" className={s.action} onClick={() => onNavigate?.('members', { tab: 'addons', purchaseAddonFor: memberId })}>
+                <span className={s.actionIcon} data-tone="blue"><ShoppingCart /></span>
+                <span className={s.actionLabel}>Purchase add-on</span>
+                <ChevronRight className={s.chev} />
+              </button>
+              <button type="button" className={s.action} onClick={() => onNavigate?.('promotions-campaign')}>
+                <span className={s.actionIcon} data-tone="violet"><Percent /></span>
+                <span className={s.actionLabel}>Set target / offer discount</span>
+                <ChevronRight className={s.chev} />
+              </button>
+              <button type="button" className={s.action} onClick={() => onNavigate?.('messaging')}>
+                <span className={s.actionIcon} data-tone="amber"><MessageSquare /></span>
+                <span className={s.actionLabel}>Send message</span>
+                <ChevronRight className={s.chev} />
+              </button>
+            </div>
+          </div>
+        </aside>
 
-        {/* Right Content - Detailed Analytics Tabs */}
-        <div className="lg:col-span-8">
-          <Card className="overflow-hidden border-primary/20">
-            <Tabs defaultValue="timeline" className="w-full">
-              <CardHeader className="bg-gradient-light border-b border-primary/10">
-                <TabsList className="w-full min-w-0 overflow-x-auto flex flex-nowrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-border/70">
-                  <TabsTrigger value="timeline" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Activity Timeline
-                  </TabsTrigger>
-                  <TabsTrigger value="financial" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Financial History
-                  </TabsTrigger>
-                  <TabsTrigger value="usage" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Gym Usage
-                  </TabsTrigger>
-                  <TabsTrigger value="performance" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Performance
-                  </TabsTrigger>
-                  <TabsTrigger value="promotions" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Promotions
-                  </TabsTrigger>
-                  <TabsTrigger value="feedback" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Workout Feedback
-                  </TabsTrigger>
-                  <TabsTrigger value="communication" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Communication History
-                  </TabsTrigger>
-                  <TabsTrigger value="transactions" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Transactions
-                  </TabsTrigger>
-                  <TabsTrigger value="notes" className="flex-none justify-center rounded-lg border border-transparent bg-white/70 text-foreground hover:bg-white data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm whitespace-nowrap px-4 py-1.5 text-xs sm:text-sm">
-                    Notes
-                  </TabsTrigger>
-                </TabsList>
-              </CardHeader>
+        <section className={`${s.card} ${s.main}`}>
+          <Tabs defaultValue="timeline" className={`w-full ${s.tabsRoot}`}>
+            <TabsList className={s.tabList}>
+              <TabsTrigger value="timeline" className={s.tab}>Timeline</TabsTrigger>
+              <TabsTrigger value="financial" className={s.tab}>Financial</TabsTrigger>
+              <TabsTrigger value="transactions" className={s.tab}>Transactions<span className={s.count}>{totalTransactions}</span></TabsTrigger>
+              <TabsTrigger value="usage" className={s.tab}>Gym usage</TabsTrigger>
+              <TabsTrigger value="performance" className={s.tab}>Performance</TabsTrigger>
+              <TabsTrigger value="feedback" className={s.tab}>Feedback</TabsTrigger>
+              <TabsTrigger value="promotions" className={s.tab}>Promotions</TabsTrigger>
+              <TabsTrigger value="communication" className={s.tab}>Messages<span className={s.count}>{communications.length}</span></TabsTrigger>
+              <TabsTrigger value="notes" className={s.tab}>Notes<span className={s.count}>{notes.length}</span></TabsTrigger>
+            </TabsList>
 
-              <CardContent className="p-6">
+            <div className={s.tabBody}>
                 {/* Tab 1: Activity Timeline */}
                 <TabsContent value="timeline" className="space-y-4 mt-0">
                   {timelineItems.length === 0 ? (
@@ -1257,7 +1156,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                           <YAxis />
                           <Tooltip />
                           <Legend />
-                          <Bar dataKey="amount" fill="#0047AB" name={`Revenue (${currencyCode})`} />
+                          <Bar dataKey="amount" fill="#0047AB" name={`Revenue (${currencySymbol})`} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1455,7 +1354,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                     ? 'border-red-500 text-red-500'
                                     : 'border-blue-600 text-blue-600'
                               }>
-                                {r.rewardValue ? `${currencyCode} ${r.rewardValue}` : r.status}
+                                {r.rewardValue ? `${currencyPrefix}${r.rewardValue}` : r.status}
                               </Badge>
                             </div>
                           ))}
@@ -1878,7 +1777,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               <TableHead className="table-header">Type</TableHead>
                               <TableHead className="table-header">Receipt No.</TableHead>
                               <TableHead className="table-header">Mode</TableHead>
-                              <TableHead className="table-header text-right">Amount ({currencyCode})</TableHead>
+                              <TableHead className="table-header text-right">Amount ({currencySymbol})</TableHead>
                               <TableHead className="table-header">Remarks</TableHead>
                               <TableHead className="table-header text-center">Actions</TableHead>
                             </TableRow>
@@ -2007,10 +1906,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                     )}
                   </div>
                 </TabsContent>
-              </CardContent>
-            </Tabs>
-          </Card>
-        </div>
+            </div>
+          </Tabs>
+        </section>
       </div>
 
       {/* Message Details Drawer */}

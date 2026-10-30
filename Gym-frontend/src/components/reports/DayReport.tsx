@@ -183,7 +183,7 @@ function TextReport({ title, subtitle, blocks }: { title: string; subtitle: stri
  * copyable as text and exportable to Excel.
  */
 export function DayReport() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const today = ymd(new Date());
   const [preset, setPreset] = useState<Preset>("today");
   const [from, setFrom] = useState(today);
@@ -432,7 +432,7 @@ export function DayReport() {
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} minTickGap={8} />
                   <YAxis yAxisId="money" tick={{ fontSize: 11 }} />
                   <YAxis yAxisId="count" orientation="right" allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any, name: any) => (name === "Check-ins" ? v : `${currencyCode} ${money(v)}`)} />
+                  <Tooltip formatter={(v: any, name: any) => (name === "Check-ins" ? v : `${currencyPrefix}${money(v)}`)} />
                   <Legend />
                   <Bar yAxisId="money" dataKey="Collection" fill={TEAL} isAnimationActive={false} />
                   <Bar yAxisId="money" dataKey="Expenses" fill="#F59E0B" isAnimationActive={false} />
@@ -464,7 +464,7 @@ export function DayReport() {
                     <Pie data={methods} dataKey="value" nameKey="name" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} isAnimationActive={false}>
                       {methods.map((_: Row, i: number) => <PieCell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: any) => `${currencyCode} ${money(v)}`} />
+                    <Tooltip formatter={(v: any) => `${currencyPrefix}${money(v)}`} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -478,7 +478,7 @@ export function DayReport() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="stream" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: any) => `${currencyCode} ${money(v)}`} />
+                  <Tooltip formatter={(v: any) => `${currencyPrefix}${money(v)}`} />
                   <Bar dataKey="amount" name="Revenue" fill={TEAL} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>

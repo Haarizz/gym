@@ -19,7 +19,7 @@ export function LineEditDialog({ line, open, onOpenChange, onSave, onRemove }: {
   onSave: (patch: Partial<CartLine>) => void;
   onRemove: () => void;
 }) {
-  const { settings, currencyCode } = usePos();
+  const { settings, currencyCode, currencySymbol } = usePos();
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [discType, setDiscType] = useState<"PERCENT" | "AMOUNT">("PERCENT");
@@ -74,7 +74,7 @@ export function LineEditDialog({ line, open, onOpenChange, onSave, onRemove }: {
             {stockShort && <span className={`${s.fieldHint} ${s.warnText}`}>Only {line.stock} in stock.</span>}
           </div>
           <div className={s.field}>
-            <Label>Unit price ({currencyCode})</Label>
+            <Label>Unit price ({currencySymbol})</Label>
             <Input type="number" min="0" step="0.01" value={price} disabled={!settings.allowPriceOverride} onChange={(e) => setPrice(e.target.value)} onFocus={(e) => e.target.select()} />
             {!settings.allowPriceOverride
               ? <span className={s.fieldHint}>Price overrides are disabled in POS settings.</span>
@@ -88,7 +88,7 @@ export function LineEditDialog({ line, open, onOpenChange, onSave, onRemove }: {
           <div className="flex items-center gap-2">
             <div className={s.segmented}>
               <button type="button" className={discType === "PERCENT" ? s.segOn : ""} onClick={() => setDiscType("PERCENT")}>%</button>
-              <button type="button" className={discType === "AMOUNT" ? s.segOn : ""} onClick={() => setDiscType("AMOUNT")}>{currencyCode}</button>
+              <button type="button" className={discType === "AMOUNT" ? s.segOn : ""} onClick={() => setDiscType("AMOUNT")}>{currencySymbol}</button>
             </div>
             <Input type="number" min="0" step="0.01" value={noDiscount ? "" : disc} disabled={noDiscount} onChange={(e) => setDisc(e.target.value)} placeholder="0" onFocus={(e) => e.target.select()} />
           </div>
@@ -121,7 +121,7 @@ export function BillDiscountDialog({ open, onOpenChange, value, subtotal, onAppl
   subtotal: number;
   onApply: (d: BillDiscount | null) => void;
 }) {
-  const { settings, currencyCode } = usePos();
+  const { settings, currencyCode, currencySymbol } = usePos();
   const [type, setType] = useState<"PERCENT" | "AMOUNT">("PERCENT");
   const [v, setV] = useState("");
   useEffect(() => {
@@ -143,7 +143,7 @@ export function BillDiscountDialog({ open, onOpenChange, value, subtotal, onAppl
         <div className="flex items-center gap-2">
           <div className={s.segmented}>
             <button type="button" className={type === "PERCENT" ? s.segOn : ""} onClick={() => setType("PERCENT")}>%</button>
-            <button type="button" className={type === "AMOUNT" ? s.segOn : ""} onClick={() => setType("AMOUNT")}>{currencyCode}</button>
+            <button type="button" className={type === "AMOUNT" ? s.segOn : ""} onClick={() => setType("AMOUNT")}>{currencySymbol}</button>
           </div>
           <Input type="number" min="0" step="0.01" autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="0" />
         </div>

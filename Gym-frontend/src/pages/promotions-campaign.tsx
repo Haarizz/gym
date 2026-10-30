@@ -233,7 +233,7 @@ function SpecificMemberBadges({ ids }: { ids: string[] }) {
 }
 
 export function PromotionsCampaign() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   // Promotions (offers members redeem) vs Campaigns (social-media pushes linked to lead forms).
   // ?tab=campaigns deep-links straight to the Campaigns tab.
@@ -879,7 +879,7 @@ export function PromotionsCampaign() {
     if (promotion.discountType === 'percentage') {
       return `${promotion.discountValue}% OFF`;
     } else if (promotion.discountType === 'fixed') {
-      return `${currencyCode} ${promotion.discountValue} OFF`;
+      return `${currencyPrefix}${promotion.discountValue} OFF`;
     } else {
       return 'FREE';
     }
@@ -1635,7 +1635,7 @@ export function PromotionsCampaign() {
                       </div>
                       <div>
                         <Label className="text-sm text-muted-foreground">Minimum Purchase</Label>
-                        <p className="font-medium">{selectedPromotion.minimumPurchase ? `${currencyCode} ${selectedPromotion.minimumPurchase}` : 'None'}</p>
+                        <p className="font-medium">{selectedPromotion.minimumPurchase ? `${currencyPrefix}${selectedPromotion.minimumPurchase}` : 'None'}</p>
                       </div>
                     </div>
 
@@ -1982,7 +1982,7 @@ export function PromotionsCampaign() {
                       label={promotionForm.discountType === "percentage"
                         ? "Discount Value (%)"
                         : promotionForm.discountType === "fixed"
-                        ? `Discount Value (${currencyCode})`
+                        ? `Discount Value (${currencySymbol})`
                         : "Discount Value"}
                       required={discountValueRequired}
                       error={fieldError("discountValue")}
@@ -2003,7 +2003,7 @@ export function PromotionsCampaign() {
                     </FormField>
                   )}
 
-                  <FormField htmlFor="promo-minimumPurchase" label={`Minimum Purchase (${currencyCode})`} error={fieldError("minimumPurchase")} hint="Optional">
+                  <FormField htmlFor="promo-minimumPurchase" label={`Minimum Purchase (${currencySymbol})`} error={fieldError("minimumPurchase")} hint="Optional">
                     <Input
                       {...fieldA11y("promo-minimumPurchase", fieldError("minimumPurchase"), true)}
                       type="number"
@@ -2016,7 +2016,7 @@ export function PromotionsCampaign() {
                       onBlur={() => touchField("minimumPurchase")}
                     />
                   </FormField>
-                  <FormField htmlFor="promo-maximumDiscount" label={`Maximum Discount (${currencyCode})`} error={fieldError("maximumDiscount")} hint="Optional cap on the discount amount">
+                  <FormField htmlFor="promo-maximumDiscount" label={`Maximum Discount (${currencySymbol})`} error={fieldError("maximumDiscount")} hint="Optional cap on the discount amount">
                     <Input
                       {...fieldA11y("promo-maximumDiscount", fieldError("maximumDiscount"), true)}
                       type="number"

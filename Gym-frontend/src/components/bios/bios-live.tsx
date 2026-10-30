@@ -14,6 +14,9 @@ export interface BiosLiveData {
   hasLiveData: boolean;
   gymData: GymDataContext | null;
   currencyCode: string;
+  /** On-screen symbol / amount prefix (the Dirham sign for AED) — CSV exports keep currencyCode. */
+  currencySymbol: string;
+  currencyPrefix: string;
   totalRevenue: number;
   totalExpenses: number;
   netIncome: number;
@@ -66,9 +69,9 @@ export const formatSignedPercent = (value: number | null) =>
 
 export const clampPercent = (value: number) => Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 
-/** Chart tooltip formatter: 125750 -> "126K AED". */
-export const compactCurrency = (value: number, currencyCode: string) =>
-  `${(Number(value) / 1000).toFixed(0)}K ${currencyCode}`;
+/** Chart tooltip formatter: 125750 -> "<prefix>126K" (pass live.currencyPrefix). */
+export const compactCurrency = (value: number, currencyPrefix: string) =>
+  `${currencyPrefix}${(Number(value) / 1000).toFixed(0)}K`;
 
 const toCsvCell = (value: unknown) => {
   const s = value == null ? '' : String(value);

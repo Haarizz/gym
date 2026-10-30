@@ -97,7 +97,7 @@ function offerPreview(f: OfferFormFields): { discount: number; pays: number } | 
 
 export function ManagePlans() {
   const { activeBranchId } = useBranch();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,7 +245,7 @@ export function ManagePlans() {
             : promo.discountType === "free"
               ? "Free"
               : promo.discountValue != null
-                ? `${currencyCode} ${promo.discountValue}`
+                ? `${currencyPrefix}${promo.discountValue}`
                 : "—";
           const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "";
           const validPeriod = promo.startDate && promo.endDate
@@ -1390,7 +1390,7 @@ export function ManagePlans() {
 
             {/* Price */}
             <div className="space-y-2">
-              <Label htmlFor="price">Price ({currencyCode}) *</Label>
+              <Label htmlFor="price">Price ({currencySymbol}) *</Label>
               <Input
                 id="price"
                 type="number"
@@ -1427,7 +1427,7 @@ export function ManagePlans() {
                 {formData.offerType !== "none" && (
                   <div className="space-y-2">
                     <Label htmlFor="offerValue">
-                      {formData.offerType === "percentage" ? "Offer (%) *" : `Amount off (${currencyCode}) *`}
+                      {formData.offerType === "percentage" ? "Offer (%) *" : `Amount off (${currencySymbol}) *`}
                     </Label>
                     <Input
                       id="offerValue"
@@ -2011,7 +2011,7 @@ export function ManagePlans() {
                   <div className="space-y-2">
                     <Label htmlFor="chargePerExtraDay">
                       Charge for Extra Days
-                      <span className="text-xs text-muted-foreground ml-2">({currencyCode} per day)</span>
+                      <span className="text-xs text-muted-foreground ml-2">({currencySymbol} per day)</span>
                     </Label>
                     <Input
                       id="chargePerExtraDay"
@@ -2133,7 +2133,7 @@ export function ManagePlans() {
                     <div className="space-y-2">
                       <Label htmlFor="pricePerMember">
                         Price Per Member
-                        <span className="text-xs text-muted-foreground ml-2">({currencyCode})</span>
+                        <span className="text-xs text-muted-foreground ml-2">({currencySymbol})</span>
                       </Label>
                       <Input
                         id="pricePerMember"
@@ -2215,7 +2215,7 @@ export function ManagePlans() {
                     <div className="space-y-2">
                       <Label htmlFor="additionalMemberPrice">
                         Additional Member Price
-                        <span className="text-xs text-muted-foreground ml-2">({currencyCode}, falls back to Price Per Member if blank)</span>
+                        <span className="text-xs text-muted-foreground ml-2">({currencySymbol}, falls back to Price Per Member if blank)</span>
                       </Label>
                       <Input
                         id="additionalMemberPrice"
@@ -2254,11 +2254,11 @@ export function ManagePlans() {
                           </p>
                           {formData.planType === "Couple" ? (
                             <p className="text-xs text-gray-600 mt-1">
-                              Example: {formData.pricePerMember || "0"} × 2 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 2).toFixed(2)} on ONE invoice billed only to the couple head.
+                              Example: {formData.pricePerMember || "0"} × 2 members = {currencyPrefix}{((parseFloat(formData.pricePerMember as string) || 0) * 2).toFixed(2)} on ONE invoice billed only to the couple head.
                             </p>
                           ) : (
                             <p className="text-xs text-gray-600 mt-1">
-                              Example: {formData.pricePerMember || "0"} × 5 members = {currencyCode} {((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
+                              Example: {formData.pricePerMember || "0"} × 5 members = {currencyPrefix}{((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
                             </p>
                           )}
                         </div>

@@ -49,6 +49,7 @@ import { PAYMENT_TYPES } from '../payments/paymentModel';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 import { walkInRegistrationService, type MyWalkInLink, type PendingWalkInRegistration } from '../utils/supabase/walk-in-registration-service';
 import { WalkInQr } from '../components/shared/WalkInQr';
+import { useDebouncedValue } from '../utils/use-debounced-value';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -102,12 +103,19 @@ function staffToPerson(s: Staff): PersonEntry {
   };
 }
 
+/** Members listed at a time on the check-in screen (the rest are a search away). */
+const MEMBER_RESULTS = 50;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CheckIn() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   // ── Data state ──────────────────────────────────────────────────────────────
-  const [people, setPeople]               = useState<PersonEntry[]>([]);
+  const [memberPeople, setMemberPeople]   = useState<PersonEntry[]>([]);
+  const [staffPeople, setStaffPeople]     = useState<PersonEntry[]>([]);
+  const [memberTotal, setMemberTotal]     = useState(0);   // every member in the branch
+  const [memberMatches, setMemberMatches] = useState(0);   // members matching the current search
+  const [memberSearching, setMemberSearching] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceRecord[]>([]);
   const [loading, setLoading]             = useState(true);
   const [checkingInId, setCheckingInId]   = useState<number | null>(null);
@@ -198,22 +206,40 @@ export function CheckIn() {
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
+  // Members are searched on the server (name, ID or phone) — a gym can have far
+  // more members than are worth sending to the browser; without a search the list
+  // shows the most recent ones. Staff are few and load once.
+  const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
+  const searchRef = useRef(debouncedSearch);
+  searchRef.current = debouncedSearch;
+
+  const loadMembers = useCallback(async (search: string) => {
+    const res = await membersService.getMembers(search ? { search } : {}, { page: 1, limit: MEMBER_RESULTS });
+    if (search !== searchRef.current) return; // a newer search already replaced this one
+    setMemberPeople(res.members.map(memberToPerson));
+    setMemberMatches(Number(res.pagination?.total ?? res.members.length));
+    if (!search) setMemberTotal(Number(res.pagination?.total ?? res.members.length));
+  }, []);
+
   const loadPeople = useCallback(async () => {
     try {
-      const [membersRes, staffRes] = await Promise.all([
-        membersService.getMembers({}, { page: 0, limit: 500 }),
+      const [, staffRes] = await Promise.all([
+        loadMembers(searchRef.current),
         staffService.getStaff({}, 1, 500),
       ]);
-      const combined: PersonEntry[] = [
-        ...membersRes.members.map(memberToPerson),
-        ...staffRes.items.map(staffToPerson),
-      ];
-      setPeople(combined);
+      setStaffPeople(staffRes.items.map(staffToPerson));
       setStaffOptions(staffRes.items);
     } catch (err) {
       toast.error('Failed to load people list');
     }
-  }, []);
+  }, [loadMembers]);
+
+  useEffect(() => {
+    setMemberSearching(true);
+    loadMembers(debouncedSearch)
+      .catch(() => toast.error('Failed to search members'))
+      .finally(() => setMemberSearching(false));
+  }, [debouncedSearch, loadMembers]);
 
   const loadTodayAttendance = useCallback(async () => {
     try {
@@ -314,10 +340,12 @@ export function CheckIn() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
-  const filtered = people.filter(p => {
-    const q = searchTerm.toLowerCase();
-    return p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q);
-  });
+  // Members come back already matched by the server; staff are matched here.
+  const q = searchTerm.trim().toLowerCase();
+  const filtered = [
+    ...memberPeople,
+    ...staffPeople.filter(p => p.name.toLowerCase().includes(q) || p.bizId.toLowerCase().includes(q)),
+  ];
 
   // member_id → attendance record id, for members currently checked in (no checkout yet)
   const activeMemberAttendance = todayAttendance.reduce<Record<number, number>>((map, r) => {
@@ -536,7 +564,7 @@ export function CheckIn() {
       setDailyCheckIns(prev => [visitor, ...prev.filter(p => p.id !== resp.attendance_id)]);
       toast.success(`Access granted to ${visitorName}`, {
         description: walkInCredit > 0
-          ? `${selectedPlanDetails?.name} — ${currencyCode} ${walkInCredit} left on credit`
+          ? `${selectedPlanDetails?.name} — ${currencyPrefix}${walkInCredit} left on credit`
           : `${selectedPlanDetails?.name} — Valid for ${selectedPlanDetails?.duration}`,
       });
       resetDailyForm();
@@ -689,7 +717,7 @@ export function CheckIn() {
                     <CardDescription>Search and check-in</CardDescription>
                   </div>
                   <Badge variant="outline" className="border-primary/30 text-primary">
-                    {people.length} total
+                    {memberTotal + staffPeople.length} total
                   </Badge>
                 </div>
               </CardHeader>
@@ -713,7 +741,14 @@ export function CheckIn() {
                     {searchTerm ? `No results for "${searchTerm}"` : 'No members or staff found'}
                   </div>
                 ) : (
-                  <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '520px' }}>
+                  <div className={`space-y-2 overflow-y-auto pr-1 transition-opacity ${memberSearching ? 'opacity-50' : ''}`} style={{ maxHeight: '520px' }}>
+                    {memberMatches > memberPeople.length && (
+                      <p className="text-xs text-muted-foreground px-1">
+                        {q
+                          ? `Showing the first ${memberPeople.length} of ${memberMatches} matching members — type more to narrow it down.`
+                          : `Showing the ${memberPeople.length} most recent members — search by name, ID or phone to find anyone.`}
+                      </p>
+                    )}
                     {filtered.map(person => (
                       <PersonRow
                         key={`${person.kind}-${person.id}`}

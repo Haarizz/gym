@@ -219,7 +219,7 @@ public class AdminDashboardReportService {
     }
 
     private Report activeMembersReport() {
-        List<Object[]> current = memberRepository.countActiveMembersByType();
+        List<Object[]> current = memberRepository.countActiveMembersByType(java.time.LocalDate.now().atStartOfDay());
         long totalActive = current.stream().mapToLong(r -> (Long) r[1]).sum();
 
         List<Map<String, Object>> rows = new ArrayList<>();

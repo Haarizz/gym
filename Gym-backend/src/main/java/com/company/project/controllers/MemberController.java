@@ -49,11 +49,15 @@ public class MemberController {
             @RequestParam(required = false) String status,
             @RequestParam(name = "membership_type", required = false) String membershipType,
             @RequestParam(name = "payment_status",  required = false) String paymentStatus,
+            @RequestParam(required = false) String plan,
+            @RequestParam(name = "expiring_within", required = false) Integer expiringWithin,
+            @RequestParam(required = false) String dues,
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "20") int limit) {
 
         return ResponseEntity.ok(
-                memberService.getMembers(search, status, membershipType, paymentStatus, page, limit)
+                memberService.getMembers(search, status, membershipType, paymentStatus,
+                        plan, expiringWithin, dues, page, limit)
         );
     }
 

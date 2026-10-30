@@ -35,7 +35,7 @@ const lineDeductions = (l: PayrollLine) => Number(l.attendance_deduction) + Numb
 
 export function Payroll({ onNavigate }: PayrollProps) {
   const { activeBranchId } = useBranch();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencyPrefix } = useCurrency();
   const money = useMoneyText();
   const canCreate = hasPermission("PAYROLL_CREATE") || hasPermission("PAYROLL_EDIT");
   const canApprove = hasPermission("PAYROLL_APPROVE");
@@ -376,7 +376,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} cursor={{ fill: "rgba(43,122,120,0.06)" }} />
+                  <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} cursor={{ fill: "rgba(43,122,120,0.06)" }} />
                   <Bar dataKey="gross" name="Gross" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={36} />
                   <Bar dataKey="net" name="Net" fill="#2B7A78" radius={[6, 6, 0, 0]} maxBarSize={36} />
                 </BarChart>
@@ -596,7 +596,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                         {deptChart.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+                      <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 )}
@@ -608,7 +608,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(v: number) => `${currencyCode} ${Number(v).toLocaleString()}`} />
+                      <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} />
                       <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                         {deductionChart.map((_, i) => <Cell key={i} fill={["#E63946", "#F59E0B", "#8B5CF6"][i]} />)}
                       </Bar>

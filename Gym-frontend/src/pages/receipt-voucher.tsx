@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { receiptVoucherService, type ReceiptVoucher as RVType } from '../utils/supabase/receipt-voucher-service';
 import { accountHeadsService, AccountHead } from '../utils/supabase/account-heads-service';
 import { downloadReceiptVoucher } from '../utils/receipt-invoice';
+import { ListPagination } from '../components/list-pagination';
 import { usePaymentManager } from '../payments/usePaymentManager';
 import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { PAYMENT_TYPES, PaymentLine } from '../payments/paymentModel';
@@ -158,8 +159,10 @@ const membersData = [
   { id: 'MEM-2024-007', name: 'Robert Brown', membershipType: 'Standard', phone: '+971-50-789-0123' }
 ];
 
+const VOUCHERS_PAGE_SIZE = 25;
+
 export function ReceiptVoucher() {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol } = useCurrency();
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -338,6 +341,12 @@ export function ReceiptVoucher() {
     
     return matchesSearch && matchesSource && matchesStatus && matchesPaymentMode && matchesBranch && matchesCalendar;
   });
+
+  // The table renders one page at a time; the stats above still use every voucher.
+  const [voucherPage, setVoucherPage] = useState(1);
+  useEffect(() => { setVoucherPage(1); },
+    [searchTerm, sourceFilter, statusFilter, paymentModeFilter, branchFilter, calendarDateStr]);
+  const pagedReceipts = filteredReceipts.slice((voucherPage - 1) * VOUCHERS_PAGE_SIZE, voucherPage * VOUCHERS_PAGE_SIZE);
 
   // Calculate dashboard metrics
   const today = new Date().toISOString().split('T')[0];
@@ -957,7 +966,7 @@ export function ReceiptVoucher() {
                     <TableHead>Date</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Member</TableHead>
-                    <TableHead className="text-right">Amount ({currencyCode})</TableHead>
+                    <TableHead className="text-right">Amount ({currencySymbol})</TableHead>
                     <TableHead>Payment Mode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -977,7 +986,7 @@ export function ReceiptVoucher() {
                         No receipt vouchers found.
                       </TableCell>
                     </TableRow>
-                  ) : filteredReceipts.map((receipt, index) => (
+                  ) : pagedReceipts.map((receipt, index) => (
                     <TableRow key={receipt.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-50/80 transition-colors`}>
                       <TableCell>
                         <Checkbox
@@ -1119,6 +1128,8 @@ export function ReceiptVoucher() {
                 </TableBody>
               </Table>
             </div>
+            <ListPagination page={voucherPage} pageSize={VOUCHERS_PAGE_SIZE} total={filteredReceipts.length}
+              onPageChange={setVoucherPage} noun="receipt vouchers" />
           </CardContent>
         </Card>
 
@@ -1214,7 +1225,7 @@ export function ReceiptVoucher() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Amount ({currencyCode}) *</Label>
+                  <Label>Amount ({currencySymbol}) *</Label>
                   <Input
                     type="number"
                     placeholder="0.00"
@@ -1362,7 +1373,7 @@ export function ReceiptVoucher() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Amount ({currencyCode}) *</Label>
+                  <Label>Amount ({currencySymbol}) *</Label>
                   <Input
                     type="number"
                     placeholder="0.00"

@@ -182,7 +182,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { memberId: routeMemberId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const { isAllBranches } = useBranch();
   const isEditMode = Boolean(routeMemberId);
 
@@ -1256,7 +1256,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const basePrice = getMembershipDetails().price;
     const calculated = discountType === 'percentage' ? (basePrice * discountValue) / 100 : discountValue;
     setDiscountAmount(Math.min(calculated, basePrice));
-    toast.success(`Coupon "${code}" applied! ${discountType === 'percentage' ? `${discountValue}% Off` : `${currencyCode} ${discountValue} Off`}`);
+    toast.success(`Coupon "${code}" applied! ${discountType === 'percentage' ? `${discountValue}% Off` : `${currencyPrefix}${discountValue} Off`}`);
   };
 
   // Handle promo code apply
@@ -1312,7 +1312,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         calculatedDiscount = discValue;
       }
       setDiscountAmount(Math.min(calculatedDiscount, basePrice));
-      toast.success(`Promo code "${promoCodeInput.trim()}" applied! ${discType === 'percentage' ? `${discValue}% Off` : `${currencyCode} ${discValue} Off`}`);
+      toast.success(`Promo code "${promoCodeInput.trim()}" applied! ${discType === 'percentage' ? `${discValue}% Off` : `${currencyPrefix}${discValue} Off`}`);
     } catch (err: any) {
       toast.error(err.message || 'Invalid promotion code');
     } finally {
@@ -1387,7 +1387,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
         calculatedDiscount = referralDiscount.discountValue;
       }
       setDiscountAmount(Math.min(calculatedDiscount, basePrice));
-      toast.success(`Referral code applied! ${referralDiscount.discountType === 'percentage' ? `${referralDiscount.discountValue}% Off` : `${currencyCode} ${referralDiscount.discountValue} Off`} — Referred by ${referral.referrerName}`);
+      toast.success(`Referral code applied! ${referralDiscount.discountType === 'percentage' ? `${referralDiscount.discountValue}% Off` : `${currencyPrefix}${referralDiscount.discountValue} Off`} — Referred by ${referral.referrerName}`);
     } catch (err: any) {
       toast.error(err.message || 'Invalid referral code');
     } finally {
@@ -2207,7 +2207,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                               </div>
                               <div>
                                 <Label className="text-sm text-gray-600 mb-1 block">
-                                  Fee to bill {headName} ({currencyCode})
+                                  Fee to bill {headName} ({currencySymbol})
                                 </Label>
                                 <Input
                                   type="number"
@@ -2240,7 +2240,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                               {(() => {
                                 const due = Math.max(0, parseFloat(member.minorFee || '0') - parseFloat(member.minorAmountPaid || '0'));
                                 return due > 0
-                                  ? `${currencyCode} ${due.toFixed(2)} will be added to ${headName}'s due.`
+                                  ? `${currencyPrefix}${due.toFixed(2)} will be added to ${headName}'s due.`
                                   : `Fully covered now — won't show as a due on ${headName}'s account.`;
                               })()}
                             </p>
@@ -2282,7 +2282,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                                   <SelectContent>
                                     {apiPlans.map((p) => (
                                       <SelectItem key={p.id} value={p.id.toString()}>
-                                        {p.name} — {currencyCode} {p.price}
+                                        {p.name} — {currencyPrefix}{p.price}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -2290,7 +2290,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                                 <p className="text-xs text-gray-500 mt-1">Leave blank to share the primary member's plan.</p>
                               </div>
                               <div>
-                                <Label className="text-sm text-gray-600 mb-1 block">Fee ({currencyCode})</Label>
+                                <Label className="text-sm text-gray-600 mb-1 block">Fee ({currencySymbol})</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -2321,7 +2321,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                               const due = Math.max(0, parseFloat(member.membershipFee || '0') - parseFloat(member.amountPaid || '0'));
                               return due > 0 ? (
                                 <p className="text-xs text-gray-500">
-                                  {currencyCode} {due.toFixed(2)} will remain as this member's own outstanding balance.
+                                  {currencyPrefix}{due.toFixed(2)} will remain as this member's own outstanding balance.
                                 </p>
                               ) : null;
                             })()}
@@ -2361,11 +2361,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                           <span className="text-sm font-bold text-primary">
                             {pricesPerMember(getSelectedPrimaryPlan()) ? (
                               <>
-                                {currencyCode} {Number(getSelectedPrimaryPlan()?.pricePerMember)} × {familyMembers.length + 1} ={' '}
-                                {currencyCode} {computeFamilyHeadTotal(getSelectedPrimaryPlan()!, familyMembers.length + 1).toFixed(2)}
+                                {currencyPrefix}{Number(getSelectedPrimaryPlan()?.pricePerMember)} × {familyMembers.length + 1} ={' '}
+                                {currencyPrefix}{computeFamilyHeadTotal(getSelectedPrimaryPlan()!, familyMembers.length + 1).toFixed(2)}
                               </>
                             ) : (
-                              <>{currencyCode} {Number(getMembershipDetails().price || 0).toFixed(2)}</>
+                              <>{currencyPrefix}{Number(getMembershipDetails().price || 0).toFixed(2)}</>
                             )}
                           </span>
                         </div>
@@ -2381,8 +2381,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                             {formData.firstName || 'Primary'}'s own fee + minor family member fees
                           </span>
                           <span className="text-sm font-bold text-amber-800">
-                            {currencyCode} {getFinalPrice().toFixed(2)} + {currencyCode} {getFamilyMinorFeeTotal().toFixed(2)} ={' '}
-                            {currencyCode} {(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
+                            {currencyPrefix}{getFinalPrice().toFixed(2)} + {currencyPrefix}{getFamilyMinorFeeTotal().toFixed(2)} ={' '}
+                            {currencyPrefix}{(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
                           </span>
                         </div>
                         <p className="text-xs text-amber-700 mt-1">
@@ -2528,7 +2528,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <p className="font-semibold text-green-800">Plan Selected</p>
                       <p className="text-sm text-green-600">
                         {getMembershipDetails().name} — <CurrencyGlyph /> {getMembershipDetails().price}
-                        {getMembershipDetails().savings ? ` (Save ${currencyCode} ${getMembershipDetails().savings})` : ''}
+                        {getMembershipDetails().savings ? ` (Save ${currencyPrefix}${getMembershipDetails().savings})` : ''}
                       </p>
                     </div>
                   </div>
@@ -3174,22 +3174,22 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   <div className="mt-3 pt-3 border-t border-blue-200 text-sm">
                     <div className="flex items-center justify-between text-blue-800">
                       <span>{formData.firstName || 'Primary member'}'s own fee</span>
-                      <span className="font-semibold">{currencyCode} {getFinalPrice().toFixed(2)}</span>
+                      <span className="font-semibold">{currencyPrefix}{getFinalPrice().toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between text-blue-800 mt-1">
                       <span>+ Family member fees ({familyMembers.filter(m => m.isMinor).length})</span>
-                      <span className="font-semibold">{currencyCode} {getFamilyMinorFeeTotal().toFixed(2)}</span>
+                      <span className="font-semibold">{currencyPrefix}{getFamilyMinorFeeTotal().toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200">
                       <span className="font-semibold text-blue-900">Total Amount Due (whole family):</span>
                       <span className="text-2xl font-bold text-blue-900">
-                        <span className="text-sm">{currencyCode}</span> {(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
+                        <span className="text-sm">{currencySymbol}</span> {(getFinalPrice() + getFamilyMinorFeeTotal()).toFixed(2)}
                       </span>
                     </div>
                     <p className="text-xs text-blue-600 mt-2">
-                      The payment method you pick below only collects {formData.firstName || 'the primary member'}'s own {currencyCode} {getFinalPrice().toFixed(2)} — family member fees are captured on their own row below.
+                      The payment method you pick below only collects {formData.firstName || 'the primary member'}'s own {currencyPrefix}{getFinalPrice().toFixed(2)} — family member fees are captured on their own row below.
                       {getFamilyMinorUnpaidTotal() > 0
-                        ? ` ${currencyCode} ${getFamilyMinorUnpaidTotal().toFixed(2)} of it isn't marked paid yet and will be added to ${formData.firstName || 'the primary member'}'s due.`
+                        ? ` ${currencyPrefix}${getFamilyMinorUnpaidTotal().toFixed(2)} of it isn't marked paid yet and will be added to ${formData.firstName || 'the primary member'}'s due.`
                         : ' All of it is already marked paid on those rows.'}
                     </p>
                   </div>
@@ -3247,7 +3247,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                         <span className="ml-4 text-green-600 font-semibold">
                           {discount.discountType === 'percentage' 
                             ? `${discount.discountValue}% Off` 
-                            : `${currencyCode} ${discount.discountValue} Off`}
+                            : `${currencyPrefix}${discount.discountValue} Off`}
                         </span>
                       </div>
                     </SelectItem>

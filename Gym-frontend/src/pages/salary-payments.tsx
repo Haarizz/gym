@@ -114,7 +114,7 @@ const CURRENT_YEAR = String(new Date().getFullYear());
 const YEAR_OPTIONS = [-1, 0, 1].map(d => String(new Date().getFullYear() + d));
 
 export function SalaryPayments({ onNavigate, initialMonth, initialYear }: SalaryPaymentsProps) {
-  const { currencyCode } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const [activeTab, setActiveTab] = useState("individual");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
@@ -389,7 +389,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
 
     const validation = validateSplitPayment(netSalary, paymentsToUse);
     if (enableSplitPayment && !validation.isValid) {
-      toast.error(`Split payment total must equal net salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
+      toast.error(`Split payment total must equal net salary. Difference: ${currencyPrefix}${Math.abs(validation.difference)}`);
       return;
     }
 
@@ -431,7 +431,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
     if (bulkEnableSplit) {
       const validation = validateSplitPayment(totalAmount, bulkSplitPayments);
       if (!validation.isValid) {
-        toast.error(`Split payment total must equal total salary. Difference: ${currencyCode} ${Math.abs(validation.difference)}`);
+        toast.error(`Split payment total must equal total salary. Difference: ${currencyPrefix}${Math.abs(validation.difference)}`);
         return;
       }
     }
@@ -968,7 +968,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value }) => `${name}: ${currencyCode} ${value.toLocaleString()}`}
+                        label={({ name, value }) => `${name}: ${currencyPrefix}${value.toLocaleString()}`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
@@ -977,7 +977,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `${currencyCode} ${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number) => `${currencyPrefix}${value.toLocaleString()}`} />
                     </RechartsPie>
                   </ResponsiveContainer>
                 ) : (
@@ -1186,7 +1186,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                       )}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>{selectedItems ? "Other allowance" : "Allowances"} ({currencyCode})</Label>
+                          <Label>{selectedItems ? "Other allowance" : "Allowances"} ({currencySymbol})</Label>
                           <Input
                             type="number"
                             value={paymentAdjustments.allowances}
@@ -1197,7 +1197,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>{selectedItems ? "Other deduction" : "Deductions"} ({currencyCode})</Label>
+                          <Label>{selectedItems ? "Other deduction" : "Deductions"} ({currencySymbol})</Label>
                           <Input
                             type="number"
                             value={paymentAdjustments.deductions}
@@ -1356,7 +1356,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                                   </Select>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label>Amount ({currencyCode}) *</Label>
+                                  <Label>Amount ({currencySymbol}) *</Label>
                                   <Input
                                     type="number"
                                     placeholder="0.00"
@@ -1717,7 +1717,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Amount ({currencyCode}) *</Label>
+                            <Label>Amount ({currencySymbol}) *</Label>
                             <Input
                               type="number"
                               placeholder="0.00"
