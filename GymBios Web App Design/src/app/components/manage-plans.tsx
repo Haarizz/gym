@@ -31,7 +31,13 @@ import {
   Megaphone,
   Percent,
   Building2,
-  Snowflake
+  Snowflake,
+  Columns3,
+  List,
+  Eye,
+  Power,
+  ArrowUpDown,
+  GripVertical
 } from 'lucide-react';
 import { Checkbox } from "./ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
@@ -242,6 +248,11 @@ type Plan = typeof samplePlans[0] & {
   selectedPromotions: number[];
   selectedCampaigns: number[];
   selectedFacilities: string[];
+  maxFreezeDays?: number;
+  maxFreezeOccurrences?: number;
+  chargePerExtraDay?: number;
+  freeDaysAllowed?: number;
+  autoUnfreeze?: boolean;
 };
 
 export function ManagePlans() {
@@ -252,6 +263,12 @@ export function ManagePlans() {
   const [filterDuration, setFilterDuration] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [sortKey, setSortKey] = useState<"name" | "price" | "subscribers" | "created">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [draggedPlanId, setDraggedPlanId] = useState<number | null>(null);
+  const [expandedCardSections, setExpandedCardSections] = useState<Record<number, string[]>>({});
 
   // Form state for creating/editing plans
   const [formData, setFormData] = useState({
@@ -340,7 +357,12 @@ export function ManagePlans() {
       trainingStreams: formData.trainingStreams,
       selectedPromotions: formData.selectedPromotions,
       selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
+      selectedFacilities: formData.selectedFacilities,
+      maxFreezeDays: formData.maxFreezeDays ? Number(formData.maxFreezeDays) : undefined,
+      maxFreezeOccurrences: formData.maxFreezeOccurrences ? Number(formData.maxFreezeOccurrences) : undefined,
+      chargePerExtraDay: formData.chargePerExtraDay ? Number(formData.chargePerExtraDay) : undefined,
+      freeDaysAllowed: formData.freeDaysAllowed ? Number(formData.freeDaysAllowed) : undefined,
+      autoUnfreeze: formData.autoUnfreeze
     };
 
     setPlans([...plans, newPlan]);
@@ -400,7 +422,12 @@ export function ManagePlans() {
       trainingStreams: formData.trainingStreams,
       selectedPromotions: formData.selectedPromotions,
       selectedCampaigns: formData.selectedCampaigns,
-      selectedFacilities: formData.selectedFacilities
+      selectedFacilities: formData.selectedFacilities,
+      maxFreezeDays: formData.maxFreezeDays ? Number(formData.maxFreezeDays) : undefined,
+      maxFreezeOccurrences: formData.maxFreezeOccurrences ? Number(formData.maxFreezeOccurrences) : undefined,
+      chargePerExtraDay: formData.chargePerExtraDay ? Number(formData.chargePerExtraDay) : undefined,
+      freeDaysAllowed: formData.freeDaysAllowed ? Number(formData.freeDaysAllowed) : undefined,
+      autoUnfreeze: formData.autoUnfreeze
     };
 
     setPlans(plans.map(p => p.id === editingPlan.id ? updatedPlan : p));
@@ -425,6 +452,52 @@ export function ManagePlans() {
 
   const handleDeletePlan = (planId: number) => {
     setPlans(plans.filter(p => p.id !== planId));
+  };
+
+  const handleToggleStatus = (planId: number, status?: "Active" | "Inactive") => {
+    setPlans(currentPlans =>
+      currentPlans.map(plan =>
+        plan.id === planId
+          ? { ...plan, status: status || (plan.status === "Active" ? "Inactive" : "Active") }
+          : plan
+      )
+    );
+    setSelectedPlan(current =>
+      current?.id === planId
+        ? { ...current, status: status || (current.status === "Active" ? "Inactive" : "Active") }
+        : current
+    );
+  };
+
+  const getPlanCode = (plan: Plan) => `PLN-${String(plan.id).slice(-4).padStart(4, "0")}`;
+  const getSubscriberCount = (plan: Plan) => (Number(String(plan.id).slice(-3)) * 17 + 24) % 480;
+  const getCreatedDate = (plan: Plan) => {
+    const day = ((Number(String(plan.id).slice(-2)) * 3) % 27) + 1;
+    return new Date(2024, (Number(String(plan.id).slice(-2)) + 2) % 12, day);
+  };
+
+  const handleSort = (key: "name" | "price" | "subscribers" | "created") => {
+    if (sortKey === key) {
+      setSortDirection(direction => direction === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
+  const isCardSectionExpanded = (planId: number, section: string) =>
+    expandedCardSections[planId]?.includes(section) ?? false;
+
+  const toggleCardSection = (planId: number, section: string) => {
+    setExpandedCardSections(current => {
+      const sections = current[planId] || [];
+      return {
+        ...current,
+        [planId]: sections.includes(section)
+          ? sections.filter(item => item !== section)
+          : [...sections, section],
+      };
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -459,12 +532,22 @@ export function ManagePlans() {
 
   // Filter plans based on search and filters
   const filteredPlans = plans.filter(plan => {
-    const matchesSearch = plan.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.toLowerCase();
+    const matchesSearch =
+      plan.name.toLowerCase().includes(normalizedSearch) ||
+      getPlanCode(plan).toLowerCase().includes(normalizedSearch) ||
+      plan.type.toLowerCase().includes(normalizedSearch);
     const matchesDuration = filterDuration === "all" || plan.durationType.toLowerCase() === filterDuration.toLowerCase();
     const matchesType = filterType === "all" || plan.planType.toLowerCase() === filterType.toLowerCase();
     const matchesStatus = filterStatus === "all" || plan.status.toLowerCase() === filterStatus.toLowerCase();
     
     return matchesSearch && matchesDuration && matchesType && matchesStatus;
+  }).sort((a, b) => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    if (sortKey === "price") return (a.price - b.price) * direction;
+    if (sortKey === "subscribers") return (getSubscriberCount(a) - getSubscriberCount(b)) * direction;
+    if (sortKey === "created") return (getCreatedDate(a).getTime() - getCreatedDate(b).getTime()) * direction;
+    return a.name.localeCompare(b.name) * direction;
   });
 
   const handleCloseDialog = () => {
@@ -572,15 +655,39 @@ export function ManagePlans() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1>Manage Plans</h1>
           <p className="text-muted-foreground">Create and manage membership plans, class packages, and training programs.</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Plan
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border border-[#327F74]/20 bg-[#F0F8F6] p-1" aria-label="Plan view">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setViewMode("kanban")}
+              className={viewMode === "kanban" ? "bg-[#327F74] text-white hover:bg-[#1F5A52] hover:text-white" : "text-[#1F5A52]"}
+            >
+              <Columns3 className="mr-2 h-4 w-4" />
+              Kanban View
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setViewMode("list")}
+              className={viewMode === "list" ? "bg-[#327F74] text-white hover:bg-[#1F5A52] hover:text-white" : "text-[#1F5A52]"}
+            >
+              <List className="mr-2 h-4 w-4" />
+              List View
+            </Button>
+          </div>
+          <Button onClick={() => setShowCreateDialog(true)} className="bg-[#327F74] hover:bg-[#1F5A52]">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Plan
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -616,7 +723,7 @@ export function ManagePlans() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              ${(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
+              AED {(plans.reduce((sum, p) => sum + p.price, 0) / plans.length).toFixed(0)}
             </div>
             <p className="text-xs text-muted-foreground">Across all plans</p>
           </CardContent>
@@ -636,41 +743,44 @@ export function ManagePlans() {
         </Card>
       </div>
 
-      {/* Plan Overview / List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan Overview</CardTitle>
-          <CardDescription>View and manage all membership plans</CardDescription>
-          
-          {/* Filters and Search */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      {/* Shared plan workspace */}
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b bg-white">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <CardTitle>Plan Overview</CardTitle>
+              <CardDescription>
+                {filteredPlans.length} of {plans.length} plans · {viewMode === "kanban" ? "Organized by status" : "Structured plan directory"}
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="w-fit border-[#327F74]/30 text-[#1F5A52]">
+              {viewMode === "kanban" ? "Kanban View" : "List View"}
+            </Badge>
+          </div>
+
+          {/* Shared filters remain mounted while switching views */}
+          <div className="mt-4 flex flex-col gap-3 lg:flex-row">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search plans..."
+                placeholder="Search plan name, code, or type..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="pl-10"
               />
             </div>
-            
-            <div className="flex gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <Select value={filterDuration} onValueChange={setFilterDuration}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Duration" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[145px]"><SelectValue placeholder="Duration" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Duration</SelectItem>
+                  <SelectItem value="all">All Durations</SelectItem>
                   <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="annual">Annual</SelectItem>
                   <SelectItem value="sessions">Sessions</SelectItem>
                 </SelectContent>
               </Select>
-
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[145px]"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="individual">Individual</SelectItem>
@@ -678,13 +788,10 @@ export function ManagePlans() {
                   <SelectItem value="corporate">Corporate</SelectItem>
                 </SelectContent>
               </Select>
-
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[135px]"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
@@ -692,178 +799,249 @@ export function ManagePlans() {
             </div>
           </div>
         </CardHeader>
-        
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Plan Name</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Price / Discounts</TableHead>
-                <TableHead>Assigned Trainers</TableHead>
-                <TableHead>Training Streams</TableHead>
-                <TableHead>Facilities</TableHead>
-                <TableHead>Promotions & Campaigns</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPlans.map((plan) => (
-                <TableRow key={plan.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{plan.name}</div>
-                      <div className="text-sm text-muted-foreground">{plan.type}</div>
+
+        <CardContent className={viewMode === "kanban" ? "bg-[#F7FAF9] p-4 sm:p-6" : "p-0"}>
+          {filteredPlans.length === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center px-6 text-center">
+              <Search className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="font-medium">No plans match these filters</p>
+              <p className="text-sm text-muted-foreground">Try changing the search term or filter selection.</p>
+            </div>
+          ) : viewMode === "kanban" ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {(["Active", "Inactive"] as const).map((status) => {
+                const statusPlans = filteredPlans.filter(plan => plan.status === status);
+                return (
+                  <section
+                    key={status}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => {
+                      if (draggedPlanId !== null) handleToggleStatus(draggedPlanId, status);
+                      setDraggedPlanId(null);
+                    }}
+                    className="min-h-[280px] rounded-xl border border-[#327F74]/15 bg-white/75 p-3"
+                  >
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${status === "Active" ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        <h3 className="font-semibold text-foreground">{status}</h3>
+                        <Badge variant="secondary">{statusPlans.length}</Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Drop plans here</span>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                      {plan.duration}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getTypeColor(plan.planType)}>
-                      {plan.planType}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">AED {plan.price}</div>
-                      {plan.discount > 0 && (
-                        <div className="text-sm text-green-600">{plan.discount}% off</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {plan.assignableTrainers && plan.assignableTrainers.length > 0 ? (
-                        plan.assignableTrainers.slice(0, 2).map((trainer, index) => (
-                          <Badge key={index} variant="outline" className="text-xs mr-1">
-                            {trainer}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No trainers assigned</span>
-                      )}
-                      {plan.assignableTrainers && plan.assignableTrainers.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{plan.assignableTrainers.length - 2} more
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {plan.trainingStreams && plan.trainingStreams.length > 0 ? (
-                        <>
-                          <div className="flex flex-wrap gap-1">
-                            {getTrainingStreamNames(plan.trainingStreams).slice(0, 2).map((streamName, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {streamName}
-                              </Badge>
-                            ))}
+                    <div className="space-y-3">
+                      {statusPlans.length === 0 ? (
+                        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-[#327F74]/20 text-sm text-muted-foreground">
+                          No {status.toLowerCase()} plans
+                        </div>
+                      ) : statusPlans.map((plan) => (
+                        <article
+                          key={plan.id}
+                          draggable
+                          onDragStart={() => setDraggedPlanId(plan.id)}
+                          onDragEnd={() => setDraggedPlanId(null)}
+                          onClick={() => setSelectedPlan(plan)}
+                          className="group cursor-pointer rounded-xl border border-border bg-white p-4 font-['Plus_Jakarta_Sans'] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#327F74]/35 hover:shadow-md"
+                        >
+                          <div className="flex items-start gap-3">
+                            <GripVertical className="mt-1 h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-foreground">{plan.name}</p>
+                                  <p className="text-xs text-muted-foreground">{getPlanCode(plan)} · {plan.type}</p>
+                                </div>
+                                <Badge className={getStatusColor(plan.status)}>{plan.status}</Badge>
+                              </div>
+                              {/* 1. Plan Summary */}
+                              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y py-3 text-sm">
+                                <div><p className="text-xs text-muted-foreground">Price / Billing</p><p className="font-semibold text-[#1F5A52]">AED {plan.price.toLocaleString()} · {plan.durationType}</p></div>
+                                <div><p className="text-xs text-muted-foreground">Subscribers</p><p className="font-medium">{getSubscriberCount(plan)}</p></div>
+                              </div>
+
+                              {/* 2. Description / Notes */}
+                              <section className="border-b py-3">
+                                <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-[#1F5A52]"><Info className="h-3.5 w-3.5" />Description / Notes</div>
+                                <p className={`whitespace-pre-line text-xs leading-5 text-muted-foreground ${!isCardSectionExpanded(plan.id, "description") ? "line-clamp-2" : ""}`}>
+                                  {plan.description || "No description added"}
+                                </p>
+                                {plan.description && plan.description.length > 90 && (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => { event.stopPropagation(); toggleCardSection(plan.id, "description"); }}
+                                    className="mt-1 text-xs font-semibold text-[#327F74] hover:underline"
+                                  >
+                                    {isCardSectionExpanded(plan.id, "description") ? "Show Less" : "View More"}
+                                  </button>
+                                )}
+                              </section>
+
+                              {/* 3. Training Streams */}
+                              <section className="border-b py-3">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-[#1F5A52]"><Key className="h-3.5 w-3.5" />Training Streams <span className="font-normal text-muted-foreground">({plan.trainingStreams.length})</span></div>
+                                  {plan.trainingStreams.length > 3 && (
+                                    <button type="button" onClick={(event) => { event.stopPropagation(); toggleCardSection(plan.id, "streams"); }} className="text-xs font-semibold text-[#327F74] hover:underline">
+                                      {isCardSectionExpanded(plan.id, "streams") ? "Show Less" : "View All"}
+                                    </button>
+                                  )}
+                                </div>
+                                {plan.trainingStreams.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {getTrainingStreamNames(plan.trainingStreams).slice(0, isCardSectionExpanded(plan.id, "streams") ? undefined : 3).map((streamName, index) => (
+                                      <button key={index} type="button" onClick={(event) => { event.stopPropagation(); setSelectedPlan(plan); }} className="rounded-md border border-[#327F74]/20 bg-[#F0F8F6] px-2 py-1 text-[11px] font-medium text-[#1F5A52] hover:border-[#327F74]/50">{streamName}</button>
+                                    ))}
+                                  </div>
+                                ) : <p className="text-xs text-muted-foreground">No training streams configured</p>}
+                              </section>
+
+                              {/* 4. Facility Access */}
+                              <section className="border-b py-3">
+                                <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#1F5A52]"><Building2 className="h-3.5 w-3.5" />Facility Access</div>
+                                {plan.selectedFacilities.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {plan.selectedFacilities.slice(0, 2).map((facilityId) => {
+                                      const facility = availableFacilities.find(item => item.id === facilityId);
+                                      return facility ? (
+                                        <button key={facility.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedPlan(plan); }} className="rounded-md border bg-white px-2 py-1 text-[11px] font-medium hover:border-[#327F74]/40"><span className="mr-1">{facility.icon}</span>{facility.name}</button>
+                                      ) : null;
+                                    })}
+                                    {plan.selectedFacilities.length > 2 && <Badge variant="secondary" className="text-[10px]">+{plan.selectedFacilities.length - 2} more</Badge>}
+                                  </div>
+                                ) : <p className="text-xs text-muted-foreground">No facilities configured</p>}
+                              </section>
+
+                              {/* 5. Campaigns & Promotions */}
+                              <section className="border-b py-3">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-[#1F5A52]"><Megaphone className="h-3.5 w-3.5" />Campaigns & Promotions</div>
+                                  {plan.selectedPromotions.length + plan.selectedCampaigns.length > 2 && (
+                                    <button type="button" onClick={(event) => { event.stopPropagation(); toggleCardSection(plan.id, "marketing"); }} className="text-xs font-semibold text-[#327F74] hover:underline">
+                                      {isCardSectionExpanded(plan.id, "marketing") ? "Show Less" : "View All"}
+                                    </button>
+                                  )}
+                                </div>
+                                {plan.selectedPromotions.length + plan.selectedCampaigns.length > 0 ? (
+                                  <div className="space-y-1.5">
+                                    {[...plan.selectedPromotions.map(id => ({ kind: "Promotion", item: availablePromotions.find(promotion => promotion.id === id) })), ...plan.selectedCampaigns.map(id => ({ kind: "Campaign", item: availableCampaigns.find(campaign => campaign.id === id) }))]
+                                      .filter(entry => entry.item)
+                                      .slice(0, isCardSectionExpanded(plan.id, "marketing") ? undefined : 2)
+                                      .map((entry, index) => (
+                                        <button key={`${entry.kind}-${index}`} type="button" onClick={(event) => { event.stopPropagation(); setSelectedPlan(plan); }} className="flex w-full items-start justify-between gap-2 rounded-md border bg-white px-2.5 py-2 text-left hover:border-[#327F74]/40">
+                                          <span className="min-w-0"><span className="block truncate text-[11px] font-semibold">{entry.item?.name}</span><span className="block text-[10px] text-muted-foreground">{entry.kind}{"validPeriod" in (entry.item || {}) ? ` · ${(entry.item as typeof availablePromotions[number]).validPeriod}` : ""}</span></span>
+                                          <Badge className={entry.item?.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>{entry.item?.status}</Badge>
+                                        </button>
+                                      ))}
+                                  </div>
+                                ) : <p className="text-xs text-muted-foreground">No campaigns assigned</p>}
+                              </section>
+
+                              {/* 6. Freezing Policy */}
+                              <section className="py-3">
+                                <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#1F5A52]"><Snowflake className="h-3.5 w-3.5" />Freezing Policy</div>
+                                {plan.maxFreezeDays !== undefined || plan.maxFreezeOccurrences !== undefined || plan.freeDaysAllowed !== undefined ? (
+                                  plan.maxFreezeDays === 0 ? (
+                                    <Badge className="bg-red-100 text-red-700">Freezing Not Allowed</Badge>
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#F0F8F6] p-2.5 text-[11px]">
+                                      <div><span className="text-muted-foreground">Allowed</span><p className="font-semibold text-emerald-700">Yes</p></div>
+                                      {plan.maxFreezeDays !== undefined && <div><span className="text-muted-foreground">Maximum Days</span><p className="font-semibold">{plan.maxFreezeDays} days</p></div>}
+                                      {plan.maxFreezeOccurrences !== undefined && <div><span className="text-muted-foreground">Max Requests</span><p className="font-semibold">{plan.maxFreezeOccurrences}</p></div>}
+                                      {plan.freeDaysAllowed !== undefined && <div><span className="text-muted-foreground">Free Days</span><p className="font-semibold">{plan.freeDaysAllowed} days</p></div>}
+                                      {plan.chargePerExtraDay !== undefined && <div><span className="text-muted-foreground">Extra Day Charge</span><p className="font-semibold">AED {plan.chargePerExtraDay}</p></div>}
+                                      {plan.autoUnfreeze !== undefined && <div><span className="text-muted-foreground">Auto Unfreeze</span><p className="font-semibold">{plan.autoUnfreeze ? "Enabled" : "Disabled"}</p></div>}
+                                    </div>
+                                  )
+                                ) : <p className="text-xs text-muted-foreground">No freezing policy configured</p>}
+                              </section>
+
+                              <div className="flex flex-wrap items-center gap-1.5 border-t pt-3">
+                                <Button variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); setSelectedPlan(plan); }}><Eye className="mr-1 h-3.5 w-3.5" />View</Button>
+                                <Button variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleEditPlan(plan); }}><Edit className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                                <Button variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleDuplicatePlan(plan); }}><Copy className="mr-1 h-3.5 w-3.5" />Duplicate</Button>
+                                <Button variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleToggleStatus(plan.id); }}><Power className="mr-1 h-3.5 w-3.5" />{plan.status === "Active" ? "Deactivate" : "Activate"}</Button>
+                              </div>
+                            </div>
                           </div>
-                          {plan.trainingStreams.length > 2 && (
-                            <div className="text-xs text-muted-foreground">
-                              +{plan.trainingStreams.length - 2} more streams
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No streams selected</span>
-                      )}
+                        </article>
+                      ))}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {plan.selectedFacilities && plan.selectedFacilities.length > 0 ? (
-                        <>
-                          <div className="flex flex-wrap gap-1">
-                            {getFacilityNames(plan.selectedFacilities).slice(0, 2).map((facilityName, index) => (
-                              <Badge key={index} variant="outline" className="text-xs" style={{ color: '#2B7A78', borderColor: '#2B7A78' }}>
-                                {facilityName}
-                              </Badge>
-                            ))}
-                          </div>
-                          {plan.selectedFacilities.length > 2 && (
-                            <div className="text-xs text-muted-foreground">
-                              +{plan.selectedFacilities.length - 2} more
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No facilities</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {(plan.selectedPromotions && plan.selectedPromotions.length > 0) || 
-                       (plan.selectedCampaigns && plan.selectedCampaigns.length > 0) ? (
-                        <>
-                          {plan.selectedPromotions && plan.selectedPromotions.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {getPromotionNames(plan.selectedPromotions).slice(0, 1).map((promoName, index) => (
-                                <Badge key={index} variant="outline" className="text-xs bg-green-50 text-green-700">
-                                  <Percent className="h-3 w-3 mr-1" />
-                                  {promoName}
-                                </Badge>
-                              ))}
-                              {plan.selectedPromotions.length > 1 && (
-                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                                  +{plan.selectedPromotions.length - 1} more
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          {plan.selectedCampaigns && plan.selectedCampaigns.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {getCampaignNames(plan.selectedCampaigns).slice(0, 1).map((campaignName, index) => (
-                                <Badge key={index} variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                  <Megaphone className="h-3 w-3 mr-1" />
-                                  {campaignName}
-                                </Badge>
-                              ))}
-                              {plan.selectedCampaigns.length > 1 && (
-                                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                  +{plan.selectedCampaigns.length - 1} more
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No promotions</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(plan.status)}>
-                      {plan.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditPlan(plan)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDuplicatePlan(plan)}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeletePlan(plan.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#F7FAF9]">
+                    <TableHead><button className="flex items-center gap-1" onClick={() => handleSort("name")}>Plan Name <ArrowUpDown className="h-3.5 w-3.5" /></button></TableHead>
+                    <TableHead>Plan Code</TableHead>
+                    <TableHead><button className="flex items-center gap-1" onClick={() => handleSort("price")}>Price <ArrowUpDown className="h-3.5 w-3.5" /></button></TableHead>
+                    <TableHead>Billing Cycle</TableHead>
+                    <TableHead><button className="flex items-center gap-1" onClick={() => handleSort("subscribers")}>Subscribers <ArrowUpDown className="h-3.5 w-3.5" /></button></TableHead>
+                    <TableHead>Validity</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead><button className="flex items-center gap-1" onClick={() => handleSort("created")}>Created Date <ArrowUpDown className="h-3.5 w-3.5" /></button></TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPlans.map((plan) => (
+                    <TableRow key={plan.id} onClick={() => setSelectedPlan(plan)} className="cursor-pointer hover:bg-[#F0F8F6]/70">
+                      <TableCell><div className="font-medium">{plan.name}</div><div className="text-xs text-muted-foreground">{plan.type} · {plan.planType}</div></TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{getPlanCode(plan)}</TableCell>
+                      <TableCell><div className="font-semibold text-[#1F5A52]">AED {plan.price.toLocaleString()}</div>{plan.discount > 0 && <div className="text-xs text-emerald-600">{plan.discount}% discount</div>}</TableCell>
+                      <TableCell>{plan.durationType}</TableCell>
+                      <TableCell>{getSubscriberCount(plan)}</TableCell>
+                      <TableCell><div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" />{plan.duration}</div></TableCell>
+                      <TableCell><Badge className={getStatusColor(plan.status)}>{plan.status}</Badge></TableCell>
+                      <TableCell>{getCreatedDate(plan).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button title="View plan" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); setSelectedPlan(plan); }}><Eye className="h-4 w-4" /></Button>
+                          <Button title="Edit plan" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleEditPlan(plan); }}><Edit className="h-4 w-4" /></Button>
+                          <Button title="Duplicate plan" variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleDuplicatePlan(plan); }}><Copy className="h-4 w-4" /></Button>
+                          <Button title={plan.status === "Active" ? "Deactivate plan" : "Activate plan"} variant="ghost" size="sm" onClick={(event) => { event.stopPropagation(); handleToggleStatus(plan.id); }}><Power className="h-4 w-4" /></Button>
+                          <Button title="Delete plan" variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={(event) => { event.stopPropagation(); handleDeletePlan(plan.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Existing plan data shown in a lightweight detail view */}
+      <Dialog open={Boolean(selectedPlan)} onOpenChange={(open) => !open && setSelectedPlan(null)}>
+        <DialogContent className="sm:max-w-[620px]">
+          {selectedPlan && (
+            <>
+              <DialogHeader>
+                <div className="mb-2 flex items-center gap-2"><Badge className={getStatusColor(selectedPlan.status)}>{selectedPlan.status}</Badge><span className="font-mono text-xs text-muted-foreground">{getPlanCode(selectedPlan)}</span></div>
+                <DialogTitle>{selectedPlan.name}</DialogTitle>
+                <DialogDescription>{selectedPlan.description}</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4 py-3 sm:grid-cols-3">
+                <div className="rounded-lg bg-[#F0F8F6] p-3"><p className="text-xs text-muted-foreground">Price</p><p className="font-semibold text-[#1F5A52]">AED {selectedPlan.price.toLocaleString()}</p></div>
+                <div className="rounded-lg bg-[#F0F8F6] p-3"><p className="text-xs text-muted-foreground">Subscribers</p><p className="font-semibold">{getSubscriberCount(selectedPlan)}</p></div>
+                <div className="rounded-lg bg-[#F0F8F6] p-3"><p className="text-xs text-muted-foreground">Validity</p><p className="font-semibold">{selectedPlan.duration}</p></div>
+                <div><p className="text-xs text-muted-foreground">Billing Cycle</p><p className="font-medium">{selectedPlan.durationType}</p></div>
+                <div><p className="text-xs text-muted-foreground">Plan Type</p><p className="font-medium">{selectedPlan.planType}</p></div>
+                <div><p className="text-xs text-muted-foreground">Created</p><p className="font-medium">{getCreatedDate(selectedPlan).toLocaleDateString("en-GB")}</p></div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => handleDuplicatePlan(selectedPlan)}><Copy className="mr-2 h-4 w-4" />Duplicate</Button>
+                <Button variant="outline" onClick={() => handleToggleStatus(selectedPlan.id)}><Power className="mr-2 h-4 w-4" />{selectedPlan.status === "Active" ? "Deactivate" : "Activate"}</Button>
+                <Button className="bg-[#327F74] hover:bg-[#1F5A52]" onClick={() => { const plan = selectedPlan; setSelectedPlan(null); handleEditPlan(plan); }}><Edit className="mr-2 h-4 w-4" />Edit Plan</Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Plan Creation / Editing Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={handleCloseDialog}>
