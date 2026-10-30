@@ -555,6 +555,13 @@ class MembersService {
     return response.json();
   }
 
+  /** Every plan period (bill, start, expiry) with its freezes, plus add-ons and PT */
+  async getSubscriptionTimeline(id: string | number): Promise<SubscriptionTimeline> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/members/${id}/subscription-timeline`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load subscription timeline: ${response.status}`));
+    return response.json();
+  }
+
   async searchMembers(query: string): Promise<Member[]> {
     if (!query.trim()) return [];
     const result = await this.getMembers({ search: query }, { limit: 10 });
@@ -629,6 +636,109 @@ export interface FreezeHistoryEntry {
   chargeWaived?: boolean;
   recordedBy?: string | null;
   status: "Active" | "Completed";
+}
+
+export interface SubscriptionFreeze {
+  id: number | null;
+  start_date: string | null;
+  planned_end_date: string | null;
+  /** Last frozen day of a finished freeze. */
+  ended_on: string | null;
+  /** The day the member was back (unfreeze date). */
+  unfrozen_on: string | null;
+  /** Days frozen so far (open freeze) or in total (finished). */
+  days: number;
+  requested_days: number;
+  status: "Active" | "Completed" | "Scheduled";
+  reason?: string | null;
+  source?: string | null;
+  recorded_by?: string | null;
+  free_days: number;
+  charged_days: number;
+  charge_amount: number | null;
+  charge_waived: boolean;
+  charge_invoice_no?: string | null;
+  expiry_before: string | null;
+  /** Expiry once this freeze is over — projected to its planned end while it runs. */
+  expiry_after: string | null;
+}
+
+export interface SubscriptionPeriod {
+  receipt_id?: number | null;
+  invoice_no?: string | null;
+  receipt_no?: string | null;
+  kind: string;
+  plan_name: string | null;
+  plan_category?: string | null;
+  is_pt: boolean;
+  purchased_at?: string | null;
+  start_date: string | null;
+  original_end_date?: string | null;
+  end_date: string | null;
+  projected_end_date?: string | null;
+  duration_days?: number | null;
+  frozen_days: number;
+  freezes: SubscriptionFreeze[];
+  amount: number | null;
+  discount_amount?: number | null;
+  discount_label?: string | null;
+  paid_amount?: number | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  approval_status?: string | null;
+  processed_by?: string | null;
+  billed_to?: string | null;
+  status: string;
+  renewed_on?: string | null;
+  renewal_invoice_no?: string | null;
+  expired_before_renewal?: boolean;
+  gap_days?: number;
+}
+
+export interface SubscriptionAddon {
+  id: number;
+  transaction_id?: string | null;
+  name: string;
+  category?: string | null;
+  is_pt: boolean;
+  purchase_date: string | null;
+  start_date: string | null;
+  expiry_date: string | null;
+  amount: number | null;
+  payment_mode?: string | null;
+  status?: string | null;
+  invoice_no?: string | null;
+}
+
+export interface SubscriptionPtSession {
+  id: number;
+  date: string | null;
+  start_time: string | null;
+  session_name: string | null;
+  trainer: string | null;
+  status: string | null;
+  price: number | null;
+}
+
+export interface SubscriptionTimeline {
+  summary: {
+    join_date: string | null;
+    current_plan: string | null;
+    membership_status: string | null;
+    first_start_date: string | null;
+    expiry_date: string | null;
+    projected_expiry_date: string | null;
+    freeze_start_date: string | null;
+    freeze_end_date: string | null;
+    total_frozen_days: number;
+    freeze_count: number;
+    renewal_count: number;
+    family_head_name: string | null;
+  };
+  /** Oldest first. */
+  periods: SubscriptionPeriod[];
+  addons: SubscriptionAddon[];
+  pt_sessions: SubscriptionPtSession[];
 }
 
 export const membersService = new MembersService();

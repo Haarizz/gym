@@ -25,18 +25,21 @@ public class MemberController {
     private final com.company.project.services.FamilyPlanChangeService familyPlanChangeService;
     private final TenantDataSources tenantDataSources;
     private final MemberAppAccountService appAccountService;
+    private final com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
                             LeadService leadService,
                             com.company.project.services.FamilyPlanChangeService familyPlanChangeService,
                             TenantDataSources tenantDataSources,
-                            MemberAppAccountService appAccountService) {
+                            MemberAppAccountService appAccountService,
+                            com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService) {
         this.memberService = memberService;
         this.freezeService = freezeService;
         this.leadService = leadService;
         this.familyPlanChangeService = familyPlanChangeService;
         this.tenantDataSources = tenantDataSources;
         this.appAccountService = appAccountService;
+        this.subscriptionTimelineService = subscriptionTimelineService;
     }
 
     /**
@@ -325,6 +328,15 @@ public class MemberController {
     @GetMapping("/{id}/freezes")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> freezeHistory(@PathVariable Long id) {
         return ResponseEntity.ok(freezeService.getHistoryView(id));
+    }
+
+    /**
+     * GET /api/members/{id}/subscription-timeline — every plan period (bill, start,
+     * expiry), the freezes in it and the expiry they moved to, plus add-ons and PT
+     */
+    @GetMapping("/{id}/subscription-timeline")
+    public ResponseEntity<java.util.Map<String, Object>> subscriptionTimeline(@PathVariable Long id) {
+        return ResponseEntity.ok(subscriptionTimelineService.getTimeline(id));
     }
 
     /**

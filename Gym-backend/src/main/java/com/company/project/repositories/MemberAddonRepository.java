@@ -19,4 +19,6 @@ public interface MemberAddonRepository extends JpaRepository<MemberAddon, Long>,
            "AND LOWER(COALESCE(a.status, '')) NOT IN ('cancelled', 'refunded') " +
            "GROUP BY a.addonName")
     List<Object[]> sumRevenueByAddonNameInPeriod(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    List<MemberAddon> findByMemberDbIdOrderByPurchaseDateAsc(Long memberDbId);
 }

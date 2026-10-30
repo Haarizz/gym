@@ -58,6 +58,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("date") LocalDate date,
             @Param("windowStart") LocalTime windowStart,
             @Param("windowEnd") LocalTime windowEnd);
+
+    // A member's personal-training session bookings, oldest first (subscription timeline)
+    @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH s.trainer " +
+           "WHERE b.member.id = :memberId AND LOWER(s.type) = 'pt' ORDER BY s.date ASC, s.startTime ASC")
+    List<Booking> findPtBookingsByMember(@Param("memberId") Long memberId);
+
     // Mobile Booking Queries
     @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH s.trainer " +
            "WHERE b.member.id = :memberId AND b.status <> 'cancelled' " +

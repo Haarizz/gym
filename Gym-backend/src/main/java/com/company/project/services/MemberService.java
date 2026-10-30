@@ -1148,12 +1148,11 @@ public class MemberService {
         RenewalReward reward = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode(),
                 request.getPromotionId());
 
-        // Compute new expiry from plan duration, extending from current expiry (or today)
+        // Compute new expiry from plan duration, extending from current expiry (or today if lapsed)
         if (member.getMembershipPlan() != null) {
             Optional<MembershipPlan> planOpt = planRepository.findByName(member.getMembershipPlan());
             if (planOpt.isPresent()) {
-                LocalDateTime base = member.getExpiryDate() != null
-                        ? member.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime base = renewalBase(member.getExpiryDate());
                 LocalDateTime newExpiry = computeExpiry(base, planOpt.get());
                 member.setMembershipEndDate(newExpiry);
                 member.setExpiryDate(newExpiry);
@@ -1369,7 +1368,7 @@ public class MemberService {
 
         if (minor.getMembershipPlan() != null) {
             planRepository.findByName(minor.getMembershipPlan()).ifPresent(plan -> {
-                LocalDateTime base = minor.getExpiryDate() != null ? minor.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime base = renewalBase(minor.getExpiryDate());
                 LocalDateTime newExpiry = computeExpiry(base, plan);
                 minor.setMembershipEndDate(newExpiry);
                 minor.setExpiryDate(newExpiry);
@@ -1459,9 +1458,9 @@ public class MemberService {
         head.setMembershipFee(totalFee);
 
         // Extend expiry together for the head and every dependent from the head's
-        // current expiry (or today) — same base date, same duration, so the whole
-        // family stays in sync.
-        LocalDateTime base = head.getExpiryDate() != null ? head.getExpiryDate() : LocalDateTime.now();
+        // current expiry (or today if lapsed) — same base date, same duration, so the
+        // whole family stays in sync.
+        LocalDateTime base = renewalBase(head.getExpiryDate());
         LocalDateTime newExpiry = computeExpiry(base, plan);
         head.setMembershipEndDate(newExpiry);
         head.setExpiryDate(newExpiry);
@@ -1995,7 +1994,17 @@ public class MemberService {
 
     // ── Expiry computation ──────────────────────────────────────────────────
 
-    private LocalDateTime computeExpiry(LocalDateTime startDate, MembershipPlan plan) {
+    /**
+     * Where a renewal's new period starts: an early renewal keeps the days left and
+     * runs on from the current expiry; a lapsed one starts today. Extending from an
+     * expiry in the past left a member who paid today still expired.
+     */
+    static LocalDateTime renewalBase(LocalDateTime currentExpiry) {
+        LocalDateTime now = LocalDateTime.now();
+        return currentExpiry != null && currentExpiry.isAfter(now) ? currentExpiry : now;
+    }
+
+    static LocalDateTime computeExpiry(LocalDateTime startDate, MembershipPlan plan) {
         if (plan.getDurationValue() == null || plan.getDurationType() == null) return startDate;
         try {
             long val = Long.parseLong(plan.getDurationValue());
