@@ -14,7 +14,7 @@ interface TrainerWelcomeCardProps {
 export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
   const { t } = useTranslation();
   const firstName = trainerInfo.name.split(' ')[0] || trainerInfo.name;
-  const greeting = getGreeting();
+  const greeting = getGreeting(t);
   const hasRating = trainerInfo.rating != null && trainerInfo.ratingCount > 0;
 
   return (

@@ -291,7 +291,12 @@ export function createUseRestoreSession(
     const logoutMutation = useMutation({
       mutationFn: async () => {
         // While still authenticated: stop this member's pushes reaching this device.
-        await unregisterPushNotifications();
+        // Best-effort — a rejected session (401) must still clear the stored one below.
+        try {
+          await unregisterPushNotifications();
+        } catch {
+          // Ignored: signing out matters more than unregistering.
+        }
         try {
           return await authOrchestrator.signOut();
         } catch {

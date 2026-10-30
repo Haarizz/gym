@@ -110,7 +110,8 @@ public class StaffService {
             // Case-insensitive: web stores "Trainer", mobile stores the security role name "TRAINER".
             if (role != null && !role.isBlank()) predicates.add(cb.equal(cb.lower(root.get("role")), role.trim().toLowerCase()));
             if (department != null && !department.isBlank()) predicates.add(cb.equal(root.get("department"), department));
-            if (status != null && !status.isBlank()) predicates.add(cb.equal(root.get("status"), status));
+            // Case-insensitive too: staff are saved as "active" but callers ask for "Active".
+            if (status != null && !status.isBlank()) predicates.add(cb.equal(cb.lower(root.get("status")), status.trim().toLowerCase()));
             if (branch != null && !branch.isBlank()) predicates.add(cb.equal(root.get("branch"), branch));
             return cb.and(predicates.toArray(new Predicate[0]));
         };

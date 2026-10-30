@@ -23,6 +23,7 @@ export interface BranchDTO {
   tax_percentage?: number;
   tax_inclusive?: boolean;
   terms_and_policies?: string;
+  walk_in_self_registration?: boolean;
 }
 
 export interface BranchRequestDTO {
@@ -46,6 +47,7 @@ export interface BranchRequestDTO {
   tax_percentage?: number;
   tax_inclusive?: boolean;
   terms_and_policies?: string;
+  walk_in_self_registration?: boolean;
 }
 
 export interface BranchImageDTO {

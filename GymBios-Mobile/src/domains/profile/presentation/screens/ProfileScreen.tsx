@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { useAuthStore, useRestoreSession } from '@/domains/auth';
+import { getRoleHomeHref } from '@/domains/auth/presentation/navigation/routes';
 import { SlideIn } from '@/shared/components/Animations/SlideIn';
 
 import { ProfileHubScreen } from './ProfileHubScreen';
@@ -14,6 +15,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { LanguageSelectScreen } from './LanguageSelectScreen';
 import { WalletScreen } from '@/domains/memberPortal/wallet/WalletScreen';
 import { EnquiriesScreen } from '@/domains/memberPortal/enquiries/presentation/EnquiriesScreen';
+import { AccountScreen } from '@/domains/account';
 
 const SLIDE_DURATION = 320;
 
@@ -26,9 +28,10 @@ export type ProfileView =
   | 'wallet'
   | 'enquiries'
   | 'settings'
-  | 'language';
+  | 'language'
+  | 'account';
 
-const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'enquiries', 'settings', 'language'];
+const VALID_VIEWS: ProfileView[] = ['hub', 'my-profile', 'referrals', 'my-performance', 'transactions', 'wallet', 'enquiries', 'settings', 'language', 'account'];
 
 export function ProfileScreen() {
   const router = useRouter();
@@ -49,7 +52,7 @@ export function ProfileScreen() {
     if (view && (VALID_VIEWS as string[]).includes(view)) {
       if (view === 'my-performance' && !isEmployee) return;
       if (view === 'referrals' && isEmployee) return;
-      if ((view === 'wallet' || view === 'enquiries') && appRole !== 'member') return;
+      if ((view === 'wallet' || view === 'enquiries' || view === 'account') && appRole !== 'member') return;
       setActiveView(view as ProfileView);
     }
   }, [view, isEmployee, appRole]);
@@ -68,9 +71,12 @@ export function ProfileScreen() {
   const handleClose = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => {
-      router.back();
+      // No history after a cold load (web reload / app restored after being killed),
+      // so go to this role's own home rather than wherever back() falls through to.
+      if (router.canGoBack()) router.back();
+      else if (appRole) router.replace(getRoleHomeHref(appRole));
     }, SLIDE_DURATION);
-  }, [router]);
+  }, [router, appRole]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -107,6 +113,9 @@ export function ProfileScreen() {
         />
       );
       break;
+    case 'account':
+      content = <AccountScreen onBack={() => setActiveView('hub')} />;
+      break;
     case 'settings':
       content = (
         <SettingsScreen
@@ -138,6 +147,7 @@ export function ProfileScreen() {
           onNavigateToWallet={() => setActiveView('wallet')}
           onNavigateToEnquiries={() => setActiveView('enquiries')}
           onNavigateToSettings={() => setActiveView('settings')}
+          onNavigateToAccount={() => setActiveView('account')}
           onLogout={handleLogout}
         />
       );

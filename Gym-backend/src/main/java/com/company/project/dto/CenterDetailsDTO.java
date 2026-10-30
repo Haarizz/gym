@@ -28,7 +28,7 @@ public class CenterDetailsDTO {
     private Long reviewCount;
 
     private List<FacilityResponseDTO> amenities;
-    private List<StaffResponseDTO> trainers;
+    private List<CenterTrainerDTO> trainers;
 
     // Getters and Setters
     public String getTenantSlug() { return tenantSlug; }
@@ -67,8 +67,8 @@ public class CenterDetailsDTO {
     public List<FacilityResponseDTO> getAmenities() { return amenities; }
     public void setAmenities(List<FacilityResponseDTO> amenities) { this.amenities = amenities; }
 
-    public List<StaffResponseDTO> getTrainers() { return trainers; }
-    public void setTrainers(List<StaffResponseDTO> trainers) { this.trainers = trainers; }
+    public List<CenterTrainerDTO> getTrainers() { return trainers; }
+    public void setTrainers(List<CenterTrainerDTO> trainers) { this.trainers = trainers; }
 
     public Integer getEstablishedYear() { return establishedYear; }
     public void setEstablishedYear(Integer establishedYear) { this.establishedYear = establishedYear; }

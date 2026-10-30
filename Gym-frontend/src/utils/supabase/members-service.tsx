@@ -71,13 +71,22 @@ export interface Member {
   // once the account buys here again (it's superseded by the new purchase).
   global_user_id?: number | null;
   app_username?: string;
+  // Legacy flag — no longer gates anything; see access_state / membership_suspended.
   app_access_enabled?: boolean;
+  // What this gym's membership lets the member use in the app (backend MemberAccessState).
+  // Anything but ACTIVE closes this gym's member features; the app account, Community
+  // and gym discovery always stay open.
+  access_state?: 'ACTIVE' | 'SUSPENDED' | 'PENDING_APPROVAL' | 'PAYMENT_REJECTED';
+  membership_suspended?: boolean;
+  suspended_reason?: string | null;
+  suspended_by?: string | null;
+  suspended_at?: string | null;
   // Which staff member actually handled this sale — credited toward their revenue
   // target regardless of which account is logged in. Write-only (create/renew).
   processed_by_staff_id?: number;
   // Reception/admin approval gate for a mobile self-service purchase paid by
   // Cash/Credit/Mixed — undefined/null when no approval was ever required.
-  // "PENDING" means app_access_enabled is false until an Approvals action resolves it.
+  // "PENDING" closes this gym's member features in the app until an Approvals action resolves it.
   approval_status?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
   approved_by?: string | null;
   approved_at?: string | null;
@@ -182,6 +191,20 @@ export interface PaginationParams {
   limit?: number;
 }
 
+// GET /api/members/{id}/app-account (backend MemberAppAccountService.AppAccountStatus).
+// NONE — no app account; GYM_LOGIN — an old gym-only login that no longer signs in;
+// LINKED — the member's own GymBios account; AWAITING_CONFIRMATION — a link request is
+// waiting for the account owner to accept in their app.
+export interface MemberAppAccount {
+  status: 'NONE' | 'GYM_LOGIN' | 'LINKED' | 'AWAITING_CONFIRMATION';
+  username?: string | null;
+  email?: string | null;
+  email_verified?: boolean | null;
+  link_request_id?: number | null;
+  link_requested_account?: string | null;
+  link_request_expires_at?: string | null;
+}
+
 export interface MembersResponse {
   members: Member[];
   pagination: {
@@ -272,21 +295,61 @@ class MembersService {
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to delete member: ${response.status}`));
   }
 
-  async setMemberCredentials(id: string, appUsername: string, appPassword: string): Promise<Member> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/members/${id}/set-credentials`,
-      { method: 'POST', body: JSON.stringify({ appUsername, appPassword }) }
-    );
-    if (!response.ok) throw new Error(await parseApiError(response, `Failed to set credentials: ${response.status}`));
+
+  // The member's GymBios app account (docs/global-accounts-for-gym-created-members-plan.md §1).
+  async getAppAccount(id: string): Promise<MemberAppAccount> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/members/${id}/app-account`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load app account: ${response.status}`));
     return response.json();
   }
 
-  async toggleMemberAccess(id: string, enabled: boolean): Promise<Member> {
+  // Creates the member's own GymBios account at the desk (email comes from the member
+  // record) and links it. The gym can't change or reset it afterwards.
+  async createAppAccount(id: string, username: string, password: string): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/members/${id}/toggle-access`,
-      { method: 'PATCH', body: JSON.stringify({ enabled }) }
+      `${backendBaseUrl}/members/${id}/app-account`,
+      { method: 'POST', body: JSON.stringify({ username, password }) }
     );
-    if (!response.ok) throw new Error(await parseApiError(response, `Failed to toggle member access: ${response.status}`));
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to create app account: ${response.status}`));
+    return response.json();
+  }
+
+  // Asks the owner of an existing GymBios account to link it; they accept in their app.
+  async requestAccountLink(id: string, identifier: string): Promise<MemberAppAccount> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/app-account/link`,
+      { method: 'POST', body: JSON.stringify({ identifier }) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to send link request: ${response.status}`));
+    return response.json();
+  }
+
+  async cancelAccountLink(id: string): Promise<MemberAppAccount> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/app-account/link`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to cancel link request: ${response.status}`));
+    return response.json();
+  }
+
+  // Suspends this gym's membership. Never blocks the member's app account — they can
+  // still sign in, use the Community and browse gyms.
+  async suspendMembership(id: string, reason?: string): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/suspend`,
+      { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to suspend membership: ${response.status}`));
+    return response.json();
+  }
+
+  async resumeMembership(id: string): Promise<Member> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/${id}/resume`,
+      { method: 'POST' }
+    );
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to resume membership: ${response.status}`));
     return response.json();
   }
 

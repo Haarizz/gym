@@ -19,8 +19,15 @@ public class User extends BaseEntity {
     @Column(unique = true, nullable = false)
     private String username;
 
-    @Column(unique = true, nullable = false)
+    // Optional for GymBios accounts created at a gym's desk for someone with no email
+    // (V104); still unique when present.
+    @Column(unique = true)
     private String email;
+
+    // False for an email typed in by staff until the owner confirms it in the app;
+    // password reset only goes to a verified address.
+    @Column(name = "email_verified", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT TRUE")
+    private boolean emailVerified = true;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
@@ -58,6 +65,9 @@ public class User extends BaseEntity {
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }

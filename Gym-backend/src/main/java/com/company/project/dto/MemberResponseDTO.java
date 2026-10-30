@@ -1,6 +1,7 @@
 package com.company.project.dto;
 
 import com.company.project.entities.Member;
+import com.company.project.services.MemberAccessState;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
@@ -83,6 +84,16 @@ public class MemberResponseDTO {
     // one (here or at another gym), so it can no longer be approved.
     private Boolean superseded;
 
+    // ACTIVE | SUSPENDED | PENDING_APPROVAL | PAYMENT_REJECTED — see MemberAccessState.
+    // Gates this gym's member features in the app, never the account itself.
+    private String accessState;
+    private Boolean membershipSuspended;
+    private String suspendedReason;
+    private String suspendedBy;
+    private String suspendedAt;
+    // Only on /api/members/me: the gym this membership is at, for the app's status screens.
+    private String gymName;
+
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MemberResponseDTO fromEntity(Member m) {
@@ -146,6 +157,11 @@ public class MemberResponseDTO {
         dto.approvedBy          = m.getApprovedBy();
         dto.approvedAt          = m.getApprovedAt()          != null ? m.getApprovedAt().format(ISO) + "Z"          : null;
         dto.rejectionReason     = m.getRejectionReason();
+        dto.accessState         = MemberAccessState.of(m).name();
+        dto.membershipSuspended = m.isMembershipSuspended();
+        dto.suspendedReason     = m.getSuspendedReason();
+        dto.suspendedBy         = m.getSuspendedBy();
+        dto.suspendedAt         = m.getSuspendedAt()         != null ? m.getSuspendedAt().format(ISO) + "Z"         : null;
         return dto;
     }
 
@@ -225,4 +241,16 @@ public class MemberResponseDTO {
     public void setSuperseded(Boolean superseded) { this.superseded = superseded; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public String getAccessState() { return accessState; }
+    public void setAccessState(String accessState) { this.accessState = accessState; }
+    public Boolean getMembershipSuspended() { return membershipSuspended; }
+    public void setMembershipSuspended(Boolean membershipSuspended) { this.membershipSuspended = membershipSuspended; }
+    public String getSuspendedReason() { return suspendedReason; }
+    public void setSuspendedReason(String suspendedReason) { this.suspendedReason = suspendedReason; }
+    public String getSuspendedBy() { return suspendedBy; }
+    public void setSuspendedBy(String suspendedBy) { this.suspendedBy = suspendedBy; }
+    public String getSuspendedAt() { return suspendedAt; }
+    public void setSuspendedAt(String suspendedAt) { this.suspendedAt = suspendedAt; }
+    public String getGymName() { return gymName; }
+    public void setGymName(String gymName) { this.gymName = gymName; }
 }

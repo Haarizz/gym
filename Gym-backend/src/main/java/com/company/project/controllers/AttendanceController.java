@@ -5,7 +5,10 @@ import com.company.project.dto.AttendanceStatsDTO;
 import com.company.project.dto.CheckInResponse;
 import com.company.project.dto.CheckOutResponse;
 import com.company.project.dto.WalkInCheckInRequest;
+import com.company.project.dto.WalkInSelfRegistrationDTOs;
 import com.company.project.services.AttendanceService;
+import com.company.project.services.CheckInSettingsService;
+import com.company.project.services.WalkInRegistrationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,9 +20,15 @@ import java.util.Map;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final WalkInRegistrationService walkInRegistrationService;
+    private final CheckInSettingsService checkInSettingsService;
 
-    public AttendanceController(AttendanceService attendanceService) {
+    public AttendanceController(AttendanceService attendanceService,
+                                WalkInRegistrationService walkInRegistrationService,
+                                CheckInSettingsService checkInSettingsService) {
         this.attendanceService = attendanceService;
+        this.walkInRegistrationService = walkInRegistrationService;
+        this.checkInSettingsService = checkInSettingsService;
     }
 
     /**
@@ -65,13 +74,20 @@ public class AttendanceController {
      * Check out a member by their attendance record ID.
      * Sets checkOutTime = now, calculates duration, status → completed.
      *
+     * Before the branch's minimum visit time this answers 409 MIN_VISIT_NOT_REACHED;
+     * the desk confirms and repeats with force=true.
+     *
      * POST /api/attendance/{id}/checkout
      */
     @PostMapping("/{id}/checkout")
-    public ResponseEntity<?> checkout(@PathVariable Long id) {
+    public ResponseEntity<?> checkout(@PathVariable Long id,
+                                      @RequestParam(defaultValue = "false") boolean force) {
         try {
-            CheckOutResponse resp = attendanceService.checkout(id);
+            CheckOutResponse resp = attendanceService.checkout(id, force);
             return ResponseEntity.ok(resp);
+        } catch (com.company.project.exceptions.MinVisitNotReachedException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                    .body(Map.of("error", e.getMessage(), "code", "MIN_VISIT_NOT_REACHED"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -100,6 +116,21 @@ public class AttendanceController {
         return ResponseEntity.ok(attendanceService.updateReportSettings(request));
     }
 
+    /** GET/PUT the branch's check-in timing rules (Check In page › Configuration). */
+    @GetMapping("/check-in-settings")
+    public ResponseEntity<com.company.project.dto.CheckInSettingsDTO> getCheckInSettings() {
+        return ResponseEntity.ok(checkInSettingsService.get());
+    }
+
+    @PutMapping("/check-in-settings")
+    public ResponseEntity<?> updateCheckInSettings(@RequestBody com.company.project.dto.CheckInSettingsDTO request) {
+        try {
+            return ResponseEntity.ok(checkInSettingsService.update(request));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> getReport(
             @RequestParam(required = false) String startDate,
@@ -123,5 +154,34 @@ public class AttendanceController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * Today's self-registered walk-ins waiting for staff to take payment. Paying goes
+     * through POST /walkin with self_registration_id.
+     *
+     * GET /api/attendance/walkin-registrations
+     */
+    @GetMapping("/walkin-registrations")
+    public ResponseEntity<List<WalkInSelfRegistrationDTOs.Pending>> getPendingWalkInRegistrations() {
+        return ResponseEntity.ok(walkInRegistrationService.listPending());
+    }
+
+    /** POST /api/attendance/walkin-registrations/{id}/dismiss — visitor left / duplicate. */
+    @PostMapping("/walkin-registrations/{id}/dismiss")
+    public ResponseEntity<Void> dismissWalkInRegistration(@PathVariable Long id) {
+        walkInRegistrationService.dismiss(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * The caller's walk-in QR link — personal (?s=code) for staff, so scans count
+     * toward their target.
+     *
+     * GET /api/attendance/walkin/my-link
+     */
+    @GetMapping("/walkin/my-link")
+    public ResponseEntity<WalkInSelfRegistrationDTOs.MyLink> getMyWalkInLink() {
+        return ResponseEntity.ok(walkInRegistrationService.myLink());
     }
 }

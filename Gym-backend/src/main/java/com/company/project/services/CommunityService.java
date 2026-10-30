@@ -57,6 +57,8 @@ public class CommunityService {
             "Only active members of this gym can post in its community.";
     private static final String AWAITING_APPROVAL =
             "You can post in the community once the gym approves your membership payment.";
+    private static final String MEMBERSHIP_SUSPENDED =
+            "Your membership at this gym is suspended, so you can't post in its community.";
 
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostCommentRepository communityPostCommentRepository;
@@ -643,8 +645,10 @@ public class CommunityService {
         if (member == null) {
             throw new CommunityMembershipRequiredException(POST_REQUIRES_MEMBERSHIP);
         }
-        if (Boolean.FALSE.equals(member.getAppAccessEnabled())) {
-            throw new CommunityMembershipRequiredException(AWAITING_APPROVAL);
+        switch (MemberAccessState.of(member)) {
+            case ACTIVE -> { }
+            case SUSPENDED -> throw new CommunityMembershipRequiredException(MEMBERSHIP_SUSPENDED);
+            default -> throw new CommunityMembershipRequiredException(AWAITING_APPROVAL);
         }
         if (!GlobalMembershipService.isActive(member)) {
             throw new CommunityMembershipRequiredException(POST_REQUIRES_MEMBERSHIP);

@@ -17,8 +17,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.context.ApplicationContext;
 import com.company.project.repositories.MemberRepository;
+import com.company.project.services.MemberAccessState;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Phase 2 multi-tenant groundwork: reads the "tenant" claim from the already
@@ -83,13 +88,21 @@ public class TenantContextFilter extends OncePerRequestFilter {
     // caller's currently selected X-Tenant-ID.
     private static final RequestMatcher GLOBAL_COMMUNITY_PATH = uriStartsWith("/api/mobile/community/");
 
+    // The signed-in person's own GymBios account (email, gyms' link requests) — never
+    // about the gym selected in the app; accepting a link request picks its gym itself.
+    private static final RequestMatcher ACCOUNT_PATH = new OrRequestMatcher(
+            uriEquals("/api/mobile/account"),
+            uriStartsWith("/api/mobile/account/")
+    );
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
             uriStartsWith("/api/mobile/discovery/"),
             STRICTLY_GLOBAL_FAMILY_PATH,
             STRICTLY_GLOBAL_REFERRAL_PATH,
-            GLOBAL_COMMUNITY_PATH
+            GLOBAL_COMMUNITY_PATH,
+            ACCOUNT_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -100,20 +113,24 @@ public class TenantContextFilter extends OncePerRequestFilter {
             STRICTLY_GLOBAL_FAMILY_PATH,
             STRICTLY_GLOBAL_REFERRAL_PATH,
             GLOBAL_COMMUNITY_PATH,
+            ACCOUNT_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );
 
     private static final RequestMatcher OWN_STATUS_CHECK_PATH = uriEquals("/api/members/me");
 
-    // Reachable while a purchase awaits approval: the status check itself, plus push-token
-    // registration so the device can receive the "payment approved" push (see
+    // Reachable while this gym's member features are closed (suspended, or a purchase
+    // pending/refused approval — see MemberAccessState): the status check itself, plus
+    // push-token registration so the device can receive the "payment approved" push (see
     // MemberPaymentApprovalNotifier) — a member who bought by cash is pending from their
     // very first app session, so blocking this would mean they never get that push.
     private static final RequestMatcher PENDING_APPROVAL_ALLOWED_PATH = new OrRequestMatcher(
             OWN_STATUS_CHECK_PATH,
             uriStartsWith("/api/mobile/member/push-tokens")
     );
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final RequestMatcher LEGACY_EXEMPT_PATH = new OrRequestMatcher(
             GLOBAL_EXEMPT_PATH,
@@ -170,7 +187,9 @@ public class TenantContextFilter extends OncePerRequestFilter {
                     if (tenantSlug != null && !tenantSlug.isBlank() && !strictlyGlobal) {
                         TenantContextHolder.setCurrentTenant(tenantSlug);
                         
-                        // Validate multi-tenant authorization for global users on protected member paths
+                        // Validate multi-tenant authorization for members (GymBios accounts) on
+                        // protected member paths. Staff are never gated here, and old gym-only
+                        // member logins never get this far (JwtAuthenticationFilter rejects them).
                         if (userDetails.isGlobal() && !GLOBAL_EXEMPT_PATH.matches(request)) {
                             MemberRepository memberRepository = applicationContext.getBean(MemberRepository.class);
                             var member = memberRepository.findByGlobalUserId(userDetails.getId()).orElse(null);
@@ -178,20 +197,20 @@ public class TenantContextFilter extends OncePerRequestFilter {
                                 TenantContextHolder.clear();
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Not a member of this Gym");
                                 return;
-                            }
-                            // A Cash/Credit/Mixed mobile purchase awaiting reception approval
-                            // (see MobileDiscoveryController.purchaseMembership) has
-                            // appAccessEnabled=false until staff approve/reject it in the
-                            // web app's Approvals tab — block every other member-facing
-                            // mobile endpoint for this gym until then, so the restriction
-                            // can't be bypassed by calling an API other than /purchase.
-                            // /api/members/me stays reachable (see isOwnStatusCheckPath)
-                            // so the app can keep checking whether it's been resolved.
-                            if (!PENDING_APPROVAL_ALLOWED_PATH.matches(request) && Boolean.FALSE.equals(member.getAppAccessEnabled())) {
-                                TenantContextHolder.clear();
-                                response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                                        "Access Denied: Membership payment is awaiting approval");
-                                return;
+                            } else {
+                                // A suspended membership, or a Cash/Credit/Mixed purchase awaiting
+                                // (or refused) reception approval, closes this gym's member
+                                // features — every member-facing endpoint, so it can't be bypassed
+                                // by calling a different API. The account itself, Community, gym
+                                // discovery and profile stay open (GLOBAL_EXEMPT_PATH), and
+                                // /api/members/me stays reachable so the app can show the state
+                                // and notice when it's lifted.
+                                MemberAccessState state = MemberAccessState.of(member);
+                                if (!state.allowsMemberFeatures() && !PENDING_APPROVAL_ALLOWED_PATH.matches(request)) {
+                                    TenantContextHolder.clear();
+                                    writeAccessRefusal(response, state);
+                                    return;
+                                }
                             }
                         }
                     } else {
@@ -210,5 +229,18 @@ public class TenantContextFilter extends OncePerRequestFilter {
         } finally {
             TenantContextHolder.clear();
         }
+    }
+
+    private static void writeAccessRefusal(HttpServletResponse response, MemberAccessState state) throws IOException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", 403);
+        body.put("error", "Forbidden");
+        body.put("code", "MEMBERSHIP_" + state.name());
+        body.put("access_state", state.name());
+        body.put("message", state.refusalMessage());
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        JSON.writeValue(response.getWriter(), body);
     }
 }

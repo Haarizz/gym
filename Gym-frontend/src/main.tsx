@@ -5,6 +5,7 @@ import { CurrencyProvider } from "./utils/currency";
 import { BranchProvider } from "./utils/branch-context";
 import { PrivacyPolicyPage, TermsOfServicePage, SupportPage } from "./pages/legal-pages";
 import { PublicLeadFormPage } from "./pages/public-lead-form";
+import { PublicWalkInPage } from "./pages/public-walk-in";
 import { applyResponsiveScope } from "./utils/responsive-scope";
 import "@fontsource-variable/plus-jakarta-sans/wght.css";
 import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
@@ -29,9 +30,14 @@ const path = window.location.pathname;
 // Public gym lead forms (/f/{formKey}) are opened by strangers from social-media
 // ads — same standalone treatment as the legal pages above.
 const leadFormMatch = path.match(/^\/f\/([A-Za-z0-9]+)\/?$/);
+// Walk-in self-registration (/w/{tenantSlug}/{branchId}?s=staffCode), from the QR
+// at the gym or on a staff member's phone — same standalone treatment.
+const walkInMatch = path.match(/^\/w\/([A-Za-z0-9_-]+)\/(\d+)\/?$/);
 
 if (leadFormMatch) {
   root.render(<PublicLeadFormPage formKey={leadFormMatch[1]} />);
+} else if (walkInMatch) {
+  root.render(<PublicWalkInPage tenantSlug={walkInMatch[1]} branchId={walkInMatch[2]} />);
 } else if (path === '/privacy-policy') {
   root.render(<PrivacyPolicyPage />);
 } else if (path === '/terms-of-service') {

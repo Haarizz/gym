@@ -73,6 +73,11 @@ public class Branch extends BaseEntity {
     @Column(name = "terms_and_policies", columnDefinition = "TEXT")
     private String termsAndPolicies;
 
+    // Whether visitors may sign themselves up as walk-ins from the public QR page.
+    // They still need staff to take payment before they get in.
+    @Column(name = "walk_in_self_registration", columnDefinition = "boolean not null default false")
+    private boolean walkInSelfRegistration = false;
+
     // ACTIVE / INACTIVE
     @Column(nullable = false)
     private String status = "ACTIVE";
@@ -135,6 +140,9 @@ public class Branch extends BaseEntity {
 
     public String getAcceptedPaymentMethods() { return acceptedPaymentMethods; }
     public void setAcceptedPaymentMethods(String acceptedPaymentMethods) { this.acceptedPaymentMethods = acceptedPaymentMethods; }
+
+    public boolean isWalkInSelfRegistration() { return walkInSelfRegistration; }
+    public void setWalkInSelfRegistration(boolean walkInSelfRegistration) { this.walkInSelfRegistration = walkInSelfRegistration; }
 
     public boolean isBnplEnabled() { return bnplEnabled; }
     public void setBnplEnabled(boolean bnplEnabled) { this.bnplEnabled = bnplEnabled; }

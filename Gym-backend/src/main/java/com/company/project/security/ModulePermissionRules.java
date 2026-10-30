@@ -142,6 +142,7 @@ public final class ModulePermissionRules {
         // Community, attendance, classes
         anyWrite("/api/community/**", "COMMUNITY");
         writes("/api/attendance/report-settings", "ATTENDANCE", "SETTINGS");
+        writes("/api/attendance/check-in-settings", "ATTENDANCE", "SETTINGS");
         writes("/api/attendance/**", "ATTENDANCE", "CHECK_IN");
         writes("/api/checkin/device-keys/**", "CHECK_IN", "SETTINGS");
         writes("/api/checkin/**", "CHECK_IN", "ATTENDANCE");

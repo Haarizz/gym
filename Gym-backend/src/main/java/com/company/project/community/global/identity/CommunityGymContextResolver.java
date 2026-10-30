@@ -14,7 +14,7 @@ import java.util.Optional;
  * is only ever a *request*:
  *
  *   GLOBAL actor:  requested gym → that gym's database → member row by
- *                  global_user_id → appAccessEnabled → attributed to that gym.
+ *                  global_user_id → member access state (MemberAccessState) → attributed to that gym.
  *                  Anything else is 403.
  *   TENANT actor:  always the JWT tenant; a different requested gym is 403,
  *                  never silently replaced.
@@ -60,7 +60,7 @@ public class CommunityGymContextResolver {
                 return false;
             }
             Lookup lookup = membershipLookup.byGlobalUser(db.get(), actor.globalUserId());
-            return lookup.result() == Result.MEMBER && lookup.membership().appAccessEnabled();
+            return lookup.result() == Result.MEMBER && lookup.membership().accessState().allowsMemberFeatures();
         }
         return false;
     }
@@ -79,9 +79,7 @@ public class CommunityGymContextResolver {
         if (lookup.result() != Result.MEMBER) {
             throw notAMember();
         }
-        if (!lookup.membership().appAccessEnabled()) {
-            throw CommunityException.forbidden("APP_ACCESS_PENDING", "Your membership is awaiting approval");
-        }
+        requireMemberFeatures(lookup.membership());
         return new GymContext(requestedGym, gymName(requestedGym), lookup.membership().branchId(),
                 lookup.membership().branchName(), lookup.membership().memberId());
     }
@@ -106,9 +104,7 @@ public class CommunityGymContextResolver {
         Long branchId = BranchContextHolder.getActiveBranchId();
         Lookup lookup = membershipLookup.byLocalUser(db, actor.tenantUserId());
         if (lookup.result() == Result.MEMBER) {
-            if (!lookup.membership().appAccessEnabled()) {
-                throw CommunityException.forbidden("APP_ACCESS_PENDING", "Your membership is awaiting approval");
-            }
+            requireMemberFeatures(lookup.membership());
             memberId = lookup.membership().memberId();
             if (branchId == null) {
                 branchId = lookup.membership().branchId();
@@ -116,6 +112,16 @@ public class CommunityGymContextResolver {
         }
         String branchName = membershipLookup.branchName(db, branchId).orElse(null);
         return new GymContext(gym, gymName(gym), branchId, branchName, memberId);
+    }
+
+    /** Posting as a gym member needs that membership open — suspended or unapproved ones can only read. */
+    private static void requireMemberFeatures(TenantMembershipLookup.Membership membership) {
+        switch (membership.accessState()) {
+            case ACTIVE -> { }
+            case SUSPENDED -> throw CommunityException.forbidden("MEMBERSHIP_SUSPENDED",
+                    "Your membership at this gym is suspended");
+            default -> throw CommunityException.forbidden("APP_ACCESS_PENDING", "Your membership is awaiting approval");
+        }
     }
 
     private String gymName(String tenantSlug) {

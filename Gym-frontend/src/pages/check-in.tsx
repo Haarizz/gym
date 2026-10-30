@@ -7,6 +7,10 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -27,11 +31,13 @@ import {
   CalendarClock,
   RefreshCw,
   Briefcase,
+  Clock,
+  Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { staffService, type Staff } from '../utils/supabase/staff-service';
-import { checkInService, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
+import { checkInService, MinVisitNotReachedError, type CheckInSettings, type TodayAttendanceRecord, type WalkInCheckInRequest } from '../utils/supabase/checkin-service';
 import { staffAttendanceService } from '../utils/supabase/staff-attendance-service';
 import { attendanceService } from '../utils/supabase/attendance-service';
 import { plansService, type Plan } from '../utils/supabase/plans-service';
@@ -41,6 +47,8 @@ import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
 import { buildPaymentPayload } from '../payments/paymentPayload';
 import { PAYMENT_TYPES } from '../payments/paymentModel';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
+import { walkInRegistrationService, type MyWalkInLink, type PendingWalkInRegistration } from '../utils/supabase/walk-in-registration-service';
+import { WalkInQr } from '../components/shared/WalkInQr';
 import { useDebouncedValue } from '../utils/use-debounced-value';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -54,6 +62,9 @@ interface PersonEntry {
   role: string;        // membership type for members, role for staff
   status: string;
   photoUrl?: string;
+  // Membership suspended by staff — check-in is refused until it's resumed.
+  suspended?: boolean;
+  suspendedReason?: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -75,6 +86,8 @@ function memberToPerson(m: Member): PersonEntry {
     role: m.membership_type || 'Member',
     status: m.membership_status,
     photoUrl: m.photo_url,
+    suspended: !!m.membership_suspended,
+    suspendedReason: m.suspended_reason ?? null,
   };
 }
 
@@ -131,6 +144,11 @@ export function CheckIn() {
   const [bankAccounts, setBankAccounts]   = useState<AccountHead[]>([]);
   const [staffOptions, setStaffOptions]   = useState<Staff[]>([]);
   const [processedByStaffId, setProcessedByStaffId] = useState('');
+  // QR self-registrations waiting for payment; selfRegistration is the one loaded into the form.
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingWalkInRegistration[]>([]);
+  const [selfRegistration, setSelfRegistration] = useState<PendingWalkInRegistration | null>(null);
+  const [walkInLink, setWalkInLink] = useState<MyWalkInLink | null>(null);
+  const [walkInQrOpen, setWalkInQrOpen] = useState(false);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +162,38 @@ export function CheckIn() {
       .then(settings => { if (settings.gym_capacity) setGymCapacity(settings.gym_capacity); })
       .catch(() => {});
   }, []);
+
+  // Check-in timing rules for this branch (Configuration tab). Enforced by the backend.
+  const [savedSettings, setSavedSettings] = useState<CheckInSettings | null>(null);
+  const [settingsForm, setSettingsForm] = useState<CheckInSettings | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  // A check-out the backend held back for the minimum visit time, awaiting the desk's override.
+  const [earlyCheckOut, setEarlyCheckOut] = useState<{ attendanceId: number; name: string; message: string } | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'configuration' || savedSettings) return;
+    checkInService.getSettings()
+      .then(settings => { setSavedSettings(settings); setSettingsForm(settings); })
+      .catch(() => toast.error('Could not load check-in settings'));
+  }, [activeTab, savedSettings]);
+
+  const settingsDirty = !!settingsForm && !!savedSettings
+    && (Object.keys(settingsForm) as (keyof CheckInSettings)[]).some(k => settingsForm[k] !== savedSettings[k]);
+
+  const saveSettings = async () => {
+    if (!settingsForm) return;
+    setSavingSettings(true);
+    try {
+      const saved = await checkInService.updateSettings(settingsForm);
+      setSavedSettings(saved);
+      setSettingsForm(saved);
+      toast.success('Check-in settings saved');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save check-in settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   // Daily/walk-in passes are now real plans configured in Manage Plans under the
   // "Walk-In / Daily Visitor" membership type, instead of a hardcoded list.
@@ -241,9 +291,52 @@ export function CheckIn() {
     }
   }, [walkInsLoaded]);
 
+  const loadPendingRegistrations = useCallback(async () => {
+    try {
+      setPendingRegistrations(await walkInRegistrationService.listPending());
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false));
-  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns]);
+    Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false));
+  }, [loadPeople, loadTodayAttendance, loadStaffActiveMap, loadTodayWalkIns, loadPendingRegistrations]);
+
+  // Visitors sign up from their own phones — keep the pending list fresh while the desk is on this tab.
+  useEffect(() => {
+    if (activeTab !== 'daily') return;
+    const timer = window.setInterval(loadPendingRegistrations, 30_000);
+    return () => window.clearInterval(timer);
+  }, [activeTab, loadPendingRegistrations]);
+
+  const openWalkInQr = () => {
+    setWalkInQrOpen(true);
+    walkInRegistrationService.myLink().then(setWalkInLink).catch(() => toast.error('Could not load the walk-in QR'));
+  };
+
+  // Loads a self-registered visitor into the form; payment then goes through the normal Grant Access.
+  const takeSelfRegistrationPayment = (r: PendingWalkInRegistration) => {
+    resetDailyForm();
+    setSelfRegistration(r);
+    setVisitorName(r.name);
+    setVisitorMobile(r.phone);
+    if (r.plan_id && walkInPlans.some(p => p.id === r.plan_id)) setSelectedPlan(String(r.plan_id));
+    if (r.referred_by_staff_id && staffOptions.some(st => String(st.id) === String(r.referred_by_staff_id))) {
+      setProcessedByStaffId(String(r.referred_by_staff_id));
+    }
+  };
+
+  const dismissSelfRegistration = async (r: PendingWalkInRegistration) => {
+    try {
+      await walkInRegistrationService.dismiss(r.id);
+      setPendingRegistrations(prev => prev.filter(p => p.id !== r.id));
+      if (selfRegistration?.id === r.id) resetDailyForm();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Could not dismiss this visitor');
+      loadPendingRegistrations();
+    }
+  };
 
   // ── Derived values ───────────────────────────────────────────────────────────
 
@@ -275,14 +368,18 @@ export function CheckIn() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleCheckOut = async (attendanceId: number, memberName: string) => {
+  const handleCheckOut = async (attendanceId: number, memberName: string, force = false) => {
     setCheckingOutId(attendanceId);
     try {
-      const res = await checkInService.checkout(attendanceId);
+      const res = await checkInService.checkout(attendanceId, force);
       toast.success(`${memberName} checked out — ${res.formatted_duration}`);
       await loadTodayAttendance();
     } catch (err: any) {
-      toast.error(err.message || 'Checkout failed');
+      if (err instanceof MinVisitNotReachedError) {
+        setEarlyCheckOut({ attendanceId, name: memberName, message: err.message });
+      } else {
+        toast.error(err.message || 'Checkout failed');
+      }
     } finally {
       setCheckingOutId(null);
     }
@@ -445,8 +542,10 @@ export function CheckIn() {
         device_id: 'WEB',
         notes: `Plan: ${selectedPlanDetails?.name}, Payment: ${paymentSummary}, Amount: ${currencyCode} ${walkInCharge}`,
         processed_by_staff_id: processedByStaffId ? Number(processedByStaffId) : undefined,
+        self_registration_id: selfRegistration?.id,
       };
       const resp = await checkInService.walkInCheckIn(req);
+      if (selfRegistration) setPendingRegistrations(prev => prev.filter(p => p.id !== selfRegistration.id));
 
       const visitor = {
         id: resp.attendance_id,
@@ -471,6 +570,7 @@ export function CheckIn() {
       resetDailyForm();
     } catch (err: any) {
       toast.error(err.message || 'Walk-in check-in failed');
+      if (selfRegistration) loadPendingRegistrations();
     } finally {
       setGrantingAccess(false);
     }
@@ -478,7 +578,7 @@ export function CheckIn() {
 
   const resetDailyForm = () => {
     setVisitorName(''); setVisitorMobile(''); setVisitorPhoto(null);
-    setSelectedPlan(''); setProcessedByStaffId('');
+    setSelectedPlan(''); setProcessedByStaffId(''); setSelfRegistration(null);
     walkInPaymentManager.clearLines();
     if (isCameraActive && videoRef.current) {
       (videoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
@@ -501,11 +601,15 @@ export function CheckIn() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns()]).finally(() => setLoading(false)); }}
+            onClick={() => { setLoading(true); setWalkInsLoaded(false); Promise.all([loadPeople(), loadTodayAttendance(), loadStaffActiveMap(), loadTodayWalkIns(), loadPendingRegistrations()]).finally(() => setLoading(false)); }}
             className="border-primary/30"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button variant="outline" className="border-primary/30" onClick={openWalkInQr}>
+            <QrCode className="mr-2 h-4 w-4" />
+            Walk-in QR
           </Button>
           <Button variant="outline" className="border-primary/30 opacity-60 cursor-not-allowed" disabled title="Hardware device required">
             <QrCode className="mr-2 h-4 w-4" />
@@ -593,6 +697,10 @@ export function CheckIn() {
           <TabsTrigger value="daily" className="flex-1">
             <UserPlus className="h-4 w-4 mr-2" />
             Walk-In / Daily
+          </TabsTrigger>
+          <TabsTrigger value="configuration" className="flex-1">
+            <Settings className="h-4 w-4 mr-2" />
+            Configuration
           </TabsTrigger>
         </TabsList>
 
@@ -744,6 +852,45 @@ export function CheckIn() {
 
         {/* ── Daily Visitor tab ── */}
         <TabsContent value="daily" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          {pendingRegistrations.length > 0 && (
+            <Card className="border-amber-200 shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-amber-600" />
+                  Self-registered — awaiting payment
+                  <Badge className="bg-amber-100 text-amber-800 border-0">{pendingRegistrations.length}</Badge>
+                </CardTitle>
+                <CardDescription>Visitors who signed up with the walk-in QR. They get in only after you take payment.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {pendingRegistrations.map(r => (
+                  <div
+                    key={r.id}
+                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border ${selfRegistration?.id === r.id ? 'border-primary bg-gradient-light' : 'border-primary/10'}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-primary truncate">{r.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.phone}
+                        {r.plan_name ? ` · ${r.plan_name}` : ''}
+                        {r.referred_by_staff_name ? ` · via ${r.referred_by_staff_name}` : ''}
+                        {' · '}{new Date(r.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="btn-primary" onClick={() => takeSelfRegistrationPayment(r)}>
+                        Take payment
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => dismissSelfRegistration(r)} title="Visitor left or signed up twice">
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-primary/10 shadow-lg overflow-hidden">
               <CardHeader className="bg-gradient-primary text-white">
@@ -754,6 +901,14 @@ export function CheckIn() {
                 <CardDescription className="text-white/80">Register and grant temporary access</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
+                {selfRegistration && (
+                  <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-sm">
+                    <span className="text-amber-900">
+                      Taking payment for <strong>{selfRegistration.name}</strong>, who signed up with the walk-in QR.
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={resetDailyForm}><X className="h-4 w-4" /></Button>
+                  </div>
+                )}
                 {/* Visitor info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-primary flex items-center">
@@ -955,6 +1110,57 @@ export function CheckIn() {
             </Card>
           </div>
         </TabsContent>
+
+        {/* ── Configuration tab ── */}
+        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
+          <Card className="border-primary/10 shadow-lg overflow-hidden max-w-3xl">
+            <CardHeader className="bg-gradient-light border-b border-primary/10">
+              <CardTitle className="text-primary">Check-in Configuration</CardTitle>
+              <CardDescription>Timing rules for member check-ins at this branch. Set 0 to turn a rule off.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {!settingsForm ? (
+                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+              ) : (
+                <div className="space-y-6">
+                  <SettingField
+                    label="Minimum time between check-in and check-out"
+                    hint="Members can't check themselves out sooner. Staff can still check them out here after confirming."
+                    value={settingsForm.min_visit_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, min_visit_minutes: v })}
+                  />
+                  <Separator className="bg-primary/10" />
+                  <SettingField
+                    label="Quick break time"
+                    hint="Length of a break during a visit. Members tap Take Break in the app and stay checked in; break time isn't counted as gym time. 0 turns Take Break off."
+                    value={settingsForm.break_grace_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, break_grace_minutes: v })}
+                  />
+                  <Separator className="bg-primary/10" />
+                  <SettingField
+                    label="Next check-in time after a check-out"
+                    hint="After any check-out, how long a member must wait before checking in again."
+                    value={settingsForm.cooldown_minutes}
+                    onChange={v => setSettingsForm({ ...settingsForm, cooldown_minutes: v })}
+                  />
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="border-primary/30"
+                      onClick={() => setSettingsForm(savedSettings)}
+                      disabled={!settingsDirty || savingSettings}
+                    >
+                      Reset
+                    </Button>
+                    <Button className="btn-primary" onClick={saveSettings} disabled={!settingsDirty || savingSettings}>
+                      {savingSettings ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Confirm check-in dialog */}
@@ -1006,6 +1212,77 @@ export function CheckIn() {
           </DialogContent>
         </Dialog>
       )}
+      <AlertDialog open={!!earlyCheckOut} onOpenChange={open => { if (!open) setEarlyCheckOut(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check out {earlyCheckOut?.name} early?</AlertDialogTitle>
+            <AlertDialogDescription>{earlyCheckOut?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep checked in</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (earlyCheckOut) handleCheckOut(earlyCheckOut.attendanceId, earlyCheckOut.name, true);
+                setEarlyCheckOut(null);
+              }}
+            >
+              Check out anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Dialog open={walkInQrOpen} onOpenChange={setWalkInQrOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Walk-in QR</DialogTitle>
+            <DialogDescription>
+              {walkInLink?.staff_name
+                ? `Your personal code — sign-ups through it count toward ${walkInLink.staff_name}'s walk-in target.`
+                : 'Visitors scan this to sign themselves up, then pay here.'}
+            </DialogDescription>
+          </DialogHeader>
+          {!walkInLink ? (
+            <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
+          ) : !walkInLink.enabled ? (
+            <p className="text-sm text-muted-foreground py-4">
+              Self-registration is off for {walkInLink.branch_name || 'this branch'}. Turn it on under Settings › Branch › Walk-in Self-Registration.
+            </p>
+          ) : (
+            <WalkInQr
+              path={walkInLink.path}
+              title={walkInLink.branch_name || 'Walk-in registration'}
+              subtitle={walkInLink.staff_name ? `Scan to register — ${walkInLink.staff_name}` : undefined}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── SettingField sub-component ────────────────────────────────────────────────
+
+function SettingField({ label, hint, value, onChange }: {
+  label: string;
+  hint: string;
+  value: number;
+  onChange: (minutes: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-primary">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          max={1440}
+          value={value}
+          onChange={e => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+          className="w-28 border-primary/20 focus:border-primary"
+        />
+        <span className="text-sm text-muted-foreground">minutes</span>
+      </div>
+      <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -1024,11 +1301,12 @@ function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaf
   isActing: boolean;
 }) {
   const isMember  = person.kind === 'member';
-  const isActive  = person.status?.toLowerCase() === 'active';
+  const isSuspended = isMember && !!person.suspended;
+  const isActive  = person.status?.toLowerCase() === 'active' && !isSuspended;
 
   const statusColor = isActive
     ? 'bg-green-100 text-green-800'
-    : person.status === 'suspended'
+    : isSuspended || person.status === 'suspended'
     ? 'bg-red-100 text-red-800'
     : 'bg-gray-100 text-gray-700';
 
@@ -1054,7 +1332,12 @@ function PersonRow({ person, onCheckIn, onMemberCheckOut, onStaffClockIn, onStaf
         </div>
       </div>
       <div className="flex items-center space-x-2">
-        <Badge className={`${statusColor} border-0 text-xs capitalize`}>{person.status}</Badge>
+        <Badge
+          className={`${statusColor} border-0 text-xs capitalize`}
+          title={isSuspended ? `Membership suspended${person.suspendedReason ? `: ${person.suspendedReason}` : ''}` : undefined}
+        >
+          {isSuspended ? 'Suspended' : person.status}
+        </Badge>
         {isMember ? (
           isCheckedIn ? (
             <Button

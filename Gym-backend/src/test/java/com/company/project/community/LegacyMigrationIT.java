@@ -116,7 +116,8 @@ class LegacyMigrationIT {
         j.execute("CREATE TABLE roles (id BIGINT PRIMARY KEY, role_name VARCHAR(50))");
         j.execute("CREATE TABLE user_roles (user_id BIGINT, role_id BIGINT)");
         j.execute("CREATE TABLE members (id BIGINT PRIMARY KEY, name VARCHAR(100), photo_url TEXT, user_id BIGINT, "
-                + "global_user_id BIGINT, branch_id BIGINT, app_access_enabled BOOLEAN)");
+                + "global_user_id BIGINT, branch_id BIGINT, app_access_enabled BOOLEAN, "
+                + "membership_suspended BOOLEAN NOT NULL DEFAULT FALSE, approval_status VARCHAR(20))");
         j.execute("CREATE TABLE user_profiles (id BIGSERIAL PRIMARY KEY, user_id BIGINT, full_name VARCHAR(100), photo_url TEXT)");
         j.execute("CREATE TABLE community_posts (id BIGINT PRIMARY KEY, author_user_id BIGINT NOT NULL REFERENCES users(id), "
                 + "branch_id BIGINT, archived BOOLEAN DEFAULT FALSE, like_count INT DEFAULT 0, comment_count INT DEFAULT 0, "

@@ -4,12 +4,15 @@ import { BrandColors } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useTranslation } from 'react-i18next';
 import { useMembershipApprovalStatus } from '../hooks/useMembershipApprovalStatus';
+import { MembershipSuspendedScreen } from './MembershipSuspendedScreen';
 import { PaymentRejectedScreen } from './PaymentRejectedScreen';
 import { PendingApprovalScreen } from './PendingApprovalScreen';
 
 /**
  * Wraps member tabs whose APIs are tenant-scoped (dashboard, bookings,
- * membership, ...). While a Cash/Credit/Mixed purchase is awaiting reception
+ * membership, ...). A membership staff suspended is locked the same way and gets
+ * its own screen; the account, Community and gym discovery stay open (those tabs
+ * aren't wrapped). While a Cash/Credit/Mixed purchase is awaiting reception
  * approval, TenantContextFilter 403s every one of those endpoints, so the
  * wrapped screen must not even mount — otherwise its queries fire and the user
  * gets a stack of "403" toasts behind the pending screen. A rejected purchase
@@ -26,6 +29,18 @@ export function MemberApprovalGate({ children }: { children: ReactNode }) {
       <View style={styles.loaderContainer}>
         <Loader message={t('approval.loading')} />
       </View>
+    );
+  }
+
+  // Checked first: a suspension stands even when a payment is also pending.
+  if (approval.data?.accessState === 'SUSPENDED') {
+    return (
+      <MembershipSuspendedScreen
+        gymName={approval.data.gymName}
+        suspendedReason={approval.data.suspendedReason}
+        onRefresh={() => approval.refetch()}
+        isRefreshing={approval.isRefetching}
+      />
     );
   }
 

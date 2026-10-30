@@ -25,6 +25,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -156,14 +158,70 @@ class TenantContextFilterTest {
 
         when(applicationContext.getBean(MemberRepository.class)).thenReturn(memberRepository);
         Member member = new Member();
-        member.setAppAccessEnabled(false);
+        member.setApprovalStatus("PENDING");
+        when(memberRepository.findByGlobalUserId(1L)).thenReturn(Optional.of(member));
+        StringWriter body = captureBody();
+
+        tenantContextFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        assertTrue(body.toString().contains("\"code\":\"MEMBERSHIP_PENDING_APPROVAL\""), body.toString());
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(TenantContextHolder.getCurrentTenant()); // Cleared in finally
+    }
+
+    @Test
+    void testMemberEndpoint_GlobalSuspendedMember_RefusedAsSuspended() throws ServletException, IOException {
+        setupMockAuth(true, "ROLE_MEMBER");
+        mockTenantHeader("gym-a");
+        mockRequestUri("/api/mobile/member/dashboard");
+
+        when(applicationContext.getBean(MemberRepository.class)).thenReturn(memberRepository);
+        Member member = new Member();
+        member.setApprovalStatus("APPROVED");
+        member.setMembershipSuspended(true);
+        when(memberRepository.findByGlobalUserId(1L)).thenReturn(Optional.of(member));
+        StringWriter body = captureBody();
+
+        tenantContextFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        assertTrue(body.toString().contains("\"access_state\":\"SUSPENDED\""), body.toString());
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void testStaffLogin_NeverGatedByMemberAccess() throws ServletException, IOException {
+        setupMockAuth(false, "ROLE_RECEPTIONIST", "ROLE_MEMBER");
+        mockTenantHeader("gym-a");
+        mockRequestUri("/api/members");
+
+        tenantContextFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verify(applicationContext, never()).getBean(MemberRepository.class);
+    }
+
+    @Test
+    void testOwnStatusCheck_GlobalSuspendedMember_Allowed() throws ServletException, IOException {
+        setupMockAuth(true, "ROLE_MEMBER");
+        mockTenantHeader("gym-a");
+        mockRequestUri("/api/members/me");
+
+        when(applicationContext.getBean(MemberRepository.class)).thenReturn(memberRepository);
+        Member member = new Member();
+        member.setMembershipSuspended(true);
         when(memberRepository.findByGlobalUserId(1L)).thenReturn(Optional.of(member));
 
         tenantContextFilter.doFilterInternal(request, response, filterChain);
 
-        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: Membership payment is awaiting approval");
-        verify(filterChain, never()).doFilter(request, response);
-        assertNull(TenantContextHolder.getCurrentTenant()); // Cleared in finally
+        verify(filterChain).doFilter(request, response);
+    }
+
+    private StringWriter captureBody() throws IOException {
+        StringWriter body = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(body));
+        return body;
     }
 
     @Test
@@ -174,7 +232,7 @@ class TenantContextFilterTest {
 
         when(applicationContext.getBean(MemberRepository.class)).thenReturn(memberRepository);
         Member member = new Member();
-        member.setAppAccessEnabled(false);
+        member.setApprovalStatus("PENDING");
         when(memberRepository.findByGlobalUserId(1L)).thenReturn(Optional.of(member));
 
         String[] capturedTenant = new String[1];

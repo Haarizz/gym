@@ -1,6 +1,12 @@
 # Global Accounts for Gym-Created Members — Plan
 
 **Status:** Proposed, not started. Interim fixes are in place (see "Interim fixes").
+Membership suspension (section 5, step 0) is implemented on `changes_anandu`
+(migration `V103__membership_suspension.sql`), not yet released.
+Steps 1–7 are implemented on `changes_anandu`, not yet released (the app isn't in
+production) — see "Steps 1–7 — what's built". Members now sign in with GymBios accounts
+only: run the step 6 migration on every database that still has gym-only member logins
+(dry run first), or those members are refused at sign-in.
 **Scope:** Gym-backend (tenant DBs, main DB, control plane), Gym-frontend (Add Member,
 member details), GymBios-Mobile (login, invite claim).
 **Related:** [mobile-multi-membership-switcher-plan.md](mobile-multi-membership-switcher-plan.md)
@@ -16,6 +22,13 @@ exactly like a member who bought their plan in the app.
 Result: one kind of member account, one identity across gyms, and every mobile
 feature (profile, purchases, referrals, reviews, Community, multi-gym) works the
 same way for everyone.
+
+**Principle: the account belongs to the person, not to a gym.** GymBios is an
+independent app — anyone can sign up, browse Community and find gyms without being a
+member anywhere. A gym never grants or removes access to the app. What a gym controls
+is the *membership* it holds for that person. Staff can help someone create their
+account at the desk (section 1), but once created it is the person's: no gym can edit,
+reset or disable it. A gym can only suspend its own membership (section 5).
 
 ## The problem today
 
@@ -66,6 +79,25 @@ These are the problems this plan removes outright rather than patching:
   gym-created members are invisible to Community access checks, gym recovery after a
   reinstall, and the planned membership switcher.
 
+### Blocking a member locks the wrong thing
+
+The **App Access** toggle on the web member page (`MemberService.toggleMemberAccess`)
+behaves differently per account kind, and neither matches the principle above:
+
+- **Gym-created login** — sets `users.enabled = false`, so the member can't sign in
+  at all, and loses Community and gym discovery too.
+- **Global account** — sets `members.app_access_enabled = false`. Sign-in works and
+  `TenantContextFilter` refuses that gym's member endpoints, but the app's
+  `MemberApprovalGate` only recognises a *pending* or *rejected* payment, so it opens
+  the home screen and every call on it fails with "Membership payment is awaiting
+  approval". The web card also hides the toggle for these members (it requires
+  `user_id`), so staff can only block them from the mobile admin screens.
+
+Underneath, `app_access_enabled` does two jobs: the staff toggle **and** the
+Cash/Credit/Mixed payment-approval lock (set `false` on purchase, set back to `true`
+by `approveMemberPayment` and renewal approval). Approving a payment would therefore
+silently undo a staff block.
+
 ## Interim fixes (already done)
 
 These keep gym-created logins safe until this plan lands, and stay as a fallback
@@ -81,43 +113,66 @@ afterwards:
 
 ## Proposed design
 
-### 1. Invite instead of a staff-set password
+### 1. Staff-assisted sign-up, then the account is the person's
 
-Staff no longer set the member's app password. On **Add Member** (and **Give app
-access** for an existing member), the backend sends an **invite** to the member's email:
+Staff keep the ability to set a username and password — for members who can't or
+won't sign up themselves (e.g. an elderly member who asks reception to "set up the
+app"). What changes is *what* they create: a **global GymBios account**, the same kind
+as an in-app sign-up, not a gym login.
 
-1. **Email has no global account yet** → the invite link lets the member set their own
-   password. The global account (`users`, `user_profiles` in the main DB) is created at
-   that moment, already linked: `members.global_user_id` is set and the link is recorded
+**Creating a new account** — on **Add Member**, or **Create app account** on an
+existing member's page:
+
+1. Staff enter a username, password and (optionally) an email.
+2. The backend checks the username and email against all global accounts.
+3. If neither is taken, it creates the global account (`users`, `user_profiles` in the
+   main DB, via `MobileAuthService.createVerifiedMember`) and links it straight away —
+   the person is at the desk: `members.global_user_id` is set and the link is recorded
    in `user_memberships` (`GlobalMembershipService.recordLink`).
-2. **Email already has a global account** (they use the app at another gym) → the
-   invite asks them to sign in and confirm "Link your membership at <Gym>". Only then
-   is the gym record linked to their account.
+4. A staff-entered email starts **unverified**; a verification email is sent, and
+   password reset only ever goes to a verified email (section 2). A mistyped email
+   therefore can't be used by a stranger to take the account over.
 
-The family invitation flow already works like this (`MobileFamilyInvitationService`,
-`FamilyInvitationDirectoryEntry`, claim endpoints) and should be reused.
+**Linking an existing account** — if the username or email already belongs to a
+global account (they already use the app, perhaps at another gym), staff can't create
+or change anything. They use **Link existing account**: the person confirms "Link your
+membership at <Gym>" in their own app (or signs in on the gym's device). Only then is
+the gym record linked. The family invitation flow already works like this
+(`MobileFamilyInvitationService`, `FamilyInvitationDirectoryEntry`, claim endpoints)
+and should be reused.
 
-Why not create the account silently with a staff-chosen password:
+**After creation the account belongs to the person, permanently:**
 
-- Staff must never set or reset the password of an account the person created
-  themselves (the code already refuses this: "Global mobile accounts manage their own
-  credentials").
-- A mistyped email would attach the membership — and its payments — to a stranger's
-  account. Confirming from the inbox proves the email belongs to the member.
+- Staff can't change its username or password, reset it, or disable it. Only the
+  person changes their password, in the app (the code already refuses staff changes
+  to global accounts: "Global mobile accounts manage their own credentials").
+- Nothing that happens to a membership touches the account — suspension, expiry,
+  freeze, payment rejection, or deleting the member record. Those only change what
+  that gym's membership gives access to (section 5).
+- The member page shows **App account: linked (username)** — no toggle, no edit.
 
-Until the invite is accepted, the member is an ordinary gym member with no app
-access. Reception can resend the invite from the member's page.
+A member with no linked account is just a gym member; the person can still sign up in
+the app themselves and be linked later.
 
-### 2. Members without an email
+### 2. Members without an email, and forgotten passwords
 
-Couple/Family dependents and minors can have no email (`members.email` is nullable),
-but a global account needs a unique email. Options:
+**Email is optional on global accounts.** Elderly members, dependents and minors
+often have none (`members.email` is nullable), but main-DB `users.email` is
+`NOT NULL UNIQUE` today. A main-DB migration makes it nullable (still unique when
+present); username stays required and unique. Such accounts sign in with username
+and password only. Minors reached through a guardian's account is revisited with the
+family features.
 
-- **A.** No app login until an email is added (simplest).
-- **B.** Phone-number login (needs OTP-by-SMS, which the app doesn't have today).
-- **C.** Minors are reached through the guardian's account only.
+**Forgotten password: self-service by email only.**
 
-Recommendation: **A** now, revisit **C** with the family features.
+- Accounts with a **verified email** reset their own password from the login screen
+  (a mobile forgot-password flow — not present today, to be built).
+- Accounts **without** a verified email can't self-reset; they go to **GymBios
+  support**, never the gym. Support verifies identity and resets it.
+- Gym staff never reset a global account's password, even with the person present.
+
+When staff create an account without an email, the screen warns that the person won't
+be able to recover a forgotten password themselves and suggests adding one.
 
 ### 3. Who owns the profile
 
@@ -136,89 +191,256 @@ With one global account, there is still a gym record per gym. The rule:
 A one-time migration per gym, safe to re-run:
 
 1. For each member with `user_id` set and no `global_user_id`:
-   - **Email not used by any global account** → create the global account, copying the
-     password hash (same encoder) so their current password keeps working; copy the
-     member's details into `user_profiles`; set `global_user_id`; record the link.
-   - **Email already used by a global account** → don't merge automatically; send the
-     "link your membership" invite from step 1.
-   - **No email** → leave as is (see 2).
+   - **Email and username not used by any global account** → create the global
+     account with the same username, copying the password hash (same encoder) so their
+     current login keeps working unchanged; copy the member's details into
+     `user_profiles`; set `global_user_id`; record the link. The email is marked
+     unverified (it was typed by staff).
+   - **No email** → same, with no email (section 2).
+   - **Email or username already used by a global account** → don't merge
+     automatically; send the "link your membership" confirmation from section 1.
+     If only the username clashes, the member keeps their gym login until they confirm.
 2. Remove the old gym login (`users` row in the gym DB) and its `user_directory` entry
    once the member is linked, so login goes through the global path.
 3. Phones logged in with an old gym login must sign in once more (their token carries
    the gym user id).
 
 Before running in production, produce a dry-run report per gym: how many members fall
-into each group, and every email clash.
+into each group, and every email or username clash.
 
-### 5. Staff tools on the web
+### 5. Membership access vs. the account
+
+A gym can **suspend a membership**; it can never lock the account. This is
+independent of the migration and ships first (implementation step 0).
+
+**Separate state for suspension.** New member fields `membership_suspended`,
+`suspended_reason`, `suspended_by`, `suspended_at`, written only by the new
+Suspend / Resume staff actions — never by payment approval. Payment gating keeps
+using `approval_status`. The backend derives one per-gym `access_state`:
+
+| `access_state` | From | Checked |
+|---|---|---|
+| `SUSPENDED` | `membership_suspended = true` | first — wins over everything |
+| `PENDING_APPROVAL` | `approval_status = 'PENDING'` | |
+| `PAYMENT_REJECTED` | `approval_status = 'REJECTED'`, not superseded (`isSupersededRejection`) | |
+| `ACTIVE` | anything else | |
+
+`app_access_enabled` stops gating members; it's dropped once all readers use
+`access_state`. The migration that adds the new fields sets
+`membership_suspended = true` where `app_access_enabled = false` with no pending or
+rejected approval (those can only have come from the staff toggle), and re-enables
+the `users` rows that `toggleMemberAccess` disabled.
+
+**What a suspended (or pending / rejected) member keeps and loses:**
+
+| Keeps — never gated by a gym | Loses — at that gym only |
+|---|---|
+| Sign-in, profile | Home dashboard |
+| Community (reading; posting via another gym where active) | Bookings, check-in, workouts |
+| Gym centers / Discover / catalog | Membership details, payments, wallet |
+| Memberships at other gyms | Offers, team |
+| `/api/members/me`, push tokens, notifications | |
+
+**Enforcement.**
+
+- `TenantContextFilter` resolves the member for both token kinds (`global_user_id`
+  for global, `user_id` for gym-created logins) and refuses member endpoints unless
+  `access_state = ACTIVE`, returning the state as an error code instead of the
+  current fixed "awaiting approval" message. Gym-independent paths (auth, profile,
+  discovery, Community) are untouched.
+- `/api/members/me` returns `access_state` and `suspended_reason`.
+- Mobile: `MemberApprovalGate` / `isMemberAccessLocked` switch on `access_state`
+  rather than inferring it from flags, with a new **Membership suspended** screen
+  (gym name, reason, "contact reception", links to Community and Gyms).
+- Web: the member page's **App Access** card becomes **Membership access —
+  Active / Suspended**, with Suspend (asks for a reason) and Resume, shown for every
+  member regardless of account kind.
+
+### 6. Staff tools on the web
 
 These act on gym logins today and need the global-account versions:
 
 | Today | After |
 |---|---|
-| Set app username/password on Add Member | Send invite |
-| `setMemberCredentials` (reset password) | Resend invite / send password-reset email |
-| `toggleMemberAccess` (`User.enabled`) | `setAppAccessEnabled` (already used for global members) |
-| Member page shows "app username" | Show invite status: not sent / sent / accepted |
+| Set app username/password on Add Member (gym login) | Same fields, creates a **global** account and links it (section 1) — only if username/email are free |
+| — | **Link existing account** — person confirms in their app |
+| `setMemberCredentials` (staff change username/password later) | **Removed.** Only the person changes their password; forgotten passwords go through email reset or GymBios support (section 2) |
+| `toggleMemberAccess` (`User.enabled`) | Suspend / resume membership (section 5) — never touches the account |
+| Member page shows "app username" | **App account:** not linked / awaiting confirmation / linked (username), plus **Membership access:** active / suspended |
 
-### 6. What gets simpler afterwards
+### 7. What gets simpler afterwards
 
 - The duplicate-membership check at a gym becomes reliable: one `global_user_id` per
   person, email no longer the only guard.
 - Buying at a second gym works for everyone and lands on the same account — the
   membership switcher plan then covers all members.
-- Payment-approval blocking, rejection handling and Community access apply to every
-  member the same way.
+- Payment-approval blocking, suspension, rejection handling and Community access
+  apply to every member the same way; the `user_id` lookup in `TenantContextFilter`
+  goes away.
 - The account-kind branches added by the interim fixes can be reduced to the global
   path (keep them until the migration report shows no gym-created logins left).
 
 ## Decisions needed
 
-1. **Invite vs. auto-create.** Recommended: invite (section 1). Auto-create is only
-   safe for emails with no existing account, and still lets staff choose the password.
-2. **Members without email.** Recommended: no app login until an email is added.
-3. **Profile edits by staff.** Recommended: staff edits to identity fields copy back to
-   the global profile. Alternative: identity fields are read-only on the web once the
-   member has accepted the invite.
-4. **Existing gym-created logins.** Recommended: migrate with password hash copied;
-   email clashes go through the invite. Alternative: leave them as they are and only
-   use invites for new members (keeps two kinds of login indefinitely).
-5. **Usernames.** Global login today accepts username or email. Recommended: invited
-   members log in with email; keep existing usernames working during the migration
-   (they're already unique across gyms through `user_directory`).
+1. **How staff give app access.** Decided: staff-assisted sign-up — staff set a
+   username and password, which creates a global account linked at once; existing
+   accounts are linked only with the person's confirmation (section 1).
+2. **Members without email.** Decided: email is optional on global accounts;
+   username + password login (section 2).
+3. **Forgotten passwords.** Decided: self-service reset to a verified email; accounts
+   without one go to GymBios support, never the gym (section 2).
+4. **Who controls the account after creation.** Decided: the person. Staff can't
+   edit, reset or disable it; no membership status affects it (sections 1, 5).
+5. **What a gym can block.** Decided: a gym can only suspend its own membership
+   (section 5); it can never lock the person's account or their access to Community,
+   gym discovery or other gyms.
+6. **Profile edits by staff.** Implemented as recommended: staff edits to identity
+   fields copy back to the global profile. Alternative still open: identity fields
+   read-only on the web once the account is linked.
+7. **Existing gym-created logins.** Built as recommended (step 6, not yet run): migrate
+   with username and password hash copied; clashes go through link confirmation. Alternative: leave them as they
+   are and only create global accounts for new members (keeps two kinds of login
+   indefinitely).
+8. **Usernames.** Global login accepts username or email. Recommended: keep it so;
+   migrated usernames keep working (they're already unique across gyms through
+   `user_directory`, but must also be checked against global usernames).
 
 ## Suggested implementation order
 
-1. Invite backend: create/link global account on accept, `recordLink`, resend.
-2. Web: Add Member sends the invite; member page shows invite status and resend.
-3. Mobile: invite-accept screens (set password / sign in and confirm link).
+0. Membership suspension (section 5) — backend fields, migration and filter; mobile
+   gate and suspended screen (all 9 locales); web Membership access card. Independent
+   of the steps below and ships first.
+1. Backend: main-DB migration making `users.email` nullable plus an email-verified
+   flag; staff-assisted global account creation + `recordLink`; link-existing-account
+   request and confirm; forgot-password by verified email.
+2. Web: Add Member / Create app account create the global account; Link existing
+   account; member page shows app account status (no edit, no reset).
+3. Mobile: confirm-link screen; forgot-password screens; email verification.
 4. Profile ownership sync (section 3), both directions.
-5. Staff tool switch-over (section 5).
+5. Staff tool switch-over (section 6).
 6. Migration: dry-run report on QA, review, then run on QA, then production.
 7. After production shows no gym-created logins left, simplify the interim branches.
 
+## Steps 1–7 — what's built
+
+- **Clean-up (step 7):** done before any production run, since the app isn't live. A
+  member-only login in a gym's own database is refused at sign-in ("This login has
+  moved to a GymBios account…") and its old tokens are rejected
+  (`UserDetailsImpl.isMemberOnly`, `AuthService.login`, `JwtAuthenticationFilter`). Gone:
+  the gym-login branches in `TenantContextFilter`, `MobileProfileService` (gym record
+  read/write), `AuthService` (name, profile-completed, branch lookups by `user_id`), and
+  staff password reset for gym logins (`set-credentials` only creates accounts now; web
+  and mobile admin offer Create/Link instead). Creating or linking an account for a
+  member with an old gym login retires that login (`MemberAppAccountService.retireGymLogin`),
+  which is also how staff fix the migration's BLOCKED_USERNAME members. Kept on purpose:
+  the `isGlobal()` id-space guards in purchase, review and referral endpoints — a
+  non-global sign-in is now always staff. Single-database mode (tenant routing off) is
+  unaffected.
+
+- **Migration (step 6), not yet run:** `GymLoginMigrationService`, platform-admin only.
+  `POST /api/platform/account-migration/dry-run[?tenantSlug=…]` reports, per gym, what
+  would happen to each member with a gym-only login and changes nothing.
+  `POST /api/platform/account-migration/run` with `{"tenantSlug": "…", "confirm": "MIGRATE"}`
+  (omit tenantSlug for all gyms) does it. Outcomes: MIGRATE (new GymBios account, same
+  username and password hash, details copied, gym login retired), LINK_REQUEST (email
+  already has an account — request sent, gym login kept), ALREADY_REQUESTED,
+  RETIRE_GYM_LOGIN (already linked), BLOCKED_USERNAME (username used in the main DB —
+  decide by hand), SKIPPED_STAFF_LOGIN, SKIPPED_MISSING_LOGIN, FAILED. Re-runnable;
+  an interrupted MIGRATE resumes. Retiring disables the gym `users` row (rows elsewhere
+  still reference it) and removes its `user_directory` entry, rather than deleting.
+  Re-run after members accept link requests to retire their gym logins.
+- **Signed-out handling (for step 6):** the backend now rejects tokens of disabled
+  logins and answers 401 (not 403) when there's no valid sign-in; the app and the web
+  sign out on a 401, so migrated members simply sign in again.
+
+- **Staff tools (step 5):** the mobile admin member screen matches the web card —
+  account status (none / gym login / linked / awaiting confirmation), Create account,
+  Link existing, Cancel request; the Add Member wizard's toggle creates a GymBios
+  account. Staff can no longer set or reset a GymBios account's password anywhere;
+  `set-credentials` survives only to create an account (older clients) and to reset an
+  old gym-only login's password until step 6 moves it over.
+
+- **Profile sync (step 4):** one field mapping, `IdentityField` (name, phone, date of
+  birth, gender, nationality, address, emergency contact/phone, blood type, medical
+  conditions, allergies, medications, chronic illnesses, health notes, height, weight,
+  photo). An app edit copies the changed fields to the member's record at every linked
+  gym (`MemberProfileSyncService`, replacing the photo-only sync). A staff edit of a
+  linked member copies the changed fields to the account profile after the gym's save
+  commits (decision 6, recommended option); it does not reach the member's other gyms
+  until the person next edits that field in the app. Desk sign-up copies the whole gym
+  record onto the new account; accepting a link fills empty fields both ways and
+  overwrites nothing. Email is never copied — the account owns it.
+
+- **App (step 3):** `domains/account` — Profile → Account (email add/change, verify with
+  a code, link requests); a sheet in the member layout asks about pending link requests
+  (accept switches the app to that gym); "Forgot password?" on sign-in opens
+  `(auth)/forgot-password` (email → code + new password). Strings in en, ar, de, es,
+  fr, hi, zh.
+
+- **Web (step 2):** Add Member has a "Member has no email" checkbox (email required
+  otherwise) and its App Account section creates a GymBios account, warning when the
+  member has no email. Edit Member and the member profile page show `MemberAppAccountCard`:
+  create account / link existing account / pending request with cancel / linked account
+  (username, email, verified) — no password change except for old gym-only logins.
+
+- **Schema:** `V104__optional_account_email.sql` — `users.email` optional,
+  `users.email_verified` (existing rows true; desk-created false). Local dev applies the
+  email change through `DatabaseFixer`. Control plane `V10__account_links_and_codes.sql`
+  — `account_link_requests`, `account_codes`.
+- **Desk sign-up:** Add Member and `set-credentials` (create branch) now create a GymBios
+  account and link it (`MemberAppAccountService.createForMember`). Refused when the
+  username or email is already any login (GymBios account, gym login in
+  `user_directory`, or a pending in-app sign-up). Old gym logins keep their
+  change-password path until the migration.
+- **Staff endpoints:** `GET /api/members/{id}/app-account` (NONE / GYM_LOGIN / LINKED /
+  AWAITING_CONFIRMATION), `POST /api/members/{id}/app-account`,
+  `POST|DELETE /api/members/{id}/app-account/link`. Link requests last 14 days and email
+  the owner when their email is verified.
+- **App endpoints (strictly global):** `GET /api/mobile/account`,
+  `PUT /api/mobile/account/email`, `POST /api/mobile/account/email/send-code`,
+  `POST /api/mobile/account/email/verify`, `GET /api/mobile/account/link-requests`,
+  `POST /api/mobile/account/link-requests/{id}/accept|decline`.
+- **Forgotten password (public):** `POST /api/mobile/auth/password-reset/request`
+  (same answer whether or not the email has an account) and `/confirm`. Verified,
+  member-only accounts only. The code is never in the response unless
+  `account.password-reset.dev-return-code=true` (local testing only).
+- **Known gaps:** a person whose email a gym typed by mistake can't sign up with it until
+  support frees it (follow-up: a verified sign-up should take an address only held
+  unverified); creating a gym login (staff) doesn't yet check GymBios usernames.
+
 ## Risks
 
-- **Wrong email typed by staff** — mitigated by the invite: nothing links until the
-  real owner accepts.
-- **Email clashes during migration** — never merged automatically; reported and sent
-  through the invite.
+- **Wrong email typed by staff** — the email stays unverified and password reset only
+  goes to verified emails, so the stranger who owns that address can't take the
+  account over. An existing account is never linked without its owner confirming.
+- **Email or username clashes during migration** — never merged automatically;
+  reported and sent through link confirmation.
 - **Forced sign-in** after migration — one-time; announce it to gyms beforehand.
-- **Members without email** lose nothing they have today only if their existing gym
-  login is kept; decide this together with decision 2.
+- **No-email accounts can't self-recover** — support load for forgotten passwords;
+  staff are prompted to add an email at creation.
+- **Suspension backfill guesses intent** — rows with `app_access_enabled = false` and
+  no pending/rejected approval are assumed staff-blocked. List them per gym in the
+  migration log so reception can resume any that are wrong.
 
 ## Relevant code
 
 - Gym login creation: `MemberService.createMember` (app username/password branch),
   `MemberService.setMemberCredentials`, `MemberService.toggleMemberAccess`
 - Login routing: `AuthService.login` (`user_directory` lookup → gym vs. global)
-- Global account creation: `MobileAuthService.createVerifiedMember`
+- Global account creation: `MobileAuthService.createVerifiedMember`; main-DB
+  `User` entity (`email` currently `nullable = false, unique = true`)
 - Linking: `MemberService.linkGlobalUser`, `GlobalMembershipService.recordLink`,
   `UserMembershipBackfillRunner`
 - Duplicate check: `MemberRepository.existsUnrejectedMembership`
 - Cross-gym purchase check: `GlobalMembershipService.hasPurchaseInAnotherGymSince`,
   `MemberService.isSupersededRejection`
-- Approval gate: `TenantContextFilter` (pending-approval block for global users)
+- Approval gate: `TenantContextFilter` (pending-approval block for global users),
+  `/api/members/me` (`MemberController.getMyMembership`); mobile
+  `MemberApprovalGate`, `useMembershipApprovalStatus`
+- Access flag writers: `MemberService.toggleMemberAccess` / `setAppAccessEnabled`,
+  `approveMemberPayment`, `MobileDiscoveryController.purchaseMembership`,
+  `MobileFamilyPurchaseService`
+- Web access card: `Gym-frontend/src/components/shared/member-detail.tsx`
 - Invite flow to reuse: `MobileFamilyInvitationService`, `MobileFamilyClaimController`
 - Photo sync pattern: `MemberPhotoSyncService`
 - Interim fixes: `MobileProfileService`, `MobileDiscoveryController`,

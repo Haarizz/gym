@@ -5,4 +5,6 @@ export const checkInKeys = {
     [...checkInKeys.all, 'status', identifier] as const,
   memberStatus: () => [...checkInKeys.all, 'memberStatus'] as const,
   deviceKeys: () => [...checkInKeys.all, 'deviceKeys'] as const,
+  pendingWalkIns: () => [...checkInKeys.all, 'pendingWalkIns'] as const,
+  myWalkInLink: () => [...checkInKeys.all, 'myWalkInLink'] as const,
 };

@@ -27,6 +27,12 @@ const payments = {
     noReason: 'No se indicó ningún motivo. Contacta con el gimnasio para más detalles.',
     rejectedInfo: 'Contacta con la recepción del gimnasio para resolver el pago, o vuelve a comprar un plan.',
     browseGyms: 'Explorar gimnasios',
+
+    suspendedTitle: "Membresía suspendida",
+    suspendedAtGym: "El gimnasio ha suspendido tu membresía en {{gym}}.",
+    suspendedGeneric: "El gimnasio ha suspendido tu membresía.",
+    suspendedInfo: "Tu cuenta de GymBios sigue funcionando: puedes explorar la Comunidad y buscar gimnasios. Contacta con la recepción del gimnasio para restablecer tu membresía y desliza hacia abajo para comprobarlo de nuevo.",
+    openCommunity: "Abrir Comunidad",
   },
 
   outstanding: {

@@ -36,6 +36,16 @@ export interface CheckOutResponse {
   formatted_duration: string;
 }
 
+// Per-branch check-in timing rules (minutes). 0 turns a rule off.
+export interface CheckInSettings {
+  min_visit_minutes: number;
+  break_grace_minutes: number;
+  cooldown_minutes: number;
+}
+
+// Thrown by checkout() when the visit is shorter than the branch minimum; the desk can retry with force.
+export class MinVisitNotReachedError extends Error {}
+
 export interface TodayAttendanceRecord {
   id: number;
   member_id: number;
@@ -79,6 +89,10 @@ export interface WalkInCheckInRequest {
   // Which staff member actually handled this walk-in — credited toward their
   // revenue target regardless of which account is logged in.
   processed_by_staff_id?: number;
+  // The visitor's own pending self-registration (QR sign-up) this payment is for —
+  // confirmed by the backend, which also credits the staff whose QR was scanned
+  // when processed_by_staff_id is left empty.
+  self_registration_id?: number;
 }
 
 // ── Service ──────────────────────────────────────────────────────────────────
@@ -95,13 +109,32 @@ class CheckInService {
     return data;
   }
 
-  async checkout(attendanceId: number): Promise<CheckOutResponse> {
+  async checkout(attendanceId: number, force = false): Promise<CheckOutResponse> {
     const res = await authService.makeAuthenticatedRequest(
-      `${BASE}/attendance/${attendanceId}/checkout`,
+      `${BASE}/attendance/${attendanceId}/checkout${force ? '?force=true' : ''}`,
       { method: 'POST' }
     );
     const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || `Checkout failed: ${res.status}`);
+    if (!res.ok) {
+      const message = data?.error || `Checkout failed: ${res.status}`;
+      throw data?.code === 'MIN_VISIT_NOT_REACHED' ? new MinVisitNotReachedError(message) : new Error(message);
+    }
+    return data;
+  }
+
+  async getSettings(): Promise<CheckInSettings> {
+    const res = await authService.makeAuthenticatedRequest(`${BASE}/attendance/check-in-settings`);
+    if (!res.ok) throw new Error(`Failed to load check-in settings: ${res.status}`);
+    return res.json();
+  }
+
+  async updateSettings(settings: CheckInSettings): Promise<CheckInSettings> {
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE}/attendance/check-in-settings`,
+      { method: 'PUT', body: JSON.stringify(settings) }
+    );
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.message || data?.error || `Failed to save check-in settings: ${res.status}`);
     return data;
   }
 

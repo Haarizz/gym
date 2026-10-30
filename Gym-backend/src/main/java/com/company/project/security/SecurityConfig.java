@@ -17,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -77,7 +79,11 @@ public class SecurityConfig {
                         // listed here — it requires an authenticated Bearer token and falls
                         // through to the authenticated() catch-all below.
                         "/api/mobile/auth/google", "/api/mobile/auth/google/complete",
-                        "/api/mobile/auth/apple", "/api/mobile/auth/apple/complete", "/error").permitAll()
+                        "/api/mobile/auth/apple", "/api/mobile/auth/apple/complete",
+                        // Forgotten password: no session yet by definition. Scoped by the code
+                        // emailed to the account's verified address (AccountSelfService).
+                        "/api/mobile/auth/password-reset/request", "/api/mobile/auth/password-reset/confirm",
+                        "/error").permitAll()
 
                 // Public lead-capture endpoint — the "Request a demo" onboarding form on the
                 // unauthenticated pricing/login page (business-onboarding-fullscreen.tsx) submits
@@ -93,6 +99,13 @@ public class SecurityConfig {
                 // Managing forms stays under /api/lead-forms (authenticated, LEADS_*).
                 .requestMatchers(HttpMethod.GET, "/api/public/lead-forms/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/public/lead-forms/*/submit").permitAll()
+
+                // Walk-in self-registration (/w/{tenant}/{branch}, from the gym's or a
+                // staff member's QR). Only answers for branches that switched it on, and
+                // a submission just queues the visitor for staff to take payment
+                // (PublicWalkInController); rate-limited and honeypot-checked like above.
+                .requestMatchers(HttpMethod.GET, "/api/public/walk-in/*/*").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/walk-in/*/*/submit").permitAll()
 
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on
@@ -110,6 +123,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/**").authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // No valid sign-in → 401, not Spring's default 403: clients sign out on 401
+            // (an expired token, or a login since disabled), while 403 stays "signed in
+            // but not allowed" — e.g. a suspended membership.
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authenticationProvider(authenticationProvider())
             // Device key filter runs first so hardware devices are identified before JWT check
             .addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)

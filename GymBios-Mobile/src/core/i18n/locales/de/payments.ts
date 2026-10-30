@@ -27,6 +27,12 @@ const payments = {
     noReason: 'Es wurde kein Grund angegeben. Bitte wende dich für Details an das Studio.',
     rejectedInfo: 'Bitte kläre die Zahlung am Empfang deines Studios oder kaufe erneut einen Tarif.',
     browseGyms: 'Studios durchsuchen',
+
+    suspendedTitle: "Mitgliedschaft ausgesetzt",
+    suspendedAtGym: "Deine Mitgliedschaft bei {{gym}} wurde vom Studio ausgesetzt.",
+    suspendedGeneric: "Deine Mitgliedschaft wurde vom Studio ausgesetzt.",
+    suspendedInfo: "Dein GymBios-Konto funktioniert weiterhin: Du kannst die Community durchsuchen und Studios finden. Wende dich an den Empfang des Studios, um deine Mitgliedschaft wiederherzustellen, und ziehe dann nach unten, um erneut zu prüfen.",
+    openCommunity: "Community öffnen",
   },
 
   outstanding: {

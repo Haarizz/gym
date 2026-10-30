@@ -22,6 +22,8 @@ export interface BenefitInfo {
   id: string;
   name: string;
   description?: string;
+  icon?: string;
+  category?: string;
 }
 
 export type FreezeUnavailableReason = 'PLAN_DOES_NOT_ALLOW' | 'NO_DAYS_LEFT' | 'NO_FREEZES_LEFT';

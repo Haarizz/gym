@@ -44,8 +44,12 @@ export interface Member {
   /** Set when the member signed up through the app with a GymBios account (no local login). */
   globalUserId?: number;
   appUsername?: string;
-  /** Only an explicit false blocks the app — the backend treats null as allowed. */
+  /** Legacy app-access flag; no longer gates anything — see membershipSuspended. */
   appAccessEnabled?: boolean;
+
+  // Membership access — staff can suspend this gym's membership, never the app account.
+  membershipSuspended?: boolean;
+  suspendedReason?: string;
 
   // Medical
   bloodGroup?: string;

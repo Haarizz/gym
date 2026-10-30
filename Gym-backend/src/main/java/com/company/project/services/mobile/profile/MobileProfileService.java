@@ -35,6 +35,7 @@ import com.company.project.repositories.ReceiptRepository;
 import com.company.project.entities.Member;
 import com.company.project.entities.Receipt;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.accounts.IdentityField;
 
 @Service
 @Transactional
@@ -82,39 +83,16 @@ public class MobileProfileService {
         this.receiptRepository = receiptRepository;
     }
 
+    /** The account's own profile — the person's details (plan §3), created on first read. */
     public MobileProfileDTO getProfileByUserId(Long userId) {
-        return getProfileByUserId(userId, true);
-    }
-
-    /**
-     * global=false is a gym-created login (staff gave the member app credentials on the
-     * web). Its members row is what the web panel shows, so it wins over user_profiles
-     * for every field both hold — otherwise the app and the web drift into two different
-     * people (see updateProfile, which writes those fields back to the members row).
-     */
-    public MobileProfileDTO getProfileByUserId(Long userId, boolean global) {
-        Member member = global ? null : findGymMember(userId);
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> userProfileRepository.save(newProfile(userId, member)));
-        if (member != null) {
-            // Also heals rows saved before the two were kept in step (persisted on commit).
-            syncFromMember(profile, member);
-        }
+                .orElseGet(() -> userProfileRepository.save(newProfile(userId)));
         return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
     }
 
     public MobileProfileDTO updateProfile(Long userId, MobileProfileDTO request) {
-        return updateProfile(userId, request, true);
-    }
-
-    public MobileProfileDTO updateProfile(Long userId, MobileProfileDTO request, boolean global) {
-        Member member = global ? null : findGymMember(userId);
         UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> newProfile(userId, member));
-        if (member != null) {
-            // Validate this edit against the gym's current values, not stale ones.
-            syncFromMember(profile, member);
-        }
+                .orElseGet(() -> newProfile(userId));
 
         if (request.getFullName() != null) profile.setFullName(request.getFullName());
         if (request.getPhone() != null) profile.setPhone(request.getPhone());
@@ -159,80 +137,22 @@ public class MobileProfileService {
         if (request.getPhotoUrl() != null) profile.setPhotoUrl(request.getPhotoUrl());
 
         profile = userProfileRepository.save(profile);
-        if (member != null) {
-            writeBackToMember(request, profile, member);
-            memberRepository.save(member);
-        }
         return withAccountEmail(MobileProfileDTO.fromEntity(profile), userId);
     }
 
-    /** The members row of a gym-created login, or null (staff accounts, or no member record). */
-    private Member findGymMember(Long userId) {
-        return memberRepository.findByUserId(userId).orElse(null);
-    }
-
-    private UserProfile newProfile(Long userId, Member member) {
+    private UserProfile newProfile(Long userId) {
         UserProfile profile = new UserProfile();
         profile.setUser(userRepository.getReferenceById(userId));
         profile.setFullName("Member"); // Add a default since fullName is non-null
-        if (member != null) {
-            // Start from what the gym already recorded, so the member isn't sent through
-            // profile completion to retype it.
-            syncFromMember(profile, member);
-        }
         return profile;
     }
 
-    // Copies every field the gym has filled in onto the profile; blanks on the members
-    // row leave the profile's own value alone.
-    private static void syncFromMember(UserProfile profile, Member member) {
-        if (StringUtils.hasText(member.getName())) profile.setFullName(member.getName());
-        if (StringUtils.hasText(member.getPhone())) profile.setPhone(member.getPhone());
-        if (member.getDateOfBirth() != null) profile.setDateOfBirth(member.getDateOfBirth());
-        if (StringUtils.hasText(member.getGender())) profile.setGender(member.getGender());
-        if (StringUtils.hasText(member.getNationality())) profile.setNationality(member.getNationality());
-        if (StringUtils.hasText(member.getAddress())) profile.setAddress(member.getAddress());
-        String emergencyName = firstText(member.getEmergencyContactName(), member.getEmergencyContact());
-        if (emergencyName != null) profile.setEmergencyContact(emergencyName);
-        String emergencyPhone = firstText(member.getEmergencyContactPhone(), member.getEmergencyPhone());
-        if (emergencyPhone != null) profile.setEmergencyPhone(emergencyPhone);
-        if (StringUtils.hasText(member.getBloodType())) profile.setBloodType(member.getBloodType());
-        if (StringUtils.hasText(member.getMedicalConditions())) profile.setMedicalConditions(member.getMedicalConditions());
-        if (StringUtils.hasText(member.getAllergies())) profile.setAllergies(member.getAllergies());
-        if (member.getHeight() != null) profile.setHeight(member.getHeight());
-        if (member.getWeight() != null) profile.setWeight(member.getWeight());
-        if (StringUtils.hasText(member.getPhotoUrl())) profile.setPhotoUrl(member.getPhotoUrl());
-    }
-
-    // Only the fields this request changed, using the values just validated and saved
-    // on the profile. Name and phone are never blanked on the gym's record. The web form
-    // fills both emergency pairs, so both are kept in step.
-    private static void writeBackToMember(MobileProfileDTO request, UserProfile profile, Member member) {
-        if (request.getFullName() != null && StringUtils.hasText(profile.getFullName())) member.setName(profile.getFullName());
-        if (request.getPhone() != null && StringUtils.hasText(profile.getPhone())) member.setPhone(profile.getPhone());
-        if (request.getDateOfBirth() != null) member.setDateOfBirth(profile.getDateOfBirth());
-        if (request.getGender() != null) member.setGender(profile.getGender());
-        if (request.getNationality() != null) member.setNationality(profile.getNationality());
-        if (request.getAddress() != null) member.setAddress(profile.getAddress());
-        if (request.getEmergencyContact() != null) {
-            member.setEmergencyContact(profile.getEmergencyContact());
-            member.setEmergencyContactName(profile.getEmergencyContact());
-        }
-        if (request.getEmergencyPhone() != null) {
-            member.setEmergencyPhone(profile.getEmergencyPhone());
-            member.setEmergencyContactPhone(profile.getEmergencyPhone());
-        }
-        if (request.getBloodType() != null) member.setBloodType(profile.getBloodType());
-        if (request.getMedicalConditions() != null) member.setMedicalConditions(profile.getMedicalConditions());
-        if (request.getAllergies() != null) member.setAllergies(profile.getAllergies());
-        if (request.getHeight() != null) member.setHeight(profile.getHeight());
-        if (request.getWeight() != null) member.setWeight(profile.getWeight());
-        if (request.getPhotoUrl() != null) member.setPhotoUrl(profile.getPhotoUrl());
-    }
-
-    private static String firstText(String a, String b) {
-        if (StringUtils.hasText(a)) return a;
-        return StringUtils.hasText(b) ? b : null;
+    /** The account's current identity values, for copying an app edit to its gyms (MemberProfileSyncService). */
+    @Transactional(readOnly = true)
+    public java.util.Map<IdentityField, Object> identityValues(Long userId) {
+        return userProfileRepository.findByUserId(userId)
+                .map(IdentityField::valuesOf)
+                .orElseGet(() -> new java.util.EnumMap<>(IdentityField.class));
     }
 
     private void validateAge(LocalDate dateOfBirth) {

@@ -5,6 +5,7 @@ const common = {
     optional: '(optional)',
     error: 'Error',
     pleaseWait: 'Please wait',
+    close: 'Close',
   },
 
   language: {

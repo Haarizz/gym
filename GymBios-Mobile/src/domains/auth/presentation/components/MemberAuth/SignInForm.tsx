@@ -1,5 +1,6 @@
 import { Trans, useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { FieldErrors } from 'react-hook-form';
@@ -8,6 +9,7 @@ import { Button, Input, Typography } from '@/shared/components';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { loginSchema, type LoginValues } from './schemas';
 import { SocialAuthButtons } from './SocialAuthButtons';
+import { FORGOT_PASSWORD_HREF } from '../../navigation/routes';
 
 const LOGIN_FIELD_ORDER: (keyof LoginValues)[] = ['username', 'password'];
 
@@ -35,6 +37,7 @@ export function SignInForm({
   isAppleAvailable,
 }: SignInFormProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const {
     control,
     handleSubmit,
@@ -53,7 +56,7 @@ export function SignInForm({
   };
 
   const onForgotPassword = () => {
-    Alert.alert(t('auth.comingSoonTitle'), t('auth.forgotPasswordSoon'));
+    router.push(FORGOT_PASSWORD_HREF);
   };
 
   return (

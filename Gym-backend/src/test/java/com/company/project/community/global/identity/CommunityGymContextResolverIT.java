@@ -51,9 +51,10 @@ class CommunityGymContextResolverIT {
         a.update("INSERT INTO gyms (id, slug, name) VALUES (1, 'main', 'Gym A')");
         a.update("INSERT INTO branches (id, branch_name) VALUES (10, 'A Downtown')");
         a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled) VALUES (100, 'John', 10, 42, TRUE)");
-        a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled) VALUES (101, 'Pending', 10, 43, FALSE)");
+        a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled, approval_status) VALUES (101, 'Pending', 10, 43, FALSE, 'PENDING')");
         a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled) VALUES (102, 'Legacy', 10, 44, NULL)");
         a.update("INSERT INTO members (id, name, branch_id, user_id, app_access_enabled) VALUES (103, 'Staff-member', 10, 7, TRUE)");
+        a.update("INSERT INTO members (id, name, branch_id, global_user_id, membership_suspended) VALUES (104, 'Suspended', 10, 46, TRUE)");
 
         JdbcTemplate b = new JdbcTemplate(gymB);
         b.update("INSERT INTO gyms (id, slug, name) VALUES (1, 'main', 'Gym B')");
@@ -75,7 +76,8 @@ class CommunityGymContextResolverIT {
         jdbc.execute("CREATE TABLE gyms (id BIGINT PRIMARY KEY, slug VARCHAR(100), name VARCHAR(255))");
         jdbc.execute("CREATE TABLE branches (id BIGINT PRIMARY KEY, branch_name VARCHAR(255))");
         jdbc.execute("CREATE TABLE members (id BIGINT PRIMARY KEY, name VARCHAR(255), photo_url TEXT, branch_id BIGINT, "
-                + "user_id BIGINT, global_user_id BIGINT UNIQUE, app_access_enabled BOOLEAN)");
+                + "user_id BIGINT, global_user_id BIGINT UNIQUE, app_access_enabled BOOLEAN, "
+                + "membership_suspended BOOLEAN NOT NULL DEFAULT FALSE, approval_status VARCHAR(20))");
         return ds;
     }
 
@@ -134,9 +136,15 @@ class CommunityGymContextResolverIT {
     }
 
     @Test
-    void scenarioI_appAccessDisabledBlocksPostingButNullMeansNeverRestricted() {
+    void scenarioI_pendingApprovalBlocksPostingButLegacyRowsAreNeverRestricted() {
         assertEquals("APP_ACCESS_PENDING", code(() -> resolver.resolveForWrite(CommunityActor.global(43), "gym-a")));
         assertEquals(102L, resolver.resolveForWrite(CommunityActor.global(44), "gym-a").memberId());
+    }
+
+    @Test
+    void scenarioI2_suspendedMembershipCanReadButNotPostAsThatGym() {
+        assertEquals("MEMBERSHIP_SUSPENDED", code(() -> resolver.resolveForWrite(CommunityActor.global(46), "gym-a")));
+        assertFalse(resolver.canSeeGymContent(CommunityActor.global(46), "gym-a"));
     }
 
     @Test

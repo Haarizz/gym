@@ -1,9 +1,20 @@
-import { usePathname, useSegments, useRouter, type Href } from 'expo-router';
-import { useEffect } from 'react';
+import {
+  useGlobalSearchParams,
+  usePathname,
+  useRouter,
+  useSegments,
+  useSitemap,
+  type Href,
+  type SitemapType,
+} from 'expo-router';
+import { useEffect, useMemo, useRef } from 'react';
+import { setUnauthorizedHandler } from '@/core/network/apiClient';
+import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { i18n, useLanguageStore } from '@/core/i18n';
 import { Loader } from '@/shared/components';
-import { ROLE_SELECTION_HREF, MEMBER_AUTH_HREF } from '../navigation/routes';
+import { APP_ROLES, type AppRole } from '../../domain/valueObjects/AppRole';
+import { ROLE_SELECTION_HREF, MEMBER_AUTH_HREF, getRoleHomeHref } from '../navigation/routes';
 
 import type { createUseRestoreSession } from '../hooks/useAuthFlow';
 
@@ -17,13 +28,49 @@ const POST_ONBOARDING_HREF = '/(member)?claimReferral=1';
 const languageSelectHref = (next: string) =>
   `/(auth)/language-select?next=${encodeURIComponent(next)}` as Href;
 
+const ROLE_GROUPS = APP_ROLES.map((role) => `(${role})`);
+
+function collectRouteKeys(node: SitemapType | null, keys = new Set<string>()): Set<string> {
+  if (!node) return keys;
+  // './(member)/team/[staffId].tsx' -> '(member)/team/[staffId]'
+  keys.add(node.contextKey.replace(/^\.\//, '').replace(/\.[jt]sx?$/, ''));
+  node.children.forEach((child) => collectRouteKeys(child, keys));
+  return keys;
+}
+
+/**
+ * Route groups don't appear in URLs, so `/profile`, `/community`, `/` … exist under
+ * every role group and a cold load (web reload, or the OS restoring the app after it
+ * was killed while idle) resolves them to the first group — `(admin)`. A member then
+ * sits inside the admin tab shell and lands on the admin dashboard when backing out.
+ * Returns the same screen inside the user's own group (or their home if that group
+ * has no such screen), or null when the URL already belongs to their role.
+ */
+function wrongRoleGroupHref(
+  segments: string[],
+  appRole: AppRole,
+  routeKeys: Set<string>,
+  params: Record<string, string | string[] | undefined>,
+): Href | null {
+  const group = segments[0];
+  const ownGroup = `(${appRole})`;
+  if (!ROLE_GROUPS.includes(group) || group === ownGroup) return null;
+
+  const rest = segments.slice(1);
+  const pattern = [ownGroup, ...rest].join('/');
+  if (routeKeys.has(pattern) || routeKeys.has(`${pattern}/index`)) {
+    return { pathname: `/${pattern}`, params } as Href;
+  }
+  return getRoleHomeHref(appRole);
+}
+
 interface AuthBootstrapProps {
   useRestoreSession: ReturnType<typeof createUseRestoreSession>;
   children: React.ReactNode;
 }
 
 export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProps) {
-  const { restore, isHydrated, isRestoring, isAuthenticated, session } = useRestoreSession();
+  const { restore, isHydrated, isRestoring, isAuthenticated, session, logout } = useRestoreSession();
 
   const isLanguageHydrated = useLanguageStore((s) => s.isHydrated);
   const hasChosenLanguage = useLanguageStore((s) => s.hasChosen);
@@ -31,11 +78,36 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
 
   const segments = useSegments();
   const pathname = usePathname();
+  const params = useGlobalSearchParams();
   const router = useRouter();
+  const sitemap = useSitemap();
+  const routeKeys = useMemo(() => collectRouteKeys(sitemap), [sitemap]);
+
+  const appRole = isAuthenticated ? session?.appRole : undefined;
+  const roleRedirect = useMemo(
+    () => (appRole ? wrongRoleGroupHref(segments, appRole, routeKeys, params) : null),
+    [appRole, segments, routeKeys, params],
+  );
 
   useEffect(() => {
     restore();
   }, [restore]);
+
+  // The backend rejected this sign-in: sign out once (several requests may fail
+  // together) and let the guard below send the person to sign in again.
+  const signingOut = useRef(false);
+  useEffect(() => {
+    if (session) signingOut.current = false;
+  }, [session]);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (signingOut.current) return;
+      signingOut.current = true;
+      toast.error(i18n.t('auth.sessionExpired'));
+      logout();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [logout]);
 
   useEffect(() => {
     hydrateLanguage();
@@ -51,6 +123,10 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
     const profileCompleted = session?.profileCompleted ?? session?.user.profileCompleted ?? false;
 
     if (isAuthenticated) {
+      if (roleRedirect) {
+        router.replace(roleRedirect);
+        return;
+      }
       if (session?.appRole === 'member') {
         if (!profileCompleted && !isProfileCompletion) {
           // Profile incomplete → send to profile completion
@@ -83,6 +159,7 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
     router,
     isLanguageHydrated,
     hasChosenLanguage,
+    roleRedirect,
   ]);
 
   if (!isHydrated || isRestoring || !isLanguageHydrated) {
@@ -91,7 +168,8 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
 
   const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'role-selection';
 
-  if (!isAuthenticated && !inAuthGroup && segments.length > 0) {
+  // Don't mount another role's layout (and fire its 403'd requests) while redirecting.
+  if ((!isAuthenticated && !inAuthGroup && segments.length > 0) || roleRedirect) {
     return <Loader message={i18n.t('auth.redirecting')} />;
   }
 

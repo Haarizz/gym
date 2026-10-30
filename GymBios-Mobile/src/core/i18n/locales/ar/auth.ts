@@ -20,8 +20,7 @@ const auth = {
     enterPassword: 'أدخل كلمة المرور',
     rememberMe: 'تذكّرني',
     forgotPassword: 'نسيت كلمة المرور؟',
-    comingSoonTitle: 'قريبًا',
-    forgotPasswordSoon: 'ستتوفر استعادة كلمة المرور قريبًا.',
+    sessionExpired: "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     signIn: 'تسجيل الدخول',
     newToGymBios: 'جديد على GymBios؟ <link>أنشئ حسابًا</link>',
 
@@ -162,6 +161,23 @@ const auth = {
       checkIns: 'تسجيلات الوصول',
       streak: 'السلسلة',
     },
+  },
+  passwordReset: {
+    title: "إعادة تعيين كلمة المرور",
+    emailSubtitle: "أدخل البريد الإلكتروني لحسابك. إذا كان موثّقًا فسنرسل إليه رمزًا.",
+    email: "البريد الإلكتروني",
+    sendCode: "إرسال الرمز",
+    noEmailNote: "لا يوجد بريد موثّق في حسابك؟ تواصل مع دعم GymBios — لا يمكن لصالتك إعادة تعيينها.",
+    codeSubtitle: "أدخل الرمز المرسل إلى {{email}} واختر كلمة مرور جديدة.",
+    code: "الرمز",
+    newPassword: "كلمة المرور الجديدة",
+    confirmPassword: "تأكيد كلمة المرور الجديدة",
+    reset: "إعادة تعيين كلمة المرور",
+    resend: "إرسال رمز جديد",
+    mismatch: "كلمتا المرور غير متطابقتين",
+    done: "تمت إعادة تعيين كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.",
+    devCode: "رمز التطوير: {{code}}",
+    backToSignIn: "العودة لتسجيل الدخول",
   },
 } satisfies LocaleResource;
 

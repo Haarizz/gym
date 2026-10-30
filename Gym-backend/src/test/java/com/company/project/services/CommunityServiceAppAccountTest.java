@@ -98,6 +98,10 @@ class CommunityServiceAppAccountTest {
         member.setName("Asha Menon");
         member.setGlobalUserId(GLOBAL_ID);
         member.setAppAccessEnabled(appAccessEnabled);
+        // A purchase awaiting approval is what locks a member (MemberAccessState), not the flag itself.
+        if (Boolean.FALSE.equals(appAccessEnabled)) {
+            member.setApprovalStatus("PENDING");
+        }
         member.setMembershipStatus(membershipStatus);
         when(memberRepository.findByGlobalUserId(GLOBAL_ID)).thenReturn(Optional.of(member));
         return member;

@@ -79,8 +79,8 @@ public class MobileReferralController {
         
         UserDetailsImpl principal = getCurrentPrincipal();
         if (!principal.isGlobal()) {
-            // Codes are for people joining through the app. A gym-created login is already
-            // a member, and its id isn't a global user id an attribution could key on.
+            // Codes are for people joining through the app with a GymBios account; a staff
+            // sign-in's id isn't a global user id an attribution could key on.
             return ResponseEntity.badRequest().body(Map.of("error", GYM_LOGIN_REFEREE_MESSAGE));
         }
         Long userId = principal.getId();
@@ -180,7 +180,7 @@ public class MobileReferralController {
         }
     }
 
-    // The caller's global user id, or null for a gym-created login (whose id is the gym's users.id).
+    // The caller's global user id, or null for a staff sign-in (whose id is the gym's users.id).
     private static Long globalIdOf(UserDetailsImpl principal) {
         return principal.isGlobal() ? principal.getId() : null;
     }

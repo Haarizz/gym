@@ -36,12 +36,12 @@ public class GlobalMembershipService {
     private static final Logger log = LoggerFactory.getLogger(GlobalMembershipService.class);
 
     // Same rule check-in applies (CheckInService.validateMembership): status "active",
-    // not past expiry — plus not held back pending payment approval, the mobile
-    // app-access gate (TenantContextFilter).
+    // not past expiry — plus this gym's member features open (not suspended, not held
+    // back by payment approval), the gate TenantContextFilter applies.
     private static final String ACTIVE_MEMBERSHIP_SQL =
             "SELECT 1 FROM members WHERE global_user_id = ?"
                     + " AND LOWER(membership_status) = 'active'"
-                    + " AND (app_access_enabled IS NULL OR app_access_enabled)"
+                    + " AND " + MemberAccessState.SQL_ALLOWS_MEMBER_FEATURES
                     + " AND (COALESCE(expiry_date, membership_end_date) IS NULL"
                     + "      OR COALESCE(expiry_date, membership_end_date) >= ?)"
                     + " LIMIT 1";
@@ -213,7 +213,7 @@ public class GlobalMembershipService {
         if (!"active".equalsIgnoreCase(member.getMembershipStatus())) {
             return false;
         }
-        if (Boolean.FALSE.equals(member.getAppAccessEnabled())) {
+        if (!MemberAccessState.of(member).allowsMemberFeatures()) {
             return false;
         }
         LocalDateTime expiry = member.getExpiryDate() != null ? member.getExpiryDate() : member.getMembershipEndDate();

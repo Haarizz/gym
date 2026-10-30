@@ -120,6 +120,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Solo los socios del gimnasio seleccionado pueden comentar.',
         APP_ACCESS_PENDING: 'Podrás comentar cuando se apruebe tu membresía.',
+        MEMBERSHIP_SUSPENDED: "Tu membresía en este gimnasio está suspendida, así que no puedes comentar como miembro.",
         GYM_CONTEXT_REQUIRED: 'Elige uno de tus gimnasios para comentar.',
         MEMBERSHIP_UNDETERMINED: 'No se pudo confirmar tu membresía.',
       },
@@ -153,6 +154,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Solo los socios del gimnasio seleccionado pueden publicar. Cambia a uno de tus gimnasios para publicar.',
         APP_ACCESS_PENDING: 'Podrás publicar cuando se apruebe tu membresía.',
+        MEMBERSHIP_SUSPENDED: "Tu membresía en este gimnasio está suspendida. Cambia a otro de tus gimnasios para publicar.",
         GYM_CONTEXT_REQUIRED: 'Elige uno de tus gimnasios para publicar.',
         MEMBERSHIP_UNDETERMINED: 'No se pudo confirmar tu membresía.',
         PLATFORM_CANNOT_POST: 'Las cuentas de plataforma no pueden publicar en la comunidad.',

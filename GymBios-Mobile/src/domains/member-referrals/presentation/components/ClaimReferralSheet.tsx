@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   PanResponder,
   Platform,
@@ -39,7 +39,7 @@ interface ClaimReferralSheetProps {
 
 /**
  * Bottom sheet that asks a newly onboarded member for the referral code of whoever
- * invited them. Shown over gym discovery right after profile completion.
+ * invited them. Shown over member home right after profile completion.
  */
 export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferralSheetProps) {
   const { t } = useTranslation();
@@ -51,12 +51,33 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
 
   const { mutate: claimReferral, isPending } = useClaimReferral();
   // Invalidated by a successful claim, so it refetches with the referrer's name.
-  const { data: myClaim } = useMyReferralClaim();
+  // Only fetched while the sheet is up: it's tenant-scoped, so on a suspended or
+  // payment-locked gym it 403s — a hidden sheet must not toast that at the user.
+  const { data: myClaim } = useMyReferralClaim(visible);
 
   const [translateY] = useState(() => new Animated.Value(700));
   const [shakeX] = useState(() => new Animated.Value(0));
   // Keeps the Modal mounted until the close animation finishes.
   const [isMounted, setIsMounted] = useState(visible);
+  // Lifts the sheet above the keyboard. KeyboardAvoidingView can't do this on
+  // Android: the app is edge-to-edge and a Modal window never resizes for the IME.
+  const [keyboardInset] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const animateTo = (toValue: number, duration?: number) =>
+      Animated.timing(keyboardInset, {
+        toValue,
+        duration: duration || 220,
+        useNativeDriver: false,
+      }).start();
+    const subscriptions = [
+      Keyboard.addListener(showEvent, (e) => animateTo(e.endCoordinates.height, e.duration)),
+      Keyboard.addListener(hideEvent, (e) => animateTo(0, e.duration)),
+    ];
+    return () => subscriptions.forEach((s) => s.remove());
+  }, [keyboardInset]);
 
   useEffect(() => {
     if (visible) {
@@ -98,7 +119,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
   );
 
   const handleChange = (value: string) => {
-    setCode(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH));
+    setCode(value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH));
     setError(null);
   };
 
@@ -136,7 +157,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
         // doesn't make the user a member of the referrer's gym, and pinning
         // X-Tenant-ID there makes the backend 403 every request as "not a member
         // of this Gym". The tenant is set once a purchase actually creates the
-        // membership (see MemberCentersScreen.handleViewDetails).
+        // membership (see PlanPurchaseModal's purchase onSuccess).
         inputRef.current?.blur();
         setStep('done');
       },
@@ -155,10 +176,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
 
   return (
     <Modal transparent visible={isMounted} animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <Animated.View style={[styles.backdrop, { paddingBottom: keyboardInset }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
 
         <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
@@ -217,7 +235,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
                     onBlur={() => setIsFocused(false)}
                     onSubmitEditing={handleClaim}
                     maxLength={CODE_LENGTH}
-                    autoCapitalize="characters"
+                    autoCapitalize="none"
                     autoCorrect={false}
                     spellCheck={false}
                     textContentType="oneTimeCode"
@@ -281,7 +299,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
             )}
           </SafeAreaView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 }

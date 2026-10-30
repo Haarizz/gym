@@ -20,8 +20,7 @@ const auth = {
     enterPassword: '请输入密码',
     rememberMe: '记住我',
     forgotPassword: '忘记密码？',
-    comingSoonTitle: '即将推出',
-    forgotPasswordSoon: '找回密码功能即将推出。',
+    sessionExpired: "你的登录已失效，请重新登录。",
     signIn: '登录',
     newToGymBios: '初次使用 GymBios？<link>注册账号</link>',
 
@@ -162,6 +161,23 @@ const auth = {
       checkIns: '签到次数',
       streak: '坚持天数',
     },
+  },
+  passwordReset: {
+    title: "重置密码",
+    emailSubtitle: "输入账户邮箱。如果该邮箱已验证，我们会发送验证码。",
+    email: "邮箱",
+    sendCode: "发送验证码",
+    noEmailNote: "你的账户没有已验证的邮箱？请联系 GymBios 客服——健身房无法为你重置。",
+    codeSubtitle: "输入发送至 {{email}} 的验证码，并设置新密码。",
+    code: "验证码",
+    newPassword: "新密码",
+    confirmPassword: "确认新密码",
+    reset: "重置密码",
+    resend: "发送新验证码",
+    mismatch: "两次输入的密码不一致",
+    done: "密码已重置，请使用新密码登录。",
+    devCode: "开发验证码：{{code}}",
+    backToSignIn: "返回登录",
   },
 } satisfies LocaleResource;
 

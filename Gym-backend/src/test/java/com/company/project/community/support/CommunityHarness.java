@@ -139,7 +139,8 @@ public final class CommunityHarness implements AutoCloseable {
         jdbc.execute("CREATE TABLE gyms (id BIGINT PRIMARY KEY, slug VARCHAR(100), name VARCHAR(255))");
         jdbc.execute("CREATE TABLE branches (id BIGINT PRIMARY KEY, branch_name VARCHAR(255))");
         jdbc.execute("CREATE TABLE members (id BIGINT PRIMARY KEY, name VARCHAR(255), photo_url TEXT, branch_id BIGINT, "
-                + "user_id BIGINT, global_user_id BIGINT UNIQUE, app_access_enabled BOOLEAN)");
+                + "user_id BIGINT, global_user_id BIGINT UNIQUE, app_access_enabled BOOLEAN, "
+                + "membership_suspended BOOLEAN NOT NULL DEFAULT FALSE, approval_status VARCHAR(20))");
         jdbc.execute("CREATE TABLE users (id BIGINT PRIMARY KEY, username VARCHAR(255))");
         jdbc.execute("CREATE TABLE user_profiles (id BIGSERIAL PRIMARY KEY, user_id BIGINT, full_name VARCHAR(255), photo_url TEXT)");
         return ds;
@@ -149,8 +150,8 @@ public final class CommunityHarness implements AutoCloseable {
         JdbcTemplate a = new JdbcTemplate(gymA);
         a.update("INSERT INTO gyms VALUES (1, 'main', 'FitZone A')");
         a.update("INSERT INTO branches VALUES (10, 'Downtown')");
-        a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled) VALUES "
-                + "(100, 'John', 10, 42, TRUE), (101, 'Pending', 10, 43, FALSE)");
+        a.update("INSERT INTO members (id, name, branch_id, global_user_id, app_access_enabled, approval_status) VALUES "
+                + "(100, 'John', 10, 42, TRUE, NULL), (101, 'Pending', 10, 43, FALSE, 'PENDING')");
         a.update("INSERT INTO users VALUES (42, 'gym-a-admin@example.com'), (9, 'trainer@example.com')");
         a.update("INSERT INTO user_profiles (user_id, full_name) VALUES (42, 'Alice (A admin)')");
 

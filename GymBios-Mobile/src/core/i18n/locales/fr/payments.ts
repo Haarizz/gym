@@ -27,6 +27,12 @@ const payments = {
     noReason: 'Aucun motif n’a été indiqué. Veuillez contacter la salle pour plus de détails.',
     rejectedInfo: 'Veuillez contacter l’accueil de la salle pour régulariser le paiement, ou acheter à nouveau une formule.',
     browseGyms: 'Parcourir les salles',
+
+    suspendedTitle: "Adhésion suspendue",
+    suspendedAtGym: "Votre adhésion à {{gym}} a été suspendue par la salle.",
+    suspendedGeneric: "Votre adhésion a été suspendue par la salle.",
+    suspendedInfo: "Votre compte GymBios fonctionne toujours : vous pouvez parcourir la Communauté et trouver des salles. Contactez l'accueil de la salle pour rétablir votre adhésion, puis tirez vers le bas pour vérifier à nouveau.",
+    openCommunity: "Ouvrir la Communauté",
   },
 
   outstanding: {

@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/shared/components/AppText';
 import { tOr } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
@@ -68,6 +69,7 @@ export function CenterFiltersModal({
   onClose,
 }: CenterFiltersModalProps) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [local, setLocal] = useState<CenterFilters>(filters);
   const [isDraggingPrice, setIsDraggingPrice] = useState(false);
   const isPriceActive = isPriceRangeActive(local.priceMin, local.priceMax);
@@ -90,7 +92,7 @@ export function CenterFiltersModal({
     (local.paymentMode ? 1 : 0);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -201,7 +203,7 @@ export function CenterFiltersModal({
             </View>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: Math.max(Spacing.four, insets.bottom + Spacing.two) }]}>
             <Pressable
               style={styles.resetButton}
               onPress={() => {

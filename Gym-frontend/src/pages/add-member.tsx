@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Slider } from "../components/ui/slider";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { MemberAppAccountCard, AccountEmailNote } from "../components/members/MemberAppAccountCard";
 import { toast } from "sonner";
 import { usePaymentManager } from '../payments/usePaymentManager';
 import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
@@ -203,12 +204,10 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   // Payment popup state management
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [showAppPassword, setShowAppPassword] = useState(false);
-  const [existingUserId, setExistingUserId] = useState<number | undefined>();
-  const [existingAppUsername, setExistingAppUsername] = useState('');
-  const [editNewAppUsername, setEditNewAppUsername] = useState('');
-  const [editNewAppPassword, setEditNewAppPassword] = useState('');
-  const [showEditNewAppPassword, setShowEditNewAppPassword] = useState(false);
-  const [isSavingMemberCredentials, setIsSavingMemberCredentials] = useState(false);
+  // "Member has no email" — e.g. an elderly member or a minor. Email is required unless
+  // staff tick this; an app account made for them then has no email either, so a
+  // forgotten password needs GymBios support (plan §2).
+  const [noEmail, setNoEmail] = useState(false);
 
   // Bank accounts pulled from Chart of Accounts (Ledger) for Bank Transfer payments
   const [bankAccounts, setBankAccounts] = useState<AccountHead[]>([]);
@@ -659,8 +658,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             healthNotes: member.health_notes || ''
           }));
           setInternalId(member.id);
-          setExistingUserId(member.user_id);
-          setExistingAppUsername(member.app_username || '');
+          setNoEmail(!member.email);
         }
       }).catch((err: any) => {
         console.error("Failed to load member for edit", err);
@@ -1003,11 +1001,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
     // Validation
     const isMemberIdValid = isEditMode ? !!formData.memberId : true;
-    if (!isMemberIdValid || !formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.membershipPlan) {
+    if (!isMemberIdValid || !formData.firstName || !formData.lastName || (!formData.email && !noEmail) || !formData.phone || !formData.membershipPlan) {
       toast.error('Please fill in all required fields', {
         description: isEditMode
-          ? 'Member ID, first name, last name, email, phone, and membership plan are required.'
-          : 'First name, last name, email, phone, and membership plan are required.',
+          ? 'Member ID, first name, last name, email (or "Member has no email"), phone, and membership plan are required.'
+          : 'First name, last name, email (or "Member has no email"), phone, and membership plan are required.',
         duration: 4000
       });
       return;
@@ -1479,7 +1477,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
 
     const memberPayload = {
       name: `${formData.firstName} ${formData.lastName}`.trim(),
-      email: formData.email,
+      // Blank is saved as no email (backend applyRequest).
+      email: noEmail ? '' : formData.email,
       phone: formData.phone,
       membership_type: effectiveMembershipType,
       membership_status: 'active' as const,
@@ -1964,8 +1963,27 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="email" className="mb-1.5 block">Email <span className="text-red-500">*</span></Label>
-                <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="john.doe@email.com" required />
+                <Label htmlFor="email" className="mb-1.5 block">Email {!noEmail && <span className="text-red-500">*</span>}</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={noEmail ? '' : formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder={noEmail ? 'No email' : 'john.doe@email.com'}
+                  required={!noEmail}
+                  disabled={noEmail}
+                />
+                <label className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={noEmail}
+                    onChange={(e) => {
+                      setNoEmail(e.target.checked);
+                      if (e.target.checked) setFormData({...formData, email: ''});
+                    }}
+                  />
+                  Member has no email
+                </label>
               </div>
               <div>
                 <Label htmlFor="phone" className="mb-1.5 block">Phone <span className="text-red-500">*</span></Label>
@@ -2777,8 +2795,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                       <FaMobileScreen className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-base font-semibold">App Access (Optional)</CardTitle>
-                      <p className="text-sm text-muted-foreground">Create login credentials so this member can access the GymBios mobile app. Leave blank to skip.</p>
+                      <CardTitle className="text-base font-semibold">App Account (Optional)</CardTitle>
+                      <p className="text-sm text-muted-foreground">Creates the member's own GymBios account so they can use the mobile app. It belongs to them — the gym can't change its password later. Leave blank to skip; if they already use the app, link their account from Edit Member instead.</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -2825,143 +2843,18 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                   {formData.appUsername && !formData.appPassword && (
                     <p className="text-sm text-amber-600 mt-3">Both username and password are required to create app access.</p>
                   )}
+                  {formData.appUsername && (
+                    <div className="mt-3">
+                      <AccountEmailNote hasEmail={!noEmail && !!formData.email} email={formData.email} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* App Access Section — edit mode */}
-            {isEditMode && (
-              <Card className="border-primary/10 shadow-sm">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 rounded-full shrink-0">
-                      <FaMobileScreen className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base font-semibold">App Access</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {existingUserId
-                          ? 'Manage this member\'s mobile app login credentials.'
-                          : 'No app login set up yet. Create credentials to give access to the mobile app.'}
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-4">
-                  {existingUserId ? (
-                    <>
-                      <div className="flex items-center gap-2 text-sm">
-                        <FaKey className="h-4 w-4 text-indigo-600 shrink-0" />
-                        <span className="text-muted-foreground">Username:</span>
-                        <span className="font-mono font-medium">{existingAppUsername}</span>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Change Password</Label>
-                        <div className="flex gap-2 mt-1">
-                          <div className="relative flex-1">
-                            <Input
-                              type={showEditNewAppPassword ? 'text' : 'password'}
-                              placeholder="New password"
-                              className="pr-10"
-                              value={editNewAppPassword}
-                              onChange={e => setEditNewAppPassword(e.target.value)}
-                              autoComplete="new-password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowEditNewAppPassword(v => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showEditNewAppPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={!editNewAppPassword || isSavingMemberCredentials}
-                            onClick={async () => {
-                              if (!internalId) return;
-                              setIsSavingMemberCredentials(true);
-                              try {
-                                await membersService.setMemberCredentials(internalId, existingAppUsername, editNewAppPassword);
-                                setEditNewAppPassword('');
-                                toast.success('Password updated successfully');
-                              } catch (e: any) {
-                                toast.error(e.message || 'Failed to update password');
-                              } finally { setIsSavingMemberCredentials(false); }
-                            }}
-                          >
-                            Update
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <FaKey className="h-4 w-4 text-indigo-600" />
-                            Username
-                          </Label>
-                          <Input
-                            placeholder="e.g. john.doe"
-                            value={editNewAppUsername}
-                            onChange={e => setEditNewAppUsername(e.target.value)}
-                            autoComplete="off"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <FaKey className="h-4 w-4 text-indigo-600" />
-                            Password
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              type={showEditNewAppPassword ? 'text' : 'password'}
-                              placeholder="Min 6 characters"
-                              className="pr-10"
-                              value={editNewAppPassword}
-                              onChange={e => setEditNewAppPassword(e.target.value)}
-                              autoComplete="new-password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowEditNewAppPassword(v => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showEditNewAppPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      {editNewAppUsername && !editNewAppPassword && (
-                        <p className="text-sm text-amber-600">Both username and password are required.</p>
-                      )}
-                      <Button
-                        type="button"
-                        disabled={!editNewAppUsername || !editNewAppPassword || isSavingMemberCredentials}
-                        onClick={async () => {
-                          if (!internalId) return;
-                          setIsSavingMemberCredentials(true);
-                          try {
-                            const updated = await membersService.setMemberCredentials(internalId, editNewAppUsername, editNewAppPassword);
-                            setExistingUserId(updated.user_id);
-                            setExistingAppUsername(updated.app_username || editNewAppUsername);
-                            setEditNewAppUsername('');
-                            setEditNewAppPassword('');
-                            toast.success('App access created');
-                          } catch (e: any) {
-                            toast.error(e.message || 'Failed to create app access');
-                          } finally { setIsSavingMemberCredentials(false); }
-                        }}
-                      >
-                        Set App Access
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+            {/* App Account — edit mode: create, link, or show the member's GymBios account */}
+            {isEditMode && internalId && (
+              <MemberAppAccountCard memberId={internalId} memberEmail={formData.email} />
             )}
 
             <div className="flex items-center justify-between gap-3 py-4 border-t bg-slate-50/60 rounded-xl px-4">

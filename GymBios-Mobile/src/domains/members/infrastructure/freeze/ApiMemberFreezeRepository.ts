@@ -46,6 +46,8 @@ interface MemberResponse {
   user_id?: number | null;
   app_username?: string | null;
   app_access_enabled: boolean;
+  membership_suspended?: boolean | null;
+  suspended_reason?: string | null;
 
   created_at?: string;
   updated_at?: string;
@@ -119,6 +121,8 @@ export class ApiMemberFreezeRepository implements MemberFreezeRepository {
       userId: response.user_id ?? undefined,
       appUsername: response.app_username ?? undefined,
       appAccessEnabled: response.app_access_enabled,
+      membershipSuspended: response.membership_suspended ?? undefined,
+      suspendedReason: response.suspended_reason ?? undefined,
 
       createdAt: response.created_at,
       updatedAt: response.updated_at,

@@ -120,6 +120,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Seuls les membres de la salle sélectionnée peuvent commenter.',
         APP_ACCESS_PENDING: 'Vous pourrez commenter une fois votre adhésion validée.',
+        MEMBERSHIP_SUSPENDED: "Votre adhésion à cette salle est suspendue, vous ne pouvez donc pas commenter en tant que membre.",
         GYM_CONTEXT_REQUIRED: 'Choisissez une de vos salles pour commenter.',
         MEMBERSHIP_UNDETERMINED: 'Votre adhésion n’a pas pu être confirmée.',
       },
@@ -153,6 +154,7 @@ const community = {
       blocked: {
         NOT_A_MEMBER: 'Seuls les membres de la salle sélectionnée peuvent publier. Passez à l’une de vos salles pour publier.',
         APP_ACCESS_PENDING: 'Vous pourrez publier une fois votre adhésion validée.',
+        MEMBERSHIP_SUSPENDED: "Votre adhésion à cette salle est suspendue. Passez à une autre de vos salles pour publier.",
         GYM_CONTEXT_REQUIRED: 'Choisissez une de vos salles pour publier.',
         MEMBERSHIP_UNDETERMINED: 'Votre adhésion n’a pas pu être confirmée.',
         PLATFORM_CANNOT_POST: 'Les comptes plateforme ne peuvent pas publier dans la communauté.',

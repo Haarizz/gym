@@ -51,7 +51,15 @@ export const discoveryApi = {
       avgRating: data.avg_rating,
       reviewCount: data.review_count ?? 0,
       amenities: data.amenities || [],
-      trainers: data.trainers || [],
+      trainers: (data.trainers || []).map((trainer: any) => ({
+        id: trainer.id,
+        name: trainer.name,
+        role: trainer.role,
+        department: trainer.department,
+        photoUrl: trainer.photo_url,
+        averageRating: trainer.average_rating ?? null,
+        ratingCount: trainer.rating_count ?? 0,
+      })),
     };
   },
 

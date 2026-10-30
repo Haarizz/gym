@@ -6,7 +6,6 @@ import com.company.project.dto.CenterDetailsDTO;
 import com.company.project.dto.CenterSummaryDTO;
 import com.company.project.dto.FacilityResponseDTO;
 import com.company.project.dto.MembershipPlanResponseDTO;
-import com.company.project.dto.StaffResponseDTO;
 import com.company.project.entities.Branch;
 import com.company.project.entities.Member;
 import com.company.project.entities.UserProfile;
@@ -18,7 +17,7 @@ import com.company.project.repositories.MemberRepository;
 import com.company.project.services.FacilityService;
 import com.company.project.services.MembershipPlanService;
 import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
-import com.company.project.services.StaffService;
+import com.company.project.services.mobile.staff.MobileMemberStaffService;
 import com.company.project.services.MemberService;
 import com.company.project.security.TenantContextHolder;
 import com.company.project.security.BranchContextHolder;
@@ -46,14 +45,13 @@ import java.math.BigDecimal;
 @RequestMapping("/api/mobile/discovery/centers")
 public class MobileDiscoveryController {
 
-    public static final String GYM_LOGIN_PURCHASE_MESSAGE = "Your app login was created by your gym, so plans can't be bought from here yet. Renew from the Membership screen or at reception.";
+    public static final String GYM_LOGIN_PURCHASE_MESSAGE = "Plans are bought with a GymBios member account. Staff sign-ins can't buy plans from the app.";
 
     private final GlobalBranchDiscoveryRepository globalDiscoveryRepository;
     private final BranchRepository branchRepository;
     private final BranchImageRepository branchImageRepository;
     private final ReviewRepository reviewRepository;
     private final FacilityService facilityService;
-    private final StaffService staffService;
     private final MembershipPlanService planService;
     private final MemberService memberService;
     private final MemberRepository memberRepository;
@@ -62,6 +60,7 @@ public class MobileDiscoveryController {
     private final NotificationService notificationService;
     private final MobileReferralResolutionService mobileReferralResolutionService;
     private final com.company.project.services.DiscountCodeService discountCodeService;
+    private final MobileMemberStaffService memberStaffService;
 
     // Payment methods that require reception/admin approval before the member gets
     // app access — cash and credit need physical/manual verification that the money
@@ -79,7 +78,6 @@ public class MobileDiscoveryController {
             BranchImageRepository branchImageRepository,
             ReviewRepository reviewRepository,
             FacilityService facilityService,
-            StaffService staffService,
             MembershipPlanService planService,
             MemberService memberService,
             MemberRepository memberRepository,
@@ -87,13 +85,13 @@ public class MobileDiscoveryController {
             EntityManagerFactory entityManagerFactory,
             NotificationService notificationService,
             MobileReferralResolutionService mobileReferralResolutionService,
-            com.company.project.services.DiscountCodeService discountCodeService) {
+            com.company.project.services.DiscountCodeService discountCodeService,
+            MobileMemberStaffService memberStaffService) {
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
         this.branchImageRepository = branchImageRepository;
         this.reviewRepository = reviewRepository;
         this.facilityService = facilityService;
-        this.staffService = staffService;
         this.planService = planService;
         this.memberService = memberService;
         this.memberRepository = memberRepository;
@@ -102,6 +100,7 @@ public class MobileDiscoveryController {
         this.notificationService = notificationService;
         this.mobileReferralResolutionService = mobileReferralResolutionService;
         this.discountCodeService = discountCodeService;
+        this.memberStaffService = memberStaffService;
     }
 
     @GetMapping
@@ -249,9 +248,10 @@ public class MobileDiscoveryController {
             dto.setAvgRating(reviewCount > 0 ? reviewRepository.findAverageRatingByBranchId(branchId) : null);
 
             // Branch-scoped the same way getCenterPlans() already scopes plans below —
-            // FacilityService/StaffService read BranchContextHolder internally.
+            // FacilityService reads BranchContextHolder internally.
             dto.setAmenities(facilityService.getFacilities("Active", null));
-            dto.setTrainers(staffService.getStaff(null, null, null, "Active", null, 1, 100).getItems());
+            // Public trainer view (name, role, branch rating) — never the full staff record.
+            dto.setTrainers(memberStaffService.getCenterTrainers(branchId));
 
             return ResponseEntity.ok(dto);
         } finally {
@@ -311,9 +311,9 @@ public class MobileDiscoveryController {
             return ResponseEntity.status(401).build();
         }
         UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
-        // A gym-created login's id is that gym's users.id, not a global user id — reading
-        // the global profile and linking global_user_id with it would pick up (or hand the
-        // membership to) whichever global account shares that number.
+        // Only a GymBios account's id is a global user id. A staff sign-in's id is its gym's
+        // users.id — reading the global profile and linking global_user_id with it would
+        // pick up (or hand the membership to) whichever account shares that number.
         if (!userDetails.isGlobal()) {
             throw new IllegalArgumentException(GYM_LOGIN_PURCHASE_MESSAGE);
         }
@@ -444,11 +444,10 @@ public class MobileDiscoveryController {
             memberService.linkGlobalUser(Long.valueOf(createdMember.getId()), globalUserId);
 
             if (requiresApproval) {
-                // appAccessEnabled=false is the actual gate — TenantContextFilter 403s
-                // every other member-facing mobile endpoint while it's false (see its
-                // global-user authorization check). globalUserId-linked members aren't
-                // covered by the legacy User.enabled/toggleMemberAccess flow, hence the
-                // separate setter here instead of reusing that path.
+                // approval_status=PENDING (set by createMember) is the actual gate —
+                // TenantContextFilter 403s this gym's other member endpoints until staff
+                // decide (MemberAccessState). The legacy app_access_enabled flag is kept
+                // in step for older readers of the member record.
                 createdMember = memberService.setAppAccessEnabled(Long.valueOf(createdMember.getId()), false);
 
                 notificationService.notifyRoles(

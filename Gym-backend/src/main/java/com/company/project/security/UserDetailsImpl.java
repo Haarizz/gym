@@ -72,6 +72,19 @@ public class UserDetailsImpl implements UserDetails {
     public boolean isGlobal() { return isGlobal; }
     public void setGlobal(boolean isGlobal) { this.isGlobal = isGlobal; }
 
+    /** Shown when an old gym-only member login tries to sign in (plan §4, step 7). */
+    public static final String GYM_LOGIN_MOVED_MESSAGE =
+            "This login has moved to a GymBios account. Sign in with your GymBios account, or ask your gym for help.";
+
+    /** Holds only the MEMBER role — a member's login, not staff (who may also be members). */
+    public boolean isMemberOnly() {
+        List<String> roles = authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a.startsWith("ROLE_"))
+                .toList();
+        return !roles.isEmpty() && roles.stream().allMatch("ROLE_MEMBER"::equals);
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;

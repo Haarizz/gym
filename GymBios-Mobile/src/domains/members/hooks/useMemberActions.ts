@@ -8,7 +8,6 @@ import type {
 } from '../application/directory/MemberDirectoryRepository';
 import type { AddFamilyMemberRequest } from '../application/family/MemberFamilyRepository';
 import type { FreezeRequest } from '../application/freeze/MemberFreezeRepository';
-import type { SetCredentialsRequest } from '../application/access/MemberAccessRepository';
 import type {
   RenewalRequest,
   MinorRenewalRequest,
@@ -157,18 +156,9 @@ export function useMemberActions() {
 
   // --- Access ---
 
-  const setCredentials = useCallback(
-    async (id: number, request: SetCredentialsRequest): Promise<Member> => {
-      const result = await accessService.setCredentials(id, request);
-      invalidateMemberData();
-      return result;
-    },
-    [invalidateMemberData],
-  );
-
-  const toggleAccess = useCallback(
-    async (id: number, enabled: boolean): Promise<Member> => {
-      const result = await accessService.toggleAccess(id, enabled);
+  const setMembershipSuspended = useCallback(
+    async (id: number, suspended: boolean, reason?: string): Promise<Member> => {
+      const result = await accessService.setMembershipSuspended(id, suspended, reason);
       invalidateMemberData();
       return result;
     },
@@ -193,7 +183,6 @@ export function useMemberActions() {
     unfreezeMember,
     getFreezeAllowance,
 
-    setCredentials,
-    toggleAccess,
+    setMembershipSuspended,
   };
 }

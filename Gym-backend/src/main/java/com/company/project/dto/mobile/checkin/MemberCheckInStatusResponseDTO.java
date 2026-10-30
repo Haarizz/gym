@@ -12,12 +12,18 @@ public class MemberCheckInStatusResponseDTO {
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime checkInTime;
 
-    // Workout timer on the current visit (null until started / while running)
+    // Take Break on the current visit: start of the running break (null if none)
+    // and minutes of finished breaks, both left out of the visit length
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
-    private LocalDateTime workoutStartTime;
+    private LocalDateTime breakStartTime;
+    private Integer breakMinutes;
+
+    // Branch check-in settings (CheckInSettings) as they apply right now:
+    // the Take Break length (0 = breaks off) and when the minimum visit time is up
+    // (null if already allowed).
+    private int breakAllowanceMinutes;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
-    private LocalDateTime workoutEndTime;
-    private Integer workoutMinutes;
+    private LocalDateTime checkOutAvailableAt;
 
     // A visit from an earlier day with no check-out. The member is not "checked in";
     // the next check-in closes it at unclosedAutoCloseTime.
@@ -71,15 +77,6 @@ public class MemberCheckInStatusResponseDTO {
         this.checkInTime = checkInTime;
     }
 
-    public LocalDateTime getWorkoutStartTime() { return workoutStartTime; }
-    public void setWorkoutStartTime(LocalDateTime workoutStartTime) { this.workoutStartTime = workoutStartTime; }
-
-    public LocalDateTime getWorkoutEndTime() { return workoutEndTime; }
-    public void setWorkoutEndTime(LocalDateTime workoutEndTime) { this.workoutEndTime = workoutEndTime; }
-
-    public Integer getWorkoutMinutes() { return workoutMinutes; }
-    public void setWorkoutMinutes(Integer workoutMinutes) { this.workoutMinutes = workoutMinutes; }
-
     public Long getUnclosedAttendanceId() { return unclosedAttendanceId; }
     public void setUnclosedAttendanceId(Long unclosedAttendanceId) { this.unclosedAttendanceId = unclosedAttendanceId; }
 
@@ -115,4 +112,16 @@ public class MemberCheckInStatusResponseDTO {
 
     public String getBlockedReason() { return blockedReason; }
     public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
+
+    public LocalDateTime getBreakStartTime() { return breakStartTime; }
+    public void setBreakStartTime(LocalDateTime breakStartTime) { this.breakStartTime = breakStartTime; }
+
+    public Integer getBreakMinutes() { return breakMinutes; }
+    public void setBreakMinutes(Integer breakMinutes) { this.breakMinutes = breakMinutes; }
+
+    public int getBreakAllowanceMinutes() { return breakAllowanceMinutes; }
+    public void setBreakAllowanceMinutes(int breakAllowanceMinutes) { this.breakAllowanceMinutes = breakAllowanceMinutes; }
+
+    public LocalDateTime getCheckOutAvailableAt() { return checkOutAvailableAt; }
+    public void setCheckOutAvailableAt(LocalDateTime checkOutAvailableAt) { this.checkOutAvailableAt = checkOutAvailableAt; }
 }

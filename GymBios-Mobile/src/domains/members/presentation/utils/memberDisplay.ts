@@ -56,7 +56,8 @@ export function getMemberStatusTone(member: Member): Tone {
   const status = (member.status ?? '').toLowerCase();
   const left = daysUntil(getMemberExpiry(member));
   const isExp = status === 'active' && left !== null && left < 0;
-  const key = isExp ? 'expired' : status;
+  // Staff suspension wins over everything, as on the backend (MemberAccessState).
+  const key = member.membershipSuspended ? 'suspended' : isExp ? 'expired' : status;
   const color = STATUS_COLORS[key] ?? NEUTRAL;
 
   const statusKeyMap: Record<string, string> = {

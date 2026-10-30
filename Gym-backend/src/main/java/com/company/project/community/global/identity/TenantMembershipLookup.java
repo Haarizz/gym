@@ -1,6 +1,7 @@
 package com.company.project.community.global.identity;
 
 import com.company.project.community.global.identity.TenantDataSources.TenantDb;
+import com.company.project.services.MemberAccessState;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,7 @@ public class TenantMembershipLookup {
 
     public enum Result { MEMBER, NOT_A_MEMBER, UNDETERMINED }
 
-    public record Membership(long memberId, Long branchId, String branchName, boolean appAccessEnabled,
+    public record Membership(long memberId, Long branchId, String branchName, MemberAccessState accessState,
                              String memberName, String photoUrl) {}
 
     public record Lookup(Result result, Membership membership) {
@@ -51,16 +52,15 @@ public class TenantMembershipLookup {
     private Lookup find(TenantDb db, String column, long id) {
         JdbcTemplate jdbc = new JdbcTemplate(db.dataSource());
         List<Membership> rows = jdbc.query(
-                "SELECT m.id, m.branch_id, b.branch_name, m.app_access_enabled, m.name, m.photo_url "
+                "SELECT m.id, m.branch_id, b.branch_name, m.membership_suspended, m.approval_status, m.name, m.photo_url "
                         + "FROM members m LEFT JOIN branches b ON b.id = m.branch_id WHERE m." + column + " = ?",
                 (rs, i) -> new Membership(
                         rs.getLong(1),
                         (Long) rs.getObject(2),
                         rs.getString(3),
-                        // NULL means never restricted (column predates the approval flow).
-                        !Boolean.FALSE.equals(rs.getObject(4)),
-                        rs.getString(5),
-                        rs.getString(6)),
+                        MemberAccessState.of(rs.getBoolean(4), rs.getString(5)),
+                        rs.getString(6),
+                        rs.getString(7)),
                 id);
         if (rows.isEmpty()) {
             return Lookup.of(Result.NOT_A_MEMBER);

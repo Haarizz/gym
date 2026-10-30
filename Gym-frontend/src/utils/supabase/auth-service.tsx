@@ -352,6 +352,12 @@ class AuthService {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
+    // The backend no longer accepts this sign-in (the login was disabled, or the token
+    // was revoked server-side): end the session the same way an expired token does.
+    if (response.status === 401 && token && !url.includes('/auth/')) {
+      expireSessionAndReload();
+      return response;
+    }
     // A permission denial means our cached permissions are stale (the role was
     // edited): refresh them so the sidebar and buttons catch up right away.
     if (response.status === 403 && !url.includes('/auth/')) {

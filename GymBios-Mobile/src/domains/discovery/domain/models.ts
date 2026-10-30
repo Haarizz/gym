@@ -26,28 +26,16 @@ export interface FacilityResponse {
   bookings_this_month: number;
 }
 
-export interface StaffResponse {
-  id: string;
-  staffId: string;
+/** A staff member as shown publicly on a center's page. */
+export interface CenterTrainer {
+  id: number;
   name: string;
-  email: string | null;
-  phone: string | null;
   role: string | null;
   department: string | null;
-  branch: string | null;
-  monthlyTarget: number | null;
-  baseSalary: number | null;
-  status: string;
-  joinDate: string | null;
-  address: string | null;
   photoUrl: string | null;
-  certifications: any[];
-  schedule: Record<string, string[]>;
-  createdAt: string | null;
-  updatedAt: string | null;
-  userId: number | null;
-  appUsername: string | null;
-  appAccessEnabled: boolean | null;
+  /** Average of the branch's member ratings; null until someone rates. */
+  averageRating: number | null;
+  ratingCount: number;
 }
 
 export interface CenterDetails {
@@ -74,7 +62,7 @@ export interface CenterDetails {
   avgRating: number | null;
   reviewCount: number;
   amenities: FacilityResponse[];
-  trainers: StaffResponse[];
+  trainers: CenterTrainer[];
 }
 
 export interface CenterPlan {

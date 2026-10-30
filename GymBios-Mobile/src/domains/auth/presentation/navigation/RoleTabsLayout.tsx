@@ -108,7 +108,7 @@ export function RoleTabsLayout({
   const headerFg = headerOnLight ? BrandColors.textPrimary : '#FFFFFF';
   const headerFgMuted = headerOnLight ? 'rgba(30,42,58,0.65)' : 'rgba(255,255,255,0.8)';
 
-  const greeting = getGreeting();
+  const greeting = getGreeting(t);
 
   const isAdmin = roleGroup === '(admin)';
   const tabBarBottom = (insets.bottom > 0 ? insets.bottom : 24) + 6;

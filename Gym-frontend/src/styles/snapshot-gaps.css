@@ -9,6 +9,10 @@
  */
 
 @layer utilities {
+  /* Member App Account cards (MemberAppAccountCard, Add/Edit Member). */
+  .bg-indigo-600 { background-color: var(--color-indigo-600); }
+  .mb-1\.5 { margin-bottom: calc(var(--spacing) * 1.5); }
+
   .text-\[\#327F74\] { color: #327F74; }
   .bg-\[\#327F74\] { background-color: #327F74; }
   .border-\[\#327F74\] { border-color: #327F74; }

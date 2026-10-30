@@ -1,13 +1,16 @@
-import { i18n } from '@/core/i18n';
+import type { TFunction } from 'i18next';
 
-/** Time-of-day greeting shared by the role header and dashboard welcome cards. */
-export function getGreeting(date: Date = new Date()): string {
+/**
+ * Time-of-day greeting shared by the role header and dashboard welcome cards.
+ * Takes the component's `t` so React Compiler re-runs it when the language changes.
+ */
+export function getGreeting(t: TFunction, date: Date = new Date()): string {
   const hour = date.getHours();
 
-  if (hour < 5) return i18n.t('greeting.welcomeBack');
-  if (hour < 12) return i18n.t('greeting.goodMorning');
-  if (hour < 18) return i18n.t('greeting.goodAfternoon');
-  if (hour < 22) return i18n.t('greeting.goodEvening');
+  if (hour < 5) return t('greeting.welcomeBack');
+  if (hour < 12) return t('greeting.goodMorning');
+  if (hour < 18) return t('greeting.goodAfternoon');
+  if (hour < 22) return t('greeting.goodEvening');
 
-  return i18n.t('greeting.welcomeBack');
+  return t('greeting.welcomeBack');
 }

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated as RNAnimated,
   Easing as RNEasing,
@@ -236,13 +236,11 @@ function useIsKeyboardShown(): boolean {
 // Only state and navigation are taken from the navigator's props: it builds
 // a fresh insets object on every render, which would defeat the memo below.
 interface RoleTabBarProps extends Pick<BottomTabBarProps, 'state' | 'navigation'> {
-  tabs: { name: string; title: string; icon: TabIcon }[];
+  tabs: PillTab[];
   activeColor: string;
   hidden: boolean;
   bottom: number;
 }
-
-type TabLayout = { x: number; width: number };
 
 export const RoleTabBar = memo(function RoleTabBar({
   state,
@@ -252,11 +250,88 @@ export const RoleTabBar = memo(function RoleTabBar({
   hidden,
   bottom,
 }: RoleTabBarProps) {
+  const visibleTabs = useMemo(
+    () => tabs.filter((tab) => state.routes.some((r) => r.name === tab.name)),
+    [tabs, state.routes],
+  );
+
+  // Handlers below are stable across renders and read the latest navigator
+  // state from this ref at call time.
+  const latest = useRef({ state, navigation });
+  useLayoutEffect(() => {
+    latest.current = { state, navigation };
+  });
+
+  const handlePress = useCallback((name: string) => {
+    const { state, navigation } = latest.current;
+    const route = state.routes.find((r) => r.name === name);
+    if (!route) return;
+    const focused = state.routes[state.index]?.name === name;
+
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (!focused && !event.defaultPrevented) {
+      navigation.navigate(route.name, route.params);
+    }
+  }, []);
+
+  const handleLongPress = useCallback((name: string) => {
+    const { state, navigation } = latest.current;
+    const route = state.routes.find((r) => r.name === name);
+    if (!route) return;
+    navigation.emit({ type: 'tabLongPress', target: route.key });
+  }, []);
+
+  return (
+    <PillTabBar
+      tabs={visibleTabs}
+      activeName={state.routes[state.index]?.name}
+      activeColor={activeColor}
+      hidden={hidden}
+      bottom={bottom}
+      onTabPress={handlePress}
+      onTabLongPress={handleLongPress}
+    />
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Pill tab bar
+// ---------------------------------------------------------------------------
+
+export type PillTab = { name: string; title: string; icon: TabIcon };
+
+// Navigator-agnostic floating pill with the travelling bubble. RoleTabBar
+// drives it from Expo Router tabs; screens with their own in-screen sections
+// (e.g. Community) drive it from local state so both bars look identical.
+interface PillTabBarProps {
+  tabs: PillTab[];
+  activeName: string | undefined;
+  activeColor: string;
+  hidden: boolean;
+  bottom: number;
+  onTabPress: (name: string) => void;
+  onTabLongPress?: (name: string) => void;
+}
+
+type TabLayout = { x: number; width: number };
+
+export const PillTabBar = memo(function PillTabBar({
+  tabs,
+  activeName,
+  activeColor,
+  hidden,
+  bottom,
+  onTabPress,
+  onTabLongPress,
+}: PillTabBarProps) {
   const reduceMotion = useReducedMotion();
   const isKeyboardShown = useIsKeyboardShown();
 
-  const focusedName = state.routes[state.index]?.name;
-  const activeIndex = tabs.findIndex((t) => t.name === focusedName);
+  const activeIndex = tabs.findIndex((t) => t.name === activeName);
 
   const indicatorX = useSharedValue(0);
   const indicatorOpacity = useSharedValue(0);
@@ -270,9 +345,9 @@ export const RoleTabBar = memo(function RoleTabBar({
 
   // Handlers below are stable across renders and read the latest values from
   // these refs at call time, so memoised tab items never act on stale state.
-  const latest = useRef({ state, navigation, tabs, activeIndex, reduceMotion });
+  const latest = useRef({ tabs, activeIndex, reduceMotion, onTabPress, onTabLongPress });
   useLayoutEffect(() => {
-    latest.current = { state, navigation, tabs, activeIndex, reduceMotion };
+    latest.current = { tabs, activeIndex, reduceMotion, onTabPress, onTabLongPress };
   });
 
   const moveIndicator = useCallback(() => {
@@ -333,26 +408,11 @@ export const RoleTabBar = memo(function RoleTabBar({
   );
 
   const handlePress = useCallback((name: string) => {
-    const { state, navigation } = latest.current;
-    const route = state.routes.find((r) => r.name === name);
-    if (!route) return;
-    const focused = state.routes[state.index]?.name === name;
-
-    const event = navigation.emit({
-      type: 'tabPress',
-      target: route.key,
-      canPreventDefault: true,
-    });
-    if (!focused && !event.defaultPrevented) {
-      navigation.navigate(route.name, route.params);
-    }
+    latest.current.onTabPress(name);
   }, []);
 
   const handleLongPress = useCallback((name: string) => {
-    const { state, navigation } = latest.current;
-    const route = state.routes.find((r) => r.name === name);
-    if (!route) return;
-    navigation.emit({ type: 'tabLongPress', target: route.key });
+    latest.current.onTabLongPress?.(name);
   }, []);
 
   const indicatorStyle = useAnimatedStyle(() => ({
@@ -383,22 +443,20 @@ export const RoleTabBar = memo(function RoleTabBar({
           />
         </Animated.View>
 
-        {tabs.map((tab, index) =>
-          state.routes.some((r) => r.name === tab.name) ? (
-            <TabItem
-              key={tab.name}
-              name={tab.name}
-              focused={index === activeIndex}
-              iconName={tab.icon}
-              title={tab.title}
-              activeColor={activeColor}
-              reduceMotion={reduceMotion}
-              onPress={handlePress}
-              onLongPress={handleLongPress}
-              onLayout={handleLayout}
-            />
-          ) : null,
-        )}
+        {tabs.map((tab, index) => (
+          <TabItem
+            key={tab.name}
+            name={tab.name}
+            focused={index === activeIndex}
+            iconName={tab.icon}
+            title={tab.title}
+            activeColor={activeColor}
+            reduceMotion={reduceMotion}
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+            onLayout={handleLayout}
+          />
+        ))}
       </View>
     </View>
   );

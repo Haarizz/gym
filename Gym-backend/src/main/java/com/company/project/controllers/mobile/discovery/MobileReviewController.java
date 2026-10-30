@@ -78,8 +78,8 @@ public class MobileReviewController {
             return ResponseEntity.status(401).build();
         }
         UserDetailsImpl principal = (UserDetailsImpl) auth.getPrincipal();
-        // A gym-created login's id is that gym's users.id — looking it up as a global
-        // user id would match whichever member holds that global id.
+        // A staff sign-in's id is that gym's users.id — looking it up as a global user id
+        // would match whichever member holds that global id.
         Long globalUserId = principal.isGlobal() ? principal.getId() : null;
 
         try {

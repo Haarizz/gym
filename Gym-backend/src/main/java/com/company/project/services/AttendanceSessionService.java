@@ -65,8 +65,10 @@ public class AttendanceSessionService {
             LocalDateTime workoutEnd = end.isBefore(a.getWorkoutStartTime()) ? a.getWorkoutStartTime() : end;
             endWorkout(a, workoutEnd);
         }
+        if (a.getBreakStartTime() != null) endBreak(a, end);
+        int breakMinutes = a.getBreakMinutes() != null ? a.getBreakMinutes() : 0;
         a.setCheckOutTime(end);
-        a.setTotalMinutes((int) Math.max(Duration.between(a.getCheckInTime(), end).toMinutes(), 0));
+        a.setTotalMinutes((int) Math.max(Duration.between(a.getCheckInTime(), end).toMinutes() - breakMinutes, 0));
         a.setStatus("completed");
         if (stale) {
             a.setNotes((a.getNotes() != null ? a.getNotes() + " | " : "")
@@ -74,10 +76,21 @@ public class AttendanceSessionService {
         }
     }
 
-    /** Ends the visit's workout at {@code at}. Does not save. */
+    /**
+     * Ends the visit's workout at {@code at}. Does not save. The member app no longer
+     * starts workouts; this only closes one left running from before that change.
+     */
     public static void endWorkout(Attendance a, LocalDateTime at) {
         a.setWorkoutEndTime(at);
         a.setWorkoutMinutes((int) Math.max(Duration.between(a.getWorkoutStartTime(), at).toMinutes(), 0));
+    }
+
+    /** Ends the visit's running break at {@code at}, adding it to breakMinutes. Does not save. */
+    public static void endBreak(Attendance a, LocalDateTime at) {
+        LocalDateTime start = a.getBreakStartTime();
+        int minutes = start.isAfter(at) ? 0 : (int) Duration.between(start, at).toMinutes();
+        a.setBreakMinutes((a.getBreakMinutes() != null ? a.getBreakMinutes() : 0) + minutes);
+        a.setBreakStartTime(null);
     }
 
     /**

@@ -50,8 +50,11 @@ import {
   Eye,
   Snowflake,
   Loader2,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { MemberAppAccountCard } from "../components/members/MemberAppAccountCard";
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
 import { format, differenceInDays, parseISO } from "date-fns";
 import {
@@ -229,6 +232,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isFreezeDialogOpen, setIsFreezeDialogOpen] = useState(false);
+  // Suspension closes this gym's member features and check-in; the member's app
+  // account is never blocked (they keep Community and gym browsing).
+  const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [savingSuspension, setSavingSuspension] = useState(false);
 
   const [transferForm, setTransferForm] = useState({
     fullName: '', mobileNumber: '', email: '', gender: '', dateOfBirth: '', confirmTransfer: false,
@@ -562,6 +570,36 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
   };
 
+  const handleSuspend = async () => {
+    if (!memberId) return;
+    setSavingSuspension(true);
+    try {
+      await membersService.suspendMembership(String(memberId), suspendReason.trim() || undefined);
+      toast.success('Membership suspended');
+      setIsSuspendModalOpen(false);
+      setSuspendReason('');
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to suspend membership');
+    } finally {
+      setSavingSuspension(false);
+    }
+  };
+
+  const handleResume = async () => {
+    if (!memberId) return;
+    setSavingSuspension(true);
+    try {
+      await membersService.resumeMembership(String(memberId));
+      toast.success('Membership resumed');
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to resume membership');
+    } finally {
+      setSavingSuspension(false);
+    }
+  };
+
   const handleDeactivate = async () => {
     if (!memberId || !deactivateForm.confirmDeactivation) return;
     setSavingDeactivate(true);
@@ -763,8 +801,20 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <StatusIcon />
                 {String(displayStatus || '').replace(/_/g, ' ')}
               </span>
+              {member.membership_suspended && (
+                <span className={s.pill} data-tone="amber">
+                  <PauseCircle />
+                  Suspended
+                </span>
+              )}
               <span className={s.memberId}>{member.member_id || member.id}</span>
             </div>
+            {member.membership_suspended && (
+              <p className="text-sm text-amber-700">
+                Check-in and app member features are closed
+                {member.suspended_reason ? ` — ${member.suspended_reason}` : ''}
+              </p>
+            )}
             <div className={s.contacts}>
               <span className={s.contact}><Phone />{member.phone || '—'}</span>
               <span className={s.contact}>
@@ -819,6 +869,28 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <UserX className="h-4 w-4 mr-2" />
               Deactivate
             </Button>
+            {member.membership_suspended ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-green-300 text-green-700 hover:bg-green-50"
+                onClick={handleResume}
+                disabled={savingSuspension}
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Resume
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                onClick={() => setIsSuspendModalOpen(true)}
+              >
+                <PauseCircle className="h-4 w-4 mr-2" />
+                Suspend
+              </Button>
+            )}
           </div>
         </div>
 
@@ -941,6 +1013,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               </div>
             </div>
           </div>
+
+          {/* App Account: create, link, or show the member's GymBios account */}
+          <MemberAppAccountCard key={member.id} memberId={String(member.id)} memberEmail={member.email} />
 
           <div className={`${s.card} ${s.panel}`}>
             <div className={s.panelHead}>
@@ -2061,6 +2136,42 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
       </Dialog>
 
       {/* Deactivate Membership Modal */}
+      <Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-amber-700">
+              <PauseCircle className="h-5 w-5" />
+              <span>Suspend Membership</span>
+            </DialogTitle>
+            <DialogDescription>
+              {member.name} won't be able to check in or use this gym's member features in the app
+              (bookings, membership, payments). They can still sign in, use the Community and browse gyms.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="suspendReason" className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-500" />
+              <span>Reason (optional, shown to the member in the app)</span>
+            </Label>
+            <Textarea
+              id="suspendReason"
+              placeholder="Enter reason for suspension..."
+              rows={3}
+              value={suspendReason}
+              onChange={(e) => setSuspendReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSuspendModalOpen(false)} disabled={savingSuspension}>
+              Cancel
+            </Button>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleSuspend} disabled={savingSuspension}>
+              {savingSuspension ? 'Suspending...' : 'Suspend Membership'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isDeactivateModalOpen} onOpenChange={setIsDeactivateModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

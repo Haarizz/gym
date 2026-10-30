@@ -52,6 +52,8 @@ interface MemberResponse {
   global_user_id?: number | null;
   app_username?: string | null;
   app_access_enabled?: boolean | null;
+  membership_suspended?: boolean | null;
+  suspended_reason?: string | null;
 
   blood_group?: string | null;
   height?: string | null;
@@ -194,6 +196,8 @@ export class ApiMemberDirectoryRepository
       globalUserId: response.global_user_id ?? undefined,
       appUsername: response.app_username ?? undefined,
       appAccessEnabled: response.app_access_enabled ?? undefined,
+      membershipSuspended: response.membership_suspended ?? undefined,
+      suspendedReason: response.suspended_reason ?? undefined,
 
       bloodGroup: response.blood_group ?? undefined,
       height: response.height ?? undefined,

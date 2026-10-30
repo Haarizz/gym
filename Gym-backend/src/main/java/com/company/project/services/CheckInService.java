@@ -134,7 +134,8 @@ public class CheckInService {
             throw new IllegalArgumentException("Provide at least one of: qr, face_id, member_id");
         }
 
-        boolean allowed = "active".equalsIgnoreCase(member.getMembershipStatus());
+        boolean suspended = member.isMembershipSuspended();
+        boolean allowed = !suspended && "active".equalsIgnoreCase(member.getMembershipStatus());
 
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay   = LocalDate.now().atTime(LocalTime.MAX);
@@ -149,7 +150,9 @@ public class CheckInService {
         resp.setAllowed(allowed);
         resp.setMessage(allowed
                 ? "Welcome back, " + member.getName() + "!"
-                : "Membership " + member.getMembershipStatus() + " — please contact reception.");
+                : suspended
+                    ? "Membership suspended — please contact reception."
+                    : "Membership " + member.getMembershipStatus() + " — please contact reception.");
         return resp;
     }
 
@@ -254,6 +257,10 @@ public class CheckInService {
     }
 
     private void validateMembership(Member member) {
+        // A suspended membership closes the gym itself too, not just the app's member features.
+        if (member.isMembershipSuspended()) {
+            throw new RuntimeException(suspendedMessage(member));
+        }
         String status = member.getMembershipStatus();
         if (!"active".equalsIgnoreCase(status)) {
             throw new RuntimeException(
@@ -271,5 +278,11 @@ public class CheckInService {
                     "Check-in denied — membership expired on " + expiry.toLocalDate() +
                     " for member: " + member.getName());
         }
+    }
+
+    public static String suspendedMessage(Member member) {
+        String reason = member.getSuspendedReason();
+        return "Check-in denied — membership is suspended for member: " + member.getName()
+                + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "");
     }
 }

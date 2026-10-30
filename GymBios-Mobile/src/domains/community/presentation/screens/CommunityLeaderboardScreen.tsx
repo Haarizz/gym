@@ -8,11 +8,13 @@ import { EmptyState, Loader, Typography } from '@/shared/components';
 
 import { useCommunityLeaderboard } from '../../hooks/useCommunity';
 import { CommunityLeaderboard } from '../components/CommunityLeaderboard';
+import { useCommunityNavInset } from '../components/CommunityBottomNav';
 
 export function CommunityLeaderboardScreen() {
   const { t } = useTranslation();
   const { primaryColor, headerColors } = useCommunityTheme();
   const { data, isLoading, isError, refetch, isRefetching } = useCommunityLeaderboard();
+  const navInset = useCommunityNavInset();
 
   if (isLoading) {
     return (
@@ -50,7 +52,7 @@ export function CommunityLeaderboardScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.scroll}
+      contentContainerStyle={[styles.scroll, { paddingBottom: navInset + Spacing.three }]}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -78,7 +80,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     padding: Spacing.three,
-    paddingBottom: Spacing.six,
     gap: Spacing.three,
   },
   sectionTitle: {

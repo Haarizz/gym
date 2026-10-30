@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { memberCheckInApi } from '../infrastructure/MemberCheckInApi';
-import type { MemberCheckInStatus, MemberFeedbackPayload, MemberWorkoutResponse } from '../domain/MemberFeedback';
+import type { MemberBreakResponse, MemberCheckInStatus, MemberFeedbackPayload } from '../domain/MemberFeedback';
 import { checkInKeys } from './checkInKeys';
 import { dashboardKeys } from '@/domains/dashboard/hooks/useStaffDashboard';
 
@@ -24,9 +24,8 @@ export function useMemberCheckIn() {
         checkedIn: true,
         attendanceId: resp.attendanceId ?? null,
         checkInTime: resp.checkInTime ?? new Date().toISOString(),
-        workoutStartTime: null,
-        workoutEndTime: null,
-        workoutMinutes: null,
+        breakStartTime: null,
+        breakMinutes: 0,
         unclosedAttendanceId: null,
         unclosedCheckInTime: null,
         unclosedAutoCloseTime: null,
@@ -61,8 +60,8 @@ export function useSubmitWorkoutFeedback() {
   });
 }
 
-/** Workout start/end — writes the result into the cached status so the timer reacts at once. */
-function useWorkoutMutation(run: () => Promise<MemberWorkoutResponse>) {
+/** Take Break / Resume — writes the result into the cached status so the card reacts at once. */
+function useBreakMutation(run: () => Promise<MemberBreakResponse>) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -72,9 +71,8 @@ function useWorkoutMutation(run: () => Promise<MemberWorkoutResponse>) {
         prev
           ? {
               ...prev,
-              workoutStartTime: resp.workoutStartTime ?? null,
-              workoutEndTime: resp.workoutEndTime ?? null,
-              workoutMinutes: resp.workoutMinutes ?? null,
+              breakStartTime: resp.breakStartTime ?? null,
+              breakMinutes: resp.breakMinutes ?? 0,
             }
           : prev,
       );
@@ -83,10 +81,10 @@ function useWorkoutMutation(run: () => Promise<MemberWorkoutResponse>) {
   });
 }
 
-export function useStartWorkout() {
-  return useWorkoutMutation(() => memberCheckInApi.startWorkout());
+export function useTakeBreak() {
+  return useBreakMutation(() => memberCheckInApi.startBreak());
 }
 
-export function useEndWorkout() {
-  return useWorkoutMutation(() => memberCheckInApi.endWorkout());
+export function useResumeFromBreak() {
+  return useBreakMutation(() => memberCheckInApi.resumeFromBreak());
 }
