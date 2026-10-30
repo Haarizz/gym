@@ -237,6 +237,35 @@ public class PosReturnService {
                 .map(r -> mapper.saleReturn(r, returnItemRepo.findByReturnId(r.getId()))).toList();
     }
 
+    /**
+     * POS customer returns, newest first — listed read-only in Inventory › Wastage / Returns.
+     * search matches the return, sale or member; from/to are business days.
+     */
+    @Transactional(readOnly = true)
+    public com.company.project.dto.pos.PosResponses.ReturnsPage list(String search, java.time.LocalDate from, java.time.LocalDate to,
+                                                                      int page, int size) {
+        org.springframework.data.jpa.domain.Specification<PosSaleReturn> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> p = new java.util.ArrayList<>();
+            if (search != null && !search.isBlank()) {
+                String like = "%" + search.trim().toLowerCase(java.util.Locale.ROOT) + "%";
+                p.add(cb.or(cb.like(cb.lower(cb.coalesce(root.get("returnNumber"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("transactionNumber"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("memberName"), "")), like)));
+            }
+            if (from != null) p.add(cb.greaterThanOrEqualTo(root.get("businessDate"), from));
+            if (to != null) p.add(cb.lessThanOrEqualTo(root.get("businessDate"), to));
+            return cb.and(p.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        org.springframework.data.domain.Page<PosSaleReturn> result = returnRepo.findAll(spec,
+                org.springframework.data.domain.PageRequest.of(Math.max(page, 1) - 1, safeSize,
+                        org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
+        List<ReturnDTO> dtos = result.getContent().stream()
+                .map(r -> mapper.saleReturn(r, returnItemRepo.findByReturnId(r.getId()))).toList();
+        return new com.company.project.dto.pos.PosResponses.ReturnsPage(dtos,
+                new com.company.project.dto.pos.PosResponses.PageMeta(Math.max(page, 1), safeSize, result.getTotalElements(), result.getTotalPages()));
+    }
+
     @Transactional(readOnly = true)
     public ReturnDTO get(Long id) {
         PosSaleReturn r = returnRepo.findById(id).orElseThrow(() -> new EntityNotFoundException("Return not found with id: " + id));

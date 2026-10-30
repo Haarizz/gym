@@ -85,6 +85,10 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     // eligibility rules, since Member itself carries no renewal counter of its own.
     long countByMemberDbIdAndTransactionType(Long memberDbId, String transactionType);
 
+    // The same count for every member at once: [memberDbId, count]
+    @Query("SELECT r.memberDbId, COUNT(r) FROM Receipt r WHERE r.transactionType = :type AND r.memberDbId IS NOT NULL GROUP BY r.memberDbId")
+    List<Object[]> countByMemberForTransactionType(@Param("type") String transactionType);
+
     // Fallback: find full history by member name (handles receipts with stale/null memberDbId)
     List<Receipt> findByMemberNameOrderByTransactionDateAsc(String memberName);
 

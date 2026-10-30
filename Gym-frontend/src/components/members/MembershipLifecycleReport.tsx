@@ -26,7 +26,7 @@ import { DatePickerField } from "../shared/DatePickerField";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
 import { receiptsService, type Receipt } from "../../utils/supabase/receipts-service";
-import { downloadReceiptInvoice } from "../../utils/receipt-invoice";
+import { downloadReceiptInvoice, downloadPaymentReceipt } from "../../utils/receipt-invoice";
 import { classifyRenewals, hasStoredRenewalKind, matchesKind, type RenewalKind } from "./RenewalTransactionHistory";
 
 export type LifecycleReportType = "transactions" | "renewals" | "expired" | "expiring" | "joined" | "freeze";
@@ -512,10 +512,15 @@ export function MembershipLifecycleReport({
                               <Badge className={(r.status || "").toLowerCase() === "paid" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>{r.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => downloadReceiptInvoice(r, currencyCode)}>
-                                <Printer className="h-4 w-4 mr-1" />
-                                Print
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                <Button variant="outline" size="sm" title="Print receipt" onClick={() => downloadPaymentReceipt(r, currencyCode)}>
+                                  <Printer className="h-4 w-4 mr-1" />
+                                  Receipt
+                                </Button>
+                                <Button variant="outline" size="sm" title="Print tax invoice" onClick={() => downloadReceiptInvoice(r, currencyCode)}>
+                                  Invoice
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

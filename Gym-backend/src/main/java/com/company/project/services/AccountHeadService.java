@@ -191,6 +191,11 @@ public class AccountHeadService {
 
         java.util.Map<Long, JournalVoucher> jvMap = jvs.stream().collect(java.util.stream.Collectors.toMap(JournalVoucher::getId, j -> j));
         List<JournalVoucherLine> allLines = journalVoucherLineRepository.findByJournalVoucherIdIn(jvMap.keySet());
+        // One lookup for every account name, not one query per line.
+        java.util.Map<String, String> accountNames = new java.util.HashMap<>();
+        for (AccountHead a : accountHeadRepository.findAll()) {
+            if (a.getCode() != null) accountNames.putIfAbsent(a.getCode(), a.getName());
+        }
 
         for (JournalVoucherLine line : allLines) {
             JournalVoucher jv = jvMap.get(line.getJournalVoucherId());
@@ -206,12 +211,81 @@ public class AccountHeadService {
             entry.setSourceType("JOURNAL_VOUCHER");
             entry.setSourceId(jv.getId());
             entry.setAccountCode(line.getAccountCode());
-            accountHeadRepository.findFirstByCode(line.getAccountCode())
-                    .ifPresent(a -> entry.setAccountName(a.getName()));
+            entry.setAccountName(accountNames.get(line.getAccountCode()));
             entries.add(entry);
         }
         entries.sort(Comparator.comparing(LedgerEntryDTO::getDate));
         return entries;
+    }
+
+    /**
+     * The General Ledger one page at a time, in ledger order (date, voucher, line). For one
+     * account the running balance is the account's opening balance plus the rows before
+     * this page in the range — the same figure getLedgerEntries gives each row. "All
+     * accounts" mixes accounts, so its rows carry no balance (as getAllLedgerEntries).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getLedgerPage(String account, LocalDate from, LocalDate to, int page, int limit) {
+        boolean all = account == null || account.isBlank() || "all".equalsIgnoreCase(account);
+        String code = all ? "" : account.trim();
+        AccountHead single = all ? null : accountHeadRepository.findFirstByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found: " + code));
+        LocalDate start = from != null ? from : LocalDate.of(1900, 1, 1);
+        LocalDate end = to != null ? to : LocalDate.of(9999, 12, 31);
+        int size = Math.min(Math.max(limit, 1), 200);
+        int pageNo = Math.max(page, 1);
+
+        Object[] totals = journalVoucherLineRepository.ledgerTotals(start, end, all, code).get(0);
+        long total = ((Number) totals[0]).longValue();
+        List<Object[]> rows = journalVoucherLineRepository.findLedgerPage(start, end, all, code,
+                org.springframework.data.domain.PageRequest.of(pageNo - 1, size));
+
+        java.util.Map<String, String> accountNames = new java.util.HashMap<>();
+        for (AccountHead a : accountHeadRepository.findAll()) {
+            if (a.getCode() != null) accountNames.putIfAbsent(a.getCode(), a.getName());
+        }
+        BigDecimal balance = BigDecimal.ZERO;
+        if (single != null && !rows.isEmpty()) {
+            JournalVoucherLine firstLine = (JournalVoucherLine) rows.get(0)[0];
+            JournalVoucher firstJv = (JournalVoucher) rows.get(0)[1];
+            BigDecimal before = journalVoucherLineRepository.ledgerNetBefore(start, end, code,
+                    firstJv.getDate(), firstJv.getId(), firstLine.getId());
+            balance = (single.getOpeningBalance() != null ? single.getOpeningBalance() : BigDecimal.ZERO)
+                    .add(before != null ? before : BigDecimal.ZERO);
+        }
+
+        List<LedgerEntryDTO> entries = new ArrayList<>();
+        for (Object[] row : rows) {
+            JournalVoucherLine line = (JournalVoucherLine) row[0];
+            JournalVoucher jv = (JournalVoucher) row[1];
+            LedgerEntryDTO entry = new LedgerEntryDTO();
+            entry.setDate(jv.getDate());
+            entry.setReference(jv.getVoucherNo());
+            entry.setDescription(line.getDescription() != null ? line.getDescription() : jv.getNarration());
+            entry.setDebit(line.getDebit() != null ? line.getDebit() : BigDecimal.ZERO);
+            entry.setCredit(line.getCredit() != null ? line.getCredit() : BigDecimal.ZERO);
+            if (single != null) {
+                balance = balance.add(entry.getDebit()).subtract(entry.getCredit());
+                entry.setBalance(balance);
+            } else {
+                entry.setBalance(BigDecimal.ZERO);
+            }
+            entry.setSourceType("JOURNAL_VOUCHER");
+            entry.setSourceId(jv.getId());
+            entry.setAccountCode(line.getAccountCode());
+            entry.setAccountName(accountNames.get(line.getAccountCode()));
+            entries.add(entry);
+        }
+
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("entries", entries);
+        out.put("page", pageNo);
+        out.put("limit", size);
+        out.put("total", total);
+        out.put("total_pages", (int) Math.ceil(total / (double) size));
+        out.put("total_debit", totals[1]);
+        out.put("total_credit", totals[2]);
+        return out;
     }
 
     @Transactional(readOnly = true)

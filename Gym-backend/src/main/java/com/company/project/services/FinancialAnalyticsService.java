@@ -61,21 +61,17 @@ public class FinancialAnalyticsService {
 
     public Map<String, Object> getDashboard() {
         Map<String, AccountHead> accountMap = buildAccountMap();
-        Set<Long> postedIds = getAllPostedJvIds();
 
         BigDecimal totalRevenue  = BigDecimal.ZERO;
         BigDecimal totalExpenses = BigDecimal.ZERO;
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
-            if (!postedIds.contains(line.getJournalVoucherId())) continue;
-            String code = line.getAccountCode();
-            if (code == null) continue;
-            AccountHead acc = accountMap.get(code);
+        for (Object[] row : journalVoucherLineRepository.sumPostedByAccount()) {
+            AccountHead acc = row[0] == null ? null : accountMap.get((String) row[0]);
             if (acc == null) continue;
 
             String type = acc.getType() != null ? acc.getType().toUpperCase() : "";
-            BigDecimal debit  = safe(line.getDebit());
-            BigDecimal credit = safe(line.getCredit());
+            BigDecimal debit  = decimal(row[1]);
+            BigDecimal credit = decimal(row[2]);
 
             if ("REVENUE".equals(type))  totalRevenue  = totalRevenue .add(credit.subtract(debit));
             if ("EXPENSE".equals(type))  totalExpenses = totalExpenses.add(debit.subtract(credit));
@@ -133,34 +129,15 @@ public class FinancialAnalyticsService {
             cursor = cursor.plusMonths(1);
         }
 
-        // Collect posted JVs in range
-        Set<Long> postedIds = getPostedJvIds(from, to);
-
-        // For each JV line, look up the date via its parent JV
-        Map<Long, LocalDate> jvDateById = journalVoucherRepository
-                .findByStatusOrderByDateDesc("POSTED")
-                .stream()
-                .filter(jv -> jv.getDate() != null
-                        && !jv.getDate().isBefore(from)
-                        && !jv.getDate().isAfter(to))
-                .collect(Collectors.toMap(JournalVoucher::getId, JournalVoucher::getDate, (a, b) -> a));
-
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
-            Long jvId = line.getJournalVoucherId();
-            if (!postedIds.contains(jvId)) continue;
-            LocalDate date = jvDateById.get(jvId);
-            if (date == null) continue;
-
-            String code = line.getAccountCode();
-            if (code == null) continue;
-            AccountHead acc = accountMap.get(code);
+        for (Object[] row : journalVoucherLineRepository.sumPostedByAccountAndMonth(from, to)) {
+            AccountHead acc = row[0] == null ? null : accountMap.get((String) row[0]);
             if (acc == null) continue;
 
             String type = acc.getType() != null ? acc.getType().toUpperCase() : "";
-            String key  = date.getYear() + "-" + String.format("%02d", date.getMonthValue());
+            String key  = ((Number) row[1]).intValue() + "-" + String.format("%02d", ((Number) row[2]).intValue());
 
-            BigDecimal debit  = safe(line.getDebit());
-            BigDecimal credit = safe(line.getCredit());
+            BigDecimal debit  = decimal(row[3]);
+            BigDecimal credit = decimal(row[4]);
 
             if ("REVENUE".equals(type) && revenueByMonth.containsKey(key)) {
                 revenueByMonth.merge(key, credit.subtract(debit), BigDecimal::add);
@@ -195,18 +172,15 @@ public class FinancialAnalyticsService {
 
     public List<Map<String, Object>> getRevenueBySource() {
         Map<String, AccountHead> accountMap = buildAccountMap();
-        Set<Long> postedIds = getAllPostedJvIds();
 
         Map<String, BigDecimal> bySource = new LinkedHashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
-            if (!postedIds.contains(line.getJournalVoucherId())) continue;
-            String code = line.getAccountCode();
-            if (code == null) continue;
+        for (Object[] row : postedTotalsByCode()) {
+            String code = (String) row[0];
             AccountHead acc = accountMap.get(code);
             if (acc == null || !"REVENUE".equals(acc.getType() != null ? acc.getType().toUpperCase() : "")) continue;
 
             String name   = acc.getName() != null ? acc.getName() : code;
-            BigDecimal cr = safe(line.getCredit()).subtract(safe(line.getDebit()));
+            BigDecimal cr = decimal(row[2]).subtract(decimal(row[1]));
             bySource.merge(name, cr, BigDecimal::add);
         }
 
@@ -224,18 +198,15 @@ public class FinancialAnalyticsService {
 
     public List<Map<String, Object>> getExpenseByCategory() {
         Map<String, AccountHead> accountMap = buildAccountMap();
-        Set<Long> postedIds = getAllPostedJvIds();
 
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedIds)) {
-            if (!postedIds.contains(line.getJournalVoucherId())) continue;
-            String code = line.getAccountCode();
-            if (code == null) continue;
+        for (Object[] row : postedTotalsByCode()) {
+            String code = (String) row[0];
             AccountHead acc = accountMap.get(code);
             if (acc == null || !"EXPENSE".equals(acc.getType() != null ? acc.getType().toUpperCase() : "")) continue;
 
             String name   = acc.getName() != null ? acc.getName() : code;
-            BigDecimal dr = safe(line.getDebit()).subtract(safe(line.getCredit()));
+            BigDecimal dr = decimal(row[1]).subtract(decimal(row[2]));
             byCategory.merge(name, dr, BigDecimal::add);
         }
 
@@ -300,22 +271,17 @@ public class FinancialAnalyticsService {
     //  HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    private Set<Long> getAllPostedJvIds() {
-        return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED")
-                .stream().map(JournalVoucher::getId).collect(Collectors.toSet());
+    /** Posted [accountCode, debit, credit] totals, in account-code order so breakdowns list stably. */
+    private List<Object[]> postedTotalsByCode() {
+        return journalVoucherLineRepository.sumPostedByAccount().stream()
+                .filter(row -> row[0] != null)
+                .sorted(Comparator.comparing(row -> (String) row[0]))
+                .collect(Collectors.toList());
     }
 
-    private Set<Long> getPostedJvIds(LocalDate from, LocalDate to) {
-        return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED")
-                .stream()
-                .filter(jv -> {
-                    if (jv.getDate() == null) return false;
-                    if (from != null && jv.getDate().isBefore(from)) return false;
-                    if (to   != null && jv.getDate().isAfter(to))   return false;
-                    return true;
-                })
-                .map(JournalVoucher::getId)
-                .collect(Collectors.toSet());
+    private static BigDecimal decimal(Object v) {
+        if (v == null) return BigDecimal.ZERO;
+        return v instanceof BigDecimal b ? b : new BigDecimal(v.toString());
     }
 
     private Map<String, AccountHead> buildAccountMap() {

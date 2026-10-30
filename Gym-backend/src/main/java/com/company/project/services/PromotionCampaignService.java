@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -430,8 +431,29 @@ public class PromotionCampaignService {
      */
     @Transactional(readOnly = true)
     public List<EligibleMemberDTO> getEligibilityMembers() {
-        List<Member> members = memberRepository.findAll();
+        return getEligibilityMembers(null);
+    }
+
+    /** Just one member when memberId is given (the member profile), otherwise everyone. */
+    @Transactional(readOnly = true)
+    public List<EligibleMemberDTO> getEligibilityMembers(Long memberId) {
+        List<Member> members = memberId != null
+                ? memberRepository.findById(memberId).map(List::of).orElse(List.of())
+                : memberRepository.findAll();
         List<EligibleMemberDTO> result = new ArrayList<>();
+        // Plans and renewal counts are read once, not once per member.
+        Map<String, MembershipPlan> plans = new HashMap<>();
+        for (MembershipPlan plan : membershipPlanRepository.findAll()) {
+            if (plan.getName() != null) plans.putIfAbsent(plan.getName(), plan);
+        }
+        Map<Long, Long> renewalCounts = new HashMap<>();
+        if (memberId != null) {
+            renewalCounts.put(memberId, receiptRepository.countByMemberDbIdAndTransactionType(memberId, "Renewal"));
+        } else {
+            for (Object[] row : receiptRepository.countByMemberForTransactionType("Renewal")) {
+                renewalCounts.put((Long) row[0], ((Number) row[1]).longValue());
+            }
+        }
 
         for (Member m : members) {
             EligibleMemberDTO dto = new EligibleMemberDTO();
@@ -445,20 +467,16 @@ public class PromotionCampaignService {
             // "individual / family / corporate" (what the eligibility rule engine's
             // membership_type condition expects) lives on the plan's planType, not on
             // Member.membershipType (which is the Basic/Standard/Premium/VIP tier).
-            if (m.getMembershipPlan() != null) {
-                membershipPlanRepository.findByName(m.getMembershipPlan()).ifPresent(plan -> {
-                    int months = planDurationInMonths(plan);
-                    dto.setCurrentPlan(new EligibleMemberDTO.CurrentPlan(m.getMembershipPlan(), months));
-                    if (plan.getPlanType() != null) {
-                        dto.setMembershipType(plan.getPlanType().toLowerCase());
-                    }
-                });
+            MembershipPlan plan = m.getMembershipPlan() != null ? plans.get(m.getMembershipPlan()) : null;
+            if (plan != null) {
+                int months = planDurationInMonths(plan);
+                dto.setCurrentPlan(new EligibleMemberDTO.CurrentPlan(m.getMembershipPlan(), months));
+                if (plan.getPlanType() != null) {
+                    dto.setMembershipType(plan.getPlanType().toLowerCase());
+                }
             }
 
-            long renewals = m.getId() != null
-                    ? receiptRepository.countByMemberDbIdAndTransactionType(m.getId(), "Renewal")
-                    : 0;
-            dto.setRenewalCount((int) renewals);
+            dto.setRenewalCount(renewalCounts.getOrDefault(m.getId(), 0L).intValue());
 
             result.add(dto);
         }

@@ -155,17 +155,21 @@ public class LedgerTransactionService {
                     ? journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", from, to)
                     : journalVoucherRepository.findByStatusOrderByDateDesc("POSTED");
 
-            // Batch-fetch every line for every JV in one query rather than one query per
-            // voucher, and take the first non-null cost center as "the" cost center for
-            // that voucher row — a JV can have lines on several cost centers at once, so
-            // this is a representative value for the list view, not a guaranteed-unique one.
-            List<Long> jvIds = jvs.stream().map(JournalVoucher::getId).collect(Collectors.toList());
+            // One cost center per voucher row — a JV can have lines on several cost centers,
+            // so this is a representative value for the list view, not a guaranteed-unique
+            // one. Only vouchers that have one come back, rather than every line of every JV.
             Map<Long, String> costCenterByJvId = new HashMap<>();
-            if (!jvIds.isEmpty()) {
-                for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(jvIds)) {
-                    if (line.getCostCenter() != null && !line.getCostCenter().isBlank()) {
-                        costCenterByJvId.putIfAbsent(line.getJournalVoucherId(), line.getCostCenter());
-                    }
+            // A sale or return of goods also moves the goods' cost (inventory ↔ COGS) in the
+            // same voucher; the list shows what was charged or refunded, not that plus the cost.
+            Map<Long, BigDecimal> amountWithoutStockCost = new HashMap<>();
+            if (!jvs.isEmpty()) {
+                for (Object[] row : journalVoucherLineRepository.findCostCenterPerVoucher()) {
+                    costCenterByJvId.put((Long) row[0], (String) row[1]);
+                }
+                for (Object[] row : journalVoucherLineRepository.findAmountWithoutStockCost(
+                        FinancialEventService.ACC_INVENTORY_ASSET, FinancialEventService.ACC_PURCHASE_COGS)) {
+                    BigDecimal amount = row[1] == null ? BigDecimal.ZERO : new BigDecimal(row[1].toString());
+                    if (amount.signum() > 0) amountWithoutStockCost.put((Long) row[0], amount);
                 }
             }
 
@@ -182,8 +186,14 @@ public class LedgerTransactionService {
                 dto.setType(jv.isSystemGenerated() ? "System Journal" : "Journal Voucher");
                 dto.setReferenceNo(jv.getVoucherNo());
                 dto.setDescription(jv.getNarration());
-                dto.setDebit(jv.getTotalDebit()  != null ? jv.getTotalDebit()  : BigDecimal.ZERO);
-                dto.setCredit(jv.getTotalCredit() != null ? jv.getTotalCredit() : BigDecimal.ZERO);
+                BigDecimal moneyAmount = amountWithoutStockCost.get(jv.getId());
+                if (moneyAmount != null) {
+                    dto.setDebit(moneyAmount);
+                    dto.setCredit(moneyAmount);
+                } else {
+                    dto.setDebit(jv.getTotalDebit()  != null ? jv.getTotalDebit()  : BigDecimal.ZERO);
+                    dto.setCredit(jv.getTotalCredit() != null ? jv.getTotalCredit() : BigDecimal.ZERO);
+                }
                 dto.setBranch(null);
                 dto.setStatus(jv.getStatus());
                 dto.setCostCenter(costCenterByJvId.get(jv.getId()));

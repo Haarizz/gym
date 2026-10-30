@@ -31,7 +31,7 @@ import {
 import { toast } from "sonner";
 import { getCompanyDetails } from "../utils/company-details";
 import { getVatRate, splitVatInclusive } from "../utils/tax";
-import { buildFullReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
+import { buildFullReceiptHtml, buildPaymentReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
 import { printHtml } from "../utils/print-html";
 import { getReceiptColors } from "../utils/receipt-colors";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
@@ -295,13 +295,14 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     }
   };
 
-  const handleDownloadPDF  = () => handlePrintReceipt();
+  // The Tax Invoice (original layout) and the payment Receipt are separate documents.
+  const handlePrintInvoice = () => handlePrintReceipt('invoice');
 
   // Guards against a stray double-click (or the separate Print/Download PDF
   // buttons both firing) opening two print windows/dialogs at once.
   const printInFlightRef = useRef(false);
 
-  const handlePrintReceipt = async () => {
+  const handlePrintReceipt = async (kind: 'receipt' | 'invoice' = 'receipt') => {
     if (printInFlightRef.current) return;
     printInFlightRef.current = true;
 
@@ -341,7 +342,8 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
     try {
       // Hidden-iframe print: only the browser's print dialog appears, no new tab.
-      printHtml(buildFullReceiptHtml(printData, company, await getReceiptColors()));
+      const build = kind === 'invoice' ? buildFullReceiptHtml : buildPaymentReceiptHtml;
+      printHtml(build(printData, company, await getReceiptColors()));
     } finally {
       printInFlightRef.current = false;
     }
@@ -808,12 +810,12 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
                           <p className="text-sm text-green-700">Receipt #{generatedReceiptNo}</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" onClick={handleDownloadPDF} className="gap-2">
-                            <Download className="h-4 w-4" />Download PDF
+                          <Button variant="outline" onClick={handlePrintInvoice} className="gap-2">
+                            <FileText className="h-4 w-4" />Tax Invoice
                           </Button>
                           <Button
                             variant="outline"
-                            onClick={handlePrintReceipt}
+                            onClick={() => handlePrintReceipt()}
                             className="gap-2"
                             style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
                           >
@@ -969,11 +971,11 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
 
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setShowReceiptModal(false)}>Close</Button>
-            <Button variant="outline" onClick={handlePrintReceipt} className="gap-2" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-              <Printer className="h-4 w-4" />Print
+            <Button variant="outline" onClick={handlePrintInvoice} className="gap-2" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
+              <FileText className="h-4 w-4" />Tax Invoice
             </Button>
-            <Button onClick={handleDownloadPDF} style={{ backgroundColor: 'var(--primary)' }} className="text-white gap-2">
-              <Download className="h-4 w-4" />Download PDF
+            <Button onClick={() => handlePrintReceipt()} style={{ backgroundColor: 'var(--primary)' }} className="text-white gap-2">
+              <Printer className="h-4 w-4" />Print Receipt
             </Button>
           </DialogFooter>
         </DialogContent>

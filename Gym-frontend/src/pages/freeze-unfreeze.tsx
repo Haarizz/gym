@@ -96,12 +96,8 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
     try {
       const res = await membersService.getMembers({ status: 'frozen' }, { limit: 100 });
       setFrozenMembers(res.members);
-      // Plan freeze settings per frozen member (auto-unfreeze, freezes used)
-      const entries = await Promise.all(res.members.map(async (m) => {
-        try { return [String(m.id), await membersService.getFreezeAllowance(m.id)] as const; }
-        catch { return null; }
-      }));
-      setFrozenAllowances(Object.fromEntries(entries.filter(Boolean) as [string, FreezeAllowance][]));
+      // Plan freeze settings per frozen member (auto-unfreeze, freezes used), in one call
+      setFrozenAllowances(await membersService.getFreezeAllowances(res.members.map((m) => m.id)).catch(() => ({})));
     } catch {
       // show an empty list
     }

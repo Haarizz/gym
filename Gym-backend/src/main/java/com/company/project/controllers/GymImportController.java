@@ -2,6 +2,7 @@ package com.company.project.controllers;
 
 import com.company.project.services.gymimport.GymImportService;
 import com.company.project.services.gymimport.GymImportService.OnboardRequest;
+import com.company.project.services.gymimport.ImportedMemberAccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,12 @@ import java.util.Map;
  *   POST   /api/gym-imports/{id}/onboard       create the gym and load everything (background)
  *   GET    /api/gym-imports/{id}               progress, report and result
  *   DELETE /api/gym-imports/{id}               discard the import and its files
+ *
+ * App accounts for a gym imported before onboarding created them
+ * (ImportedMemberAccountService):
+ *
+ *   POST   /api/gym-imports/app-accounts/dry-run?slug=   usernames it would give, changes nothing
+ *   POST   /api/gym-imports/app-accounts                 {"slug": "…", "confirm": "CREATE"}
  */
 @RestController
 @RequestMapping("/api/gym-imports")
@@ -31,9 +38,26 @@ import java.util.Map;
 public class GymImportController {
 
     private final GymImportService gymImportService;
+    private final ImportedMemberAccountService memberAccounts;
 
-    public GymImportController(GymImportService gymImportService) {
+    public GymImportController(GymImportService gymImportService, ImportedMemberAccountService memberAccounts) {
         this.gymImportService = gymImportService;
+        this.memberAccounts = memberAccounts;
+    }
+
+    @PostMapping("/app-accounts/dry-run")
+    public ResponseEntity<Map<String, Object>> appAccountsDryRun(@RequestParam String slug) {
+        return ResponseEntity.ok(memberAccounts.createAccounts(slug.trim(), true, null));
+    }
+
+    @PostMapping("/app-accounts")
+    public ResponseEntity<Map<String, Object>> createAppAccounts(@RequestBody Map<String, Object> body) {
+        if (!"CREATE".equals(text(body, "confirm"))) {
+            throw new com.company.project.exceptions.BusinessRuleViolationException(
+                    "Send \"confirm\": \"CREATE\" to create the accounts (try the dry run first).");
+        }
+        String slug = text(body, "slug");
+        return ResponseEntity.ok(memberAccounts.createAccounts(slug == null ? null : slug.trim(), false, null));
     }
 
     @PostMapping

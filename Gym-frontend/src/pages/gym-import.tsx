@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, CheckCircle2, ChevronDown, Database, Eye, EyeOff, FileCode2, FolderOpen, ImageIcon,
-  Loader2, RotateCcw, Upload, XCircle,
+  Loader2, RotateCcw, Smartphone, Upload, XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import {
-  gymImportApi, gymImportErrorMessage, GymImportJob, ImportReport,
+  gymImportApi, gymImportErrorMessage, GymImportJob, ImportAppAccounts, ImportReport,
 } from '../utils/supabase/gym-import-service';
 import { gymApi } from '../utils/supabase/gym-service';
 import styles from './gym-import.module.css';
@@ -219,6 +219,7 @@ export function GymImport() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   const stepIndex = { upload: 0, importing: 0, review: 1, onboarding: 2, done: 3 }[phase];
+  const appAccounts = job?.result?.app_accounts as ImportAppAccounts | undefined;
   const retrying = job?.status === 'FAILED' && job?.failed_during === 'ONBOARD';
   const gymCreated = !!job?.tenant_id;
 
@@ -414,12 +415,51 @@ export function GymImport() {
             <Stat value={job.result.receipts} label="Receipts" />
             <Stat value={job.result.photos} label="Photos" />
             <Stat value={(job.result.ledger as Record<string, number> | undefined)?.receipts_posted} label="Payments posted" />
+            <Stat value={appAccounts?.created} label="App accounts" />
           </div>
+          {appAccounts && <AppAccountsSummary accounts={appAccounts} />}
           <div className={styles.footer} style={{ justifyContent: 'center' }}>
             <Button variant="outline" onClick={startOver}>Import another gym</Button>
             <Button onClick={() => navigate('/gym-management')}>Go to Gym Management</Button>
           </div>
         </section>
+      )}
+    </div>
+  );
+}
+
+function AppAccountsSummary({ accounts }: { accounts: ImportAppAccounts }) {
+  const example = accounts.with_gym_id[0];
+  return (
+    <div className={styles.appAccess}>
+      <h3><Smartphone /> Member app access</h3>
+      <p>
+        {accounts.created} member{accounts.created === 1 ? '' : 's'} can sign in to the GymBios app with their{' '}
+        <strong>member number</strong> as the username (e.g. GYM00001) and the password{' '}
+        <strong>{accounts.starting_password}</strong>. Ask members to change it in the app.
+      </p>
+      {accounts.with_gym_id.length > 0 && (
+        <details>
+          <summary>
+            {accounts.with_gym_id.length} member number{accounts.with_gym_id.length === 1 ? ' was' : 's were'} already
+            used by another gym, so the gym ID was added{example ? ` (e.g. ${example.username})` : ''}
+          </summary>
+          <ul>
+            {accounts.with_gym_id.map((r) => (
+              <li key={r.member_id}>{r.member_no} · {r.name} → <strong>{r.username}</strong></li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {accounts.failed.length > 0 && (
+        <details open data-tone="bad">
+          <summary>{accounts.failed.length} member{accounts.failed.length === 1 ? '' : 's'} got no app account — create it from the member page</summary>
+          <ul>
+            {accounts.failed.map((r) => (
+              <li key={r.member_id}>{r.member_no} · {r.name}: {r.detail}</li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

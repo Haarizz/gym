@@ -131,6 +131,15 @@ export function ReceiptDialog({ sale, open, onOpenChange, reprint = false, onNew
 
 // ── Sales lookup (reprint / returns entry point) ───────────────────────────
 
+// The status filter matches what statusPill shows: a part-returned sale is still COMPLETED
+// underneath (returnStatus PARTIAL), so "Completed" means nothing returned yet.
+const STATUS_FILTERS: Record<string, { status?: string; returnStatus?: string }> = {
+  ALL: {},
+  COMPLETED: { status: "COMPLETED", returnStatus: "NONE" },
+  PART_RETURNED: { status: "COMPLETED", returnStatus: "PARTIAL" },
+  REFUNDED: { status: "REFUNDED" },
+};
+
 export function SalesLookupDialog({ open, onOpenChange, mode, onPick }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -150,7 +159,7 @@ export function SalesLookupDialog({ open, onOpenChange, mode, onPick }: {
     try {
       const page = await posApi.sales({
         search: search.trim() || undefined, from, to,
-        status: status === "ALL" ? undefined : status,
+        ...STATUS_FILTERS[status],
         paymentMethod: payment === "ALL" ? undefined : payment,
         size: 50,
       });
@@ -196,6 +205,7 @@ export function SalesLookupDialog({ open, onOpenChange, mode, onPick }: {
             <SelectContent>
               <SelectItem value="ALL">All statuses</SelectItem>
               <SelectItem value="COMPLETED">Completed</SelectItem>
+              <SelectItem value="PART_RETURNED">Part returned</SelectItem>
               <SelectItem value="REFUNDED">Refunded</SelectItem>
             </SelectContent>
           </Select>

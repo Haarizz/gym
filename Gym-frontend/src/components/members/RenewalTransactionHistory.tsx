@@ -29,7 +29,7 @@ import { Skeleton } from "../ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { receiptsService, type Receipt } from "../../utils/supabase/receipts-service";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
-import { downloadReceiptInvoice } from "../../utils/receipt-invoice";
+import { downloadReceiptInvoice, downloadPaymentReceipt } from "../../utils/receipt-invoice";
 import { splitPaid } from "../../utils/payment-split";
 import { StatFilterNotice } from "./MemberStatCards";
 import { ListPagination } from "../list-pagination";
@@ -475,15 +475,17 @@ export function RenewalTransactionHistory({
                       </TableCell>
                       <TableCell>{statusBadge(r.status)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          title={`Print receipt ${r.receipt_no}`}
-                          onClick={() => downloadReceiptInvoice(r, currencyCode)}
-                        >
-                          <Printer className="h-4 w-4 mr-1" />
-                          Print
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" title={`Print receipt ${r.receipt_no}`}
+                            onClick={() => downloadPaymentReceipt(r, currencyCode)}>
+                            <Printer className="h-4 w-4 mr-1" />
+                            Receipt
+                          </Button>
+                          <Button variant="outline" size="sm" title={`Print tax invoice for ${r.receipt_no}`}
+                            onClick={() => downloadReceiptInvoice(r, currencyCode)}>
+                            Invoice
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

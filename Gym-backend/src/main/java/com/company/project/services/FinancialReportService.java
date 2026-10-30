@@ -89,7 +89,7 @@ public class FinancialReportService {
      */
     public Map<String, Object> getIncomeStatement(LocalDate from, LocalDate to) {
         // Collect all posted JV IDs for this period
-        Set<Long> postedJvIds = getPostedJvIds(from, to);
+        List<JournalVoucherLine> postedTotals = postedTotalsByAccount(from, to);
 
         // Map account codes to their AccountHead (type + name)
         Map<String, AccountHead> accountMap = buildAccountMap();
@@ -97,8 +97,7 @@ public class FinancialReportService {
         Map<String, BigDecimal> revenueByAccount  = new LinkedHashMap<>();
         Map<String, BigDecimal> expenseByAccount  = new LinkedHashMap<>();
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
-            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+        for (JournalVoucherLine line : postedTotals) {
 
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -149,13 +148,12 @@ public class FinancialReportService {
     public Map<String, Object> getBalanceSheet(LocalDate asOf) {
         List<AccountHead> accounts = accountHeadRepository.findAllByOrderByCodeAsc();
 
-        Set<Long> postedJvIds = getPostedJvIds(null, asOf);
+        List<JournalVoucherLine> postedTotals = postedTotalsByAccount(null, asOf);
 
         Map<String, BigDecimal> debitByCode  = new HashMap<>();
         Map<String, BigDecimal> creditByCode = new HashMap<>();
-        if (!postedJvIds.isEmpty()) {
-            for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
-                if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+        if (!postedTotals.isEmpty()) {
+            for (JournalVoucherLine line : postedTotals) {
                 String code = line.getAccountCode();
                 if (code == null) continue;
                 debitByCode.merge(code,  safe(line.getDebit()),  BigDecimal::add);
@@ -210,12 +208,11 @@ public class FinancialReportService {
 
     public Map<String, Object> getTrialBalance(LocalDate asOf) {
         List<AccountHead> accounts = accountHeadRepository.findAllByOrderByCodeAsc();
-        Set<Long> postedJvIds = getPostedJvIds(null, asOf);
+        List<JournalVoucherLine> postedTotals = postedTotalsByAccount(null, asOf);
 
         Map<String, BigDecimal> debitByCode  = new HashMap<>();
         Map<String, BigDecimal> creditByCode = new HashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
-            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+        for (JournalVoucherLine line : postedTotals) {
             String code = line.getAccountCode();
             if (code == null) continue;
             debitByCode.merge(code,  safe(line.getDebit()),  BigDecimal::add);
@@ -344,7 +341,7 @@ public class FinancialReportService {
      * Statement, so it can never drift from that report.
      */
     public Map<String, Object> getTaxSummary(LocalDate from, LocalDate to) {
-        Set<Long> postedJvIds = getPostedJvIds(from, to);
+        List<JournalVoucherLine> postedTotals = postedTotalsByAccount(from, to);
         Map<String, AccountHead> accountMap = buildAccountMap();
 
         BigDecimal totalRevenue  = BigDecimal.ZERO;
@@ -352,8 +349,7 @@ public class FinancialReportService {
         BigDecimal outputVat     = BigDecimal.ZERO;
         BigDecimal inputVat      = BigDecimal.ZERO;
 
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
-            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+        for (JournalVoucherLine line : postedTotals) {
 
             String code = line.getAccountCode();
             if (code == null) continue;
@@ -407,10 +403,8 @@ public class FinancialReportService {
      * as distinct lines instead of lumping them into "VAT".
      */
     private List<Map<String, Object>> getTaxByCodeBreakdown(LocalDate from, LocalDate to) {
-        Set<Long> postedJvIds = getPostedJvIds(from, to);
         Map<String, BigDecimal> netByAccount = new HashMap<>();
-        for (JournalVoucherLine line : journalVoucherLineRepository.findByJournalVoucherIdIn(postedJvIds)) {
-            if (!postedJvIds.contains(line.getJournalVoucherId())) continue;
+        for (JournalVoucherLine line : postedTotalsByAccount(from, to)) {
             String code = line.getAccountCode();
             if (code == null) continue;
             netByAccount.merge(code, safe(line.getCredit()).subtract(safe(line.getDebit())), BigDecimal::add);
@@ -701,6 +695,25 @@ public class FinancialReportService {
      * Returns the set of POSTED JournalVoucher IDs whose date falls within
      * [from, to]. Null bounds are treated as open-ended.
      */
+    /**
+     * One summed line per account over the POSTED vouchers dated in [from, to] (null bounds
+     * are open-ended) — the reports that only add debits and credits up per account read
+     * these instead of every journal line.
+     */
+    private List<JournalVoucherLine> postedTotalsByAccount(LocalDate from, LocalDate to) {
+        List<JournalVoucherLine> totals = new ArrayList<>();
+        for (Object[] row : journalVoucherLineRepository.sumPostedByAccountBetween(
+                from != null ? from : LocalDate.of(1900, 1, 1), to != null ? to : LocalDate.of(9999, 12, 31))) {
+            if (row[0] == null) continue;
+            JournalVoucherLine line = new JournalVoucherLine();
+            line.setAccountCode((String) row[0]);
+            line.setDebit(row[1] == null ? BigDecimal.ZERO : new BigDecimal(row[1].toString()));
+            line.setCredit(row[2] == null ? BigDecimal.ZERO : new BigDecimal(row[2].toString()));
+            totals.add(line);
+        }
+        return totals;
+    }
+
     private Set<Long> getPostedJvIds(LocalDate from, LocalDate to) {
         return journalVoucherRepository.findByStatusOrderByDateDesc("POSTED")
                 .stream()

@@ -5,6 +5,7 @@ import com.company.project.dto.MembershipPlanResponseDTO;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,10 +25,32 @@ public class MembershipPlanService {
 
     private final MembershipPlanRepository planRepository;
     private final BranchService branchService;
+    private final MemberRepository memberRepository;
 
-    public MembershipPlanService(MembershipPlanRepository planRepository, BranchService branchService) {
+    public MembershipPlanService(MembershipPlanRepository planRepository, BranchService branchService,
+                                 MemberRepository memberRepository) {
         this.planRepository = planRepository;
         this.branchService = branchService;
+        this.memberRepository = memberRepository;
+    }
+
+    /**
+     * Members per plan, keyed by the plan name in lower case (members store the plan by name):
+     * {"active": effectively active today, "total": everyone ever on it}. One grouped query.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Map<String, Long>> getMemberCounts() {
+        Map<String, Map<String, Long>> out = new LinkedHashMap<>();
+        for (Object[] row : memberRepository.countMembersByPlan(LocalDate.now().atStartOfDay())) {
+            String key = ((String) row[0]).trim().toLowerCase(Locale.ROOT);
+            if (key.isEmpty()) continue;
+            long total = row[1] == null ? 0 : ((Number) row[1]).longValue();
+            long active = row[2] == null ? 0 : ((Number) row[2]).longValue();
+            Map<String, Long> counts = out.computeIfAbsent(key, k -> new LinkedHashMap<>(Map.of("active", 0L, "total", 0L)));
+            counts.merge("active", active, Long::sum);
+            counts.merge("total", total, Long::sum);
+        }
+        return out;
     }
 
     public List<MembershipPlanResponseDTO> getPlans(String status) {
@@ -160,6 +186,9 @@ public class MembershipPlanService {
         if (req.getSelectedFacilities()  != null) plan.setSelectedFacilities(req.getSelectedFacilities());
         if (req.getSelectedPromotions()  != null) plan.setSelectedPromotions(req.getSelectedPromotions());
         if (req.getSelectedCampaigns()   != null) plan.setSelectedCampaigns(req.getSelectedCampaigns());
+
+        // Family and Couple plans always bill the head (the entity re-checks this on save).
+        plan.normalizeBillingMode();
 
         // Compute human-readable duration string
         plan.setDuration(computeDuration(req.getDurationValue(), req.getDurationType()));

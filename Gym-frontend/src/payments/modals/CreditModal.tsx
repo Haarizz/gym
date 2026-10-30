@@ -55,11 +55,16 @@ export function CreditModal({
   offeredTypes,
   fixedParty,
 }: CreditModalProps) {
+  // The screen already knows who owes this (the member being added / renewed, the walk-in
+  // visitor): it passes just that one customer and no search, so there's nothing to look up.
+  const knownCustomer = !fixedParty && !onSearchCustomers && customers.length === 1 ? customers[0] : null;
+  const searchable = !fixedParty && !knownCustomer && !!onSearchCustomers;
+
   const [amount, setAmount] = useState(() => String(editingLine?.amount ?? target));
   const [receivedNow, setReceivedNow] = useState("0");
   const [customerQuery, setCustomerQuery] = useState(editingLine?.customerName ?? "");
   const [selectedCustomer, setSelectedCustomer] = useState<CreditCustomer | null>(
-    fixedParty ?? (editingLine ? { code: editingLine.customerCode ?? "", name: editingLine.customerName ?? "" } : null)
+    fixedParty ?? knownCustomer ?? (editingLine ? { code: editingLine.customerCode ?? "", name: editingLine.customerName ?? "" } : null)
   );
 
   const numericAmount = toAmount(amount);
@@ -117,6 +122,18 @@ export function CreditModal({
           </div>
         ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {!searchable ? (
+            selectedCustomer ? (
+              <div style={{ fontSize: 13.5, borderRadius: 10, border: "1px solid light-dark(#ddd6fe, oklch(38% 0.055 293.3))", padding: 14, backgroundColor: "light-dark(#f5f3ff, var(--muted-bg))" }}>
+                <div style={{ fontSize: 12, color: "light-dark(#6b7280, oklch(82% 0.023 264.4))" }}>On account of</div>
+                <div style={{ fontWeight: 600, color: "light-dark(#4c1d95, oklch(82% 0.15 293.7))", marginTop: 2 }}>{selectedCustomer.name}</div>
+              </div>
+            ) : (
+              <p style={{ fontSize: 12.5, color: "light-dark(#b45309, oklch(82% 0.146 49))", margin: 0 }}>
+                Enter the customer's name on the form first — the credit is recorded against them.
+              </p>
+            )
+          ) : (
           <div>
             <Label style={{ fontSize: 12 }}>Customer</Label>
             <div style={{ position: "relative", marginTop: 6 }}>
@@ -169,6 +186,7 @@ export function CreditModal({
               </div>
             )}
           </div>
+          )}
 
           <div>
             <Label style={{ fontSize: 12 }}>Received Now (optional)</Label>

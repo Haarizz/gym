@@ -8,7 +8,7 @@ import { Label } from "../ui/label";
 import { useBranch } from "../../utils/branch-context";
 import { useCurrency } from "../../utils/currency";
 import { getCompanyDetails, type CompanyDetails } from "../../utils/company-details";
-import { buildFullReceiptHtml, type ReceiptPrintData } from "../../utils/receipt-invoice";
+import { buildFullReceiptHtml, buildPaymentReceiptHtml, type ReceiptPrintData } from "../../utils/receipt-invoice";
 import {
   DEFAULT_RECEIPT_COLORS,
   getReceiptColors,
@@ -71,6 +71,8 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
   const [hexDraft, setHexDraft] = useState<ReceiptColors>(DEFAULT_RECEIPT_COLORS);
   const [company, setCompany] = useState<CompanyDetails | null>(null);
   const [loading, setLoading] = useState(false);
+  // The colours apply to both documents; preview either one.
+  const [previewDoc, setPreviewDoc] = useState<"receipt" | "invoice">("receipt");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -102,9 +104,9 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
   // The printable template auto-prints on load; strip its scripts so the preview only displays
   const previewHtml = useMemo(
     () => (company
-      ? buildFullReceiptHtml(sampleData(currencyCode), company, colors).replace(/<script[\s\S]*?<\/script>/gi, "")
+      ? (previewDoc === "invoice" ? buildFullReceiptHtml : buildPaymentReceiptHtml)(sampleData(currencyCode), company, colors).replace(/<script[\s\S]*?<\/script>/gi, "")
       : ""),
-    [company, colors, currencyCode],
+    [company, colors, currencyCode, previewDoc],
   );
 
   const invalidHex = FIELDS.some((f) => !HEX.test(hexDraft[f.key]));
@@ -149,7 +151,7 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
               Edit Receipt Template
             </DialogTitle>
             <DialogDescription>
-              Colours for printed member receipts in <strong>{activeBranchName}</strong>. Each branch keeps its own colours.
+              Colours for printed member receipts and tax invoices in <strong>{activeBranchName}</strong>. Each branch keeps its own colours.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -225,7 +227,19 @@ export function ReceiptTemplateEditor({ open, onOpenChange }: { open: boolean; o
 
           {/* Live preview */}
           <div className="lg:col-span-3 bg-gray-100 overflow-auto" style={{ padding: 16, minHeight: 0 }}>
-            <p className="text-xs text-muted-foreground mb-2">Live preview (sample data)</p>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs text-muted-foreground">Live preview (sample data)</p>
+              <div className="inline-flex rounded-md border bg-white p-0.5" role="tablist" aria-label="Preview document">
+                {([["receipt", "Receipt"], ["invoice", "Tax Invoice"]] as const).map(([value, label]) => (
+                  <button key={value} type="button" role="tab" aria-selected={previewDoc === value}
+                    onClick={() => setPreviewDoc(value)}
+                    className="rounded px-3 py-1 text-xs font-medium"
+                    style={previewDoc === value ? { background: colors.primary, color: "#fff" } : undefined}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {loading || !company ? (
               <div className="flex items-center justify-center h-64 text-muted-foreground gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…

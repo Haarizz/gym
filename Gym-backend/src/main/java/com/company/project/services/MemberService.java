@@ -135,9 +135,26 @@ public class MemberService {
                                              String membershipType, String paymentStatus,
                                              String plan, Integer expiringWithin, String dues,
                                              int page, int limit) {
+        return getMembers(search, status, membershipType, paymentStatus, plan, expiringWithin, dues, null, null, page, limit);
+    }
+
+    /**
+     * joinedFrom (inclusive) / joinedTo (exclusive) keep members who joined in that window
+     * (Members › New Members), listed newest join first.
+     */
+    public MembersPageResponseDTO getMembers(String search, String status,
+                                             String membershipType, String paymentStatus,
+                                             String plan, Integer expiringWithin, String dues,
+                                             LocalDateTime joinedFrom, LocalDateTime joinedTo,
+                                             int page, int limit) {
         Specification<Member> spec = buildSpec(search, status, membershipType, paymentStatus,
                 plan, expiringWithin, dues);
-        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (joinedFrom != null) spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("joinDate"), joinedFrom));
+        if (joinedTo != null) spec = spec.and((root, q, cb) -> cb.lessThan(root.get("joinDate"), joinedTo));
+        Sort sort = joinedFrom != null || joinedTo != null
+                ? Sort.by(Sort.Direction.DESC, "joinDate").and(Sort.by(Sort.Direction.DESC, "createdAt"))
+                : Sort.by(Sort.Direction.DESC, "createdAt");
+        Pageable pageable = PageRequest.of(page - 1, limit, sort);
         Page<Member> memberPage = memberRepository.findAll(spec, pageable);
 
         List<MemberResponseDTO> dtos = memberPage.getContent().stream()

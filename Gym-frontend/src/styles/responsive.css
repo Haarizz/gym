@@ -421,7 +421,7 @@ html:not([data-gb-pos]) [data-slot="alert-dialog-content"] {
   }
 
   html:not([data-gb-pos]) .flex-col > [data-slot="select-trigger"],
-  html:not([data-gb-pos]) .flex-col:not(.items-center):not(.items-start):not(.items-end) > button,
+  html:not([data-gb-pos]) .flex-col:not(.items-center):not(.items-start):not(.items-end) > button:not(.absolute),
   html:not([data-gb-pos]) .flex-col > .relative:has(> [data-slot="input"]) {
     width: 100%;
   }

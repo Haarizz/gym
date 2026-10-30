@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 class FinancialOverviewServiceTest {
@@ -63,7 +64,7 @@ class FinancialOverviewServiceTest {
                 head("4100", "POS Sales Revenue", "REVENUE", "0"),
                 head("5000", "Salary Expense", "EXPENSE", "0"),
                 head("5100", "Maintenance Expense", "EXPENSE", "0")));
-        when(journalVoucherRepository.findByStatusOrderByDateDesc("POSTED")).thenReturn(vouchers);
+        when(journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc(eq("POSTED"), any(), any())).thenReturn(vouchers);
         when(journalVoucherLineRepository.findByJournalVoucherIdIn(any())).thenReturn(lines);
         when(receiptRepository.findAll(any(Specification.class))).thenReturn(List.of());
         when(saleTransactionRepository.findAll(any(Specification.class))).thenReturn(List.of());

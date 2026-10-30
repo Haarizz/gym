@@ -41,11 +41,13 @@ import {
   Megaphone,
   Percent,
   Building2,
-  Snowflake
+  Snowflake,
+  Crown
 } from 'lucide-react';
 import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import planStyles from "./manage-plans.module.css";
+import { PlanKanban, PlanViewToggle, type PlanViewMode } from "../components/plans/PlanKanban";
 import exampleImage from 'figma:asset/362a2ed9c216cf9c38308e71b24d35a09379ac76.png';
 import { toast } from "sonner";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
@@ -97,7 +99,13 @@ function offerPreview(f: OfferFormFields): { discount: number; pays: number } | 
 
 export function ManagePlans() {
   const { activeBranchId } = useBranch();
-  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix, formatCurrency } = useCurrency();
+  // Always opens in List; Kanban is one click away for this visit.
+  const [viewMode, setViewMode] = useState<PlanViewMode>("list");
+  const changeViewMode = (mode: PlanViewMode) => setViewMode(mode);
+  const [savingStatusIds, setSavingStatusIds] = useState<Set<number>>(new Set());
+  // Members on each plan (by plan name, lower case) for the kanban cards.
+  const [memberCounts, setMemberCounts] = useState<Record<string, { active: number; total: number }> | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -233,6 +241,16 @@ export function ManagePlans() {
     };
     loadPlans();
   }, [activeBranchId]);
+
+  // Counts only matter on the board; a failure just hides them.
+  useEffect(() => {
+    if (viewMode !== "kanban") return;
+    let cancelled = false;
+    plansService.getMemberCounts()
+      .then(c => { if (!cancelled) setMemberCounts(c); })
+      .catch(() => { if (!cancelled) setMemberCounts(null); });
+    return () => { cancelled = true; };
+  }, [viewMode, activeBranchId]);
 
   useEffect(() => {
     const loadPromotions = async () => {
@@ -463,7 +481,7 @@ export function ManagePlans() {
         selectedFacilities: formData.selectedFacilities,
         selectedPromotions: formData.selectedPromotions,
         selectedCampaigns: formData.selectedCampaigns,
-        familyBillingMode: formData.familyBillingMode,
+        familyBillingMode: /^(family|couple)$/i.test(formData.planType) ? "family_head" : formData.familyBillingMode,
         pricePerMember: formData.pricePerMember ? parseFloat(formData.pricePerMember as string) : null,
         maxFamilyMembers: formData.maxFamilyMembers ? parseInt(formData.maxFamilyMembers as string) : null,
         maxAdultMembers: formData.maxAdultMembers ? parseInt(formData.maxAdultMembers as string) : null,
@@ -558,7 +576,7 @@ export function ManagePlans() {
         selectedFacilities: formData.selectedFacilities,
         selectedPromotions: formData.selectedPromotions,
         selectedCampaigns: formData.selectedCampaigns,
-        familyBillingMode: formData.familyBillingMode,
+        familyBillingMode: /^(family|couple)$/i.test(formData.planType) ? "family_head" : formData.familyBillingMode,
         pricePerMember: formData.pricePerMember ? parseFloat(formData.pricePerMember as string) : null,
         maxFamilyMembers: formData.maxFamilyMembers ? parseInt(formData.maxFamilyMembers as string) : null,
         maxAdultMembers: formData.maxAdultMembers ? parseInt(formData.maxAdultMembers as string) : null,
@@ -574,6 +592,41 @@ export function ManagePlans() {
     } catch (err) {
       console.error('Failed to update plan:', err);
       setError('Failed to update plan. Please try again.');
+    }
+  };
+
+  // Kanban: move a plan between Active and Inactive. Everything else is sent back as it
+  // was loaded, so only the status changes.
+  const handleSetPlanStatus = async (plan: Plan, status: "Active" | "Inactive") => {
+    setSavingStatusIds(prev => new Set(prev).add(plan.id));
+    setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, status } : p));
+    try {
+      const updated = await plansService.updatePlan(plan.id, {
+        name: plan.name, type: plan.type, planType: plan.planType,
+        durationType: plan.durationType, durationValue: plan.durationValue,
+        price: plan.price, discount: plan.discount,
+        offerType: plan.offerType ?? "", offerValue: plan.offerValue, offerLabel: plan.offerLabel,
+        offerStartDate: plan.offerStartDate, offerEndDate: plan.offerEndDate,
+        status, description: plan.description, maxSessions: plan.maxSessions,
+        assignableTrainers: plan.assignableTrainers ?? [], membershipCapacity: plan.membershipCapacity,
+        maxCapacity: plan.maxCapacity, attendanceLimit: plan.attendanceLimit, attendanceValue: plan.attendanceValue,
+        attendancePeriod: plan.attendancePeriod, maxFreezeDays: plan.maxFreezeDays,
+        maxFreezeOccurrences: plan.maxFreezeOccurrences, chargePerExtraDay: plan.chargePerExtraDay,
+        freeDaysAllowed: plan.freeDaysAllowed, autoUnfreeze: plan.autoUnfreeze,
+        trainingStreams: plan.trainingStreams ?? [], selectedFacilities: plan.selectedFacilities ?? [],
+        selectedPromotions: plan.selectedPromotions ?? [], selectedCampaigns: plan.selectedCampaigns ?? [],
+        familyBillingMode: plan.familyBillingMode ?? undefined, pricePerMember: plan.pricePerMember,
+        maxFamilyMembers: plan.maxFamilyMembers, maxAdultMembers: plan.maxAdultMembers,
+        maxChildMembers: plan.maxChildMembers, allowAdditionalMembers: plan.allowAdditionalMembers ?? undefined,
+        additionalMemberPrice: plan.additionalMemberPrice, autoCalculateTotal: plan.autoCalculateTotal ?? undefined,
+      });
+      setPlans(prev => prev.map(p => p.id === plan.id ? updated : p));
+      toast.success(`${plan.name} is now ${status.toLowerCase()}`);
+    } catch (err: any) {
+      setPlans(prev => prev.map(p => p.id === plan.id ? plan : p));
+      toast.error(err?.message || `Could not mark ${plan.name} as ${status.toLowerCase()}`);
+    } finally {
+      setSavingStatusIds(prev => { const next = new Set(prev); next.delete(plan.id); return next; });
     }
   };
 
@@ -909,8 +962,15 @@ export function ManagePlans() {
       {/* Plan Overview / List */}
       <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
-          <CardTitle>Plan Overview</CardTitle>
-          <CardDescription>View and manage all membership plans</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <CardTitle>Plan Overview</CardTitle>
+              <CardDescription>
+                {filteredPlans.length} of {plans.length} plans · {viewMode === "kanban" ? "drag a card to change its status" : "every plan in one table"}
+              </CardDescription>
+            </div>
+            <PlanViewToggle value={viewMode} onChange={changeViewMode} />
+          </div>
           
           {/* Filters and Search */}
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
@@ -966,6 +1026,29 @@ export function ManagePlans() {
         </CardHeader>
         
         <CardContent>
+          {viewMode === "kanban" ? (
+            filteredPlans.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-muted-foreground py-10">
+                <Search className="h-8 w-8 mb-2 opacity-20" />
+                <p>No plans match these filters.</p>
+              </div>
+            ) : (
+              <PlanKanban
+                plans={filteredPlans}
+                money={(n) => formatCurrency(Number(n) || 0)}
+                streamNames={(ids) => getTrainingStreamNames(ids) as string[]}
+                facilityNames={(ids) => getFacilityNames(ids) as string[]}
+                promotionNames={(ids) => getPromotionNames(ids) as string[]}
+                effectivePrice={getPlanEffectivePrice}
+                onView={handleViewPlan}
+                onEdit={handleEditPlan}
+                onDuplicate={handleDuplicatePlan}
+                onSetStatus={handleSetPlanStatus}
+                savingIds={savingStatusIds}
+                memberCounts={memberCounts}
+              />
+            )
+          ) : (
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="hover:bg-transparent">
@@ -1157,6 +1240,7 @@ export function ManagePlans() {
               )))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -2097,36 +2181,19 @@ export function ManagePlans() {
 
                 <CollapsibleContent className={planStyles.collapsibleContent}>
                 <div className="space-y-4 pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    {formData.planType === "Couple"
-                      ? "Configure how this Couple plan bills its two members."
-                      : "Configure how this Family plan bills its members and how many members a family can have."}
-                  </p>
-
-                  {/* Billing Mode */}
-                  <div className="space-y-2">
-                    <Label htmlFor="familyBillingMode">Billing Mode</Label>
-                    <Select
-                      value={formData.familyBillingMode}
-                      onValueChange={(value) => setFormData({...formData, familyBillingMode: value})}
-                    >
-                      <SelectTrigger id="familyBillingMode">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formData.planType === "Couple" ? (
-                          <>
-                            <SelectItem value="individual">Individual — each partner bills separately</SelectItem>
-                            <SelectItem value="family_head">Couple Head — both partners bill together on ONE invoice</SelectItem>
-                          </>
-                        ) : (
-                          <>
-                            <SelectItem value="individual">Individual — adults bill separately, minors bill to head</SelectItem>
-                            <SelectItem value="family_head">Family Head — everyone bills together on ONE invoice</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                  {/* One billing model: the head pays for everyone on one invoice. */}
+                  <div className="flex items-start gap-3 rounded-lg border border-[#2B7A78]/30 bg-[#DFF5F4] p-3">
+                    <Crown className="h-5 w-5 text-[#2B7A78] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-[#1E293B]">
+                        {formData.planType === "Couple" ? "Couple head pays for both" : "Family head pays for everyone"}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {formData.planType === "Couple"
+                          ? "The member you register first is the couple head. Their partner is added under them and the whole plan is billed to the head on one invoice."
+                          : "The member you register first is the family head. Family members are added under them and the whole plan is billed to the head on one invoice — family members never pay separately."}
+                      </p>
+                    </div>
                   </div>
 
                   <div className={formData.planType === "Couple" ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
@@ -2234,7 +2301,7 @@ export function ManagePlans() {
                     <div className="space-y-0.5">
                       <Label htmlFor="autoCalculateTotal" className="text-base">Auto Calculate Total Amount</Label>
                       <p className="text-sm text-muted-foreground">
-                        Automatically compute the family invoice as Price Per Member × current member count
+                        Automatically compute the {formData.planType === "Couple" ? "couple" : "family"} invoice as Price Per Member × current member count
                       </p>
                     </div>
                     <Switch
@@ -2244,27 +2311,29 @@ export function ManagePlans() {
                     />
                   </div>
 
-                  {formData.familyBillingMode === "family_head" && (
-                    <div className="bg-[#DFF5F4] border border-[#2B7A78] rounded-md p-4">
-                      <div className="flex items-start gap-2">
-                        <Info className="h-5 w-5 text-[#2B7A78] flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-[#1E293B]">
-                            {formData.planType === "Couple" ? "Couple Head Billing Preview" : "Family Head Billing Preview"}
-                          </p>
-                          {formData.planType === "Couple" ? (
+                  {/* What the head is charged — mirrors MemberService: price per member × members when
+                      Auto Calculate is on and a price per member is set, otherwise the plan's own price. */}
+                  {(() => {
+                    const perMember = parseFloat(formData.pricePerMember as string) || 0;
+                    const byMember = formData.autoCalculateTotal !== false && perMember > 0;
+                    const count = formData.planType === "Couple" ? 2 : (parseInt(formData.maxFamilyMembers as string) || 4);
+                    const head = formData.planType === "Couple" ? "couple head" : "family head";
+                    return (
+                      <div className="bg-[#DFF5F4] border border-[#2B7A78] rounded-md p-4">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-5 w-5 text-[#2B7A78] flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-[#1E293B]">What the {head} pays</p>
                             <p className="text-xs text-gray-600 mt-1">
-                              Example: {formData.pricePerMember || "0"} × 2 members = {currencyPrefix}{((parseFloat(formData.pricePerMember as string) || 0) * 2).toFixed(2)} on ONE invoice billed only to the couple head.
+                              {byMember
+                                ? <>Price per member × members: {currencyPrefix}{perMember.toFixed(2)} × {count} = {currencyPrefix}{(perMember * count).toFixed(2)} on one invoice to the {head}.</>
+                                : <>The plan price ({currencyPrefix}{(parseFloat(formData.price as string) || 0).toFixed(2)}) for {formData.planType === "Couple" ? "both partners" : "the whole family"}, on one invoice to the {head}. {formData.autoCalculateTotal !== false ? "Set a price per member" : "Turn on Auto Calculate and set a price per member"} to charge per person instead.</>}
                             </p>
-                          ) : (
-                            <p className="text-xs text-gray-600 mt-1">
-                              Example: {formData.pricePerMember || "0"} × 5 members = {currencyPrefix}{((parseFloat(formData.pricePerMember as string) || 0) * 5).toFixed(2)} on ONE invoice billed only to the family head.
-                            </p>
-                          )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </CollapsibleContent>
               </Collapsible>

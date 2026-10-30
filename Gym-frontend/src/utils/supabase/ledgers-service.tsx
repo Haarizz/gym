@@ -122,6 +122,14 @@ export interface LedgerEntry {
   accountName?: string;
 }
 
+export interface LedgerPage {
+  entries: LedgerEntry[];
+  /** Rows matching the filter across every page. */
+  total: number;
+  totalDebit: number;
+  totalCredit: number;
+}
+
 function mapAccountHead(r: any): AccountHead {
   return {
     id: r.id,
@@ -192,6 +200,25 @@ class LedgersService {
     if (!res.ok) throw new Error("Failed to fetch account heads");
     const data = await res.json();
     return data.map(mapAccountHead);
+  }
+
+  /** The General Ledger one page at a time ("all" or one account code), with whole-filter totals. */
+  async getLedgerPage(account: string, from: string, to: string, page: number, limit: number): Promise<LedgerPage> {
+    const query = new URLSearchParams({ account, page: String(page), limit: String(limit) });
+    if (from) query.set("from", from);
+    if (to) query.set("to", to);
+    const res = await authService.makeAuthenticatedRequest(
+      `${BASE_URL}/account-heads/ledger/page?${query.toString()}`,
+      { method: "GET" }
+    );
+    if (!res.ok) throw new Error("Failed to fetch ledger entries");
+    const data = await res.json();
+    return {
+      entries: (data.entries ?? []).map(mapLedgerEntry),
+      total: Number(data.total ?? 0),
+      totalDebit: Number(data.total_debit ?? 0),
+      totalCredit: Number(data.total_credit ?? 0),
+    };
   }
 
   async getAllLedgerEntries(from?: string, to?: string): Promise<LedgerEntry[]> {

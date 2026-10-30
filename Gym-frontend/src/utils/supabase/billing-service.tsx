@@ -13,6 +13,12 @@ export interface BillingStats {
   collection_rate: number;
   monthly_data: { month: string; collected: number; target: number }[];
   payment_method_breakdown: Record<string, number>;
+  /** Money received today, and per payment method. */
+  today_collection?: number;
+  today_payment_method_breakdown?: Record<string, number>;
+  /** Unpaid remainder of today's / this month's bills (left on credit). */
+  today_on_credit?: number;
+  monthly_on_credit?: number;
 }
 
 export interface MemberDue {

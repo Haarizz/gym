@@ -160,7 +160,17 @@ public class FinancialOverviewService {
         }
 
         Map<String, Account> accounts = loadAccounts();
-        List<JournalVoucher> vouchers = journalVoucherRepository.findByStatusOrderByDateDesc("POSTED").stream()
+        // Only the vouchers the figures and charts look at (both periods and the 12-month
+        // chart). Everything posted before that only feeds the closing balances, which the
+        // database totals per account instead of loading years of lines.
+        LocalDate windowFrom = java.util.stream.Stream.of(current.from(), previous.from(), to.withDayOfMonth(1).minusMonths(11))
+                .min(Comparator.naturalOrder()).orElse(from);
+        LocalDate windowTo = previous.to().isAfter(to) ? previous.to() : to;
+        Map<String, BigDecimal> netBeforeWindow = new HashMap<>();
+        for (Object[] row : journalVoucherLineRepository.sumPostedNetByAccountBefore(windowFrom)) {
+            if (row[0] != null) netBeforeWindow.put((String) row[0], row[1] == null ? BigDecimal.ZERO : new BigDecimal(row[1].toString()));
+        }
+        List<JournalVoucher> vouchers = journalVoucherRepository.findByStatusAndDateBetweenOrderByDateDesc("POSTED", windowFrom, windowTo).stream()
                 .filter(v -> v.getDate() != null && v.getDeletedAt() == null)
                 .collect(Collectors.toList());
         Map<Long, JournalVoucher> voucherById = vouchers.stream()
@@ -190,11 +200,11 @@ public class FinancialOverviewService {
         CashFlow cashBefore = cashFlow(postings, previous);
 
         // Balances as of the end of the range (opening balance + everything posted up to it).
-        BigDecimal receivableLedger = balance(postings, accounts, to, Account::receivable, true);
-        BigDecimal payableLedger = balance(postings, accounts, to, Account::payable, false);
-        BigDecimal taxPayable = balance(postings, accounts, to, Account::tax, false);
-        BigDecimal deferredRevenue = balance(postings, accounts, to, Account::deferred, false);
-        BigDecimal cashBalance = balance(postings, accounts, to, Account::cash, true);
+        BigDecimal receivableLedger = balance(postings, accounts, netBeforeWindow, to, Account::receivable, true);
+        BigDecimal payableLedger = balance(postings, accounts, netBeforeWindow, to, Account::payable, false);
+        BigDecimal taxPayable = balance(postings, accounts, netBeforeWindow, to, Account::tax, false);
+        BigDecimal deferredRevenue = balance(postings, accounts, netBeforeWindow, to, Account::deferred, false);
+        BigDecimal cashBalance = balance(postings, accounts, netBeforeWindow, to, Account::cash, true);
 
         // Takings by payment method (membership receipts + POS sales), current and previous.
         Collections takingsNow = collections(current);
@@ -308,9 +318,14 @@ public class FinancialOverviewService {
     }
 
     /** Balance at the end of `asOf`: debit-normal (assets) or credit-normal (liabilities). */
-    static BigDecimal balance(List<Posting> postings, Map<String, Account> accounts, LocalDate asOf,
-                              java.util.function.Predicate<Account> which, boolean debitNormal) {
+    /** netBefore: debit − credit per account code posted before the loaded postings begin. */
+    static BigDecimal balance(List<Posting> postings, Map<String, Account> accounts, Map<String, BigDecimal> netBefore,
+                              LocalDate asOf, java.util.function.Predicate<Account> which, boolean debitNormal) {
         BigDecimal total = accounts.values().stream().filter(which).map(Account::opening).reduce(BigDecimal.ZERO, BigDecimal::add);
+        for (Account a : accounts.values()) {
+            BigDecimal net = netBefore.get(a.code());
+            if (net != null && which.test(a)) total = total.add(debitNormal ? net : net.negate());
+        }
         for (Posting x : postings) {
             if (x.date().isAfter(asOf) || !which.test(x.account())) continue;
             BigDecimal net = x.debit().subtract(x.credit());

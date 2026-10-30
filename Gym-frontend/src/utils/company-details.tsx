@@ -132,7 +132,7 @@ export interface ReceiptQrDetails {
 // The QR encodes the bill details directly as plain text — same approach
 // GCC e-invoicing QR codes use — rather than a URL, so scanning it shows the
 // bill on the scanning phone with no server round-trip or public endpoint.
-function buildReceiptQrPayload(company: CompanyDetails, receiptNo: string, details?: ReceiptQrDetails): string {
+export function buildReceiptQrPayload(company: CompanyDetails, receiptNo: string, details?: ReceiptQrDetails): string {
   const lines = [
     `${company.name} - Tax Invoice`,
     `Receipt No: ${receiptNo}`,

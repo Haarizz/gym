@@ -803,7 +803,8 @@ public final class LegacyGymTransformer {
 
         List<Object[]> planRows = new ArrayList<>();
         for (PlanDef p : plans) {
-            planRows.add(new Object[] { p.name, "Membership", p.planType, "individual", p.size > 1 ? p.size : null, "Daily",
+            planRows.add(new Object[] { p.name, "Membership", p.planType,
+                    com.company.project.entities.MembershipPlan.isGroupPlanType(p.planType) ? "family_head" : "individual", p.size > 1 ? p.size : null, "Daily",
                     String.valueOf(p.days), p.days + " daily", p.price, ZERO, "Active", p.description, "[]", "Unlimited", 0,
                     "Unlimited", 3, "Payment", 30, 2, ZERO, 10, true, true, true, "[]", "[]", "[]", "[]", branch, now, MARK });
         }
