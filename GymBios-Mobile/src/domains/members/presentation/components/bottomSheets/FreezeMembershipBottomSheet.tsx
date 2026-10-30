@@ -71,6 +71,9 @@ export function FreezeMembershipBottomSheet({
     return () => { cancelled = true; };
   }, [visible, member.id, member.isFrozen, loadAllowance]);
 
+  // A freeze can't start after the expiry (the backend rejects it): the member would be frozen until then for nothing.
+  const expiryDay = member.expiryDate ? new Date(new Date(member.expiryDate).setHours(0, 0, 0, 0)) : undefined;
+
   // The end date is the last day frozen, so 1 → 3 Oct is 3 days.
   const freezeDays =
     startDate && endDate
@@ -166,6 +169,7 @@ export function FreezeMembershipBottomSheet({
                 setError(undefined);
               }}
               minimumDate={startOfToday()}
+              maximumDate={expiryDay}
             />
             <DatePicker
               label={t('members.freezeSheet.freezeUntil')}

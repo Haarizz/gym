@@ -1669,7 +1669,7 @@ public class MemberService {
                 ? parseDateTime(request.getFreezeStartDate())
                 : null;
         if (freezeStart == null) freezeStart = LocalDateTime.now();
-        validateFreezeStartDate(freezeStart, member.getMembershipStartDate());
+        validateFreezeStartDate(freezeStart, member.getMembershipStartDate(), member.getExpiryDate());
         member.setMembershipStatus("frozen");
         member.setFreezeStartDate(freezeStart);
         member.setFreezeEndDate(freezeUntil);
@@ -1707,13 +1707,19 @@ public class MemberService {
 
     // Mirrors the client-side checks in the Freeze Membership dialogs so a
     // caller bypassing the UI (or a stale frontend) can't backdate a freeze.
-    private void validateFreezeStartDate(LocalDateTime freezeStart, LocalDateTime membershipStartDate) {
+    private void validateFreezeStartDate(LocalDateTime freezeStart, LocalDateTime membershipStartDate,
+                                         LocalDateTime expiryDate) {
         LocalDate startDay = freezeStart.toLocalDate();
         if (startDay.isBefore(LocalDate.now())) {
             throw new BusinessRuleViolationException("Freeze start date cannot be in the past");
         }
         if (membershipStartDate != null && startDay.isBefore(membershipStartDate.toLocalDate())) {
             throw new BusinessRuleViolationException("Freeze start date cannot be before the membership start date");
+        }
+        // The member is frozen from now, but unfreezing only extends the expiry from the
+        // freeze start, so a freeze starting after expiry would only cost them days.
+        if (expiryDate != null && startDay.isAfter(expiryDate.toLocalDate())) {
+            throw new BusinessRuleViolationException("Freeze start date cannot be after the membership expiry date");
         }
     }
 

@@ -121,7 +121,7 @@ export function MemberMembershipScreen() {
       autoRenew: ms?.auto_renew || false,
       price: ms?.plan ? ms.plan.price : null,
       pricePeriod: ms?.plan?.duration,
-      benefits: benefits ? benefits.map(b => b.name) : [],
+      benefits: Array.isArray(benefits) ? benefits : [],
       freezeAvailable: freeze?.available || false,
       freezeDaysAllowed: freeze?.allowed_days || 0,
       isFrozen: freeze?.is_frozen || false,

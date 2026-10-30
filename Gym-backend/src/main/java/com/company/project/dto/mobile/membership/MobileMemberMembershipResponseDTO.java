@@ -180,8 +180,18 @@ public class MobileMemberMembershipResponseDTO {
         private String id;
         private String name;
         private String description;
+        private String icon;
+        private String category;
 
         public BenefitInfo() {
+        }
+
+        public BenefitInfo(String id, String name, String description, String icon, String category) {
+            this.id = id;
+            this.name = name;
+            this.description = description;
+            this.icon = icon;
+            this.category = category;
         }
 
         public String getId() {
@@ -206,6 +216,22 @@ public class MobileMemberMembershipResponseDTO {
 
         public void setDescription(String description) {
             this.description = description;
+        }
+
+        public String getIcon() {
+            return icon;
+        }
+
+        public void setIcon(String icon) {
+            this.icon = icon;
+        }
+
+        public String getCategory() {
+            return category;
+        }
+
+        public void setCategory(String category) {
+            this.category = category;
         }
     }
 

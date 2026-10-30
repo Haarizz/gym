@@ -119,7 +119,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
   );
 
   const handleChange = (value: string) => {
-    setCode(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH));
+    setCode(value.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH));
     setError(null);
   };
 
@@ -235,7 +235,7 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
                     onBlur={() => setIsFocused(false)}
                     onSubmitEditing={handleClaim}
                     maxLength={CODE_LENGTH}
-                    autoCapitalize="characters"
+                    autoCapitalize="none"
                     autoCorrect={false}
                     spellCheck={false}
                     textContentType="oneTimeCode"

@@ -8,6 +8,8 @@ import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { parsePlanTerm } from '../../domain/planTerm';
 
+import type { BenefitInfo } from '../../domain/models';
+
 // Deep-green gradient glass — matches reference `.plan-card`
 const GREEN_START = 'rgba(27,90,76,0.82)';
 const GREEN_END   = 'rgba(18,63,53,0.65)';
@@ -24,7 +26,7 @@ export interface MembershipDetails {
   price: number | null;
   /** Plan length from the backend, e.g. "1 month", "56 monthly", "8 sessions". */
   pricePeriod?: string;
-  benefits: string[];
+  benefits: BenefitInfo[];
   freezeAvailable: boolean;
   freezeDaysAllowed: number;
   isFrozen: boolean;

@@ -10,6 +10,7 @@ import {
   I18nManager,
 } from 'react-native';
 import { Trans, useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/shared/components/AppText';
 import { formatClockTime, formatDate } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
@@ -57,6 +58,7 @@ type Step = 'select' | 'review' | 'pay';
 export function BookClassModal({ visible, onClose, promoCode }: BookClassModalProps) {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('select');
   const [selectedDayOffset, setSelectedDayOffset] = useState(0);
   const [selected, setSelected] = useState<AvailableClassData | null>(null);
@@ -168,7 +170,7 @@ export function BookClassModal({ visible, onClose, promoCode }: BookClassModalPr
 
   return (
     <>
-      <Modal visible={visible && step !== 'pay'} animationType="slide" transparent onRequestClose={close}>
+      <Modal visible={visible && step !== 'pay'} animationType="slide" transparent statusBarTranslucent onRequestClose={close}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <View style={styles.header}>
@@ -436,7 +438,7 @@ export function BookClassModal({ visible, onClose, promoCode }: BookClassModalPr
               </ScrollView>
             )}
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(Spacing.four, insets.bottom + Spacing.two) }]}>
               {step === 'select' ? (
                 <Pressable
                   style={[styles.confirmButton, !selected && styles.confirmButtonDisabled]}

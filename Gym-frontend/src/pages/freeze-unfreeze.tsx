@@ -55,6 +55,13 @@ const fmt = (d?: string | Date | null) => (d ? format(new Date(d), 'dd MMM yyyy'
 // A stored freeze end is the moment the member is back (midnight after a staff-picked
 // last day), so the last day actually frozen is the moment before it.
 const lastFrozenDay = (end: string) => new Date(new Date(end).getTime() - 1);
+// A freeze can't start after the expiry: the member would be frozen until then for nothing.
+const expiryDay = (m: Member) => {
+  if (!m.expiry_date) return null;
+  const d = new Date(m.expiry_date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   // Freeze form (left)
@@ -177,6 +184,12 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
 
     if (fStart < today) {
       toast.error('Freeze start date cannot be in the past');
+      return;
+    }
+
+    const expiry = expiryDay(selectedMember);
+    if (expiry && fStart > expiry) {
+      toast.error('Freeze start date cannot be after the membership expiry date');
       return;
     }
 
@@ -500,7 +513,10 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
                               setFreezeStartDate(d);
                               if (d && freezeEndDate && freezeEndDate < d) setFreezeEndDate(undefined);
                             }}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            disabled={(date) => {
+                              const expiry = expiryDay(selectedMember);
+                              return date < new Date(new Date().setHours(0, 0, 0, 0)) || (!!expiry && date > expiry);
+                            }}
                           />
                         </PopoverContent>
                       </Popover>

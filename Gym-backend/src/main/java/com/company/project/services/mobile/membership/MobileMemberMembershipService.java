@@ -14,6 +14,8 @@ import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.project.entities.Facility;
+import com.company.project.repositories.FacilityRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -27,6 +29,7 @@ public class MobileMemberMembershipService {
     private final MemberRepository memberRepository;
     private final MembershipPlanRepository membershipPlanRepository;
     private final MembershipFreezeService freezeService;
+    private final FacilityRepository facilityRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -34,10 +37,12 @@ public class MobileMemberMembershipService {
     public MobileMemberMembershipService(
             MemberRepository memberRepository,
             MembershipPlanRepository membershipPlanRepository,
-            MembershipFreezeService freezeService) {
+            MembershipFreezeService freezeService,
+            FacilityRepository facilityRepository) {
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.freezeService = freezeService;
+        this.facilityRepository = facilityRepository;
     }
 
     private String baseCurrencySymbol() {
@@ -137,32 +142,133 @@ public class MobileMemberMembershipService {
         // 2. Benefits
         List<MobileMemberMembershipResponseDTO.BenefitInfo> benefits = new ArrayList<>();
         if (plan != null) {
-            if (plan.getDescription() != null && !plan.getDescription().trim().isEmpty()) {
-                MobileMemberMembershipResponseDTO.BenefitInfo descBenefit = new MobileMemberMembershipResponseDTO.BenefitInfo();
-                descBenefit.setId("desc");
-                descBenefit.setName("Plan Details");
-                descBenefit.setDescription(plan.getDescription());
-                benefits.add(descBenefit);
-            }
-            if ("Unlimited".equalsIgnoreCase(plan.getAttendanceLimit())) {
-                MobileMemberMembershipResponseDTO.BenefitInfo attendance = new MobileMemberMembershipResponseDTO.BenefitInfo();
-                attendance.setId("attendance");
-                attendance.setName("Unlimited Access");
-                attendance.setDescription("Train as many times as you like.");
-                benefits.add(attendance);
+            // 2.1 Gym & Floor Access
+            String attendanceName;
+            String attendanceDesc;
+            if ("Unlimited".equalsIgnoreCase(plan.getAttendanceLimit()) || plan.getAttendanceLimit() == null) {
+                attendanceName = "Unlimited Gym Floor Access";
+                attendanceDesc = "Full access to strength, cardio, and functional training areas during open hours.";
             } else if (plan.getAttendanceValue() != null) {
-                MobileMemberMembershipResponseDTO.BenefitInfo attendance = new MobileMemberMembershipResponseDTO.BenefitInfo();
-                attendance.setId("attendance");
-                attendance.setName("Limited Access");
-                attendance.setDescription(plan.getAttendanceValue() + " visits per " + plan.getAttendancePeriod() + ".");
-                benefits.add(attendance);
+                attendanceName = "Gym Access (" + plan.getAttendanceValue() + " visits/" + (plan.getAttendancePeriod() != null ? plan.getAttendancePeriod().toLowerCase() : "period") + ")";
+                attendanceDesc = "Up to " + plan.getAttendanceValue() + " check-ins per " + (plan.getAttendancePeriod() != null ? plan.getAttendancePeriod().toLowerCase() : "period") + " with full equipment access.";
+            } else {
+                attendanceName = "Gym Access Included";
+                attendanceDesc = "Access to gym floor, workout equipment, and training zones.";
             }
+            benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                "attendance", attendanceName, attendanceDesc, "activity", "Access"
+            ));
+
+            // 2.2 Facilities & Amenities
+            List<String> facilityNames = new ArrayList<>();
+            if (plan.getSelectedFacilities() != null && !plan.getSelectedFacilities().isEmpty()) {
+                List<Facility> allFacilities = facilityRepository.findAll();
+                for (String facRef : plan.getSelectedFacilities()) {
+                    for (Facility f : allFacilities) {
+                        if (facRef.equalsIgnoreCase(f.getFacilityId()) ||
+                            facRef.equalsIgnoreCase(String.valueOf(f.getId())) ||
+                            facRef.equalsIgnoreCase(f.getName())) {
+                            if (!facilityNames.contains(f.getName())) {
+                                facilityNames.add(f.getName());
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!facilityNames.isEmpty()) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "facilities",
+                    "Included Facilities & Amenities",
+                    "Full access to " + String.join(", ", facilityNames) + ".",
+                    "droplet",
+                    "Amenities"
+                ));
+            } else {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "facilities",
+                    "Locker & Shower Facilities",
+                    "Complimentary day lockers, changing rooms, and hot showers.",
+                    "droplet",
+                    "Amenities"
+                ));
+            }
+
+            // 2.3 Coaching & Training Support
             if (plan.getMaxSessions() != null && plan.getMaxSessions() > 0) {
-                MobileMemberMembershipResponseDTO.BenefitInfo sessions = new MobileMemberMembershipResponseDTO.BenefitInfo();
-                sessions.setId("sessions");
-                sessions.setName("Personal Training");
-                sessions.setDescription(plan.getMaxSessions() + " sessions included.");
-                benefits.add(sessions);
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "sessions",
+                    "Personal Training (" + plan.getMaxSessions() + " Sessions)",
+                    plan.getMaxSessions() + " dedicated one-on-one sessions included with a certified trainer.",
+                    "award",
+                    "Coaching"
+                ));
+            } else if (plan.getAssignableTrainers() != null && !plan.getAssignableTrainers().isEmpty()) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "coaching",
+                    "Dedicated Trainer Guidance",
+                    "Guidance from assigned coaches: " + String.join(", ", plan.getAssignableTrainers()) + ".",
+                    "users",
+                    "Coaching"
+                ));
+            } else {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "coaching",
+                    "Floor Trainer Support",
+                    "Certified trainers available on the gym floor for exercise guidance and form checks.",
+                    "award",
+                    "Coaching"
+                ));
+            }
+
+            // 2.4 Training Streams & Classes
+            if (plan.getTrainingStreams() != null && !plan.getTrainingStreams().isEmpty()) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "classes",
+                    "Group Training Streams",
+                    "Access to " + plan.getTrainingStreams().size() + " scheduled specialized training streams.",
+                    "calendar",
+                    "Classes"
+                ));
+            }
+
+            // 2.5 Freeze & Flexibility
+            if (plan.getFreeDaysAllowed() != null && plan.getFreeDaysAllowed() > 0) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "freeze",
+                    "Complimentary Freeze Allowance",
+                    "Pause your membership up to " + plan.getFreeDaysAllowed() + " free days when traveling or recovering.",
+                    "pause-circle",
+                    "Flexibility"
+                ));
+            } else if (plan.getMaxFreezeDays() != null && plan.getMaxFreezeDays() > 0) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "freeze",
+                    "Membership Freeze Privilege",
+                    "Pause your membership up to " + plan.getMaxFreezeDays() + " days per period.",
+                    "pause-circle",
+                    "Flexibility"
+                ));
+            }
+
+            // 2.6 Digital & Platform Perks
+            benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                "digital",
+                "GymBios Digital Access",
+                "Contactless QR check-in, workout tracking, community challenges, and digital billing.",
+                "smartphone",
+                "Privileges"
+            ));
+
+            // 2.7 Plan Custom Description (if present)
+            if (plan.getDescription() != null && !plan.getDescription().trim().isEmpty()) {
+                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "desc",
+                    "Special Plan Features",
+                    plan.getDescription().trim(),
+                    "check-circle",
+                    "Details"
+                ));
             }
         }
         response.setBenefits(benefits);
