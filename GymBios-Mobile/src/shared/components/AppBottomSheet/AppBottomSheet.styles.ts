@@ -82,4 +82,8 @@ export const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingBottom: Spacing.six,
   },
+  // The pinned footer already separates the content from the sheet's edge.
+  contentContainerWithFooter: {
+    paddingBottom: Spacing.four,
+  },
 });

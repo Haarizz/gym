@@ -69,6 +69,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("time") LocalTime time
     );
 
+    // Not-yet-started bookings cancelled because staff rejected the payment (newest first per session).
+    @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH s.trainer " +
+           "WHERE b.member.id = :memberId AND b.status = 'cancelled' AND b.paymentRejectionReason IS NOT NULL " +
+           "AND (s.date > :date OR (s.date = :date AND s.startTime >= :time)) " +
+           "ORDER BY s.date ASC, s.startTime ASC, b.id DESC")
+    List<Booking> findUpcomingPaymentRejectedBookings(
+            @Param("memberId") Long memberId,
+            @Param("date") LocalDate date,
+            @Param("time") LocalTime time
+    );
+
     @Query("SELECT b FROM Booking b JOIN FETCH b.session s LEFT JOIN FETCH s.trainer " +
            "WHERE b.member.id = :memberId " +
            "AND (s.date < :date OR (s.date = :date AND s.startTime < :time)) " +

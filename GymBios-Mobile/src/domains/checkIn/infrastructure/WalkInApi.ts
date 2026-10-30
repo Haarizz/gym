@@ -70,7 +70,8 @@ export const walkInApi = {
       amount: payment.summary.finalAmount,
       paid_amount: Math.min(payment.summary.paidAmount, payment.summary.finalAmount),
       payment_method: payment.paymentMethodUsed,
-      payment_breakdown: nonCredit.length > 1
+      // Mixed legs, or a Stripe payment the backend must verify.
+      payment_breakdown: nonCredit.length > 1 || nonCredit.some((leg) => leg.stripePaymentIntentId)
         ? nonCredit.map((leg) => ({
             method: leg.method,
             amount: leg.amount,
@@ -83,6 +84,7 @@ export const walkInApi = {
             bank_account_name: leg.bankAccountName,
             online_payment_type: leg.onlinePaymentType,
             provider_name: leg.providerName,
+            stripe_payment_intent_id: leg.stripePaymentIntentId,
           }))
         : undefined,
       bank_account_code: payment.bankAccountCode,

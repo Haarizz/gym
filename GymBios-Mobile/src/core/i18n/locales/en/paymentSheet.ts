@@ -1,22 +1,97 @@
 const paymentSheet = {
   paymentSheet: {
-    title: 'Payment & Checkout',
-    processingFor: 'Processing payment for {{title}}',
-    completePayment: 'Complete Payment (<amount/>)',
-    totalAmount: 'Total Amount',
-    selectMethod: 'Select Payment Method',
+    title: 'Checkout',
+    processingFor: 'Paying for {{title}}',
+    amountDue: 'Amount due',
+    howToPay: 'How would you like to pay?',
+    howToPayStaff: 'How is the member paying?',
+    allMethods: 'All payment methods',
 
-    // Display only — the English titles in shared/payment/constants are what the API receives.
+    // Display only — shared/payment/constants METHOD_API_TITLES is what the API receives.
     methods: {
-      cash: { title: 'Cash', subtitle: 'Physical cash payment' },
-      card: { title: 'Card', subtitle: 'Debit or Credit Card' },
-      credit: { title: 'Credit', subtitle: 'Add to member account' },
-      mixed: { title: 'Mixed Payment', subtitle: 'Split across methods' },
-      cheque: { title: 'Cheque', subtitle: 'Paper cheque payment' },
-      bank_transfer: { title: 'Bank Transfer', subtitle: 'Direct wire / ETF' },
-      online: { title: 'Online Payment', subtitle: 'UPI, Wallet, Stripe' },
+      card: { title: 'Card', subtitle: 'Card, Apple Pay, Google Pay' },
+      upi: { title: 'UPI', subtitle: 'Any UPI app' },
+      netbanking: { title: 'Net banking', subtitle: 'Pay from your bank' },
+      cash: { title: 'Cash', subtitleMember: 'Pay at reception', subtitleStaff: 'Collect in person' },
+      credit: { title: 'Pay later', subtitle: 'Part now, rest on account' },
+      mixed: { title: 'Cash + online', subtitle: 'Split the payment' },
     },
-    other: 'Other',
+
+    unavailable: {
+      online: 'Not available yet',
+      inrOnly: 'Only for INR payments',
+      nothingToPay: 'Nothing to pay online',
+    },
+
+    online: {
+      title: {
+        card: 'Pay by card',
+        upi: 'Pay with UPI',
+        netbanking: 'Pay with net banking',
+      },
+      note: {
+        card: 'Pay <amount/> by card, Apple Pay or Google Pay in the secure checkout.',
+        upi: 'Approve <amount/> in your UPI app, then come back here.',
+        netbanking: 'Choose your bank and approve <amount/>, then come back here.',
+      },
+      secure: 'Payments are processed securely by Stripe. Card details never reach the gym.',
+    },
+
+    cash: {
+      memberTitle: 'Pay at reception',
+      memberNote: "We'll send a payment request to the front desk. Pay <amount/> in cash at the reception — it's confirmed once staff receive it.",
+      sendRequest: 'Send request',
+      staffTitle: 'Collect cash',
+      staffNote: 'Take <amount/> in cash from the member, then confirm.',
+      received: 'Cash received',
+    },
+
+    credit: {
+      memberNote: 'Pay part of it now if you like — the rest goes on your account once the front desk approves it.',
+      staffNote: "Take part of it now if the member wants — the rest is added to their outstanding balance.",
+      payNow: 'Pay now',
+      nothingNow: 'Nothing',
+      onAccount: 'On account',
+      payNowWith: 'Pay now with',
+      dueDate: 'Due date (optional)',
+      selectDueDate: 'Select due date',
+      request: 'Request credit',
+      addToAccount: 'Add to account',
+    },
+
+    mixed: {
+      memberNote: 'Pay the cash part at reception; the rest is charged online now.',
+      staffNote: 'Collect the cash part first; the rest is charged online.',
+      cashPart: 'Cash part',
+      cash: 'Cash',
+      payOnlineWith: 'Pay the rest with',
+    },
+
+    split: {
+      exactAmount: 'Exact amount (<currency/>)',
+      ofTotal: 'of <amount/>',
+    },
+
+    cta: {
+      pay: 'Pay <amount/>',
+      payNow: 'Pay <amount/> now',
+      payOnline: 'Pay <amount/> online',
+    },
+
+    // Local backend simulation (payments.simulate) — shown instead of Stripe's sheet.
+    simulated: {
+      badge: 'TEST MODE',
+      title: 'Test payment',
+      note: 'Simulation — no money moves. Approve to continue as if <amount/> was paid by {{method}}.',
+      approve: 'Approve test payment',
+      decline: 'Decline',
+    },
+
+    processing: {
+      opening: 'Opening secure checkout…',
+      finishing: 'Finishing up…',
+      keepOpen: 'Please keep this screen open',
+    },
 
     discount: {
       title: 'Select Discount (Optional)',
@@ -28,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'Amount (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'Please select a card type',
-      chequeNumberRequired: 'Cheque number is required',
-      transactionReferenceRequired: 'Transaction reference is required',
-      selectPaymentType: 'Please select payment type',
-      providerNameRequired: 'Provider name is required',
-      selectReceivedVia: 'Please select payment method received via',
-      cardTypeRequired: 'Card type is required',
-      referenceRequired: 'Reference is required',
-      paymentTypeRequired: 'Payment type is required',
-      splitMismatch: 'Total split amount must equal the final amount',
-      dueDateRequired: 'Payment due date is required for partial payments',
+    form: {
+      example: 'e.g. {{value}}',
     },
 
-    form: {
-      cashDetails: 'Cash Payment Details',
-      cardDetails: 'Card Payment Details',
-      chequeDetails: 'Cheque Payment Details',
-      bankDetails: 'Bank Transfer Details',
-      onlineDetails: 'Online Payment Details',
-      creditDetails: 'Credit Payment Details',
-      mixedDetails: 'Mixed / Split Payment Details',
-      mixedSubtitle: 'Split total across multiple methods',
-
-      paidAmount: 'Paid Amount (<currency/>) *',
-      amount: 'Amount (<currency/>) *',
-      receivedAmount: 'Received Amount (<currency/>)',
-      payBackAmount: 'Pay Back Amount (<currency/>)',
-      amountToReturn: 'Amount to return',
-      dueDate: 'Payment Due Date *',
-      dueDateOptional: 'Payment Due Date (Optional)',
-      selectDueDate: 'Select due date',
-      selectDate: 'Select date',
-
-      finalAmount: 'Final Amount:',
-      paidAmountLabel: 'Paid Amount:',
-      receivedAmountLabel: 'Received Amount:',
-      remainingDue: 'Remaining Due:',
-      payBack: 'Pay Back:',
-      remainingOrDue: 'Remaining/Due:',
-      remainingOnCredit: 'Remaining (On Credit):',
-
-      cashReturnRequired: 'Cash Return Required:',
-      returnToCustomer: 'Return <amount/> to customer',
-      partialPayment: 'Partial Payment:',
-      addedToOutstanding: '<amount/> will be added to outstanding balance.',
-      addedToMemberOutstanding: "<amount/> will be added to member's outstanding balance.",
-      fullCredit: 'Full Credit:',
-      entireOnCredit: 'Member will have the entire <amount/> on credit.',
-      partialReceived: 'Partial Received:',
-      receivedViaNote: '<received/> received via {{method}}. Remaining <remaining/> recorded on credit.',
-      otherMethod: 'other method',
-
-      cardType: 'Card Type *',
-      referenceNumberOptional: 'Reference / Transaction Number (Optional)',
-      referenceOptional: 'Reference (Optional)',
-      referenceIdRequired: 'Reference / Transaction ID *',
-      transactionReferenceIdRequired: 'Transaction / Reference ID *',
-      transactionReferenceRequired: 'Transaction Reference *',
-      chequeNumber: 'Cheque Number *',
-      bankNameOptional: 'Bank Name (Optional)',
-      chequeDateOptional: 'Cheque Date (Optional)',
-      bankAccountLedgerOptional: 'Bank Account (Ledger, Optional)',
-      bankAccountLedger: 'Bank Account (Ledger)',
-      ledgerHint: 'Accounts pulled from Chart of Accounts. Amount will be credited to selected account.',
-      onlinePaymentType: 'Online Payment Type *',
-      paymentType: 'Payment Type *',
-      paymentProviderName: 'Payment Provider Name *',
-      providerName: 'Provider Name *',
-      receivedVia: 'Received Via *',
-      receivedPlaceholder: '0.00 (Leave empty for full credit)',
-      transactionIdPlaceholder: 'Transaction ID',
-      chequeNumberPlaceholder: 'Cheque number',
-      referenceIdPlaceholder: 'Reference ID',
-      providerNamePlaceholder: 'Provider name',
-      example: 'e.g. {{value}}',
-
-      method: 'Method *',
-      leg: 'Leg #{{n}}',
-      addLeg: '+ Add Payment Leg',
-      totalSplit: 'Total Split Amount:',
-      exceedBy: 'Split amounts exceed final amount by <amount/>',
-      shortBy: 'Split amounts fall short by <amount/>',
-      splitMatches: 'Split total matches final amount perfectly.',
+    errors: {
+      failed: 'The payment did not go through',
+      refunded: "That didn't go through. If you were charged, the money is refunded automatically.",
+      noGym: 'No gym is selected for this payment',
+      needBoth: 'Choose an amount for both the cash and online parts',
+      amountTooHigh: "Can't be more than the amount due",
     },
   },
 };

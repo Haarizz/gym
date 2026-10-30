@@ -137,7 +137,7 @@ const profile = {
     title: '钱包',
     subtitle: '退款与奖励抵扣余额',
     availableBalance: '可用余额',
-    balanceHint: '预约课程时可直接抵扣，取消预约的退款也会退回此处。',
+    balanceHint: '可用于课程和附加项目，取消的预约和附加项目的退款也会退回此处。',
     history: '余额明细',
     emptyTitle: '暂无钱包明细',
     emptyDescription: '退款与推荐奖励将显示在此处。',
@@ -148,6 +148,8 @@ const profile = {
       BOOKING: '课程预约',
       REFERRAL_REWARD: '推荐奖励',
       BILLING_USE: '消费支出',
+      ADDON: '购买附加项目',
+      ADDON_REFUND: '附加项目退款',
     },
   },
 

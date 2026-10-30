@@ -22,10 +22,13 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
     private final WalkInRegistrationService walkInRegistrationService;
     private final CheckInSettingsService checkInSettingsService;
+    private final com.company.project.services.payments.StripePaymentService stripePaymentService;
 
     public AttendanceController(AttendanceService attendanceService,
                                 WalkInRegistrationService walkInRegistrationService,
-                                CheckInSettingsService checkInSettingsService) {
+                                CheckInSettingsService checkInSettingsService,
+                                com.company.project.services.payments.StripePaymentService stripePaymentService) {
+        this.stripePaymentService = stripePaymentService;
         this.attendanceService = attendanceService;
         this.walkInRegistrationService = walkInRegistrationService;
         this.checkInSettingsService = checkInSettingsService;
@@ -147,7 +150,10 @@ public class AttendanceController {
     @PostMapping("/walkin")
     public ResponseEntity<?> walkInCheckIn(@RequestBody WalkInCheckInRequest req) {
         try {
-            CheckInResponse resp = attendanceService.walkInCheckIn(req);
+            // The web desk records payments taken at the counter; only the mobile app's
+            // Stripe legs need checking with Stripe.
+            CheckInResponse resp = stripePaymentService.withVerifiedPayments(req.getPaymentBreakdown(), false, null,
+                    () -> attendanceService.walkInCheckIn(req));
             return ResponseEntity.ok(resp);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

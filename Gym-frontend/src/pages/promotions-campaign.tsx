@@ -219,6 +219,9 @@ const CHANNEL_OPTIONS = [
 ];
 
 const APPLICABLE_PLAN_OPTIONS = ["Standard Monthly", "Standard Annual", "Premium Monthly", "Premium Annual"];
+// Where else the code may be used. Add-on checkout only accepts promotions that list
+// "Add-ons" here (backend DiscountCodeService.SERVICE_ADDONS).
+const APPLICABLE_SERVICE_OPTIONS = [{ value: "Add-ons", label: "Add-ons" }];
 
 /** Names of the members a "Specific Members" promotion is limited to */
 function SpecificMemberBadges({ ids }: { ids: string[] }) {
@@ -2173,6 +2176,23 @@ export function PromotionsCampaign() {
                       );
                     })}
                   </div>
+                </fieldset>
+
+                <fieldset className={promoStyles.subsection}>
+                  <legend className="text-sm font-medium">Applicable Services</legend>
+                  <div className={promoStyles.optionGrid}>
+                    {APPLICABLE_SERVICE_OPTIONS.map(opt => (
+                      <div key={opt.value} className={promoStyles.checkRow}>
+                        <Checkbox
+                          id={`promo-service-${opt.value.toLowerCase()}`}
+                          checked={promotionForm.applicableServices.includes(opt.value)}
+                          onCheckedChange={(checked) => updateArrayField("applicableServices", opt.value, checked === true)}
+                        />
+                        <Label htmlFor={`promo-service-${opt.value.toLowerCase()}`}>{opt.label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Only promotions with Add-ons checked can be used when buying add-ons.</p>
                 </fieldset>
               </section>
             )}

@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: 'Zahlung & Checkout',
-    processingFor: 'Zahlung für {{title}}',
-    completePayment: 'Zahlung abschließen (<amount/>)',
-    totalAmount: 'Gesamtbetrag',
-    selectMethod: 'Zahlungsmethode wählen',
+    title: "Bezahlen",
+    processingFor: "Zahlung für {{title}}",
+    amountDue: "Fälliger Betrag",
+    howToPay: "Wie möchtest du bezahlen?",
+    howToPayStaff: "Wie zahlt das Mitglied?",
+    allMethods: "Alle Zahlungsarten",
 
     methods: {
-      cash: { title: 'Bar', subtitle: 'Barzahlung' },
-      card: { title: 'Karte', subtitle: 'Debit- oder Kreditkarte' },
-      credit: { title: 'Auf Rechnung', subtitle: 'Dem Mitgliedskonto belasten' },
-      mixed: { title: 'Gemischte Zahlung', subtitle: 'Auf mehrere Methoden aufteilen' },
-      cheque: { title: 'Scheck', subtitle: 'Zahlung per Papierscheck' },
-      bank_transfer: { title: 'Banküberweisung', subtitle: 'Direkte Überweisung' },
-      online: { title: 'Online-Zahlung', subtitle: 'UPI, Wallet, Stripe' },
+      card: { title: "Karte", subtitle: "Karte, Apple Pay, Google Pay" },
+      upi: { title: "UPI", subtitle: "Jede UPI-App" },
+      netbanking: { title: "Onlinebanking", subtitle: "Von deiner Bank zahlen" },
+      cash: { title: "Bar", subtitleMember: "An der Rezeption zahlen", subtitleStaff: "Persönlich kassieren" },
+      credit: { title: "Später zahlen", subtitle: "Teil jetzt, Rest aufs Konto" },
+      mixed: { title: "Bar + online", subtitle: "Zahlung aufteilen" },
     },
-    other: 'Sonstige',
+
+    unavailable: {
+      online: "Noch nicht verfügbar",
+      inrOnly: "Nur für Zahlungen in INR",
+      nothingToPay: "Nichts online zu zahlen",
+    },
+
+    online: {
+      title: {
+        card: "Mit Karte zahlen",
+        upi: "Mit UPI zahlen",
+        netbanking: "Per Onlinebanking zahlen",
+      },
+      note: {
+        card: "Zahle <amount/> per Karte, Apple Pay oder Google Pay im sicheren Checkout.",
+        upi: "Bestätige <amount/> in deiner UPI-App und kehre dann hierher zurück.",
+        netbanking: "Wähle deine Bank, bestätige <amount/> und kehre dann hierher zurück.",
+      },
+      secure: "Zahlungen werden sicher von Stripe abgewickelt. Kartendaten erreichen das Studio nie.",
+    },
+
+    cash: {
+      memberTitle: "An der Rezeption zahlen",
+      memberNote: "Wir senden eine Zahlungsanfrage an die Rezeption. Zahle <amount/> bar an der Rezeption – bestätigt, sobald das Team das Geld erhalten hat.",
+      sendRequest: "Anfrage senden",
+      staffTitle: "Bargeld kassieren",
+      staffNote: "Nimm <amount/> bar vom Mitglied entgegen und bestätige dann.",
+      received: "Bargeld erhalten",
+    },
+
+    credit: {
+      memberNote: "Zahle auf Wunsch einen Teil jetzt – der Rest wird nach Freigabe durch die Rezeption deinem Konto belastet.",
+      staffNote: "Nimm auf Wunsch einen Teil jetzt an – der Rest wird dem offenen Saldo des Mitglieds hinzugefügt.",
+      payNow: "Jetzt zahlen",
+      nothingNow: "Nichts",
+      onAccount: "Aufs Konto",
+      payNowWith: "Jetzt zahlen mit",
+      dueDate: "Fälligkeitsdatum (optional)",
+      selectDueDate: "Fälligkeitsdatum wählen",
+      request: "Zahlungsaufschub anfragen",
+      addToAccount: "Aufs Konto buchen",
+    },
+
+    mixed: {
+      memberNote: "Zahle den Baranteil an der Rezeption; der Rest wird jetzt online belastet.",
+      staffNote: "Kassiere zuerst den Baranteil; der Rest wird online belastet.",
+      cashPart: "Baranteil",
+      cash: "Bar",
+      payOnlineWith: "Rest zahlen mit",
+    },
+
+    split: {
+      exactAmount: "Genauer Betrag (<currency/>)",
+      ofTotal: "von <amount/>",
+    },
+
+    cta: {
+      pay: "<amount/> zahlen",
+      payNow: "<amount/> jetzt zahlen",
+      payOnline: "<amount/> online zahlen",
+    },
+
+    simulated: {
+      badge: "TESTMODUS",
+      title: "Testzahlung",
+      note: "Simulation – es fließt kein Geld. Bestätige, um so fortzufahren, als wären <amount/> per {{method}} bezahlt worden.",
+      approve: "Testzahlung bestätigen",
+      decline: "Ablehnen",
+    },
+
+    processing: {
+      opening: "Sicherer Checkout wird geöffnet…",
+      finishing: "Wird abgeschlossen…",
+      keepOpen: "Bitte lass diesen Bildschirm geöffnet",
+    },
 
     discount: {
       title: 'Rabatt wählen (optional)',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'Betrag (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'Bitte wähle einen Kartentyp',
-      chequeNumberRequired: 'Schecknummer ist erforderlich',
-      transactionReferenceRequired: 'Transaktionsreferenz ist erforderlich',
-      selectPaymentType: 'Bitte wähle eine Zahlungsart',
-      providerNameRequired: 'Name des Anbieters ist erforderlich',
-      selectReceivedVia: 'Bitte wähle, wie die Zahlung eingegangen ist',
-      cardTypeRequired: 'Kartentyp ist erforderlich',
-      referenceRequired: 'Referenz ist erforderlich',
-      paymentTypeRequired: 'Zahlungsart ist erforderlich',
-      splitMismatch: 'Die Summe der Teilbeträge muss dem Endbetrag entsprechen',
-      dueDateRequired: 'Für Teilzahlungen ist ein Fälligkeitsdatum erforderlich',
+    form: {
+      example: 'z. B. {{value}}',
     },
 
-    form: {
-      cashDetails: 'Details zur Barzahlung',
-      cardDetails: 'Details zur Kartenzahlung',
-      chequeDetails: 'Details zur Scheckzahlung',
-      bankDetails: 'Details zur Banküberweisung',
-      onlineDetails: 'Details zur Online-Zahlung',
-      creditDetails: 'Details zur Zahlung auf Rechnung',
-      mixedDetails: 'Details zur gemischten / geteilten Zahlung',
-      mixedSubtitle: 'Gesamtbetrag auf mehrere Methoden aufteilen',
-
-      paidAmount: 'Gezahlter Betrag (<currency/>) *',
-      amount: 'Betrag (<currency/>) *',
-      receivedAmount: 'Erhaltener Betrag (<currency/>)',
-      payBackAmount: 'Rückgeld (<currency/>)',
-      amountToReturn: 'Zurückzugebender Betrag',
-      dueDate: 'Fälligkeitsdatum *',
-      dueDateOptional: 'Fälligkeitsdatum (optional)',
-      selectDueDate: 'Fälligkeitsdatum wählen',
-      selectDate: 'Datum wählen',
-
-      finalAmount: 'Endbetrag:',
-      paidAmountLabel: 'Gezahlter Betrag:',
-      receivedAmountLabel: 'Erhaltener Betrag:',
-      remainingDue: 'Noch offen:',
-      payBack: 'Rückgeld:',
-      remainingOrDue: 'Rest/Offen:',
-      remainingOnCredit: 'Rest (auf Rechnung):',
-
-      cashReturnRequired: 'Rückgeld erforderlich:',
-      returnToCustomer: '<amount/> an den Kunden zurückgeben',
-      partialPayment: 'Teilzahlung:',
-      addedToOutstanding: '<amount/> wird zum offenen Saldo hinzugefügt.',
-      addedToMemberOutstanding: '<amount/> wird zum offenen Saldo des Mitglieds hinzugefügt.',
-      fullCredit: 'Vollständig auf Rechnung:',
-      entireOnCredit: 'Der gesamte Betrag von <amount/> wird dem Mitglied in Rechnung gestellt.',
-      partialReceived: 'Teilweise erhalten:',
-      receivedViaNote: '<received/> per {{method}} erhalten. Restbetrag <remaining/> auf Rechnung erfasst.',
-      otherMethod: 'andere Methode',
-
-      cardType: 'Kartentyp *',
-      referenceNumberOptional: 'Referenz / Transaktionsnummer (optional)',
-      referenceOptional: 'Referenz (optional)',
-      referenceIdRequired: 'Referenz / Transaktions-ID *',
-      transactionReferenceIdRequired: 'Transaktions- / Referenz-ID *',
-      transactionReferenceRequired: 'Transaktionsreferenz *',
-      chequeNumber: 'Schecknummer *',
-      bankNameOptional: 'Bankname (optional)',
-      chequeDateOptional: 'Scheckdatum (optional)',
-      bankAccountLedgerOptional: 'Bankkonto (Hauptbuch, optional)',
-      bankAccountLedger: 'Bankkonto (Hauptbuch)',
-      ledgerHint: 'Konten aus dem Kontenplan. Der Betrag wird dem gewählten Konto gutgeschrieben.',
-      onlinePaymentType: 'Art der Online-Zahlung *',
-      paymentType: 'Zahlungsart *',
-      paymentProviderName: 'Name des Zahlungsanbieters *',
-      providerName: 'Name des Anbieters *',
-      receivedVia: 'Erhalten per *',
-      receivedPlaceholder: '0.00 (leer lassen für vollständige Rechnung)',
-      transactionIdPlaceholder: 'Transaktions-ID',
-      chequeNumberPlaceholder: 'Schecknummer',
-      referenceIdPlaceholder: 'Referenz-ID',
-      providerNamePlaceholder: 'Name des Anbieters',
-      example: 'z. B. {{value}}',
-
-      method: 'Methode *',
-      leg: 'Teil {{n}}',
-      addLeg: '+ Teilzahlung hinzufügen',
-      totalSplit: 'Summe der Teilbeträge:',
-      exceedBy: 'Die Teilbeträge übersteigen den Endbetrag um <amount/>',
-      shortBy: 'Den Teilbeträgen fehlen <amount/> zum Endbetrag',
-      splitMatches: 'Die Teilbeträge entsprechen genau dem Endbetrag.',
+    errors: {
+      failed: "Die Zahlung ist fehlgeschlagen",
+      refunded: "Das hat nicht geklappt. Falls etwas abgebucht wurde, wird es automatisch erstattet.",
+      noGym: "Für diese Zahlung ist kein Studio ausgewählt",
+      needBoth: "Wähle einen Betrag für den Bar- und den Onlineanteil",
+      amountTooHigh: "Darf den fälligen Betrag nicht übersteigen",
     },
   },
 } satisfies LocaleResource;

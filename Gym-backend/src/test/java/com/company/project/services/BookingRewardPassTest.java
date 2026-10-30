@@ -35,6 +35,7 @@ class BookingRewardPassTest {
     @Mock private TrainingSessionRepository sessionRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private NotificationService notificationService;
+    @Mock private com.company.project.services.mobile.push.BookingPaymentNotifier bookingPaymentNotifier;
     @Mock private QrCodeService qrCodeService;
     @Mock private RewardRedemptionService rewardRedemptionService;
     @Mock private DiscountCodeService discountCodeService;
@@ -51,7 +52,7 @@ class BookingRewardPassTest {
         MockitoAnnotations.openMocks(this);
         BookingPaymentService payments = new BookingPaymentService(rewardRedemptionService, discountCodeService,
                 walletService, receiptService, receiptRepository, memberRepository, financialEventService,
-                notificationService);
+                notificationService, bookingPaymentNotifier);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
                 notificationService, qrCodeService, rewardRedemptionService, payments);
 

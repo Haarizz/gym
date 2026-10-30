@@ -82,6 +82,30 @@ public class MobileMemberBookingsService {
         return bookings.stream().map(b -> mapToMemberBookingDTO(b, false)).collect(Collectors.toList());
     }
 
+    /**
+     * Not-yet-started bookings cancelled because staff rejected the payment, with the reason.
+     * Shown apart from the upcoming list; one per session (the latest), and none for a
+     * session the member has since booked again.
+     */
+    public List<MemberBookingDTO> getRejectedBookings(UserDetailsImpl principal) {
+        java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
+        if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
+
+        Member member = memberOpt.get();
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        java.util.Set<Long> bookedSessionIds = bookingRepository.findUpcomingBookings(member.getId(), today, now).stream()
+                .map(b -> b.getSession().getId())
+                .collect(Collectors.toSet());
+        java.util.Set<Long> shownSessionIds = new java.util.HashSet<>();
+        return bookingRepository.findUpcomingPaymentRejectedBookings(member.getId(), today, now).stream()
+                .filter(b -> !bookedSessionIds.contains(b.getSession().getId()))
+                .filter(b -> shownSessionIds.add(b.getSession().getId()))
+                .map(b -> mapToMemberBookingDTO(b, false))
+                .collect(Collectors.toList());
+    }
+
     public List<MemberBookingDTO> getPastBookings(UserDetailsImpl principal) {
         java.util.Optional<Member> memberOpt = getAuthenticatedMember(principal);
         if (memberOpt.isEmpty()) return java.util.Collections.emptyList();
@@ -316,6 +340,7 @@ public class MobileMemberBookingsService {
         dto.setRefundMethod(booking.getRefundMethod());
         dto.setRefundedAmount(booking.getRefundedAmount());
         dto.setCancelledBy(booking.getCancelledBy());
+        dto.setRejectionReason(booking.getPaymentRejectionReason());
 
         if (isAttended) {
             dto.setStatus("ATTENDED");

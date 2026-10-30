@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: 'भुगतान और चेकआउट',
-    processingFor: '{{title}} के लिए भुगतान',
-    completePayment: 'भुगतान पूरा करें (<amount/>)',
-    totalAmount: 'कुल राशि',
-    selectMethod: 'भुगतान तरीका चुनें',
+    title: "भुगतान",
+    processingFor: "{{title}} के लिए भुगतान",
+    amountDue: "देय राशि",
+    howToPay: "आप कैसे भुगतान करना चाहेंगे?",
+    howToPayStaff: "सदस्य कैसे भुगतान कर रहे हैं?",
+    allMethods: "सभी भुगतान तरीके",
 
     methods: {
-      cash: { title: 'नकद', subtitle: 'नकद भुगतान' },
-      card: { title: 'कार्ड', subtitle: 'डेबिट या क्रेडिट कार्ड' },
-      credit: { title: 'क्रेडिट', subtitle: 'सदस्य खाते में जोड़ें' },
-      mixed: { title: 'मिश्रित भुगतान', subtitle: 'कई तरीकों में बाँटें' },
-      cheque: { title: 'चेक', subtitle: 'कागज़ी चेक से भुगतान' },
-      bank_transfer: { title: 'बैंक ट्रांसफ़र', subtitle: 'सीधा वायर / ETF' },
-      online: { title: 'ऑनलाइन भुगतान', subtitle: 'UPI, वॉलेट, Stripe' },
+      card: { title: "कार्ड", subtitle: "कार्ड, Apple Pay, Google Pay" },
+      upi: { title: "UPI", subtitle: "कोई भी UPI ऐप" },
+      netbanking: { title: "नेट बैंकिंग", subtitle: "अपने बैंक से भुगतान करें" },
+      cash: { title: "नकद", subtitleMember: "रिसेप्शन पर भुगतान करें", subtitleStaff: "व्यक्तिगत रूप से लें" },
+      credit: { title: "बाद में भुगतान", subtitle: "कुछ अभी, बाकी खाते में" },
+      mixed: { title: "नकद + ऑनलाइन", subtitle: "भुगतान बाँटें" },
     },
-    other: 'अन्य',
+
+    unavailable: {
+      online: "अभी उपलब्ध नहीं",
+      inrOnly: "केवल INR भुगतान के लिए",
+      nothingToPay: "ऑनलाइन भुगतान के लिए कुछ नहीं",
+    },
+
+    online: {
+      title: {
+        card: "कार्ड से भुगतान करें",
+        upi: "UPI से भुगतान करें",
+        netbanking: "नेट बैंकिंग से भुगतान करें",
+      },
+      note: {
+        card: "सुरक्षित चेकआउट में कार्ड, Apple Pay या Google Pay से <amount/> का भुगतान करें।",
+        upi: "अपने UPI ऐप में <amount/> स्वीकृत करें, फिर यहाँ लौटें।",
+        netbanking: "अपना बैंक चुनें, <amount/> स्वीकृत करें, फिर यहाँ लौटें।",
+      },
+      secure: "भुगतान Stripe द्वारा सुरक्षित रूप से प्रोसेस होते हैं। कार्ड विवरण जिम तक कभी नहीं पहुँचते।",
+    },
+
+    cash: {
+      memberTitle: "रिसेप्शन पर भुगतान करें",
+      memberNote: "हम फ्रंट डेस्क को भुगतान अनुरोध भेजेंगे। रिसेप्शन पर <amount/> नकद दें — स्टाफ को राशि मिलने पर पुष्टि हो जाएगी।",
+      sendRequest: "अनुरोध भेजें",
+      staffTitle: "नकद लें",
+      staffNote: "सदस्य से <amount/> नकद लें, फिर पुष्टि करें।",
+      received: "नकद मिल गया",
+    },
+
+    credit: {
+      memberNote: "चाहें तो कुछ हिस्सा अभी दें — बाकी रिसेप्शन की मंज़ूरी के बाद आपके खाते में जुड़ जाएगा।",
+      staffNote: "सदस्य चाहें तो कुछ हिस्सा अभी लें — बाकी उनके बकाया में जुड़ जाएगा।",
+      payNow: "अभी भुगतान करें",
+      nothingNow: "कुछ नहीं",
+      onAccount: "खाते में",
+      payNowWith: "अभी भुगतान करें",
+      dueDate: "देय तिथि (वैकल्पिक)",
+      selectDueDate: "देय तिथि चुनें",
+      request: "क्रेडिट का अनुरोध करें",
+      addToAccount: "खाते में जोड़ें",
+    },
+
+    mixed: {
+      memberNote: "नकद हिस्सा रिसेप्शन पर दें; बाकी अभी ऑनलाइन लिया जाएगा।",
+      staffNote: "पहले नकद हिस्सा लें; बाकी ऑनलाइन लिया जाएगा।",
+      cashPart: "नकद हिस्सा",
+      cash: "नकद",
+      payOnlineWith: "बाकी का भुगतान",
+    },
+
+    split: {
+      exactAmount: "सटीक राशि (<currency/>)",
+      ofTotal: "<amount/> में से",
+    },
+
+    cta: {
+      pay: "<amount/> का भुगतान करें",
+      payNow: "अभी <amount/> का भुगतान करें",
+      payOnline: "<amount/> ऑनलाइन भुगतान करें",
+    },
+
+    simulated: {
+      badge: "टेस्ट मोड",
+      title: "टेस्ट भुगतान",
+      note: "सिमुलेशन — कोई पैसा नहीं कटता। आगे बढ़ने के लिए स्वीकृत करें, जैसे <amount/> का भुगतान {{method}} से हुआ हो।",
+      approve: "टेस्ट भुगतान स्वीकृत करें",
+      decline: "अस्वीकार करें",
+    },
+
+    processing: {
+      opening: "सुरक्षित चेकआउट खुल रहा है…",
+      finishing: "पूरा किया जा रहा है…",
+      keepOpen: "कृपया यह स्क्रीन खुली रखें",
+    },
 
     discount: {
       title: 'छूट चुनें (वैकल्पिक)',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'राशि (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'कृपया कार्ड का प्रकार चुनें',
-      chequeNumberRequired: 'चेक नंबर आवश्यक है',
-      transactionReferenceRequired: 'लेनदेन संदर्भ आवश्यक है',
-      selectPaymentType: 'कृपया भुगतान प्रकार चुनें',
-      providerNameRequired: 'प्रदाता का नाम आवश्यक है',
-      selectReceivedVia: 'कृपया चुनें कि भुगतान किस तरीके से मिला',
-      cardTypeRequired: 'कार्ड का प्रकार आवश्यक है',
-      referenceRequired: 'संदर्भ आवश्यक है',
-      paymentTypeRequired: 'भुगतान प्रकार आवश्यक है',
-      splitMismatch: 'विभाजित राशि का योग अंतिम राशि के बराबर होना चाहिए',
-      dueDateRequired: 'आंशिक भुगतान के लिए भुगतान की देय तिथि आवश्यक है',
+    form: {
+      example: 'जैसे {{value}}',
     },
 
-    form: {
-      cashDetails: 'नकद भुगतान विवरण',
-      cardDetails: 'कार्ड भुगतान विवरण',
-      chequeDetails: 'चेक भुगतान विवरण',
-      bankDetails: 'बैंक ट्रांसफ़र विवरण',
-      onlineDetails: 'ऑनलाइन भुगतान विवरण',
-      creditDetails: 'क्रेडिट भुगतान विवरण',
-      mixedDetails: 'मिश्रित / विभाजित भुगतान विवरण',
-      mixedSubtitle: 'कुल राशि को कई तरीकों में बाँटें',
-
-      paidAmount: 'भुगतान राशि (<currency/>) *',
-      amount: 'राशि (<currency/>) *',
-      receivedAmount: 'प्राप्त राशि (<currency/>)',
-      payBackAmount: 'वापसी राशि (<currency/>)',
-      amountToReturn: 'लौटाने वाली राशि',
-      dueDate: 'भुगतान की देय तिथि *',
-      dueDateOptional: 'भुगतान की देय तिथि (वैकल्पिक)',
-      selectDueDate: 'देय तिथि चुनें',
-      selectDate: 'तारीख चुनें',
-
-      finalAmount: 'अंतिम राशि:',
-      paidAmountLabel: 'भुगतान राशि:',
-      receivedAmountLabel: 'प्राप्त राशि:',
-      remainingDue: 'शेष बकाया:',
-      payBack: 'वापसी:',
-      remainingOrDue: 'शेष/बकाया:',
-      remainingOnCredit: 'शेष (क्रेडिट पर):',
-
-      cashReturnRequired: 'नकद वापसी आवश्यक:',
-      returnToCustomer: 'ग्राहक को <amount/> लौटाएँ',
-      partialPayment: 'आंशिक भुगतान:',
-      addedToOutstanding: '<amount/> बकाया राशि में जोड़ा जाएगा।',
-      addedToMemberOutstanding: '<amount/> सदस्य की बकाया राशि में जोड़ा जाएगा।',
-      fullCredit: 'पूरा क्रेडिट:',
-      entireOnCredit: 'पूरी <amount/> राशि सदस्य के क्रेडिट पर रहेगी।',
-      partialReceived: 'आंशिक प्राप्त:',
-      receivedViaNote: '<received/> {{method}} से प्राप्त हुआ। शेष <remaining/> क्रेडिट पर दर्ज किया गया।',
-      otherMethod: 'अन्य तरीका',
-
-      cardType: 'कार्ड का प्रकार *',
-      referenceNumberOptional: 'संदर्भ / लेनदेन नंबर (वैकल्पिक)',
-      referenceOptional: 'संदर्भ (वैकल्पिक)',
-      referenceIdRequired: 'संदर्भ / लेनदेन ID *',
-      transactionReferenceIdRequired: 'लेनदेन / संदर्भ ID *',
-      transactionReferenceRequired: 'लेनदेन संदर्भ *',
-      chequeNumber: 'चेक नंबर *',
-      bankNameOptional: 'बैंक का नाम (वैकल्पिक)',
-      chequeDateOptional: 'चेक की तारीख (वैकल्पिक)',
-      bankAccountLedgerOptional: 'बैंक खाता (लेजर, वैकल्पिक)',
-      bankAccountLedger: 'बैंक खाता (लेजर)',
-      ledgerHint: 'खाते चार्ट ऑफ़ अकाउंट्स से लिए गए हैं। राशि चुने गए खाते में जमा होगी।',
-      onlinePaymentType: 'ऑनलाइन भुगतान प्रकार *',
-      paymentType: 'भुगतान प्रकार *',
-      paymentProviderName: 'भुगतान प्रदाता का नाम *',
-      providerName: 'प्रदाता का नाम *',
-      receivedVia: 'किस तरीके से मिला *',
-      receivedPlaceholder: '0.00 (पूरे क्रेडिट के लिए खाली छोड़ें)',
-      transactionIdPlaceholder: 'लेनदेन ID',
-      chequeNumberPlaceholder: 'चेक नंबर',
-      referenceIdPlaceholder: 'संदर्भ ID',
-      providerNamePlaceholder: 'प्रदाता का नाम',
-      example: 'जैसे {{value}}',
-
-      method: 'तरीका *',
-      leg: 'भाग #{{n}}',
-      addLeg: '+ भुगतान भाग जोड़ें',
-      totalSplit: 'कुल विभाजित राशि:',
-      exceedBy: 'विभाजित राशि अंतिम राशि से <amount/> अधिक है',
-      shortBy: 'विभाजित राशि अंतिम राशि से <amount/> कम है',
-      splitMatches: 'विभाजित राशि अंतिम राशि से बिल्कुल मेल खाती है।',
+    errors: {
+      failed: "भुगतान पूरा नहीं हुआ",
+      refunded: "यह पूरा नहीं हुआ। अगर पैसा कटा है, तो वह अपने आप वापस हो जाएगा।",
+      noGym: "इस भुगतान के लिए कोई जिम चुना नहीं गया है",
+      needBoth: "नकद और ऑनलाइन दोनों हिस्सों के लिए राशि चुनें",
+      amountTooHigh: "देय राशि से अधिक नहीं हो सकती",
     },
   },
 } satisfies LocaleResource;

@@ -76,6 +76,7 @@ public class MemberBookingDTO {
     private String refundMethod;              // WALLET
     private java.math.BigDecimal refundedAmount;
     private String cancelledBy;               // MEMBER | STAFF
+    private String rejectionReason;           // set when staff rejected the payment
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
@@ -118,4 +119,7 @@ public class MemberBookingDTO {
 
     public String getCancelledBy() { return cancelledBy; }
     public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 }

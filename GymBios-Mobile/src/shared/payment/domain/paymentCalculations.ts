@@ -1,4 +1,5 @@
-import type { DiscountType, PaymentSplitRow } from '../types';
+import { METHOD_API_TITLES, ONLINE_PAYMENT_TYPE_LABELS } from '../constants';
+import type { DiscountType, OnlineMethodType, PaymentSplit } from '../types';
 
 export function calculateDiscountAmount(
   subtotal: number,
@@ -46,18 +47,19 @@ export function calculateTotals(
   };
 }
 
-export function calculateSplitTotal(rows: PaymentSplitRow[]): number {
-  return rows.reduce((sum, r) => sum + (r.amount || 0), 0);
+/** Rounds to cents so split amounts always add back up to the total. */
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
-export function validateSplitPayment(
-  rows: PaymentSplitRow[],
-  finalAmount: number,
-): { isValid: boolean; difference: number } {
-  const total = calculateSplitTotal(rows);
-  const diff = Math.abs(total - finalAmount);
+/** The leg for a payment Stripe collected; the intent id is what the backend verifies. */
+export function onlineLeg(methodType: OnlineMethodType, amount: number, paymentIntentId: string): PaymentSplit {
   return {
-    isValid: diff < 0.01 && rows.length > 0,
-    difference: total - finalAmount,
+    method: METHOD_API_TITLES[methodType],
+    amount: roundMoney(amount),
+    onlinePaymentType: ONLINE_PAYMENT_TYPE_LABELS[methodType],
+    providerName: 'Stripe',
+    reference: paymentIntentId,
+    stripePaymentIntentId: paymentIntentId,
   };
 }

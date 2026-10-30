@@ -41,6 +41,8 @@ const ROUTES: Record<string, RouteResolver> = {
       : '/(member)/profile?view=enquiries';
   },
   'membership-renewal': (role) => (role === '(member)' ? '/(member)/membership' : null),
+  // Add-on payment approved / rejected / refunded
+  membership: (role) => (role === '(member)' ? '/(member)/membership' : null),
   'membership-payment': (role, item) => {
     if (role !== '(member)') return null;
     const id = Number(item.actionUrl?.split('/').filter(Boolean)[1]);

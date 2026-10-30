@@ -40,6 +40,7 @@ function mapBooking(d: any): MemberBookingData {
     refundMethod: d.refund_method ?? null,
     refundedAmount: num(d.refunded_amount),
     cancelledBy: d.cancelled_by ?? null,
+    rejectionReason: d.rejection_reason ?? null,
   };
 }
 
@@ -71,6 +72,11 @@ export class ApiMemberBookingsRepository implements MemberBookingsRepository {
 
   async getPastBookings(): Promise<MemberBookingData[]> {
     const response = await apiClient.get<any[]>('/mobile/member/bookings/history');
+    return response.data.map(mapBooking);
+  }
+
+  async getRejectedBookings(): Promise<MemberBookingData[]> {
+    const response = await apiClient.get<any[]>('/mobile/member/bookings/rejected');
     return response.data.map(mapBooking);
   }
 
@@ -113,6 +119,7 @@ export class ApiMemberBookingsRepository implements MemberBookingsRepository {
           bank_account_name: split.bankAccountName,
           online_payment_type: split.onlinePaymentType,
           provider_name: split.providerName,
+          stripe_payment_intent_id: split.stripePaymentIntentId,
         })),
         bank_account_code: request.bankAccountCode,
         bank_account_name: request.bankAccountName,

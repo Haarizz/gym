@@ -81,7 +81,7 @@ export function BookClassModal({ visible, onClose, promoCode }: BookClassModalPr
 
   const selectedDate = dates.find((d) => d.offset === selectedDayOffset) ?? dates[0];
 
-  const { data: availableClasses, isLoading, isError } = useAvailableClasses(selectedDate.isoString);
+  const { data: availableClasses, isLoading, isError } = useAvailableClasses(selectedDate.isoString, visible);
   const { mutate: createBooking, isPending: isCreating } = useCreateMemberBooking();
   const { data: wallet } = useMyWallet(visible);
 

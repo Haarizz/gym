@@ -10,6 +10,8 @@ export interface EnvConfig {
   /** Public, non-secret Google OAuth client IDs — see .env for why these are safe here. */
   googleWebClientId: string;
   googleIosClientId: string;
+  /** Stripe publishable key (pk_...) — public by design; the secret key lives on the backend only. */
+  stripePublishableKey: string;
 }
 
 function resolveEnvironment(): AppEnvironment {
@@ -29,4 +31,5 @@ export const env: EnvConfig = {
   useMockApi: process.env.EXPO_PUBLIC_USE_MOCK_API === 'true',
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
   googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
+  stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
 };

@@ -137,7 +137,7 @@ const profile = {
     title: 'Wallet',
     subtitle: 'Erstattungen & Prämienguthaben',
     availableBalance: 'Verfügbares Guthaben',
-    balanceHint: 'Nutze es beim Buchen einer Einheit. Stornierte Buchungen werden hierher erstattet.',
+    balanceHint: 'Nutze es für Einheiten und Add-ons. Stornierte Buchungen und Add-ons werden hierher erstattet.',
     history: 'Verlauf',
     emptyTitle: 'Keine Wallet-Aktivität',
     emptyDescription: 'Erstattungen und Prämienguthaben erscheinen hier.',
@@ -148,6 +148,8 @@ const profile = {
       BOOKING: 'Buchung einer Einheit',
       REFERRAL_REWARD: 'Empfehlungsprämie',
       BILLING_USE: 'Kauf',
+      ADDON: 'Add-on-Kauf',
+      ADDON_REFUND: 'Add-on-Erstattung',
     },
   },
 

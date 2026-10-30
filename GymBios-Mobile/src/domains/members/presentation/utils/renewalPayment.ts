@@ -12,7 +12,7 @@ export interface RenewalPaymentFields {
 /**
  * Turns the shared payment sheet's result into the renewal endpoints' payment fields,
  * the same way the web admin renewal does: "Credit" is never a real method — it only
- * means nothing was received — and the per-leg breakdown is sent only for Mixed.
+ * means nothing was received — and the per-leg breakdown is sent only for Mixed or a Stripe payment.
  */
 export function toRenewalPayment(result: PaymentResult): RenewalPaymentFields {
   const { finalAmount, paidAmount } = result.summary;
@@ -32,6 +32,8 @@ export function toRenewalPayment(result: PaymentResult): RenewalPaymentFields {
       amountReceived,
       paymentStatus,
       paymentMethod: leg.method,
+      // A Stripe leg goes along so the backend can verify it with Stripe.
+      paymentBreakdown: leg.stripePaymentIntentId ? legs : undefined,
       bankAccountCode: leg.bankAccountCode ?? result.bankAccountCode,
       bankAccountName: leg.bankAccountName ?? result.bankAccountName,
     };

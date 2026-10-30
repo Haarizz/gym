@@ -4,6 +4,7 @@ import com.company.project.dto.mobile.membership.MobileOutstandingBalanceDTO;
 import com.company.project.dto.mobile.membership.MobileOutstandingBalanceSettleRequestDTO;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.membership.MobileMemberOutstandingBalanceService;
+import com.company.project.services.payments.StripePaymentService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +18,12 @@ import java.util.UUID;
 public class MobileMemberOutstandingBalanceController {
 
     private final MobileMemberOutstandingBalanceService outstandingBalanceService;
+    private final StripePaymentService stripePaymentService;
 
-    public MobileMemberOutstandingBalanceController(MobileMemberOutstandingBalanceService outstandingBalanceService) {
+    public MobileMemberOutstandingBalanceController(MobileMemberOutstandingBalanceService outstandingBalanceService,
+                                                    StripePaymentService stripePaymentService) {
         this.outstandingBalanceService = outstandingBalanceService;
+        this.stripePaymentService = stripePaymentService;
     }
 
     @GetMapping
@@ -42,7 +46,9 @@ public class MobileMemberOutstandingBalanceController {
             @RequestHeader("Payload-Fingerprint") String fingerprint,
             @RequestBody @Valid MobileOutstandingBalanceSettleRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl principal) {
-        String responseJson = outstandingBalanceService.settle(principal, membershipId, idempotencyKey, fingerprint, request);
+        String responseJson = stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), true,
+                idempotencyKey.toString(),
+                () -> outstandingBalanceService.settle(principal, membershipId, idempotencyKey, fingerprint, request));
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(responseJson);
     }
 }

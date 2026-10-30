@@ -136,4 +136,48 @@ class DiscountCodeServiceTest {
         assertEquals(new BigDecimal("50.00"), service.redeemAtCheckout("GYMABC123", new BigDecimal("300"), 10L, "Sam"));
         verify(promotionService, never()).redeemPromotion(any(), any(), any(), any());
     }
+
+    // ── Add-on checkout ──
+
+    @Test
+    void addonCodeNeedsAddonsInApplicableServices() {
+        PromotionCampaignResponseDTO promo = promo("percentage", "10", null, null);
+        when(promo.getApplicableServices()).thenReturn(java.util.List.of("Add-ons"));
+        when(promotionService.validateByCode("NEWYEAR")).thenReturn(promo);
+
+        assertEquals(new BigDecimal("30.00"),
+                service.resolveForAddon("NEWYEAR", new BigDecimal("300"), null).getDiscountAmount());
+    }
+
+    @Test
+    void membershipPromotionIsRefusedOnAddons() {
+        PromotionCampaignResponseDTO promo = promo("percentage", "10", null, null);
+        when(promo.getName()).thenReturn("New Year");
+        when(promo.getApplicableServices()).thenReturn(java.util.List.of());
+        when(promotionService.validateByCode("NEWYEAR")).thenReturn(promo);
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> service.resolveForAddon("NEWYEAR", new BigDecimal("300"), null));
+    }
+
+    @Test
+    void referralCouponIsRefusedOnAddons() {
+        when(promotionService.validateByCode("GYMABC123")).thenThrow(new EntityNotFoundException("Invalid promotion code"));
+        when(couponService.validate("GYMABC123")).thenReturn(new Coupon());
+
+        BusinessRuleViolationException e = assertThrows(BusinessRuleViolationException.class,
+                () -> service.resolveForAddon("GYMABC123", new BigDecimal("300"), null));
+        assertEquals("Referral coupons can't be used on add-ons", e.getMessage());
+    }
+
+    @Test
+    void redeemingAnAddonCodeRecordsTheRedemption() {
+        PromotionCampaignResponseDTO promo = promo("fixed", "50", null, null);
+        when(promo.getApplicableServices()).thenReturn(java.util.List.of("Add-ons"));
+        when(promotionService.validateByCode("NEWYEAR")).thenReturn(promo);
+
+        service.redeemForAddon("NEWYEAR", new BigDecimal("300"), 10L);
+
+        verify(promotionService).redeemPromotion(7L, new BigDecimal("250.00"), new BigDecimal("50.00"), 10L);
+    }
 }

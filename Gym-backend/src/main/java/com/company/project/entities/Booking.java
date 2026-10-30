@@ -76,6 +76,10 @@ public class Booking extends BaseEntity implements BranchAware {
     @Column(name = "cancelled_by", length = 16)
     private String cancelledBy;
 
+    // Why staff rejected the payment; set only on a booking cancelled by a rejection.
+    @Column(name = "payment_rejection_reason", columnDefinition = "TEXT")
+    private String paymentRejectionReason;
+
     @Column(name = "qr_code")
     private String qrCode;
 
@@ -157,6 +161,9 @@ public class Booking extends BaseEntity implements BranchAware {
 
     public String getCancelledBy() { return cancelledBy; }
     public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+
+    public String getPaymentRejectionReason() { return paymentRejectionReason; }
+    public void setPaymentRejectionReason(String paymentRejectionReason) { this.paymentRejectionReason = paymentRejectionReason; }
 
     @Column(name = "branch_id")
     private Long branchId;

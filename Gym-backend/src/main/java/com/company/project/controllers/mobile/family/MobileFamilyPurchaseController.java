@@ -17,6 +17,7 @@ import com.company.project.services.GlobalUserService;
 import com.company.project.services.mobile.family.MobileFamilyInvitationService;
 import com.company.project.services.mobile.family.MobileFamilyPricingService;
 import com.company.project.services.mobile.family.MobileFamilyPurchaseService;
+import com.company.project.services.payments.StripePaymentService;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -48,6 +49,7 @@ public class MobileFamilyPurchaseController {
     private final GlobalBranchDiscoveryRepository globalDiscoveryRepository;
     private final EntityManagerFactory entityManagerFactory;
     private final MemberRepository memberRepository;
+    private final StripePaymentService stripePaymentService;
 
     public MobileFamilyPurchaseController(MobileFamilyPurchaseService purchaseService,
                                           MobileFamilyPricingService pricingService,
@@ -55,7 +57,9 @@ public class MobileFamilyPurchaseController {
                                           GlobalUserService globalUserService,
                                           GlobalBranchDiscoveryRepository globalDiscoveryRepository,
                                           EntityManagerFactory entityManagerFactory,
-                                          MemberRepository memberRepository) {
+                                          MemberRepository memberRepository,
+                                          StripePaymentService stripePaymentService) {
+        this.stripePaymentService = stripePaymentService;
         this.purchaseService = purchaseService;
         this.pricingService = pricingService;
         this.invitationService = invitationService;
@@ -122,8 +126,10 @@ public class MobileFamilyPurchaseController {
             TenantContextHolder.setCurrentTenant(tenantSlug);
             BranchContextHolder.setActiveBranchId(branchId);
 
-            MobileFamilyPurchaseService.PurchaseOutcome outcome = purchaseService.purchase(
-                    idempotencyKey, fingerprint, request, user.getId(), user.getEmail(), profile, tenantSlug, gymName);
+            MobileFamilyPurchaseService.PurchaseOutcome outcome = stripePaymentService.withVerifiedPayments(
+                    request.getPaymentBreakdown(), true, idempotencyKey.toString(),
+                    () -> purchaseService.purchase(idempotencyKey, fingerprint, request, user.getId(),
+                            user.getEmail(), profile, tenantSlug, gymName));
 
             // Committed — now it's safe to tell family members about it.
             for (MobileFamilyPurchaseService.InvitationEmail email : outcome.emails()) {
@@ -157,8 +163,9 @@ public class MobileFamilyPurchaseController {
                 : globalDiscoveryRepository.findByTenantSlugAndBranchId(tenantSlug, member.getBranchId())
                         .map(GlobalBranchDiscovery::getGymName).orElse(null);
 
-        MobileFamilyPurchaseService.PurchaseOutcome outcome = purchaseService.convert(
-                idempotencyKey, fingerprint, request, member.getId(), tenantSlug, gymName);
+        MobileFamilyPurchaseService.PurchaseOutcome outcome = stripePaymentService.withVerifiedPayments(
+                request.getPaymentBreakdown(), true, idempotencyKey.toString(),
+                () -> purchaseService.convert(idempotencyKey, fingerprint, request, member.getId(), tenantSlug, gymName));
         for (MobileFamilyPurchaseService.InvitationEmail email : outcome.emails()) {
             invitationService.sendInvitationEmail(email.email(), email.name(), email.inviterName(),
                     gymName, email.planName());

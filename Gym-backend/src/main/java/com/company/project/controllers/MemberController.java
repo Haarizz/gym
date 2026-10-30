@@ -25,12 +25,15 @@ public class MemberController {
     private final com.company.project.services.FamilyPlanChangeService familyPlanChangeService;
     private final TenantDataSources tenantDataSources;
     private final MemberAppAccountService appAccountService;
+    private final com.company.project.services.payments.StripePaymentService stripePaymentService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
                             LeadService leadService,
                             com.company.project.services.FamilyPlanChangeService familyPlanChangeService,
                             TenantDataSources tenantDataSources,
-                            MemberAppAccountService appAccountService) {
+                            MemberAppAccountService appAccountService,
+                            com.company.project.services.payments.StripePaymentService stripePaymentService) {
+        this.stripePaymentService = stripePaymentService;
         this.memberService = memberService;
         this.freezeService = freezeService;
         this.leadService = leadService;
@@ -193,7 +196,9 @@ public class MemberController {
                 request.setProcessedByStaffId(leadService.resolveCreditedStaffId(leadId));
             }
         }
-        MemberResponseDTO created = memberService.createMember(request);
+        // Shared with the web desk: only Stripe legs from the mobile app are checked.
+        MemberResponseDTO created = stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), false, null,
+                () -> memberService.createMember(request));
         if (leadId != null) {
             leadService.linkRegisteredMember(leadId, Long.valueOf(created.getId()));
         }
@@ -227,7 +232,8 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> renewMember(
             @PathVariable Long id,
             @RequestBody com.company.project.dto.RenewalRequestDTO request) {
-        return ResponseEntity.ok(freezeService.renewEndingFreeze(id, request));
+        return ResponseEntity.ok(stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), false, null,
+                () -> freezeService.renewEndingFreeze(id, request)));
     }
 
     /**
@@ -239,7 +245,8 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> renewFamilyMinor(
             @PathVariable Long id,
             @RequestBody com.company.project.dto.MinorRenewalRequestDTO request) {
-        return ResponseEntity.ok(memberService.renewFamilyMinor(id, request));
+        return ResponseEntity.ok(stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), false, null,
+                () -> memberService.renewFamilyMinor(id, request)));
     }
 
     /**
@@ -252,7 +259,8 @@ public class MemberController {
     public ResponseEntity<MemberResponseDTO> renewFamily(
             @PathVariable Long headId,
             @RequestBody com.company.project.dto.FamilyRenewalRequestDTO request) {
-        return ResponseEntity.ok(freezeService.renewFamilyEndingFreeze(headId, request));
+        return ResponseEntity.ok(stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), false, null,
+                () -> freezeService.renewFamilyEndingFreeze(headId, request)));
     }
 
     /**

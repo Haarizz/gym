@@ -42,6 +42,7 @@ class BookingPaymentServiceTest {
     @Mock private MemberRepository memberRepository;
     @Mock private FinancialEventService financialEventService;
     @Mock private NotificationService notificationService;
+    @Mock private com.company.project.services.mobile.push.BookingPaymentNotifier bookingPaymentNotifier;
 
     private BookingPaymentService service;
     private Member member;
@@ -53,7 +54,8 @@ class BookingPaymentServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new BookingPaymentService(rewardRedemptionService, discountCodeService, walletService,
-                receiptService, receiptRepository, memberRepository, financialEventService, notificationService);
+                receiptService, receiptRepository, memberRepository, financialEventService, notificationService,
+                bookingPaymentNotifier);
 
         member = new Member();
         member.setId(10L);

@@ -7,6 +7,7 @@ export const queryKeys = {
   all: ['memberBookings'] as const,
   upcoming: () => [...queryKeys.all, 'upcoming'] as const,
   past: () => [...queryKeys.all, 'past'] as const,
+  rejected: () => [...queryKeys.all, 'rejected'] as const,
   stats: () => [...queryKeys.all, 'stats'] as const,
   availableClasses: (date: string) => [...queryKeys.all, 'availableClasses', date] as const,
 };
@@ -25,6 +26,13 @@ export function usePastBookings() {
   });
 }
 
+export function useRejectedBookings() {
+  return useQuery({
+    queryKey: queryKeys.rejected(),
+    queryFn: () => memberBookingsRepository.getRejectedBookings(),
+  });
+}
+
 export function useBookingStats() {
   return useQuery({
     queryKey: queryKeys.stats(),
@@ -32,10 +40,14 @@ export function useBookingStats() {
   });
 }
 
-export function useAvailableClasses(date: string) {
+// The booking modal stays mounted, so it refetches each time it opens: staff may have
+// approved or rejected a payment since, which changes what's bookable.
+export function useAvailableClasses(date: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.availableClasses(date),
     queryFn: () => memberBookingsRepository.getAvailableClasses(date),
+    enabled,
+    staleTime: 0,
   });
 }
 
@@ -65,6 +77,7 @@ export function useCreateMemberBooking() {
     onSuccess: (_, variables) => {
       // Invalidate relevant queries so the UI updates
       queryClient.invalidateQueries({ queryKey: queryKeys.upcoming() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rejected() });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats() });
       // The available classes query caches state based on whether user has booked,
       // so it needs to be invalidated to pick up the confirmed booking state.

@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: 'Reembolsado al monedero',
       NOT_REFUNDABLE: 'Sin reembolso',
       VOIDED: 'No se cobró nada',
+      rejected: 'Pago rechazado: {{reason}}',
+    },
+
+    rejected: {
+      title: 'Pago rechazado',
+      subtitle: 'El gimnasio no aprobó el pago de estas reservas, así que se cancelaron.',
+      reasonLabel: 'Motivo',
+      notCharged: 'No se cobró nada.',
+      bookAgain: 'Reservar de nuevo',
     },
 
     cancelledToastTitle: 'Reserva cancelada',

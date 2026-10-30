@@ -176,22 +176,38 @@ public class MobileMemberMembershipResponseDTO {
         }
     }
 
+    /**
+     * One thing the member's plan actually includes. The app builds its (translated) text
+     * from {@code type} and the raw values; {@code name}/{@code description} are an English
+     * fallback for older app builds and unknown types.
+     */
     public static class BenefitInfo {
         private String id;
+        /** "access", "facilities", "sessions", "trainers", "streams", "addon" or "plan_notes". */
+        private String type;
         private String name;
         private String description;
-        private String icon;
-        private String category;
+        /** Names the benefit covers: facilities, trainers, training streams. */
+        private List<String> items;
+        /** Allowance size: visits/days/hours per period, or included sessions. */
+        private Integer count;
+        /** Amount of the access allowance used in the current period. */
+        private Integer used;
+        /** Access allowance unit: "Sessions", "Days" or "Hours" (null when unlimited). */
+        private String unit;
+        /** Access allowance period: "Payment", "Week", "Month" or "Year". */
+        private String period;
+        /** When an add-on runs out. */
+        private LocalDateTime expiresAt;
 
         public BenefitInfo() {
         }
 
-        public BenefitInfo(String id, String name, String description, String icon, String category) {
+        public BenefitInfo(String id, String type, String name, String description) {
             this.id = id;
+            this.type = type;
             this.name = name;
             this.description = description;
-            this.icon = icon;
-            this.category = category;
         }
 
         public String getId() {
@@ -200,6 +216,14 @@ public class MobileMemberMembershipResponseDTO {
 
         public void setId(String id) {
             this.id = id;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
         }
 
         public String getName() {
@@ -218,20 +242,52 @@ public class MobileMemberMembershipResponseDTO {
             this.description = description;
         }
 
-        public String getIcon() {
-            return icon;
+        public List<String> getItems() {
+            return items;
         }
 
-        public void setIcon(String icon) {
-            this.icon = icon;
+        public void setItems(List<String> items) {
+            this.items = items;
         }
 
-        public String getCategory() {
-            return category;
+        public Integer getCount() {
+            return count;
         }
 
-        public void setCategory(String category) {
-            this.category = category;
+        public void setCount(Integer count) {
+            this.count = count;
+        }
+
+        public Integer getUsed() {
+            return used;
+        }
+
+        public void setUsed(Integer used) {
+            this.used = used;
+        }
+
+        public String getUnit() {
+            return unit;
+        }
+
+        public void setUnit(String unit) {
+            this.unit = unit;
+        }
+
+        public String getPeriod() {
+            return period;
+        }
+
+        public void setPeriod(String period) {
+            this.period = period;
+        }
+
+        public LocalDateTime getExpiresAt() {
+            return expiresAt;
+        }
+
+        public void setExpiresAt(LocalDateTime expiresAt) {
+            this.expiresAt = expiresAt;
         }
     }
 

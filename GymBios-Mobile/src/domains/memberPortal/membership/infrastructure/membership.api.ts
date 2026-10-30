@@ -1,5 +1,20 @@
 import { apiClient } from '@/core/network/apiClient';
-import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse, MobileReceiptDetail, FreezeMembershipResult, MobileMembershipPlan } from '../domain/models';
+import { MemberMembershipState, MembershipPayment, AddOnCatalogResponse, MobileReceiptDetail, FreezeMembershipResult, MobileMembershipPlan, ActiveAddOn } from '../domain/models';
+import type { DiscountCode } from '@/domains/member-referrals/domain/types';
+import type { PaymentSplit } from '@/shared/payment/types';
+
+export interface AddOnPurchaseRequest {
+  paymentMethodUsed?: string;
+  paymentBreakdown?: PaymentSplit[];
+  paidAmount?: number;
+  bankAccountCode?: string;
+  bankAccountName?: string;
+  paymentDueDate?: string;
+  couponCode?: string;
+  walletAmount?: number;
+  /** The total shown after the code; the server refuses a different one. */
+  expectedAmount: number;
+}
 
 // Snake_case plan from /mobile/member/membership/plans and the change preview.
 function mapPlan(plan: any): MobileMembershipPlan {
@@ -132,10 +147,57 @@ export const membershipApi = {
     };
   },
 
-  purchaseAddOn: async (addonId: number, request: any): Promise<any> => {
-    // request matches PaymentResult but tailored for the backend
-    const response = await apiClient.post<any>(`/mobile/member/add-ons/${addonId}/purchase`, request);
-    return response.data;
+  /** A promotion code priced on this add-on; only promotions scoped to add-ons pass. */
+  validateAddOnCode: async (addonId: number, code: string): Promise<DiscountCode> => {
+    const response = await apiClient.get<any>(`/mobile/member/add-ons/${addonId}/validate-code`, {
+      params: { code },
+      skipGlobalErrorToast: true, // the picker shows the reason inline
+    });
+    const d = response.data;
+    return {
+      source: d.source,
+      promotionId: d.promotion_id ?? null,
+      code: d.code,
+      name: d.name,
+      discountType: d.discount_type,
+      discountValue: Number(d.discount_value ?? 0),
+      discountAmount: d.discount_amount != null ? Number(d.discount_amount) : null,
+    };
+  },
+
+  purchaseAddOn: async (addonId: number, request: AddOnPurchaseRequest): Promise<ActiveAddOn> => {
+    const response = await apiClient.post<any>(`/mobile/member/add-ons/${addonId}/purchase`, {
+      coupon_code: request.couponCode,
+      wallet_amount: request.walletAmount,
+      expected_amount: request.expectedAmount,
+      payment_method_used: request.paymentMethodUsed,
+      paid_amount: request.paidAmount,
+      bank_account_code: request.bankAccountCode,
+      bank_account_name: request.bankAccountName,
+      payment_due_date: request.paymentDueDate,
+      payment_breakdown: request.paymentBreakdown?.map((split) => ({
+        method: split.method,
+        amount: split.amount,
+        reference: split.reference,
+        card_type: split.cardType,
+        cheque_number: split.chequeNumber,
+        cheque_date: split.chequeDate,
+        bank_name: split.bankName,
+        bank_account_code: split.bankAccountCode,
+        bank_account_name: split.bankAccountName,
+        online_payment_type: split.onlinePaymentType,
+        provider_name: split.providerName,
+        stripe_payment_intent_id: split.stripePaymentIntentId,
+      })),
+    });
+    const d = response.data;
+    return {
+      id: d.id,
+      addonName: d.addonName || d.addon_name,
+      category: d.category,
+      expiryDate: d.expiryDate || d.expiry_date,
+      status: d.status,
+    };
   },
 
   getMembershipPlans: async (page: number = 1, limit: number = 10, search?: string): Promise<any> => {
@@ -198,6 +260,7 @@ export const membershipApi = {
         bank_account_name: split.bankAccountName,
         online_payment_type: split.onlinePaymentType,
         provider_name: split.providerName,
+        stripe_payment_intent_id: split.stripePaymentIntentId,
       })),
     });
     return response.data;

@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Text } from '@/shared/components/AppText';
+import { formatDate } from '@/core/i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import Feather from '@expo/vector-icons/Feather';
 import { CurrencyValue } from '@/core/providers';
@@ -20,93 +21,78 @@ interface MembershipBenefitsTabProps {
   onOpenFreeze: () => void;
 }
 
-interface EnrichedBenefit {
-  id: string;
-  name: string;
-  description: string;
-  iconName: keyof typeof Feather.glyphMap;
-  category: string;
-  color: string;
-  bgColor: string;
+type FeatherName = keyof typeof Feather.glyphMap;
+
+const BENEFIT_STYLE: Record<string, { icon: FeatherName; color: string; bg: string }> = {
+  access:     { icon: 'activity',    color: '#0D9488', bg: 'rgba(13,148,136,0.12)' },
+  facilities: { icon: 'grid',        color: '#0284C7', bg: 'rgba(2,132,199,0.12)' },
+  sessions:   { icon: 'award',       color: '#7C3AED', bg: 'rgba(124,58,237,0.12)' },
+  trainers:   { icon: 'users',       color: '#7C3AED', bg: 'rgba(124,58,237,0.12)' },
+  streams:    { icon: 'video',       color: '#E11D48', bg: 'rgba(225,29,72,0.12)' },
+  addon:      { icon: 'plus-circle', color: '#D97706', bg: 'rgba(217,119,6,0.12)' },
+  plan_notes: { icon: 'file-text',   color: BrandColors.teal, bg: 'rgba(27,90,76,0.12)' },
+};
+const DEFAULT_STYLE = { icon: 'check-circle' as FeatherName, color: BrandColors.teal, bg: 'rgba(27,90,76,0.12)' };
+
+const PERIODS = ['Payment', 'Week', 'Month', 'Year'] as const;
+
+interface BenefitView {
+  title: string;
+  description?: string | null;
+  meta?: string;
+  /** 0–1 share of a limited access allowance already used. */
+  progress?: number;
 }
 
-function resolveIconAndCategory(id?: string, icon?: string): {
-  iconName: keyof typeof Feather.glyphMap;
-  category: string;
-  color: string;
-  bgColor: string;
-} {
-  const normalizedId = (id || '').toLowerCase();
-
-  if (icon && icon in Feather.glyphMap) {
-    return {
-      iconName: icon as keyof typeof Feather.glyphMap,
-      category: 'Perk',
-      color: BrandColors.teal,
-      bgColor: 'rgba(27,90,76,0.12)',
-    };
+/** Builds the translated text for a benefit from its type and raw values. */
+function describeBenefit(b: BenefitInfo, t: TFunction): BenefitView {
+  const fallback = { title: b.name, description: b.description };
+  switch (b.type) {
+    case 'access': {
+      if (b.count == null) return fallback;
+      if (!b.unit) {
+        return {
+          title: t('membership.benefits.access.unlimitedTitle'),
+          description: t('membership.benefits.access.unlimitedDesc', { count: b.count }),
+        };
+      }
+      const period = PERIODS.find(p => p === b.period) ?? 'Payment';
+      const used = b.used ?? 0;
+      const amount = t(`membership.benefits.access.amount.${b.unit}`, { count: b.count });
+      return {
+        title: t(`membership.benefits.access.title.${period}`, { amount }),
+        description: t(`membership.benefits.access.usage.${period}`, {
+          used,
+          left: Math.max(0, b.count - used),
+        }),
+        progress: b.count > 0 ? Math.min(1, used / b.count) : undefined,
+      };
+    }
+    case 'facilities':
+      return { title: t('membership.benefits.facilitiesTitle') };
+    case 'sessions':
+      if (b.count == null) return fallback;
+      return {
+        title: t('membership.benefits.sessionsTitle', { count: b.count }),
+        description: b.items?.length ? t('membership.benefits.sessionsTrainers') : null,
+      };
+    case 'trainers':
+      return { title: t('membership.benefits.trainersTitle'), description: t('membership.benefits.trainersDesc') };
+    case 'streams':
+      return { title: t('membership.benefits.streamsTitle') };
+    case 'addon':
+      return {
+        title: b.name,
+        description: b.description,
+        meta: b.expires_at
+          ? `${t('membership.benefits.addonLabel')} · ${t('membership.benefits.addonUntil', { date: formatDate(b.expires_at, 'PP') })}`
+          : t('membership.benefits.addonLabel'),
+      };
+    case 'plan_notes':
+      return { title: t('membership.benefits.planNotesTitle'), description: b.description };
+    default:
+      return fallback;
   }
-
-  if (normalizedId.includes('attend') || normalizedId.includes('access')) {
-    return {
-      iconName: 'activity',
-      category: 'Access',
-      color: '#0D9488',
-      bgColor: 'rgba(13,148,136,0.12)',
-    };
-  }
-
-  if (normalizedId.includes('facil') || normalizedId.includes('shower') || normalizedId.includes('locker')) {
-    return {
-      iconName: 'droplet',
-      category: 'Amenities',
-      color: '#0284C7',
-      bgColor: 'rgba(2,132,199,0.12)',
-    };
-  }
-
-  if (normalizedId.includes('session') || normalizedId.includes('coach') || normalizedId.includes('train')) {
-    return {
-      iconName: 'award',
-      category: 'Coaching',
-      color: '#7C3AED',
-      bgColor: 'rgba(124,58,237,0.12)',
-    };
-  }
-
-  if (normalizedId.includes('class') || normalizedId.includes('stream')) {
-    return {
-      iconName: 'calendar',
-      category: 'Classes',
-      color: '#E11D48',
-      bgColor: 'rgba(225,29,72,0.12)',
-    };
-  }
-
-  if (normalizedId.includes('freeze')) {
-    return {
-      iconName: 'pause-circle',
-      category: 'Flexibility',
-      color: '#D97706',
-      bgColor: 'rgba(217,119,6,0.12)',
-    };
-  }
-
-  if (normalizedId.includes('digital') || normalizedId.includes('app')) {
-    return {
-      iconName: 'smartphone',
-      category: 'Privileges',
-      color: '#059669',
-      bgColor: 'rgba(5,150,105,0.12)',
-    };
-  }
-
-  return {
-    iconName: 'check-circle',
-    category: 'Perk',
-    color: BrandColors.teal,
-    bgColor: 'rgba(27,90,76,0.12)',
-  };
 }
 
 export function MembershipBenefitsTab({
@@ -115,142 +101,63 @@ export function MembershipBenefitsTab({
   onOpenFreeze,
 }: MembershipBenefitsTabProps) {
   const { t } = useTranslation();
-
-  const benefitsList = useMemo<EnrichedBenefit[]>(() => {
-    const rawBenefits: (BenefitInfo | string)[] = membership.benefits || [];
-
-    // If backend already provided rich structured benefits (more than 1 or with descriptions)
-    const hasRichBackendData =
-      rawBenefits.length > 1 ||
-      (rawBenefits.length === 1 &&
-        typeof rawBenefits[0] === 'object' &&
-        !!rawBenefits[0].description);
-
-    if (hasRichBackendData) {
-      return rawBenefits.map((item, index) => {
-        const id = typeof item === 'object' ? item.id || `b_${index}` : `b_${index}`;
-        const name = typeof item === 'object' ? item.name : String(item);
-        const description =
-          typeof item === 'object' && item.description
-            ? item.description
-            : 'Included as part of your active membership subscription.';
-        const { iconName, category, color, bgColor } = resolveIconAndCategory(
-          id,
-          typeof item === 'object' ? item.icon : undefined
-        );
-
-        return {
-          id,
-          name,
-          description,
-          iconName,
-          category: (typeof item === 'object' && item.category) || category,
-          color,
-          bgColor,
-        };
-      });
-    }
-
-    // Fallback/enrichment: When a plan in database has sparse data (e.g. only "Unlimited Access" with no description)
-    const attendanceName =
-      rawBenefits.length > 0
-        ? typeof rawBenefits[0] === 'object'
-          ? rawBenefits[0].name
-          : String(rawBenefits[0])
-        : 'Unlimited Gym Floor Access';
-
-    const enriched: EnrichedBenefit[] = [
-      {
-        id: 'attendance',
-        name: attendanceName,
-        description: 'Full access to cardio, strength equipment, and functional workout areas during club hours.',
-        iconName: 'activity',
-        category: 'Access',
-        color: '#0D9488',
-        bgColor: 'rgba(13,148,136,0.12)',
-      },
-      {
-        id: 'facilities',
-        name: 'Locker & Shower Facilities',
-        description: 'Complimentary day lockers, private changing rooms, and hot showers.',
-        iconName: 'droplet',
-        category: 'Amenities',
-        color: '#0284C7',
-        bgColor: 'rgba(2,132,199,0.12)',
-      },
-      {
-        id: 'coaching',
-        name: 'Floor Trainer Support',
-        description: 'Certified fitness coaches available on the gym floor for exercise orientation and form checks.',
-        iconName: 'award',
-        category: 'Coaching',
-        color: '#7C3AED',
-        bgColor: 'rgba(124,58,237,0.12)',
-      },
-    ];
-
-    if (membership.freezeAvailable && membership.freezeDaysAllowed > 0) {
-      enriched.push({
-        id: 'freeze',
-        name: 'Complimentary Freeze Allowance',
-        description: `Pause your membership up to ${membership.freezeDaysAllowed} free days when traveling or recovering.`,
-        iconName: 'pause-circle',
-        category: 'Flexibility',
-        color: '#D97706',
-        bgColor: 'rgba(217,119,6,0.12)',
-      });
-    }
-
-    enriched.push({
-      id: 'digital',
-      name: 'GymBios Digital Access',
-      description: 'Contactless QR check-in, workout tracking, community challenges, and digital billing.',
-      iconName: 'smartphone',
-      category: 'Privileges',
-      color: '#059669',
-      bgColor: 'rgba(5,150,105,0.12)',
-    });
-
-    return enriched;
-  }, [membership]);
+  const benefits = membership.benefits ?? [];
 
   return (
     <View style={styles.container}>
-      {/* Plan Benefits — rich glass card */}
+      {/* Plan Benefits — only what the plan and active add-ons actually include */}
       <GlassSurface radius={Radius.lg} style={styles.card}>
         <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderTitleWrap}>
-            <Text style={styles.cardTitle}>{t('membership.benefits.title')}</Text>
+          <Text style={styles.cardTitle}>{t('membership.benefits.title')}</Text>
+          {benefits.length > 0 && (
             <Text style={styles.cardSubtitle}>
-              {membership.type ? `${membership.type} · Included Perks` : 'Included with your membership'}
+              {t('membership.benefits.subtitle', { plan: membership.type })}
             </Text>
-          </View>
-          <View style={styles.badgeIncluded}>
-            <Feather name="check" size={11} color={BrandColors.teal} />
-            <Text style={styles.badgeIncludedText}>ACTIVE</Text>
-          </View>
+          )}
         </View>
 
-        <View style={styles.benefitsGrid}>
-          {benefitsList.map((item) => (
-            <View key={item.id} style={styles.benefitCard}>
-              <View style={[styles.iconCircle, { backgroundColor: item.bgColor }]}>
-                <Feather name={item.iconName} size={18} color={item.color} />
-              </View>
-              <View style={styles.benefitContent}>
-                <View style={styles.benefitTopRow}>
-                  <Text style={styles.benefitName}>{item.name}</Text>
-                  {item.category ? (
-                    <View style={styles.categoryPill}>
-                      <Text style={styles.categoryPillText}>{item.category.toUpperCase()}</Text>
-                    </View>
-                  ) : null}
+        {benefits.length > 0 ? (
+          <View style={styles.benefitsGrid}>
+            {benefits.map((benefit) => {
+              const view = describeBenefit(benefit, t);
+              const look = BENEFIT_STYLE[benefit.type ?? ''] ?? DEFAULT_STYLE;
+              const items = benefit.type === 'addon' ? [] : benefit.items ?? [];
+              return (
+                <View key={benefit.id} style={styles.benefitCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: look.bg }]}>
+                    <Feather name={look.icon} size={18} color={look.color} />
+                  </View>
+                  <View style={styles.benefitContent}>
+                    <Text style={styles.benefitName}>{view.title}</Text>
+                    {view.meta ? <Text style={[styles.benefitMeta, { color: look.color }]}>{view.meta}</Text> : null}
+                    {view.description ? <Text style={styles.benefitDesc}>{view.description}</Text> : null}
+                    {view.progress != null && (
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${view.progress * 100}%`, backgroundColor: look.color },
+                          ]}
+                        />
+                      </View>
+                    )}
+                    {items.length > 0 && (
+                      <View style={styles.chips}>
+                        {items.map(item => (
+                          <View key={item} style={styles.chip}>
+                            <Text style={styles.chipText}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <Text style={styles.benefitDesc}>{item.description}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>{t('membership.benefits.empty')}</Text>
+        )}
       </GlassSurface>
 
       {/* Freeze Info — info-banner recipe from reference */}
@@ -317,14 +224,7 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.four,
-    gap: Spacing.two,
-  },
-  cardHeaderTitleWrap: {
-    flex: 1,
+    marginBottom: Spacing.three,
   },
   cardTitle: {
     fontSize: TypographyScale.subtitle,
@@ -337,23 +237,6 @@ const styles = StyleSheet.create({
     color: BrandColors.textSecondary,
     fontWeight: '500',
     marginTop: 2,
-  },
-  badgeIncluded: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(27,90,76,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(27,90,76,0.2)',
-  },
-  badgeIncludedText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: BrandColors.teal,
-    letterSpacing: 0.5,
   },
   benefitsGrid: {
     gap: Spacing.three,
@@ -379,37 +262,55 @@ const styles = StyleSheet.create({
   },
   benefitContent: {
     flex: 1,
-  },
-  benefitTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-    marginBottom: 3,
+    gap: 3,
   },
   benefitName: {
     fontSize: 14,
     fontWeight: '700',
     color: BrandColors.textPrimary,
-    flex: 1,
   },
-  categoryPill: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  categoryPillText: {
-    fontSize: 9,
+  benefitMeta: {
+    fontSize: 11,
     fontWeight: '700',
-    color: BrandColors.textSecondary,
-    letterSpacing: 0.4,
   },
   benefitDesc: {
     fontSize: 12,
     color: BrandColors.textSecondary,
     lineHeight: 17,
     fontWeight: '400',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+    marginTop: Spacing.one,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: Radius.full,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: Spacing.one,
+  },
+  chip: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.textPrimary,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: BrandColors.textSecondary,
+    fontStyle: 'italic',
   },
   // Freeze info-banner
   freezeCard: {

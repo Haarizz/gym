@@ -1,94 +1,57 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
 import { FeatherIcon } from '@/shared/components/CurrencyIcon';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
-import { useTranslation } from 'react-i18next';
 import type { PaymentMethodOption } from '@/shared/payment/constants';
 
 interface PaymentMethodCardProps {
   option: PaymentMethodOption;
-  isSelected: boolean;
+  title: string;
+  subtitle: string;
+  /** Why the tile can't be used right now; the tile is disabled when set. */
+  unavailableReason?: string;
   onSelect: () => void;
 }
 
 export function PaymentMethodCard({
   option,
-  isSelected,
+  title,
+  subtitle,
+  unavailableReason,
   onSelect,
 }: PaymentMethodCardProps) {
   const theme = useTheme();
-  const { t } = useTranslation();
-  const title = t(`paymentSheet.methods.${option.id}.title`);
+  const disabled = !!unavailableReason;
 
   return (
     <Pressable
       onPress={onSelect}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}
+      accessibilityState={{ disabled }}
       accessibilityLabel={title}
+      accessibilityHint={unavailableReason ?? subtitle}
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: isSelected
-            ? theme.primary + '10'
-            : theme.backgroundElement,
-          borderColor: isSelected ? theme.primary : theme.border,
-          borderWidth: isSelected ? 2 : 1,
-          opacity: pressed ? 0.8 : 1,
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+          opacity: disabled ? 0.5 : 1,
+          transform: [{ scale: pressed ? 0.96 : 1 }],
         },
       ]}
     >
-      <View style={styles.topRow}>
-        <View
-          style={[
-            styles.iconWrapper,
-            {
-              backgroundColor: isSelected
-                ? theme.primary
-                : option.badgeColor + '20',
-            },
-          ]}
-        >
-          <FeatherIcon
-            name={option.iconName as any}
-            size={18}
-            color={isSelected ? theme.primaryText : option.badgeColor}
-          />
-        </View>
-
-        {isSelected ? (
-          <View
-            style={[
-              styles.checkBadge,
-              { backgroundColor: theme.primary },
-            ]}
-          >
-            <Feather name="check" size={12} color={theme.primaryText} />
-          </View>
-        ) : null}
+      <View style={[styles.iconWrapper, { backgroundColor: theme.primary + '18' }]}>
+        <FeatherIcon name={option.iconName as any} size={20} color={theme.primary} />
       </View>
-
-      <Typography
-        variant="bodySmallBold"
-        style={[
-          styles.title,
-          { color: isSelected ? theme.primary : theme.text },
-        ]}
-        numberOfLines={1}
-      >
+      <Typography variant="bodySmallBold" style={{ color: theme.text }} numberOfLines={1}>
         {title}
       </Typography>
-
-      <Typography
-        variant="caption"
-        style={{ color: theme.textSecondary, marginTop: 2 }}
-        numberOfLines={1}
-      >
-        {t(`paymentSheet.methods.${option.id}.subtitle`)}
+      <Typography variant="caption" style={{ color: theme.textSecondary }} numberOfLines={2}>
+        {unavailableReason ?? subtitle}
       </Typography>
     </Pressable>
   );
@@ -96,32 +59,19 @@ export function PaymentMethodCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.md,
+    flex: 1,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
     padding: Spacing.three,
-    justifyContent: 'space-between',
-    minHeight: 96,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.two,
+    gap: 2,
+    minHeight: 118,
   },
   iconWrapper: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.md,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  checkBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontWeight: '700',
+    marginBottom: Spacing.two,
   },
 });

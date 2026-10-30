@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: '支付与结账',
-    processingFor: '正在处理 {{title}} 的付款',
-    completePayment: '完成支付 (<amount/>)',
-    totalAmount: '总金额',
-    selectMethod: '选择支付方式',
+    title: "结账",
+    processingFor: "支付 {{title}}",
+    amountDue: "应付金额",
+    howToPay: "您想如何付款？",
+    howToPayStaff: "会员如何付款？",
+    allMethods: "所有付款方式",
 
     methods: {
-      cash: { title: '现金', subtitle: '实体现金支付' },
-      card: { title: '刷卡', subtitle: '借记卡或信用卡' },
-      credit: { title: '挂账 / 信用', subtitle: '记入会员账户' },
-      mixed: { title: '组合支付', subtitle: '多种支付方式组合' },
-      cheque: { title: '支票', subtitle: '纸质支票付款' },
-      bank_transfer: { title: '银行转账', subtitle: '银行电汇 / 电子转账' },
-      online: { title: '在线支付', subtitle: '微信、支付宝、网银' },
+      card: { title: "银行卡", subtitle: "银行卡、Apple Pay、Google Pay" },
+      upi: { title: "UPI", subtitle: "任意 UPI 应用" },
+      netbanking: { title: "网上银行", subtitle: "通过您的银行付款" },
+      cash: { title: "现金", subtitleMember: "在前台付款", subtitleStaff: "当面收款" },
+      credit: { title: "稍后付款", subtitle: "先付一部分，其余记账" },
+      mixed: { title: "现金 + 在线", subtitle: "分开付款" },
     },
-    other: '其他',
+
+    unavailable: {
+      online: "暂不可用",
+      inrOnly: "仅限 INR 付款",
+      nothingToPay: "无需在线付款",
+    },
+
+    online: {
+      title: {
+        card: "银行卡付款",
+        upi: "UPI 付款",
+        netbanking: "网上银行付款",
+      },
+      note: {
+        card: "在安全结账页面使用银行卡、Apple Pay 或 Google Pay 支付 <amount/>。",
+        upi: "在您的 UPI 应用中确认 <amount/>，然后返回此处。",
+        netbanking: "选择您的银行并确认 <amount/>，然后返回此处。",
+      },
+      secure: "付款由 Stripe 安全处理，银行卡信息不会传给健身房。",
+    },
+
+    cash: {
+      memberTitle: "在前台付款",
+      memberNote: "我们会向前台发送付款请求。请在前台以现金支付 <amount/>，工作人员收款后即确认。",
+      sendRequest: "发送请求",
+      staffTitle: "收取现金",
+      staffNote: "向会员收取 <amount/> 现金后确认。",
+      received: "已收到现金",
+    },
+
+    credit: {
+      memberNote: "如愿意可先付一部分，其余在前台批准后记入您的账户。",
+      staffNote: "如会员愿意可先收一部分，其余计入其未结余额。",
+      payNow: "现在支付",
+      nothingNow: "不支付",
+      onAccount: "记账",
+      payNowWith: "现在支付方式",
+      dueDate: "到期日（选填）",
+      selectDueDate: "选择到期日",
+      request: "申请赊账",
+      addToAccount: "记入账户",
+    },
+
+    mixed: {
+      memberNote: "现金部分在前台支付；其余部分现在在线扣款。",
+      staffNote: "先收取现金部分；其余部分在线扣款。",
+      cashPart: "现金部分",
+      cash: "现金",
+      payOnlineWith: "其余部分支付方式",
+    },
+
+    split: {
+      exactAmount: "精确金额 (<currency/>)",
+      ofTotal: "共 <amount/>",
+    },
+
+    cta: {
+      pay: "支付 <amount/>",
+      payNow: "现在支付 <amount/>",
+      payOnline: "在线支付 <amount/>",
+    },
+
+    simulated: {
+      badge: "测试模式",
+      title: "测试付款",
+      note: "模拟付款，不会产生实际扣款。确认后将视为已通过{{method}}支付 <amount/>。",
+      approve: "确认测试付款",
+      decline: "拒绝",
+    },
+
+    processing: {
+      opening: "正在打开安全结账…",
+      finishing: "正在完成…",
+      keepOpen: "请保持此页面打开",
+    },
 
     discount: {
       title: '选择折扣（选填）',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: '金额 (<currency/>)',
     },
 
-    errors: {
-      selectCardType: '请选择卡片类型',
-      chequeNumberRequired: '请输入支票号码',
-      transactionReferenceRequired: '请输入交易参考号',
-      selectPaymentType: '请选择支付类型',
-      providerNameRequired: '请输入服务商名称',
-      selectReceivedVia: '请选择收款渠道',
-      cardTypeRequired: '请选择卡片类型',
-      referenceRequired: '请输入参考号',
-      paymentTypeRequired: '请选择支付类型',
-      splitMismatch: '分账金额总和必须等于最终应付金额',
-      dueDateRequired: '部分付款必须填写付款截止日期',
+    form: {
+      example: '例如 {{value}}',
     },
 
-    form: {
-      cashDetails: '现金支付详情',
-      cardDetails: '银行卡支付详情',
-      chequeDetails: '支票支付详情',
-      bankDetails: '银行转账详情',
-      onlineDetails: '在线支付详情',
-      creditDetails: '挂账支付详情',
-      mixedDetails: '组合 / 分拆支付详情',
-      mixedSubtitle: '将总额拆分到多种支付方式',
-
-      paidAmount: '已付金额 (<currency/>) *',
-      amount: '金额 (<currency/>) *',
-      receivedAmount: '实收金额 (<currency/>)',
-      payBackAmount: '找零金额 (<currency/>)',
-      amountToReturn: '应找零金额',
-      dueDate: '付款截止日期 *',
-      dueDateOptional: '付款截止日期（选填）',
-      selectDueDate: '选择截止日期',
-      selectDate: '选择日期',
-
-      finalAmount: '最终金额：',
-      paidAmountLabel: '已付金额：',
-      receivedAmountLabel: '实收金额：',
-      remainingDue: '尚欠金额：',
-      payBack: '找零：',
-      remainingOrDue: '剩余/欠款：',
-      remainingOnCredit: '剩余挂账：',
-
-      cashReturnRequired: '需要找零：',
-      returnToCustomer: '找零 <amount/> 给顾客',
-      partialPayment: '部分付款：',
-      addedToOutstanding: '<amount/> 将计入未结清余额。',
-      addedToMemberOutstanding: '<amount/> 将计入该会员的未结清余额。',
-      fullCredit: '全额挂账：',
-      entireOnCredit: '全部金额 <amount/> 将作为挂账处理。',
-      partialReceived: '部分实收：',
-      receivedViaNote: '通过 {{method}} 实收 <received/>。剩余 <remaining/> 记为挂账。',
-      otherMethod: '其他方式',
-
-      cardType: '卡片类型 *',
-      referenceNumberOptional: '参考号 / 交易单号（选填）',
-      referenceOptional: '参考号（选填）',
-      referenceIdRequired: '参考号 / 交易 ID *',
-      transactionReferenceIdRequired: '交易 / 参考单号 *',
-      transactionReferenceRequired: '交易参考号 *',
-      chequeNumber: '支票号码 *',
-      bankNameOptional: '开户银行（选填）',
-      chequeDateOptional: '支票日期（选填）',
-      bankAccountLedgerOptional: '银行账户（科目，选填）',
-      bankAccountLedger: '银行账户（科目）',
-      ledgerHint: '账户来源于会计科目表。金额将计入所选账户。',
-      onlinePaymentType: '在线支付方式 *',
-      paymentType: '支付类型 *',
-      paymentProviderName: '支付服务商名称 *',
-      providerName: '服务商名称 *',
-      receivedVia: '收款渠道 *',
-      receivedPlaceholder: '0.00（留空表示全额挂账）',
-      transactionIdPlaceholder: '交易流水号',
-      chequeNumberPlaceholder: '支票号码',
-      referenceIdPlaceholder: '参考号',
-      providerNamePlaceholder: '服务商名称',
-      example: '例如 {{value}}',
-
-      method: '支付方式 *',
-      leg: '分账 #{{n}}',
-      addLeg: '+ 添加支付分项',
-      totalSplit: '分拆总金额：',
-      exceedBy: '分拆总额超出最终金额 <amount/>',
-      shortBy: '分拆总额缺少 <amount/>',
-      splitMatches: '分拆金额总计与最终金额完全一致。',
+    errors: {
+      failed: "付款未成功",
+      refunded: "付款未成功。如已扣款，款项将自动退回。",
+      noGym: "此付款未选择健身房",
+      needBoth: "请为现金和在线部分分别选择金额",
+      amountTooHigh: "不能超过应付金额",
     },
   },
 } satisfies LocaleResource;

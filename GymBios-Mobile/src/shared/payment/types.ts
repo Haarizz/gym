@@ -1,11 +1,15 @@
-export type PaymentMethod =
-  | 'cash'
-  | 'card'
-  | 'credit'
-  | 'mixed'
-  | 'cheque'
-  | 'bank_transfer'
-  | 'online';
+/**
+ * The tiles in the payment sheet. Card / UPI / Net banking are paid in Stripe's own
+ * sheet; Cash is a "pay at reception" request (members) or a one-tap "cash received"
+ * (staff); Credit and Mixed combine those.
+ */
+export type PaymentMethod = 'card' | 'upi' | 'netbanking' | 'cash' | 'credit' | 'mixed';
+
+/** The methods Stripe collects — PaymentIntent payment_method_types. */
+export type OnlineMethodType = 'card' | 'upi' | 'netbanking';
+
+/** Who is holding the phone: a member paying for themselves, or staff at the desk. */
+export type PayerMode = 'member' | 'staff';
 
 export type DiscountType = 'none' | 'fixed' | 'percentage';
 
@@ -15,22 +19,8 @@ export interface DiscountApplied {
   discountAmount: number;
 }
 
-export interface PaymentSplitRow {
-  id: string;
-  method: PaymentMethod;
-  amount: number;
-  cardType?: string;
-  reference?: string;
-  chequeNumber?: string;
-  bankName?: string;
-  chequeDate?: string;
-  bankAccountId?: string;
-  onlinePaymentType?: string;
-  providerName?: string;
-}
-
 /**
- * Payment leg model matching backend PaymentSplitDTO exactly.
+ * Payment leg model matching backend PaymentSplitDTO.
  */
 export interface PaymentSplit {
   method: string;
@@ -44,6 +34,8 @@ export interface PaymentSplit {
   bankAccountName?: string;
   onlinePaymentType?: string;
   providerName?: string;
+  /** Stripe PaymentIntent that collected this leg; the backend verifies it with Stripe. */
+  stripePaymentIntentId?: string;
 }
 
 /**
@@ -80,6 +72,12 @@ export interface PaymentBottomSheetProps {
   allowDiscount?: boolean;
   initialDiscount?: { type: DiscountType; value: number };
   isProcessing?: boolean;
+  /** Defaults to 'member'. Staff take cash in hand; members send a pay-at-reception request. */
+  payer?: PayerMode;
+  /** Restrict the tiles, e.g. settling a balance only accepts online payment. Defaults to all. */
+  methods?: PaymentMethod[];
+  /** The gym being paid, when it isn't the app's current gym (first purchase at a new gym). */
+  tenantSlug?: string;
   onClose: () => void;
   onComplete: (result: PaymentResult) => void;
 }

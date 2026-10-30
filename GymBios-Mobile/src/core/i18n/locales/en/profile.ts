@@ -135,7 +135,7 @@ const profile = {
     title: 'Wallet',
     subtitle: 'Refunds & reward credit',
     availableBalance: 'Available balance',
-    balanceHint: 'Use it when you book a session. Cancelled bookings are refunded here.',
+    balanceHint: 'Use it for sessions and add-ons. Cancelled bookings and add-ons are refunded here.',
     history: 'History',
     emptyTitle: 'No wallet activity',
     emptyDescription: 'Refunds and reward credits will show up here.',
@@ -146,6 +146,8 @@ const profile = {
       BOOKING: 'Session booking',
       REFERRAL_REWARD: 'Referral reward',
       BILLING_USE: 'Purchase',
+      ADDON: 'Add-on purchase',
+      ADDON_REFUND: 'Add-on refund',
     },
   },
 

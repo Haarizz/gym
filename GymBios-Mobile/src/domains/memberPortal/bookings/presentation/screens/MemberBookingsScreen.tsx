@@ -19,12 +19,14 @@ import { GlassBlob, GlassSurface } from '@/shared/components';
 import { BookingStatsHeader } from '../components/BookingStatsHeader';
 import { BookingCard, type BookingItemData } from '../components/BookingCard';
 import { PastBookingItem, type PastBookingData } from '../components/PastBookingItem';
+import { RejectedBookingItem } from '../components/RejectedBookingItem';
 import { BookClassModal } from '../components/BookClassModal';
 import { CancelBookingSheet } from '../components/CancelBookingSheet';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet/AppBottomSheet';
 import {
   useUpcomingBookings,
   usePastBookings,
+  useRejectedBookings,
   useBookingStats,
   useCancelBooking
 } from '../../hooks/useMemberBookings';
@@ -85,6 +87,9 @@ export function MemberBookingsScreen() {
     isRefetching: isRefetchingStats
   } = useBookingStats();
 
+  // Separate from upcoming: payments staff rejected, with their reason, until the session starts.
+  const { data: rejectedBookings, refetch: refetchRejected } = useRejectedBookings();
+
   const cancelMutation = useCancelBooking();
 
   const [isBookModalVisible, setIsBookModalVisible] = useState(false);
@@ -119,6 +124,7 @@ export function MemberBookingsScreen() {
   const onRefresh = () => {
     refetchUpcoming();
     refetchPast();
+    refetchRejected();
     refetchStats();
   };
 
@@ -150,7 +156,9 @@ export function MemberBookingsScreen() {
     trainer: b.trainerName ?? '',
     attended: isAttendedStatus(b.status),
     cancelled: (b.status || '').toUpperCase() === 'CANCELLED',
-    refundNote: b.refundStatus ? tOr(`bookings.refundNote.${b.refundStatus}`, '') || null : null,
+    refundNote: b.rejectionReason
+      ? t('bookings.refundNote.rejected', { reason: b.rejectionReason })
+      : b.refundStatus ? tOr(`bookings.refundNote.${b.refundStatus}`, '') || null : null,
   }));
 
   const details = selectedBookingForDetails;
@@ -191,6 +199,26 @@ export function MemberBookingsScreen() {
         <Feather name="plus" size={20} color="#FFFFFF" />
         <Text style={styles.bookButtonText}>{t('bookings.bookSession')}</Text>
       </Pressable>
+
+      {/* Rejected payments — kept out of Upcoming since these bookings were cancelled */}
+      {rejectedBookings && rejectedBookings.length > 0 && (
+        <GlassSurface radius={Radius.lg} style={[styles.sectionCard, styles.rejectedSection]}>
+          <View style={styles.rejectedHeader}>
+            <Feather name="alert-circle" size={18} color="#DC2626" />
+            <Text style={[styles.sectionTitle, styles.rejectedTitle]}>{t('bookings.rejected.title')}</Text>
+          </View>
+          <Text style={styles.rejectedSubtitle}>{t('bookings.rejected.subtitle')}</Text>
+          <View style={styles.list}>
+            {rejectedBookings.map((booking) => (
+              <RejectedBookingItem
+                key={booking.id}
+                booking={booking}
+                onBookAgain={() => setIsBookModalVisible(true)}
+              />
+            ))}
+          </View>
+        </GlassSurface>
+      )}
 
       {/* Upcoming Bookings Section */}
       <GlassSurface radius={Radius.lg} style={styles.sectionCard}>
@@ -368,6 +396,25 @@ const styles = StyleSheet.create({
     fontSize: TypographyScale.subtitle,
     fontWeight: '700',
     color: BrandColors.textPrimary,
+    marginBottom: Spacing.three,
+  },
+  rejectedSection: {
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  rejectedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  rejectedTitle: {
+    marginBottom: 0,
+    color: '#B91C1C',
+  },
+  rejectedSubtitle: {
+    fontSize: 13,
+    color: BrandColors.textSecondary,
+    marginTop: 2,
     marginBottom: Spacing.three,
   },
   list: {

@@ -210,6 +210,8 @@ public class FinancialEventService {
                         "Membership payment held as deferred revenue"));
             } else if (ReceiptService.TXN_CLASS_BOOKING.equals(receipt.getTransactionType())) {
                 lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0], "Class booking revenue"));
+            } else if (ReceiptService.TXN_ADDON.equals(receipt.getTransactionType())) {
+                lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0], "Add-on revenue"));
             } else {
                 lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", split[0], "Revenue recognition"));
             }
@@ -1145,6 +1147,34 @@ public class FinancialEventService {
                 "Booking Refund: #" + bookingId + " — " + memberName,
                 LocalDate.now(), lines, "BILLING");
         registerSource("BookingRefund", bookingId, "BILLING", jv.getId());
+    }
+
+    /**
+     * ADDONS — a cancelled add-on's payment refunded to the member's wallet. Reverses
+     * the revenue its purchase booked, like onBookingRefundedToWallet.
+     * DR  Service / Add-on Revenue     (amount, net of VAT)
+     * DR  Tax / GST Payable            (VAT portion)
+     * CR  Reward Wallet Liability      (amount)
+     */
+    public void onAddonRefundedToWallet(MemberAddon addon, String memberName, BigDecimal amount) {
+        if (alreadyJournaled("AddonRefund", addon.getId())) return;
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+
+        BigDecimal[] split = splitVatInclusive(amount);
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0],
+                "Add-on refund — " + memberName));
+        if (split[1].compareTo(BigDecimal.ZERO) > 0) {
+            lines.add(dr(ACC_TAX_PAYABLE, "Tax / GST Payable", split[1], "Add-on refund — VAT reversal"));
+        }
+        lines.add(cr(ACC_REWARD_LIABILITY, "Reward Wallet Liability", amount,
+                "Add-on " + addon.getTransactionId() + " refunded to wallet"));
+
+        JournalVoucher jv = createAndPost(
+                "Add-on Refund: " + (addon.getAddonName() != null ? addon.getAddonName() : "Add-on")
+                + " — " + memberName + " | " + addon.getTransactionId(),
+                LocalDate.now(), lines, "ADDONS");
+        registerSource("AddonRefund", addon.getId(), "ADDONS", jv.getId());
     }
 
     // ─────────────────────────────────────────────────────────────────────────

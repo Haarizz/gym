@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 
+const DIVIDER = 'rgba(15,23,42,0.07)';
+
 export const styles = StyleSheet.create({
   loaderContainer: {
     padding: Spacing.six,
@@ -17,20 +19,23 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   content: {
-    paddingBottom: Spacing.six,
+    gap: Spacing.four,
   },
-  headerBanner: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
+  summaryCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.four,
+  },
+  summaryTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.four,
-    borderBottomWidth: 1,
-    borderBottomColor: BrandColors.neutral[200],
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginBottom: Spacing.three,
   },
   receiptNo: {
-    fontSize: TypographyScale.title,
+    flexShrink: 1,
+    fontSize: TypographyScale.body,
     fontWeight: '700',
     color: BrandColors.textPrimary,
   },
@@ -44,47 +49,72 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  section: {
-    paddingHorizontal: Spacing.four,
-    marginBottom: Spacing.six,
+  summaryLabel: {
+    fontSize: TypographyScale.caption,
+    color: BrandColors.textSecondary,
+    fontWeight: '600',
+  },
+  summaryAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: BrandColors.textPrimary,
+    marginTop: 2,
+  },
+  summaryMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.two,
+  },
+  summaryMetaText: {
+    fontSize: TypographyScale.caption,
+    color: BrandColors.textSecondary,
+    fontWeight: '500',
   },
   sectionTitle: {
     fontSize: TypographyScale.caption,
-    fontWeight: '600',
+    fontWeight: '700',
     color: BrandColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.two,
+  },
+  sectionCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: DIVIDER,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.two,
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+    paddingVertical: Spacing.two + 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BrandColors.neutral[200],
+    borderBottomColor: DIVIDER,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
   },
   rowLabel: {
     fontSize: TypographyScale.body,
     color: BrandColors.textSecondary,
-    flex: 1,
+    flexShrink: 0,
+    maxWidth: '45%',
   },
   rowValue: {
     fontSize: TypographyScale.body,
     color: BrandColors.textPrimary,
-    fontWeight: '500',
-    flex: 2,
+    fontWeight: '600',
+    flex: 1,
     textAlign: 'right',
-  },
-  totalsContainer: {
-    marginTop: Spacing.two,
-    paddingTop: Spacing.four,
-    borderTopWidth: 2,
-    borderTopColor: BrandColors.neutral[200],
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
   },
   totalLabel: {
     fontSize: TypographyScale.body,
@@ -95,34 +125,38 @@ export const styles = StyleSheet.create({
     color: BrandColors.textPrimary,
     fontWeight: '600',
   },
-  grandTotalLabel: {
+  balanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.three,
+    borderTopWidth: 1,
+    borderTopColor: DIVIDER,
+    marginTop: Spacing.one,
+  },
+  balanceLabel: {
     fontSize: TypographyScale.subtitle,
     fontWeight: '700',
     color: BrandColors.textPrimary,
-    marginTop: Spacing.two,
   },
-  grandTotalValue: {
+  balanceValue: {
     fontSize: TypographyScale.subtitle,
-    fontWeight: '700',
-    marginTop: Spacing.two,
-  },
-  actionBar: {
-    padding: Spacing.four,
-    borderTopWidth: 1,
-    borderTopColor: BrandColors.neutral[200],
-    backgroundColor: BrandColors.surface,
+    fontWeight: '800',
   },
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.three,
+    gap: Spacing.two,
+    paddingVertical: Spacing.three + 2,
     borderRadius: Radius.md,
+  },
+  downloadButtonPressed: {
+    opacity: 0.85,
   },
   downloadButtonText: {
     color: 'white',
     fontSize: TypographyScale.body,
-    fontWeight: '600',
-    marginStart: Spacing.two,
+    fontWeight: '700',
   },
 });

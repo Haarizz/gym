@@ -1,5 +1,8 @@
 package com.company.project.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.util.Objects;
 
@@ -45,6 +48,15 @@ public class PaymentSplitDTO {
     // since one bill can collect several payments on different dates.
     private String paymentDate;
 
+    // Stripe PaymentIntent (pi_...) that collected this leg in the mobile app. Set only
+    // for gateway legs; StripePaymentService verifies it with Stripe before the leg is
+    // trusted, and refunds it if the payment is later rejected. The fixed name + alias
+    // keep it intact both in snake_case bodies and in the camelCase mobile purchase
+    // bodies (whose nested legs are otherwise read with the global snake_case naming).
+    @JsonProperty("stripe_payment_intent_id")
+    @JsonAlias("stripePaymentIntentId")
+    private String stripePaymentIntentId;
+
     public PaymentSplitDTO() {}
 
     public PaymentSplitDTO(String method, BigDecimal amount, String reference) {
@@ -55,6 +67,9 @@ public class PaymentSplitDTO {
 
     public String getPaymentDate() { return paymentDate; }
     public void setPaymentDate(String paymentDate) { this.paymentDate = paymentDate; }
+
+    public String getStripePaymentIntentId() { return stripePaymentIntentId; }
+    public void setStripePaymentIntentId(String stripePaymentIntentId) { this.stripePaymentIntentId = stripePaymentIntentId; }
 
     public String getMethod() { return method; }
     public void setMethod(String method) { this.method = method; }
@@ -109,11 +124,12 @@ public class PaymentSplitDTO {
                 Objects.equals(bankAccountCode, that.bankAccountCode) &&
                 Objects.equals(bankAccountName, that.bankAccountName) &&
                 Objects.equals(onlinePaymentType, that.onlinePaymentType) &&
-                Objects.equals(providerName, that.providerName);
+                Objects.equals(providerName, that.providerName) &&
+                Objects.equals(stripePaymentIntentId, that.stripePaymentIntentId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(method, amount, reference, cardType, chequeNumber, chequeDate, bankName, bankAccountCode, bankAccountName, onlinePaymentType, providerName);
+        return Objects.hash(method, amount, reference, cardType, chequeNumber, chequeDate, bankName, bankAccountCode, bankAccountName, onlinePaymentType, providerName, stripePaymentIntentId);
     }
 }

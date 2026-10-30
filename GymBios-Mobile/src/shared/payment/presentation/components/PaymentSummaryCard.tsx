@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
@@ -14,6 +13,7 @@ interface PaymentSummaryCardProps {
   amount: number;
 }
 
+/** The "amount due" hero at the top of the payment sheet. */
 export function PaymentSummaryCard({
   title,
   subtitle,
@@ -23,92 +23,45 @@ export function PaymentSummaryCard({
   const { t } = useTranslation();
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: theme.backgroundElement,
-          borderColor: theme.border,
-        },
-      ]}
-    >
-      <View style={styles.content}>
-        <View style={styles.leftContainer}>
-          <View
-            style={[
-              styles.iconBadge,
-              { backgroundColor: theme.primary + '15' },
-            ]}
-          >
-            <Feather name="shopping-bag" size={20} color={theme.primary} />
-          </View>
-          <View style={styles.textGroup}>
-            <Typography variant="bodySmallBold" style={{ color: theme.text }}>
-              {title}
-            </Typography>
-            {subtitle ? (
-              <Typography
-                variant="caption"
-                style={{ color: theme.textSecondary, marginTop: 2 }}
-              >
-                {subtitle}
-              </Typography>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.amountContainer}>
-          <Typography
-            variant="caption"
-            style={{ color: theme.textSecondary, textAlign: 'right' }}
-          >
-            {t('paymentSheet.totalAmount')}
+    <View style={[styles.card, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '30' }]}>
+      <View style={styles.textGroup}>
+        <Typography variant="caption" style={{ color: theme.textSecondary }}>
+          {t('paymentSheet.amountDue')}
+        </Typography>
+        <Typography variant="bodySmallBold" style={{ color: theme.text }} numberOfLines={2}>
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography variant="caption" style={{ color: theme.textSecondary }} numberOfLines={1}>
+            {subtitle}
           </Typography>
-          <Typography
-            variant="subtitle"
-            style={[styles.amountText, { color: theme.primary }]}
-          >
-            <CurrencyValue amount={amount} decimals={2} />
-          </Typography>
-        </View>
+        ) : null}
       </View>
+      <Typography variant="subtitle" style={[styles.amount, { color: theme.primary }]}>
+        <CurrencyValue amount={amount} decimals={2} />
+      </Typography>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.xl,
     borderWidth: 1,
-    padding: Spacing.three,
-  },
-  content: {
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three + Spacing.one,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-  },
-  leftContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginEnd: Spacing.two,
-  },
-  iconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginEnd: Spacing.three,
+    gap: Spacing.three,
   },
   textGroup: {
     flex: 1,
+    gap: 2,
   },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  amountText: {
-    fontWeight: '700',
-    marginTop: 2,
+  amount: {
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
   },
 });

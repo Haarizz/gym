@@ -136,6 +136,8 @@ import { PlatformLeads } from "./pages/platform-leads";
 import { PlatformFollowUp } from "./pages/platform-follow-up";
 import { usePermissions, hasPermission } from "./utils/permissions";
 import { membersService } from "./utils/supabase/members-service";
+import { bookingService } from "./utils/supabase/booking-service";
+import { addonsService } from "./utils/supabase/addons-service";
 
 import ErrorBoundary from "./components/shared/error-boundary";
 import { ResponsiveEnhancer } from "./components/shared/ResponsiveEnhancer";
@@ -937,8 +939,8 @@ export default function App() {
   }, [visibleMenuItems]);
   const isMemberRole = roles.some(r => r.toLowerCase().replace("role_", "") === "member");
 
-  // Red dot on the Approvals sidebar item while mobile cash/credit purchases are
-  // waiting on reception. Re-checked on navigation, branch switch, a 60s poll, and
+  // Red dot on the Approvals sidebar item while mobile cash/credit purchases,
+  // bookings or add-ons are waiting on reception. Re-checked on navigation, branch switch, a 60s poll, and
   // the 'approvals_updated' event the Approvals page fires after approve/reject.
   const canSeeApprovals = isAuthenticated && !isGymbiosAdmin && permissions.includes("MEMBERS_APPROVE");
   const [hasPendingApprovals, setHasPendingApprovals] = useState(false);
@@ -950,8 +952,13 @@ export default function App() {
     let cancelled = false;
     const check = async () => {
       try {
-        const res = await membersService.getPendingApprovals({ page: 1, limit: 1 });
-        if (!cancelled) setHasPendingApprovals((res.pagination?.total ?? res.members?.length ?? 0) > 0);
+        const [res, bookings, addons] = await Promise.all([
+          membersService.getPendingApprovals({ page: 1, limit: 1 }),
+          bookingService.getPendingPaymentApprovals(),
+          addonsService.getPendingPaymentApprovals(),
+        ]);
+        const pendingMembers = res.pagination?.total ?? res.members?.length ?? 0;
+        if (!cancelled) setHasPendingApprovals(pendingMembers + bookings.length + addons.length > 0);
       } catch {
         // Leave the last known state; a transient failure shouldn't flicker the dot.
       }

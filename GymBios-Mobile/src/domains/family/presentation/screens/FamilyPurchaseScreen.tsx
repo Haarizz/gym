@@ -511,6 +511,7 @@ export function FamilyPurchaseScreen() {
           title={t('family.subscribeTo', { plan: selectedPlan.name })}
           subtitle={details.centerName}
           allowDiscount={false}
+          tenantSlug={tenantSlug || undefined}
           onClose={() => setIsPaymentVisible(false)}
           isProcessing={purchaseMutation.isPending}
           onComplete={handlePaymentComplete}

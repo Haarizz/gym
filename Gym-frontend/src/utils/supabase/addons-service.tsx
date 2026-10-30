@@ -23,6 +23,14 @@ export interface MemberAddon {
   updated_at: string;
   /** Only on the createAddon response — the receipt the purchase generated. */
   receipt?: Receipt;
+  /** What an app purchase took from the member's wallet. */
+  wallet_amount?: number | null;
+  /** What went back to the wallet when it was cancelled. */
+  refunded_amount?: number | null;
+  /** Only on the pending-approvals list: received so far (wallet included) and the promo code. */
+  paid_amount?: number | null;
+  discount_amount?: number | null;
+  discount_label?: string | null;
 }
 
 export interface AddonsResponse {
@@ -101,13 +109,52 @@ class AddonsService {
     return response.json();
   }
 
+  /** Cancelling refunds what was paid to the member's wallet. */
   async updateAddonStatus(id: string, status: string): Promise<MemberAddon> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/member-addons/${id}/status?status=${encodeURIComponent(status)}`,
       { method: 'PUT' }
     );
-    if (!response.ok) throw new Error(`Failed to update addon status: ${response.status}`);
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to update addon status: ${response.status}`));
     return response.json();
+  }
+
+  /** Add-ons bought in the app with Cash/Credit/Mixed, awaiting reception approval. */
+  async getPendingPaymentApprovals(): Promise<MemberAddon[]> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/member-addons/pending-approvals`);
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to fetch add-on approvals: ${response.status}`));
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  /** Activates the add-on and posts the payment to the ledger. */
+  async approvePayment(id: string): Promise<MemberAddon> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/member-addons/${id}/approve-payment`,
+      { method: 'POST', body: JSON.stringify({}) }
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to approve payment: ${response.status}`));
+    return response.json();
+  }
+
+  /** The add-on never starts; any wallet amount is returned. */
+  async rejectPayment(id: string, reason: string): Promise<MemberAddon> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/member-addons/${id}/reject-payment`,
+      { method: 'POST', body: JSON.stringify({ reason }) }
+    );
+    if (!response.ok) throw new Error(await this.errorMessage(response, `Failed to reject payment: ${response.status}`));
+    return response.json();
+  }
+
+  private async errorMessage(response: Response, fallback: string): Promise<string> {
+    const text = await response.text().catch(() => '');
+    try {
+      const body = JSON.parse(text);
+      return body.message || body.error || fallback;
+    } catch {
+      return text || fallback;
+    }
   }
 
   async deleteAddon(id: string): Promise<void> {

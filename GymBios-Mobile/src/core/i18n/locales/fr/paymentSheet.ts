@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: 'Paiement',
-    processingFor: 'Paiement pour {{title}}',
-    completePayment: 'Finaliser le paiement (<amount/>)',
-    totalAmount: 'Montant total',
-    selectMethod: 'Choisir un moyen de paiement',
+    title: "Paiement",
+    processingFor: "Paiement pour {{title}}",
+    amountDue: "Montant dû",
+    howToPay: "Comment souhaitez-vous payer ?",
+    howToPayStaff: "Comment le membre paie-t-il ?",
+    allMethods: "Tous les moyens de paiement",
 
     methods: {
-      cash: { title: 'Espèces', subtitle: 'Paiement en espèces' },
-      card: { title: 'Carte', subtitle: 'Carte de débit ou de crédit' },
-      credit: { title: 'Crédit', subtitle: 'Ajouter au compte du membre' },
-      mixed: { title: 'Paiement mixte', subtitle: 'Répartir sur plusieurs moyens' },
-      cheque: { title: 'Chèque', subtitle: 'Paiement par chèque' },
-      bank_transfer: { title: 'Virement bancaire', subtitle: 'Virement direct' },
-      online: { title: 'Paiement en ligne', subtitle: 'UPI, portefeuille, Stripe' },
+      card: { title: "Carte", subtitle: "Carte, Apple Pay, Google Pay" },
+      upi: { title: "UPI", subtitle: "Toute appli UPI" },
+      netbanking: { title: "Banque en ligne", subtitle: "Payez depuis votre banque" },
+      cash: { title: "Espèces", subtitleMember: "Payer à l’accueil", subtitleStaff: "Encaisser en personne" },
+      credit: { title: "Payer plus tard", subtitle: "Une partie maintenant, le reste sur compte" },
+      mixed: { title: "Espèces + en ligne", subtitle: "Fractionner le paiement" },
     },
-    other: 'Autre',
+
+    unavailable: {
+      online: "Pas encore disponible",
+      inrOnly: "Uniquement pour les paiements en INR",
+      nothingToPay: "Rien à payer en ligne",
+    },
+
+    online: {
+      title: {
+        card: "Payer par carte",
+        upi: "Payer par UPI",
+        netbanking: "Payer par banque en ligne",
+      },
+      note: {
+        card: "Payez <amount/> par carte, Apple Pay ou Google Pay dans le paiement sécurisé.",
+        upi: "Validez <amount/> dans votre appli UPI, puis revenez ici.",
+        netbanking: "Choisissez votre banque, validez <amount/>, puis revenez ici.",
+      },
+      secure: "Les paiements sont traités en toute sécurité par Stripe. Les données de carte ne parviennent jamais à la salle.",
+    },
+
+    cash: {
+      memberTitle: "Payer à l’accueil",
+      memberNote: "Nous envoyons une demande de paiement à l’accueil. Payez <amount/> en espèces à l’accueil — c’est confirmé dès que l’équipe l’a reçu.",
+      sendRequest: "Envoyer la demande",
+      staffTitle: "Encaisser en espèces",
+      staffNote: "Encaissez <amount/> en espèces auprès du membre, puis confirmez.",
+      received: "Espèces reçues",
+    },
+
+    credit: {
+      memberNote: "Payez une partie maintenant si vous le souhaitez — le reste est porté sur votre compte après validation par l’accueil.",
+      staffNote: "Encaissez une partie maintenant si le membre le souhaite — le reste s’ajoute à son solde dû.",
+      payNow: "Payer maintenant",
+      nothingNow: "Rien",
+      onAccount: "Sur le compte",
+      payNowWith: "Payer maintenant par",
+      dueDate: "Date d’échéance (facultatif)",
+      selectDueDate: "Choisir une date d’échéance",
+      request: "Demander un crédit",
+      addToAccount: "Ajouter au compte",
+    },
+
+    mixed: {
+      memberNote: "Payez la partie en espèces à l’accueil ; le reste est débité en ligne maintenant.",
+      staffNote: "Encaissez d’abord la partie en espèces ; le reste est débité en ligne.",
+      cashPart: "Partie en espèces",
+      cash: "Espèces",
+      payOnlineWith: "Payer le reste par",
+    },
+
+    split: {
+      exactAmount: "Montant exact (<currency/>)",
+      ofTotal: "sur <amount/>",
+    },
+
+    cta: {
+      pay: "Payer <amount/>",
+      payNow: "Payer <amount/> maintenant",
+      payOnline: "Payer <amount/> en ligne",
+    },
+
+    simulated: {
+      badge: "MODE TEST",
+      title: "Paiement test",
+      note: "Simulation — aucun argent n’est débité. Validez pour continuer comme si <amount/> avaient été payés par {{method}}.",
+      approve: "Valider le paiement test",
+      decline: "Refuser",
+    },
+
+    processing: {
+      opening: "Ouverture du paiement sécurisé…",
+      finishing: "Finalisation…",
+      keepOpen: "Veuillez garder cet écran ouvert",
+    },
 
     discount: {
       title: 'Choisir une remise (facultatif)',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'Montant (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'Veuillez choisir un type de carte',
-      chequeNumberRequired: 'Le numéro de chèque est obligatoire',
-      transactionReferenceRequired: 'La référence de transaction est obligatoire',
-      selectPaymentType: 'Veuillez choisir un type de paiement',
-      providerNameRequired: 'Le nom du prestataire est obligatoire',
-      selectReceivedVia: 'Veuillez indiquer le moyen de réception du paiement',
-      cardTypeRequired: 'Le type de carte est obligatoire',
-      referenceRequired: 'La référence est obligatoire',
-      paymentTypeRequired: 'Le type de paiement est obligatoire',
-      splitMismatch: 'La somme des montants répartis doit être égale au montant final',
-      dueDateRequired: 'Une date d’échéance est obligatoire pour les paiements partiels',
+    form: {
+      example: 'ex. {{value}}',
     },
 
-    form: {
-      cashDetails: 'Détails du paiement en espèces',
-      cardDetails: 'Détails du paiement par carte',
-      chequeDetails: 'Détails du paiement par chèque',
-      bankDetails: 'Détails du virement bancaire',
-      onlineDetails: 'Détails du paiement en ligne',
-      creditDetails: 'Détails du paiement à crédit',
-      mixedDetails: 'Détails du paiement mixte / fractionné',
-      mixedSubtitle: 'Répartir le total sur plusieurs moyens',
-
-      paidAmount: 'Montant payé (<currency/>) *',
-      amount: 'Montant (<currency/>) *',
-      receivedAmount: 'Montant reçu (<currency/>)',
-      payBackAmount: 'Monnaie à rendre (<currency/>)',
-      amountToReturn: 'Montant à rendre',
-      dueDate: 'Date d’échéance *',
-      dueDateOptional: 'Date d’échéance (facultatif)',
-      selectDueDate: 'Choisir une échéance',
-      selectDate: 'Choisir une date',
-
-      finalAmount: 'Montant final :',
-      paidAmountLabel: 'Montant payé :',
-      receivedAmountLabel: 'Montant reçu :',
-      remainingDue: 'Reste dû :',
-      payBack: 'À rendre :',
-      remainingOrDue: 'Restant/Dû :',
-      remainingOnCredit: 'Restant (à crédit) :',
-
-      cashReturnRequired: 'Monnaie à rendre :',
-      returnToCustomer: 'Rendre <amount/> au client',
-      partialPayment: 'Paiement partiel :',
-      addedToOutstanding: '<amount/> sera ajouté au solde dû.',
-      addedToMemberOutstanding: '<amount/> sera ajouté au solde dû du membre.',
-      fullCredit: 'Entièrement à crédit :',
-      entireOnCredit: 'La totalité de <amount/> sera à crédit pour le membre.',
-      partialReceived: 'Reçu partiellement :',
-      receivedViaNote: '<received/> reçu par {{method}}. Le reste, <remaining/>, est enregistré à crédit.',
-      otherMethod: 'autre moyen',
-
-      cardType: 'Type de carte *',
-      referenceNumberOptional: 'Référence / Numéro de transaction (facultatif)',
-      referenceOptional: 'Référence (facultatif)',
-      referenceIdRequired: 'Référence / ID de transaction *',
-      transactionReferenceIdRequired: 'ID de transaction / référence *',
-      transactionReferenceRequired: 'Référence de transaction *',
-      chequeNumber: 'Numéro de chèque *',
-      bankNameOptional: 'Nom de la banque (facultatif)',
-      chequeDateOptional: 'Date du chèque (facultatif)',
-      bankAccountLedgerOptional: 'Compte bancaire (grand livre, facultatif)',
-      bankAccountLedger: 'Compte bancaire (grand livre)',
-      ledgerHint: 'Comptes issus du plan comptable. Le montant sera crédité sur le compte sélectionné.',
-      onlinePaymentType: 'Type de paiement en ligne *',
-      paymentType: 'Type de paiement *',
-      paymentProviderName: 'Nom du prestataire de paiement *',
-      providerName: 'Nom du prestataire *',
-      receivedVia: 'Reçu par *',
-      receivedPlaceholder: '0.00 (laisser vide pour un crédit total)',
-      transactionIdPlaceholder: 'ID de transaction',
-      chequeNumberPlaceholder: 'Numéro de chèque',
-      referenceIdPlaceholder: 'ID de référence',
-      providerNamePlaceholder: 'Nom du prestataire',
-      example: 'ex. {{value}}',
-
-      method: 'Moyen *',
-      leg: 'Partie n° {{n}}',
-      addLeg: '+ Ajouter une partie',
-      totalSplit: 'Total réparti :',
-      exceedBy: 'Les montants répartis dépassent le montant final de <amount/>',
-      shortBy: 'Il manque <amount/> aux montants répartis',
-      splitMatches: 'Le total réparti correspond exactement au montant final.',
+    errors: {
+      failed: "Le paiement n’a pas abouti",
+      refunded: "Cela n’a pas abouti. Si vous avez été débité, vous serez remboursé automatiquement.",
+      noGym: "Aucune salle n’est sélectionnée pour ce paiement",
+      needBoth: "Choisissez un montant pour la partie espèces et la partie en ligne",
+      amountTooHigh: "Ne peut pas dépasser le montant dû",
     },
   },
 } satisfies LocaleResource;

@@ -95,6 +95,10 @@ public class TenantContextFilter extends OncePerRequestFilter {
             uriStartsWith("/api/mobile/account/")
     );
 
+    // Starting a Stripe payment names its gym in the body: a first purchase pays a gym
+    // the caller isn't a member of yet. Spending it is checked on the purchase itself.
+    private static final RequestMatcher STRICTLY_GLOBAL_PAYMENTS_PATH = uriStartsWith("/api/mobile/payments/");
+
     private static final RequestMatcher STRICTLY_GLOBAL_PATH = new OrRequestMatcher(
             uriStartsWith("/api/mobile/auth/"),
             STRICTLY_GLOBAL_PROFILE_PATH,
@@ -102,7 +106,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
             STRICTLY_GLOBAL_FAMILY_PATH,
             STRICTLY_GLOBAL_REFERRAL_PATH,
             GLOBAL_COMMUNITY_PATH,
-            ACCOUNT_PATH
+            ACCOUNT_PATH,
+            STRICTLY_GLOBAL_PAYMENTS_PATH
     );
 
     private static final RequestMatcher GLOBAL_EXEMPT_PATH = new OrRequestMatcher(
@@ -114,6 +119,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             STRICTLY_GLOBAL_REFERRAL_PATH,
             GLOBAL_COMMUNITY_PATH,
             ACCOUNT_PATH,
+            STRICTLY_GLOBAL_PAYMENTS_PATH,
             uriStartsWith("/api/community"),
             uriStartsWith("/api/notifications")
     );
@@ -180,9 +186,11 @@ public class TenantContextFilter extends OncePerRequestFilter {
                     // /api/mobile/profile/ is global only for global (member) accounts. Staff/admin
                     // ids are tenant users.id, so their profile must resolve in the tenant DB —
                     // otherwise the lazy profile insert hits the default DB and fails
-                    // user_profiles_user_id_fkey.
+                    // user_profiles_user_id_fkey. Payments likewise: staff stay routed to
+                    // their own gym (a non-global caller on a global path is refused below).
                     boolean strictlyGlobal = STRICTLY_GLOBAL_PATH.matches(request)
-                            && (userDetails.isGlobal() || !STRICTLY_GLOBAL_PROFILE_PATH.matches(request));
+                            && (userDetails.isGlobal() || !(STRICTLY_GLOBAL_PROFILE_PATH.matches(request)
+                                    || STRICTLY_GLOBAL_PAYMENTS_PATH.matches(request)));
 
                     if (tenantSlug != null && !tenantSlug.isBlank() && !strictlyGlobal) {
                         TenantContextHolder.setCurrentTenant(tenantSlug);

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Glass Pay – mobile payment reference</title>
+<style>
+:root{--bg:#dff2ec;--ink:#0c2b27;--mut:#4d6b66;--g:rgba(255,255,255,.38);--g2:rgba(255,255,255,.62);--ln:rgba(255,255,255,.75);--acc:#17806a;--acc2:#38d1a6;--on:#fff;--b1:#5fe0bd;--b2:#79aefc;--b3:#ffd08a;--sh:rgba(15,70,58,.22);color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#07201c;--ink:#e6fbf5;--mut:#93b8af;--g:rgba(255,255,255,.08);--g2:rgba(255,255,255,.16);--ln:rgba(255,255,255,.22);--acc:#2fd0a2;--acc2:#7af0cc;--on:#04211b;--b1:#0f8f73;--b2:#2d56b8;--b3:#a2672a;--sh:rgba(0,0,0,.5);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#07201c;--ink:#e6fbf5;--mut:#93b8af;--g:rgba(255,255,255,.08);--g2:rgba(255,255,255,.16);--ln:rgba(255,255,255,.22);--acc:#2fd0a2;--acc2:#7af0cc;--on:#04211b;--b1:#0f8f73;--b2:#2d56b8;--b3:#a2672a;--sh:rgba(0,0,0,.5);color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:500 15px/1.35 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;overflow:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(50px);opacity:.85;animation:fl 14s ease-in-out infinite alternate}
+.blob:nth-child(1){width:60vmax;height:60vmax;max-width:420px;max-height:420px;background:var(--b1);top:-90px;left:-80px}
+.blob:nth-child(2){width:50vmax;height:50vmax;max-width:380px;max-height:380px;background:var(--b2);bottom:60px;right:-120px;animation-delay:-5s}
+.blob:nth-child(3){width:40vmax;height:40vmax;max-width:280px;max-height:280px;background:var(--b3);bottom:-60px;left:10%;animation-delay:-9s}
+@keyframes fl{to{transform:translate(40px,-50px) scale(1.15)}}
+.app{position:relative;width:100%;max-width:430px;height:100%;display:flex;flex-direction:column;padding:14px 14px 0}
+.glass{background:var(--g);backdrop-filter:blur(26px) saturate(180%);-webkit-backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--ln);box-shadow:0 10px 34px var(--sh),inset 0 1.5px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(255,255,255,.18),inset 0 0 22px rgba(255,255,255,.14);position:relative;overflow:hidden}
+.glass::before{content:"";position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 32%,rgba(255,255,255,0) 70%,rgba(255,255,255,.18) 100%);opacity:.55;pointer-events:none;border-radius:inherit}
+.bar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ib{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:var(--ink);cursor:pointer;font:inherit;padding:0}
+.bar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.01em}
+.bar p{margin:0;color:var(--mut);font-size:12.5px}
+.hero{border-radius:28px;padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-end}
+.hero small{color:var(--mut);display:block;margin-bottom:2px}
+.hero b{font-size:15px}
+.amt{font-size:34px;font-weight:800;letter-spacing:-.03em;text-align:right;font-variant-numeric:tabular-nums}
+.amt i{font-style:normal;font-size:14px;font-weight:600;color:var(--mut);margin-right:5px}
+.sheet{flex:1;margin-top:12px;border-radius:32px 32px 0 0;padding:20px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:0;border-bottom:0}
+.screen{display:none;flex:1;flex-direction:column;min-height:0;overflow-y:auto;scrollbar-width:none}
+.screen.on{display:flex;animation:in .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateY(14px) scale(.98)}}
+h2{font-size:14px;margin:0 0 12px 4px;color:var(--mut);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.m{border-radius:22px;padding:14px;text-align:left;cursor:pointer;font:inherit;color:var(--ink);background:var(--g);border:1px solid var(--ln);box-shadow:inset 0 1px 0 rgba(255,255,255,.7);transition:transform .2s,background .2s,box-shadow .2s}
+.m:active{transform:scale(.95)}
+.m .ic{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:var(--g2);margin-bottom:10px;color:var(--acc)}
+.m b{display:block;font-size:15px}.m span{font-size:12px;color:var(--mut)}
+svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cta{margin-top:auto;border:0;border-radius:999px;height:56px;font:700 16px inherit;font-family:inherit;color:var(--on);background:linear-gradient(135deg,var(--acc2),var(--acc));box-shadow:0 8px 24px var(--sh),inset 0 2px 0 rgba(255,255,255,.55),inset 0 -2px 6px rgba(0,0,0,.12);cursor:pointer;width:100%;transition:transform .15s,opacity .2s,filter .2s;flex-shrink:0}
+.cta:active{transform:scale(.97)}.cta:disabled{opacity:.4;filter:grayscale(.5);cursor:not-allowed}
+.ghost{background:var(--g2);color:var(--ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.7);border:1px solid var(--ln);margin-top:10px}
+.cta+.cta{margin-top:10px}
+.row{display:flex;justify-content:space-between;padding:9px 4px;font-size:14px}.row span{color:var(--mut)}.row b{font-variant-numeric:tabular-nums}
+.disp{border-radius:22px;padding:14px 18px;margin-bottom:10px}
+.disp small{color:var(--mut)}.disp .v{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.chg{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:14px}.chg b{color:var(--acc);font-size:18px}.chg.bad b{color:#d2495b}
+.chips{display:flex;gap:8px;margin-bottom:10px}
+.chip{flex:1;border-radius:999px;padding:9px 0;text-align:center;font:600 13px inherit;font-family:inherit;color:var(--ink);cursor:pointer;background:var(--g2);border:1px solid var(--ln)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.pad button{height:50px;border-radius:18px;font:600 21px inherit;font-family:inherit;color:var(--ink);background:var(--g);border:1px solid var(--ln);box-shadow:inset 0 1px 0 rgba(255,255,255,.7);cursor:pointer}
+.pad button:active{background:var(--g2);transform:scale(.94)}
+.center{align-items:center;text-align:center}
+.orb{width:168px;height:168px;border-radius:50%;margin:10px auto 18px;display:grid;place-items:center;color:var(--acc);position:relative}
+.orb svg.i{width:60px;height:60px;stroke-width:1.5}
+.orb::after,.orb::before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--acc2);animation:pl 2.4s ease-out infinite;opacity:0}
+.orb::before{animation-delay:1.2s}
+@keyframes pl{from{transform:scale(.9);opacity:.8}to{transform:scale(1.7);opacity:0}}
+.qr{width:206px;height:206px;border-radius:26px;padding:14px;margin:0 auto 12px;background:rgba(255,255,255,.92)}
+.qr svg{width:100%;height:100%;display:block}
+.note{color:var(--mut);font-size:13px;margin:0 0 14px}
+.slider{width:100%;accent-color:var(--acc);margin:6px 0 14px}
+.ref{border-radius:20px;padding:6px 14px;margin-bottom:12px}
+.spin{width:84px;height:84px;border-radius:50%;margin:24px auto 18px;border:5px solid var(--g2);border-top-color:var(--acc);animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(1turn)}}
+.ok{width:92px;height:92px;border-radius:50%;margin:8px auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc2),var(--acc));color:var(--on);box-shadow:0 10px 30px var(--sh),inset 0 2px 0 rgba(255,255,255,.6)}
+.ok svg{width:46px;height:46px;stroke-width:3;stroke-dasharray:40;stroke-dashoffset:40;animation:dr .6s .2s forwards}
+@keyframes dr{to{stroke-dashoffset:0}}
+.rc{width:100%;border-radius:22px;padding:6px 14px;margin:10px 0 14px;text-align:left}
+.rc .row{border-bottom:1px dashed var(--ln)}.rc .row:last-child{border:0}
+.ttl{font-size:22px;font-weight:800;margin:0;letter-spacing:-.02em}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.ok svg{stroke-dashoffset:0}}
+@media (max-height:700px){.pad button{height:42px}.orb{width:130px;height:130px}.qr{width:170px;height:170px}}
+</style>
+</head>
+<body>
+<div class="blob"></div><div class="blob"></div><div class="blob"></div>
+<main class="app">
+  <div class="bar">
+    <button class="ib glass" id="back" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div><h1>Checkout</h1><p>Payment for Golden · Main Branch</p></div>
+  </div>
+  <section class="hero glass"><div><small>Amount due</small><b>Golden</b></div><div class="amt"><i>AED</i>50.00</div></section>
+
+  <section class="sheet glass">
+    <div class="screen on" id="s0">
+      <h2>How would the customer like to pay?</h2>
+      <div class="grid" id="methods"></div>
+    </div>
+    <div class="screen" id="s1"></div>
+    <div class="screen center" id="s2">
+      <div class="spin"></div><p class="ttl" id="pt">Processing</p><p class="note" id="pn">Please keep this screen open</p>
+    </div>
+    <div class="screen center" id="s3">
+      <div class="ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <p class="ttl">Payment received</p><p class="note" id="sub"></p>
+      <div class="rc glass" id="rc"></div>
+      <button class="cta ghost" id="share" style="margin-top:0">Share receipt</button>
+      <button class="cta" id="again">New sale</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const TOTAL=50, $=s=>document.querySelector(s), fmt=n=>'AED '+n.toFixed(2);
+const P={
+ cash:'<path d="M3 7h18v10H3z"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/>',
+ card:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/>',
+ qr:'<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-4M14 18v2"/>',
+ wallet:'<path d="M4 7a2 2 0 012-2h11v4"/><rect x="3" y="8" width="18" height="12" rx="3"/><circle cx="16.5" cy="14" r="1"/>',
+ bank:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
+ split:'<path d="M12 4v6M12 10l-6 8M12 10l6 8"/>',
+ face:'<path d="M5 9V6a1 1 0 011-1h3M15 5h3a1 1 0 011 1v3M19 15v3a1 1 0 01-1 1h-3M9 19H6a1 1 0 01-1-1v-3M9 10v1M15 10v1M9.5 15c1.5 1.3 3.5 1.3 5 0"/>',
+ nfc:'<path d="M6 8a8 8 0 010 8M10 6a12 12 0 010 12M14 4a16 16 0 010 16"/>'
+};
+const ic=k=>`<svg class="i" viewBox="0 0 24 24">${P[k]}</svg>`;
+const M=[['cash','Cash','Count and give change'],['card','Card','Tap, insert or swipe'],['qr','QR code','Customer scans to pay'],['wallet','Wallet','Apple Pay, Google Pay'],['bank','Bank transfer','Instant transfer'],['split','Split','Cash plus card']];
+$('#methods').innerHTML=M.map(m=>`<button class="m" data-k="${m[0]}"><div class="ic">${ic(m[0])}</div><b>${m[1]}</b><span>${m[2]}</span></button>`).join('');
+
+let cur=0, st={};
+function show(n){document.querySelectorAll('.screen').forEach((e,i)=>e.classList.toggle('on',i===n));cur=n}
+$('#back').onclick=()=>{if(cur===1)show(0)};
+$('#methods').onclick=e=>{const b=e.target.closest('.m');if(b)open(b.dataset.k)};
+
+function cta(id,t,dis){return `<button class="cta" id="${id}" ${dis?'disabled':''}>${t}</button>`}
+function open(k){
+  st={k};const s=$('#s1');show(1);
+  if(k==='cash'){
+    st.t='';
+    s.innerHTML=`<h2>Cash received</h2><div class="glass disp"><small>Customer gives</small><div class="v" id="tv">AED 0.00</div><div class="chg" id="cg"><span>Change due</span><b>AED 0.00</b></div></div>
+    <div class="chips"><button class="chip" data-v="50">Exact</button><button class="chip" data-v="100">100</button><button class="chip" data-v="200">200</button><button class="chip" data-v="500">500</button></div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9,'.',0,'⌫'].map(x=>`<button data-n="${x}">${x}</button>`).join('')}</div>${cta('go','Confirm cash payment',1)}`;
+    s.onclick=e=>{const n=e.target.closest('[data-n]'),c=e.target.closest('.chip');
+      if(c)st.t=c.dataset.v;
+      if(n){const x=n.dataset.n;if(x==='⌫')st.t=st.t.slice(0,-1);else if(x!=='.'||!st.t.includes('.'))if(!/\.\d\d$/.test(st.t)&&st.t.length<7)st.t+=x}
+      const v=parseFloat(st.t)||0,ch=v-TOTAL;$('#tv').textContent=fmt(v);
+      $('#cg').className='chg'+(ch<0?' bad':'');$('#cg').innerHTML=ch<0?`<span>Still to collect</span><b>${fmt(-ch)}</b>`:`<span>Change due</span><b>${fmt(ch)}</b>`;
+      $('#go').disabled=ch<0;st.v=v;st.ch=ch;
+      if(e.target.id==='go')pay(['Recording cash','Opening till'],{Method:'Cash',Received:fmt(v),Change:fmt(ch)})};
+  }
+  if(k==='card'||k==='wallet'){
+    const w=k==='wallet';
+    s.innerHTML=`<div class="center" style="display:flex;flex-direction:column;flex:1"><div class="orb glass">${ic(w?'face':'nfc')}</div><p class="ttl">${w?'Confirm on your phone':'Hold card near the reader'}</p><p class="note">${w?'Use Face ID or fingerprint to approve AED 50.00':'Tap, insert or swipe. Waiting for the terminal…'}</p>
+    ${cta('go',w?'Simulate approval':'Simulate card tap')}</div>`;
+    $('#go').onclick=()=>pay(w?['Verifying identity','Approving payment']:['Reading card','Contacting bank','Authorising'],{Method:w?'Wallet':'Card','Card':'•••• 4242',Auth:'A'+rnd(6)});
+  }
+  if(k==='qr'){
+    st.sec=300;
+    s.innerHTML=`<div class="center" style="display:flex;flex-direction:column;flex:1"><div class="qr">${qr()}</div><p class="ttl">Scan to pay AED 50.00</p><p class="note">Works with any UPI or bank app · expires in <b id="cd">5:00</b></p>${cta('go','Simulate scan')}</div>`;
+    clearInterval(st.iv);st.iv=setInterval(()=>{if(cur!==1){clearInterval(st.iv);return}st.sec--;const c=$('#cd');if(c)c.textContent=Math.floor(st.sec/60)+':'+String(st.sec%60).padStart(2,'0');if(st.sec<=0){clearInterval(st.iv);show(0)}},1000);
+    $('#go').onclick=()=>pay(['Scan detected','Confirming with bank'],{Method:'QR code',Ref:'QR'+rnd(8)});
+  }
+  if(k==='bank'){
+    const r='GLD'+rnd(6);
+    s.innerHTML=`<h2>Ask the customer to transfer</h2><div class="ref glass"><div class="row"><span>Account</span><b>Golden Trading LLC</b></div><div class="row"><span>IBAN</span><b>AE07 0331 2345 6789</b></div><div class="row"><span>Reference</span><b>${r}</b></div><div class="row"><span>Amount</span><b>AED 50.00</b></div></div><p class="note">Confirm only after the bank notification arrives.</p>${cta('go','Funds received')}`;
+    $('#go').onclick=()=>pay(['Matching reference','Reconciling'],{Method:'Bank transfer',Ref:r});
+  }
+  if(k==='split'){
+    st.c=20;
+    s.innerHTML=`<h2>Split the payment</h2><div class="glass disp"><div class="chg" style="margin:0"><span>Cash</span><b id="sc">AED 20.00</b></div><input class="slider" id="sl" type="range" min="0" max="${TOTAL}" step="5" value="20" aria-label="Cash portion"><div class="chg" style="margin:0"><span>Card</span><b id="sk">AED 30.00</b></div></div><p class="note">Collect the cash first, then the card part is charged.</p>${cta('go','Collect payment')}`;
+    $('#sl').oninput=e=>{st.c=+e.target.value;$('#sc').textContent=fmt(st.c);$('#sk').textContent=fmt(TOTAL-st.c)};
+    $('#go').onclick=()=>pay(['Recording cash','Charging card','Authorising'],{Method:'Cash + Card',Cash:fmt(st.c),Card:fmt(TOTAL-st.c)});
+  }
+}
+function rnd(n){return Math.random().toString(36).slice(2,2+n).toUpperCase()}
+function qr(){const N=25,c=[];let sd=50;const r=()=>(sd=(sd*9301+49297)%233280)/233280;
+  const fd=(x,y)=>[[0,0],[N-7,0],[0,N-7]].some(([a,b])=>x>=a&&x<a+7&&y>=b&&y<b+7);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){let on;
+    if(fd(x,y)){const o=[[0,0],[N-7,0],[0,N-7]].find(([a,b])=>x>=a&&x<a+7&&y>=b&&y<b+7),dx=x-o[0],dy=y-o[1];on=dx===0||dy===0||dx===6||dy===6||(dx>1&&dx<5&&dy>1&&dy<5)}
+    else on=r()>.52;
+    if(on)c.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`)}
+  return `<svg viewBox="0 0 ${N} ${N}" fill="#0c2b27" shape-rendering="crispEdges">${c.join('')}</svg>`}
+
+function pay(steps,info){
+  clearInterval(st.iv);show(2);let i=0;
+  const tick=()=>{if(i<steps.length){$('#pt').textContent=steps[i++]+'…';setTimeout(tick,750)}else done(info)};tick();
+}
+function done(info){
+  const id='TXN-'+rnd(8),t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  $('#sub').textContent=info.Method+' · '+t;
+  const rows={Amount:fmt(TOTAL),...info,Transaction:id};delete rows.Method;
+  $('#rc').innerHTML=Object.entries(rows).map(([a,b])=>`<div class="row"><span>${a}</span><b>${b}</b></div>`).join('');
+  show(3);
+}
+$('#again').onclick=()=>show(0);
+$('#share').onclick=async()=>{const t='Receipt: '+$('#sub').textContent+' · '+fmt(TOTAL);try{await navigator.share({text:t})}catch(e){}};
+</script>
+</body>
+</html>

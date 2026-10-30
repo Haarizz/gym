@@ -34,6 +34,13 @@ public class MemberAddonResponseDTO {
     // Only set on the create response: the customer-facing receipt the purchase
     // just generated, so the success dialog can print it without a second call.
     private ReceiptResponseDTO receipt;
+    private BigDecimal walletAmount;
+    private BigDecimal refundedAmount;
+    // Only on the pending-approvals list, from the purchase's receipt: what was
+    // received so far (wallet included) and the promo code taken off the price.
+    private BigDecimal paidAmount;
+    private BigDecimal discountAmount;
+    private String discountLabel;
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -57,6 +64,8 @@ public class MemberAddonResponseDTO {
         dto.paymentBreakdown = a.getPaymentBreakdown();
         dto.createdAt       = a.getCreatedAt() != null ? a.getCreatedAt().format(ISO) + "Z" : null;
         dto.updatedAt       = a.getUpdatedAt() != null ? a.getUpdatedAt().format(ISO) + "Z" : null;
+        dto.walletAmount    = a.getWalletAmount();
+        dto.refundedAmount  = a.getRefundedAmount();
         return dto;
     }
 
@@ -83,5 +92,17 @@ public class MemberAddonResponseDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public ReceiptResponseDTO getReceipt() { return receipt; }
 
+    public BigDecimal getWalletAmount() { return walletAmount; }
+    public BigDecimal getRefundedAmount() { return refundedAmount; }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public String getDiscountLabel() { return discountLabel; }
+
     public void setReceipt(ReceiptResponseDTO receipt) { this.receipt = receipt; }
+    public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public void setDiscountLabel(String discountLabel) { this.discountLabel = discountLabel; }
 }

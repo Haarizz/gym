@@ -11,6 +11,7 @@ import com.company.project.enums.PassContext;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.ReceiptRepository;
+import com.company.project.services.mobile.push.BookingPaymentNotifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -65,6 +66,7 @@ public class BookingPaymentService {
     private final MemberRepository memberRepository;
     private final FinancialEventService financialEventService;
     private final NotificationService notificationService;
+    private final BookingPaymentNotifier bookingPaymentNotifier;
 
     public BookingPaymentService(RewardRedemptionService rewardRedemptionService,
                                  DiscountCodeService discountCodeService,
@@ -73,7 +75,8 @@ public class BookingPaymentService {
                                  ReceiptRepository receiptRepository,
                                  MemberRepository memberRepository,
                                  FinancialEventService financialEventService,
-                                 NotificationService notificationService) {
+                                 NotificationService notificationService,
+                                 BookingPaymentNotifier bookingPaymentNotifier) {
         this.rewardRedemptionService = rewardRedemptionService;
         this.discountCodeService = discountCodeService;
         this.walletService = walletService;
@@ -82,6 +85,7 @@ public class BookingPaymentService {
         this.memberRepository = memberRepository;
         this.financialEventService = financialEventService;
         this.notificationService = notificationService;
+        this.bookingPaymentNotifier = bookingPaymentNotifier;
     }
 
     // ── Refund window ─────────────────────────────────────────────────────────
@@ -256,9 +260,7 @@ public class BookingPaymentService {
             booking.setPaymentStatus(isFullyPaid(receipt) ? "paid" : "partial");
         }
         booking.setStatus("confirmed");
-        notifyMember(booking, "Booking Confirmed",
-                "Your payment for " + sessionName(booking) + " was approved. Your seat is confirmed.",
-                "SUCCESS", "BOOKING_PAYMENT_APPROVED_" + booking.getId());
+        bookingPaymentNotifier.notifyApproved(booking);
     }
 
     /** Staff rejected a Cash/Credit/Mixed booking payment: the seat is released and nothing is charged. */
@@ -268,10 +270,8 @@ public class BookingPaymentService {
         voidPendingPayment(booking, rejectedBy, reason);
         booking.setStatus("cancelled");
         booking.setCancelledBy(CANCELLED_BY_STAFF);
-        notifyMember(booking, "Booking Payment Rejected",
-                "Your payment for " + sessionName(booking) + " was not approved"
-                        + (StringUtils.hasText(reason) ? ": " + reason : "") + ". The booking has been cancelled.",
-                "WARNING", "BOOKING_PAYMENT_REJECTED_" + booking.getId());
+        booking.setPaymentRejectionReason(StringUtils.hasText(reason) ? reason.trim() : null);
+        bookingPaymentNotifier.notifyRejected(booking, reason);
     }
 
     // ── Cancellation & refunds ────────────────────────────────────────────────
@@ -391,18 +391,6 @@ public class BookingPaymentService {
 
     private static boolean isFullyPaid(Receipt receipt) {
         return money(receipt.getPaidAmount()).compareTo(money(receipt.getAmount())) >= 0;
-    }
-
-    private void notifyMember(Booking booking, String title, String message, String type, String eventKey) {
-        Member member = booking.getMember();
-        if (member == null) return;
-        Long targetId = member.getUserId() != null ? member.getUserId() : member.getGlobalUserId();
-        try {
-            notificationService.notifyUser(targetId, title, message, type, "MEDIUM", "BOOKINGS",
-                    booking.getId(), "/book-session", eventKey);
-        } catch (Exception ignored) {
-            // A failed notification must not undo the approval itself.
-        }
     }
 
     private static String describe(TrainingSession session) {

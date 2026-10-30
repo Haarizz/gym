@@ -9,6 +9,8 @@ import {
 export interface MemberBookingsRepository {
   getUpcomingBookings(): Promise<MemberBookingData[]>;
   getPastBookings(): Promise<MemberBookingData[]>;
+  /** Upcoming sessions whose payment staff rejected, with the reason. */
+  getRejectedBookings(): Promise<MemberBookingData[]>;
   getStats(): Promise<BookingStatsData>;
   cancelBooking(bookingId: number, refundMethod?: RefundMethod): Promise<MemberBookingData>;
   getAvailableClasses(date: string): Promise<AvailableClassData[]>;

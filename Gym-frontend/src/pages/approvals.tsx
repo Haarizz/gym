@@ -4,10 +4,12 @@
 // credit terms are acceptable) before the member gets app access. See
 // MobileDiscoveryController.purchaseMembership on the backend for how a member
 // lands in this state. Class/PT bookings paid the same way in the app wait here
-// too (BookingPaymentService) — the seat is held until reception decides.
+// too (BookingPaymentService) — the seat is held until reception decides — and so do
+// add-ons bought in the app (AddonPaymentService), which stay inactive until then.
 import React, { useCallback, useEffect, useState } from 'react';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { bookingService, type BookingApi } from '../utils/supabase/booking-service';
+import { addonsService, type MemberAddon } from '../utils/supabase/addons-service';
 import { useCurrency } from '../utils/currency';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -40,6 +42,7 @@ import {
   Clock,
   Wallet,
   CalendarCheck,
+  PackagePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,7 +52,8 @@ type ActionType = 'approve' | 'reject';
 
 type ActionTarget =
   | { kind: 'member'; type: ActionType; member: Member }
-  | { kind: 'booking'; type: ActionType; booking: BookingApi };
+  | { kind: 'booking'; type: ActionType; booking: BookingApi }
+  | { kind: 'addon'; type: ActionType; addon: MemberAddon };
 
 function formatDateTime(value?: string | null): string {
   if (!value) return '—';
@@ -70,6 +74,9 @@ export function Approvals() {
 
   const [bookingApprovals, setBookingApprovals] = useState<BookingApi[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+
+  const [addonApprovals, setAddonApprovals] = useState<MemberAddon[]>([]);
+  const [loadingAddons, setLoadingAddons] = useState(false);
 
   const [actionDialog, setActionDialog] = useState<ActionTarget | null>(null);
   const [reason, setReason] = useState('');
@@ -100,6 +107,17 @@ export function Approvals() {
     }
   }, []);
 
+  const loadAddons = useCallback(async () => {
+    setLoadingAddons(true);
+    try {
+      setAddonApprovals(await addonsService.getPendingPaymentApprovals());
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load add-on payments');
+    } finally {
+      setLoadingAddons(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
@@ -108,9 +126,14 @@ export function Approvals() {
     loadBookings();
   }, [loadBookings]);
 
+  useEffect(() => {
+    loadAddons();
+  }, [loadAddons]);
+
   const refreshAll = () => {
     loadMembers();
     loadBookings();
+    loadAddons();
   };
 
   const openAction = (type: ActionType, member: Member) => {
@@ -120,6 +143,11 @@ export function Approvals() {
 
   const openBookingAction = (type: ActionType, booking: BookingApi) => {
     setActionDialog({ kind: 'booking', type, booking });
+    setReason('');
+  };
+
+  const openAddonAction = (type: ActionType, addon: MemberAddon) => {
+    setActionDialog({ kind: 'addon', type, addon });
     setReason('');
   };
 
@@ -143,6 +171,17 @@ export function Approvals() {
         }
         setActionDialog(null);
         await loadMembers();
+      } else if (actionDialog.kind === 'addon') {
+        const { addon } = actionDialog;
+        if (type === 'approve') {
+          await addonsService.approvePayment(addon.id);
+          toast.success(`${addon.member_name}'s ${addon.addon_name} is now active`);
+        } else {
+          await addonsService.rejectPayment(addon.id, reason.trim());
+          toast.success(`${addon.member_name}'s add-on payment rejected`);
+        }
+        setActionDialog(null);
+        await loadAddons();
       } else {
         const { booking } = actionDialog;
         if (type === 'approve') {
@@ -164,14 +203,14 @@ export function Approvals() {
     }
   };
 
-  const dialogName = actionDialog
-    ? actionDialog.kind === 'member' ? actionDialog.member.name : actionDialog.booking.memberName
-    : '';
-  const dialogMethod = actionDialog
-    ? (actionDialog.kind === 'member'
-        ? actionDialog.member.payment_method_used
-        : actionDialog.booking.paymentMethod)?.toLowerCase() || 'payment'
-    : 'payment';
+  const dialogName = !actionDialog ? ''
+    : actionDialog.kind === 'member' ? actionDialog.member.name
+    : actionDialog.kind === 'addon' ? actionDialog.addon.member_name
+    : actionDialog.booking.memberName;
+  const dialogMethod = (!actionDialog ? undefined
+    : actionDialog.kind === 'member' ? actionDialog.member.payment_method_used
+    : actionDialog.kind === 'addon' ? actionDialog.addon.payment_mode
+    : actionDialog.booking.paymentMethod)?.toLowerCase() || 'payment';
 
   const cardShell = 'border-primary/10 shadow-md hover:shadow-lg transition-shadow';
 
@@ -182,7 +221,7 @@ export function Approvals() {
         <div>
           <h1 className="text-3xl font-bold">Approvals</h1>
           <p className="text-muted-foreground mt-2">
-            Review mobile purchases and session bookings paid by Cash, Credit, or Mixed payment
+            Review mobile purchases, session bookings, and add-ons paid by Cash, Credit, or Mixed payment
           </p>
         </div>
         <Button variant="outline" onClick={refreshAll}>
@@ -215,6 +254,18 @@ export function Approvals() {
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{bookingApprovals.length}</div>
             <p className="text-xs text-muted-foreground">Seats held until the payment is confirmed</p>
+          </CardContent>
+        </Card>
+        <Card className={cardShell}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-primary">Add-on Payments</CardTitle>
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <PackagePlus className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{addonApprovals.length}</div>
+            <p className="text-xs text-muted-foreground">Add-ons inactive until the payment is confirmed</p>
           </CardContent>
         </Card>
       </div>
@@ -417,6 +468,96 @@ export function Approvals() {
         </CardContent>
       </Card>
 
+      {/* Add-on payments */}
+      <h2 className="text-lg font-semibold pt-2">Add-on Payments</h2>
+      <Card className={cardShell}>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Member</TableHead>
+                <TableHead>Add-on</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead>Purchased</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingAddons && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Loading add-on payments...
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loadingAddons && addonApprovals.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <PackagePlus className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    No add-on payments are waiting on approval.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loadingAddons && addonApprovals.map((addon) => {
+                const amount = Number(addon.amount ?? 0);
+                const received = Number(addon.paid_amount ?? 0);
+                return (
+                  <TableRow key={addon.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell>
+                      <div className="font-medium">{addon.member_name || '—'}</div>
+                      <div className="text-xs text-muted-foreground">{addon.member_id}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{addon.addon_name || '—'}</div>
+                      <div className="text-xs text-muted-foreground">{addon.transaction_id}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 gap-1">
+                        <Wallet className="h-3 w-3" />
+                        {addon.payment_mode || '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(amount)}
+                      {addon.discount_label && (
+                        <div className="text-xs text-muted-foreground">{addon.discount_label}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className={received < amount ? 'text-red-600 font-medium' : ''}>
+                      {formatCurrency(received)}
+                      {addon.wallet_amount ? (
+                        <div className="text-xs text-muted-foreground">incl. {formatCurrency(Number(addon.wallet_amount))} wallet</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{formatDateTime(addon.purchase_date)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-700 border-green-200 hover:bg-green-50"
+                        onClick={() => openAddonAction('approve', addon)}
+                      >
+                        <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-700 border-red-200 hover:bg-red-50"
+                        onClick={() => openAddonAction('reject', addon)}
+                      >
+                        <XCircle className="mr-1.5 h-4 w-4" /> Reject
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Approve / Reject confirmation dialog */}
       <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) setActionDialog(null); }}>
         <DialogContent className="max-w-md">
@@ -429,6 +570,10 @@ export function Approvals() {
                     ? (actionDialog.type === 'approve'
                         ? <>Confirm that <strong>{dialogName}</strong>'s {dialogMethod} was received. This unlocks their app access.</>
                         : <>Reject <strong>{dialogName}</strong>'s payment. Their membership will be marked inactive and app access stays locked.</>)
+                    : actionDialog.kind === 'addon'
+                    ? (actionDialog.type === 'approve'
+                        ? <>Confirm that <strong>{dialogName}</strong>'s {dialogMethod} for <strong>{actionDialog.addon.addon_name}</strong> was received. The add-on becomes active from today.</>
+                        : <>Reject <strong>{dialogName}</strong>'s payment for <strong>{actionDialog.addon.addon_name}</strong>. The add-on won't start, and any wallet amount is returned.</>)
                     : (actionDialog.type === 'approve'
                         ? <>Confirm that <strong>{dialogName}</strong>'s {dialogMethod} for <strong>{actionDialog.booking.sessionName}</strong> was received. Their seat is confirmed.</>
                         : <>Reject <strong>{dialogName}</strong>'s payment for <strong>{actionDialog.booking.sessionName}</strong>. The booking is cancelled, the seat released, and any wallet amount or Reward Pass returned.</>)}

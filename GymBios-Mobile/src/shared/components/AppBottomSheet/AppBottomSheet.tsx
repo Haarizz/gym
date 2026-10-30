@@ -81,7 +81,7 @@ export function AppBottomSheet({
 
             <ScrollView
               style={styles.body}
-              contentContainerStyle={styles.contentContainer}
+              contentContainerStyle={[styles.contentContainer, !!footer && styles.contentContainerWithFooter]}
               showsVerticalScrollIndicator={false}
             >
               {children}

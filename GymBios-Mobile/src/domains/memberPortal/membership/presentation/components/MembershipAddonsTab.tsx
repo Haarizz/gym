@@ -9,7 +9,7 @@ import { BrandColors, Glass, heroTint, Radius, Spacing, TypographyScale } from '
 import { GlassSurface, Pagination } from '@/shared/components';
 import { PaymentBottomSheet } from '@/shared/payment';
 import type { PaymentResult } from '@/shared/payment/types';
-import { AddOn, AddOnCatalogResponse } from '../../domain/models';
+import { ADDON_PENDING_APPROVAL, AddOn, AddOnCatalogResponse, AddOnCheckout } from '../../domain/models';
 import { AddOnDetailsBottomSheet } from './AddOnDetailsBottomSheet';
 import { usePurchaseAddOn } from '../../hooks/usePurchaseAddOn';
 
@@ -24,34 +24,44 @@ export interface MembershipAddonsTabProps {
 export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }: MembershipAddonsTabProps) {
   const { t } = useTranslation();
   const [selectedAddOn, setSelectedAddOn] = useState<AddOn | null>(null);
-  const [paymentAddOn, setPaymentAddOn] = useState<AddOn | null>(null);
-  
+  // Set once the member has reviewed the price (code, wallet) and goes on to pay.
+  const [checkout, setCheckout] = useState<AddOnCheckout | null>(null);
+
   const purchaseMutation = usePurchaseAddOn();
 
-  const handleBuyNow = (addon: AddOn) => {
-    // Close the details sheet.
-    setSelectedAddOn(null);
-    // Open the payment sheet.
-    setPaymentAddOn(addon);
-  };
-
-  const handlePaymentComplete = (result: PaymentResult) => {
-    if (!paymentAddOn) return;
-
+  const purchase = (order: AddOnCheckout, paymentResult?: PaymentResult) => {
     purchaseMutation.mutate(
-      { addonId: paymentAddOn.id, paymentResult: result },
+      { checkout: order, paymentResult },
       {
-        onSuccess: () => {
-          toast.success(t('membership.addons.purchased', { name: paymentAddOn.name }));
-          setPaymentAddOn(null);
+        onSuccess: (addOn) => {
+          if (addOn.status === ADDON_PENDING_APPROVAL) {
+            toast.success(
+              t('membership.addons.awaitingApprovalMessage', {
+                name: order.addOn.name,
+                method: paymentResult?.paymentMethodUsed ?? '',
+              }),
+              { title: t('membership.addons.awaitingApprovalTitle'), duration: 5000 },
+            );
+          } else {
+            toast.success(t('membership.addons.purchased', { name: order.addOn.name }));
+          }
+          setCheckout(null);
+          setSelectedAddOn(null);
         },
         onError: (err: any) => {
           toast.error(err?.message || t('membership.addons.purchaseFailed'), {
             title: t('membership.addons.purchaseFailedTitle'),
           });
+          // Back to the review step, e.g. to drop a code that no longer applies.
+          setCheckout(null);
         },
       }
     );
+  };
+
+  const handleContinue = (order: AddOnCheckout) => {
+    if (order.toPay > 0) setCheckout(order);
+    else purchase(order);
   };
 
   if (isLoading) {
@@ -126,7 +136,11 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
             <View key={activeAddOn.id} style={styles.activeItem}>
               <View style={styles.activeRow}>
                 <Text style={styles.activeName}>{activeAddOn.addonName}</Text>
-                <Text style={styles.activePrice}>{activeAddOn.status}</Text>
+                <Text style={styles.activePrice}>
+                  {activeAddOn.status === ADDON_PENDING_APPROVAL
+                    ? t('membership.addons.pendingApproval')
+                    : activeAddOn.status}
+                </Text>
               </View>
             </View>
           ))
@@ -137,21 +151,24 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
       </View>
 
       <AddOnDetailsBottomSheet
-        visible={!!selectedAddOn}
+        key={selectedAddOn?.id ?? 'none'}
+        visible={!!selectedAddOn && !checkout}
         addOn={selectedAddOn}
+        isProcessing={purchaseMutation.isPending}
         onClose={() => setSelectedAddOn(null)}
-        onBuyNow={handleBuyNow}
+        onContinue={handleContinue}
       />
 
-      {paymentAddOn && (
+      {checkout && (
         <PaymentBottomSheet
-          visible={!!paymentAddOn}
-          amount={paymentAddOn.price}
-          title={paymentAddOn.name}
-          subtitle={t('membership.addons.purchasingSubtitle', { unit: paymentAddOn.pricingUnit })}
+          visible
+          amount={checkout.toPay}
+          title={checkout.addOn.name}
+          subtitle={t('membership.addons.purchasingSubtitle', { unit: checkout.addOn.pricingUnit })}
           allowDiscount={false}
-          onClose={() => setPaymentAddOn(null)}
-          onComplete={handlePaymentComplete}
+          isProcessing={purchaseMutation.isPending}
+          onClose={() => setCheckout(null)}
+          onComplete={(result) => purchase(checkout, result)}
         />
       )}
     </View>

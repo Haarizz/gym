@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: 'تم الاسترداد إلى المحفظة',
       NOT_REFUNDABLE: 'لم يتم الاسترداد',
       VOIDED: 'لم يتم خصم أي مبلغ',
+      rejected: 'تم رفض الدفع: {{reason}}',
+    },
+
+    rejected: {
+      title: 'تم رفض الدفع',
+      subtitle: 'لم يوافق النادي على الدفع لهذه الحجوزات، لذلك تم إلغاؤها.',
+      reasonLabel: 'السبب',
+      notCharged: 'لم يتم خصم أي مبلغ.',
+      bookAgain: 'احجز مرة أخرى',
     },
 
     cancelledToastTitle: 'تم إلغاء الحجز',

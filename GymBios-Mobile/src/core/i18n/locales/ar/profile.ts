@@ -137,7 +137,7 @@ const profile = {
     title: 'المحفظة',
     subtitle: 'المبالغ المستردة ورصيد المكافآت',
     availableBalance: 'الرصيد المتاح',
-    balanceHint: 'استخدمه عند حجز جلسة. تُسترد الحجوزات الملغاة هنا.',
+    balanceHint: 'استخدمه للجلسات والإضافات. تُسترد الحجوزات والإضافات الملغاة هنا.',
     history: 'السجل',
     emptyTitle: 'لا يوجد نشاط في المحفظة',
     emptyDescription: 'ستظهر المبالغ المستردة وأرصدة المكافآت هنا.',
@@ -148,6 +148,8 @@ const profile = {
       BOOKING: 'حجز جلسة',
       REFERRAL_REWARD: 'مكافأة إحالة',
       BILLING_USE: 'شراء',
+      ADDON: 'شراء إضافة',
+      ADDON_REFUND: 'استرداد إضافة',
     },
   },
 

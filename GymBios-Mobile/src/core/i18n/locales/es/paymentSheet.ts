@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: 'Pago',
-    processingFor: 'Procesando el pago de {{title}}',
-    completePayment: 'Completar pago (<amount/>)',
-    totalAmount: 'Importe total',
-    selectMethod: 'Elige el método de pago',
+    title: "Pago",
+    processingFor: "Pago de {{title}}",
+    amountDue: "Importe a pagar",
+    howToPay: "¿Cómo quieres pagar?",
+    howToPayStaff: "¿Cómo paga el socio?",
+    allMethods: "Todos los métodos de pago",
 
     methods: {
-      cash: { title: 'Efectivo', subtitle: 'Pago en efectivo' },
-      card: { title: 'Tarjeta', subtitle: 'Tarjeta de débito o crédito' },
-      credit: { title: 'Crédito', subtitle: 'Cargar a la cuenta del socio' },
-      mixed: { title: 'Pago mixto', subtitle: 'Repartir entre varios métodos' },
-      cheque: { title: 'Cheque', subtitle: 'Pago con cheque' },
-      bank_transfer: { title: 'Transferencia bancaria', subtitle: 'Transferencia directa' },
-      online: { title: 'Pago online', subtitle: 'UPI, monedero, Stripe' },
+      card: { title: "Tarjeta", subtitle: "Tarjeta, Apple Pay, Google Pay" },
+      upi: { title: "UPI", subtitle: "Cualquier app UPI" },
+      netbanking: { title: "Banca online", subtitle: "Paga desde tu banco" },
+      cash: { title: "Efectivo", subtitleMember: "Paga en recepción", subtitleStaff: "Cobrar en persona" },
+      credit: { title: "Pagar después", subtitle: "Parte ahora, el resto a cuenta" },
+      mixed: { title: "Efectivo + online", subtitle: "Divide el pago" },
     },
-    other: 'Otro',
+
+    unavailable: {
+      online: "Aún no disponible",
+      inrOnly: "Solo para pagos en INR",
+      nothingToPay: "Nada que pagar online",
+    },
+
+    online: {
+      title: {
+        card: "Pagar con tarjeta",
+        upi: "Pagar con UPI",
+        netbanking: "Pagar con banca online",
+      },
+      note: {
+        card: "Paga <amount/> con tarjeta, Apple Pay o Google Pay en el pago seguro.",
+        upi: "Aprueba <amount/> en tu app UPI y vuelve aquí.",
+        netbanking: "Elige tu banco, aprueba <amount/> y vuelve aquí.",
+      },
+      secure: "Los pagos los procesa Stripe de forma segura. Los datos de la tarjeta nunca llegan al gimnasio.",
+    },
+
+    cash: {
+      memberTitle: "Paga en recepción",
+      memberNote: "Enviaremos una solicitud de pago a recepción. Paga <amount/> en efectivo en recepción; se confirma cuando el personal lo recibe.",
+      sendRequest: "Enviar solicitud",
+      staffTitle: "Cobrar en efectivo",
+      staffNote: "Cobra <amount/> en efectivo al socio y confirma.",
+      received: "Efectivo recibido",
+    },
+
+    credit: {
+      memberNote: "Paga una parte ahora si quieres; el resto se carga a tu cuenta cuando recepción lo apruebe.",
+      staffNote: "Cobra una parte ahora si el socio quiere; el resto se suma a su saldo pendiente.",
+      payNow: "Pagar ahora",
+      nothingNow: "Nada",
+      onAccount: "A cuenta",
+      payNowWith: "Pagar ahora con",
+      dueDate: "Fecha de vencimiento (opcional)",
+      selectDueDate: "Elige la fecha de vencimiento",
+      request: "Solicitar crédito",
+      addToAccount: "Añadir a la cuenta",
+    },
+
+    mixed: {
+      memberNote: "Paga la parte en efectivo en recepción; el resto se cobra online ahora.",
+      staffNote: "Cobra primero la parte en efectivo; el resto se cobra online.",
+      cashPart: "Parte en efectivo",
+      cash: "Efectivo",
+      payOnlineWith: "Paga el resto con",
+    },
+
+    split: {
+      exactAmount: "Importe exacto (<currency/>)",
+      ofTotal: "de <amount/>",
+    },
+
+    cta: {
+      pay: "Pagar <amount/>",
+      payNow: "Pagar <amount/> ahora",
+      payOnline: "Pagar <amount/> online",
+    },
+
+    simulated: {
+      badge: "MODO DE PRUEBA",
+      title: "Pago de prueba",
+      note: "Simulación: no se mueve dinero. Aprueba para continuar como si se hubieran pagado <amount/> con {{method}}.",
+      approve: "Aprobar pago de prueba",
+      decline: "Rechazar",
+    },
+
+    processing: {
+      opening: "Abriendo el pago seguro…",
+      finishing: "Terminando…",
+      keepOpen: "Mantén esta pantalla abierta",
+    },
 
     discount: {
       title: 'Elige un descuento (opcional)',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'Importe (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'Elige un tipo de tarjeta',
-      chequeNumberRequired: 'El número de cheque es obligatorio',
-      transactionReferenceRequired: 'La referencia de la transacción es obligatoria',
-      selectPaymentType: 'Elige un tipo de pago',
-      providerNameRequired: 'El nombre del proveedor es obligatorio',
-      selectReceivedVia: 'Indica por qué método se recibió el pago',
-      cardTypeRequired: 'El tipo de tarjeta es obligatorio',
-      referenceRequired: 'La referencia es obligatoria',
-      paymentTypeRequired: 'El tipo de pago es obligatorio',
-      splitMismatch: 'La suma de los importes divididos debe coincidir con el importe final',
-      dueDateRequired: 'La fecha de vencimiento es obligatoria para pagos parciales',
+    form: {
+      example: 'p. ej. {{value}}',
     },
 
-    form: {
-      cashDetails: 'Detalles del pago en efectivo',
-      cardDetails: 'Detalles del pago con tarjeta',
-      chequeDetails: 'Detalles del pago con cheque',
-      bankDetails: 'Detalles de la transferencia',
-      onlineDetails: 'Detalles del pago online',
-      creditDetails: 'Detalles del pago a crédito',
-      mixedDetails: 'Detalles del pago mixto / dividido',
-      mixedSubtitle: 'Reparte el total entre varios métodos',
-
-      paidAmount: 'Importe pagado (<currency/>) *',
-      amount: 'Importe (<currency/>) *',
-      receivedAmount: 'Importe recibido (<currency/>)',
-      payBackAmount: 'Cambio (<currency/>)',
-      amountToReturn: 'Importe a devolver',
-      dueDate: 'Fecha de vencimiento *',
-      dueDateOptional: 'Fecha de vencimiento (opcional)',
-      selectDueDate: 'Elige la fecha de vencimiento',
-      selectDate: 'Elige la fecha',
-
-      finalAmount: 'Importe final:',
-      paidAmountLabel: 'Importe pagado:',
-      receivedAmountLabel: 'Importe recibido:',
-      remainingDue: 'Pendiente:',
-      payBack: 'Cambio:',
-      remainingOrDue: 'Restante/Pendiente:',
-      remainingOnCredit: 'Restante (a crédito):',
-
-      cashReturnRequired: 'Hay que dar cambio:',
-      returnToCustomer: 'Devuelve <amount/> al cliente',
-      partialPayment: 'Pago parcial:',
-      addedToOutstanding: '<amount/> se añadirá al saldo pendiente.',
-      addedToMemberOutstanding: '<amount/> se añadirá al saldo pendiente del socio.',
-      fullCredit: 'Todo a crédito:',
-      entireOnCredit: 'El socio tendrá los <amount/> completos a crédito.',
-      partialReceived: 'Recibido parcialmente:',
-      receivedViaNote: '<received/> recibido por {{method}}. El resto, <remaining/>, queda a crédito.',
-      otherMethod: 'otro método',
-
-      cardType: 'Tipo de tarjeta *',
-      referenceNumberOptional: 'Referencia / Número de transacción (opcional)',
-      referenceOptional: 'Referencia (opcional)',
-      referenceIdRequired: 'Referencia / ID de transacción *',
-      transactionReferenceIdRequired: 'ID de transacción / referencia *',
-      transactionReferenceRequired: 'Referencia de transacción *',
-      chequeNumber: 'Número de cheque *',
-      bankNameOptional: 'Nombre del banco (opcional)',
-      chequeDateOptional: 'Fecha del cheque (opcional)',
-      bankAccountLedgerOptional: 'Cuenta bancaria (libro mayor, opcional)',
-      bankAccountLedger: 'Cuenta bancaria (libro mayor)',
-      ledgerHint: 'Cuentas del plan contable. El importe se abonará en la cuenta seleccionada.',
-      onlinePaymentType: 'Tipo de pago online *',
-      paymentType: 'Tipo de pago *',
-      paymentProviderName: 'Nombre del proveedor de pago *',
-      providerName: 'Nombre del proveedor *',
-      receivedVia: 'Recibido por *',
-      receivedPlaceholder: '0.00 (déjalo vacío para crédito total)',
-      transactionIdPlaceholder: 'ID de transacción',
-      chequeNumberPlaceholder: 'Número de cheque',
-      referenceIdPlaceholder: 'ID de referencia',
-      providerNamePlaceholder: 'Nombre del proveedor',
-      example: 'p. ej. {{value}}',
-
-      method: 'Método *',
-      leg: 'Parte n.º {{n}}',
-      addLeg: '+ Añadir parte de pago',
-      totalSplit: 'Total dividido:',
-      exceedBy: 'Los importes divididos superan el importe final en <amount/>',
-      shortBy: 'A los importes divididos les faltan <amount/>',
-      splitMatches: 'El total dividido coincide exactamente con el importe final.',
+    errors: {
+      failed: "El pago no se completó",
+      refunded: "No se completó. Si se te cobró, el dinero se reembolsa automáticamente.",
+      noGym: "No hay gimnasio seleccionado para este pago",
+      needBoth: "Elige un importe para la parte en efectivo y la online",
+      amountTooHigh: "No puede superar el importe a pagar",
     },
   },
 } satisfies LocaleResource;

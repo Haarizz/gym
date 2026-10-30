@@ -3,6 +3,7 @@ package com.company.project.controllers.mobile.bookings;
 import com.company.project.dto.mobile.bookings.*;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.bookings.MobileMemberBookingsService;
+import com.company.project.services.payments.StripePaymentService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,8 +17,11 @@ import java.util.List;
 public class MobileMemberBookingsController {
 
     private final MobileMemberBookingsService bookingsService;
+    private final StripePaymentService stripePaymentService;
 
-    public MobileMemberBookingsController(MobileMemberBookingsService bookingsService) {
+    public MobileMemberBookingsController(MobileMemberBookingsService bookingsService,
+                                          StripePaymentService stripePaymentService) {
+        this.stripePaymentService = stripePaymentService;
         this.bookingsService = bookingsService;
     }
 
@@ -29,6 +33,12 @@ public class MobileMemberBookingsController {
     @GetMapping("/history")
     public ResponseEntity<List<MemberBookingDTO>> getPastBookings(@AuthenticationPrincipal UserDetailsImpl principal) {
         return ResponseEntity.ok(bookingsService.getPastBookings(principal));
+    }
+
+    /** Upcoming sessions whose payment staff rejected, with the reason — listed apart from upcoming bookings. */
+    @GetMapping("/rejected")
+    public ResponseEntity<List<MemberBookingDTO>> getRejectedBookings(@AuthenticationPrincipal UserDetailsImpl principal) {
+        return ResponseEntity.ok(bookingsService.getRejectedBookings(principal));
     }
 
     @GetMapping("/stats")
@@ -54,7 +64,8 @@ public class MobileMemberBookingsController {
     public ResponseEntity<MemberBookingDTO> createBooking(
             @AuthenticationPrincipal UserDetailsImpl principal,
             @RequestBody CreateMemberBookingRequestDTO request) {
-        return ResponseEntity.ok(bookingsService.createBooking(principal, request));
+        return ResponseEntity.ok(stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), true, null,
+                () -> bookingsService.createBooking(principal, request)));
     }
 
     /** Body (optional): { "refund_method": "WALLET" } — WALLET is the only one available for now. */

@@ -18,12 +18,27 @@ export interface MembershipInfo {
   branch_id?: number | null;
 }
 
+export type BenefitType = 'access' | 'facilities' | 'sessions' | 'trainers' | 'streams' | 'addon' | 'plan_notes';
+
+/**
+ * Something the member's plan actually includes. The app builds the text from `type` and
+ * the raw values; `name`/`description` are the backend's English fallback for unknown types.
+ */
 export interface BenefitInfo {
   id: string;
+  type?: BenefitType | string;
   name: string;
-  description?: string;
-  icon?: string;
-  category?: string;
+  description?: string | null;
+  /** Facility, trainer or training stream names. */
+  items?: string[] | null;
+  /** Access allowance per period, or included sessions. */
+  count?: number | null;
+  /** Access allowance used in the current period. */
+  used?: number | null;
+  unit?: 'Sessions' | 'Days' | 'Hours' | null;
+  period?: 'Payment' | 'Week' | 'Month' | 'Year' | null;
+  /** When an add-on runs out. */
+  expires_at?: string | null;
 }
 
 export type FreezeUnavailableReason = 'PLAN_DOES_NOT_ALLOW' | 'NO_DAYS_LEFT' | 'NO_FREEZES_LEFT';
@@ -126,6 +141,21 @@ export interface ActiveAddOn {
   category: string;
   expiryDate: string;
   status: string;
+}
+
+/** Backend status of an add-on bought with Cash/Credit/Mixed until reception approves it. */
+export const ADDON_PENDING_APPROVAL = 'Pending Approval';
+
+/** What the member agreed to on the add-on's review step — the server re-prices it. */
+export interface AddOnCheckout {
+  addOn: AddOn;
+  /** An add-on promotion code, already validated against this add-on. */
+  couponCode?: string;
+  /** Price after the code. */
+  net: number;
+  walletApplied: number;
+  /** net − walletApplied: what the payment sheet collects. */
+  toPay: number;
 }
 
 export interface PaginationInfo {

@@ -178,6 +178,7 @@ export function WalkInRegistrationScreen() {
         title={selectedPlanName || t('checkIn.walkIn.walkInPassFallback')}
         subtitle={t('checkIn.walkIn.visitorPassSubtitle', { name: fullName })}
         allowDiscount={false}
+        payer="staff"
         onClose={handlePaymentClose}
         onComplete={handlePaymentDone}
       />

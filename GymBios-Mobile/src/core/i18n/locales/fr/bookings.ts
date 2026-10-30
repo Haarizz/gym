@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: 'Remboursé sur le portefeuille',
       NOT_REFUNDABLE: 'Non remboursé',
       VOIDED: 'Rien n’a été facturé',
+      rejected: 'Paiement refusé : {{reason}}',
+    },
+
+    rejected: {
+      title: 'Paiement refusé',
+      subtitle: 'La salle n\'a pas validé le paiement de ces réservations, elles ont donc été annulées.',
+      reasonLabel: 'Motif',
+      notCharged: 'Rien n\'a été facturé.',
+      bookAgain: 'Réserver à nouveau',
     },
 
     cancelledToastTitle: 'Réservation annulée',

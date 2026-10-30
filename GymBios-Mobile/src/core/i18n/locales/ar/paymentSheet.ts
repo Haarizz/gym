@@ -2,22 +2,96 @@ import type { LocaleResource } from '../en';
 
 const paymentSheet = {
   paymentSheet: {
-    title: 'الدفع وإتمام الشراء',
-    processingFor: 'معالجة الدفع مقابل {{title}}',
-    completePayment: 'إكمال الدفع (<amount/>)',
-    totalAmount: 'المبلغ الإجمالي',
-    selectMethod: 'اختر طريقة الدفع',
+    title: "الدفع",
+    processingFor: "الدفع مقابل {{title}}",
+    amountDue: "المبلغ المستحق",
+    howToPay: "كيف تودّ الدفع؟",
+    howToPayStaff: "كيف سيدفع العضو؟",
+    allMethods: "كل طرق الدفع",
 
     methods: {
-      cash: { title: 'نقدًا', subtitle: 'دفع نقدي' },
-      card: { title: 'بطاقة', subtitle: 'بطاقة خصم أو ائتمان' },
-      credit: { title: 'آجل', subtitle: 'إضافة إلى حساب العضو' },
-      mixed: { title: 'دفع مختلط', subtitle: 'تقسيم على عدة طرق' },
-      cheque: { title: 'شيك', subtitle: 'دفع بشيك ورقي' },
-      bank_transfer: { title: 'تحويل بنكي', subtitle: 'تحويل مباشر' },
-      online: { title: 'دفع إلكتروني', subtitle: 'UPI، محفظة، Stripe' },
+      card: { title: "البطاقة", subtitle: "بطاقة، Apple Pay، Google Pay" },
+      upi: { title: "UPI", subtitle: "أي تطبيق UPI" },
+      netbanking: { title: "الخدمات المصرفية عبر الإنترنت", subtitle: "ادفع من بنكك" },
+      cash: { title: "نقدًا", subtitleMember: "ادفع في الاستقبال", subtitleStaff: "استلام نقدي مباشر" },
+      credit: { title: "ادفع لاحقًا", subtitle: "جزء الآن والباقي على الحساب" },
+      mixed: { title: "نقدًا + إلكترونيًا", subtitle: "قسّم الدفعة" },
     },
-    other: 'أخرى',
+
+    unavailable: {
+      online: "غير متاح بعد",
+      inrOnly: "للمدفوعات بالروبية الهندية فقط",
+      nothingToPay: "لا يوجد مبلغ للدفع إلكترونيًا",
+    },
+
+    online: {
+      title: {
+        card: "الدفع بالبطاقة",
+        upi: "الدفع عبر UPI",
+        netbanking: "الدفع عبر البنك",
+      },
+      note: {
+        card: "ادفع <amount/> بالبطاقة أو Apple Pay أو Google Pay في صفحة الدفع الآمنة.",
+        upi: "وافق على <amount/> في تطبيق UPI ثم عد إلى هنا.",
+        netbanking: "اختر بنكك ووافق على <amount/> ثم عد إلى هنا.",
+      },
+      secure: "تتم معالجة المدفوعات بأمان عبر Stripe. لا تصل بيانات البطاقة إلى النادي.",
+    },
+
+    cash: {
+      memberTitle: "ادفع في الاستقبال",
+      memberNote: "سنرسل طلب دفع إلى مكتب الاستقبال. ادفع <amount/> نقدًا في الاستقبال — يتم التأكيد عند استلام الموظفين للمبلغ.",
+      sendRequest: "إرسال الطلب",
+      staffTitle: "استلام نقدي",
+      staffNote: "استلم <amount/> نقدًا من العضو ثم أكّد.",
+      received: "تم استلام النقد",
+    },
+
+    credit: {
+      memberNote: "يمكنك دفع جزء الآن — ويُضاف الباقي إلى حسابك بعد موافقة الاستقبال.",
+      staffNote: "استلم جزءًا الآن إن أراد العضو — ويُضاف الباقي إلى رصيده المستحق.",
+      payNow: "ادفع الآن",
+      nothingNow: "لا شيء",
+      onAccount: "على الحساب",
+      payNowWith: "ادفع الآن عبر",
+      dueDate: "تاريخ الاستحقاق (اختياري)",
+      selectDueDate: "اختر تاريخ الاستحقاق",
+      request: "طلب دفع آجل",
+      addToAccount: "إضافة إلى الحساب",
+    },
+
+    mixed: {
+      memberNote: "ادفع الجزء النقدي في الاستقبال؛ ويُخصم الباقي إلكترونيًا الآن.",
+      staffNote: "استلم الجزء النقدي أولًا؛ ويُخصم الباقي إلكترونيًا.",
+      cashPart: "الجزء النقدي",
+      cash: "نقدًا",
+      payOnlineWith: "ادفع الباقي عبر",
+    },
+
+    split: {
+      exactAmount: "المبلغ بالضبط (<currency/>)",
+      ofTotal: "من <amount/>",
+    },
+
+    cta: {
+      pay: "ادفع <amount/>",
+      payNow: "ادفع <amount/> الآن",
+      payOnline: "ادفع <amount/> إلكترونيًا",
+    },
+
+    simulated: {
+      badge: "وضع الاختبار",
+      title: "دفعة تجريبية",
+      note: "محاكاة — لا تنتقل أي أموال. وافق للمتابعة كما لو تم دفع <amount/> عبر {{method}}.",
+      approve: "الموافقة على الدفعة التجريبية",
+      decline: "رفض",
+    },
+
+    processing: {
+      opening: "جارٍ فتح صفحة الدفع الآمنة…",
+      finishing: "جارٍ الإنهاء…",
+      keepOpen: "يُرجى إبقاء هذه الشاشة مفتوحة",
+    },
 
     discount: {
       title: 'اختر خصمًا (اختياري)',
@@ -29,90 +103,16 @@ const paymentSheet = {
       amountLabel: 'المبلغ (<currency/>)',
     },
 
-    errors: {
-      selectCardType: 'يرجى اختيار نوع البطاقة',
-      chequeNumberRequired: 'رقم الشيك مطلوب',
-      transactionReferenceRequired: 'مرجع المعاملة مطلوب',
-      selectPaymentType: 'يرجى اختيار نوع الدفع',
-      providerNameRequired: 'اسم المزوّد مطلوب',
-      selectReceivedVia: 'يرجى اختيار طريقة استلام الدفعة',
-      cardTypeRequired: 'نوع البطاقة مطلوب',
-      referenceRequired: 'المرجع مطلوب',
-      paymentTypeRequired: 'نوع الدفع مطلوب',
-      splitMismatch: 'يجب أن يساوي مجموع المبالغ المقسّمة المبلغ النهائي',
-      dueDateRequired: 'تاريخ استحقاق الدفع مطلوب للدفعات الجزئية',
+    form: {
+      example: 'مثال: {{value}}',
     },
 
-    form: {
-      cashDetails: 'تفاصيل الدفع النقدي',
-      cardDetails: 'تفاصيل الدفع بالبطاقة',
-      chequeDetails: 'تفاصيل الدفع بالشيك',
-      bankDetails: 'تفاصيل التحويل البنكي',
-      onlineDetails: 'تفاصيل الدفع الإلكتروني',
-      creditDetails: 'تفاصيل الدفع الآجل',
-      mixedDetails: 'تفاصيل الدفع المختلط / المقسّم',
-      mixedSubtitle: 'قسّم الإجمالي على عدة طرق',
-
-      paidAmount: 'المبلغ المدفوع (<currency/>) *',
-      amount: 'المبلغ (<currency/>) *',
-      receivedAmount: 'المبلغ المستلم (<currency/>)',
-      payBackAmount: 'المبلغ المُعاد (<currency/>)',
-      amountToReturn: 'المبلغ الواجب إعادته',
-      dueDate: 'تاريخ استحقاق الدفع *',
-      dueDateOptional: 'تاريخ استحقاق الدفع (اختياري)',
-      selectDueDate: 'اختر تاريخ الاستحقاق',
-      selectDate: 'اختر التاريخ',
-
-      finalAmount: 'المبلغ النهائي:',
-      paidAmountLabel: 'المبلغ المدفوع:',
-      receivedAmountLabel: 'المبلغ المستلم:',
-      remainingDue: 'المتبقي المستحق:',
-      payBack: 'المبلغ المُعاد:',
-      remainingOrDue: 'المتبقي/المستحق:',
-      remainingOnCredit: 'المتبقي (آجل):',
-
-      cashReturnRequired: 'يلزم إعادة نقدية:',
-      returnToCustomer: 'أعد <amount/> إلى العميل',
-      partialPayment: 'دفع جزئي:',
-      addedToOutstanding: 'سيُضاف <amount/> إلى الرصيد المستحق.',
-      addedToMemberOutstanding: 'سيُضاف <amount/> إلى الرصيد المستحق على العضو.',
-      fullCredit: 'آجل بالكامل:',
-      entireOnCredit: 'سيكون كامل المبلغ <amount/> آجلًا على العضو.',
-      partialReceived: 'استلام جزئي:',
-      receivedViaNote: 'تم استلام <received/> عبر {{method}}. تم تسجيل المتبقي <remaining/> آجلًا.',
-      otherMethod: 'طريقة أخرى',
-
-      cardType: 'نوع البطاقة *',
-      referenceNumberOptional: 'رقم المرجع / المعاملة (اختياري)',
-      referenceOptional: 'المرجع (اختياري)',
-      referenceIdRequired: 'رقم المرجع / المعاملة *',
-      transactionReferenceIdRequired: 'رقم المعاملة / المرجع *',
-      transactionReferenceRequired: 'مرجع المعاملة *',
-      chequeNumber: 'رقم الشيك *',
-      bankNameOptional: 'اسم البنك (اختياري)',
-      chequeDateOptional: 'تاريخ الشيك (اختياري)',
-      bankAccountLedgerOptional: 'الحساب البنكي (دفتر الأستاذ، اختياري)',
-      bankAccountLedger: 'الحساب البنكي (دفتر الأستاذ)',
-      ledgerHint: 'الحسابات مأخوذة من دليل الحسابات. سيُقيَّد المبلغ في الحساب المختار.',
-      onlinePaymentType: 'نوع الدفع الإلكتروني *',
-      paymentType: 'نوع الدفع *',
-      paymentProviderName: 'اسم مزوّد الدفع *',
-      providerName: 'اسم المزوّد *',
-      receivedVia: 'طريقة الاستلام *',
-      receivedPlaceholder: '0.00 (اتركه فارغًا للآجل الكامل)',
-      transactionIdPlaceholder: 'رقم المعاملة',
-      chequeNumberPlaceholder: 'رقم الشيك',
-      referenceIdPlaceholder: 'رقم المرجع',
-      providerNamePlaceholder: 'اسم المزوّد',
-      example: 'مثال: {{value}}',
-
-      method: 'الطريقة *',
-      leg: 'الجزء رقم {{n}}',
-      addLeg: '+ إضافة جزء دفع',
-      totalSplit: 'إجمالي المبالغ المقسّمة:',
-      exceedBy: 'المبالغ المقسّمة تزيد عن المبلغ النهائي بمقدار <amount/>',
-      shortBy: 'المبالغ المقسّمة تقل عن المبلغ النهائي بمقدار <amount/>',
-      splitMatches: 'مجموع المبالغ المقسّمة يطابق المبلغ النهائي تمامًا.',
+    errors: {
+      failed: "لم تتم عملية الدفع",
+      refunded: "لم تتم العملية. إذا خُصم منك مبلغ فسيُعاد تلقائيًا.",
+      noGym: "لم يتم اختيار نادٍ لهذه الدفعة",
+      needBoth: "اختر مبلغًا للجزأين النقدي والإلكتروني",
+      amountTooHigh: "لا يمكن أن يتجاوز المبلغ المستحق",
     },
   },
 } satisfies LocaleResource;

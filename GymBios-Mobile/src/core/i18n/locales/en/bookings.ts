@@ -29,6 +29,15 @@ const bookings = {
       REFUNDED: 'Refunded to wallet',
       NOT_REFUNDABLE: 'Not refunded',
       VOIDED: 'Nothing charged',
+      rejected: 'Payment rejected: {{reason}}',
+    },
+
+    rejected: {
+      title: 'Payment Rejected',
+      subtitle: "The gym didn't approve the payment for these bookings, so they were cancelled.",
+      reasonLabel: 'Reason',
+      notCharged: 'Nothing was charged.',
+      bookAgain: 'Book again',
     },
 
     cancelledToastTitle: 'Booking Cancelled',

@@ -173,6 +173,8 @@ export function PlanPurchaseModal({
         title={t('centers.purchase.title', { name: plan.name })}
         subtitle={center.centerName}
         allowDiscount={false}
+        // A first purchase pays a gym the member doesn't belong to yet.
+        tenantSlug={center.tenantSlug}
         onClose={close}
         isProcessing={purchaseMutation.isPending}
         onComplete={handlePayNow}

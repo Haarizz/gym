@@ -45,6 +45,10 @@ public class ReceiptService {
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
 
+    // Optional so unit tests that build this service by hand needn't provide it.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.services.payments.StripePaymentService stripePaymentService;
+
     public ReceiptService(ReceiptRepository receiptRepository,
                           MemberRepository memberRepository,
                           FinancialEventService financialEventService,
@@ -555,6 +559,76 @@ public class ReceiptService {
         return receiptRepository.save(saved);
     }
 
+    public static final String TXN_ADDON = "Add-on";
+
+    /**
+     * The bill for an add-on a member bought in the app — like createBookingReceipt:
+     * amount is the price after any promo code, paidAmount what was paid now (wallet
+     * included). Not posted here: AddonPaymentService posts it right away, or once staff
+     * approve a Cash/Credit/Mixed payment.
+     */
+    public Receipt createAddonReceipt(Member member, String addonName, LocalDateTime validFrom, LocalDateTime validTill,
+                                      BigDecimal amount, BigDecimal paidAmount, String paymentMethod,
+                                      List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
+                                      String bankAccountCode, String bankAccountName,
+                                      LocalDateTime dueDate) {
+        BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
+        BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(total) : BigDecimal.ZERO;
+
+        Receipt r = new Receipt();
+        r.setTransactionDate(LocalDateTime.now());
+        r.setMemberDbId(member.getId());
+        r.setMemberId(member.getMemberId());
+        r.setMemberName(member.getName());
+        r.setMemberPhone(member.getPhone());
+        r.setTransactionType(TXN_ADDON);
+        r.setAmount(total);
+        r.setPaymentMethod(normalizePaymentMethod(paymentMethod));
+        r.setPaymentBreakdown(paymentBreakdown);
+        r.setPaidAmount(paid);
+        r.setTotalPaidToDate(paid);
+        r.setBalanceAfter(member.getOutstandingBalance() != null ? member.getOutstandingBalance() : BigDecimal.ZERO);
+        if (paid.compareTo(total) >= 0) {
+            r.setStatus("Paid");
+        } else if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+            r.setStatus("Pending");
+        } else {
+            r.setStatus("Partial");
+        }
+        r.setBankAccountCode(bankAccountCode);
+        r.setBankAccountName(bankAccountName);
+        r.setDueDate(paid.compareTo(total) < 0 && dueDate != null ? dueDate : validFrom);
+        r.setPlanName(addonName);
+        r.setValidFrom(validFrom);
+        r.setValidTill(validTill);
+        r.setMembershipType(member.getMembershipType());
+        r.setProcessedBy("Mobile App");
+
+        Receipt saved = receiptRepository.save(r);
+        saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
+        saved.setInvoiceNo(voucherNumberService.next("INV"));
+        return receiptRepository.save(saved);
+    }
+
+    /** Posts an app add-on receipt's received amount to the General Ledger and Receipt Vouchers. */
+    public void postAddonReceipt(Receipt receipt) {
+        if (receipt.getPaidAmount() == null || receipt.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) return;
+        financialEventService.onMemberPaymentReceived(receipt);
+        receiptVoucherService.createVoucherFromModule(
+                "Add-on Purchase – " + (receipt.getPlanName() != null ? receipt.getPlanName() : "Add-on"),
+                "Add-on",
+                receipt.getMemberName(),
+                receipt.getMemberDbId(),
+                receipt.getPaidAmount(),
+                receipt.getPaymentMethod(),
+                receipt.getReceiptNo(),
+                null,
+                receipt.getPlanName(),
+                receipt.getPaymentBreakdown(),
+                receipt.getBranchId()
+        );
+    }
+
     /** Posts a booking receipt's received amount to the General Ledger and Receipt Vouchers. */
     public void postBookingReceipt(Receipt receipt) {
         if (receipt.getPaidAmount() == null || receipt.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) return;
@@ -657,7 +731,15 @@ public class ReceiptService {
         receipt.setApprovedBy(rejectedBy);
         receipt.setApprovedAt(LocalDateTime.now());
         receipt.setRejectionReason(reason);
-        return receiptRepository.save(receipt);
+        Receipt saved = receiptRepository.save(receipt);
+        // The cash part of a Mixed/Credit payment never arrived, but its card / UPI /
+        // net banking part was really charged through Stripe — send that back once the
+        // rejection commits.
+        if (stripePaymentService != null) {
+            stripePaymentService.refundRejected(receipt.getPaymentBreakdown(),
+                    "Payment rejected by " + rejectedBy + (reason != null ? ": " + reason : ""));
+        }
+        return saved;
     }
 
     public Receipt createReceiptForMember(Member member, String transactionType, String paymentStatus,

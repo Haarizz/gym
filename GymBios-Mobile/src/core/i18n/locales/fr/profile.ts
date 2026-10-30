@@ -137,7 +137,7 @@ const profile = {
     title: 'Portefeuille',
     subtitle: 'Remboursements et crédits de récompense',
     availableBalance: 'Solde disponible',
-    balanceHint: 'Utilisez-le pour réserver une séance. Les réservations annulées sont remboursées ici.',
+    balanceHint: 'Utilisez-le pour les séances et les options. Les réservations et options annulées sont remboursées ici.',
     history: 'Historique',
     emptyTitle: 'Aucune activité',
     emptyDescription: 'Les remboursements et crédits de récompense apparaîtront ici.',
@@ -148,6 +148,8 @@ const profile = {
       BOOKING: 'Réservation de séance',
       REFERRAL_REWARD: 'Récompense de parrainage',
       BILLING_USE: 'Achat',
+      ADDON: "Achat d'option",
+      ADDON_REFUND: "Remboursement d'option",
     },
   },
 

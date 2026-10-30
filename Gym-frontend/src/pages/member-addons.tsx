@@ -19,6 +19,7 @@ import {
   Trash2,
   X,
   Printer,
+  Ban,
 } from "lucide-react";
 import { FaCircleCheck, FaStar } from "react-icons/fa6";
 import {
@@ -231,7 +232,7 @@ const EMPTY_PLAN_FORM = {
 
 
 export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilterChange, onStats }: MemberAddonsProps) {
-  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
+  const { currencyCode, currencySymbol, currencyPrefix, formatCurrency } = useCurrency();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -268,6 +269,8 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
   const setTransactionStatusFilter = onStatusFilterChange ?? setLocalStatusFilter;
   const [lastCreatedAddon, setLastCreatedAddon] = useState<MemberAddon | null>(null);
   const [printingAddonId, setPrintingAddonId] = useState<string | null>(null);
+  const [cancellingAddon, setCancellingAddon] = useState<MemberAddon | null>(null);
+  const [cancelProcessing, setCancelProcessing] = useState(false);
 
   // Add-on plan catalog — admin-editable, replacing what used to be a
   // hardcoded array. addonPlans holds every plan (incl. inactive ones, shown
@@ -678,6 +681,26 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     toast.success("Receipt sent via WhatsApp/SMS");
   };
 
+  // Cancelling refunds what was paid to the member's wallet (backend AddonPaymentService).
+  const handleConfirmCancelAddon = async () => {
+    if (!cancellingAddon) return;
+    setCancelProcessing(true);
+    try {
+      const updated = await addonsService.updateAddonStatus(cancellingAddon.id, "Cancelled");
+      setTransactions(prev => prev.map(t => (t.id === updated.id ? { ...t, ...updated } : t)));
+      toast.success(
+        updated.refunded_amount
+          ? `${cancellingAddon.addon_name} cancelled — ${formatCurrency(Number(updated.refunded_amount))} refunded to ${cancellingAddon.member_name}'s wallet`
+          : `${cancellingAddon.addon_name} cancelled`
+      );
+      setCancellingAddon(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to cancel add-on");
+    } finally {
+      setCancelProcessing(false);
+    }
+  };
+
   const handlePrintAddonReceipt = async (txn: MemberAddon) => {
     setPrintingAddonId(txn.id);
     try {
@@ -841,6 +864,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="expiring">Expiring in 7 days</SelectItem>
                   <SelectItem value="Expired">Expired</SelectItem>
+                  <SelectItem value="Pending Approval">Pending Approval</SelectItem>
                   <SelectItem value="Cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -920,6 +944,8 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                                 ? "bg-green-100 text-green-800"
                                 : effectiveAddonStatus(txn) === "Expired"
                                 ? "bg-gray-100 text-gray-800"
+                                : effectiveAddonStatus(txn) === "Pending Approval"
+                                ? "bg-amber-100 text-amber-800"
                                 : "bg-red-100 text-red-800"
                             }
                           >
@@ -936,6 +962,16 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                           >
                             <Printer className="h-4 w-4 text-primary" />
                           </Button>
+                          {(txn.status === "Active" || txn.status === "Pending Approval") && (
+                            <Button
+                              variant="outline" size="sm"
+                              className="h-8 w-8 p-0 ml-2 border-red-200 hover:bg-red-50"
+                              title="Cancel Add-on"
+                              onClick={() => setCancellingAddon(txn)}
+                            >
+                              <Ban className="h-4 w-4 text-red-600" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -1610,6 +1646,32 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
           <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end shrink-0">
             <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>Close</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel add-on confirmation */}
+      <Dialog open={!!cancellingAddon} onOpenChange={(open) => { if (!open && !cancelProcessing) setCancellingAddon(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Add-on</DialogTitle>
+            <DialogDescription>
+              {cancellingAddon && (cancellingAddon.status === "Pending Approval"
+                ? <>Cancel <strong>{cancellingAddon.member_name}</strong>'s <strong>{cancellingAddon.addon_name}</strong>? Its payment was never approved, so nothing is charged and any wallet amount is returned.</>
+                : <>Cancel <strong>{cancellingAddon.member_name}</strong>'s <strong>{cancellingAddon.addon_name}</strong>? What they paid is refunded to their wallet, and anything still owed on it is written off. This can't be undone.</>)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancellingAddon(null)} disabled={cancelProcessing}>
+              Keep Add-on
+            </Button>
+            <Button
+              onClick={handleConfirmCancelAddon}
+              disabled={cancelProcessing}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {cancelProcessing ? "Cancelling..." : "Cancel Add-on"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -378,6 +378,7 @@ export function MemberFormScreen({
         amount={parseFloat(data.membershipFee || '0')}
         title={data.membershipType || 'Membership Registration'}
         subtitle={data.name ? `Member: ${data.name}` : undefined}
+        payer="staff"
         onClose={() => setShowPaymentSheet(false)}
         onComplete={handlePaymentComplete}
       />

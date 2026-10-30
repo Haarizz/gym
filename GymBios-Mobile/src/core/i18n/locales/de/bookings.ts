@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: 'Auf Wallet erstattet',
       NOT_REFUNDABLE: 'Nicht erstattet',
       VOIDED: 'Nichts berechnet',
+      rejected: 'Zahlung abgelehnt: {{reason}}',
+    },
+
+    rejected: {
+      title: 'Zahlung abgelehnt',
+      subtitle: 'Das Studio hat die Zahlung für diese Buchungen nicht freigegeben, daher wurden sie storniert.',
+      reasonLabel: 'Grund',
+      notCharged: 'Es wurde nichts berechnet.',
+      bookAgain: 'Erneut buchen',
     },
 
     cancelledToastTitle: 'Buchung storniert',

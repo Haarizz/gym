@@ -137,7 +137,7 @@ const profile = {
     title: 'Monedero',
     subtitle: 'Reembolsos y saldo de recompensas',
     availableBalance: 'Saldo disponible',
-    balanceHint: 'Úsalo al reservar una sesión. Las reservas canceladas se reembolsan aquí.',
+    balanceHint: 'Úsalo en sesiones y complementos. Las reservas y complementos cancelados se reembolsan aquí.',
     history: 'Historial',
     emptyTitle: 'Sin actividad en el monedero',
     emptyDescription: 'Los reembolsos y saldos de recompensas aparecerán aquí.',
@@ -148,6 +148,8 @@ const profile = {
       BOOKING: 'Reserva de sesión',
       REFERRAL_REWARD: 'Recompensa por referido',
       BILLING_USE: 'Compra',
+      ADDON: 'Compra de complemento',
+      ADDON_REFUND: 'Reembolso de complemento',
     },
   },
 

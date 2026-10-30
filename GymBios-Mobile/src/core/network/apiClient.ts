@@ -53,6 +53,12 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
 }
 
+/** The gym the app is currently working in (X-Tenant-ID), if any. */
+export function getApiClientTenant(): string | null {
+  const tenant = apiClient.defaults.headers.common['X-Tenant-ID'];
+  return typeof tenant === 'string' && tenant ? tenant : null;
+}
+
 export function setApiClientTenant(tenant: string | null) {
   if (tenant) {
     apiClient.defaults.headers.common['X-Tenant-ID'] = tenant;

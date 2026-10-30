@@ -116,6 +116,12 @@
         }
       ],
       "@react-native-google-signin/google-signin",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "enableGooglePay": true
+        }
+      ],
       "expo-apple-authentication",
       "expo-mail-composer",
       [

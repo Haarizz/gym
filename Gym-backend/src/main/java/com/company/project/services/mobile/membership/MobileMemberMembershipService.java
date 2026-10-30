@@ -2,20 +2,25 @@ package com.company.project.services.mobile.membership;
 
 import com.company.project.dto.mobile.membership.MobileMemberMembershipResponseDTO;
 import com.company.project.entities.Currency;
+import com.company.project.entities.Facility;
 import com.company.project.entities.Member;
+import com.company.project.entities.MemberAddon;
 import com.company.project.entities.MembershipPlan;
+import com.company.project.entities.TrainingStream;
 import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.repositories.FacilityRepository;
+import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.MembershipPlanRepository;
+import com.company.project.repositories.TrainingStreamRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.CheckInPolicyService;
 import com.company.project.services.MembershipFreezeService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.company.project.entities.Facility;
-import com.company.project.repositories.FacilityRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -30,6 +35,9 @@ public class MobileMemberMembershipService {
     private final MembershipPlanRepository membershipPlanRepository;
     private final MembershipFreezeService freezeService;
     private final FacilityRepository facilityRepository;
+    private final TrainingStreamRepository trainingStreamRepository;
+    private final MemberAddonRepository memberAddonRepository;
+    private final CheckInPolicyService checkInPolicyService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -38,11 +46,17 @@ public class MobileMemberMembershipService {
             MemberRepository memberRepository,
             MembershipPlanRepository membershipPlanRepository,
             MembershipFreezeService freezeService,
-            FacilityRepository facilityRepository) {
+            FacilityRepository facilityRepository,
+            TrainingStreamRepository trainingStreamRepository,
+            MemberAddonRepository memberAddonRepository,
+            CheckInPolicyService checkInPolicyService) {
         this.memberRepository = memberRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.freezeService = freezeService;
         this.facilityRepository = facilityRepository;
+        this.trainingStreamRepository = trainingStreamRepository;
+        this.memberAddonRepository = memberAddonRepository;
+        this.checkInPolicyService = checkInPolicyService;
     }
 
     private String baseCurrencySymbol() {
@@ -140,138 +154,7 @@ public class MobileMemberMembershipService {
         response.setMembership(membershipInfo);
 
         // 2. Benefits
-        List<MobileMemberMembershipResponseDTO.BenefitInfo> benefits = new ArrayList<>();
-        if (plan != null) {
-            // 2.1 Gym & Floor Access
-            String attendanceName;
-            String attendanceDesc;
-            if ("Unlimited".equalsIgnoreCase(plan.getAttendanceLimit()) || plan.getAttendanceLimit() == null) {
-                attendanceName = "Unlimited Gym Floor Access";
-                attendanceDesc = "Full access to strength, cardio, and functional training areas during open hours.";
-            } else if (plan.getAttendanceValue() != null) {
-                attendanceName = "Gym Access (" + plan.getAttendanceValue() + " visits/" + (plan.getAttendancePeriod() != null ? plan.getAttendancePeriod().toLowerCase() : "period") + ")";
-                attendanceDesc = "Up to " + plan.getAttendanceValue() + " check-ins per " + (plan.getAttendancePeriod() != null ? plan.getAttendancePeriod().toLowerCase() : "period") + " with full equipment access.";
-            } else {
-                attendanceName = "Gym Access Included";
-                attendanceDesc = "Access to gym floor, workout equipment, and training zones.";
-            }
-            benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                "attendance", attendanceName, attendanceDesc, "activity", "Access"
-            ));
-
-            // 2.2 Facilities & Amenities
-            List<String> facilityNames = new ArrayList<>();
-            if (plan.getSelectedFacilities() != null && !plan.getSelectedFacilities().isEmpty()) {
-                List<Facility> allFacilities = facilityRepository.findAll();
-                for (String facRef : plan.getSelectedFacilities()) {
-                    for (Facility f : allFacilities) {
-                        if (facRef.equalsIgnoreCase(f.getFacilityId()) ||
-                            facRef.equalsIgnoreCase(String.valueOf(f.getId())) ||
-                            facRef.equalsIgnoreCase(f.getName())) {
-                            if (!facilityNames.contains(f.getName())) {
-                                facilityNames.add(f.getName());
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-            if (!facilityNames.isEmpty()) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "facilities",
-                    "Included Facilities & Amenities",
-                    "Full access to " + String.join(", ", facilityNames) + ".",
-                    "droplet",
-                    "Amenities"
-                ));
-            } else {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "facilities",
-                    "Locker & Shower Facilities",
-                    "Complimentary day lockers, changing rooms, and hot showers.",
-                    "droplet",
-                    "Amenities"
-                ));
-            }
-
-            // 2.3 Coaching & Training Support
-            if (plan.getMaxSessions() != null && plan.getMaxSessions() > 0) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "sessions",
-                    "Personal Training (" + plan.getMaxSessions() + " Sessions)",
-                    plan.getMaxSessions() + " dedicated one-on-one sessions included with a certified trainer.",
-                    "award",
-                    "Coaching"
-                ));
-            } else if (plan.getAssignableTrainers() != null && !plan.getAssignableTrainers().isEmpty()) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "coaching",
-                    "Dedicated Trainer Guidance",
-                    "Guidance from assigned coaches: " + String.join(", ", plan.getAssignableTrainers()) + ".",
-                    "users",
-                    "Coaching"
-                ));
-            } else {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "coaching",
-                    "Floor Trainer Support",
-                    "Certified trainers available on the gym floor for exercise guidance and form checks.",
-                    "award",
-                    "Coaching"
-                ));
-            }
-
-            // 2.4 Training Streams & Classes
-            if (plan.getTrainingStreams() != null && !plan.getTrainingStreams().isEmpty()) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "classes",
-                    "Group Training Streams",
-                    "Access to " + plan.getTrainingStreams().size() + " scheduled specialized training streams.",
-                    "calendar",
-                    "Classes"
-                ));
-            }
-
-            // 2.5 Freeze & Flexibility
-            if (plan.getFreeDaysAllowed() != null && plan.getFreeDaysAllowed() > 0) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "freeze",
-                    "Complimentary Freeze Allowance",
-                    "Pause your membership up to " + plan.getFreeDaysAllowed() + " free days when traveling or recovering.",
-                    "pause-circle",
-                    "Flexibility"
-                ));
-            } else if (plan.getMaxFreezeDays() != null && plan.getMaxFreezeDays() > 0) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "freeze",
-                    "Membership Freeze Privilege",
-                    "Pause your membership up to " + plan.getMaxFreezeDays() + " days per period.",
-                    "pause-circle",
-                    "Flexibility"
-                ));
-            }
-
-            // 2.6 Digital & Platform Perks
-            benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                "digital",
-                "GymBios Digital Access",
-                "Contactless QR check-in, workout tracking, community challenges, and digital billing.",
-                "smartphone",
-                "Privileges"
-            ));
-
-            // 2.7 Plan Custom Description (if present)
-            if (plan.getDescription() != null && !plan.getDescription().trim().isEmpty()) {
-                benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
-                    "desc",
-                    "Special Plan Features",
-                    plan.getDescription().trim(),
-                    "check-circle",
-                    "Details"
-                ));
-            }
-        }
-        response.setBenefits(benefits);
+        response.setBenefits(buildBenefits(member, plan));
 
         // 3. Freeze Information
         MobileMemberMembershipResponseDTO.FreezeInfo freezeInfo = new MobileMemberMembershipResponseDTO.FreezeInfo();
@@ -311,5 +194,136 @@ public class MobileMemberMembershipService {
         response.setRenewalOffer(offerInfo);
 
         return response;
+    }
+
+    /**
+     * What the member's plan (and any active add-ons) actually includes. Nothing is listed
+     * that the gym hasn't configured, so a sparse plan gives a short list.
+     */
+    private List<MobileMemberMembershipResponseDTO.BenefitInfo> buildBenefits(Member member, MembershipPlan plan) {
+        List<MobileMemberMembershipResponseDTO.BenefitInfo> benefits = new ArrayList<>();
+        if (plan != null) {
+            benefits.add(accessBenefit(member));
+
+            List<String> facilities = planFacilityNames(plan);
+            if (!facilities.isEmpty()) {
+                MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                        "facilities", "facilities", "Facilities included", String.join(", ", facilities));
+                b.setItems(facilities);
+                benefits.add(b);
+            }
+
+            List<String> trainers = plan.getAssignableTrainers() == null ? List.of()
+                    : plan.getAssignableTrainers().stream()
+                            .filter(t -> t != null && !t.isBlank())
+                            .map(String::trim)
+                            .distinct()
+                            .toList();
+            if (plan.getMaxSessions() != null && plan.getMaxSessions() > 0) {
+                MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                        "sessions", "sessions", plan.getMaxSessions() + " sessions included",
+                        trainers.isEmpty() ? null : "With " + String.join(", ", trainers));
+                b.setCount(plan.getMaxSessions());
+                b.setItems(trainers);
+                benefits.add(b);
+            } else if (!trainers.isEmpty()) {
+                MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                        "trainers", "trainers", "Your trainers", String.join(", ", trainers));
+                b.setItems(trainers);
+                benefits.add(b);
+            }
+
+            List<String> streams = planStreamTitles(plan);
+            if (!streams.isEmpty()) {
+                MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                        "streams", "streams", "Training streams", String.join(", ", streams));
+                b.setItems(streams);
+                b.setCount(streams.size());
+                benefits.add(b);
+            }
+        }
+
+        // Add-ons are bought separately, so they count even without a resolvable plan.
+        for (MemberAddon addon : memberAddonRepository.findActiveForMember(
+                member.getId(), member.getMemberId(), LocalDateTime.now())) {
+            if (addon.getAddonName() == null || addon.getAddonName().isBlank()) continue;
+            MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "addon-" + addon.getId(), "addon", addon.getAddonName().trim(),
+                    addon.getAddonDescription() != null && !addon.getAddonDescription().isBlank()
+                            ? addon.getAddonDescription().trim() : null);
+            b.setExpiresAt(addon.getExpiryDate());
+            benefits.add(b);
+        }
+
+        if (plan != null && plan.getDescription() != null && !plan.getDescription().isBlank()) {
+            benefits.add(new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "plan_notes", "plan_notes", "About your plan", plan.getDescription().trim()));
+        }
+        return benefits;
+    }
+
+    /** The plan's check-in allowance, with usage from the same rules check-in enforces. */
+    private MobileMemberMembershipResponseDTO.BenefitInfo accessBenefit(Member member) {
+        CheckInPolicyService.Allowance allowance = checkInPolicyService.evaluate(member);
+        if (allowance.limitValue() == null) {
+            MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                    "access", "access", "Unlimited gym access",
+                    "No visit limit. Check in up to " + allowance.maxCheckInsPerDay() + " times a day.");
+            b.setCount(allowance.maxCheckInsPerDay());
+            return b;
+        }
+        int limit = allowance.limitValue();
+        int used = allowance.used() == null ? 0 : allowance.used();
+        String unit = allowance.limitUnit().toLowerCase();
+        String period = allowance.limitPeriod();
+        String per = switch (period == null ? "" : period.toLowerCase()) {
+            case "week" -> "per week";
+            case "month" -> "per month";
+            case "year" -> "per year";
+            default -> "for your plan";
+        };
+        MobileMemberMembershipResponseDTO.BenefitInfo b = new MobileMemberMembershipResponseDTO.BenefitInfo(
+                "access", "access", limit + " gym " + unit + " " + per,
+                used + " used, " + Math.max(0, limit - used) + " left");
+        b.setCount(limit);
+        b.setUsed(used);
+        b.setUnit(allowance.limitUnit());
+        b.setPeriod(period);
+        return b;
+    }
+
+    /** Plans store facility refs as the facility's db id, facility code or (older plans) its name. */
+    private List<String> planFacilityNames(MembershipPlan plan) {
+        if (plan.getSelectedFacilities() == null || plan.getSelectedFacilities().isEmpty()) return List.of();
+        List<Facility> facilities = facilityRepository.findAll().stream()
+                .filter(f -> f.getName() != null && !"Inactive".equalsIgnoreCase(f.getStatus()))
+                .toList();
+        List<String> names = new ArrayList<>();
+        for (String ref : plan.getSelectedFacilities()) {
+            if (ref == null) continue;
+            facilities.stream()
+                    .filter(f -> ref.equalsIgnoreCase(String.valueOf(f.getId()))
+                            || ref.equalsIgnoreCase(f.getFacilityId())
+                            || ref.equalsIgnoreCase(f.getName()))
+                    .findFirst()
+                    .map(Facility::getName)
+                    .filter(name -> !names.contains(name))
+                    .ifPresent(names::add);
+        }
+        return names;
+    }
+
+    private List<String> planStreamTitles(MembershipPlan plan) {
+        if (plan.getTrainingStreams() == null || plan.getTrainingStreams().isEmpty()) return List.of();
+        List<Long> ids = plan.getTrainingStreams().stream()
+                .filter(java.util.Objects::nonNull)
+                .map(Integer::longValue)
+                .toList();
+        return trainingStreamRepository.findAllById(ids).stream()
+                .map(TrainingStream::getTitle)
+                .filter(title -> title != null && !title.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 }

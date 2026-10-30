@@ -295,6 +295,7 @@ export function MemberDetailsScreen({
         subtitle={`Member: ${selectedMember.name}`}
         // The plan's offer is already in its price; reward passes aren't supported here yet.
         allowDiscount={false}
+        payer="staff"
         isProcessing={renewing}
         onClose={() => {
           if (!renewing) setPaymentVisible(false);

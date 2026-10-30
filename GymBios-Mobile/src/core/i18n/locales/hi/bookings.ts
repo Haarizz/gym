@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: 'वॉलेट में रिफ़ंड किया गया',
       NOT_REFUNDABLE: 'रिफ़ंड नहीं हुआ',
       VOIDED: 'कोई शुल्क नहीं लिया गया',
+      rejected: 'भुगतान अस्वीकृत: {{reason}}',
+    },
+
+    rejected: {
+      title: 'भुगतान अस्वीकृत',
+      subtitle: 'जिम ने इन बुकिंग का भुगतान स्वीकृत नहीं किया, इसलिए इन्हें रद्द कर दिया गया।',
+      reasonLabel: 'कारण',
+      notCharged: 'कोई शुल्क नहीं लिया गया।',
+      bookAgain: 'फिर से बुक करें',
     },
 
     cancelledToastTitle: 'बुकिंग रद्द',

@@ -1,34 +1,46 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 
 import { Trans, useTranslation } from 'react-i18next';
+import { useTheme } from '@/core/hooks';
 import { CurrencyValue } from '@/core/providers';
-import { Spacing } from '@/core/theme';
+import { useCurrencyStore } from '@/core/providers/currencyDefinitions';
+import { getApiClientTenant } from '@/core/network/apiClient';
+import { Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 import { Button } from '@/shared/components/Button';
-import { DEFAULT_BANK_ACCOUNTS, PAYMENT_METHODS } from '../../constants';
-import { calculateTotals, validateSplitPayment } from '../../domain/paymentCalculations';
+import { Typography } from '@/shared/components/Typography';
+import { METHOD_API_TITLES, ONLINE_METHOD_TYPES, PAYMENT_METHODS } from '../../constants';
+import { calculateTotals, onlineLeg, roundMoney } from '../../domain/paymentCalculations';
+import { isOnlinePaymentAvailable, payOnline, type SimulatedDecision } from '../../gateway/stripeCheckout';
 import type {
   DiscountType,
+  OnlineMethodType,
   PaymentBottomSheetProps,
   PaymentMethod,
   PaymentResult,
   PaymentSplit,
-  PaymentSplitRow,
   PaymentStatus,
-  PaymentSummary,
 } from '@/shared/payment/types';
 import { DiscountSelector } from '../components/DiscountSelector';
 import { PaymentMethodGrid } from '../components/PaymentMethodGrid';
 import { PaymentSummaryCard } from '../components/PaymentSummaryCard';
-import { BankTransferPaymentForm } from '../components/PaymentMethodForms/BankTransferPaymentForm';
-import { CardPaymentForm } from '../components/PaymentMethodForms/CardPaymentForm';
-import { CashPaymentForm } from '../components/PaymentMethodForms/CashPaymentForm';
-import { ChequePaymentForm } from '../components/PaymentMethodForms/ChequePaymentForm';
-import { CreditPaymentForm } from '../components/PaymentMethodForms/CreditPaymentForm';
-import { MixedPaymentForm } from '../components/PaymentMethodForms/MixedPaymentForm';
-import { OnlinePaymentForm } from '../components/PaymentMethodForms/OnlinePaymentForm';
+import { CashStep, CreditStep, MixedStep, OnlineStep, SimulatedStep } from '../components/steps/MethodSteps';
 
+type Step = 'methods' | 'detail' | 'working' | 'simulate';
+type WorkingPhase = 'opening' | 'finishing';
+
+const isOnline = (method: PaymentMethod): method is OnlineMethodType =>
+  (ONLINE_METHOD_TYPES as string[]).includes(method);
+
+/**
+ * Mobile checkout: pick a method, confirm, done — no reference numbers or card types to
+ * type. Card / UPI / Net banking open Stripe's own payment sheet and hand the backend a
+ * PaymentIntent id it verifies with Stripe. Cash is a pay-at-reception request for
+ * members (staff approve it, as before) or a one-tap "cash received" for staff. Credit
+ * and Mixed are the only screens with an amount to choose.
+ */
 export function PaymentBottomSheet({
   visible,
   amount,
@@ -36,440 +48,380 @@ export function PaymentBottomSheet({
   subtitle,
   allowDiscount = true,
   initialDiscount = { type: 'none', value: 0 },
-  isProcessing = false,
+  isProcessing,
+  payer = 'member',
+  methods,
+  tenantSlug,
   onClose,
   onComplete,
 }: PaymentBottomSheetProps) {
   const { t } = useTranslation();
-  // State
+  const theme = useTheme();
+  const currencyCode = useCurrencyStore((s) => s.currencyCode);
+
   const [discountType, setDiscountType] = useState<DiscountType>(initialDiscount.type);
   const [discountValue, setDiscountValue] = useState<number>(initialDiscount.value);
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
+  const [step, setStep] = useState<Step>('methods');
+  const [method, setMethod] = useState<PaymentMethod>('card');
+  const [phase, setPhase] = useState<WorkingPhase>('opening');
+  const [notice, setNotice] = useState<string | null>(null);
+  // Local backend simulation: the test payment waiting for approve / decline.
+  const [simulated, setSimulated] = useState<{ methodType: OnlineMethodType; amount: number } | null>(null);
+  const decideSimulated = useRef<((decision: SimulatedDecision) => void) | null>(null);
 
-  // Fields for methods
-  const [paidAmount, setPaidAmount] = useState<string>('');
-  const [cardType, setCardType] = useState<string>('');
-  const [reference, setReference] = useState<string>('');
-  const [chequeNumber, setChequeNumber] = useState<string>('');
-  const [bankName, setBankName] = useState<string>('');
-  const [chequeDate, setChequeDate] = useState<Date | null>(null);
-  const [bankAccountId, setBankAccountId] = useState<string>('');
-  const [onlinePaymentType, setOnlinePaymentType] = useState<string>('');
-  const [providerName, setProviderName] = useState<string>('');
-  const [paymentDueDate, setPaymentDueDate] = useState<Date | null>(null);
+  const [creditNow, setCreditNow] = useState(0);
+  const [creditVia, setCreditVia] = useState<OnlineMethodType>('card');
+  const [mixedCash, setMixedCash] = useState(0);
+  const [mixedVia, setMixedVia] = useState<OnlineMethodType>('card');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
 
-  // Credit state
-  const [creditReceivedAmount, setCreditReceivedAmount] = useState<string>('');
-  const [creditReceivedVia, setCreditReceivedVia] = useState<PaymentMethod | ''>('');
+  const { subtotal, discountAmount, finalAmount } = calculateTotals(amount, discountType, discountValue, 0);
 
-  // Mixed payment rows
-  const [splitRows, setSplitRows] = useState<PaymentSplitRow[]>([]);
+  // ── What can be offered ────────────────────────────────────────────────────
+  const onlineReady = isOnlinePaymentAvailable();
+  const isInr = currencyCode === 'INR';
 
-  // Validation errors
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const availableOnline = useMemo(
+    () =>
+      ONLINE_METHOD_TYPES.filter((type) => {
+        const option = PAYMENT_METHODS.find((o) => o.id === type);
+        return onlineReady && (!option?.inrOnly || isInr) && (!methods || methods.includes(type));
+      }),
+    [onlineReady, isInr, methods],
+  );
 
-  // Reset or initialize state when sheet opens or amount changes
-  useEffect(() => {
+  const options = useMemo(
+    () => PAYMENT_METHODS.filter((o) => !methods || methods.includes(o.id)),
+    [methods],
+  );
+
+  const unavailable = useMemo(() => {
+    const reasons: Partial<Record<PaymentMethod, string>> = {};
+    for (const option of options) {
+      if (option.online) {
+        if (!onlineReady) reasons[option.id] = t('paymentSheet.unavailable.online');
+        else if (option.inrOnly && !isInr) reasons[option.id] = t('paymentSheet.unavailable.inrOnly');
+        else if (finalAmount <= 0) reasons[option.id] = t('paymentSheet.unavailable.nothingToPay');
+      }
+    }
+    // Mixed needs an online part; with nothing left to pay there's nothing to split.
+    if (availableOnline.length === 0) reasons.mixed = t('paymentSheet.unavailable.online');
+    else if (finalAmount <= 0) reasons.mixed = t('paymentSheet.unavailable.nothingToPay');
+    return reasons;
+  }, [options, onlineReady, isInr, finalAmount, availableOnline.length, t]);
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // Set once a result is handed to the caller; cleared when its request settles.
+  const awaitingCaller = useRef<{ online: boolean } | null>(null);
+  const prevProcessing = useRef(isProcessing);
+
+  // Every opening starts fresh at the method grid (adjusted during render, not in an effect).
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (visible) {
-      setPaidAmount(String(amount || '0'));
-      setCreditReceivedAmount('');
-      setCreditReceivedVia('');
-      setSplitRows([
-        { id: '1', method: 'cash', amount: Math.max(0, amount / 2) },
-        { id: '2', method: 'card', amount: Math.max(0, amount / 2) },
-      ]);
-      setErrors({});
+      setStep('methods');
+      setNotice(null);
+      setDueDate(null);
     }
-  }, [visible, amount]);
+  }
 
-  // Dynamic calculations
-  const rawPaidNum =
-    selectedMethod === 'credit'
-      ? parseFloat(creditReceivedAmount || '0')
-      : selectedMethod === 'mixed'
-        ? splitRows.reduce((sum, r) => sum + (r.amount || 0), 0)
-        : parseFloat(paidAmount || '0');
+  // A screen's request finished but the sheet is still open → it failed (on success the
+  // screen closes the sheet). The backend has already refunded any Stripe charge.
+  useEffect(() => {
+    const was = prevProcessing.current;
+    prevProcessing.current = isProcessing;
+    if (!(was && !isProcessing && awaitingCaller.current)) return;
+    const { online } = awaitingCaller.current;
+    const timer = setTimeout(() => {
+      awaitingCaller.current = null;
+      setStep('detail');
+      setNotice(online ? t('paymentSheet.errors.refunded') : null);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isProcessing, t]);
 
-  const { subtotal, discountAmount, finalAmount, paidAmount: calculatedPaidAmount, remainingAmount, payBackAmount } =
-    calculateTotals(amount, discountType, discountValue, rawPaidNum);
+  const firstOnline = availableOnline[0] ?? 'card';
 
-  // Form validator
-  const validateForm = useCallback((): boolean => {
-    const newErrors: Record<string, string> = {};
+  const openMethod = useCallback(
+    (next: PaymentMethod) => {
+      setMethod(next);
+      setNotice(null);
+      setCreditNow(0);
+      setCreditVia(firstOnline);
+      setMixedCash(roundMoney(finalAmount / 2));
+      setMixedVia(firstOnline);
+      setStep('detail');
+    },
+    [finalAmount, firstOnline],
+  );
 
-    if (selectedMethod === 'card') {
-      if (!cardType) newErrors.cardType = t('paymentSheet.errors.selectCardType');
-    } else if (selectedMethod === 'cheque') {
-      if (!chequeNumber.trim()) newErrors.chequeNumber = t('paymentSheet.errors.chequeNumberRequired');
-    } else if (selectedMethod === 'bank_transfer') {
-      if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.transactionReferenceRequired');
-    } else if (selectedMethod === 'online') {
-      if (!onlinePaymentType) newErrors.onlinePaymentType = t('paymentSheet.errors.selectPaymentType');
-      if (onlinePaymentType === 'Other' && !providerName.trim()) {
-        newErrors.providerName = t('paymentSheet.errors.providerNameRequired');
+  // ── Completing ─────────────────────────────────────────────────────────────
+  const finish = useCallback(
+    (legs: PaymentSplit[], paid: number, hasOnline: boolean) => {
+      const remaining = roundMoney(Math.max(0, finalAmount - paid));
+      const paymentStatus: PaymentStatus = remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
+      const result: PaymentResult = {
+        paymentMethodUsed: METHOD_API_TITLES[method],
+        paymentBreakdown: legs,
+        paymentStatus,
+        outstandingBalance: remaining,
+        discountApplied: discountAmount,
+        summary: {
+          subtotal,
+          discount: { type: discountType, value: discountValue, discountAmount },
+          finalAmount,
+          paidAmount: paid,
+          remainingAmount: remaining,
+          payBackAmount: 0,
+          paymentDueDate: method === 'credit' && dueDate ? dueDate.toISOString().split('T')[0] : undefined,
+        },
+      };
+
+      if (isProcessing !== undefined) {
+        // The screen reports its request through isProcessing — show it here.
+        awaitingCaller.current = { online: hasOnline };
+        setPhase('finishing');
+        setStep('working');
+      } else {
+        setStep('methods');
       }
-      if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.transactionReferenceRequired');
-    } else if (selectedMethod === 'credit') {
-      if (creditReceivedAmount && parseFloat(creditReceivedAmount) > 0) {
-        if (!creditReceivedVia) newErrors.receivedVia = t('paymentSheet.errors.selectReceivedVia');
-        if (creditReceivedVia === 'card' && !cardType) newErrors.cardType = t('paymentSheet.errors.cardTypeRequired');
-        if (creditReceivedVia === 'cheque' && !chequeNumber.trim()) newErrors.chequeNumber = t('paymentSheet.errors.chequeNumberRequired');
-        if (creditReceivedVia === 'bank_transfer' && !reference.trim()) newErrors.reference = t('paymentSheet.errors.referenceRequired');
-        if (creditReceivedVia === 'online') {
-          if (!onlinePaymentType) newErrors.onlinePaymentType = t('paymentSheet.errors.paymentTypeRequired');
-          if (onlinePaymentType === 'Other' && !providerName.trim()) newErrors.providerName = t('paymentSheet.errors.providerNameRequired');
-          if (!reference.trim()) newErrors.reference = t('paymentSheet.errors.referenceRequired');
-        }
+      onComplete(result);
+    },
+    [finalAmount, method, discountAmount, subtotal, discountType, discountValue, dueDate, isProcessing, onComplete],
+  );
+
+  /** Takes {@code amountToCharge} through Stripe; resolves the intent id, or null if not paid. */
+  const charge = useCallback(
+    async (methodType: OnlineMethodType, amountToCharge: number): Promise<string | null> => {
+      const slug = tenantSlug ?? getApiClientTenant();
+      if (!slug) {
+        setNotice(t('paymentSheet.errors.noGym'));
+        return null;
       }
-    } else if (selectedMethod === 'mixed') {
-      const { isValid } = validateSplitPayment(splitRows, finalAmount);
-      if (!isValid) {
-        newErrors.rows = t('paymentSheet.errors.splitMismatch');
+      setNotice(null);
+      setPhase('opening');
+      setStep('working');
+      const outcome = await payOnline(
+        { amount: roundMoney(amountToCharge), methodType, tenantSlug: slug, purpose: title },
+        {
+          onSimulated: (intent) =>
+            new Promise<SimulatedDecision>((resolve) => {
+              decideSimulated.current = resolve;
+              setSimulated({ methodType, amount: intent.amount });
+              setStep('simulate');
+            }),
+        },
+      );
+      if (outcome.status === 'succeeded') return outcome.paymentIntentId;
+      setStep('detail');
+      if (outcome.status === 'failed') setNotice(outcome.message || t('paymentSheet.errors.failed'));
+      return null;
+    },
+    [tenantSlug, title, t],
+  );
+
+  const handleConfirm = useCallback(async () => {
+    if (isOnline(method)) {
+      const intentId = await charge(method, finalAmount);
+      if (intentId) finish([onlineLeg(method, finalAmount, intentId)], finalAmount, true);
+      return;
+    }
+    if (method === 'cash') {
+      finish([{ method: 'Cash', amount: finalAmount }], finalAmount, false);
+      return;
+    }
+    if (method === 'credit') {
+      if (creditNow <= 0) {
+        finish([], 0, false);
+        return;
       }
+      const intentId = await charge(creditVia, creditNow);
+      if (intentId) finish([onlineLeg(creditVia, creditNow, intentId)], creditNow, true);
+      return;
     }
-
-    if (remainingAmount > 0 && selectedMethod !== 'credit' && !paymentDueDate) {
-      newErrors.paymentDueDate = t('paymentSheet.errors.dueDateRequired');
+    // Mixed
+    const onlinePart = roundMoney(finalAmount - mixedCash);
+    if (mixedCash <= 0 || onlinePart <= 0) {
+      setNotice(t('paymentSheet.errors.needBoth'));
+      return;
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [
-    selectedMethod,
-    cardType,
-    chequeNumber,
-    reference,
-    onlinePaymentType,
-    providerName,
-    creditReceivedAmount,
-    creditReceivedVia,
-    splitRows,
-    finalAmount,
-    remainingAmount,
-    paymentDueDate,
-    t,
-  ]);
-
-  // Complete Payment handler
-  const handleComplete = useCallback(() => {
-    if (!validateForm()) return;
-
-    const methodMeta = PAYMENT_METHODS.find((m) => m.id === selectedMethod);
-    const bankAccount = DEFAULT_BANK_ACCOUNTS.find((a) => a.id === bankAccountId);
-
-    let paymentStatus: PaymentStatus = 'PAID';
-    if (selectedMethod === 'credit' && (!creditReceivedAmount || parseFloat(creditReceivedAmount) <= 0)) {
-      paymentStatus = 'PENDING';
-    } else if (remainingAmount > 0) {
-      paymentStatus = 'PARTIAL';
+    const intentId = await charge(mixedVia, onlinePart);
+    if (intentId) {
+      finish([{ method: 'Cash', amount: mixedCash }, onlineLeg(mixedVia, onlinePart, intentId)], finalAmount, true);
     }
+  }, [method, charge, finalAmount, finish, creditNow, creditVia, mixedCash, mixedVia, t]);
 
-    // 1. UI Summary (never sent to backend)
-    const summary: PaymentSummary = {
-      subtotal,
-      discount: {
-        type: discountType,
-        value: discountValue,
-        discountAmount,
-      },
-      finalAmount,
-      paidAmount: calculatedPaidAmount,
-      remainingAmount,
-      payBackAmount,
-      paymentDueDate: paymentDueDate ? paymentDueDate.toISOString().split('T')[0] : undefined,
-    };
+  // ── Step transition ────────────────────────────────────────────────────────
+  const fade = useState(() => new Animated.Value(1))[0];
+  useEffect(() => {
+    fade.setValue(0);
+    Animated.timing(fade, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+  }, [step, method, fade]);
 
-    // 2. Payment Breakdown array (matches backend List<PaymentSplitDTO>)
-    const breakdown: PaymentSplit[] = [];
-
-    if (selectedMethod === 'cash') {
-      breakdown.push({
-        method: 'Cash',
-        amount: calculatedPaidAmount,
-      });
-    } else if (selectedMethod === 'card') {
-      breakdown.push({
-        method: 'Card',
-        amount: calculatedPaidAmount,
-        cardType: cardType || undefined,
-        reference: reference.trim() || undefined,
-      });
-    } else if (selectedMethod === 'cheque') {
-      breakdown.push({
-        method: 'Cheque',
-        amount: calculatedPaidAmount,
-        chequeNumber: chequeNumber.trim() || undefined,
-        chequeDate: chequeDate ? chequeDate.toISOString().split('T')[0] : undefined,
-        bankName: bankName.trim() || undefined,
-      });
-    } else if (selectedMethod === 'bank_transfer') {
-      breakdown.push({
-        method: 'Bank Transfer',
-        amount: calculatedPaidAmount,
-        reference: reference.trim() || undefined,
-        bankAccountCode: bankAccount?.code,
-        bankAccountName: bankAccount?.name,
-      });
-    } else if (selectedMethod === 'online') {
-      breakdown.push({
-        method: 'Online Payment',
-        amount: calculatedPaidAmount,
-        onlinePaymentType: onlinePaymentType || undefined,
-        providerName: providerName.trim() || undefined,
-        reference: reference.trim() || undefined,
-      });
-    } else if (selectedMethod === 'credit') {
-      if (creditReceivedAmount && parseFloat(creditReceivedAmount) > 0) {
-        const recAmount = parseFloat(creditReceivedAmount);
-        const recViaTitle =
-          PAYMENT_METHODS.find((m) => m.id === creditReceivedVia)?.title ||
-          creditReceivedVia ||
-          'Cash';
-        breakdown.push({
-          method: recViaTitle,
-          amount: recAmount,
-          cardType: creditReceivedVia === 'card' ? cardType : undefined,
-          reference:
-            creditReceivedVia === 'card' ||
-            creditReceivedVia === 'bank_transfer' ||
-            creditReceivedVia === 'online'
-              ? reference.trim() || undefined
-              : undefined,
-          chequeNumber:
-            creditReceivedVia === 'cheque' ? chequeNumber.trim() || undefined : undefined,
-          bankName: creditReceivedVia === 'cheque' ? bankName.trim() || undefined : undefined,
-          bankAccountCode:
-            creditReceivedVia === 'bank_transfer' ? bankAccount?.code : undefined,
-          bankAccountName:
-            creditReceivedVia === 'bank_transfer' ? bankAccount?.name : undefined,
-          onlinePaymentType:
-            creditReceivedVia === 'online' ? onlinePaymentType : undefined,
-          providerName: creditReceivedVia === 'online' ? providerName.trim() || undefined : undefined,
-        });
-      }
-    } else if (selectedMethod === 'mixed') {
-      splitRows.forEach((r) => {
-        const legMethodTitle =
-          PAYMENT_METHODS.find((m) => m.id === r.method)?.title || r.method;
-        const legBankAccount = DEFAULT_BANK_ACCOUNTS.find((a) => a.id === r.bankAccountId);
-        breakdown.push({
-          method: legMethodTitle,
-          amount: r.amount,
-          cardType: r.method === 'card' ? r.cardType : undefined,
-          reference:
-            r.method === 'card' || r.method === 'bank_transfer' || r.method === 'online'
-              ? r.reference
-              : undefined,
-          chequeNumber: r.method === 'cheque' ? r.chequeNumber : undefined,
-          chequeDate: r.method === 'cheque' ? r.chequeDate : undefined,
-          bankName: r.method === 'cheque' ? r.bankName : undefined,
-          bankAccountCode: r.method === 'bank_transfer' ? legBankAccount?.code : undefined,
-          bankAccountName: r.method === 'bank_transfer' ? legBankAccount?.name : undefined,
-          onlinePaymentType: r.method === 'online' ? r.onlinePaymentType : undefined,
-          providerName: r.method === 'online' ? r.providerName : undefined,
-        });
-      });
+  const ctaLabel = (() => {
+    const amountNode = (value: number) => <CurrencyValue amount={value} decimals={2} />;
+    if (isOnline(method)) {
+      return <Trans i18nKey="paymentSheet.cta.pay" components={{ amount: amountNode(finalAmount) }} />;
     }
+    if (method === 'cash') return t(payer === 'staff' ? 'paymentSheet.cash.received' : 'paymentSheet.cash.sendRequest');
+    if (method === 'credit') {
+      if (creditNow > 0) return <Trans i18nKey="paymentSheet.cta.payNow" components={{ amount: amountNode(creditNow) }} />;
+      return t(payer === 'staff' ? 'paymentSheet.credit.addToAccount' : 'paymentSheet.credit.request');
+    }
+    return (
+      <Trans
+        i18nKey="paymentSheet.cta.payOnline"
+        components={{ amount: amountNode(Math.max(0, finalAmount - mixedCash)) }}
+      />
+    );
+  })();
 
-    const result: PaymentResult = {
-      paymentMethodUsed: methodMeta?.title || selectedMethod,
-      paymentBreakdown: breakdown,
-      paymentStatus,
-      outstandingBalance: remainingAmount,
-      discountApplied: discountAmount,
-      bankAccountCode: bankAccount?.code,
-      bankAccountName: bankAccount?.name,
-      summary,
-    };
+  const decide = (decision: SimulatedDecision) => {
+    const resolve = decideSimulated.current;
+    decideSimulated.current = null;
+    setPhase('opening');
+    setStep('working');
+    resolve?.(decision);
+  };
 
-    onComplete(result);
-  }, [
-    validateForm,
-    selectedMethod,
-    bankAccountId,
-    creditReceivedAmount,
-    creditReceivedVia,
-    cardType,
-    reference,
-    chequeNumber,
-    chequeDate,
-    bankName,
-    onlinePaymentType,
-    providerName,
-    splitRows,
-    remainingAmount,
-    subtotal,
-    discountType,
-    discountValue,
-    discountAmount,
-    finalAmount,
-    calculatedPaidAmount,
-    payBackAmount,
-    paymentDueDate,
-    onComplete,
-  ]);
+  const footer =
+    step === 'detail' ? (
+      <Button label={ctaLabel} onPress={handleConfirm} size="lg" style={styles.cta} />
+    ) : step === 'simulate' ? (
+      <View style={styles.simulateActions}>
+        <Button label={t('paymentSheet.simulated.approve')} onPress={() => decide('approve')} size="lg" style={styles.cta} />
+        <Button
+          label={t('paymentSheet.simulated.decline')}
+          onPress={() => decide('decline')}
+          variant="outline"
+          size="lg"
+          style={styles.cta}
+        />
+      </View>
+    ) : undefined;
+
+  const closeIfIdle = () => {
+    // Closing the test screen cancels the test payment; the sheet stays for another try.
+    if (step === 'simulate') {
+      decide('cancel');
+      return;
+    }
+    // Don't drop the sheet from under an open Stripe sheet or a request in flight.
+    if (step !== 'working') onClose();
+  };
 
   return (
     <AppBottomSheet
       visible={visible}
       title={t('paymentSheet.title')}
       subtitle={t('paymentSheet.processingFor', { title })}
-      onClose={onClose}
+      onClose={closeIfIdle}
+      footer={footer}
     >
       <View style={styles.content}>
-        {/* Header Summary */}
-        <PaymentSummaryCard
-          title={title}
-          subtitle={subtitle}
-          amount={amount}
-        />
+        <PaymentSummaryCard title={title} subtitle={subtitle} amount={finalAmount} />
 
-        {/* Optional Discount Selector */}
-        {allowDiscount ? (
-          <DiscountSelector
-            discountType={discountType}
-            discountValue={discountValue}
-            onChange={(type, val) => {
-              setDiscountType(type);
-              setDiscountValue(val);
-            }}
-          />
+        {notice ? (
+          <View style={[styles.notice, { backgroundColor: theme.error + '12', borderColor: theme.error + '40' }]}>
+            <Feather name="alert-circle" size={16} color={theme.error} />
+            <Typography variant="bodySmall" style={[styles.noticeText, { color: theme.error }]}>
+              {notice}
+            </Typography>
+          </View>
         ) : null}
 
-        {/* Payment Method Selection Grid */}
-        <PaymentMethodGrid
-          selectedMethod={selectedMethod}
-          onSelectMethod={(m) => {
-            setSelectedMethod(m);
-            setErrors({});
+        <Animated.View
+          style={{
+            opacity: fade,
+            transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
           }}
-        />
+        >
+          {step === 'methods' ? (
+            <View style={styles.stepBody}>
+              {allowDiscount ? (
+                <DiscountSelector
+                  discountType={discountType}
+                  discountValue={discountValue}
+                  onChange={(type, val) => {
+                    setDiscountType(type);
+                    setDiscountValue(val);
+                  }}
+                />
+              ) : null}
+              <PaymentMethodGrid
+                options={options}
+                payer={payer}
+                unavailable={unavailable}
+                onSelectMethod={openMethod}
+              />
+            </View>
+          ) : null}
 
-        {/* Dynamic Payment Form */}
-        {selectedMethod === 'cash' ? (
-          <CashPaymentForm
-            finalAmount={finalAmount}
-            paidAmount={paidAmount}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onPaidAmountChange={setPaidAmount}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
+          {step === 'detail' ? (
+            <View style={styles.stepBody}>
+              <Pressable
+                onPress={() => {
+                  setNotice(null);
+                  setStep('methods');
+                }}
+                accessibilityRole="button"
+                style={styles.back}
+                hitSlop={8}
+              >
+                <Feather name="chevron-left" size={18} color={theme.primary} />
+                <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
+                  {t('paymentSheet.allMethods')}
+                </Typography>
+              </Pressable>
 
-        {selectedMethod === 'card' ? (
-          <CardPaymentForm
-            finalAmount={finalAmount}
-            paidAmount={paidAmount}
-            cardType={cardType}
-            reference={reference}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onPaidAmountChange={setPaidAmount}
-            onCardTypeChange={setCardType}
-            onReferenceChange={setReference}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
+              {isOnline(method) ? <OnlineStep methodType={method} amount={finalAmount} /> : null}
+              {method === 'cash' ? <CashStep payer={payer} amount={finalAmount} /> : null}
+              {method === 'credit' ? (
+                <CreditStep
+                  payer={payer}
+                  total={finalAmount}
+                  payNow={creditNow}
+                  onPayNowChange={setCreditNow}
+                  via={creditVia}
+                  availableOnline={availableOnline}
+                  onViaChange={setCreditVia}
+                  dueDate={dueDate}
+                  onDueDateChange={setDueDate}
+                />
+              ) : null}
+              {method === 'mixed' ? (
+                <MixedStep
+                  payer={payer}
+                  total={finalAmount}
+                  cashPart={mixedCash}
+                  onCashPartChange={setMixedCash}
+                  via={mixedVia}
+                  availableOnline={availableOnline}
+                  onViaChange={setMixedVia}
+                />
+              ) : null}
+            </View>
+          ) : null}
 
-        {selectedMethod === 'credit' ? (
-          <CreditPaymentForm
-            finalAmount={finalAmount}
-            receivedAmount={creditReceivedAmount}
-            receivedVia={creditReceivedVia}
-            cardType={cardType}
-            reference={reference}
-            chequeNumber={chequeNumber}
-            bankName={bankName}
-            bankAccountId={bankAccountId}
-            onlinePaymentType={onlinePaymentType}
-            providerName={providerName}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onReceivedAmountChange={setCreditReceivedAmount}
-            onReceivedViaChange={setCreditReceivedVia}
-            onCardTypeChange={setCardType}
-            onReferenceChange={setReference}
-            onChequeNumberChange={setChequeNumber}
-            onBankNameChange={setBankName}
-            onBankAccountIdChange={setBankAccountId}
-            onOnlinePaymentTypeChange={setOnlinePaymentType}
-            onProviderNameChange={setProviderName}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
+          {step === 'simulate' && simulated ? (
+            <SimulatedStep methodType={simulated.methodType} amount={simulated.amount} />
+          ) : null}
 
-        {selectedMethod === 'cheque' ? (
-          <ChequePaymentForm
-            finalAmount={finalAmount}
-            paidAmount={paidAmount}
-            chequeNumber={chequeNumber}
-            bankName={bankName}
-            chequeDate={chequeDate}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onPaidAmountChange={setPaidAmount}
-            onChequeNumberChange={setChequeNumber}
-            onBankNameChange={setBankName}
-            onChequeDateChange={setChequeDate}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
-
-        {selectedMethod === 'bank_transfer' ? (
-          <BankTransferPaymentForm
-            finalAmount={finalAmount}
-            paidAmount={paidAmount}
-            reference={reference}
-            bankAccountId={bankAccountId}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onPaidAmountChange={setPaidAmount}
-            onReferenceChange={setReference}
-            onBankAccountIdChange={setBankAccountId}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
-
-        {selectedMethod === 'online' ? (
-          <OnlinePaymentForm
-            finalAmount={finalAmount}
-            paidAmount={paidAmount}
-            onlinePaymentType={onlinePaymentType}
-            providerName={providerName}
-            reference={reference}
-            paymentDueDate={paymentDueDate}
-            errors={errors}
-            onPaidAmountChange={setPaidAmount}
-            onOnlinePaymentTypeChange={setOnlinePaymentType}
-            onProviderNameChange={setProviderName}
-            onReferenceChange={setReference}
-            onDueDateChange={setPaymentDueDate}
-          />
-        ) : null}
-
-        {selectedMethod === 'mixed' ? (
-          <MixedPaymentForm
-            finalAmount={finalAmount}
-            rows={splitRows}
-            errors={errors}
-            onRowsChange={setSplitRows}
-          />
-        ) : null}
-
-        {/* Action Button */}
-        <Button
-          label={
-            <Trans
-              i18nKey="paymentSheet.completePayment"
-              components={{ amount: <CurrencyValue amount={finalAmount} decimals={2} /> }}
-            />
-          }
-          onPress={handleComplete}
-          size="lg"
-          style={styles.actionButton}
-          loading={isProcessing}
-        />
+          {step === 'working' ? (
+            <View style={styles.working}>
+              <View style={[styles.spinnerRing, { backgroundColor: theme.primary + '12' }]}>
+                <ActivityIndicator size="large" color={theme.primary} />
+              </View>
+              <Typography variant="subtitle" style={[styles.workingTitle, { color: theme.text }]}>
+                {t(phase === 'opening' ? 'paymentSheet.processing.opening' : 'paymentSheet.processing.finishing')}
+              </Typography>
+              <Typography variant="bodySmall" style={{ color: theme.textSecondary }}>
+                {t('paymentSheet.processing.keepOpen')}
+              </Typography>
+            </View>
+          ) : null}
+        </Animated.View>
       </View>
     </AppBottomSheet>
   );
@@ -480,7 +432,48 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: Spacing.four,
   },
-  actionButton: {
-    marginTop: Spacing.two,
+  stepBody: {
+    gap: Spacing.three,
+  },
+  back: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 2,
+  },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  noticeText: {
+    flex: 1,
+  },
+  working: {
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.five,
+  },
+  spinnerRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.three,
+  },
+  workingTitle: {
+    fontWeight: '800',
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  cta: {
+    borderRadius: Radius.full,
+  },
+  simulateActions: {
+    gap: Spacing.two,
   },
 });

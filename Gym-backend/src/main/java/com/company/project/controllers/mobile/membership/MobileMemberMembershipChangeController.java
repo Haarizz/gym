@@ -7,6 +7,7 @@ import com.company.project.dto.mobile.membership.MobileMembershipPlanDTO;
 import com.company.project.dto.mobile.membership.MobileMembershipPlanPageDTO;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.membership.MobileMemberMembershipChangeService;
+import com.company.project.services.payments.StripePaymentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +20,12 @@ import java.util.Map;
 public class MobileMemberMembershipChangeController {
 
     private final MobileMemberMembershipChangeService membershipChangeService;
+    private final StripePaymentService stripePaymentService;
 
-    public MobileMemberMembershipChangeController(MobileMemberMembershipChangeService membershipChangeService) {
+    public MobileMemberMembershipChangeController(MobileMemberMembershipChangeService membershipChangeService,
+                                                  StripePaymentService stripePaymentService) {
         this.membershipChangeService = membershipChangeService;
+        this.stripePaymentService = stripePaymentService;
     }
 
     @GetMapping("/plans")
@@ -43,7 +47,10 @@ public class MobileMemberMembershipChangeController {
     public ResponseEntity<Map<String, String>> changePlan(
             @RequestBody MembershipChangeRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl principal) {
-        membershipChangeService.changePlan(request, principal);
+        stripePaymentService.withVerifiedPayments(request.getPaymentBreakdown(), true, null, () -> {
+            membershipChangeService.changePlan(request, principal);
+            return null;
+        });
         return ResponseEntity.ok(Map.of("message", "Membership plan changed successfully"));
     }
 }

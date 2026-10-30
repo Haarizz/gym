@@ -31,6 +31,15 @@ const bookings = {
       REFUNDED: '已退回钱包',
       NOT_REFUNDABLE: '未退款',
       VOIDED: '未扣费',
+      rejected: '付款被拒：{{reason}}',
+    },
+
+    rejected: {
+      title: '付款被拒',
+      subtitle: '健身房未批准这些预约的付款，因此已取消。',
+      reasonLabel: '原因',
+      notCharged: '未收取任何费用。',
+      bookAgain: '重新预约',
     },
 
     cancelledToastTitle: '预约已取消',

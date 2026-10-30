@@ -99,6 +99,7 @@ function toSplitDTO(s: PaymentSplit) {
     bank_account_name: s.bankAccountName,
     online_payment_type: s.onlinePaymentType,
     provider_name: s.providerName,
+    stripe_payment_intent_id: s.stripePaymentIntentId,
   };
 }
 

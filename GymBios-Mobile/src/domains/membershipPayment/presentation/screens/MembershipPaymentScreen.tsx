@@ -13,11 +13,13 @@ import { GlassSurface } from '@/shared/components';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import { PaymentBottomSheet } from '@/shared/payment';
-import type { PaymentResult } from '@/shared/payment/types';
+import type { PaymentMethod, PaymentResult } from '@/shared/payment/types';
 
 import { useOutstandingBalance } from '../../hooks/useOutstandingBalance';
 import { useSettleOutstandingBalance } from '../../hooks/useSettleOutstandingBalance';
 import { buildSettlementRequest, formatAmount, payBlockedMessage } from '../../domain/settlementRules';
+
+const SETTLEMENT_METHODS: PaymentMethod[] = ['card', 'upi', 'netbanking'];
 
 const MAX_2DP = { maximumFractionDigits: 2 };
 
@@ -217,6 +219,8 @@ export function MembershipPaymentScreen({ membershipId }: MembershipPaymentScree
           title={t('outstanding.completePayment')}
           subtitle={t('outstanding.sheetSubtitle', { amount: formatAmount(balance.payableAmount) })}
           allowDiscount={false}
+          // A balance is settled in full online — Cash / Credit / Mixed are refused here.
+          methods={SETTLEMENT_METHODS}
           isProcessing={settlement.isPending}
           onClose={() => setIsSheetOpen(false)}
           onComplete={handlePaymentEntered}

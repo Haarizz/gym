@@ -5,6 +5,7 @@ import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
 import com.company.project.dto.PaginationDTO;
 import com.company.project.dto.ReceiptResponseDTO;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.entities.Member;
 import com.company.project.entities.MemberAddon;
@@ -39,19 +40,22 @@ public class MemberAddonService {
     private final MemberRepository memberRepository;
     private final ReceiptService receiptService;
     private final WalletService walletService;
+    private final AddonPaymentService addonPaymentService;
 
     public MemberAddonService(MemberAddonRepository memberAddonRepository,
                                ReceiptVoucherService receiptVoucherService,
                                FinancialEventService financialEventService,
                                MemberRepository memberRepository,
                                ReceiptService receiptService,
-                               WalletService walletService) {
+                               WalletService walletService,
+                               AddonPaymentService addonPaymentService) {
         this.memberAddonRepository = memberAddonRepository;
         this.receiptVoucherService = receiptVoucherService;
         this.financialEventService = financialEventService;
         this.memberRepository = memberRepository;
         this.receiptService = receiptService;
         this.walletService = walletService;
+        this.addonPaymentService = addonPaymentService;
     }
 
     // ── Read ────────────────────────────────────────────────────────────────
@@ -254,18 +258,69 @@ public class MemberAddonService {
         return response;
     }
 
-    public MemberAddonResponseDTO updateAddonStatus(Long id, String status) {
+    /**
+     * Cancelling refunds what was paid to the payer's wallet (AddonPaymentService.settleCancellation),
+     * so a cancelled add-on can't be reactivated, and a payment awaiting approval is decided on
+     * the Approvals page rather than by flipping the status here.
+     */
+    public MemberAddonResponseDTO updateAddonStatus(Long id, String status, String changedBy) {
         MemberAddon addon = memberAddonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("MemberAddon not found with id: " + id));
-        addon.setStatus(status);
+        String current = addon.getStatus();
+        if (AddonPaymentService.STATUS_CANCELLED.equalsIgnoreCase(current)
+                || AddonPaymentService.STATUS_REJECTED.equalsIgnoreCase(current)) {
+            throw new BusinessRuleViolationException("A " + current.toLowerCase() + " add-on can't be changed");
+        }
+        if (AddonPaymentService.STATUS_CANCELLED.equalsIgnoreCase(status)) {
+            addonPaymentService.settleCancellation(addon, changedBy);
+            addon.setStatus(AddonPaymentService.STATUS_CANCELLED);
+        } else if (AddonPaymentService.STATUS_PENDING_APPROVAL.equalsIgnoreCase(current)) {
+            throw new BusinessRuleViolationException("Approve or reject this add-on's payment on the Approvals page first");
+        } else {
+            addon.setStatus(status);
+        }
         return MemberAddonResponseDTO.fromEntity(memberAddonRepository.save(addon));
     }
 
     public void deleteAddon(Long id) {
-        if (!memberAddonRepository.existsById(id)) {
-            throw new RuntimeException("MemberAddon not found with id: " + id);
+        MemberAddon addon = memberAddonRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("MemberAddon not found with id: " + id));
+        if (AddonPaymentService.STATUS_PENDING_APPROVAL.equalsIgnoreCase(addon.getStatus())) {
+            // Deleting it would strand the wallet debit and the pending receipt.
+            throw new BusinessRuleViolationException("Reject this add-on's payment on the Approvals page instead");
         }
         memberAddonRepository.deleteById(id);
+    }
+
+    // ── Payment approval (app purchases paid by Cash / Credit / Mixed) ──────
+
+    @Transactional(readOnly = true)
+    public List<MemberAddonResponseDTO> getPendingPaymentApprovals() {
+        return memberAddonRepository.findByStatusOrderByPurchaseDateAsc(AddonPaymentService.STATUS_PENDING_APPROVAL)
+                .stream()
+                .map(addon -> {
+                    MemberAddonResponseDTO dto = MemberAddonResponseDTO.fromEntity(addon);
+                    Receipt receipt = addonPaymentService.receiptFor(addon);
+                    if (receipt != null) {
+                        dto.setPaidAmount(receipt.getPaidAmount());
+                        dto.setDiscountAmount(receipt.getDiscountAmount());
+                        dto.setDiscountLabel(receipt.getDiscountLabel());
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public MemberAddonResponseDTO approvePayment(Long id, String approvedBy) {
+        MemberAddon addon = memberAddonRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("MemberAddon not found with id: " + id));
+        return MemberAddonResponseDTO.fromEntity(addonPaymentService.approve(addon, approvedBy));
+    }
+
+    public MemberAddonResponseDTO rejectPayment(Long id, String rejectedBy, String reason) {
+        MemberAddon addon = memberAddonRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("MemberAddon not found with id: " + id));
+        return MemberAddonResponseDTO.fromEntity(addonPaymentService.reject(addon, rejectedBy, reason));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

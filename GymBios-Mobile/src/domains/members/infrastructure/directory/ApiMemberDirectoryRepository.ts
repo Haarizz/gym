@@ -247,6 +247,7 @@ export class ApiMemberDirectoryRepository
                   bank_account_name: split.bankAccountName,
                   online_payment_type: split.onlinePaymentType,
                   provider_name: split.providerName,
+                  stripe_payment_intent_id: split.stripePaymentIntentId,
                 }))
               : undefined,
             discount_applied: request.discountApplied,

@@ -43,6 +43,8 @@ export interface MemberBookingData {
   refundMethod: RefundMethod | null;
   refundedAmount: number | null;
   cancelledBy: 'MEMBER' | 'STAFF' | null;
+  /** Why staff rejected the payment — set only on a booking cancelled by that rejection. */
+  rejectionReason: string | null;
 }
 
 export interface BookingStatsData {

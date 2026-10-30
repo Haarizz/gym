@@ -4,10 +4,16 @@ import com.company.project.dto.MemberAddonPageResponseDTO;
 import com.company.project.dto.MemberAddonRequestDTO;
 import com.company.project.dto.MemberAddonResponseDTO;
 import com.company.project.dto.ReceiptResponseDTO;
+import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.MemberAddonService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/member-addons")
@@ -36,6 +42,45 @@ public class MemberAddonController {
     }
 
     /**
+     * GET /api/member-addons/pending-approvals
+     * Add-ons members bought in the app with Cash/Credit/Mixed, awaiting reception
+     * approval — backs the Add-on Payments section of the web Approvals page.
+     */
+    @PreAuthorize("hasAuthority('MEMBERS_APPROVE')")
+    @GetMapping("/pending-approvals")
+    public ResponseEntity<List<MemberAddonResponseDTO>> getPendingPaymentApprovals() {
+        return ResponseEntity.ok(memberAddonService.getPendingPaymentApprovals());
+    }
+
+    /** POST /api/member-addons/{id}/approve-payment — activates the add-on and posts the payment. */
+    @PreAuthorize("hasAuthority('MEMBERS_APPROVE')")
+    @PostMapping("/{id}/approve-payment")
+    public ResponseEntity<MemberAddonResponseDTO> approvePayment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String approvedBy = principal != null ? principal.getUsername() : "Admin";
+        return ResponseEntity.ok(memberAddonService.approvePayment(id, approvedBy));
+    }
+
+    /**
+     * POST /api/member-addons/{id}/reject-payment
+     * Body: { "reason": "..." } — the add-on never starts and any wallet amount is returned.
+     */
+    @PreAuthorize("hasAuthority('MEMBERS_APPROVE')")
+    @PostMapping("/{id}/reject-payment")
+    public ResponseEntity<?> rejectPayment(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String reason = body != null ? body.get("reason") : null;
+        if (reason == null || reason.isBlank()) {
+            return ResponseEntity.badRequest().body("A rejection reason is required");
+        }
+        String rejectedBy = principal != null ? principal.getUsername() : "Admin";
+        return ResponseEntity.ok(memberAddonService.rejectPayment(id, rejectedBy, reason));
+    }
+
+    /**
      * GET /api/member-addons/{id}
      */
     @GetMapping("/{id}")
@@ -61,12 +106,15 @@ public class MemberAddonController {
 
     /**
      * PUT /api/member-addons/{id}/status?status=Cancelled
+     * Cancelling refunds what was paid to the member's wallet.
      */
     @PutMapping("/{id}/status")
     public ResponseEntity<MemberAddonResponseDTO> updateAddonStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
-        return ResponseEntity.ok(memberAddonService.updateAddonStatus(id, status));
+            @RequestParam String status,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        String changedBy = principal != null ? principal.getUsername() : "Staff";
+        return ResponseEntity.ok(memberAddonService.updateAddonStatus(id, status, changedBy));
     }
 
     /**

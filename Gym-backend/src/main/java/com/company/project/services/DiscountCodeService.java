@@ -133,6 +133,61 @@ public class DiscountCodeService {
         return discount;
     }
 
+    /** The Applicable Services entry that lets a promotion be used on add-on purchases. */
+    public static final String SERVICE_ADDONS = "Add-ons";
+
+    /**
+     * A code typed at an add-on checkout, priced on `gross`. Only a promotion whose
+     * Applicable Services include Add-ons qualifies — membership promotions and referral
+     * coupons don't. `buyer` as in resolve(); null skips the audience check.
+     */
+    public DiscountCodeDTO resolveForAddon(String rawCode, BigDecimal gross, PromotionAudience.Buyer buyer) {
+        if (rawCode == null || rawCode.isBlank()) {
+            throw new IllegalArgumentException("Code is required");
+        }
+        String code = rawCode.trim();
+
+        PromotionCampaignResponseDTO promo;
+        try {
+            promo = promotionService.validateByCode(code);
+        } catch (EntityNotFoundException notAPromotion) {
+            if (isCoupon(code)) {
+                throw new BusinessRuleViolationException("Referral coupons can't be used on add-ons");
+            }
+            throw new EntityNotFoundException("Invalid promotion code");
+        }
+        if (!appliesToAddons(promo)) {
+            throw new BusinessRuleViolationException(promo.getName() + " can't be used on add-ons");
+        }
+        if (buyer != null) PromotionAudience.require(promo, buyer);
+        return fromPromotion(promo, gross);
+    }
+
+    /** Spends an add-on promotion code (see resolveForAddon) at checkout; returns it with its discount on `gross`. */
+    @Transactional
+    public DiscountCodeDTO redeemForAddon(String code, BigDecimal gross, Long memberDbId) {
+        DiscountCodeDTO resolved = resolveForAddon(code, gross, null);
+        BigDecimal discount = resolved.getDiscountAmount();
+        // Checks the target audience for this member
+        promotionService.redeemPromotion(resolved.getPromotionId(), gross.subtract(discount), discount, memberDbId);
+        return resolved;
+    }
+
+    static boolean appliesToAddons(PromotionCampaignResponseDTO promo) {
+        if (promo.getApplicableServices() == null) return false;
+        return promo.getApplicableServices().stream()
+                .anyMatch(s -> s != null && s.replaceAll("[^A-Za-z]", "").equalsIgnoreCase("addons"));
+    }
+
+    private boolean isCoupon(String code) {
+        try {
+            couponService.validate(code.toUpperCase());
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     /**
      * percentage → gross × value / 100 (capped at maximumDiscount), free → all of gross,
      * anything else a flat amount. Never more than gross; rejects a gross under minimumPurchase.

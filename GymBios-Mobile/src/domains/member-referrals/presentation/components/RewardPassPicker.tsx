@@ -264,6 +264,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // Lets a long placeholder shrink instead of pushing Apply out of the card (web).
+    minWidth: 0,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: Radius.md,
@@ -273,6 +275,7 @@ const styles = StyleSheet.create({
     color: BrandColors.textPrimary,
   },
   applyButton: {
+    flexShrink: 0,
     backgroundColor: BrandColors.memberGold,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.four,

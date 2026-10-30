@@ -26,6 +26,7 @@ import com.company.project.dto.mobile.discovery.MobilePurchaseRequestDTO;
 import com.company.project.dto.MemberRequestDTO;
 import com.company.project.dto.MemberResponseDTO;
 import com.company.project.services.NotificationService;
+import com.company.project.services.payments.StripePaymentService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.persistence.EntityManagerFactory;
@@ -61,6 +62,7 @@ public class MobileDiscoveryController {
     private final MobileReferralResolutionService mobileReferralResolutionService;
     private final com.company.project.services.DiscountCodeService discountCodeService;
     private final MobileMemberStaffService memberStaffService;
+    private final StripePaymentService stripePaymentService;
 
     // Payment methods that require reception/admin approval before the member gets
     // app access — cash and credit need physical/manual verification that the money
@@ -86,7 +88,9 @@ public class MobileDiscoveryController {
             NotificationService notificationService,
             MobileReferralResolutionService mobileReferralResolutionService,
             com.company.project.services.DiscountCodeService discountCodeService,
-            MobileMemberStaffService memberStaffService) {
+            MobileMemberStaffService memberStaffService,
+            StripePaymentService stripePaymentService) {
+        this.stripePaymentService = stripePaymentService;
         this.globalDiscoveryRepository = globalDiscoveryRepository;
         this.branchRepository = branchRepository;
         this.branchImageRepository = branchImageRepository;
@@ -428,8 +432,11 @@ public class MobileDiscoveryController {
             memberRequest.setMembershipStartDate(todayIso);
 
             // Execute create (generates invoice/payment)
-            MemberResponseDTO createdMember = memberService.createMemberReplacingRejected(
-                    memberRequest, globalUserId, userDetails.getEmail());
+            // Card / UPI / Net banking legs are checked with Stripe first, and refunded
+            // if the membership can't be created.
+            MemberResponseDTO createdMember = stripePaymentService.withVerifiedPayments(
+                    request.getPaymentBreakdown(), true, null,
+                    () -> memberService.createMemberReplacingRejected(memberRequest, globalUserId, userDetails.getEmail()));
 
             // Note: Currently, createMember doesn't take globalUserId in the DTO,
             // we should technically set it on the Member entity.
