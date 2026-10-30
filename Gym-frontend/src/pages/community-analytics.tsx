@@ -403,8 +403,7 @@ interface StaffTargetRow { target: number; achieved: number; percentage: number 
 
 interface BaseData {
   members: Member[];
-  receipts: Receipt[];
-  target: number;                               // this month's gym-wide revenue target (0 = none set)
+  target: number;                              // this month's gym-wide revenue target (0 = none set)
   staffTargets: Map<string, StaffTargetRow>;    // this month's individual targets, by staff name
   monthly: MonthlyTrendPoint[];
   expenses: ExpenseByCategory[];
@@ -414,6 +413,7 @@ interface BaseData {
 }
 
 interface RangeData {
+  receipts: Receipt[];                          // bills and payments inside the fetch window only
   checkins: AttendanceRecord[] | null;          // null = attendance unavailable
   sales: Sale[] | null;                         // null = POS unavailable (no access / not set up)
 }
@@ -469,16 +469,12 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
     setLoadError(null);
     try {
       const now = new Date();
-      const [targets, members, receipts, monthly, dashboard, expenses, community, bookings] = await Promise.all([
+      const [targets, members, monthly, dashboard, expenses, community, bookings] = await Promise.all([
         staffService.getTargets(now.getFullYear(), now.getMonth() + 1).catch(() => [] as any[]),
-        // Members and receipts are required — a failure here must not render as "zero".
+        // Members are required — a failure here must not render as "zero".
         fetchAllPages(async page => {
           const r = await membersService.getMembers({}, { page, limit: 5000 });
           return { rows: r.members, totalPages: r.pagination.totalPages };
-        }),
-        fetchAllPages(async page => {
-          const r: any = await receiptsService.getReceipts({}, { page, limit: 5000 });
-          return { rows: (r?.receipts ?? []) as Receipt[], totalPages: Number(r?.pagination?.total_pages ?? r?.pagination?.totalPages ?? 1) };
         }),
         financialAnalyticsService.getMonthlyTrend(6).catch(() => [] as MonthlyTrendPoint[]),
         financialAnalyticsService.getDashboard().catch(() => null),
@@ -496,7 +492,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
         staffTargets.set(t.staff_name, { target, achieved, percentage: target > 0 ? (achieved / target) * 100 : 0 });
       });
       setBase({
-        members, receipts,
+        members,
         target: Number(institution?.revenue_target) || 0,
         staffTargets,
         monthly: monthly as MonthlyTrendPoint[],
@@ -510,7 +506,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
         community,
       });
     } catch (e: any) {
-      setLoadError(e?.message || "Couldn't load members and receipts");
+      setLoadError(e?.message || "Couldn't load members");
     } finally {
       setLoading(false);
     }
@@ -530,14 +526,25 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
 
   const loadRange = useCallback(async () => {
     setRangeLoading(true);
-    const [checkins, sales] = await Promise.all([
+    // Receipts only for the window the page shows — the whole history grows with every
+    // year a gym is on GymBios (an imported gym brings years of it) and isn't needed.
+    const receiptsTo = addDays(parseISO(fetchWindow.end), 1);
+    const [receipts, checkins, sales] = await Promise.all([
+      fetchAllPages(async page => {
+        const r: any = await receiptsService.getReceipts({ from: parseISO(fetchWindow.start), to: receiptsTo }, { page, limit: 2000 });
+        return { rows: (r?.receipts ?? []) as Receipt[], totalPages: Number(r?.pagination?.total_pages ?? r?.pagination?.totalPages ?? 1) };
+      }).catch((e: any) => {
+        // Required, like members: an error must not show as zero collections.
+        setLoadError(e?.message || "Couldn't load receipts");
+        return [] as Receipt[];
+      }),
       attendanceService.getAttendanceRange(fetchWindow.start, fetchWindow.end).then(r => r.items).catch(() => null),
       fetchAllPages(async page => {
         const r = await posApi.sales({ status: "COMPLETED", from: fetchWindow.start, to: fetchWindow.end, page, size: 200 });
         return { rows: r.transactions, totalPages: r.pagination.totalPages };
       }).catch(() => null),
     ]);
-    setRangeData({ checkins, sales });
+    setRangeData({ receipts, checkins, sales });
     setRangeLoading(false);
   }, [fetchWindow.start, fetchWindow.end]);
 
@@ -549,7 +556,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
   const txns = useMemo<Txn[]>(() => {
     if (!base) return [];
     const out: Txn[] = [];
-    base.receipts.forEach(r => { const t = receiptTxn(r); if (t) out.push(t); });
+    (rangeData?.receipts ?? []).forEach(r => { const t = receiptTxn(r); if (t) out.push(t); });
     (rangeData?.sales ?? []).forEach(s => { const t = saleTxn(s); if (t) out.push(t); });
     return out;
   }, [base, rangeData]);
@@ -625,7 +632,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
     const lapsedIn = (pred: (k: string) => boolean) => members.filter(m => hasLapsed(m, keys.today) && pred(endDateOf(m))).length;
     const lapsed = lapsedIn(inCur), prevLapsed = lapsedIn(inPrev);
     // Renewal bills raised in the period — paid or not (a renewal on account is still a renewal).
-    const renewalsIn = (pred: (k: string) => boolean) => base.receipts.filter(r => isRenewalBill(r) && pred(localKey(r.transaction_date || r.created_at))).length;
+    const renewalsIn = (pred: (k: string) => boolean) => (rangeData?.receipts ?? []).filter(r => isRenewalBill(r) && pred(localKey(r.transaction_date || r.created_at))).length;
     const renewals = renewalsIn(inCur), prevRenewals = renewalsIn(inPrev);
 
     const payments = cur.length, prevPayments = prev.length;
@@ -636,7 +643,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
       newMembers, prevNewMembers, newBuckets, lapsed, prevLapsed, renewals, prevRenewals,
       payments, prevPayments, avgTicket, prevAvgTicket,
     };
-  }, [base, txns, keys, ranges]);
+  }, [base, rangeData, txns, keys, ranges]);
 
   // ── Point-in-time member figures (not tied to the period) ──────────────────
   const roster = useMemo(() => {

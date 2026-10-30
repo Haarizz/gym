@@ -41,6 +41,8 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     Optional<Member> findByMemberId(String memberId);
 
+    List<Member> findByMemberIdIn(java.util.Collection<String> memberIds);
+
     Optional<Member> findByUserId(Long userId);
 
     Optional<Member> findByGlobalUserId(Long globalUserId);
@@ -169,6 +171,11 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE)
     long countEffectivelyActive(@Param("asOf") LocalDateTime asOf);
+
+    /** Rows of [membershipPlan, totalMembers, effectivelyActiveMembers] — the Manage Plans cards. */
+    @Query("SELECT m.membershipPlan, COUNT(m), SUM(CASE WHEN " + BIOS_EFFECTIVELY_ACTIVE + " THEN 1 ELSE 0 END) "
+            + "FROM Member m WHERE m.membershipPlan IS NOT NULL GROUP BY m.membershipPlan")
+    List<Object[]> countMembersByPlan(@Param("asOf") LocalDateTime asOf);
 
     /** Effectively active at :asOf among members who had joined by then — for month-end snapshots. */
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE + " AND " + BIOS_JOIN_DATE + " < :asOf")

@@ -1099,13 +1099,13 @@ public class ReceiptService {
                 .collect(Collectors.toList());
 
         // Payment method breakdown this month
-        Map<String, BigDecimal> breakdown = new LinkedHashMap<>();
-        for (Object[] row : receiptRepository.getPaymentMethodBreakdown(startOfMonth, endOfMonth)) {
-            String method = row[0] != null ? (String) row[0] : "Unknown";
-            BigDecimal total = row[2] instanceof BigDecimal ? (BigDecimal) row[2]
-                    : BigDecimal.valueOf(((Number) row[2]).doubleValue());
-            breakdown.put(method, total);
-        }
+        Map<String, BigDecimal> breakdown = methodBreakdown(startOfMonth, endOfMonth);
+
+        // Today, the same way (same day boundaries as the month above).
+        LocalDateTime startOfDay = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        BigDecimal todayCollection = receiptRepository.sumPaidInPeriod(startOfDay, endOfDay);
+        BigDecimal todayOnCredit = receiptRepository.sumPendingInPeriod(startOfDay, endOfDay);
 
         BillingStatsDTO stats = new BillingStatsDTO();
         stats.setMonthlyCollection(monthlyCollection);
@@ -1116,7 +1116,23 @@ public class ReceiptService {
         stats.setCollectionRate(Math.min(collectionRate, 100.0));
         stats.setMonthlyData(monthlyData);
         stats.setPaymentMethodBreakdown(breakdown);
+        stats.setMonthlyOnCredit(pendingThisMonth);
+        stats.setTodayCollection(todayCollection != null ? todayCollection : BigDecimal.ZERO);
+        stats.setTodayPaymentMethodBreakdown(methodBreakdown(startOfDay, endOfDay));
+        stats.setTodayOnCredit(todayOnCredit != null ? todayOnCredit : BigDecimal.ZERO);
         return stats;
+    }
+
+    /** Money received per payment method in [start, end). */
+    private Map<String, BigDecimal> methodBreakdown(LocalDateTime start, LocalDateTime end) {
+        Map<String, BigDecimal> breakdown = new LinkedHashMap<>();
+        for (Object[] row : receiptRepository.getPaymentMethodBreakdown(start, end)) {
+            String method = row[0] != null ? (String) row[0] : "Unknown";
+            BigDecimal total = row[2] instanceof BigDecimal ? (BigDecimal) row[2]
+                    : BigDecimal.valueOf(((Number) row[2]).doubleValue());
+            breakdown.merge(method, total, BigDecimal::add);
+        }
+        return breakdown;
     }
 
     // ── Member Dues ──────────────────────────────────────────────────────────

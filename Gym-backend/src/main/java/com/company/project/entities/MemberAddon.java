@@ -71,12 +71,12 @@ public class MemberAddon extends BaseEntity {
     @Column(name = "receipt_id")
     private Long receiptId;
 
-    // What came out of the member's wallet for an app purchase (V109) — given back
+    // What came out of the member's wallet for an app purchase (V110) — given back
     // if staff reject a Cash/Credit/Mixed payment.
     @Column(name = "wallet_amount", precision = 10, scale = 2)
     private BigDecimal walletAmount;
 
-    // Set once a cancelled add-on's payment has gone back to the member's wallet (V109).
+    // Set once a cancelled add-on's payment has gone back to the member's wallet (V110).
     @Column(name = "refunded_amount", precision = 10, scale = 2)
     private BigDecimal refundedAmount;
 

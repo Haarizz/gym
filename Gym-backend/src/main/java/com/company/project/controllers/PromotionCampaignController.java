@@ -106,8 +106,9 @@ public class PromotionCampaignController {
     }
 
     @GetMapping("/eligibility-members")
-    public ResponseEntity<List<EligibleMemberDTO>> getEligibilityMembers() {
-        return ResponseEntity.ok(promotionService.getEligibilityMembers());
+    public ResponseEntity<List<EligibleMemberDTO>> getEligibilityMembers(
+            @RequestParam(name = "member_id", required = false) Long memberId) {
+        return ResponseEntity.ok(promotionService.getEligibilityMembers(memberId));
     }
 
     @PostMapping("/apply-access-days")

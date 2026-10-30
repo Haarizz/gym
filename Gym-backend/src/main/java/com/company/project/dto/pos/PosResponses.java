@@ -289,6 +289,8 @@ public final class PosResponses {
 
     public record SessionsPage(List<SessionDTO> sessions, PageMeta pagination) {}
 
+    public record ReturnsPage(List<ReturnDTO> returns, PageMeta pagination) {}
+
     public record CashMovementDTO(
             Long id,
             Long posSessionId,

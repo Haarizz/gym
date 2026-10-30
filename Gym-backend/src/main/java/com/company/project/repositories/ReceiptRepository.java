@@ -49,6 +49,11 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     @Query("SELECT r FROM Receipt r WHERE r.memberDbId IN :memberDbIds AND r.transactionType IN ('New', 'Renewal') AND r.transactionDate < :before AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') ORDER BY r.transactionDate, r.id")
     List<Receipt> findMembershipReceiptsBefore(@Param("memberDbIds") List<Long> memberDbIds, @Param("before") LocalDateTime before);
 
+    // Every New/Renewal bill on these accounts, oldest first — the member profile's
+    // subscription timeline (a dependent's charges can sit on their family head's bills)
+    @Query("SELECT r FROM Receipt r WHERE r.memberDbId IN :memberDbIds AND r.transactionType IN ('New', 'Renewal') AND (r.approvalStatus IS NULL OR r.approvalStatus <> 'REJECTED') ORDER BY r.transactionDate, r.id")
+    List<Receipt> findMembershipReceipts(@Param("memberDbIds") List<Long> memberDbIds);
+
     // All receipts with real money received since a date (for monthly chart)
     @Query("SELECT r FROM Receipt r WHERE r.paidAmount > 0 AND r.transactionDate >= :start ORDER BY r.transactionDate")
     List<Receipt> findPaidSince(@Param("start") LocalDateTime start);
@@ -79,6 +84,10 @@ public interface ReceiptRepository extends JpaRepository<Receipt, Long>, JpaSpec
     // How many times a member has renewed — used to evaluate "renewal count" promotional
     // eligibility rules, since Member itself carries no renewal counter of its own.
     long countByMemberDbIdAndTransactionType(Long memberDbId, String transactionType);
+
+    // The same count for every member at once: [memberDbId, count]
+    @Query("SELECT r.memberDbId, COUNT(r) FROM Receipt r WHERE r.transactionType = :type AND r.memberDbId IS NOT NULL GROUP BY r.memberDbId")
+    List<Object[]> countByMemberForTransactionType(@Param("type") String transactionType);
 
     // Fallback: find full history by member name (handles receipts with stale/null memberDbId)
     List<Receipt> findByMemberNameOrderByTransactionDateAsc(String memberName);

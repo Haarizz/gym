@@ -135,9 +135,26 @@ public class MemberService {
                                              String membershipType, String paymentStatus,
                                              String plan, Integer expiringWithin, String dues,
                                              int page, int limit) {
+        return getMembers(search, status, membershipType, paymentStatus, plan, expiringWithin, dues, null, null, page, limit);
+    }
+
+    /**
+     * joinedFrom (inclusive) / joinedTo (exclusive) keep members who joined in that window
+     * (Members › New Members), listed newest join first.
+     */
+    public MembersPageResponseDTO getMembers(String search, String status,
+                                             String membershipType, String paymentStatus,
+                                             String plan, Integer expiringWithin, String dues,
+                                             LocalDateTime joinedFrom, LocalDateTime joinedTo,
+                                             int page, int limit) {
         Specification<Member> spec = buildSpec(search, status, membershipType, paymentStatus,
                 plan, expiringWithin, dues);
-        Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (joinedFrom != null) spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("joinDate"), joinedFrom));
+        if (joinedTo != null) spec = spec.and((root, q, cb) -> cb.lessThan(root.get("joinDate"), joinedTo));
+        Sort sort = joinedFrom != null || joinedTo != null
+                ? Sort.by(Sort.Direction.DESC, "joinDate").and(Sort.by(Sort.Direction.DESC, "createdAt"))
+                : Sort.by(Sort.Direction.DESC, "createdAt");
+        Pageable pageable = PageRequest.of(page - 1, limit, sort);
         Page<Member> memberPage = memberRepository.findAll(spec, pageable);
 
         List<MemberResponseDTO> dtos = memberPage.getContent().stream()
@@ -1148,12 +1165,11 @@ public class MemberService {
         RenewalReward reward = applyRenewalReward(member, request.getRewardPassId(), request.getCouponCode(),
                 request.getPromotionId());
 
-        // Compute new expiry from plan duration, extending from current expiry (or today)
+        // Compute new expiry from plan duration, extending from current expiry (or today if lapsed)
         if (member.getMembershipPlan() != null) {
             Optional<MembershipPlan> planOpt = planRepository.findByName(member.getMembershipPlan());
             if (planOpt.isPresent()) {
-                LocalDateTime base = member.getExpiryDate() != null
-                        ? member.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime base = renewalBase(member.getExpiryDate());
                 LocalDateTime newExpiry = computeExpiry(base, planOpt.get());
                 member.setMembershipEndDate(newExpiry);
                 member.setExpiryDate(newExpiry);
@@ -1369,7 +1385,7 @@ public class MemberService {
 
         if (minor.getMembershipPlan() != null) {
             planRepository.findByName(minor.getMembershipPlan()).ifPresent(plan -> {
-                LocalDateTime base = minor.getExpiryDate() != null ? minor.getExpiryDate() : LocalDateTime.now();
+                LocalDateTime base = renewalBase(minor.getExpiryDate());
                 LocalDateTime newExpiry = computeExpiry(base, plan);
                 minor.setMembershipEndDate(newExpiry);
                 minor.setExpiryDate(newExpiry);
@@ -1459,9 +1475,9 @@ public class MemberService {
         head.setMembershipFee(totalFee);
 
         // Extend expiry together for the head and every dependent from the head's
-        // current expiry (or today) — same base date, same duration, so the whole
-        // family stays in sync.
-        LocalDateTime base = head.getExpiryDate() != null ? head.getExpiryDate() : LocalDateTime.now();
+        // current expiry (or today if lapsed) — same base date, same duration, so the
+        // whole family stays in sync.
+        LocalDateTime base = renewalBase(head.getExpiryDate());
         LocalDateTime newExpiry = computeExpiry(base, plan);
         head.setMembershipEndDate(newExpiry);
         head.setExpiryDate(newExpiry);
@@ -1995,7 +2011,17 @@ public class MemberService {
 
     // ── Expiry computation ──────────────────────────────────────────────────
 
-    private LocalDateTime computeExpiry(LocalDateTime startDate, MembershipPlan plan) {
+    /**
+     * Where a renewal's new period starts: an early renewal keeps the days left and
+     * runs on from the current expiry; a lapsed one starts today. Extending from an
+     * expiry in the past left a member who paid today still expired.
+     */
+    static LocalDateTime renewalBase(LocalDateTime currentExpiry) {
+        LocalDateTime now = LocalDateTime.now();
+        return currentExpiry != null && currentExpiry.isAfter(now) ? currentExpiry : now;
+    }
+
+    static LocalDateTime computeExpiry(LocalDateTime startDate, MembershipPlan plan) {
         if (plan.getDurationValue() == null || plan.getDurationType() == null) return startDate;
         try {
             long val = Long.parseLong(plan.getDurationValue());

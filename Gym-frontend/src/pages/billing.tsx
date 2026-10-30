@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -36,19 +36,26 @@ import {
   ScrollText,
   UserRoundSearch,
   Baby,
-  Users
+  Users,
+  Receipt as ReceiptIcon,
+  ChevronDown,
+  Eye,
+  Wallet,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { toast } from 'sonner';
 import { billingService, BillingStats, MemberDue, MemberStatement } from '../utils/supabase/billing-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
-import type { Receipt, ReceiptFilters } from '../utils/supabase/receipts-service';
+import type { Receipt, ReceiptFilters, ReceiptsSummary } from '../utils/supabase/receipts-service';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
+import bs from './billing.module.css';
+import { CustomerCreditsPanel } from '../components/billing/CustomerCreditsPanel';
 import { ListPagination } from '../components/list-pagination';
 import { useDebouncedValue } from '../utils/use-debounced-value';
 import { membersService } from '../utils/supabase/members-service';
 import type { Member } from '../utils/supabase/members-service';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
-import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+import { downloadReceiptInvoice, downloadPaymentReceipt } from '../utils/receipt-invoice';
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
 import type { SalesInvoice } from '../utils/supabase/sales-invoice-service';
@@ -84,6 +91,33 @@ function salesInvoiceDue(inv: SalesInvoice): MemberDue {
     due_type: 'Sales Invoice',
     sales_invoice: inv,
   };
+}
+
+const METHOD_ICON: Record<string, ReactNode> = {
+  cash: <Wallet className="h-3.5 w-3.5 text-green-600" />,
+  card: <CreditCard className="h-3.5 w-3.5 text-blue-600" />,
+};
+
+/** Cash / Card / … received, largest first, then what was left on credit. */
+function MethodBreakdown({ methods, onCredit }: { methods?: Record<string, number>; onCredit?: number }) {
+  const rows = Object.entries(methods ?? {}).filter(([, v]) => Number(v) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 4);
+  if (rows.length === 0 && !(Number(onCredit) > 0)) return null;
+  return (
+    <div className={bs.breakdown}>
+      {rows.map(([method, amount]) => (
+        <div key={method} className={bs.breakdownRow}>
+          <span className={bs.breakdownMethod}>{METHOD_ICON[method.toLowerCase()] ?? <CreditCard className="h-3.5 w-3.5 text-slate-500" />}{method}</span>
+          <span className={bs.breakdownValue}><CurrencyGlyph /> {Number(amount).toLocaleString()}</span>
+        </div>
+      ))}
+      {Number(onCredit) > 0 && (
+        <div className={bs.breakdownRow}>
+          <span className={bs.breakdownMethod}><Clock className="h-3.5 w-3.5 text-orange-600" />On credit</span>
+          <span className={`${bs.breakdownValue} ${bs.credit}`}><CurrencyGlyph /> {Number(onCredit).toLocaleString()}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface BillingProps {
@@ -128,7 +162,7 @@ const toLocalIsoDate = (d: Date) =>
 
 export function Billing({ onNavigate }: BillingProps = {}) {
   const navigate = useNavigate();
-  const { currencyCode, currencyPrefix } = useCurrency();
+  const { currencyCode, currencyPrefix, formatCurrency } = useCurrency();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -136,7 +170,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [billingTab, setBillingTab] = useState("receipts");
   const [duesFilter, setDuesFilter] = useState<"all" | "overdue" | "due-soon">("all");
-  const [activeStatCard, setActiveStatCard] = useState<"monthly" | "overdue" | "due-soon" | "rate" | null>(null);
+  const [activeStatCard, setActiveStatCard] = useState<"today" | "monthly" | "overdue" | "due-soon" | "rate" | null>(null);
 
   // Send receipt dialog
   const [sendingReceipt, setSendingReceipt] = useState<Receipt | null>(null);
@@ -294,6 +328,18 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     return () => { cancelled = true; };
   }, [receiptBaseFilters, receiptDatePreset, receiptsPage]);
 
+  // Summary cards and the collection banner follow the same filters and period as the table.
+  const [receiptSummary, setReceiptSummary] = useState<ReceiptsSummary | null>(null);
+  // Member Receipts holds two lists: invoice receipts and customer (wallet) credits.
+  const [receiptsView, setReceiptsView] = useState<'invoices' | 'credits'>('invoices');
+  useEffect(() => {
+    let cancelled = false;
+    receiptsService.getSummary({ ...receiptBaseFilters, ...presetRange(receiptDatePreset) })
+      .then(sum => { if (!cancelled) setReceiptSummary(sum); })
+      .catch(() => { if (!cancelled) setReceiptSummary(null); });
+    return () => { cancelled = true; };
+  }, [receiptBaseFilters, receiptDatePreset]);
+
   // Chip counts: one count query per period.
   useEffect(() => {
     let cancelled = false;
@@ -335,7 +381,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  // The Receipt (payment received) and the Tax Invoice are separate documents.
   const handleDownloadReceipt = (receipt: Receipt) => {
+    downloadPaymentReceipt(receipt, currencyCode);
+  };
+  const handleDownloadInvoice = (receipt: Receipt) => {
     downloadReceiptInvoice(receipt, currencyCode);
   };
 
@@ -480,7 +530,33 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       `}</style>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={bs.statGrid}>
+        <Card
+          className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+          style={activeStatCard === 'today' ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          onClick={() => {
+            const next = activeStatCard === 'today' ? null : 'today';
+            setActiveStatCard(next);
+            setBillingTab('receipts');
+            setReceiptDatePreset(next ? 'today' : 'this-month');
+            setDuesFilter('all');
+          }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Collection</CardTitle>
+            <div className="p-2 rounded-lg bg-teal-50"><Wallet className="h-4 w-4 text-teal-700" /></div>
+          </CardHeader>
+          <CardContent>
+            {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+              <>
+                <div className="text-2xl font-bold"><CurrencyGlyph /> {Number(stats?.today_collection ?? 0).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Received today</p>
+                <MethodBreakdown methods={stats?.today_payment_method_breakdown} onCredit={stats?.today_on_credit} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <Card
           className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
           style={activeStatCard === 'monthly' ? { boxShadow: '0 0 0 2px #6366f1' } : undefined}
@@ -498,7 +574,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
             {loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : (
               <>
                 <div className="text-2xl font-bold"><CurrencyGlyph /> {Number(monthlyCollection).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Target: <CurrencyGlyph /> {monthlyTarget.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  Target: <CurrencyGlyph /> {monthlyTarget.toLocaleString()}
+                  {monthlyTarget > 0 ? ` (${Math.round((Number(monthlyCollection) / monthlyTarget) * 100)}%)` : ''}
+                </p>
+                <MethodBreakdown methods={stats?.payment_method_breakdown} onCredit={stats?.monthly_on_credit} />
               </>
             )}
           </CardContent>
@@ -587,12 +667,70 @@ export function Billing({ onNavigate }: BillingProps = {}) {
 
         {/* ── Member Receipts Tab ── */}
         <TabsContent value="receipts" className="space-y-6">
+          <div className={bs.viewSwitch} role="tablist" aria-label="Member receipts">
+            <button type="button" role="tab" aria-selected={receiptsView === 'invoices'} className={bs.viewTab}
+              data-active={receiptsView === 'invoices'} onClick={() => setReceiptsView('invoices')}>
+              <FileText /> Invoice Receipts
+              <span className={bs.viewCount}>{(presetCounts.all ?? receiptsTotal).toLocaleString()}</span>
+            </button>
+            <button type="button" role="tab" aria-selected={receiptsView === 'credits'} className={bs.viewTab}
+              data-active={receiptsView === 'credits'} onClick={() => setReceiptsView('credits')}>
+              <Wallet /> Customer Credits
+            </button>
+          </div>
+
+          {receiptsView === 'credits' ? <CustomerCreditsPanel /> : (<>
+          {/* Summary for the current filters and period */}
+          <div className={bs.cards}>
+            {[
+              { label: "Total Receipts", value: receiptSummary ? receiptSummary.total.toLocaleString() : "—", tone: "blue", icon: <FileText /> },
+              { label: "Paid", value: receiptSummary ? receiptSummary.paid.toLocaleString() : "—", tone: "green", icon: <CheckCircle /> },
+              { label: "Pending / Partial", value: receiptSummary ? (receiptSummary.pending + receiptSummary.partial + receiptSummary.overdue).toLocaleString() : "—", tone: "amber", icon: <Clock /> },
+              { label: "Total Collected", value: receiptSummary ? formatCurrency(receiptSummary.received) : "—", tone: "teal", icon: <Wallet /> },
+            ].map(card => (
+              <div key={card.label} className={bs.card}>
+                <div>
+                  <div className={bs.cardLabel}>{card.label}</div>
+                  <div className={bs.cardValue}>{card.value}</div>
+                </div>
+                <span className={bs.cardIcon} data-tone={card.tone}>{card.icon}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className={bs.banner}>
+            <div className={bs.bannerMain}>
+              <span className={bs.bannerIcon}><Wallet /></span>
+              <div>
+                <div className={bs.bannerLabel}>
+                  Total collected · {RECEIPT_DATE_PRESETS.find(p => p.value === receiptDatePreset)?.label ?? "All"}
+                </div>
+                <div className={bs.bannerValue}>{receiptSummary ? formatCurrency(receiptSummary.received) : "—"}</div>
+              </div>
+            </div>
+            {receiptSummary && (
+              <div className={bs.bannerSide}>
+                <div className={bs.bannerLabel}>Receipts</div>
+                <div className={bs.bannerSideValue}>
+                  {receiptSummary.paid} paid{receiptSummary.partial > 0 ? ` · ${receiptSummary.partial} partial` : ""}
+                </div>
+                {receiptSummary.partial_due > 0 && (
+                  <div className={bs.bannerLabel}>{formatCurrency(receiptSummary.partial_due)} still due on partial bills</div>
+                )}
+              </div>
+            )}
+          </div>
+
           <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Member Receipts</CardTitle>
-                  <CardDescription>All payment receipts and transaction history</CardDescription>
+                  <CardTitle className={bs.tableTitle}>
+                    <FileText className="h-4 w-4 text-primary" />
+                    All Invoice Receipts
+                    <span className={bs.count}>{receiptsTotal.toLocaleString()}</span>
+                  </CardTitle>
+                  <CardDescription>Open a receipt to print it, or use More to view or send it</CardDescription>
                 </div>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm" onClick={handleExportAllReceipts} disabled={exportingReceipts}>
@@ -688,16 +826,15 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Receipt #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Receipt / Invoice</TableHead>
                       <TableHead>Member</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Amount Paid</TableHead>
-                      <TableHead>Transaction Date &amp; Time</TableHead>
-                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Payment</TableHead>
                       <TableHead>Remaining Due</TableHead>
-                      <TableHead>Created By</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -708,7 +845,21 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                             receipt number. Two payments made at different times are NEVER
                             merged into one row; only legs paid within the SAME payment
                             event (below) are combined under one receipt. */}
-                        <TableCell className="font-medium">{receipt.receipt_no}</TableCell>
+                        <TableCell>
+                          {receipt.transaction_date ? (
+                            <>
+                              <div className={bs.when}>{new Date(receipt.transaction_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                              <div className={bs.whenSub}>
+                                {new Date(receipt.transaction_date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                {receipt.processed_by ? ` · ${receipt.processed_by}` : ""}
+                              </div>
+                            </>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className={bs.receiptNo}>{receipt.receipt_no}</div>
+                          {receipt.invoice_no && <div className={bs.invoiceNo}>{receipt.invoice_no}</div>}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <Avatar className="h-8 w-8">
@@ -746,9 +897,6 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                           )}
                         </TableCell>
                         <TableCell>
-                          {receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleString() : '-'}
-                        </TableCell>
-                        <TableCell>
                           <div className="flex items-center">
                             <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
                             {receipt.payment_method ?? '-'}
@@ -757,39 +905,36 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                         <TableCell className={Number(receipt.balance_after ?? 0) > 0 ? 'text-red-600 font-medium' : ''}>
                           <CurrencyGlyph /> {Number(receipt.balance_after ?? 0).toLocaleString()}
                         </TableCell>
-                        <TableCell>{receipt.processed_by ?? '-'}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(getDisplayStatus(receipt))}>{getDisplayStatus(receipt)}</Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            {/* View Details */}
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
-                              title="View Details"
-                              onClick={() => setSelectedReceipt(receipt)}
-                            >
-                              <FileText className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            {/* Download */}
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 border-primary/20 hover:bg-green-50"
-                              title="Download Receipt"
-                              onClick={() => handleDownloadReceipt(receipt)}
-                            >
-                              <Download className="h-4 w-4 text-green-600" />
-                            </Button>
-                            {/* Send */}
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 border-primary/20 hover:bg-purple-50"
-                              title="Send Receipt"
-                              onClick={() => { setSendingReceipt(receipt); setSendChannels([]); }}
-                            >
-                              <Send className="h-4 w-4 text-purple-600" />
-                            </Button>
+                          <div className={bs.actions}>
+                            <button type="button" className={bs.primaryAction} onClick={() => handleDownloadReceipt(receipt)} title="Print the payment receipt">
+                              <ReceiptIcon /> Receipt
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-8 px-2.5">
+                                  More <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuItem onClick={() => setSelectedReceipt(receipt)}>
+                                  <Eye className="h-4 w-4 mr-2 text-blue-600" /> View details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadInvoice(receipt)}>
+                                  <FileText className="h-4 w-4 mr-2 text-purple-600" /> Tax invoice
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadReceipt(receipt)}>
+                                  <Printer className="h-4 w-4 mr-2 text-teal-600" /> Print receipt
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => { setSendingReceipt(receipt); setSendChannels([]); }}>
+                                  <Send className="h-4 w-4 mr-2 text-green-600" /> Send to member
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -803,6 +948,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               )}
             </CardContent>
           </Card>
+          </>)}
         </TabsContent>
 
         {/* ── Member Due Tab ── */}
@@ -1500,8 +1646,11 @@ export function Billing({ onNavigate }: BillingProps = {}) {
               </div>
             </div>
             <DialogFooter>
+              <Button variant="outline" onClick={() => handleDownloadInvoice(selectedReceipt)}>
+                <FileText className="mr-2 h-4 w-4" />Tax Invoice
+              </Button>
               <Button variant="outline" onClick={() => handleDownloadReceipt(selectedReceipt)}>
-                <Download className="mr-2 h-4 w-4" />Download
+                <Download className="mr-2 h-4 w-4" />Receipt
               </Button>
               <Button onClick={() => { setSendingReceipt(selectedReceipt); setSendChannels([]); setSelectedReceipt(null); }}>
                 <Send className="mr-2 h-4 w-4" />Send Receipt

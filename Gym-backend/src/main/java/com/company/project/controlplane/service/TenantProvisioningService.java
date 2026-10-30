@@ -589,6 +589,10 @@ public class TenantProvisioningService {
             stmt.execute("DROP TABLE IF EXISTS reviews");                         // V53
             stmt.execute("DROP TABLE IF EXISTS user_identity_providers");          // V57
             stmt.execute("DROP TABLE IF EXISTS mobile_pending_social_registrations"); // V57
+            // V108 renames V106's workout_break_start_time to break_start_time; the schema
+            // export already made that column from the entity, so the rename would fail.
+            // (break_minutes, the other one, is cleared by V107 before V108.)
+            stmt.execute("ALTER TABLE IF EXISTS attendance DROP COLUMN IF EXISTS break_start_time");
         }
     }
 

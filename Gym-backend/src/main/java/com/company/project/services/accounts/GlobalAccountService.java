@@ -97,12 +97,25 @@ public class GlobalAccountService {
                                   String rawPassword, String createdBy) {
         validateUsername(username);
         validatePassword(rawPassword);
+        return createDeskAccountHashed(fullName, username, email, phone, passwordEncoder.encode(rawPassword), createdBy);
+    }
+
+    /** A password hashed for {@link #createDeskAccountHashed} — bulk sign-up hashes the shared one once. */
+    public String hashPassword(String rawPassword) {
+        validatePassword(rawPassword);
+        return passwordEncoder.encode(rawPassword);
+    }
+
+    /** {@link #createDeskAccount} with the password already hashed ({@link #hashPassword}). */
+    public long createDeskAccountHashed(String fullName, String username, String email, String phone,
+                                        String passwordHash, String createdBy) {
+        validateUsername(username);
         String cleanEmail = email != null && !email.isBlank() ? email.trim() : null;
         Long id = transactions.execute(status -> {
             Long userId = jdbc.queryForObject(
                     "INSERT INTO users (username, email, password_hash, enabled, email_verified, created_at, created_by)"
                             + " VALUES (?, ?, ?, TRUE, FALSE, NOW(), ?) RETURNING id",
-                    Long.class, username.trim(), cleanEmail, passwordEncoder.encode(rawPassword), createdBy);
+                    Long.class, username.trim(), cleanEmail, passwordHash, createdBy);
             int roles = jdbc.update(
                     "INSERT INTO user_roles (user_id, role_id, created_at, created_by)"
                             + " SELECT ?, id, NOW(), ? FROM roles WHERE role_name = 'MEMBER'",

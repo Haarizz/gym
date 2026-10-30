@@ -60,6 +60,7 @@ import {
   Settings,
   ChevronRight,
   Sparkles,
+  Printer,
 } from "lucide-react";
 import { Progress } from "./ui/progress";
 import {
@@ -79,6 +80,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { toast } from "sonner@2.0.3";
 
 interface BudgetItem {
   id: string;
@@ -101,9 +103,24 @@ export function Budgeting() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [budgetSearch, setBudgetSearch] = useState("");
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
+  const [reportType, setReportType] = useState("performance");
+  const [reportStatus, setReportStatus] = useState("all");
+  const [budgetForm, setBudgetForm] = useState({
+    budgetType: "Monthly",
+    department: "",
+    category: "",
+    branch: "",
+    budgetAmount: "",
+    alertThreshold: "80",
+    responsiblePerson: "",
+    notes: "",
+  });
 
   // Sample Budget Data
-  const budgets: BudgetItem[] = [
+  const [budgets, setBudgets] = useState<BudgetItem[]>([
     {
       id: "BDG001",
       category: "Utilities",
@@ -216,7 +233,7 @@ export function Budgeting() {
       status: "Overspent",
       branch: "Dubai Marina",
     },
-  ];
+  ]);
 
   // Branch Budget Summary
   const branchSummary = [
@@ -226,7 +243,7 @@ export function Budgeting() {
   ];
 
   // Pending Approvals
-  const pendingApprovals = [
+  const [pendingApprovals, setPendingApprovals] = useState([
     {
       id: "BGT-102",
       category: "Inventory",
@@ -251,7 +268,7 @@ export function Budgeting() {
       status: "Revision Requested",
       date: "2024-11-17",
     },
-  ];
+  ]);
 
   // AI Insights
   const aiInsights = [
@@ -321,8 +338,20 @@ export function Budgeting() {
   // Calculate Totals
   const filteredBudgets =
     selectedBranch === "all"
-      ? budgets
-      : budgets.filter((b) => b.branch === selectedBranch);
+      ? budgets.filter((budget) =>
+          [budget.id, budget.category, budget.department, budget.responsiblePerson]
+            .join(" ")
+            .toLowerCase()
+            .includes(budgetSearch.toLowerCase()),
+        )
+      : budgets.filter(
+          (budget) =>
+            budget.branch === selectedBranch &&
+            [budget.id, budget.category, budget.department, budget.responsiblePerson]
+              .join(" ")
+              .toLowerCase()
+              .includes(budgetSearch.toLowerCase()),
+        );
 
   const totalBudget = filteredBudgets.reduce((sum, b) => sum + b.budgetAmount, 0);
   const totalSpent = filteredBudgets.reduce((sum, b) => sum + b.spent, 0);
@@ -333,6 +362,73 @@ export function Budgeting() {
   const totalSavings = filteredBudgets
     .filter((b) => b.remaining > 0)
     .reduce((sum, b) => sum + b.remaining, 0);
+
+  const reportBudgets =
+    reportStatus === "all"
+      ? filteredBudgets
+      : filteredBudgets.filter((budget) => budget.status.toLowerCase() === reportStatus);
+  const reportAllocation = reportBudgets.reduce((sum, budget) => sum + budget.budgetAmount, 0);
+  const reportSpend = reportBudgets.reduce((sum, budget) => sum + budget.spent, 0);
+  const reportVariance = reportAllocation - reportSpend;
+  const reportUtilization = reportAllocation > 0 ? (reportSpend / reportAllocation) * 100 : 0;
+  const departmentReportRows = Object.values(
+    reportBudgets.reduce<
+      Record<
+        string,
+        {
+          department: string;
+          budgetCount: number;
+          allocation: number;
+          spend: number;
+          variance: number;
+          utilization: number;
+          exceptions: number;
+        }
+      >
+    >((groups, budget) => {
+      const current = groups[budget.department] || {
+        department: budget.department,
+        budgetCount: 0,
+        allocation: 0,
+        spend: 0,
+        variance: 0,
+        utilization: 0,
+        exceptions: 0,
+      };
+      current.budgetCount += 1;
+      current.allocation += budget.budgetAmount;
+      current.spend += budget.spent;
+      current.variance = current.allocation - current.spend;
+      current.utilization = current.allocation > 0 ? (current.spend / current.allocation) * 100 : 0;
+      if (budget.status !== "Safe") current.exceptions += 1;
+      groups[budget.department] = current;
+      return groups;
+    }, {}),
+  ).sort((a, b) => b.allocation - a.allocation);
+  const reportTitle =
+    reportType === "variance"
+      ? "Detailed Variance Analysis"
+      : reportType === "utilization"
+        ? "Budget Utilization & Threshold Report"
+        : reportType === "department"
+          ? "Department Budget Consolidation"
+          : "Detailed Budget Performance";
+  const reportDescription =
+    reportType === "variance"
+      ? "Compares approved allocation with actual expenditure and classifies favourable and unfavourable variance."
+      : reportType === "utilization"
+        ? "Tracks consumption, available headroom, alert thresholds, threshold gaps, and accountable budget owners."
+        : reportType === "department"
+          ? "Consolidates all filtered budget lines by department with spend, variance, utilization, and control exceptions."
+          : "Provides the complete budget ledger with allocation, actual spend, remaining value, utilization, status, and ownership.";
+  const reportCommentary =
+    reportType === "variance"
+      ? `${reportBudgets.filter((budget) => budget.remaining < 0).length} budget lines have unfavourable variance. The net variance is AED ${reportVariance.toLocaleString()}.`
+      : reportType === "utilization"
+        ? `${reportBudgets.filter((budget) => budget.percentage >= budget.alertThreshold).length} budget lines have reached or exceeded their configured alert threshold. Overall utilization is ${reportUtilization.toFixed(1)}%.`
+        : reportType === "department"
+          ? `${departmentReportRows.filter((department) => department.exceptions > 0).length} departments contain control exceptions. Review departments with utilization above 100% first.`
+          : `Overall utilization is ${reportUtilization.toFixed(1)}%. ${reportBudgets.filter((budget) => budget.status !== "Safe").length} budget lines require finance review.`;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -364,6 +460,240 @@ export function Budgeting() {
     }
   };
 
+  const resetBudgetForm = () => {
+    setBudgetForm({
+      budgetType: "Monthly",
+      department: "",
+      category: "",
+      branch: "",
+      budgetAmount: "",
+      alertThreshold: "80",
+      responsiblePerson: "",
+      notes: "",
+    });
+    setEditingBudgetId(null);
+  };
+
+  const openCreateBudget = () => {
+    resetBudgetForm();
+    setShowCreateDialog(true);
+  };
+
+  const openEditBudget = (budget: BudgetItem) => {
+    setEditingBudgetId(budget.id);
+    setBudgetForm({
+      budgetType: budget.budgetType,
+      department: budget.department,
+      category: budget.category,
+      branch: budget.branch || "",
+      budgetAmount: String(budget.budgetAmount),
+      alertThreshold: String(budget.alertThreshold),
+      responsiblePerson: budget.responsiblePerson,
+      notes: "",
+    });
+    setShowCreateDialog(true);
+  };
+
+  const saveBudget = () => {
+    const amount = Number(budgetForm.budgetAmount);
+    if (
+      !budgetForm.department ||
+      !budgetForm.category ||
+      !budgetForm.branch ||
+      !budgetForm.responsiblePerson ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      toast.error("Complete all required budget fields");
+      return;
+    }
+
+    if (editingBudgetId) {
+      setBudgets((current) =>
+        current.map((budget) => {
+          if (budget.id !== editingBudgetId) return budget;
+          const percentage = Math.round((budget.spent / amount) * 100);
+          return {
+            ...budget,
+            category: budgetForm.category,
+            department: budgetForm.department,
+            budgetType: budgetForm.budgetType,
+            budgetAmount: amount,
+            remaining: amount - budget.spent,
+            percentage,
+            responsiblePerson: budgetForm.responsiblePerson,
+            alertThreshold: Number(budgetForm.alertThreshold) || 80,
+            branch: budgetForm.branch,
+            status:
+              percentage > 100
+                ? "Overspent"
+                : percentage >= (Number(budgetForm.alertThreshold) || 80)
+                  ? "At Risk"
+                  : "Safe",
+          };
+        }),
+      );
+      toast.success("Budget updated successfully");
+    } else {
+      const newBudget: BudgetItem = {
+        id: `BDG${String(budgets.length + 1).padStart(3, "0")}`,
+        category: budgetForm.category,
+        department: budgetForm.department,
+        budgetType: budgetForm.budgetType,
+        budgetAmount: amount,
+        spent: 0,
+        remaining: amount,
+        percentage: 0,
+        responsiblePerson: budgetForm.responsiblePerson,
+        alertThreshold: Number(budgetForm.alertThreshold) || 80,
+        status: "Safe",
+        branch: budgetForm.branch,
+      };
+      setBudgets((current) => [...current, newBudget]);
+      toast.success(`${newBudget.id} created successfully`);
+    }
+    setShowCreateDialog(false);
+    resetBudgetForm();
+  };
+
+  const exportBudgets = () => {
+    const rows = [
+      ["ID", "Category", "Department", "Branch", "Type", "Budget AED", "Spent AED", "Remaining AED", "Status"],
+      ...filteredBudgets.map((budget) => [
+        budget.id,
+        budget.category,
+        budget.department,
+        budget.branch || "",
+        budget.budgetType,
+        budget.budgetAmount,
+        budget.spent,
+        budget.remaining,
+        budget.status,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `GymBios-Budgets-${selectedBranch === "all" ? "All-Branches" : selectedBranch}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success("Budget report exported");
+  };
+
+  const handleApproval = (id: string, action: "approve" | "reject" | "revise") => {
+    if (action === "revise") {
+      setPendingApprovals((current) =>
+        current.map((approval) =>
+          approval.id === id ? { ...approval, status: "Revision Requested" } : approval,
+        ),
+      );
+      toast.success(`${id} returned for revision`);
+      return;
+    }
+    setPendingApprovals((current) => current.filter((approval) => approval.id !== id));
+    toast.success(`${id} ${action === "approve" ? "approved" : "rejected"}`);
+  };
+
+  const generateReviewReport = () => {
+    const report = `GymBios Monthly Budget Review\n\nTotal Budget: AED ${totalBudget.toLocaleString()}\nTotal Spent: AED ${totalSpent.toLocaleString()}\nRemaining: AED ${totalRemaining.toLocaleString()}\nOverspend: AED ${totalOverspend.toLocaleString()}\nPending Approvals: ${pendingApprovals.length}`;
+    const url = URL.createObjectURL(new Blob([report], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "GymBios-Monthly-Budget-Review.txt";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success("Monthly review report generated");
+  };
+
+  const downloadManagementReport = () => {
+    const reportNames: Record<string, string> = {
+      performance: "Budget Performance",
+      variance: "Budget Variance",
+      utilization: "Budget Utilization",
+      department: "Department Budget",
+    };
+    const reportHeaders: Record<string, Array<string | number>> = {
+      performance: ["Budget ID", "Category", "Department", "Branch", "Allocated AED", "Actual AED", "Variance AED", "Utilization %", "Status", "Owner"],
+      variance: ["Budget ID", "Category", "Department", "Allocated AED", "Actual AED", "Variance AED", "Variance %", "Variance Type", "Status"],
+      utilization: ["Budget ID", "Category", "Owner", "Allocated AED", "Used AED", "Available AED", "Utilization %", "Alert Threshold %", "Threshold Gap %", "Status"],
+      department: ["Department", "Budget Lines", "Allocated AED", "Actual AED", "Variance AED", "Utilization %", "Control Exceptions"],
+    };
+    const detailRows: Array<Array<string | number>> =
+      reportType === "department"
+        ? departmentReportRows.map((department) => [
+            department.department,
+            department.budgetCount,
+            department.allocation,
+            department.spend,
+            department.variance,
+            department.utilization.toFixed(1),
+            department.exceptions,
+          ])
+        : reportBudgets.map((budget) => {
+            if (reportType === "variance") {
+              const variancePercent = budget.budgetAmount > 0 ? (budget.remaining / budget.budgetAmount) * 100 : 0;
+              return [
+                budget.id,
+                budget.category,
+                budget.department,
+                budget.budgetAmount,
+                budget.spent,
+                budget.remaining,
+                variancePercent.toFixed(1),
+                budget.remaining < 0 ? "Unfavourable" : "Favourable",
+                budget.status,
+              ];
+            }
+            if (reportType === "utilization") {
+              return [
+                budget.id,
+                budget.category,
+                budget.responsiblePerson,
+                budget.budgetAmount,
+                budget.spent,
+                budget.remaining,
+                budget.percentage,
+                budget.alertThreshold,
+                budget.alertThreshold - budget.percentage,
+                budget.status,
+              ];
+            }
+            return [
+              budget.id,
+              budget.category,
+              budget.department,
+              budget.branch || "",
+              budget.budgetAmount,
+              budget.spent,
+              budget.remaining,
+              budget.percentage,
+              budget.status,
+              budget.responsiblePerson,
+            ];
+          });
+    const rows: Array<Array<string | number>> = [
+      [`GymBios ${reportNames[reportType]} Report`],
+      [`Period: ${selectedPeriod}`, `Branch: ${selectedBranch === "all" ? "All Branches" : selectedBranch}`],
+      [`Status Filter: ${reportStatus === "all" ? "All Statuses" : reportStatus}`, `Generated: ${new Date().toLocaleString("en-AE")}`],
+      [],
+      reportHeaders[reportType],
+      ...detailRows,
+      [],
+      ["Report Totals", reportAllocation, reportSpend, reportVariance, reportUtilization.toFixed(1)],
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `GymBios-${reportNames[reportType].replaceAll(" ", "-")}-${selectedPeriod}.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(`${reportNames[reportType]} report downloaded`);
+  };
+
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
@@ -387,58 +717,66 @@ export function Budgeting() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={exportBudgets}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setActiveTab("governance")}>
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <Dialog
+            open={showCreateDialog}
+            onOpenChange={(open) => {
+              setShowCreateDialog(open);
+              if (!open) resetBudgetForm();
+            }}
+          >
             <DialogTrigger asChild>
-              <Button className="bg-[#2B7A78] hover:bg-[#1a4d4b] text-white">
+              <Button onClick={openCreateBudget} className="bg-[#2B7A78] hover:bg-[#1a4d4b] text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Budget
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Create New Budget</DialogTitle>
+                <DialogTitle>{editingBudgetId ? "Edit Budget" : "Create New Budget"}</DialogTitle>
                 <DialogDescription>
-                  Set up a new budget for a department or expense category
+                  {editingBudgetId
+                    ? "Update allocation, ownership, and alert controls."
+                    : "Set up a new budget for a department or expense category."}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Budget Type</Label>
-                    <Select defaultValue="monthly">
+                    <Select value={budgetForm.budgetType} onValueChange={(value) => setBudgetForm({ ...budgetForm, budgetType: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="custom">Custom</SelectItem>
+                        <SelectItem value="Yearly">Yearly</SelectItem>
+                        <SelectItem value="Quarterly">Quarterly</SelectItem>
+                        <SelectItem value="Monthly">Monthly</SelectItem>
+                        <SelectItem value="Custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Department</Label>
-                    <Select>
+                    <Select value={budgetForm.department} onValueChange={(value) => setBudgetForm({ ...budgetForm, department: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hr">HR</SelectItem>
-                        <SelectItem value="inventory">Inventory</SelectItem>
-                        <SelectItem value="fb">F&B</SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="utilities">Utilities</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
+                        <SelectItem value="HR">HR</SelectItem>
+                        <SelectItem value="Inventory">Inventory</SelectItem>
+                        <SelectItem value="F&B">F&B</SelectItem>
+                        <SelectItem value="Retail & F&B">Retail & F&B</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <SelectItem value="Utilities">Utilities</SelectItem>
+                        <SelectItem value="Marketing">Marketing</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -446,32 +784,31 @@ export function Budgeting() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select>
+                    <Select value={budgetForm.category} onValueChange={(value) => setBudgetForm({ ...budgetForm, category: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="utilities">Utilities</SelectItem>
-                        <SelectItem value="consumables">Consumables</SelectItem>
-                        <SelectItem value="equipment">Equipment Maintenance</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="inventory">Inventory Purchases</SelectItem>
-                        <SelectItem value="hr">HR & Staff</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="Utilities">Utilities</SelectItem>
+                        <SelectItem value="Consumables">Consumables</SelectItem>
+                        <SelectItem value="Equipment Maintenance">Equipment Maintenance</SelectItem>
+                        <SelectItem value="Marketing">Marketing</SelectItem>
+                        <SelectItem value="Inventory">Inventory Purchases</SelectItem>
+                        <SelectItem value="Staff Training">HR & Staff</SelectItem>
+                        <SelectItem value="Office Supplies">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Branch</Label>
-                    <Select>
+                    <Select value={budgetForm.branch} onValueChange={(value) => setBudgetForm({ ...budgetForm, branch: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select branch" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Branches</SelectItem>
-                        <SelectItem value="dubai">Dubai Marina</SelectItem>
-                        <SelectItem value="sharjah">Sharjah</SelectItem>
-                        <SelectItem value="abudhabi">Abu Dhabi</SelectItem>
+                        <SelectItem value="Dubai Marina">Dubai Marina</SelectItem>
+                        <SelectItem value="Sharjah">Sharjah</SelectItem>
+                        <SelectItem value="Abu Dhabi">Abu Dhabi</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -479,37 +816,39 @@ export function Budgeting() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Budget Amount (AED)</Label>
-                    <Input type="number" placeholder="0.00" />
+                    <Input type="number" placeholder="0.00" value={budgetForm.budgetAmount} onChange={(event) => setBudgetForm({ ...budgetForm, budgetAmount: event.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Alert Threshold (%)</Label>
-                    <Input type="number" placeholder="80" defaultValue="80" />
+                    <Input type="number" placeholder="80" value={budgetForm.alertThreshold} onChange={(event) => setBudgetForm({ ...budgetForm, alertThreshold: event.target.value })} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Responsible Person</Label>
-                  <Select>
+                  <Select value={budgetForm.responsiblePerson} onValueChange={(value) => setBudgetForm({ ...budgetForm, responsiblePerson: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Assign to" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ahmed">Ahmed Hassan</SelectItem>
-                      <SelectItem value="sarah">Sarah Johnson</SelectItem>
-                      <SelectItem value="mike">Mike Wilson</SelectItem>
-                      <SelectItem value="omar">Omar Al-Rashid</SelectItem>
+                      <SelectItem value="Ahmed Hassan">Ahmed Hassan</SelectItem>
+                      <SelectItem value="Sarah Johnson">Sarah Johnson</SelectItem>
+                      <SelectItem value="Mike Wilson">Mike Wilson</SelectItem>
+                      <SelectItem value="Omar Al-Rashid">Omar Al-Rashid</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Notes (Optional)</Label>
-                  <Input placeholder="Add any additional details..." />
+                  <Input placeholder="Add any additional details..." value={budgetForm.notes} onChange={(event) => setBudgetForm({ ...budgetForm, notes: event.target.value })} />
                 </div>
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button className="bg-[#2B7A78] hover:bg-[#1a4d4b]">Create Budget</Button>
+                <Button onClick={saveBudget} className="bg-[#2B7A78] hover:bg-[#1a4d4b]">
+                  {editingBudgetId ? "Save Changes" : "Create Budget"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -547,6 +886,68 @@ export function Budgeting() {
         </div>
       </div>
 
+      <Dialog open={Boolean(selectedBudget)} onOpenChange={(open) => !open && setSelectedBudget(null)}>
+        <DialogContent className="max-w-xl">
+          {selectedBudget && (
+            <>
+              <DialogHeader>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="font-mono text-xs text-[#2B7A78]">{selectedBudget.id}</span>
+                  <Badge className={getStatusColor(selectedBudget.status)}>{selectedBudget.status}</Badge>
+                </div>
+                <DialogTitle>{selectedBudget.category} Budget</DialogTitle>
+                <DialogDescription>
+                  {selectedBudget.department} · {selectedBudget.branch}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-3 py-3">
+                <div className="rounded-lg bg-[#DFF5F4] p-4">
+                  <p className="text-xs text-muted-foreground">Approved Budget</p>
+                  <p className="text-xl font-bold text-[#1F5A52]">AED {selectedBudget.budgetAmount.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-red-50 p-4">
+                  <p className="text-xs text-muted-foreground">Actual Spend</p>
+                  <p className="text-xl font-bold text-red-600">AED {selectedBudget.spent.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className={selectedBudget.remaining < 0 ? "font-semibold text-red-600" : "font-semibold text-green-600"}>
+                    AED {selectedBudget.remaining.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Utilization</p>
+                  <p className="font-semibold">{selectedBudget.percentage}%</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Budget Cycle</p>
+                  <p className="font-semibold">{selectedBudget.budgetType}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Budget Owner</p>
+                  <p className="font-semibold">{selectedBudget.responsiblePerson}</p>
+                </div>
+              </div>
+              <Progress value={Math.min(selectedBudget.percentage, 100)} className="h-2" />
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => setSelectedBudget(null)}>Close</Button>
+                <Button
+                  className="bg-[#2B7A78] hover:bg-[#1a4d4b]"
+                  onClick={() => {
+                    const budget = selectedBudget;
+                    setSelectedBudget(null);
+                    openEditBudget(budget);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Budget
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-white p-1 rounded-lg shadow-sm">
@@ -558,6 +959,7 @@ export function Budgeting() {
           </TabsTrigger>
           <TabsTrigger value="branches">Multi-Branch</TabsTrigger>
           <TabsTrigger value="analytics">BvA Analytics</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="intelligence">AI Intelligence</TabsTrigger>
           <TabsTrigger value="governance">Governance</TabsTrigger>
         </TabsList>
@@ -781,9 +1183,21 @@ export function Budgeting() {
                 <div className="flex gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input placeholder="Search budgets..." className="pl-10 w-64" />
+                    <Input
+                      placeholder="Search budgets..."
+                      className="pl-10 w-64"
+                      value={budgetSearch}
+                      onChange={(event) => setBudgetSearch(event.target.value)}
+                    />
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setBudgetSearch("");
+                      setSelectedBranch("all");
+                    }}
+                  >
                     <Filter className="h-4 w-4 mr-2" />
                     Filter
                   </Button>
@@ -854,10 +1268,10 @@ export function Budgeting() {
                         <TableCell className="text-sm">{budget.responsiblePerson}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" onClick={() => openEditBudget(budget)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedBudget(budget)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           </div>
@@ -925,15 +1339,15 @@ export function Budgeting() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleApproval(approval.id, "approve")}>
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Approve
                         </Button>
-                        <Button size="sm" variant="destructive">
+                        <Button size="sm" variant="destructive" onClick={() => handleApproval(approval.id, "reject")}>
                           <XCircle className="h-4 w-4 mr-2" />
                           Reject
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" onClick={() => handleApproval(approval.id, "revise")}>
                           <RefreshCcw className="h-4 w-4 mr-2" />
                           Revise
                         </Button>
@@ -1114,6 +1528,221 @@ export function Budgeting() {
           </div>
         </TabsContent>
 
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-6">
+          <Card className="border-[#2B7A78]/20 shadow-lg">
+            <CardHeader className="border-b bg-gradient-to-r from-[#DFF5F4] to-white">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#2B7A78]" />
+                    Budget Management Reports
+                  </CardTitle>
+                  <CardDescription>
+                    Generate audit-ready budget, variance, utilization, and departmental reports.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => window.print()}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </Button>
+                  <Button className="bg-[#2B7A78] text-white hover:bg-[#1a4d4b]" onClick={downloadManagementReport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download CSV
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Report Type</Label>
+                  <Select value={reportType} onValueChange={setReportType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="performance">Budget Performance</SelectItem>
+                      <SelectItem value="variance">Variance Analysis</SelectItem>
+                      <SelectItem value="utilization">Utilization Report</SelectItem>
+                      <SelectItem value="department">Department Report</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Budget Status</Label>
+                  <Select value={reportStatus} onValueChange={setReportStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="safe">Safe</SelectItem>
+                      <SelectItem value="at risk">At Risk</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="overspent">Overspent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch Scope</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted/20 px-3 text-sm">
+                    {selectedBranch === "all" ? "All Branches" : selectedBranch}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Reporting Period</Label>
+                  <div className="flex h-9 items-center rounded-md border bg-muted/20 px-3 text-sm capitalize">
+                    {selectedPeriod}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Card className="border-[#2B7A78]/15">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">Total Allocation</p>
+                    <p className="mt-1 text-xl font-bold text-[#1F5A52]">AED {reportAllocation.toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{reportBudgets.length} budget lines</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-[#2B7A78]/15">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">Actual Expenditure</p>
+                    <p className="mt-1 text-xl font-bold">AED {reportSpend.toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{reportUtilization.toFixed(1)}% utilized</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-[#2B7A78]/15">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">Net Variance</p>
+                    <p className={`mt-1 text-xl font-bold ${reportVariance < 0 ? "text-red-600" : "text-green-600"}`}>
+                      AED {reportVariance.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{reportVariance < 0 ? "Unfavourable" : "Favourable"} variance</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-[#2B7A78]/15">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">Control Exceptions</p>
+                    <p className="mt-1 text-xl font-bold text-orange-600">
+                      {reportBudgets.filter((budget) => budget.status !== "Safe").length}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Require finance review</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border">
+                <div className="flex items-center justify-between border-b bg-[#F7FAF9] px-4 py-3">
+                  <div>
+                    <p className="font-semibold">{reportTitle}</p>
+                    <p className="max-w-3xl text-xs text-muted-foreground">{reportDescription}</p>
+                  </div>
+                  <Badge variant="outline">{reportType === "department" ? departmentReportRows.length : reportBudgets.length} records</Badge>
+                </div>
+                <div className="overflow-x-auto">
+                  {reportType === "department" ? (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Department</TableHead><TableHead>Budget Lines</TableHead><TableHead className="text-right">Allocated</TableHead><TableHead className="text-right">Actual</TableHead><TableHead className="text-right">Variance</TableHead><TableHead>Utilization</TableHead><TableHead>Exceptions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {departmentReportRows.length > 0 ? departmentReportRows.map((department) => (
+                          <TableRow key={department.department}>
+                            <TableCell className="font-medium">{department.department}</TableCell>
+                            <TableCell>{department.budgetCount}</TableCell>
+                            <TableCell className="text-right font-medium">AED {department.allocation.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">AED {department.spend.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right font-medium ${department.variance < 0 ? "text-red-600" : "text-green-600"}`}>AED {department.variance.toLocaleString()}</TableCell>
+                            <TableCell><div className="min-w-24 space-y-1"><Progress value={Math.min(department.utilization, 100)} className="h-1.5" /><span className="text-xs text-muted-foreground">{department.utilization.toFixed(1)}%</span></div></TableCell>
+                            <TableCell><Badge className={department.exceptions > 0 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}>{department.exceptions}</Badge></TableCell>
+                          </TableRow>
+                        )) : <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No departments match the selected filters.</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  ) : reportType === "variance" ? (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Budget</TableHead><TableHead>Department</TableHead><TableHead className="text-right">Allocated</TableHead><TableHead className="text-right">Actual</TableHead><TableHead className="text-right">Variance</TableHead><TableHead>Variance %</TableHead><TableHead>Classification</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {reportBudgets.length > 0 ? reportBudgets.map((budget) => {
+                          const variancePercent = budget.budgetAmount > 0 ? (budget.remaining / budget.budgetAmount) * 100 : 0;
+                          return <TableRow key={budget.id}>
+                            <TableCell><button className="text-left" onClick={() => setSelectedBudget(budget)}><span className="block font-medium">{budget.category}</span><span className="font-mono text-xs text-muted-foreground">{budget.id}</span></button></TableCell>
+                            <TableCell>{budget.department}</TableCell>
+                            <TableCell className="text-right">AED {budget.budgetAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">AED {budget.spent.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right font-semibold ${budget.remaining < 0 ? "text-red-600" : "text-green-600"}`}>AED {budget.remaining.toLocaleString()}</TableCell>
+                            <TableCell className={variancePercent < 0 ? "text-red-600" : "text-green-600"}>{variancePercent.toFixed(1)}%</TableCell>
+                            <TableCell><Badge variant="outline" className={budget.remaining < 0 ? "border-red-200 text-red-700" : "border-green-200 text-green-700"}>{budget.remaining < 0 ? "Unfavourable" : "Favourable"}</Badge></TableCell>
+                            <TableCell><Badge className={getStatusColor(budget.status)}>{budget.status}</Badge></TableCell>
+                          </TableRow>;
+                        }) : <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">No variance records match the selected filters.</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  ) : reportType === "utilization" ? (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Budget</TableHead><TableHead>Owner</TableHead><TableHead className="text-right">Allocated</TableHead><TableHead className="text-right">Used</TableHead><TableHead className="text-right">Available</TableHead><TableHead>Utilization</TableHead><TableHead>Alert Threshold</TableHead><TableHead>Threshold Gap</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {reportBudgets.length > 0 ? reportBudgets.map((budget) => (
+                          <TableRow key={budget.id}>
+                            <TableCell><button className="text-left" onClick={() => setSelectedBudget(budget)}><span className="block font-medium">{budget.category}</span><span className="font-mono text-xs text-muted-foreground">{budget.id}</span></button></TableCell>
+                            <TableCell>{budget.responsiblePerson}</TableCell>
+                            <TableCell className="text-right">AED {budget.budgetAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">AED {budget.spent.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right ${budget.remaining < 0 ? "text-red-600" : "text-green-600"}`}>AED {budget.remaining.toLocaleString()}</TableCell>
+                            <TableCell><div className="min-w-28 space-y-1"><Progress value={Math.min(budget.percentage, 100)} className={`h-1.5 ${budget.percentage >= budget.alertThreshold ? "[&>div]:bg-orange-500" : "[&>div]:bg-[#2B7A78]"}`} /><span className="text-xs">{budget.percentage}%</span></div></TableCell>
+                            <TableCell>{budget.alertThreshold}%</TableCell>
+                            <TableCell className={budget.alertThreshold - budget.percentage < 0 ? "font-medium text-red-600" : "font-medium text-green-600"}>{budget.alertThreshold - budget.percentage > 0 ? "+" : ""}{budget.alertThreshold - budget.percentage}%</TableCell>
+                            <TableCell><Badge className={getStatusColor(budget.status)}>{budget.status}</Badge></TableCell>
+                          </TableRow>
+                        )) : <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No utilization records match the selected filters.</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Budget</TableHead><TableHead>Department</TableHead><TableHead>Branch</TableHead><TableHead>Cycle</TableHead><TableHead className="text-right">Allocated</TableHead><TableHead className="text-right">Actual</TableHead><TableHead className="text-right">Variance</TableHead><TableHead>Utilization</TableHead><TableHead>Status</TableHead><TableHead>Owner</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {reportBudgets.length > 0 ? reportBudgets.map((budget) => (
+                          <TableRow key={budget.id}>
+                            <TableCell><button className="text-left" onClick={() => setSelectedBudget(budget)}><span className="block font-medium">{budget.category}</span><span className="font-mono text-xs text-muted-foreground">{budget.id}</span></button></TableCell>
+                            <TableCell>{budget.department}</TableCell><TableCell>{budget.branch}</TableCell><TableCell>{budget.budgetType}</TableCell>
+                            <TableCell className="text-right font-medium">AED {budget.budgetAmount.toLocaleString()}</TableCell><TableCell className="text-right">AED {budget.spent.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right font-medium ${budget.remaining < 0 ? "text-red-600" : "text-green-600"}`}>AED {budget.remaining.toLocaleString()}</TableCell>
+                            <TableCell><div className="min-w-24 space-y-1"><Progress value={Math.min(budget.percentage, 100)} className="h-1.5" /><span className="text-xs text-muted-foreground">{budget.percentage}%</span></div></TableCell>
+                            <TableCell><Badge className={getStatusColor(budget.status)}>{budget.status}</Badge></TableCell><TableCell>{budget.responsiblePerson}</TableCell>
+                          </TableRow>
+                        )) : <TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">No budget records match the selected report filters.</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 text-red-600" />
+                    <div>
+                      <p className="font-semibold text-red-900">Exception Summary</p>
+                      <p className="mt-1 text-sm text-red-700">
+                        {reportBudgets.filter((budget) => budget.remaining < 0).length} budgets exceed allocation by a combined AED{" "}
+                        {reportBudgets.filter((budget) => budget.remaining < 0).reduce((sum, budget) => sum + Math.abs(budget.remaining), 0).toLocaleString()}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-[#2B7A78]/20 bg-[#DFF5F4] p-4">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="mt-0.5 h-5 w-5 text-[#2B7A78]" />
+                    <div>
+                      <p className="font-semibold text-[#1F5A52]">AI Report Commentary</p>
+                      <p className="mt-1 text-sm text-[#1F5A52]/80">
+                        {reportCommentary} Prioritize records above their configured threshold and review all unfavourable variances before the next approval cycle.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* AI Intelligence Tab */}
         <TabsContent value="intelligence" className="space-y-6">
           <Card className="shadow-lg border-[#2B7A78]/20 bg-gradient-to-r from-purple-50 to-blue-50">
@@ -1143,7 +1772,14 @@ export function Budgeting() {
                           "Projected electricity cost will exceed budget by 17% next month due to
                           seasonal usage."
                         </p>
-                        <Button size="sm" className="mt-3 bg-purple-600 hover:bg-purple-700">
+                        <Button
+                          size="sm"
+                          className="mt-3 bg-purple-600 hover:bg-purple-700"
+                          onClick={() => {
+                            const electricityBudget = budgets.find((budget) => budget.category === "Electricity");
+                            if (electricityBudget) openEditBudget(electricityBudget);
+                          }}
+                        >
                           Adjust Budget
                         </Button>
                       </div>
@@ -1167,7 +1803,15 @@ export function Budgeting() {
                           "Protein shake ingredient waste is high — implement portion control to
                           save AED 350/month."
                         </p>
-                        <Button size="sm" variant="outline" className="mt-3 border-blue-600 text-blue-600">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-3 border-blue-600 text-blue-600"
+                          onClick={() => {
+                            setBudgetSearch("F&B");
+                            setActiveTab("budgets");
+                          }}
+                        >
                           View Details
                         </Button>
                       </div>
@@ -1336,7 +1980,7 @@ export function Budgeting() {
                       <Badge className="bg-yellow-100 text-yellow-800">Pending Setup</Badge>
                     </div>
                   </div>
-                  <Button className="mt-4 bg-[#2B7A78] hover:bg-[#1a4d4b]">
+                  <Button className="mt-4 bg-[#2B7A78] hover:bg-[#1a4d4b]" onClick={() => toast.success("New governance rule draft created")}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add New Rule
                   </Button>
@@ -1367,7 +2011,7 @@ export function Budgeting() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" className="mt-4 border-blue-600 text-blue-600">
+                  <Button variant="outline" className="mt-4 border-blue-600 text-blue-600" onClick={generateReviewReport}>
                     <FileText className="h-4 w-4 mr-2" />
                     Generate Review Report
                   </Button>

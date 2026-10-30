@@ -218,6 +218,8 @@ export const posApi = {
   createReturn: (saleId: number, body: ReturnRequest) => request<SaleReturn>("POST", `/pos/transactions/${saleId}/returns`, body),
   returnsForSale: (saleId: number) => request<SaleReturn[]>("GET", `/pos/transactions/${saleId}/returns`),
   getReturn: (id: number) => request<SaleReturn>("GET", `/pos/returns/${id}`),
+  listReturns: (f: { search?: string; from?: string; to?: string; page?: number; size?: number }) =>
+    request<{ returns: SaleReturn[]; pagination: PageMeta }>("GET", `/pos/returns${qs(f)}`),
 
   // Held sales
   heldSales: () => request<HeldSale[]>("GET", "/pos/held-sales"),

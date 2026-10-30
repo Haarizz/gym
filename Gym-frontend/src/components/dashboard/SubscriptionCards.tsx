@@ -23,7 +23,7 @@ interface CardDef {
 // Renewals and upgrades share the Members → Renewals & Upgrades screen
 const CARDS: CardDef[] = [
   { key: 'new', title: 'Subscriptions\n(New)', icon: UserPlus, shades: ['#3b82f6', '#2563eb', '#1d4ed8'],
-    section: 'members/add', hint: 'Add a new member' },
+    section: 'members', params: { tab: 'new-members' }, hint: 'See the members who joined in this period' },
   { key: 'renew', title: 'Subscriptions\n(Renew)', icon: RotateCcw, shades: ['#22c55e', '#16a34a', '#15803d'],
     section: 'members', params: { tab: 'renewals' }, hint: 'Renew members who are due' },
   { key: 'upgrade', title: 'Subscriptions\n(Upgrades)', icon: TrendingUp, shades: ['#a855f7', '#9333ea', '#7e22ce'],
@@ -33,6 +33,9 @@ const CARDS: CardDef[] = [
   { key: 'dayPass', title: 'Day-Pass', icon: Ticket, shades: ['#6366f1', '#4f46e5', '#4338ca'],
     section: 'check-in', params: { tab: 'daily' }, hint: 'Check in a walk-in / daily visitor' },
 ];
+
+// The New Members tab opens on the same window as the dashboard period.
+const JOINED_PRESET: Record<string, string> = { today: 'today', week: 'this-week', month: 'this-month', lastMonth: 'last-month' };
 
 interface SubscriptionCardsProps {
   /** Overview period: today | week | month | lastMonth */
@@ -85,7 +88,9 @@ export function SubscriptionCards({ period, periodLabel, refreshKey = 0, onNavig
                 '--shade-600': card.shades[1],
                 '--shade-700': card.shades[2],
               } as React.CSSProperties}
-              onClick={() => onNavigate?.(card.section, card.params)}
+              onClick={() => onNavigate?.(card.section, card.key === 'new'
+                ? { ...card.params, joinedPreset: JOINED_PRESET[period] ?? 'today' }
+                : card.params)}
               title={card.hint}
             >
               <div className={styles.top}>

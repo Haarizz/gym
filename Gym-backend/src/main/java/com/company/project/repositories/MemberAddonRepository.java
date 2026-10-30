@@ -31,4 +31,6 @@ public interface MemberAddonRepository extends JpaRepository<MemberAddon, Long>,
 
     // App purchases paid by Cash/Credit/Mixed, awaiting staff approval — web Approvals page.
     List<MemberAddon> findByStatusOrderByPurchaseDateAsc(String status);
+
+    List<MemberAddon> findByMemberDbIdOrderByPurchaseDateAsc(Long memberDbId);
 }

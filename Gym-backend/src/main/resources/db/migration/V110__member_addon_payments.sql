@@ -1,4 +1,4 @@
--- V109__member_addon_payments.sql
+-- V110__member_addon_payments.sql
 -- A member buying an add-on in the app can now pay part of it from their wallet, and a
 -- Cash/Credit/Mixed payment waits for staff approval (status 'Pending Approval') like a
 -- paid booking does. wallet_amount is what came out of the wallet, so a rejected payment

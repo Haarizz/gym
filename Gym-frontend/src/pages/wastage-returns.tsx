@@ -19,7 +19,7 @@ import {
   TrendingDown, AlertTriangle, CheckCircle, Clock, Package,
   DollarSign, User, RefreshCw, Save, Send, X, Check, XCircle,
   Info, MoreHorizontal, Printer, TrendingUp, Activity,
-  ClipboardList, BarChart3
+  ClipboardList, BarChart3, RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +30,7 @@ import {
   WastageReturnStats,
 } from "../utils/supabase/wastage-return-service";
 import { productsService, Product } from "../utils/supabase/products-service";
+import { PosReturnsList } from "../components/wastage/PosReturnsList";
 import { printWhenFontReady, withPrintFont } from "../utils/print-font";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -588,6 +589,7 @@ export function WastageReturns() {
       <Tabs defaultValue="vouchers">
         <TabsList className="w-full flex">
           <TabsTrigger value="vouchers" className="flex-1"><ClipboardList className="mr-1.5 h-3.5 w-3.5" />Vouchers</TabsTrigger>
+          <TabsTrigger value="pos-returns" className="flex-1"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />POS Returns</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1"><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Analytics</TabsTrigger>
         </TabsList>
 
@@ -751,6 +753,11 @@ export function WastageReturns() {
               <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => { setPage(p => p + 1); loadData(page + 1); }}>Next</Button>
             </div>
           )}
+        </TabsContent>
+
+        {/* ── POS Returns Tab (read-only: refunded and restocked at the till) ── */}
+        <TabsContent value="pos-returns" className="mt-4">
+          <PosReturnsList />
         </TabsContent>
 
         {/* ── Analytics Tab ─────────────────────────────────────────────────── */}

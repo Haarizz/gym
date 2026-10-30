@@ -141,6 +141,17 @@ public class PosOperationsController {
 
     // ── Returns ─────────────────────────────────────────────────────────────
 
+    /** GET /api/pos/returns?search=&from=&to=&page=1&size=20 — every POS customer return, newest first */
+    @GetMapping("/returns")
+    public ResponseEntity<com.company.project.dto.pos.PosResponses.ReturnsPage> listReturns(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(returnService.list(search, from, to, page, size));
+    }
+
     @GetMapping("/returns/{id}")
     public ResponseEntity<ReturnDTO> getReturn(@PathVariable Long id) {
         return ResponseEntity.ok(returnService.get(id));

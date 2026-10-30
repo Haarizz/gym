@@ -201,6 +201,11 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [newMemberSearch, setNewMemberSearch] = useState("");
+  const [newMemberPlan, setNewMemberPlan] = useState("all");
+  const [newMemberDateRange, setNewMemberDateRange] = useState("today");
+  const [newMemberCustomFrom, setNewMemberCustomFrom] = useState("");
+  const [newMemberCustomTo, setNewMemberCustomTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
@@ -390,6 +395,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       case "suspended": return "bg-orange-100 text-orange-800";
       case "expired": return "bg-red-100 text-red-800";
       case "frozen": return "bg-[#327F74]/10 text-[#327F74]";
+      case "pending_approval": return "bg-amber-100 text-amber-800";
       default: return "bg-gray-100 text-gray-800";
     }
   };
@@ -624,6 +630,105 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     
     return [...pending, ...members];
   }, [pendingMembers, members]);
+
+  const getNewMemberDateBounds = () => {
+    const now = new Date();
+    const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    const today = startOfDay(now);
+    const dayOfWeek = (today.getDay() + 6) % 7;
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - dayOfWeek);
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+
+    switch (newMemberDateRange) {
+      case "yesterday": {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        return { from: yesterday, to: endOfDay(yesterday) };
+      }
+      case "this-week":
+        return { from: thisWeekStart, to: endOfDay(now) };
+      case "last-week": {
+        const from = new Date(thisWeekStart);
+        from.setDate(from.getDate() - 7);
+        const to = new Date(thisWeekStart);
+        to.setMilliseconds(-1);
+        return { from, to };
+      }
+      case "this-month":
+        return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfDay(now) };
+      case "last-month":
+        return {
+          from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+          to: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
+        };
+      case "this-quarter":
+        return { from: new Date(now.getFullYear(), currentQuarter * 3, 1), to: endOfDay(now) };
+      case "last-quarter": {
+        const quarterStartMonth = currentQuarter * 3 - 3;
+        return {
+          from: new Date(now.getFullYear(), quarterStartMonth, 1),
+          to: new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59, 999),
+        };
+      }
+      case "this-year":
+        return { from: new Date(now.getFullYear(), 0, 1), to: endOfDay(now) };
+      case "last-year":
+        return {
+          from: new Date(now.getFullYear() - 1, 0, 1),
+          to: new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999),
+        };
+      case "custom":
+        return {
+          from: newMemberCustomFrom ? new Date(`${newMemberCustomFrom}T00:00:00`) : new Date(0),
+          to: newMemberCustomTo ? new Date(`${newMemberCustomTo}T23:59:59.999`) : endOfDay(now),
+        };
+      default:
+        return { from: today, to: endOfDay(now) };
+    }
+  };
+
+  const availableNewMemberPlans = React.useMemo(
+    () => Array.from(new Set(combinedMembers.map((member) => getMembershipPlan(member as Member)).filter(Boolean))).sort(),
+    [combinedMembers],
+  );
+
+  const filteredNewMembers = React.useMemo(() => {
+    const { from, to } = getNewMemberDateBounds();
+    const normalizedSearch = newMemberSearch.trim().toLowerCase();
+    return combinedMembers
+      .filter((member) => {
+        const registrationValue =
+          (member as any).created_at ||
+          (member as any).join_date ||
+          (member as any).membership_start_date;
+        if (!registrationValue) return false;
+        const registrationDate = new Date(registrationValue);
+        if (Number.isNaN(registrationDate.getTime())) return false;
+        const matchesDate = registrationDate >= from && registrationDate <= to;
+        const matchesPlan = newMemberPlan === "all" || getMembershipPlan(member as Member) === newMemberPlan;
+        const matchesSearch =
+          !normalizedSearch ||
+          [member.name, member.email, member.phone, getMemberId(member as Member)]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedSearch);
+        return matchesDate && matchesPlan && matchesSearch;
+      })
+      .sort((a, b) => {
+        const aDate = new Date((a as any).created_at || (a as any).join_date || 0).getTime();
+        const bDate = new Date((b as any).created_at || (b as any).join_date || 0).getTime();
+        return bDate - aDate;
+      });
+  }, [
+    combinedMembers,
+    newMemberSearch,
+    newMemberPlan,
+    newMemberDateRange,
+    newMemberCustomFrom,
+    newMemberCustomTo,
+  ]);
 
   // Renewals & Upgrades helper functions
   const handleRenewalSearch = (value: string) => {
@@ -893,6 +998,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="members">All Members</TabsTrigger>
+          <TabsTrigger value="new-members">New Members</TabsTrigger>
           <TabsTrigger value="renewals">Renewals & Upgrades</TabsTrigger>
           <TabsTrigger value="addons">Add-ons</TabsTrigger>
           <TabsTrigger value="receipts">Member Receipts</TabsTrigger>
@@ -1161,6 +1267,241 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="new-members" className="space-y-6">
+          <Card className="overflow-hidden border-[#327F74]/20">
+            <CardHeader className="border-b bg-gradient-to-r from-[#DFF5F4] to-white">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserPlus className="h-5 w-5 text-[#327F74]" />
+                    New Members
+                  </CardTitle>
+                  <CardDescription>
+                    Members registered during the selected date period.
+                  </CardDescription>
+                </div>
+                <Badge className="w-fit bg-[#327F74] text-white">
+                  {filteredNewMembers.length} new {filteredNewMembers.length === 1 ? "member" : "members"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 p-6">
+              <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_220px_220px_auto]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search new members..."
+                    className="pl-10"
+                    value={newMemberSearch}
+                    onChange={(event) => setNewMemberSearch(event.target.value)}
+                  />
+                </div>
+                <Select value={newMemberPlan} onValueChange={setNewMemberPlan}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Membership plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Plans</SelectItem>
+                    {availableNewMemberPlans.map((plan) => (
+                      <SelectItem key={plan} value={plan}>{plan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={newMemberDateRange} onValueChange={setNewMemberDateRange}>
+                  <SelectTrigger>
+                    <CalendarDays className="mr-2 h-4 w-4 text-[#327F74]" />
+                    <SelectValue placeholder="Registration date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                    <SelectItem value="this-week">This Week</SelectItem>
+                    <SelectItem value="last-week">Last Week</SelectItem>
+                    <SelectItem value="this-month">This Month</SelectItem>
+                    <SelectItem value="last-month">Last Month</SelectItem>
+                    <SelectItem value="this-quarter">This Quarter</SelectItem>
+                    <SelectItem value="last-quarter">Last Quarter</SelectItem>
+                    <SelectItem value="this-year">This Year</SelectItem>
+                    <SelectItem value="last-year">Last Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setNewMemberSearch("");
+                    setNewMemberPlan("all");
+                    setNewMemberDateRange("today");
+                    setNewMemberCustomFrom("");
+                    setNewMemberCustomTo("");
+                  }}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset
+                </Button>
+              </div>
+
+              {newMemberDateRange === "custom" && (
+                <div className="flex flex-col gap-3 rounded-lg border border-[#327F74]/15 bg-[#F7FAF9] p-4 sm:flex-row sm:items-end">
+                  <div className="w-full space-y-2 sm:max-w-56">
+                    <Label htmlFor="new-member-from">From Date</Label>
+                    <Input
+                      id="new-member-from"
+                      type="date"
+                      value={newMemberCustomFrom}
+                      onChange={(event) => setNewMemberCustomFrom(event.target.value)}
+                    />
+                  </div>
+                  <div className="w-full space-y-2 sm:max-w-56">
+                    <Label htmlFor="new-member-to">To Date</Label>
+                    <Input
+                      id="new-member-to"
+                      type="date"
+                      min={newMemberCustomFrom || undefined}
+                      value={newMemberCustomTo}
+                      onChange={(event) => setNewMemberCustomTo(event.target.value)}
+                    />
+                  </div>
+                  <p className="pb-2 text-xs text-muted-foreground">
+                    Both start and end dates are included in the results.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-[#327F74]/15 bg-[#F0F8F6] p-4">
+                  <p className="text-xs text-muted-foreground">New Registrations</p>
+                  <p className="mt-1 text-2xl font-bold text-[#1F5A52]">{filteredNewMembers.length}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Active New Members</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-600">
+                    {filteredNewMembers.filter((member) => member.membership_status === "active").length}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Plans Represented</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {new Set(filteredNewMembers.map((member) => getMembershipPlan(member as Member))).size}
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-[#F7FAF9]">
+                        <TableHead>Member</TableHead>
+                        <TableHead>Registration Date</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Membership Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Expiry Date</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredNewMembers.length > 0 ? (
+                        filteredNewMembers.map((member) => {
+                          const registrationDate = new Date(
+                            (member as any).created_at ||
+                            (member as any).join_date ||
+                            (member as any).membership_start_date,
+                          );
+                          return (
+                            <TableRow key={member.id} className="hover:bg-[#F0F8F6]/60">
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-9 w-9">
+                                    <AvatarFallback className="bg-[#DFF5F4] text-[#1F5A52]">
+                                      {member.name.split(" ").map((name) => name[0]).join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{member.name}</p>
+                                    <p className="font-mono text-xs text-muted-foreground">{getMemberId(member as Member)}</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-[#327F74]" />
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {registrationDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {registrationDate.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <p className="font-medium">{getMembershipPlan(member as Member)}</p>
+                                <p className="text-xs text-muted-foreground">AED {getMembershipFee(member as Member).toLocaleString()}</p>
+                              </TableCell>
+                              <TableCell>{getMembershipCategory(member as Member)}</TableCell>
+                              <TableCell>
+                                <Badge className={getStatusBadgeClass(member.membership_status)}>
+                                  {member.membership_status === "pending_approval" ? "Pending Approval" : member.membership_status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <p className="text-sm">{member.phone}</p>
+                                <p className="max-w-48 truncate text-xs text-muted-foreground">{member.email}</p>
+                              </TableCell>
+                              <TableCell>
+                                {getMembershipEndDate(member as Member)
+                                  ? new Date(getMembershipEndDate(member as Member)).toLocaleDateString("en-GB")
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="View member profile"
+                                    onClick={() => openMemberHistory(getMemberId(member as Member))}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="View member analytics"
+                                    onClick={() => {
+                                      setSelectedMemberForAnalytics(member);
+                                      setAnalyticsTab("overview");
+                                    }}
+                                  >
+                                    <BarChart3 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="py-12 text-center">
+                            <UserPlus className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+                            <p className="font-medium">No new members found</p>
+                            <p className="text-sm text-muted-foreground">
+                              Adjust the plan or registration-date filters to see more records.
+                            </p>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

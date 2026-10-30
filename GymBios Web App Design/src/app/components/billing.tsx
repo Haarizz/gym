@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { toast } from 'sonner@2.0.3';
+import { MemberReceipts } from './member-receipts';
 
 const memberReceipts = [
   {
@@ -728,148 +729,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
         </TabsList>
 
         <TabsContent value="receipts" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Member Receipts</CardTitle>
-                  <CardDescription>All payment receipts and transaction history</CardDescription>
-                </div>
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filter
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search receipts..."
-                      className="pl-10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <Select value={selectedTransactionType} onValueChange={setSelectedTransactionType}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Transaction Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-transactions">All Transactions</SelectItem>
-                    <SelectItem value="registration">Registration</SelectItem>
-                    <SelectItem value="renewal">Renewal</SelectItem>
-                    <SelectItem value="upgrade">Upgrade</SelectItem>
-                    <SelectItem value="add-on">Add-on</SelectItem>
-                    <SelectItem value="member receipts">Member Receipts</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select defaultValue="this-month">
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="this-week">This Week</SelectItem>
-                    <SelectItem value="this-month">This Month</SelectItem>
-                    <SelectItem value="last-month">Last Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Receipt #</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredReceipts.map((receipt) => (
-                    <TableRow key={receipt.id}>
-                      <TableCell className="font-medium">
-                        {receipt.invoiceNumber}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={receipt.avatar} />
-                            <AvatarFallback>{receipt.memberName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{receipt.memberName}</div>
-                            <div className="text-sm text-muted-foreground">{receipt.memberEmail}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{receipt.service}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {receipt.transactionType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">AED {receipt.amount}</TableCell>
-                      <TableCell>{new Date(receipt.date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <CreditCard className="mr-2 h-4 w-4 text-muted-foreground" />
-                          {receipt.paymentMethod}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(receipt.status)}>
-                          {receipt.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => setSelectedReceipt(receipt)}>
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(receipt)}>
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEmailReceipt(receipt)}>
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handlePrintReceipt(receipt)}>
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <MemberReceipts onNavigate={onNavigate} embedded />
         </TabsContent>
 
         <TabsContent value="dues" className="space-y-6">

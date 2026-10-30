@@ -4,6 +4,7 @@ import { useBranch } from '../utils/branch-context';
 import { toast } from 'sonner';
 import { exportAsExcel } from '../utils/export-utils';
 import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
+import { ListPagination } from '../components/list-pagination';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -97,6 +98,9 @@ import {
 
 // Mock data removed
 
+/** General Ledger rows per page — a year of a busy gym is tens of thousands of lines. */
+const GL_PAGE_SIZE = 50;
+
 export function Ledgers() {
   const { currencyCode, currencySymbol } = useCurrency();
   const { activeBranchId } = useBranch();
@@ -137,6 +141,10 @@ export function Ledgers() {
   const [selectedGLAccount, setSelectedGLAccount] = useState('all');
   const [glDateFrom, setGlDateFrom] = useState('2026-01-01');
   const [glDateTo, setGlDateTo] = useState('2026-12-31');
+  // One page of entries at a time; the count and totals cover the whole filter.
+  const [glPage, setGlPage] = useState(1);
+  const [glTotals, setGlTotals] = useState({ total: 0, debit: 0, credit: 0 });
+  const [glLoading, setGlLoading] = useState(false);
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -203,12 +211,12 @@ export function Ledgers() {
     }
   }, [activeBranchId]);
 
-  const loadLedgerEntries = useCallback(async (code: string, from: string, to: string) => {
+  const loadLedgerEntries = useCallback(async (code: string, from: string, to: string, page: number) => {
+    setGlLoading(true);
     try {
-      const data = code === 'all'
-        ? await ledgersService.getAllLedgerEntries(from, to)
-        : await ledgersService.getLedgerEntries(code, from, to);
-      setLedgerEntries(data.map((e, idx) => ({
+      const result = await ledgersService.getLedgerPage(code, from, to, page, GL_PAGE_SIZE);
+      setGlTotals({ total: result.total, debit: result.totalDebit, credit: result.totalCredit });
+      setLedgerEntries(result.entries.map((e, idx) => ({
         id: `${e.sourceType}-${e.sourceId}-${e.date}-${idx}`,
         date: e.date,
         voucherNo: e.reference,
@@ -227,6 +235,8 @@ export function Ledgers() {
       })));
     } catch {
       toast.error('Failed to load ledger entries');
+    } finally {
+      setGlLoading(false);
     }
   }, [accounts, activeBranchId]);
 
@@ -303,11 +313,15 @@ export function Ledgers() {
     }
   }, [activeTab, loadTransactions]);
 
+  // A new account or date range starts again at the first page.
+  useEffect(() => { setGlPage(1); }, [selectedGLAccount, glDateFrom, glDateTo]);
+
+  // Only while the General Ledger tab is open — the other tabs don't need its entries.
   useEffect(() => {
-    if (glDateFrom && glDateTo) {
-      loadLedgerEntries(selectedGLAccount, glDateFrom, glDateTo);
+    if (activeTab === 'general-ledger' && glDateFrom && glDateTo) {
+      loadLedgerEntries(selectedGLAccount, glDateFrom, glDateTo, glPage);
     }
-  }, [selectedGLAccount, glDateFrom, glDateTo, loadLedgerEntries]);
+  }, [activeTab, selectedGLAccount, glDateFrom, glDateTo, glPage, loadLedgerEntries]);
 
   const getGroupIcon = (group: string) => {
     switch (group) {
@@ -378,14 +392,8 @@ export function Ledgers() {
     return matchesSearch && matchesStatus;
   });
 
-  const filteredGLEntries = ledgerEntries.filter(entry => {
-    const matchesAccount = selectedGLAccount === 'all' || entry.accountCode === selectedGLAccount;
-    const entryDate = new Date(entry.date);
-    const fromDate = new Date(glDateFrom);
-    const toDate = new Date(glDateTo);
-    
-    return matchesAccount && entryDate >= fromDate && entryDate <= toDate;
-  });
+  // The server already filters by account and dates.
+  const filteredGLEntries = ledgerEntries;
 
   const groupToType: Record<string, string> = {
     Assets: 'ASSET',
@@ -948,7 +956,7 @@ export function Ledgers() {
               <CardHeader>
                 <CardTitle>General Ledger Entries</CardTitle>
                 <CardDescription>
-                  All journal entries and transactions ({filteredGLEntries.length} entries)
+                  {glTotals.total.toLocaleString()} entries · Debit <CurrencyValue amount={glTotals.debit} /> · Credit <CurrencyValue amount={glTotals.credit} />
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1018,9 +1026,18 @@ export function Ledgers() {
                           </TableCell>
                         </TableRow>
                       ))}
+                      {!glLoading && filteredGLEntries.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                            No ledger entries for this account and date range.
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
+                <ListPagination page={glPage} pageSize={GL_PAGE_SIZE} total={glTotals.total}
+                  onPageChange={setGlPage} noun="entries" disabled={glLoading} />
               </CardContent>
             </Card>
           </TabsContent>

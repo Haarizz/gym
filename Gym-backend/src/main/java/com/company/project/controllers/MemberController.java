@@ -26,13 +26,15 @@ public class MemberController {
     private final TenantDataSources tenantDataSources;
     private final MemberAppAccountService appAccountService;
     private final com.company.project.services.payments.StripePaymentService stripePaymentService;
+    private final com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
                             LeadService leadService,
                             com.company.project.services.FamilyPlanChangeService familyPlanChangeService,
                             TenantDataSources tenantDataSources,
                             MemberAppAccountService appAccountService,
-                            com.company.project.services.payments.StripePaymentService stripePaymentService) {
+                            com.company.project.services.payments.StripePaymentService stripePaymentService,
+                            com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService) {
         this.stripePaymentService = stripePaymentService;
         this.memberService = memberService;
         this.freezeService = freezeService;
@@ -40,6 +42,7 @@ public class MemberController {
         this.familyPlanChangeService = familyPlanChangeService;
         this.tenantDataSources = tenantDataSources;
         this.appAccountService = appAccountService;
+        this.subscriptionTimelineService = subscriptionTimelineService;
     }
 
     /**
@@ -55,12 +58,16 @@ public class MemberController {
             @RequestParam(required = false) String plan,
             @RequestParam(name = "expiring_within", required = false) Integer expiringWithin,
             @RequestParam(required = false) String dues,
+            @RequestParam(name = "joined_from", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime joinedFrom,
+            @RequestParam(name = "joined_to", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime joinedTo,
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "20") int limit) {
 
         return ResponseEntity.ok(
                 memberService.getMembers(search, status, membershipType, paymentStatus,
-                        plan, expiringWithin, dues, page, limit)
+                        plan, expiringWithin, dues, joinedFrom, joinedTo, page, limit)
         );
     }
 
@@ -328,11 +335,40 @@ public class MemberController {
     }
 
     /**
+     * GET /api/members/freeze-allowances?ids=1,2,3 — the same allowance for several members
+     * in one call (Freeze / Unfreeze lists every frozen member), keyed by member id
+     */
+    @GetMapping("/freeze-allowances")
+    public ResponseEntity<java.util.Map<Long, java.util.Map<String, Object>>> freezeAllowances(
+            @RequestParam java.util.List<Long> ids,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        MembershipFreezeService.StaffActor actor = MembershipFreezeService.StaffActor.of(principal);
+        java.util.Map<Long, java.util.Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        for (Long id : ids.stream().distinct().limit(200).toList()) {
+            try {
+                out.put(id, freezeService.getAllowanceView(id, actor));
+            } catch (RuntimeException e) {
+                // A member that can't be read (deleted, other branch) is simply left out.
+            }
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /**
      * GET /api/members/{id}/freezes — every freeze recorded for the member, newest first
      */
     @GetMapping("/{id}/freezes")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> freezeHistory(@PathVariable Long id) {
         return ResponseEntity.ok(freezeService.getHistoryView(id));
+    }
+
+    /**
+     * GET /api/members/{id}/subscription-timeline — every plan period (bill, start,
+     * expiry), the freezes in it and the expiry they moved to, plus add-ons and PT
+     */
+    @GetMapping("/{id}/subscription-timeline")
+    public ResponseEntity<java.util.Map<String, Object>> subscriptionTimeline(@PathVariable Long id) {
+        return ResponseEntity.ok(subscriptionTimelineService.getTimeline(id));
     }
 
     /**

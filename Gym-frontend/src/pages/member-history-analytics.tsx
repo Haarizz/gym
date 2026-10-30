@@ -97,6 +97,7 @@ import { receiptsService } from '../utils/supabase/receipts-service';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
 import s from './member-history-analytics.module.css';
 import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
+import { SubscriptionTimeline } from '../components/members/SubscriptionTimeline';
 
 interface MemberHistoryAnalyticsProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
@@ -278,7 +279,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         messagingService.getMemberHistory(memberId),
         membersService.getNotes(memberId),
         addonsService.getAddons({ search: bizId, status: 'Active' }),
-        promotionsService.getEligibilityMembers(),
+        promotionsService.getEligibilityMembers(memberId),
         rewardService.getByMember(bizId),
         walletService.getWallet(bizId),
         referralService.getReferrals({ search: bizId, size: 50 }),
@@ -1050,6 +1051,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
           <Tabs defaultValue="timeline" className={`w-full ${s.tabsRoot}`}>
             <TabsList className={s.tabList}>
               <TabsTrigger value="timeline" className={s.tab}>Timeline</TabsTrigger>
+              <TabsTrigger value="subscription" className={s.tab}>Subscription</TabsTrigger>
               <TabsTrigger value="financial" className={s.tab}>Financial</TabsTrigger>
               <TabsTrigger value="transactions" className={s.tab}>Transactions<span className={s.count}>{totalTransactions}</span></TabsTrigger>
               <TabsTrigger value="usage" className={s.tab}>Gym usage</TabsTrigger>
@@ -1094,6 +1096,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                       ))}
                     </div>
                   )}
+                </TabsContent>
+
+                {/* Subscription: plan periods, freezes, renewals, PT */}
+                <TabsContent value="subscription" className="mt-0">
+                  {memberId && <SubscriptionTimeline memberId={memberId} refreshKey={member} />}
                 </TabsContent>
 
                 {/* Tab 2: Financial & Payment History */}

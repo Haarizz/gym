@@ -32,7 +32,7 @@ export interface PlanWizardData {
   attendancePeriod: string;
 
   // Step 4: Family Options (Family and Couple plans only)
-  familyBillingMode: string; // 'individual' | 'family_head' — the values the backend bills by
+  familyBillingMode: string; // always 'family_head' for Family / Couple plans (the head pays)
   pricePerMember: string;
   maxFamilyMembers: string;
   maxAdultMembers: string;
@@ -81,7 +81,7 @@ export const DEFAULT_PLAN_DATA: PlanWizardData = {
   attendancePeriod: '',
 
   // Same defaults as the web app's plan form.
-  familyBillingMode: 'individual',
+  familyBillingMode: 'family_head',
   pricePerMember: '',
   maxFamilyMembers: '',
   maxAdultMembers: '',
@@ -138,8 +138,8 @@ export function mapPlanToWizardData(plan?: MembershipPlan): PlanWizardData {
     attendanceLimit: plan.attendanceLimit ?? '',
     attendanceValue: plan.attendanceValue !== undefined ? String(plan.attendanceValue) : '',
     attendancePeriod: plan.attendancePeriod ?? '',
-    // Anything but 'family_head' (incl. older app builds' 'Per Family' etc.) is billed individually.
-    familyBillingMode: plan.familyBillingMode === 'family_head' ? 'family_head' : 'individual',
+    // Family / Couple plans always bill the head.
+    familyBillingMode: 'family_head',
     pricePerMember: plan.pricePerMember !== undefined ? String(plan.pricePerMember) : '',
     maxFamilyMembers: plan.maxFamilyMembers !== undefined ? String(plan.maxFamilyMembers) : '',
     maxAdultMembers: plan.maxAdultMembers !== undefined ? String(plan.maxAdultMembers) : '',
@@ -189,7 +189,7 @@ function buildRequest(data: PlanWizardData): MembershipPlanRequest {
     attendanceLimit: data.attendanceLimit || undefined,
     attendanceValue: data.attendanceValue ? Number(data.attendanceValue) : undefined,
     attendancePeriod: data.attendancePeriod || undefined,
-    familyBillingMode: isFamily ? data.familyBillingMode || 'individual' : undefined,
+    familyBillingMode: isFamily ? 'family_head' : undefined,
     pricePerMember: isFamily && data.pricePerMember ? Number(data.pricePerMember) : undefined,
     maxFamilyMembers: isFamilyOnly && data.maxFamilyMembers ? Number(data.maxFamilyMembers) : undefined,
     maxAdultMembers: isFamilyOnly && data.maxAdultMembers ? Number(data.maxAdultMembers) : undefined,
