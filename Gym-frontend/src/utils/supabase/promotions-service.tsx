@@ -247,9 +247,9 @@ class PromotionsService {
    * Real member data shaped for the policyRuleEngine, used to preview and
    * apply Promotional Access Days rules against actual members.
    */
-  async getEligibilityMembers(): Promise<EligibleMemberApi[]> {
+  async getEligibilityMembers(memberId?: string | number): Promise<EligibleMemberApi[]> {
     const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/promotions/eligibility-members`
+      `${backendBaseUrl}/promotions/eligibility-members${memberId != null ? `?member_id=${encodeURIComponent(String(memberId))}` : ''}`
     );
     if (!response.ok) throw new Error(`Failed to fetch eligibility members: ${response.status}`);
     return response.json();

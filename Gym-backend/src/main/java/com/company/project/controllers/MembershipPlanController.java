@@ -26,6 +26,12 @@ public class MembershipPlanController {
         return ResponseEntity.ok(planService.getPlans(status));
     }
 
+    /** Members per plan name (lower case): {"active": n, "total": n}. */
+    @GetMapping("/member-counts")
+    public ResponseEntity<Map<String, Map<String, Long>>> getMemberCounts() {
+        return ResponseEntity.ok(planService.getMemberCounts());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MembershipPlanResponseDTO> getPlanById(@PathVariable Long id) {
         return ResponseEntity.ok(planService.getPlanById(id));

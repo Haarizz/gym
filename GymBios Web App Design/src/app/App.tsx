@@ -201,6 +201,16 @@ const menuItems = [
         id: "training-streams",
       },
       {
+        title: "Trainings & Classes",
+        icon: GraduationCap,
+        id: "trainings-classes",
+      },
+      {
+        title: "Bookings",
+        icon: Calendar,
+        id: "bookings",
+      },
+      {
         title: "Reports",
         icon: BarChart3,
         id: "reports",
@@ -407,16 +417,6 @@ const menuItems = [
         title: "Staff Attendance",
         icon: UserCheck,
         id: "staff-attendance",
-      },
-      {
-        title: "Trainings & Classes",
-        icon: GraduationCap,
-        id: "trainings-classes",
-      },
-      {
-        title: "Bookings",
-        icon: Calendar,
-        id: "bookings",
       },
       {
         title: "Payroll",
@@ -654,6 +654,8 @@ export default function App() {
         "attendance",
         "check-in",
         "training-streams",
+        "trainings-classes",
+        "bookings",
         "reports",
         "analytics",
       ];
@@ -704,8 +706,6 @@ export default function App() {
       // Auto-expand Payroll & Employees for its sub-items
       const payrollEmployeesSubItems = [
         "staffs-trainers",
-        "trainings-classes",
-        "bookings",
         "payroll",
         "salary-payments",
         "salary-advances",
@@ -1115,7 +1115,7 @@ export default function App() {
         <Sidebar className="hidden md:flex bg-gradient-primary">
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center space-x-3">
-              <div className="bg-white/20 backdrop-blur-sm text-white rounded-xl p-3 shadow-lg">
+              <div className="bg-white/15 text-white rounded-xl p-3 shadow-md">
                 <Dumbbell className="h-6 w-6" />
               </div>
               <div>
@@ -1141,8 +1141,10 @@ export default function App() {
                       }
                     }}
                     isActive={activeSection === item.id}
-                    className={`w-full justify-start sidebar-item text-white hover:bg-white/10 transition-all duration-300 ${
-                      activeSection === item.id ? 'sidebar-item-active' : ''
+                    className={`w-full justify-start sidebar-item transition-all duration-150 ${
+                      activeSection === item.id
+                        ? 'sidebar-item-active'
+                        : 'text-white/90 hover:bg-[rgba(227,241,238,0.1)]'
                     }`}
                   >
                     <item.icon className="mr-3 h-4 w-4 sidebar-icon" />
@@ -1170,8 +1172,10 @@ export default function App() {
                             isActive={
                               activeSection === subItem.id
                             }
-                            className={`w-full justify-start text-sm py-2 sidebar-item text-white/90 hover:bg-white/10 transition-all duration-300 ${
-                              activeSection === subItem.id ? 'sidebar-item-active' : ''
+                            className={`w-full justify-start text-sm py-1.5 sidebar-item transition-all duration-150 ${
+                              activeSection === subItem.id
+                                ? 'sidebar-item-active'
+                                : 'text-white/75 hover:bg-[rgba(227,241,238,0.1)] hover:text-white'
                             }`}
                           >
                             <subItem.icon className="mr-3 h-4 w-4 sidebar-icon" />

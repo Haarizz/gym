@@ -55,12 +55,16 @@ public class MemberController {
             @RequestParam(required = false) String plan,
             @RequestParam(name = "expiring_within", required = false) Integer expiringWithin,
             @RequestParam(required = false) String dues,
+            @RequestParam(name = "joined_from", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime joinedFrom,
+            @RequestParam(name = "joined_to", required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime joinedTo,
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "20") int limit) {
 
         return ResponseEntity.ok(
                 memberService.getMembers(search, status, membershipType, paymentStatus,
-                        plan, expiringWithin, dues, page, limit)
+                        plan, expiringWithin, dues, joinedFrom, joinedTo, page, limit)
         );
     }
 
@@ -320,6 +324,26 @@ public class MemberController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl principal) {
         return ResponseEntity.ok(freezeService.getAllowanceView(id, MembershipFreezeService.StaffActor.of(principal)));
+    }
+
+    /**
+     * GET /api/members/freeze-allowances?ids=1,2,3 — the same allowance for several members
+     * in one call (Freeze / Unfreeze lists every frozen member), keyed by member id
+     */
+    @GetMapping("/freeze-allowances")
+    public ResponseEntity<java.util.Map<Long, java.util.Map<String, Object>>> freezeAllowances(
+            @RequestParam java.util.List<Long> ids,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        MembershipFreezeService.StaffActor actor = MembershipFreezeService.StaffActor.of(principal);
+        java.util.Map<Long, java.util.Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        for (Long id : ids.stream().distinct().limit(200).toList()) {
+            try {
+                out.put(id, freezeService.getAllowanceView(id, actor));
+            } catch (RuntimeException e) {
+                // A member that can't be read (deleted, other branch) is simply left out.
+            }
+        }
+        return ResponseEntity.ok(out);
     }
 
     /**

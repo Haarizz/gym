@@ -3,6 +3,30 @@ import { printFontReady, withPrintFont } from "./print-font";
 let activePrintFrame: HTMLIFrameElement | null = null;
 
 /**
+ * Waits for the page's closing animations (a dropdown or dialog that started the print).
+ * The print dialog freezes the page; a menu caught mid-animation never finishes closing
+ * and stays on screen, ignoring clicks. Endless animations (spinners) are skipped, and
+ * it never waits more than half a second.
+ */
+function pageAnimationsSettled(maxMs = 500): Promise<void> {
+  return new Promise<void>((resolve) => {
+    // One frame first, so a menu closed by the same click has started its animation.
+    requestAnimationFrame(() => {
+      const running = (document.getAnimations?.() ?? []).filter((a) => {
+        const end = a.effect?.getComputedTiming().endTime;
+        return a.playState === "running" && typeof end === "number" && Number.isFinite(end);
+      });
+      if (running.length === 0) return resolve();
+      const timer = setTimeout(resolve, maxMs);
+      Promise.all(running.map((a) => a.finished.catch(() => undefined))).then(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  });
+}
+
+/**
  * Prints a complete HTML document through an off-screen iframe, so the user
  * only sees the browser's print dialog — no extra tab or window. The document's
  * own @page rule controls paper size and margins.
@@ -50,6 +74,6 @@ export function printHtml(html: string) {
     pending.forEach((img) => { img.onload = done; img.onerror = done; });
   });
   const fontsReady = printFontReady(doc);
-  Promise.all([imagesReady, fontsReady]).then(() => setTimeout(doPrint, 50));
+  Promise.all([imagesReady, fontsReady, pageAnimationsSettled()]).then(() => setTimeout(doPrint, 50));
   setTimeout(doPrint, 3000);
 }

@@ -34,11 +34,23 @@ public class MembershipPlan extends BaseEntity implements BranchAware {
 
     // ── Family plan settings (only meaningful when planType == "Family") ──────
 
-    /** "individual" (default — adults bill independently, minors fold into the
-     *  head's invoice, same as every existing Family/Couple plan) or "family_head"
-     *  (every family member, adult or minor, folds into ONE invoice on the head). */
+    /** "family_head" for every Family and Couple plan: the head pays for everyone on ONE
+     *  invoice. "individual" (adults billing separately) is no longer offered; it only
+     *  remains as the value on plans of other types. See {@link #normalizeBillingMode()}. */
     @Column(name = "family_billing_mode")
     private String familyBillingMode = "individual";
+
+    /** Family and Couple plans always bill the head, whichever screen or app saved them. */
+    @PrePersist
+    @PreUpdate
+    public void normalizeBillingMode() {
+        if (isGroupPlanType(planType)) familyBillingMode = "family_head";
+    }
+
+    /** Family or Couple: plans whose members are billed to one head. */
+    public static boolean isGroupPlanType(String planType) {
+        return planType != null && (planType.trim().equalsIgnoreCase("family") || planType.trim().equalsIgnoreCase("couple"));
+    }
 
     @Column(name = "price_per_member", precision = 10, scale = 2)
     private BigDecimal pricePerMember;

@@ -93,6 +93,7 @@ public class GymImportService {
     private final UserDirectoryRepository userDirectoryRepository;
     private final TenantDataSourceRegistry tenantDataSources;
     private final LegacyImportLedgerService ledgerService;
+    private final ImportedMemberAccountService memberAccounts;
     private final Path stagingRoot;
     private final Path photosDir;
     private final ExecutorService executor = Executors.newFixedThreadPool(2, r -> {
@@ -108,6 +109,7 @@ public class GymImportService {
                             UserDirectoryRepository userDirectoryRepository,
                             TenantDataSourceRegistry tenantDataSources,
                             LegacyImportLedgerService ledgerService,
+                            ImportedMemberAccountService memberAccounts,
                             @Value("${app.storage.gym-imports-dir:${user.dir}/data/gym-imports}") String stagingDir,
                             @Value("${app.storage.photos-dir:${user.dir}/uploads/photos}") String photosDir) {
         this.gymService = gymService;
@@ -116,6 +118,7 @@ public class GymImportService {
         this.userDirectoryRepository = userDirectoryRepository;
         this.tenantDataSources = tenantDataSources;
         this.ledgerService = ledgerService;
+        this.memberAccounts = memberAccounts;
         this.stagingRoot = Paths.get(stagingDir).toAbsolutePath().normalize();
         this.photosDir = Paths.get(photosDir).toAbsolutePath().normalize();
         // Jobs don't survive a restart, so anything staged before it is orphaned
@@ -427,12 +430,19 @@ public class GymImportService {
                 TenantContextHolder.setCurrentTenant(job.slug);
                 BranchContextHolder.setActiveBranchId(branchId);
                 ledger = ledgerService.postLedger((done, total) ->
-                        job.at(60 + (int) (39.0 * done / Math.max(1, total)), "Posting the history to the accounts ("
+                        job.at(60 + (int) (29.0 * done / Math.max(1, total)), "Posting the history to the accounts ("
                                 + done + " of " + total + ")"));
             } finally {
                 BranchContextHolder.clear();
                 TenantContextHolder.clear();
             }
+
+            // Every imported member can sign in to the app: username = member number.
+            // Only members still without an account are picked up, so a retry carries on.
+            job.at(90, "Creating app accounts for the members");
+            Map<String, Object> appAccounts = memberAccounts.createAccounts(job.slug, false, (done, total) ->
+                    job.at(90 + (int) (9.0 * done / Math.max(1, total)), "Creating app accounts for the members ("
+                            + done + " of " + total + ")"));
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("tenant_id", job.tenantId);
@@ -442,6 +452,7 @@ public class GymImportService {
             plan.tables().forEach(t -> result.put(t.table(), t.rows().size()));
             result.put("photos", plan.photos().size());
             result.put("ledger", ledger);
+            result.put("app_accounts", appAccounts);
             job.result = result;
             job.dump = null;
             job.status = "COMPLETED";

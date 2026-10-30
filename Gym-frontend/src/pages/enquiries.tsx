@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ChevronLeft, ChevronRight, Inbox, MessageSquare, Phone, Send, XCircle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { formatDistanceToNowStrict } from 'date-fns';
+import {
+  CheckCircle2, ChevronLeft, ChevronRight, Inbox, Layers, MailOpen, MessageSquare, Phone, Send, XCircle,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -17,23 +16,61 @@ import { hasPermission } from '../utils/permissions';
 import {
   enquiriesService, ENQUIRY_CATEGORY_LABELS, EnquiryPage, EnquiryStatus, MemberEnquiry,
 } from '../utils/supabase/enquiries-service';
+import s from './enquiries.module.css';
 
 const PAGE_SIZE = 20;
 const MAX_REPLY_LENGTH = 2000;
 
 const formatDateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : '');
+const timeAgo = (iso: string | null | undefined) => (iso ? formatDistanceToNowStrict(new Date(iso), { addSuffix: true }) : '');
 
-const STATUS_STYLES: Record<EnquiryStatus, { label: string; className: string }> = {
-  OPEN: { label: 'Open', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  REPLIED: { label: 'Replied', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  CLOSED: { label: 'Closed', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+const STATUS: Record<EnquiryStatus, { label: string; tone: string }> = {
+  OPEN: { label: 'Awaiting reply', tone: 'amber' },
+  REPLIED: { label: 'Replied', tone: 'green' },
+  CLOSED: { label: 'Closed', tone: 'gray' },
 };
 
 type StatusTab = 'ALL' | EnquiryStatus;
 
-function StatusBadge({ status }: { status: EnquiryStatus }) {
-  const s = STATUS_STYLES[status] ?? STATUS_STYLES.OPEN;
-  return <Badge variant="outline" className={s.className}>{s.label}</Badge>;
+const TILES: { key: StatusTab; label: string; tone: string; icon: React.ReactNode }[] = [
+  { key: 'OPEN', label: 'Awaiting reply', tone: 'amber', icon: <MailOpen /> },
+  { key: 'REPLIED', label: 'Replied', tone: 'green', icon: <CheckCircle2 /> },
+  { key: 'CLOSED', label: 'Closed', tone: 'gray', icon: <XCircle /> },
+  { key: 'ALL', label: 'All enquiries', tone: 'teal', icon: <Layers /> },
+];
+
+const EMPTY_TEXT: Record<StatusTab, [string, string]> = {
+  OPEN: ['All caught up', 'No enquiries are waiting for a reply.'],
+  REPLIED: ['Nothing replied yet', 'Enquiries you answer show up here.'],
+  CLOSED: ['No closed enquiries', 'Closed enquiries show up here.'],
+  ALL: ['No enquiries yet', 'Questions members raise in the mobile app show up here.'],
+};
+
+function initials(name: string | null | undefined) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts.slice(0, 2).map(p => p[0]).join('').toUpperCase() : '?';
+}
+
+function memberName(e: MemberEnquiry) {
+  return e.member_name ?? `Member #${e.member_id}`;
+}
+
+function StatusPill({ status }: { status: EnquiryStatus }) {
+  const st = STATUS[status] ?? STATUS.OPEN;
+  return <span className={s.status} data-tone={st.tone}>{st.label}</span>;
+}
+
+/** Laptop and wider: list and conversation side by side; smaller screens open a sheet. */
+function useWide() {
+  const query = '(min-width: 1024px)';
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
 }
 
 /**
@@ -42,6 +79,7 @@ function StatusBadge({ status }: { status: EnquiryStatus }) {
  */
 export function Enquiries() {
   const { activeBranchId, isAllBranches } = useBranch();
+  const wide = useWide();
   const [tab, setTab] = useState<StatusTab>('OPEN');
   const [category, setCategory] = useState<string>('ALL');
   const [page, setPage] = useState(0);
@@ -62,123 +100,159 @@ export function Enquiries() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(0); }, [tab, category, activeBranchId]);
 
+  // Side by side, keep something open: the first enquiry, unless the selected one is still listed.
+  useEffect(() => {
+    if (!wide || !data) return;
+    if (!selected || !data.items.some(e => e.id === selected.id)) setSelected(data.items[0] ?? null);
+  }, [wide, data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onUpdated = (updated: MemberEnquiry) => {
     setSelected(updated);
     load();
   };
 
   const counts = data?.status_counts;
+  const allCount = counts ? (counts.OPEN ?? 0) + (counts.REPLIED ?? 0) + (counts.CLOSED ?? 0) : null;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+  const [emptyTitle, emptyText] = EMPTY_TEXT[tab];
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Enquiries</h1>
-        <p className="text-muted-foreground">Questions members raised from the mobile app</p>
+    <div className={s.root}>
+      <div className={s.header}>
+        <div>
+          <h1 className={s.title}>Enquiries</h1>
+          <p className={s.subtitle}>
+            Questions members raised from the mobile app
+            {isAllBranches ? ' — showing every branch; select a branch in the sidebar to reply.' : ''}
+          </p>
+        </div>
       </div>
 
-      <Card className="border-primary/10 shadow-md">
-        <CardHeader className="gap-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center">
-                <Inbox className="w-5 h-5 mr-2 text-primary" />
-                Member enquiries
-              </CardTitle>
-              <CardDescription>
-                {isAllBranches ? 'Showing every branch — select a branch to reply.' : 'Open one to read it and reply'}
-              </CardDescription>
-            </div>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full md:w-52">
-                <SelectValue placeholder="All categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All categories</SelectItem>
-                {Object.entries(ENQUIRY_CATEGORY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className={s.tiles} role="tablist" aria-label="Enquiry status">
+        {TILES.map(t => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={s.tile}
+            data-tone={t.tone}
+            data-active={tab === t.key}
+            onClick={() => setTab(t.key)}
+          >
+            <span className={s.tileIcon}>{t.icon}</span>
+            <span>
+              <div className={s.tileValue}>
+                {counts ? (t.key === 'ALL' ? allCount : counts[t.key as EnquiryStatus] ?? 0) : '—'}
+              </div>
+              <div className={s.tileLabel}>{t.label}</div>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className={s.chips} aria-label="Category">
+        {[['ALL', 'All categories'], ...Object.entries(ENQUIRY_CATEGORY_LABELS)].map(([key, label]) => (
+          <button key={key} type="button" className={s.chip} data-active={category === key} onClick={() => setCategory(key)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className={s.inbox} data-single={!wide}>
+        <div className={s.list}>
+          <div className={s.listHead}>
+            <span>
+              {data ? `${data.total} ${data.total === 1 ? 'enquiry' : 'enquiries'}` : 'Loading…'}
+              {category !== 'ALL' ? ` · ${ENQUIRY_CATEGORY_LABELS[category] ?? category}` : ''}
+            </span>
           </div>
-          <Tabs value={tab} onValueChange={v => setTab(v as StatusTab)}>
-            <TabsList>
-              <TabsTrigger value="OPEN">Open{counts ? ` (${counts.OPEN ?? 0})` : ''}</TabsTrigger>
-              <TabsTrigger value="REPLIED">Replied{counts ? ` (${counts.REPLIED ?? 0})` : ''}</TabsTrigger>
-              <TabsTrigger value="CLOSED">Closed{counts ? ` (${counts.CLOSED ?? 0})` : ''}</TabsTrigger>
-              <TabsTrigger value="ALL">All</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardHeader>
-        <CardContent className="p-0">
           {error ? (
-            <p className="text-center py-8 text-destructive">{error}</p>
+            <p className={s.error}>{error}</p>
           ) : data === null ? (
-            <p className="text-center py-8 text-muted-foreground">Loading enquiries...</p>
+            <div className={s.state}><Inbox /><span>Loading enquiries…</span></div>
           ) : data.items.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">No enquiries here.</p>
+            <div className={s.state}>
+              {tab === 'OPEN' ? <CheckCircle2 /> : <Inbox />}
+              <span className={s.stateTitle}>{emptyTitle}</span>
+              <span>{emptyText}</span>
+            </div>
           ) : (
-            <div className="divide-y">
+            <div className={s.items}>
               {data.items.map(e => (
                 <button
                   key={e.id}
-                  className="w-full flex items-start gap-4 px-6 py-4 text-left hover:bg-slate-50/50 transition-colors"
+                  type="button"
+                  className={s.item}
+                  data-selected={wide && selected?.id === e.id}
+                  data-open={e.status === 'OPEN'}
                   onClick={() => setSelected(e)}
                 >
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{e.subject}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground truncate">{e.message}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {e.member_name ?? `Member #${e.member_id}`}
-                      {e.member_code ? ` · ${e.member_code}` : ''}
-                      {' · '}{ENQUIRY_CATEGORY_LABELS[e.category] ?? e.category}
-                      {isAllBranches && e.branch_name ? ` · ${e.branch_name}` : ''}
-                      {' · '}{formatDateTime(e.created_at)}
-                    </div>
-                  </div>
-                  <StatusBadge status={e.status} />
+                  <span className={s.avatar} data-tone={STATUS[e.status]?.tone ?? 'amber'}>{initials(e.member_name)}</span>
+                  <span className={s.itemBody}>
+                    <span className={s.itemTop}>
+                      <span className={s.itemName}>{memberName(e)}</span>
+                      <span className={s.itemTime} title={formatDateTime(e.created_at)}>{timeAgo(e.created_at)}</span>
+                    </span>
+                    <div className={s.itemSubject}>{e.subject}</div>
+                    <div className={s.itemPreview}>{e.message}</div>
+                    <span className={s.itemMeta}>
+                      <StatusPill status={e.status} />
+                      <span className={s.tag}>{ENQUIRY_CATEGORY_LABELS[e.category] ?? e.category}</span>
+                      {isAllBranches && e.branch_name && <span className={s.tag}>{e.branch_name}</span>}
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
           )}
           {data && data.total > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-6 py-3 border-t text-sm text-muted-foreground">
-              <span>Page {page + 1} of {totalPages} · {data.total} enquiries</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+            <div className={s.pager}>
+              <span>Page {page + 1} of {totalPages}</span>
+              <div className={s.pagerButtons}>
+                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Previous page">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage(p => p + 1)}>
+                <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage(p => p + 1)} aria-label="Next page">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <EnquirySheet enquiry={selected} onClose={() => setSelected(null)} onUpdated={onUpdated} />
+        {wide && (
+          selected
+            ? <EnquiryDetail enquiry={selected} onUpdated={onUpdated} />
+            : <div className={s.state}><MessageSquare /><span>Select an enquiry to read it and reply.</span></div>
+        )}
+      </div>
+
+      {!wide && selected && (
+        <Sheet open onOpenChange={open => { if (!open) setSelected(null); }}>
+          <SheetContent className="sm:max-w-lg w-full overflow-y-auto p-0">
+            <SheetHeader className="sr-only">
+              <SheetTitle>{selected.subject}</SheetTitle>
+              <SheetDescription>{memberName(selected)}</SheetDescription>
+            </SheetHeader>
+            <div className={s.sheetDetail}>
+              <EnquiryDetail enquiry={selected} onUpdated={onUpdated} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
 
-function EnquirySheet({
-  enquiry, onClose, onUpdated,
-}: { enquiry: MemberEnquiry | null; onClose: () => void; onUpdated: (e: MemberEnquiry) => void }) {
+function EnquiryDetail({ enquiry, onUpdated }: { enquiry: MemberEnquiry; onUpdated: (e: MemberEnquiry) => void }) {
   const { isAllBranches } = useBranch();
   const canEdit = hasPermission('MEMBER_CONNECT_EDIT');
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  useEffect(() => { setReply(''); }, [enquiry?.id]);
-
-  if (!enquiry) return null;
+  useEffect(() => { setReply(''); }, [enquiry.id]);
 
   const readOnlyHint = !canEdit
     ? "You don't have permission to reply to members."
@@ -187,6 +261,7 @@ function EnquirySheet({
       : null;
 
   const sendReply = async () => {
+    if (!reply.trim() || readOnlyHint || busy) return;
     setBusy(true);
     try {
       const updated = await enquiriesService.reply(enquiry.id, reply.trim());
@@ -214,95 +289,95 @@ function EnquirySheet({
   };
 
   return (
-    <Sheet open onOpenChange={open => { if (!open) onClose(); }}>
-      <SheetContent className="sm:max-w-lg w-full overflow-y-auto">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={enquiry.status} />
-            <Badge variant="secondary">{ENQUIRY_CATEGORY_LABELS[enquiry.category] ?? enquiry.category}</Badge>
+    <div className={s.detail}>
+      <div className={s.detailHead}>
+        <span className={s.avatar} data-size="lg" data-tone={STATUS[enquiry.status]?.tone ?? 'amber'}>{initials(enquiry.member_name)}</span>
+        <div className={s.detailWho}>
+          <h2 className={s.detailSubject}>{enquiry.subject}</h2>
+          <div className={s.detailMember}>
+            <span>{memberName(enquiry)}{enquiry.member_code ? ` · ${enquiry.member_code}` : ''}</span>
+            {enquiry.member_phone && (
+              <a href={`tel:${enquiry.member_phone}`} className={s.call}><Phone /> {enquiry.member_phone}</a>
+            )}
           </div>
-          <SheetTitle className="text-lg">{enquiry.subject}</SheetTitle>
-          <SheetDescription>
-            {enquiry.member_name ?? `Member #${enquiry.member_id}`}
-            {enquiry.member_code ? ` · ${enquiry.member_code}` : ''}
-            {enquiry.branch_name ? ` · ${enquiry.branch_name}` : ''}
-          </SheetDescription>
-          {enquiry.member_phone && (
-            <a href={`tel:${enquiry.member_phone}`} className="text-sm text-primary inline-flex items-center gap-1">
-              <Phone className="h-3.5 w-3.5" /> {enquiry.member_phone}
-            </a>
-          )}
-        </SheetHeader>
-
-        <div className="px-4 space-y-5 pb-6">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Asked {formatDateTime(enquiry.created_at)}</p>
-            <div className="rounded-lg bg-slate-50 border p-4 text-sm whitespace-pre-wrap">{enquiry.message}</div>
+          <div className={s.detailTags}>
+            <StatusPill status={enquiry.status} />
+            <span className={s.tag}>{ENQUIRY_CATEGORY_LABELS[enquiry.category] ?? enquiry.category}</span>
+            {enquiry.branch_name && <span className={s.tag}>{enquiry.branch_name}</span>}
           </div>
+        </div>
+      </div>
 
-          {enquiry.reply ? (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">
-                Replied {formatDateTime(enquiry.replied_at)}{enquiry.replied_by ? ` by ${enquiry.replied_by}` : ''}
-              </p>
-              <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-sm whitespace-pre-wrap">{enquiry.reply}</div>
-            </div>
-          ) : enquiry.status === 'OPEN' ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Reply</p>
+      <div className={s.thread}>
+        <div className={s.msg} data-from="member">
+          <span className={s.msgMeta} title={formatDateTime(enquiry.created_at)}>
+            {memberName(enquiry)} · {timeAgo(enquiry.created_at)}
+          </span>
+          <div className={s.bubble}>{enquiry.message}</div>
+        </div>
+        {enquiry.reply && (
+          <div className={s.msg} data-from="staff">
+            <span className={s.msgMeta} title={formatDateTime(enquiry.replied_at)}>
+              {enquiry.replied_by ?? 'Staff'} · {timeAgo(enquiry.replied_at)}
+            </span>
+            <div className={s.bubble}>{enquiry.reply}</div>
+          </div>
+        )}
+        {enquiry.status === 'CLOSED' && (
+          <span className={s.notice} title={formatDateTime(enquiry.closed_at)}>
+            Closed {timeAgo(enquiry.closed_at)}{enquiry.closed_by ? ` by ${enquiry.closed_by}` : ''}
+          </span>
+        )}
+      </div>
+
+      {enquiry.status !== 'CLOSED' && (
+        <div className={s.composer}>
+          {enquiry.status === 'OPEN' && (
+            <>
               <Textarea
                 value={reply}
                 onChange={e => setReply(e.target.value.slice(0, MAX_REPLY_LENGTH))}
-                placeholder="Write your reply to the member…"
-                rows={6}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendReply(); } }}
+                placeholder={`Reply to ${memberName(enquiry)}…`}
+                rows={4}
                 disabled={!!readOnlyHint || busy}
               />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Members get one reply — they can raise a new enquiry to follow up.</span>
+              <div className={s.composerFoot}>
+                <span>Members get one reply — they can raise a new enquiry to follow up. Ctrl + Enter to send.</span>
                 <span>{reply.length}/{MAX_REPLY_LENGTH}</span>
               </div>
-            </div>
-          ) : null}
-
-          {enquiry.status === 'CLOSED' && (
-            <p className="text-xs text-muted-foreground">
-              Closed {formatDateTime(enquiry.closed_at)}{enquiry.closed_by ? ` by ${enquiry.closed_by}` : ''}
-            </p>
+            </>
           )}
-
-          {readOnlyHint && enquiry.status !== 'CLOSED' && <p className="text-sm text-muted-foreground">{readOnlyHint}</p>}
-
-          {enquiry.status !== 'CLOSED' && (
-            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <Button variant="outline" disabled={!!readOnlyHint || busy} onClick={() => setConfirmClose(true)}>
-                <XCircle className="h-4 w-4 mr-2" /> Close enquiry
+          {readOnlyHint && <p className={s.hint}>{readOnlyHint}</p>}
+          <div className={s.actions}>
+            <Button variant="outline" disabled={!!readOnlyHint || busy} onClick={() => setConfirmClose(true)}>
+              <XCircle className="h-4 w-4 mr-2" /> Close enquiry
+            </Button>
+            {enquiry.status === 'OPEN' && (
+              <Button disabled={!!readOnlyHint || busy || !reply.trim()} onClick={sendReply}>
+                <Send className="h-4 w-4 mr-2" /> {busy ? 'Sending…' : 'Send reply'}
               </Button>
-              {enquiry.status === 'OPEN' && (
-                <Button disabled={!!readOnlyHint || busy || !reply.trim()} onClick={sendReply}>
-                  <Send className="h-4 w-4 mr-2" /> {busy ? 'Sending…' : 'Send reply'}
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
+      )}
 
-        <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Close this enquiry?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {enquiry.status === 'OPEN'
-                  ? "It hasn't been replied to — once closed, it can't be answered."
-                  : 'The member will see it as closed.'}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-              <AlertDialogAction disabled={busy} onClick={e => { e.preventDefault(); close(); }}>Close enquiry</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </SheetContent>
-    </Sheet>
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close this enquiry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {enquiry.status === 'OPEN'
+                ? "It hasn't been replied to — once closed, it can't be answered."
+                : 'The member will see it as closed.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={e => { e.preventDefault(); close(); }}>Close enquiry</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

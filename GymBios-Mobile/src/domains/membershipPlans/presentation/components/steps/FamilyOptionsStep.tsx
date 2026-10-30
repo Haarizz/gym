@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { useTheme } from '@/core/hooks';
@@ -8,23 +8,6 @@ import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
 
-interface BillingModeOption {
-  value: 'individual' | 'family_head';
-  title: string;
-  description: string;
-}
-
-// Same modes and wording as the web app's plan form; the values are what the
-// backend bills by.
-const FAMILY_BILLING_MODES: BillingModeOption[] = [
-  { value: 'individual', title: 'Individual', description: 'Adults bill separately, minors bill to the head' },
-  { value: 'family_head', title: 'Family Head', description: 'Everyone bills together on ONE invoice' },
-];
-
-const COUPLE_BILLING_MODES: BillingModeOption[] = [
-  { value: 'individual', title: 'Individual', description: 'Each partner bills separately' },
-  { value: 'family_head', title: 'Couple Head', description: 'Both partners bill together on ONE invoice' },
-];
 
 interface FamilyOptionsStepProps {
   values: PlanWizardData;
@@ -36,8 +19,6 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
   const { t } = useTranslation();
   const theme = useTheme();
   const isCouple = values.planType === 'Couple';
-  const modes = isCouple ? COUPLE_BILLING_MODES : FAMILY_BILLING_MODES;
-  const isFamilyHead = values.familyBillingMode === 'family_head';
   const pricePerMember = parseFloat(values.pricePerMember) || 0;
   const planPrice = parseFloat(values.price) || 0;
 
@@ -50,30 +31,17 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
             : t('membershipPlans.form.familyStep.familyBillingTitle')
         }
       >
-        <Typography variant="bodySmallBold">
-          {t('membershipPlans.form.familyStep.billingModeLabel')}
-        </Typography>
-        {modes.map((mode) => {
-          const isActive = values.familyBillingMode === mode.value;
-          return (
-            <Pressable
-              key={mode.value}
-              onPress={() => onChange('familyBillingMode', mode.value)}
-              style={[
-                styles.modeCard,
-                {
-                  backgroundColor: isActive ? theme.primary + '14' : theme.backgroundElement,
-                  borderColor: isActive ? theme.primary : theme.border,
-                },
-              ]}
-            >
-              <Typography variant="bodySmallBold" style={isActive ? { color: theme.primary } : undefined}>
-                {mode.title}
-              </Typography>
-              <Typography variant="caption" color="textSecondary">{mode.description}</Typography>
-            </Pressable>
-          );
-        })}
+        {/* One billing model, same as the web plan form: the head pays for everyone. */}
+        <View style={[styles.modeCard, { backgroundColor: theme.primary + '14', borderColor: theme.primary }]}>
+          <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
+            {isCouple ? 'Couple head pays for both' : 'Family head pays for everyone'}
+          </Typography>
+          <Typography variant="caption" color="textSecondary">
+            {isCouple
+              ? 'The partner is added under the couple head and the whole plan is billed to the head on one invoice.'
+              : 'Family members are added under the family head and the whole plan is billed to the head on one invoice.'}
+          </Typography>
+        </View>
 
         <Input
           label={t('membershipPlans.form.familyStep.pricePerMemberLabel')}
@@ -83,11 +51,9 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
           keyboardType="decimal-pad"
         />
         <Typography variant="caption" color="textSecondary">
-          {isFamilyHead
-            ? 'With Auto Calculate on, the invoice is this price × members; leave blank to charge the subscription price for the whole family.'
-            : isCouple
-              ? 'Not used for couples billed individually — each partner pays the subscription price.'
-              : 'What each minor adds to the head\'s bill. Adults pay the subscription price on their own membership.'}
+          {isCouple
+            ? 'With Auto Calculate on, the invoice is this price × 2; leave blank to charge the subscription price for the couple.'
+            : 'With Auto Calculate on, the invoice is this price × members; leave blank to charge the subscription price for the whole family.'}
         </Typography>
       </FormSection>
 
@@ -173,7 +139,7 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
           />
         </View>
 
-        {isFamilyHead && (
+        {(
           <View style={[styles.preview, { borderColor: theme.primary }]}>
             <Typography variant="bodySmallBold">
               {isCouple

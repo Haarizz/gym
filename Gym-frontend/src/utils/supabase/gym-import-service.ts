@@ -38,6 +38,25 @@ export interface GymImportJob {
   result: (Record<string, unknown> & { name?: string; slug?: string; owner_username?: string; photos?: number }) | null;
 }
 
+export interface ImportAppAccountRow {
+  member_id: number;
+  member_no: string | null;
+  name: string | null;
+  username: string | null;
+  detail: string | null;
+}
+
+/** The members' GymBios app accounts made at the end of onboarding (result.app_accounts). */
+export interface ImportAppAccounts {
+  dry_run: boolean;
+  starting_password: string;
+  members: number;
+  created: number;
+  /** Member number already used elsewhere — the username got the gym ID added. */
+  with_gym_id: ImportAppAccountRow[];
+  failed: ImportAppAccountRow[];
+}
+
 export interface OnboardGymRequest {
   name: string;
   slug: string;

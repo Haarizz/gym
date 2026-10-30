@@ -97,6 +97,7 @@ import { FamilyRenewalPanel, type FamilyPanelState } from '../components/members
 import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
 import { withPrintFont } from "../utils/print-font";
+import { NewMembersTab } from "../components/members/NewMembersTab";
 
 const membershipPlans = [
   {
@@ -1553,6 +1554,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="w-full flex">
           <TabsTrigger value="members" className="flex-1">All Members</TabsTrigger>
+          <TabsTrigger value="new-members" className="flex-1">New Members</TabsTrigger>
           <TabsTrigger value="renewals" className="flex-1">Renewals & Upgrades</TabsTrigger>
           <TabsTrigger value="addons" className="flex-1">Add-ons</TabsTrigger>
           <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
@@ -2330,6 +2332,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="new-members">
+          <NewMembersTab planNames={filterPlanNames} onOpenMember={openMemberHistory} initialPreset={(location.state as any)?.joinedPreset} />
         </TabsContent>
 
         <TabsContent value="renewals" className="space-y-5">

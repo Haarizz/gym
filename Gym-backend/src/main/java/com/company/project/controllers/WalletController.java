@@ -16,6 +16,20 @@ public class WalletController {
         this.walletService = walletService;
     }
 
+    /**
+     * GET /api/wallet/credits?search=&type=&status=&page=1&size=20 — every wallet credit with
+     * what of it is used and left (Billing › Customer Credits), plus a summary of the filter.
+     */
+    @GetMapping("/credits")
+    public ResponseEntity<java.util.Map<String, Object>> credits(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(walletService.credits(search, type, status, page, size));
+    }
+
     /** GET /api/wallet/{memberId} */
     @GetMapping("/{memberId}")
     public ResponseEntity<WalletResponseDTO> getWallet(@PathVariable String memberId) {

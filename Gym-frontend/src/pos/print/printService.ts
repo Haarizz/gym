@@ -107,9 +107,9 @@ export class ReceiptPrinterUnavailableError extends Error {
   }
 }
 
-export const NO_RECEIPT_PRINTER = "No receipt printer is set up for this terminal. Connect the thermal printer (with the BillBull print agent running) "
+export const NO_RECEIPT_PRINTER = "No receipt printer is set up for this terminal. Connect the thermal printer (with the GymBios print agent running) "
   + "or add it in POS Console › Printers.";
-export const AGENT_NOT_RUNNING = "The BillBull print agent isn't running on this computer — start \"BillBull Print Agent\" from the Start menu and print again.";
+export const AGENT_NOT_RUNNING = "The GymBios print agent isn't running on this computer — start \"GymBios Print Agent\" from the Start menu and print again.";
 
 async function sendRaw(printer: PosPrinter, build: () => Promise<Uint8Array>, text: () => string, title: string,
                        browserHtml: () => string, copies: number, terminalName: string | null = null): Promise<PrintOutcome> {

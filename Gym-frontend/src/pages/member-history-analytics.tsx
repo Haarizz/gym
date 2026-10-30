@@ -279,7 +279,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         messagingService.getMemberHistory(memberId),
         membersService.getNotes(memberId),
         addonsService.getAddons({ search: bizId, status: 'Active' }),
-        promotionsService.getEligibilityMembers(),
+        promotionsService.getEligibilityMembers(memberId),
         rewardService.getByMember(bizId),
         walletService.getWallet(bizId),
         referralService.getReferrals({ search: bizId, size: 50 }),

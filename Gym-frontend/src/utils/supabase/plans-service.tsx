@@ -121,6 +121,13 @@ class PlansService {
     return response.json();
   }
 
+  /** Members per plan, keyed by plan name in lower case: active today and everyone ever on it. */
+  async getMemberCounts(): Promise<Record<string, { active: number; total: number }>> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/plans/member-counts`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load plan member counts: ${response.status}`));
+    return response.json();
+  }
+
   async getPlanById(id: number): Promise<Plan> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/plans/${id}`

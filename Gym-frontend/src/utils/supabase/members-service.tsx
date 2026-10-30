@@ -184,6 +184,10 @@ export interface MemberFilters {
   expiring_within?: number;
   /** 'due' = has an amount due (membership balance or unpaid sales invoice), 'clear' = none. */
   dues?: 'due' | 'clear';
+  /** Joined on or after this moment (sent as UTC, like receipt dates). */
+  joined_from?: Date;
+  /** Joined before this moment. */
+  joined_to?: Date;
 }
 
 export interface PaginationParams {
@@ -252,6 +256,8 @@ class MembersService {
     if (filters.plan)             params.append('plan',            filters.plan);
     if (filters.expiring_within != null) params.append('expiring_within', String(filters.expiring_within));
     if (filters.dues)             params.append('dues',            filters.dues);
+    if (filters.joined_from)      params.append('joined_from',     filters.joined_from.toISOString().slice(0, 19));
+    if (filters.joined_to)        params.append('joined_to',       filters.joined_to.toISOString().slice(0, 19));
 
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members?${params.toString()}`
@@ -545,6 +551,15 @@ class MembersService {
   async getFreezeAllowance(id: string | number): Promise<FreezeAllowance> {
     const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/members/${id}/freeze-allowance`);
     if (!response.ok) throw new Error(await parseApiError(response, `Failed to load freeze allowance: ${response.status}`));
+    return response.json();
+  }
+
+  /** Freeze allowances for several members in one call, keyed by member id */
+  async getFreezeAllowances(ids: Array<string | number>): Promise<Record<string, FreezeAllowance>> {
+    if (ids.length === 0) return {};
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/members/freeze-allowances?ids=${ids.map(String).join(',')}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load freeze allowances: ${response.status}`));
     return response.json();
   }
 

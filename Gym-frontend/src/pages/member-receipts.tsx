@@ -49,7 +49,7 @@ import { toast } from "sonner";
 import { receiptsService, Receipt, ReceiptFilters } from "../utils/supabase/receipts-service";
 import { ListPagination } from "../components/list-pagination";
 import { useDebouncedValue } from "../utils/use-debounced-value";
-import { downloadReceiptInvoice } from "../utils/receipt-invoice";
+import { downloadReceiptInvoice, downloadPaymentReceipt } from "../utils/receipt-invoice";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
 
 interface MemberReceiptsProps {
@@ -167,7 +167,11 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
   const toggleChannel = (list: string[], setList: (v: string[]) => void, ch: string) =>
     setList(list.includes(ch) ? list.filter(c => c !== ch) : [...list, ch]);
 
+  // The Receipt (payment received) and the Tax Invoice are separate documents.
   const handleDownloadReceipt = (receipt: Receipt) => {
+    downloadPaymentReceipt(receipt, currencyCode);
+  };
+  const handleDownloadInvoice = (receipt: Receipt) => {
     downloadReceiptInvoice(receipt, currencyCode);
   };
 
@@ -383,10 +387,18 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
                           <Button
                             variant="outline" size="sm"
                             className="h-8 w-8 p-0 border-primary/20 hover:bg-green-50"
-                            title="Download Receipt"
+                            title="Print Receipt"
                             onClick={() => handleDownloadReceipt(receipt)}
                           >
                             <Download className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="outline" size="sm"
+                            className="h-8 w-8 p-0 border-primary/20 hover:bg-amber-50"
+                            title="Print Tax Invoice"
+                            onClick={() => handleDownloadInvoice(receipt)}
+                          >
+                            <Printer className="h-4 w-4 text-amber-600" />
                           </Button>
                           <Button
                             variant="outline" size="sm"
@@ -515,8 +527,11 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
               </div>
             </div>
             <DialogFooter>
+              <Button variant="outline" onClick={() => handleDownloadInvoice(selectedReceipt)}>
+                <Printer className="mr-2 h-4 w-4" />Tax Invoice
+              </Button>
               <Button variant="outline" onClick={() => handleDownloadReceipt(selectedReceipt)}>
-                <Download className="mr-2 h-4 w-4" />Download
+                <Download className="mr-2 h-4 w-4" />Receipt
               </Button>
               <Button onClick={() => { setSendingReceipt(selectedReceipt); setSendChannels([]); setSelectedReceipt(null); }}>
                 <Send className="mr-2 h-4 w-4" />Send Receipt

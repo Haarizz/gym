@@ -59,4 +59,20 @@ public class BillingStatsDTO {
 
     public Map<String, BigDecimal> getPaymentMethodBreakdown()                         { return paymentMethodBreakdown; }
     public void setPaymentMethodBreakdown(Map<String, BigDecimal> paymentMethodBreakdown) { this.paymentMethodBreakdown = paymentMethodBreakdown; }
+
+    // Today's collection (Billing's "Today's Collection" card), and what this month's and
+    // today's bills left unpaid — the "on credit" line under each collection card.
+    private BigDecimal todayCollection = BigDecimal.ZERO;
+    private Map<String, BigDecimal> todayPaymentMethodBreakdown;
+    private BigDecimal todayOnCredit = BigDecimal.ZERO;
+    private BigDecimal monthlyOnCredit = BigDecimal.ZERO;
+
+    public BigDecimal getTodayCollection() { return todayCollection; }
+    public void setTodayCollection(BigDecimal todayCollection) { this.todayCollection = todayCollection; }
+    public Map<String, BigDecimal> getTodayPaymentMethodBreakdown() { return todayPaymentMethodBreakdown; }
+    public void setTodayPaymentMethodBreakdown(Map<String, BigDecimal> m) { this.todayPaymentMethodBreakdown = m; }
+    public BigDecimal getTodayOnCredit() { return todayOnCredit; }
+    public void setTodayOnCredit(BigDecimal todayOnCredit) { this.todayOnCredit = todayOnCredit; }
+    public BigDecimal getMonthlyOnCredit() { return monthlyOnCredit; }
+    public void setMonthlyOnCredit(BigDecimal monthlyOnCredit) { this.monthlyOnCredit = monthlyOnCredit; }
 }

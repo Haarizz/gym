@@ -37,6 +37,21 @@ public class AccountHeadController {
         return ResponseEntity.ok(accountHeadService.getAllLedgerEntries(from, to));
     }
 
+    /**
+     * GET /api/account-heads/ledger/page?account=all|<code>&from=&to=&page=1&limit=50 — the
+     * General Ledger one page at a time, with the row count and debit/credit totals of the
+     * whole filter.
+     */
+    @GetMapping("/ledger/page")
+    public ResponseEntity<java.util.Map<String, Object>> getLedgerPage(
+            @RequestParam(defaultValue = "all") String account,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int limit) {
+        return ResponseEntity.ok(accountHeadService.getLedgerPage(account, from, to, page, limit));
+    }
+
     @GetMapping("/{code}/ledger")
     public ResponseEntity<List<LedgerEntryDTO>> getLedgerEntries(
             @PathVariable String code,
