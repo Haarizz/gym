@@ -20,6 +20,9 @@ import {
   useUnreadNotificationCount,
 } from '@/domains/profile';
 import { useBranchContext } from '@/shared/providers/BranchProvider';
+import { GymSwitcherSheet } from '@/domains/gymSwitcher/presentation/GymSwitcherSheet';
+import { useMyGymMemberships } from '@/domains/gymSwitcher/gymMembershipsApi';
+import { useAuthStore } from '@/domains/auth/store/authStore';
 import { getGreeting } from '@/shared/utils/greeting';
 import {
   isCommunityRoute,
@@ -80,6 +83,7 @@ export function RoleTabsLayout({
   const [isModulesOpen, setIsModulesOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
+  const [isGymSwitcherOpen, setIsGymSwitcherOpen] = useState(false);
   const { profile, initials } = useProfile();
   const { count: unreadCount } = useUnreadNotificationCount();
   const { selectedBranchId, availableBranches, setSelectedBranchId } = useBranchContext();
@@ -111,6 +115,13 @@ export function RoleTabsLayout({
   const greeting = getGreeting(t);
 
   const isAdmin = roleGroup === '(admin)';
+
+  // A member with memberships at several gyms: the line under their name names the
+  // gym too, and opens the gym switcher.
+  const activeTenant = useAuthStore((s) => s.activeTenant);
+  const { data: gyms } = useMyGymMemberships();
+  const canSwitchGym = roleGroup === '(member)' && (gyms?.length ?? 0) > 1;
+  const activeGym = canSwitchGym ? gyms?.find((g) => g.tenantSlug === activeTenant) : undefined;
   const tabBarBottom = (insets.bottom > 0 ? insets.bottom : 24) + 6;
 
   // Only admins have an "All branches" scope. Everyone else sees the name of
@@ -121,7 +132,9 @@ export function RoleTabsLayout({
     : availableBranches.find(b => b.id === selectedBranchId)?.branch_name;
   const branchLabel = isAdmin
     ? selectedBranchName || t('portalHeader.allBranches')
-    : selectedBranchName;
+    : activeGym
+      ? [activeGym.gymName, activeGym.branchName ?? selectedBranchName].filter(Boolean).join(' · ')
+      : selectedBranchName;
 
   const isTabBarHidden = isFullScreen || isCommunityScreen;
 
@@ -202,7 +215,20 @@ export function RoleTabsLayout({
                     </Text>
                     {isAdmin && <Feather name="chevron-down" size={16} color={headerFg} style={{ marginLeft: 2 }} />}
                   </Pressable>
-                  {!!branchLabel && (
+                  {canSwitchGym ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => setIsGymSwitcherOpen(true)}
+                      style={styles.gymSwitchRow}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('gymSwitcher.headerSwitchA11y', { gym: branchLabel ?? '' })}
+                    >
+                      <Text style={[styles.branchText, styles.gymSwitchText, { color: headerFgMuted }]} numberOfLines={1}>
+                        {branchLabel || t('gymSwitcher.switchGym')}
+                      </Text>
+                      <Feather name="chevron-down" size={12} color={headerFgMuted} style={styles.gymSwitchChevron} />
+                    </Pressable>
+                  ) : !!branchLabel && (
                     <Text style={[styles.branchText, { color: headerFgMuted }]} numberOfLines={1}>
                       {branchLabel}
                     </Text>
@@ -273,6 +299,10 @@ export function RoleTabsLayout({
               <Feather name="grid" size={22} color="#FFF" />
             </GlassSurface>
           </Pressable>
+        )}
+
+        {canSwitchGym && (
+          <GymSwitcherSheet visible={isGymSwitcherOpen} onClose={() => setIsGymSwitcherOpen(false)} />
         )}
 
         <AppBottomSheet
@@ -416,6 +446,19 @@ const styles = StyleSheet.create({
   branchText: {
     fontSize: 11,
     fontWeight: '600',
+    marginTop: 1,
+  },
+  gymSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  gymSwitchText: {
+    flexShrink: 1,
+  },
+  gymSwitchChevron: {
+    marginStart: 2,
     marginTop: 1,
   },
 

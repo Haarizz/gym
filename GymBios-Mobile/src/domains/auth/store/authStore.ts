@@ -21,6 +21,12 @@ interface AuthStoreState {
   pendingRole: AppRole | null;
   isHydrated: boolean;
   activeTenant: string | null;
+  /**
+   * True when a member who belongs to several gyms signed in with no gym remembered on
+   * this device — the member layout shows the gym picker until one is chosen.
+   * Cleared by choosing a gym (setActiveTenant) and on sign-out.
+   */
+  gymChoicePending: boolean;
   pendingDeepLinkIntent: PendingDeepLink;
   setSession: (session: Session | null) => void;
   setPendingRole: (role: AppRole | null) => void;
@@ -45,6 +51,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   pendingRole: null,
   isHydrated: false,
   activeTenant: null,
+  gymChoicePending: false,
   pendingDeepLinkIntent: null,
   setSession: (session) => {
     setApiClientToken(session?.accessToken ?? null);
@@ -62,7 +69,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   setPendingDeepLinkIntent: (intent) => set({ pendingDeepLinkIntent: intent }),
   setActiveTenant: (tenant) => {
     setApiClientTenant(tenant);
-    set({ activeTenant: tenant });
+    set(tenant ? { activeTenant: tenant, gymChoicePending: false } : { activeTenant: tenant });
 
     // Persist per logged-in user, asynchronously — never under the old shared key,
     // so a stale tenant from a previously logged-in account can't leak forward.
@@ -90,11 +97,14 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       get().setActiveTenant(stored);
     } else if (get().appRole === 'member') {
       // Nothing on this device (fresh install, new phone, cleared data) — ask the
-      // server which gym this account belongs to instead of starting gym-less.
-      const { fetchLinkedGymTenant } = await import('@/domains/auth/application/fetchLinkedGymTenant');
-      const tenant = await fetchLinkedGymTenant();
-      if (tenant) {
-        get().setActiveTenant(tenant);
+      // server which gyms this account belongs to instead of starting gym-less. One
+      // gym is simply selected; with several, the member picks one (gym picker).
+      const { fetchLinkedGymChoice } = await import('@/domains/auth/application/fetchLinkedGymChoice');
+      const choice = await fetchLinkedGymChoice(userId);
+      if (choice.kind === 'single') {
+        get().setActiveTenant(choice.tenantSlug);
+      } else if (choice.kind === 'choose') {
+        set({ gymChoicePending: true });
       }
     }
 
@@ -121,6 +131,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       pendingRole: null,
       isHydrated: true,
       activeTenant: null,
+      gymChoicePending: false,
     });
 
     // Deliberately NOT clearing the per-user persisted tenant here — a member's

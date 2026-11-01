@@ -23,12 +23,16 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(state => state.user);
   const appRole = useAuthStore(state => state.appRole);
+  // A member's branch belongs to the gym they're working in, and they can switch gym
+  // (domains/gymSwitcher) — so it always comes from their member record at the active
+  // gym, never from the branch captured in the sign-in session.
+  const sessionBranchId = appRole === 'member' ? undefined : user?.branchId;
 
   // Fetch member profile if user is a member to get their branch ID
   const { data: memberProfile, isLoading: isMemberProfileLoading } = useQuery({
     queryKey: ['current-member'],
     queryFn: () => memberRepository.getCurrentMember(),
-    enabled: appRole === 'member' && !user?.branchId,
+    enabled: appRole === 'member',
     retry: false,
   });
 
@@ -43,8 +47,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Determine the best available branch ID based on loaded data
   let derivedBranchId: BranchId = 'ALL';
-  if (user?.branchId) {
-    derivedBranchId = user.branchId;
+  if (sessionBranchId) {
+    derivedBranchId = sessionBranchId;
   } else if (appRole === 'member' && memberProfile?.branchId) {
     derivedBranchId = memberProfile.branchId;
   } else if (branches?.length === 1) {
@@ -63,9 +67,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     : userSelectedBranchId;
 
   // 4. Sync API client SYNCHRONOUSLY before children render
+  // Right after a gym switch the member record is refetching: switchGym already sent
+  // the new gym's branch, so don't drop it while the record loads.
+  const holdBranchHeader = appRole === 'member' && effectiveBranchId === 'ALL' && isMemberProfileLoading;
   useMemo(() => {
-    setApiClientBranch(effectiveBranchId);
-  }, [effectiveBranchId]);
+    if (!holdBranchHeader) setApiClientBranch(effectiveBranchId);
+  }, [effectiveBranchId, holdBranchHeader]);
 
   // Display currency is branch-scoped (web Settings page) — follow the active branch.
   // /financial-settings is 403'd the same way while member access is locked.
@@ -83,7 +90,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   // would tear down the tab navigator and drop the user back on Home.
   const isResolving =
     appRole === 'member' &&
-    (approval.isLoading || (!user?.branchId && (isMemberProfileLoading || isBranchesLoading)));
+    (approval.isLoading || (!sessionBranchId && (isMemberProfileLoading || isBranchesLoading)));
   const hasResolvedRef = useRef(false);
   if (!isResolving) {
     hasResolvedRef.current = true;

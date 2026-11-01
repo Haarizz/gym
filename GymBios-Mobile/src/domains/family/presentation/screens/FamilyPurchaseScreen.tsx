@@ -25,7 +25,7 @@ import { PaymentBottomSheet } from '@/shared/payment/presentation/bottomSheets/P
 import type { PaymentResult } from '@/shared/payment/types';
 
 import { useCenterDetails, useCenterPlans, type CenterPlan } from '@/domains/discovery';
-import { useAuthStore } from '@/domains/auth/store/authStore';
+import { enterPurchasedGym } from '@/domains/gymSwitcher/gymMembershipsApi';
 import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateOfBirthRules';
 import { usePurchaseFamilyPlan } from '../../hooks/usePurchaseFamilyPlan';
 import { useFamilyQuote } from '../../hooks/useFamilyQuote';
@@ -209,7 +209,8 @@ export function FamilyPurchaseScreen() {
       {
         onSuccess: (result) => {
           setIsPaymentVisible(false);
-          useAuthStore.getState().setActiveTenant(tenantSlug);
+          // Switches to this gym (resetting the previous gym's cache) and refreshes the gym list.
+          void enterPurchasedGym(tenantSlug, branchId || null);
 
           toast.success(
             isPlanChange

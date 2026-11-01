@@ -10,11 +10,23 @@ function toDTO(r: PushTokenRegistration) {
   return { expo_push_token: r.expoPushToken, platform: r.platform };
 }
 
+// Overrides the active gym's X-Tenant-ID for this one request.
+function tenantHeaders(tenantSlug: string | null) {
+  return tenantSlug ? { 'X-Tenant-ID': tenantSlug } : undefined;
+}
+
 export const apiPushTokenRepository: PushTokenRepository = {
-  async register(registration) {
-    await apiClient.put(PATH, toDTO(registration), { skipGlobalErrorToast: true });
+  async register(registration, tenantSlug) {
+    await apiClient.put(PATH, toDTO(registration), {
+      headers: tenantHeaders(tenantSlug),
+      skipGlobalErrorToast: true,
+    });
   },
-  async unregister(registration) {
-    await apiClient.delete(PATH, { data: toDTO(registration), skipGlobalErrorToast: true });
+  async unregister(registration, tenantSlug) {
+    await apiClient.delete(PATH, {
+      data: toDTO(registration),
+      headers: tenantHeaders(tenantSlug),
+      skipGlobalErrorToast: true,
+    });
   },
 };

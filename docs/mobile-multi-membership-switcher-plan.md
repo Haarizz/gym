@@ -1,6 +1,7 @@
 # Mobile: Multiple Gym Memberships & Membership Switcher — Plan
 
-**Status:** Planned, not started. Interim fix is in place (see "Current behaviour").
+**Status:** Different gyms built on `changes_anandu`, not yet released — see "What's
+built". Same gym, second branch (§6) deferred (Decision 1).
 **Scope:** GymBios-Mobile + Gym-backend (tenant DBs and control plane).
 
 ## Goal
@@ -130,9 +131,46 @@ Largest backend change. Everything that resolves "the member" by
 - Audit reporting/dashboards that count "members" per tenant: decide whether one
   person with two branch memberships counts once or twice.
 
+## What's built (different gyms)
+
+Every member now has one global account (see
+[global-accounts-for-gym-created-members-plan.md](global-accounts-for-gym-created-members-plan.md)),
+so a second gym is a second membership on the same account.
+
+- **List:** `GET /api/mobile/profile/memberships` (the existing endpoint, not a new
+  `/me/memberships`) now returns, per gym: `tenant_slug`, `active`, `gym_name`,
+  `branch_id`, `branch_name`, `plan_name`, `status`, `expiry_date`.
+  `GlobalMembershipService.findLinkedGyms` reads the account's members row in each
+  indexed gym live; names come from `global_branch_discovery`, falling back to
+  `tenants.name`. Status: ACTIVE, EXPIRED, INACTIVE, SUSPENDED, PENDING_APPROVAL,
+  PAYMENT_REJECTED, UNAVAILABLE (gym DB unreachable). Index rows whose member was
+  deleted are left out. No change to `user_memberships` itself.
+- **Picker at sign-in:** only when the device has no remembered gym for this account and
+  the account has more than one (`fetchLinkedGymChoice` → `authStore.gymChoicePending`;
+  the member layout renders `ChooseGymScreen` instead of the tabs). Otherwise the
+  last-used gym opens directly (Decision 4).
+- **Switching:** Profile Hub → **Switch gym**, and the line under the member's name in
+  the header ("Gym · Branch ⌄"). Both only when the member has more than one gym.
+  `switchGym` sets X-Tenant-ID **and** X-Active-Branch-Id before anything refetches (a
+  branch id from the previous gym would filter the new gym's data to the wrong branch),
+  opens Home and resets the whole query cache. `BranchProvider` no longer uses the
+  session's `branchId` for members — their branch always comes from the member record
+  at the active gym.
+- **Purchases:** buying a plan or a family plan at a gym switches to it through the same
+  path (`enterPurchasedGym`), so the previous gym's cached data is cleared and the new
+  gym appears in the switcher.
+- **Push:** the device registers its token with every gym the member belongs to, and
+  unregisters from all of them on sign-out. `ExpoPushClient` adds `tenantSlug` (the
+  sending gym) to every notification's data; tapping one from another gym switches to
+  it first, then opens the screen.
+- **Wording:** "Switch gym" / "Your gyms" in the UI. Strings in en, ar, de, es, fr, hi,
+  zh (ml and ta fall back to English, as for the rest of their pending phases).
+- **Shown in the list:** expired, suspended and pending memberships too, with a status
+  badge (Decisions 5 and 7). Staff accounts are out of scope (Decision 8).
+
 ## Decisions needed
 
-1. **Same gym, second branch:** allow a separate membership per branch, or block
+1. **Same gym, second branch:** **Decided: deferred** — ship different gyms first. allow a separate membership per branch, or block
    and point to the gym's own multi-branch access / plan change?
 2. **Profile edits after purchase:** each gym's `Member` row is a copy made at
    purchase. When the user edits their global profile (phone, weight, address…),
@@ -140,8 +178,8 @@ Largest backend change. Everything that resolves "the member" by
    profile, or (c) ask per edit? (a) matches user expectations but overwrites
    staff edits in the gym's record.
 3. **UI wording:** "membership" (recommended) vs "profile".
-4. **Default on app open:** last-used membership (recommended), or always ask when
-   there's more than one?
+4. **Default on app open:** **Decided:** last-used gym; the picker only when none is
+   remembered on the device.
 5. **Expired / cancelled memberships in the switcher:** show (greyed, with Renew) or
    hide?
 6. **Family seats:** should a claimed family/couple seat appear as its own entry in

@@ -1,7 +1,11 @@
 package com.company.project.services;
 
 import com.company.project.config.TenantDataSourceRegistry;
+import com.company.project.controlplane.entities.GlobalBranchDiscovery;
+import com.company.project.controlplane.entities.Tenant;
 import com.company.project.controlplane.entities.UserMembershipEntry;
+import com.company.project.controlplane.repositories.GlobalBranchDiscoveryRepository;
+import com.company.project.controlplane.repositories.TenantRepository;
 import com.company.project.controlplane.repositories.UserMembershipRepository;
 import com.company.project.dto.mobile.profile.MobileLinkedGymDTO;
 import com.company.project.entities.Member;
@@ -54,9 +58,24 @@ public class GlobalMembershipService {
                     + " AND join_date >= ?"
                     + " LIMIT 1";
 
+    // The account's members row in one gym, for the app's gym switcher. One row per
+    // account per gym; the newest wins should a second one ever exist.
+    private static final String MEMBERSHIP_DETAILS_SQL =
+            "SELECT branch_id, membership_type, membership_status, approval_status, membership_suspended,"
+                    + " COALESCE(expiry_date, membership_end_date) AS ends_at"
+                    + " FROM members WHERE global_user_id = ?"
+                    + " ORDER BY id DESC LIMIT 1";
+
+    static final String STATUS_ACTIVE = "ACTIVE";
+    static final String STATUS_EXPIRED = "EXPIRED";
+    static final String STATUS_INACTIVE = "INACTIVE";
+    static final String STATUS_UNAVAILABLE = "UNAVAILABLE";
+
     private final UserMembershipRepository userMembershipRepository;
     private final TenantDataSourceRegistry tenantDataSourceRegistry;
     private final DataSource primaryDataSource;
+    private final TenantRepository tenantRepository;
+    private final GlobalBranchDiscoveryRepository globalBranchDiscoveryRepository;
 
     @Value("${tenant.routing.enabled:false}")
     private boolean tenantRoutingEnabled;
@@ -66,10 +85,14 @@ public class GlobalMembershipService {
 
     public GlobalMembershipService(UserMembershipRepository userMembershipRepository,
                                    TenantDataSourceRegistry tenantDataSourceRegistry,
-                                   @Qualifier("primaryDataSource") DataSource primaryDataSource) {
+                                   @Qualifier("primaryDataSource") DataSource primaryDataSource,
+                                   TenantRepository tenantRepository,
+                                   GlobalBranchDiscoveryRepository globalBranchDiscoveryRepository) {
         this.userMembershipRepository = userMembershipRepository;
         this.tenantDataSourceRegistry = tenantDataSourceRegistry;
         this.primaryDataSource = primaryDataSource;
+        this.tenantRepository = tenantRepository;
+        this.globalBranchDiscoveryRepository = globalBranchDiscoveryRepository;
     }
 
     /**
@@ -168,8 +191,10 @@ public class GlobalMembershipService {
     }
 
     /**
-     * Every gym this account is linked to, active memberships first, so the app can
-     * pick its gym again when it has none stored locally (fresh install, new device).
+     * Every gym this account is a member of, active memberships first — the app's gym
+     * switcher, and how it picks its gym again when it has none stored locally (fresh
+     * install, new device). An index entry whose members row has since been deleted is
+     * left out.
      */
     public List<MobileLinkedGymDTO> findLinkedGyms(Long globalUserId) {
         if (globalUserId == null) {
@@ -178,14 +203,100 @@ public class GlobalMembershipService {
         List<MobileLinkedGymDTO> gyms = new ArrayList<>();
         try {
             for (UserMembershipEntry entry : userMembershipRepository.findByGlobalUserId(globalUserId)) {
-                gyms.add(new MobileLinkedGymDTO(entry.getTenantSlug(),
-                        hasActiveMembershipIn(entry.getTenantSlug(), globalUserId)));
+                MobileLinkedGymDTO gym = describeMembership(entry.getTenantSlug(), globalUserId);
+                if (gym != null) {
+                    gyms.add(gym);
+                }
             }
         } catch (Exception e) {
             log.warn("Could not read membership index for global user {}: {}", globalUserId, e.getMessage());
         }
-        gyms.sort(Comparator.comparing(MobileLinkedGymDTO::active).reversed());
+        gyms.sort(Comparator.comparing(MobileLinkedGymDTO::active).reversed()
+                .thenComparing(MobileLinkedGymDTO::gymName, String.CASE_INSENSITIVE_ORDER));
         return gyms;
+    }
+
+    /** This account's membership at one gym, or null when that gym holds no members row for it. */
+    private MobileLinkedGymDTO describeMembership(String tenantSlug, Long globalUserId) {
+        Long branchId;
+        String planName;
+        String status;
+        LocalDateTime endsAt;
+        try (Connection conn = dataSourceFor(tenantSlug).getConnection();
+             PreparedStatement stmt = conn.prepareStatement(MEMBERSHIP_DETAILS_SQL)) {
+            stmt.setLong(1, globalUserId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                long branch = rs.getLong("branch_id");
+                branchId = rs.wasNull() ? null : branch;
+                planName = rs.getString("membership_type");
+                Timestamp ends = rs.getTimestamp("ends_at");
+                endsAt = ends == null ? null : ends.toLocalDateTime();
+                status = statusOf(rs.getString("membership_status"), rs.getString("approval_status"),
+                        rs.getBoolean("membership_suspended"), endsAt, LocalDateTime.now());
+            }
+        } catch (Exception e) {
+            // Still list the gym, so one unreachable database doesn't hide a membership.
+            log.warn("Could not read membership of global user {} in tenant '{}': {}",
+                    globalUserId, tenantSlug, e.getMessage());
+            return new MobileLinkedGymDTO(tenantSlug, false, tenantName(tenantSlug), null, null, null,
+                    STATUS_UNAVAILABLE, null);
+        }
+
+        String gymName = null;
+        String branchName = null;
+        if (branchId != null) {
+            try {
+                Optional<GlobalBranchDiscovery> branch =
+                        globalBranchDiscoveryRepository.findByTenantSlugAndBranchId(tenantSlug, branchId);
+                if (branch.isPresent()) {
+                    gymName = branch.get().getGymName();
+                    branchName = branch.get().getBranchName();
+                }
+            } catch (Exception e) {
+                log.warn("Could not read branch {} of tenant '{}': {}", branchId, tenantSlug, e.getMessage());
+            }
+        }
+        if (gymName == null || gymName.isBlank()) {
+            gymName = tenantName(tenantSlug);
+        }
+        return new MobileLinkedGymDTO(tenantSlug, STATUS_ACTIVE.equals(status), gymName, branchId, branchName,
+                planName, status, endsAt == null ? null : endsAt.toLocalDate());
+    }
+
+    /**
+     * One status for the switcher. Gives the same "active" answer as ACTIVE_MEMBERSHIP_SQL;
+     * when it isn't active, says why — the gym's access gate first, as TenantContextFilter
+     * applies it.
+     */
+    static String statusOf(String membershipStatus, String approvalStatus, boolean suspended,
+                           LocalDateTime endsAt, LocalDateTime now) {
+        MemberAccessState access = MemberAccessState.of(suspended, approvalStatus);
+        if (!access.allowsMemberFeatures()) {
+            return access.name();
+        }
+        if ((endsAt != null && endsAt.isBefore(now)) || "expired".equalsIgnoreCase(membershipStatus)) {
+            return STATUS_EXPIRED;
+        }
+        if (!"active".equalsIgnoreCase(membershipStatus)) {
+            return STATUS_INACTIVE;
+        }
+        return STATUS_ACTIVE;
+    }
+
+    /** The gym's name from the control plane, or its slug if that can't be read. */
+    private String tenantName(String tenantSlug) {
+        try {
+            return tenantRepository.findBySlug(tenantSlug)
+                    .map(Tenant::getName)
+                    .filter(name -> !name.isBlank())
+                    .orElse(tenantSlug);
+        } catch (Exception e) {
+            log.warn("Could not read name of tenant '{}': {}", tenantSlug, e.getMessage());
+            return tenantSlug;
+        }
     }
 
     /**

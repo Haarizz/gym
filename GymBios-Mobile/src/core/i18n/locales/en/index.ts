@@ -9,6 +9,7 @@ import bookings from './bookings';
 import membership from './membership';
 import team from './team';
 import gymRating from './gymRating';
+import gymSwitcher from './gymSwitcher';
 import enquiries from './enquiries';
 import centers from './centers';
 import payments from './payments';
@@ -51,6 +52,7 @@ const en = {
   ...membership,
   ...team,
   ...gymRating,
+  ...gymSwitcher,
   ...enquiries,
   ...centers,
   ...payments,

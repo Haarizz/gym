@@ -1,5 +1,6 @@
 package com.company.project.services.mobile.push;
 
+import com.company.project.security.TenantContextHolder;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,16 @@ public class ExpoPushClient {
     // Expo's per-request message limit.
     private static final int MAX_BATCH = 100;
 
+    /** Key in every notification's data naming the gym that sent it, so the app can switch to it on tap. */
+    public static final String TENANT_DATA_KEY = "tenantSlug";
+
     private final RestClient restClient;
+
+    @Value("${tenant.routing.enabled:false}")
+    private boolean tenantRoutingEnabled;
+
+    @Value("${tenant.routing.default-tenant-slug:default}")
+    private String defaultTenantSlug;
 
     public ExpoPushClient(@Value("${mobile.push.expo.access-token:}") String accessToken) {
         RestClient.Builder builder = RestClient.builder()
@@ -46,6 +56,7 @@ public class ExpoPushClient {
 
     /** Sends the same notification to every token. Never throws — failures are logged and reported as not accepted. */
     public SendResult send(List<String> tokens, String title, String body, Map<String, Object> data) {
+        Map<String, Object> payload = withTenant(data);
         List<String> accepted = new ArrayList<>();
         List<String> unregistered = new ArrayList<>();
 
@@ -56,7 +67,7 @@ public class ExpoPushClient {
                 m.put("to", token);
                 m.put("title", title);
                 m.put("body", body);
-                m.put("data", data);
+                m.put("data", payload);
                 m.put("sound", "default");
                 return m;
             }).toList();
@@ -86,5 +97,19 @@ public class ExpoPushClient {
             }
         }
         return new SendResult(accepted, unregistered);
+    }
+
+    /**
+     * Adds the sending gym to the data. A member can belong to several gyms and the app
+     * shows one at a time; a tap on another gym's notification switches to it first.
+     * Sends made outside a request (scheduled jobs) run against the default database.
+     */
+    private Map<String, Object> withTenant(Map<String, Object> data) {
+        Map<String, Object> payload = data == null ? new LinkedHashMap<>() : new LinkedHashMap<>(data);
+        if (!payload.containsKey(TENANT_DATA_KEY)) {
+            String tenant = tenantRoutingEnabled ? TenantContextHolder.getCurrentTenant() : null;
+            payload.put(TENANT_DATA_KEY, tenant == null || tenant.isBlank() ? defaultTenantSlug : tenant);
+        }
+        return payload;
     }
 }

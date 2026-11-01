@@ -8,6 +8,7 @@ import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterPlan, CenterSummary } from '@/domains/discovery';
 import { usePurchaseMembership } from '@/domains/discovery/hooks/usePurchaseMembership';
+import { enterPurchasedGym } from '@/domains/gymSwitcher/gymMembershipsApi';
 import { PaymentBottomSheet } from '@/shared/payment/presentation/bottomSheets/PaymentBottomSheet';
 import type { PaymentResult } from '@/shared/payment/types';
 import {
@@ -75,8 +76,8 @@ export function PlanPurchaseModal({
           // (TenantContextFilter) blocks every member-facing endpoint except
           // discovery/profile/auth while approval_status is PENDING, regardless of
           // this switch, so it does not grant early access.
-          const { setActiveTenant } = require('@/domains/auth/store/authStore').useAuthStore.getState();
-          setActiveTenant(center.tenantSlug);
+          // Also refreshes the gym switcher's list, which now includes this gym.
+          void enterPurchasedGym(center.tenantSlug, center.branchId);
 
           if (approvalStatus === 'PENDING') {
             toast.success(

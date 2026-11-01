@@ -22,6 +22,8 @@ import { useCurrency } from '@/core/providers';
 import { useMyWallet } from '@/domains/memberPortal/wallet/useMyWallet';
 import { useMemberTenantAccess } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
 import { openGymRatingSheet } from '@/domains/memberPortal/gymRating/gymRating';
+import { GymSwitcherSheet } from '@/domains/gymSwitcher/presentation/GymSwitcherSheet';
+import { useMyGymMemberships } from '@/domains/gymSwitcher/gymMembershipsApi';
 
 import { useProfile } from '../../hooks/useProfile';
 import { useProfileSummary } from '../../hooks/useProfileSummary';
@@ -71,6 +73,12 @@ export function ProfileHubScreen({
   const hasTenantAccess = useMemberTenantAccess();
   const { data: wallet } = useMyWallet(isMember && hasTenantAccess);
   const { formatCurrency } = useCurrency();
+  // Members of more than one gym can switch which gym the app works in.
+  const activeTenant = useAuthStore((s) => s.activeTenant);
+  const { data: gyms } = useMyGymMemberships();
+  const canSwitchGym = isMember && (gyms?.length ?? 0) > 1;
+  const activeGymName = gyms?.find((g) => g.tenantSlug === activeTenant)?.gymName;
+  const [gymSwitcherVisible, setGymSwitcherVisible] = useState(false);
 
   const [photoSheetVisible, setPhotoSheetVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -135,6 +143,19 @@ export function ProfileHubScreen({
               iconColor={BrandColors.teal}
               onPress={onNavigateToProfile}
             />
+
+            {canSwitchGym && (
+              <ProfileNavigationRow
+                icon="repeat"
+                title={t('gymSwitcher.switchGym')}
+                subtitle={activeGymName
+                  ? t('gymSwitcher.switchGymSubtitle', { gym: activeGymName })
+                  : t('gymSwitcher.sheetSubtitle')}
+                iconBgColor="#eef7f6"
+                iconColor={BrandColors.teal}
+                onPress={() => setGymSwitcherVisible(true)}
+              />
+            )}
 
             {!isEmployee && (
               <ProfileNavigationRow
@@ -261,6 +282,10 @@ export function ProfileHubScreen({
           onConfirm={handleConfirmLogout}
           onClose={() => setLogoutModalVisible(false)}
         />
+
+        {canSwitchGym && (
+          <GymSwitcherSheet visible={gymSwitcherVisible} onClose={() => setGymSwitcherVisible(false)} />
+        )}
 
         {/* Photo Options Bottom Sheet */}
         <AppBottomSheet
