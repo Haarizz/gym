@@ -4,9 +4,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * An Expo push token registered by a member's device. One row per device token;
- * re-registering the same token (e.g. a different member signs in on that device)
- * moves it to the new member.
+ * An Expo push token registered by a member's or a staff member's device. One row per
+ * device token; re-registering the same token (e.g. someone else signs in on that
+ * device) moves it to the new owner. Exactly one of memberId / staffId is set.
  */
 @Entity
 @Table(name = "mobile_push_tokens")
@@ -17,8 +17,12 @@ public class MobilePushToken {
     private Long id;
 
     // FK to members.id (not enforced, same as Receipt.memberDbId)
-    @Column(name = "member_id", nullable = false)
+    @Column(name = "member_id")
     private Long memberId;
+
+    // FK to employees.id (not enforced); staff app devices, for chat messages
+    @Column(name = "staff_id")
+    private Long staffId;
 
     @Column(name = "expo_push_token", nullable = false, unique = true)
     private String expoPushToken;
@@ -38,6 +42,9 @@ public class MobilePushToken {
 
     public Long getMemberId() { return memberId; }
     public void setMemberId(Long memberId) { this.memberId = memberId; }
+
+    public Long getStaffId() { return staffId; }
+    public void setStaffId(Long staffId) { this.staffId = staffId; }
 
     public String getExpoPushToken() { return expoPushToken; }
     public void setExpoPushToken(String expoPushToken) { this.expoPushToken = expoPushToken; }

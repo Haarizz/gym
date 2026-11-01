@@ -17,6 +17,10 @@ public class MemberStaffCardDTO {
     private Long ratingCount;
     /** The calling member's own rating of this staff member, if any. */
     private Integer myRating;
+    /** Whether the Message button works; if not, a ConversationPolicyService code and message to show. */
+    private boolean canMessage;
+    private String messageUnavailableCode;
+    private String messageUnavailableReason;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -47,4 +51,13 @@ public class MemberStaffCardDTO {
 
     public Integer getMyRating() { return myRating; }
     public void setMyRating(Integer myRating) { this.myRating = myRating; }
+
+    public boolean isCanMessage() { return canMessage; }
+    public void setCanMessage(boolean canMessage) { this.canMessage = canMessage; }
+
+    public String getMessageUnavailableCode() { return messageUnavailableCode; }
+    public void setMessageUnavailableCode(String messageUnavailableCode) { this.messageUnavailableCode = messageUnavailableCode; }
+
+    public String getMessageUnavailableReason() { return messageUnavailableReason; }
+    public void setMessageUnavailableReason(String messageUnavailableReason) { this.messageUnavailableReason = messageUnavailableReason; }
 }

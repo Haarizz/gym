@@ -116,6 +116,13 @@ public class Staff extends BaseEntity implements BranchAware {
     public Boolean getAppAccessEnabled() { return appAccessEnabled; }
     public void setAppAccessEnabled(Boolean appAccessEnabled) { this.appAccessEnabled = appAccessEnabled; }
 
+    // Off = members can't start new conversations with this staff member; existing ones go on.
+    @Column(name = "accepts_member_messages", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT TRUE")
+    private boolean acceptsMemberMessages = true;
+
+    public boolean isAcceptsMemberMessages() { return acceptsMemberMessages; }
+    public void setAcceptsMemberMessages(boolean acceptsMemberMessages) { this.acceptsMemberMessages = acceptsMemberMessages; }
+
     @Column(name = "branch_id")
     private Long branchId;
 

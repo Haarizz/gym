@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Computes the 9 Admin Dashboard KPI summary cards. Each KPI's calculation here
+ * Computes the Admin Dashboard KPI summary cards. Each KPI's calculation here
  * is the same one {@link AdminDashboardReportService} uses for that KPI's detail
  * report total, so the summary card and the report it opens always reconcile.
  */
@@ -55,7 +55,8 @@ public class AdminDashboardKpiService {
         kpis.add(dayPassKpi(range));
         kpis.add(checkInsKpi(range));
         kpis.add(activeMembersKpi());
-        kpis.addAll(churnAndRetentionKpis(range));
+        // Churn/retention cards hidden from the mobile dashboard for now; the
+        // calculation and their detail reports are kept so they can be re-added.
 
         return kpis;
     }

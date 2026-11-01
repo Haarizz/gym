@@ -51,4 +51,9 @@ public interface StaffRepository extends JpaRepository<Staff, Long>, JpaSpecific
     @Modifying
     @Query(value = "UPDATE employees SET walk_in_code = :code WHERE id = :id AND walk_in_code IS NULL", nativeQuery = true)
     int assignWalkInCode(@Param("id") Long id, @Param("code") String code);
+
+    /** A bulk update: the staff member may be working from another branch than their home one. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Staff s SET s.acceptsMemberMessages = :accepts WHERE s.id = :id")
+    int updateAcceptsMemberMessages(@Param("id") Long id, @Param("accepts") boolean accepts);
 }

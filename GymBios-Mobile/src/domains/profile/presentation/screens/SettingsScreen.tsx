@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { getLanguage, useLanguageStore } from '@/core/i18n';
 import { BrandColors, Spacing } from '@/core/theme';
+import { useFontSizeStore } from '@/core/theme/fontSizeStore';
 import { GlassBlob, GlassHeader } from '@/shared/components';
 
 import { useMySettings } from '../../hooks/useMySettings';
@@ -15,6 +16,7 @@ import {
   SettingsCard,
   SettingSwitchRow,
 } from '../components/SettingsSection';
+import { FONT_SIZE_LABEL_KEYS, FontSizeSheet } from '../components/FontSizeSheet';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -26,6 +28,8 @@ export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenP
   const { settings } = useMySettings();
   const { updateSettings } = useProfileMutations();
   const language = useLanguageStore((s) => s.language);
+  const fontSize = useFontSizeStore((s) => s.fontSize);
+  const [fontSizeSheetVisible, setFontSizeSheetVisible] = useState(false);
 
   // Local state initialized with query data
   const [notifications, setNotifications] = useState(settings.notifications);
@@ -62,6 +66,17 @@ export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenP
             description={t('settings.appLanguageDescription')}
             value={getLanguage(language).nativeName}
             onPress={onNavigateToLanguage}
+            divider={false}
+          />
+        </SettingsCard>
+
+        {/* Display */}
+        <SettingsCard title={t('settings.displayCard')} icon="type">
+          <SettingNavRow
+            label={t('settings.fontSize')}
+            description={t('settings.fontSizeDescription')}
+            value={t(FONT_SIZE_LABEL_KEYS[fontSize])}
+            onPress={() => setFontSizeSheetVisible(true)}
             divider={false}
           />
         </SettingsCard>
@@ -137,6 +152,8 @@ export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenP
           />
         </SettingsCard>
       </ScrollView>
+
+      <FontSizeSheet visible={fontSizeSheetVisible} onClose={() => setFontSizeSheetVisible(false)} />
     </SafeAreaView>
   );
 }

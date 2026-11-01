@@ -422,6 +422,26 @@ public class Member extends BaseEntity implements BranchAware {
     public LocalDateTime getSuspendedAt() { return suspendedAt; }
     public void setSuspendedAt(LocalDateTime suspendedAt) { this.suspendedAt = suspendedAt; }
 
+    // Member↔staff chat: off = staff can't start new conversations with this member.
+    @Column(name = "allow_staff_chats", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT TRUE")
+    private boolean allowStaffChats = true;
+
+    // Set by an admin resolving a conversation report: no chat at this branch at all.
+    @Column(name = "chat_banned_at")
+    private LocalDateTime chatBannedAt;
+
+    @Column(name = "chat_banned_by")
+    private String chatBannedBy;
+
+    public boolean isAllowStaffChats() { return allowStaffChats; }
+    public void setAllowStaffChats(boolean allowStaffChats) { this.allowStaffChats = allowStaffChats; }
+
+    public LocalDateTime getChatBannedAt() { return chatBannedAt; }
+    public void setChatBannedAt(LocalDateTime chatBannedAt) { this.chatBannedAt = chatBannedAt; }
+
+    public String getChatBannedBy() { return chatBannedBy; }
+    public void setChatBannedBy(String chatBannedBy) { this.chatBannedBy = chatBannedBy; }
+
     @Column(name = "global_user_id")
     private Long globalUserId;
 

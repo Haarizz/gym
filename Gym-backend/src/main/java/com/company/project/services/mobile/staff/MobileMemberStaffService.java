@@ -12,6 +12,8 @@ import com.company.project.repositories.StaffBranchRepository;
 import com.company.project.repositories.StaffRatingRepository;
 import com.company.project.repositories.StaffRepository;
 import com.company.project.security.UserDetailsImpl;
+import com.company.project.services.conversations.ConversationPolicyService;
+import com.company.project.services.conversations.ConversationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,16 +43,19 @@ public class MobileMemberStaffService {
     private final StaffRepository staffRepository;
     private final StaffBranchRepository staffBranchRepository;
     private final StaffRatingRepository staffRatingRepository;
+    private final ConversationService conversationService;
 
     public MobileMemberStaffService(
             MemberRepository memberRepository,
             StaffRepository staffRepository,
             StaffBranchRepository staffBranchRepository,
-            StaffRatingRepository staffRatingRepository) {
+            StaffRatingRepository staffRatingRepository,
+            ConversationService conversationService) {
         this.memberRepository = memberRepository;
         this.staffRepository = staffRepository;
         this.staffBranchRepository = staffBranchRepository;
         this.staffRatingRepository = staffRatingRepository;
+        this.conversationService = conversationService;
     }
 
     public List<MemberStaffCardDTO> getTeam(UserDetailsImpl principal) {
@@ -61,8 +66,10 @@ public class MobileMemberStaffService {
         Map<Long, Integer> myRatings = staffRatingRepository.findByBranchIdAndMemberId(branchId, member.getId()).stream()
                 .collect(Collectors.toMap(StaffRating::getStaffId, StaffRating::getRating));
 
-        return activeStaff(branchId).stream()
-                .map(s -> toCard(s, counts.get(s.getId()), myRatings.get(s.getId())))
+        List<Staff> staff = activeStaff(branchId);
+        Map<Long, ConversationPolicyService.Verdict> messaging = conversationService.memberTeamAvailability(member, staff);
+        return staff.stream()
+                .map(s -> withMessaging(toCard(s, counts.get(s.getId()), myRatings.get(s.getId())), messaging.get(s.getId())))
                 .sorted(Comparator.comparing(MemberStaffCardDTO::getName, String.CASE_INSENSITIVE_ORDER))
                 .collect(Collectors.toList());
     }
@@ -100,7 +107,10 @@ public class MobileMemberStaffService {
 
     public MemberStaffProfileDTO getProfile(UserDetailsImpl principal, Long staffId) {
         Member member = requireMember(principal);
-        return buildProfile(member, requireStaff(member.getBranchId(), staffId));
+        Staff staff = requireStaff(member.getBranchId(), staffId);
+        MemberStaffProfileDTO dto = buildProfile(member, staff);
+        withMessaging(dto.getStaff(), conversationService.memberMessageAvailability(member, staff));
+        return dto;
     }
 
     @Transactional
@@ -132,7 +142,9 @@ public class MobileMemberStaffService {
         rating.setAnonymous(request.isAnonymous());
         staffRatingRepository.save(rating);
 
-        return buildProfile(member, staff);
+        MemberStaffProfileDTO dto = buildProfile(member, staff);
+        withMessaging(dto.getStaff(), conversationService.memberMessageAvailability(member, staff));
+        return dto;
     }
 
     private MemberStaffProfileDTO buildProfile(Member member, Staff staff) {
@@ -165,6 +177,14 @@ public class MobileMemberStaffService {
         dto.setReviews(reviews);
         dto.setMyReview(reviews.stream().filter(MemberStaffReviewDTO::isMine).findFirst().orElse(null));
         return dto;
+    }
+
+    private static MemberStaffCardDTO withMessaging(MemberStaffCardDTO card, ConversationPolicyService.Verdict verdict) {
+        if (verdict == null) return card;
+        card.setCanMessage(verdict.allowed());
+        card.setMessageUnavailableCode(verdict.code());
+        card.setMessageUnavailableReason(verdict.message());
+        return card;
     }
 
     private MemberStaffReviewDTO toReview(StaffRating r, Member author, boolean mine) {

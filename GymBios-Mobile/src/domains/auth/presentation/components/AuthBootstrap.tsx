@@ -12,6 +12,7 @@ import { setUnauthorizedHandler } from '@/core/network/apiClient';
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { i18n, useLanguageStore } from '@/core/i18n';
+import { useFontSizeStore } from '@/core/theme/fontSizeStore';
 import { Loader } from '@/shared/components';
 import { APP_ROLES, type AppRole } from '../../domain/valueObjects/AppRole';
 import { ROLE_SELECTION_HREF, MEMBER_AUTH_HREF, getRoleHomeHref } from '../navigation/routes';
@@ -75,6 +76,8 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
   const isLanguageHydrated = useLanguageStore((s) => s.isHydrated);
   const hasChosenLanguage = useLanguageStore((s) => s.hasChosen);
   const hydrateLanguage = useLanguageStore((s) => s.hydrate);
+  const isFontSizeHydrated = useFontSizeStore((s) => s.isHydrated);
+  const hydrateFontSize = useFontSizeStore((s) => s.hydrate);
 
   const segments = useSegments();
   const pathname = usePathname();
@@ -112,6 +115,10 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
   useEffect(() => {
     hydrateLanguage();
   }, [hydrateLanguage]);
+
+  useEffect(() => {
+    hydrateFontSize();
+  }, [hydrateFontSize]);
 
   useEffect(() => {
     if (!isHydrated || isRestoring || !isLanguageHydrated) return;
@@ -162,7 +169,8 @@ export function AuthBootstrap({ useRestoreSession, children }: AuthBootstrapProp
     roleRedirect,
   ]);
 
-  if (!isHydrated || isRestoring || !isLanguageHydrated) {
+  // Wait for the saved font size too so text doesn't visibly resize after launch.
+  if (!isHydrated || isRestoring || !isLanguageHydrated || !isFontSizeHydrated) {
     return <Loader message={i18n.t('auth.loading')} />;
   }
 

@@ -258,4 +258,13 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Query("SELECT m FROM Member m WHERE m.branchId = :branchId AND LOWER(m.membershipStatus) = 'active' "
             + "AND (m.globalUserId IS NOT NULL OR m.userId IS NOT NULL)")
     List<Member> findActiveAppMembersByBranchId(@Param("branchId") Long branchId);
+
+    /** A bulk update: the app may be browsing another branch than the member's own. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Member m SET m.allowStaffChats = :allow WHERE m.id = :id")
+    int updateAllowStaffChats(@Param("id") Long id, @Param("allow") boolean allow);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Member m SET m.chatBannedAt = :at, m.chatBannedBy = :by WHERE m.id = :id")
+    int updateChatBan(@Param("id") Long id, @Param("at") LocalDateTime at, @Param("by") String by);
 }
