@@ -37,6 +37,16 @@ public class StaffTarget extends BaseEntity implements BranchAware {
     @Column(name = "revenue_target", precision = 12, scale = 2)
     private BigDecimal revenueTarget;
 
+    // Per-category revenue targets (revenue_target above is the overall one); null = not set
+    @Column(name = "membership_revenue_target", precision = 12, scale = 2)
+    private BigDecimal membershipRevenueTarget;
+
+    @Column(name = "pos_revenue_target", precision = 12, scale = 2)
+    private BigDecimal posRevenueTarget;
+
+    @Column(name = "pt_revenue_target", precision = 12, scale = 2)
+    private BigDecimal ptRevenueTarget;
+
     @Column(name = "revenue_achieved", precision = 12, scale = 2)
     private BigDecimal revenueAchieved = BigDecimal.ZERO;
 
@@ -84,6 +94,12 @@ public class StaffTarget extends BaseEntity implements BranchAware {
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
     public BigDecimal getRevenueTarget() { return revenueTarget; }
     public void setRevenueTarget(BigDecimal revenueTarget) { this.revenueTarget = revenueTarget; }
+    public BigDecimal getMembershipRevenueTarget() { return membershipRevenueTarget; }
+    public void setMembershipRevenueTarget(BigDecimal membershipRevenueTarget) { this.membershipRevenueTarget = membershipRevenueTarget; }
+    public BigDecimal getPosRevenueTarget() { return posRevenueTarget; }
+    public void setPosRevenueTarget(BigDecimal posRevenueTarget) { this.posRevenueTarget = posRevenueTarget; }
+    public BigDecimal getPtRevenueTarget() { return ptRevenueTarget; }
+    public void setPtRevenueTarget(BigDecimal ptRevenueTarget) { this.ptRevenueTarget = ptRevenueTarget; }
     public BigDecimal getRevenueAchieved() { return revenueAchieved; }
     public void setRevenueAchieved(BigDecimal revenueAchieved) { this.revenueAchieved = revenueAchieved; }
     public Integer getSessionsTarget() { return sessionsTarget; }

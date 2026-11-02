@@ -16,6 +16,7 @@ import { staffService, StaffTarget, CommissionRule } from "../utils/supabase/sta
 import { rolesService } from "../utils/supabase/roles-service";
 import {
   commissionEarningsService, CommissionOverview, CommissionStaffRow, CommissionMonth, CommissionCategory, CommissionStatus, CommissionCategoryFigures,
+  RevenueCategory,
 } from "../utils/supabase/workforce-service";
 import { TARGET_UNIT_TYPES, unitLabel } from "../utils/target-units";
 import {
@@ -32,7 +33,7 @@ type SegKey = "memberships" | "pos" | "pt";
 const SEGS: Array<{ key: SegKey; label: string; short: string; tone: Tone; icon: typeof CreditCard; units: string[]; hint: string }> = [
   { key: "memberships", label: "Memberships", short: "Members", tone: "teal", icon: CreditCard, units: ["admissions", "renewals", "addons", "walkins"], hint: "Admissions, renewals, add-ons and walk-ins they collected" },
   { key: "pos", label: "POS Sales", short: "POS", tone: "blue", icon: ShoppingBag, units: ["pos_sales", "pos_items"], hint: "Completed POS bills they rang up (net of refunds)" },
-  { key: "pt", label: "PT Sessions", short: "PT", tone: "violet", icon: Dumbbell, units: ["pt_sessions"], hint: "Personal training sessions delivered" },
+  { key: "pt", label: "PT Sessions", short: "PT", tone: "violet", icon: Dumbbell, units: ["pt_sessions"], hint: "Booked PT sessions (app or desk), credited to the trainer" },
 ];
 const EARN_TONE: Record<CommissionStatus, Tone> = { estimated: "blue", pending: "amber", approved: "green", paid: "teal", rejected: "red" };
 const EARN_LABEL: Record<CommissionStatus, string> = { estimated: "Estimated", pending: "Pending", approved: "Approved", paid: "Paid", rejected: "Rejected" };
@@ -42,7 +43,25 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 const achTone = (p: number): Tone => (p >= 100 ? "green" : p >= 80 ? "amber" : "red");
 const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
-interface TargetForm { id?: string; scope: "individual" | "institution"; staffId: string; period: string; revenue: string; units: Record<string, string>; }
+interface TargetForm {
+  id?: string; scope: "individual" | "institution"; staffId: string; period: string; revenue: string;
+  catRevenue: Record<RevenueCategory, string>; units: Record<string, string>;
+}
+
+// SegKey "pt" doubles as the PT revenue category; memberships here exclude PT add-ons.
+const REVENUE_CATS: Array<{ key: RevenueCategory; label: string; field: "membership_revenue_target" | "pos_revenue_target" | "pt_revenue_target"; hint: string }> = [
+  { key: "memberships", label: "Membership revenue", field: "membership_revenue_target", hint: "Admissions, renewals, add-ons, walk-ins (not PT)" },
+  { key: "pos", label: "POS sales revenue", field: "pos_revenue_target", hint: "Completed POS bills, after refunds" },
+  { key: "pt", label: "PT revenue", field: "pt_revenue_target", hint: "PT packages + bookings on their PT sessions" },
+];
+const emptyCatRevenue = (): Record<RevenueCategory, string> => ({ memberships: "", pos: "", pt: "" });
+const catRevenueFrom = (src: Partial<Record<RevenueCategory, number | null | undefined>> | undefined) => {
+  const out = emptyCatRevenue();
+  REVENUE_CATS.forEach(c => { const v = Number(src?.[c.key] || 0); out[c.key] = v > 0 ? String(v) : ""; });
+  return out;
+};
+const targetCatRevenue = (t: StaffTarget) =>
+  ({ memberships: t.membership_revenue_target, pos: t.pos_revenue_target, pt: t.pt_revenue_target });
 
 export function SetTargets({ onNavigate }: SetTargetsProps) {
   const location = useLocation();
@@ -136,7 +155,10 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
       target: main.reduce((t, u) => t + unitTarget(m, u), 0),
     };
   };
-  const segRevenue = (m: CommissionMonth, seg: SegKey) => seg === "pt" ? 0 : Number(m.categories.find(c => c.category === seg)?.revenue || 0);
+  const segRevenue = (m: CommissionMonth, seg: SegKey) => m.revenue_by_category
+    ? Number(m.revenue_by_category[seg] || 0)
+    : seg === "pt" ? 0 : Number(m.categories.find(c => c.category === seg)?.revenue || 0);
+  const segRevenueTarget = (m: CommissionMonth, seg: SegKey) => Number(m.revenue_targets?.[seg] || 0);
   const segCommission = (m: CommissionMonth, seg: SegKey) => seg === "pt" ? 0 : Number(m.categories.find(c => c.category === seg)?.commission || 0);
 
   const perStaff = useMemo(() => visible.map(r => {
@@ -201,7 +223,13 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
       });
     });
     const allocated = rows.reduce((t, r) => t + r.months.reduce((a, m) => a + (m.target_id ? Number(m.revenue_target || 0) : 0), 0), 0);
-    return { revT, revA, byUnit, allocated };
+    const byCat = REVENUE_CATS.map(c => ({
+      ...c,
+      target: instTargets.reduce((t, x) => t + Number(targetCatRevenue(x)[c.key] || 0), 0),
+      done: instTargets.reduce((t, x) => t + Number(
+        (c.key === "memberships" ? x.membership_revenue_achieved : c.key === "pos" ? x.pos_revenue_achieved : x.pt_revenue_achieved) || 0), 0),
+    }));
+    return { revT, revA, byUnit, allocated, byCat };
   }, [instTargets, rows]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -243,6 +271,9 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
       scope, staffId: row ? String(row.staff_id) : "",
       period,
       revenue: scope === "institution" ? (existing ? String(existing.revenue_target) : "") : month?.target_id ? String(month.revenue_target) : "",
+      catRevenue: scope === "institution"
+        ? (existing ? catRevenueFrom(targetCatRevenue(existing)) : emptyCatRevenue())
+        : month?.target_id ? catRevenueFrom(month.revenue_targets) : emptyCatRevenue(),
       units,
     });
   };
@@ -263,7 +294,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
         const v = parsed.filter(x => x.service === u.id).reduce((a, x) => a + Number(x.target_units || 0), 0);
         units[u.id] = v ? String(v) : "";
       });
-      setTargetForm(f => f && ({ ...f, revenue: String(t.revenue_target || ""), units }));
+      setTargetForm(f => f && ({ ...f, revenue: String(t.revenue_target || ""), catRevenue: catRevenueFrom(targetCatRevenue(t)), units }));
       toast.success(`Copied from ${MONTHS[prev.getMonth()]} ${prev.getFullYear()}`);
     } catch (e) { toast.error(errorMessage(e, "Failed to copy previous target")); }
   };
@@ -271,7 +302,9 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
   const saveTarget = async () => {
     if (!targetForm) return;
     if (targetForm.scope === "individual" && !targetForm.staffId) { toast.error("Pick a staff member"); return; }
-    const revenue = Number(targetForm.revenue) || 0;
+    const catSum = REVENUE_CATS.reduce((t, c) => t + (Number(targetForm.catRevenue[c.key]) || 0), 0);
+    // No overall figure typed → the overall target is the sum of the category targets.
+    const revenue = Number(targetForm.revenue) || catSum;
     const unitList = Object.entries(targetForm.units).filter(([, v]) => Number(v) > 0).map(([service, v]) => ({ service, target_units: Number(v), achieved_units: 0 }));
     if (revenue <= 0 && unitList.length === 0) { toast.error("Set a revenue target or at least one unit target"); return; }
     const [y, m] = targetForm.period.split("-").map(Number);
@@ -279,6 +312,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
     try {
       const payload: any = {
         scope: targetForm.scope, timeframe: "monthly", year: y, month: m, revenue_target: revenue,
+        ...Object.fromEntries(REVENUE_CATS.map(c => [c.field, Number(targetForm.catRevenue[c.key]) || null])),
         unit_targets_json: JSON.stringify(unitList),
         ...(targetForm.scope === "individual" ? { staff_db_id: Number(targetForm.staffId) } : {}),
       };
@@ -473,7 +507,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                     <ProgressBar value={target ? p : 0} tone={seg.tone} />
                     <div className={s.spread} style={{ marginTop: "0.5rem" }}>
                       <span className={cx(s.small, s.muted)}>Units <strong style={{ color: "var(--foreground)" }}>{done}{target ? ` / ${target}` : ""}</strong></span>
-                      {seg.key !== "pt" && <span className={s.small}><Money value={rev} /></span>}
+                      <span className={s.small}><Money value={rev} /></span>
                     </div>
                     <div className={s.cellSub} style={{ marginTop: 4 }}>{seg.hint}</div>
                   </div>
@@ -513,6 +547,19 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                       <td className={s.right}><Money value={inst.revT} /></td><td className={cx(s.right, s.strong)}><Money value={inst.revA} /></td>
                       <td style={{ minWidth: "10rem" }}><div className={s.barRow}><ProgressBar value={pct(inst.revA, inst.revT)} tone={achTone(pct(inst.revA, inst.revT))} /><span className={s.small}>{pct(inst.revA, inst.revT)}%</span></div></td>
                     </tr>
+                    {inst.byCat.map(c => {
+                      if (!c.target && !c.done) return null;
+                      const p = pct(c.done, c.target);
+                      return (
+                        <tr key={c.key}>
+                          <td className={s.strong}>{c.label}<div className={s.cellSub}>{c.hint}</div></td>
+                          <td><Badge plain>Revenue</Badge></td>
+                          <td className={s.right}>{c.target ? <Money value={c.target} /> : "—"}</td>
+                          <td className={cx(s.right, s.strong)}><Money value={c.done} /></td>
+                          <td style={{ minWidth: "10rem" }}>{c.target ? <div className={s.barRow}><ProgressBar value={p} tone={achTone(p)} /><span className={s.small}>{p}%</span></div> : <span className={s.muted}>No target</span>}</td>
+                        </tr>
+                      );
+                    })}
                     {TARGET_UNIT_TYPES.map(u => {
                       const v = inst.byUnit.get(u.id) ?? { target: 0, done: 0 };
                       if (!v.target && !v.done) return null;
@@ -572,15 +619,18 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                         const target = x.row.months.reduce((t, m) => t + segUnits(m, seg.key).target, 0);
                         const rev = x.row.months.reduce((t, m) => t + segRevenue(m, seg.key), 0);
                         const comm = x.row.months.reduce((t, m) => t + segCommission(m, seg.key), 0);
-                        const p = pct(done, target);
+                        const revTarget = x.row.months.reduce((t, m) => t + segRevenueTarget(m, seg.key), 0);
+                        // A revenue target, when set, is the headline; otherwise the unit target.
+                        const p = revTarget ? pct(rev, revTarget) : pct(done, target);
+                        const hasTarget = revTarget > 0 || target > 0;
                         return (
                           <div key={seg.key} className={s.section} data-tone={seg.tone} style={{ padding: "0.625rem 0.75rem" }}>
                             <div className={s.spread}>
                               <span className={s.row} style={{ gap: "0.35rem" }}><span data-tone={seg.tone} className={s.toneText}><seg.icon size={14} /></span><span className={cx(s.small, s.strong)}>{seg.short}</span></span>
-                              {target ? <span data-tone={achTone(p)} className={cx(s.toneText, s.small, s.strong)}>{p}%</span> : null}
+                              {hasTarget ? <span data-tone={achTone(p)} className={cx(s.toneText, s.small, s.strong)}>{p}%</span> : null}
                             </div>
                             <div className={s.cellSub} style={{ marginTop: 4 }}>
-                              {done}{target ? ` / ${target}` : ""} units{seg.key !== "pt" ? ` · ${money(rev)}` : ""}{comm ? ` · ${money(comm)} comm.` : ""}
+                              {money(rev)}{revTarget ? ` / ${money(revTarget)}` : ""} · {done}{target ? ` / ${target}` : ""} units{comm ? ` · ${money(comm)} comm.` : ""}
                             </div>
                           </div>
                         );
@@ -751,7 +801,10 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                           {seg.units.map(u => (
                             <Stat key={u} label={unitLabel(u)} value={`${months.reduce((t, m) => t + Number(m.units[u] || 0), 0)}${months.reduce((t, m) => t + unitTarget(m, u), 0) ? ` / ${months.reduce((t, m) => t + unitTarget(m, u), 0)}` : ""}`} />
                           ))}
-                          {seg.key !== "pt" && <Stat label="Collected" value={<Money value={months.reduce((t, m) => t + segRevenue(m, seg.key), 0)} />} />}
+                          <Stat label="Collected" value={<Money value={months.reduce((t, m) => t + segRevenue(m, seg.key), 0)} />} />
+                          {months.some(m => segRevenueTarget(m, seg.key) > 0) && (
+                            <Stat label="Revenue target" value={<Money value={months.reduce((t, m) => t + segRevenueTarget(m, seg.key), 0)} />} />
+                          )}
                           {seg.key !== "pt" && <Stat label="Commission" value={<Money value={months.reduce((t, m) => t + segCommission(m, seg.key), 0)} />} />}
                         </div>
                       </div>
@@ -837,7 +890,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
             <>
               <DialogHeader>
                 <DialogTitle>{targetForm.scope === "institution" ? "Institution target" : "Individual target"}</DialogTitle>
-                <DialogDescription>Monthly revenue and unit targets. Progress is tracked live from receipts, POS sales and PT sessions.</DialogDescription>
+                <DialogDescription>Monthly revenue (overall and per category) and unit targets. Progress is tracked live from receipts, POS sales and PT sessions.</DialogDescription>
               </DialogHeader>
               <div className={s.dialogBody}>
                 <div className={s.grid2}>
@@ -864,9 +917,28 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Revenue target" hint="Membership collections + POS sales">
-                    <Input type="number" min={0} value={targetForm.revenue} onChange={e => setTargetForm(f => f && ({ ...f, revenue: e.target.value }))} />
-                  </Field>
+                  {(() => {
+                    const catSum = REVENUE_CATS.reduce((t, c) => t + (Number(targetForm.catRevenue[c.key]) || 0), 0);
+                    return (
+                      <Field label="Overall revenue target"
+                        hint={catSum > 0 && !targetForm.revenue ? `Blank = sum of categories (${money(catSum)})`
+                          : catSum > 0 && Number(targetForm.revenue) !== catSum ? `Categories add up to ${money(catSum)}`
+                          : "Memberships + POS + PT"}>
+                        <Input type="number" min={0} value={targetForm.revenue} placeholder={catSum > 0 ? String(catSum) : ""}
+                          onChange={e => setTargetForm(f => f && ({ ...f, revenue: e.target.value }))} />
+                      </Field>
+                    );
+                  })()}
+                </div>
+                <hr className={s.divider} />
+                <span className={s.sectionLabel}>Revenue targets by category</span>
+                <div className={s.grid3}>
+                  {REVENUE_CATS.map(c => (
+                    <Field key={c.key} label={c.label} hint={c.hint}>
+                      <Input type="number" min={0} value={targetForm.catRevenue[c.key]} placeholder="No target"
+                        onChange={e => setTargetForm(f => f && ({ ...f, catRevenue: { ...f.catRevenue, [c.key]: e.target.value } }))} />
+                    </Field>
+                  ))}
                 </div>
                 <hr className={s.divider} />
                 <span className={s.sectionLabel}>Unit targets</span>

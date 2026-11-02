@@ -19,6 +19,14 @@ public class StaffTargetResponseDTO {
     private BigDecimal revenueTarget;
     private BigDecimal revenueAchieved;
     private Integer percentage;
+    /** Per-category revenue targets; null when that category has no target. */
+    private BigDecimal membershipRevenueTarget;
+    private BigDecimal posRevenueTarget;
+    private BigDecimal ptRevenueTarget;
+    /** Live revenue per category (memberships exclude PT, so the three add up to revenueAchieved). */
+    private BigDecimal membershipRevenueAchieved;
+    private BigDecimal posRevenueAchieved;
+    private BigDecimal ptRevenueAchieved;
     private Integer sessionsTarget;
     private Integer sessionsAchieved;
     private Integer newClientsTarget;
@@ -42,6 +50,9 @@ public class StaffTargetResponseDTO {
         dto.endDate = t.getEndDate() != null ? t.getEndDate().toString() : null;
         dto.revenueTarget = t.getRevenueTarget();
         dto.revenueAchieved = t.getRevenueAchieved() != null ? t.getRevenueAchieved() : BigDecimal.ZERO;
+        dto.membershipRevenueTarget = t.getMembershipRevenueTarget();
+        dto.posRevenueTarget = t.getPosRevenueTarget();
+        dto.ptRevenueTarget = t.getPtRevenueTarget();
         dto.sessionsTarget = t.getSessionsTarget();
         dto.sessionsAchieved = t.getSessionsAchieved() != null ? t.getSessionsAchieved() : 0;
         dto.newClientsTarget = t.getNewClientsTarget();
@@ -103,6 +114,14 @@ public class StaffTargetResponseDTO {
         return dto;
     }
 
+    /** Attaches the live per-category revenue (memberships excluding PT, POS, PT). */
+    public StaffTargetResponseDTO withRevenueBreakdown(BigDecimal memberships, BigDecimal pos, BigDecimal pt) {
+        this.membershipRevenueAchieved = memberships;
+        this.posRevenueAchieved = pos;
+        this.ptRevenueAchieved = pt;
+        return this;
+    }
+
     // All getters/setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -134,6 +153,18 @@ public class StaffTargetResponseDTO {
     public void setRevenueAchieved(BigDecimal revenueAchieved) { this.revenueAchieved = revenueAchieved; }
     public Integer getPercentage() { return percentage; }
     public void setPercentage(Integer percentage) { this.percentage = percentage; }
+    public BigDecimal getMembershipRevenueTarget() { return membershipRevenueTarget; }
+    public void setMembershipRevenueTarget(BigDecimal membershipRevenueTarget) { this.membershipRevenueTarget = membershipRevenueTarget; }
+    public BigDecimal getPosRevenueTarget() { return posRevenueTarget; }
+    public void setPosRevenueTarget(BigDecimal posRevenueTarget) { this.posRevenueTarget = posRevenueTarget; }
+    public BigDecimal getPtRevenueTarget() { return ptRevenueTarget; }
+    public void setPtRevenueTarget(BigDecimal ptRevenueTarget) { this.ptRevenueTarget = ptRevenueTarget; }
+    public BigDecimal getMembershipRevenueAchieved() { return membershipRevenueAchieved; }
+    public void setMembershipRevenueAchieved(BigDecimal membershipRevenueAchieved) { this.membershipRevenueAchieved = membershipRevenueAchieved; }
+    public BigDecimal getPosRevenueAchieved() { return posRevenueAchieved; }
+    public void setPosRevenueAchieved(BigDecimal posRevenueAchieved) { this.posRevenueAchieved = posRevenueAchieved; }
+    public BigDecimal getPtRevenueAchieved() { return ptRevenueAchieved; }
+    public void setPtRevenueAchieved(BigDecimal ptRevenueAchieved) { this.ptRevenueAchieved = ptRevenueAchieved; }
     public Integer getSessionsTarget() { return sessionsTarget; }
     public void setSessionsTarget(Integer sessionsTarget) { this.sessionsTarget = sessionsTarget; }
     public Integer getSessionsAchieved() { return sessionsAchieved; }

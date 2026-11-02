@@ -11,6 +11,9 @@ public class StaffTargetRequestDTO {
     private String startDate;
     private String endDate;
     private BigDecimal revenueTarget;
+    private BigDecimal membershipRevenueTarget;
+    private BigDecimal posRevenueTarget;
+    private BigDecimal ptRevenueTarget;
     private Integer sessionsTarget;
     private Integer newClientsTarget;
     private String unitTargetsJson;  // raw JSON string
@@ -31,6 +34,12 @@ public class StaffTargetRequestDTO {
     public void setEndDate(String endDate) { this.endDate = endDate; }
     public BigDecimal getRevenueTarget() { return revenueTarget; }
     public void setRevenueTarget(BigDecimal revenueTarget) { this.revenueTarget = revenueTarget; }
+    public BigDecimal getMembershipRevenueTarget() { return membershipRevenueTarget; }
+    public void setMembershipRevenueTarget(BigDecimal membershipRevenueTarget) { this.membershipRevenueTarget = membershipRevenueTarget; }
+    public BigDecimal getPosRevenueTarget() { return posRevenueTarget; }
+    public void setPosRevenueTarget(BigDecimal posRevenueTarget) { this.posRevenueTarget = posRevenueTarget; }
+    public BigDecimal getPtRevenueTarget() { return ptRevenueTarget; }
+    public void setPtRevenueTarget(BigDecimal ptRevenueTarget) { this.ptRevenueTarget = ptRevenueTarget; }
     public Integer getSessionsTarget() { return sessionsTarget; }
     public void setSessionsTarget(Integer sessionsTarget) { this.sessionsTarget = sessionsTarget; }
     public Integer getNewClientsTarget() { return newClientsTarget; }

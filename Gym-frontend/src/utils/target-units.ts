@@ -17,7 +17,7 @@ export const TARGET_UNIT_TYPES: TargetUnitType[] = [
   { id: "walkins", name: "Walk-ins", category: "Memberships", hint: "Daily entry passes" },
   { id: "pos_sales", name: "POS sales", category: "POS", hint: "Completed POS bills" },
   { id: "pos_items", name: "POS items sold", category: "POS", hint: "Items across POS bills" },
-  { id: "pt_sessions", name: "PT sessions", category: "Training", hint: "Personal training sessions delivered (not cancelled)" },
+  { id: "pt_sessions", name: "PT sessions", category: "Training", hint: "PT sessions they train that a member booked (not cancelled or awaiting approval)" },
 ];
 
 const BY_ID = new Map(TARGET_UNIT_TYPES.map(u => [u.id, u]));

@@ -125,7 +125,20 @@ public class CommissionEarningService {
         out.put("period", m.toString());
         out.put("target_id", target != null ? target.getId() : null);
         out.put("revenue_target", revenueTarget);
-        out.put("revenue", membershipRevenue.add(posRevenue));
+        // Target progress uses the full breakdown (incl. app PT bookings on this trainer's
+        // sessions); commission categories above stay memberships/POS on payments they took.
+        StaffProgressCalculator.RevenueBreakdown breakdown = calculator.computeRevenueBreakdown(s, username, start, end);
+        out.put("revenue", breakdown.total());
+        Map<String, Object> categoryTargets = new LinkedHashMap<>();
+        categoryTargets.put("memberships", target != null ? target.getMembershipRevenueTarget() : null);
+        categoryTargets.put("pos", target != null ? target.getPosRevenueTarget() : null);
+        categoryTargets.put("pt", target != null ? target.getPtRevenueTarget() : null);
+        Map<String, Object> categoryRevenue = new LinkedHashMap<>();
+        categoryRevenue.put("memberships", breakdown.memberships());
+        categoryRevenue.put("pos", breakdown.pos());
+        categoryRevenue.put("pt", breakdown.pt());
+        out.put("revenue_targets", categoryTargets);
+        out.put("revenue_by_category", categoryRevenue);
         out.put("unit_targets", unitTargets(target));
         out.put("units", units);
         out.put("categories", categories);

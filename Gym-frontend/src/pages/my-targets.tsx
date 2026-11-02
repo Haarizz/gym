@@ -29,6 +29,9 @@ import {
   Info
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
+import { StaffTargetsBoard } from "../components/targets/StaffTargetsBoard";
+import { MetricGrid } from "../components/targets/target-metrics";
+import { unitLabel } from "../utils/target-units";
 
 const COLORS = {
   success: "#4CAF50",
@@ -65,10 +68,8 @@ export function MyTargets() {
   const [error, setError] = useState<string | null>(null);
 
   // Admin accounts (no linked Staff record) don't have personal targets — instead
-  // they get a roster view of every staff member's target for the current period.
+  // they get the Staff Targets board: every staff member's targets for a chosen month.
   const [isAdminView, setIsAdminView] = useState(false);
-  const [allStaff, setAllStaff] = useState<Staff[]>([]);
-  const [allTargets, setAllTargets] = useState<StaffTarget[]>([]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -92,14 +93,6 @@ export function MyTargets() {
         setIsAdminView(true);
         setMyTarget(null);
         setPeerTargets([]);
-        // Fetch every target (not just the current month) so a staff member without a
-        // target yet for this month still shows their most recent one, rather than blank.
-        const [staffPage, targets] = await Promise.all([
-          staffService.getStaff({}, 1, 500),
-          staffService.getTargets()
-        ]);
-        setAllStaff(staffPage.items);
-        setAllTargets(targets);
       }
     } catch (e) {
       console.error("Failed to load targets", e);
@@ -113,21 +106,6 @@ export function MyTargets() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // One row per staff member: the current month's target if set, else their most recent one.
-  const staffRoster = useMemo(() => {
-    return allStaff.map(s => {
-      const targetsForStaff = allTargets.filter(t => String(t.staff_db_id) === String(s.id));
-      let target: StaffTarget | null = null;
-      if (targetsForStaff.length > 0) {
-        const current = targetsForStaff.find(
-          t => t.timeframe === "monthly" && t.year === year && t.month === month
-        );
-        target = current || [...targetsForStaff].sort((a, b) => (b.year - a.year) || ((b.month || 0) - (a.month || 0)))[0];
-      }
-      return { staff: s, target };
-    });
-  }, [allStaff, allTargets, year, month]);
 
   const unitTargets: UnitTargetRow[] = useMemo(() => {
     if (!myTarget?.unit_targets_json) return [];
@@ -229,14 +207,16 @@ export function MyTargets() {
     );
   }
 
+  if (isAdminView) return <StaffTargetsBoard />;
+
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">{isAdminView ? "Staff Targets" : "My Targets"}</h1>
+          <h1 className="text-3xl font-bold text-foreground">My Targets</h1>
           <p className="text-gray-600 mt-1">
-            {isAdminView ? "Every staff member's target and progress for the current period" : "Track your progress, targets, and earnings"}
+            Track your progress, targets, and earnings
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -253,83 +233,7 @@ export function MyTargets() {
         </Alert>
       )}
 
-      {isAdminView ? (
-        <Card className={panelCardShell}>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl text-foreground flex items-center">
-              <Users className="h-6 w-6 mr-3 text-primary" />
-              Staff Targets
-            </CardTitle>
-            <CardDescription>Each staff member's current-month target, or their most recent one if this month isn't set yet</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {staffRoster.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No staff members found.</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Achieved</TableHead>
-                    <TableHead className="text-right">Progress</TableHead>
-                    <TableHead className="text-right">Commission</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {staffRoster.map(({ staff: s, target: t }) => {
-                    const rTarget = t?.revenue_target || 0;
-                    const rAchieved = t?.revenue_achieved || 0;
-                    const pct = t?.percentage ?? (rTarget > 0 ? Math.round((rAchieved / rTarget) * 100) : 0);
-                    const isCurrentPeriod = t && t.year === year && t.month === month;
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={s.photo_url} />
-                              <AvatarFallback className="text-xs">
-                                {(s.name || "?").split(" ").map(n => n[0]).join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium text-foreground">{s.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{s.role || "—"}</TableCell>
-                        {t ? (
-                          <>
-                            <TableCell>
-                              <Badge variant={isCurrentPeriod ? "default" : "outline"} className="font-normal">
-                                {periodLabel(t)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right"><CurrencyGlyph /> {rTarget.toLocaleString()}</TableCell>
-                            <TableCell className="text-right"><CurrencyGlyph /> {rAchieved.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <span className="text-sm font-medium">{pct}%</span>
-                                <Progress value={Math.min(100, pct)} className="h-2 w-16" />
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right"><CurrencyGlyph /> {(t.commission_earned || 0).toLocaleString()}</TableCell>
-                          </>
-                        ) : (
-                          <TableCell colSpan={5} className="text-right text-muted-foreground">No target set</TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      ) : !myTarget ? (
+      {!myTarget ? (
         <Card className={panelCardShell}>
           <CardContent className="py-12 text-center space-y-2">
             <Target className="h-10 w-10 text-muted-foreground mx-auto" />
@@ -456,6 +360,20 @@ export function MyTargets() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Target breakdown: overall, membership, POS, PT revenue and PT sessions */}
+            <Card className={panelCardShell}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl text-foreground flex items-center">
+                  <Target className="h-6 w-6 mr-3 text-primary" />
+                  Target Breakdown
+                </CardTitle>
+                <CardDescription>Achieved against each target set for you this month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MetricGrid target={myTarget} />
+              </CardContent>
+            </Card>
 
             {/* Personal Overview */}
             <Card className={panelCardShell}>
@@ -596,7 +514,7 @@ export function MyTargets() {
                                 <UnitIcon className={`h-5 w-5 ${meta.color}`} />
                               </div>
                               <div>
-                                <h4 className="font-medium text-foreground">{unit.service}</h4>
+                                <h4 className="font-medium text-foreground">{unitLabel(unit.service)}</h4>
                                 <p className="text-sm text-muted-foreground">
                                   {unit.achieved_units}/{unit.target_units} units
                                 </p>

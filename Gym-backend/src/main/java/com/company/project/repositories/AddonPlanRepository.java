@@ -13,4 +13,9 @@ public interface AddonPlanRepository extends JpaRepository<AddonPlan, Long> {
     List<AddonPlan> findAllByOrderByNameAsc();
 
     List<AddonPlan> findByIsActiveTrueOrderByNameAsc();
+
+    // Lower-cased names of personal-training add-on plans (category "Personal Training"/"Training")
+    @org.springframework.data.jpa.repository.Query("SELECT LOWER(TRIM(p.name)) FROM AddonPlan p " +
+           "WHERE LOWER(p.category) IN ('personal training', 'training')")
+    List<String> findPtPlanNamesLower();
 }
