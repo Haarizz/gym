@@ -1,0 +1,90 @@
+/* Member photo viewer with zoom/pan. A module because the precompiled
+   Tailwind snapshot lacks the sizing/transform utilities needed here. */
+
+.dialog {
+  width: 440px;
+  max-width: calc(100vw - 2rem);
+  padding: 1.25rem;
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: #f1f5f9;
+  box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.06);
+  touch-action: none;
+  user-select: none;
+  cursor: zoom-in;
+}
+
+.frame.zoomed {
+  cursor: grab;
+}
+
+.frame.dragging {
+  cursor: grabbing;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  transition: transform 0.15s ease-out;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.dragging .image {
+  transition: none;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.toolButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.toolButton:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: var(--primary, #2b7a78);
+  color: var(--primary, #2b7a78);
+}
+
+.toolButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoomLabel {
+  min-width: 3.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+}
+
+.hint {
+  margin-top: -0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}

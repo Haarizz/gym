@@ -87,14 +87,17 @@ public class StaffTargetService {
         Staff staff = t.getStaff();
         if (staff == null) {
             // Institution-wide target: the whole gym's takings and units for the period.
-            return StaffTargetResponseDTO.fromEntity(t, progressCalculator.computeGymRevenue(start, end), null, null)
+            StaffProgressCalculator.RevenueBreakdown gym = progressCalculator.computeGymRevenueBreakdown(start, end);
+            return StaffTargetResponseDTO.fromEntity(t, gym.total(), null, null)
+                    .withRevenueBreakdown(gym.memberships(), gym.pos(), gym.pt())
                     .withUnits(progressCalculator.computeGymUnits(start, end));
         }
         String username = staff.getAppUsername() != null ? staff.getAppUsername() : "";
-        BigDecimal liveRevenue = progressCalculator.computeRevenue(staff, username, start, end);
+        StaffProgressCalculator.RevenueBreakdown revenue = progressCalculator.computeRevenueBreakdown(staff, username, start, end);
         int liveConversions = progressCalculator.computeConversions(staff, username, start, end);
         BigDecimal liveCommission = progressCalculator.computeCommission(staff, username, start, end);
-        return StaffTargetResponseDTO.fromEntity(t, liveRevenue, liveConversions, liveCommission)
+        return StaffTargetResponseDTO.fromEntity(t, revenue.total(), liveConversions, liveCommission)
+                .withRevenueBreakdown(revenue.memberships(), revenue.pos(), revenue.pt())
                 .withUnits(progressCalculator.computeUnits(staff, username, start, end));
     }
 
@@ -150,12 +153,20 @@ public class StaffTargetService {
         targetRepository.deleteById(id);
     }
 
+    /** A 0 or blank category target means "no target" — stored as null, not as a target of zero. */
+    private static BigDecimal positiveOrNull(BigDecimal value) {
+        return value != null && value.signum() > 0 ? value : null;
+    }
+
     private void applyRequest(StaffTargetRequestDTO req, StaffTarget target) {
         target.setScope(req.getScope());
         target.setTimeframe(req.getTimeframe());
         target.setYear(req.getYear());
         target.setMonth(req.getMonth());
         target.setRevenueTarget(req.getRevenueTarget());
+        target.setMembershipRevenueTarget(positiveOrNull(req.getMembershipRevenueTarget()));
+        target.setPosRevenueTarget(positiveOrNull(req.getPosRevenueTarget()));
+        target.setPtRevenueTarget(positiveOrNull(req.getPtRevenueTarget()));
         target.setSessionsTarget(req.getSessionsTarget());
         target.setNewClientsTarget(req.getNewClientsTarget());
         if (req.getUnitTargetsJson() != null) target.setUnitTargetsJson(req.getUnitTargetsJson());

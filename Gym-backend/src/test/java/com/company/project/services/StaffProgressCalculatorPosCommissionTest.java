@@ -30,7 +30,9 @@ class StaffProgressCalculatorPosCommissionTest {
     private final StaffProgressCalculator calculator = new StaffProgressCalculator(
             mock(ReceiptRepository.class), mock(LeadRepository.class), rules, sales,
             mock(com.company.project.repositories.SaleTransactionItemRepository.class),
-            mock(com.company.project.repositories.TrainingSessionRepository.class));
+            mock(com.company.project.repositories.TrainingSessionRepository.class),
+            mock(com.company.project.repositories.MemberAddonRepository.class),
+            mock(com.company.project.repositories.AddonPlanRepository.class));
 
     private static final LocalDateTime START = LocalDateTime.of(2026, 10, 1, 0, 0);
     private static final LocalDateTime END = LocalDateTime.of(2026, 11, 1, 0, 0);

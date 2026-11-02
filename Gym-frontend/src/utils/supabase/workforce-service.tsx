@@ -314,11 +314,17 @@ export interface CommissionCategoryFigures {
   payroll_run_id: number | null;
 }
 
+/** Revenue-target categories (Set Targets): PT is split out of memberships. */
+export type RevenueCategory = "memberships" | "pos" | "pt";
+
 export interface CommissionMonth {
   period: string;
   target_id: number | null;
   revenue_target: number;
   revenue: number;
+  // Category revenue targets (null = not set) and achieved; memberships exclude PT here.
+  revenue_targets?: Record<RevenueCategory, number | null>;
+  revenue_by_category?: Record<RevenueCategory, number>;
   unit_targets: Array<{ service: string; target_units: number; achieved_units?: number }>;
   units: Record<string, number>;
   categories: CommissionCategoryFigures[];

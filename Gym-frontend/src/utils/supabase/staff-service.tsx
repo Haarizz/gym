@@ -100,6 +100,14 @@ export interface StaffTarget {
   revenue_target: number;
   revenue_achieved: number;
   percentage: number;
+  // Category revenue targets (null = not set; revenue_target is the overall one) and live
+  // achieved figures. Memberships exclude PT, so the three achieved add up to revenue_achieved.
+  membership_revenue_target?: number | null;
+  pos_revenue_target?: number | null;
+  pt_revenue_target?: number | null;
+  membership_revenue_achieved?: number;
+  pos_revenue_achieved?: number;
+  pt_revenue_achieved?: number;
   sessions_target: number;
   sessions_achieved: number;
   new_clients_target: number;
@@ -325,6 +333,9 @@ class StaffService {
     start_date?: string;
     end_date?: string;
     revenue_target: number;
+    membership_revenue_target?: number | null;
+    pos_revenue_target?: number | null;
+    pt_revenue_target?: number | null;
     sessions_target?: number;
     new_clients_target?: number;
     unit_targets_json?: string;

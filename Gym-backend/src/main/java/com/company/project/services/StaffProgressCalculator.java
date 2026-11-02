@@ -5,8 +5,10 @@ import com.company.project.entities.Lead;
 import com.company.project.entities.Receipt;
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.Staff;
+import com.company.project.repositories.AddonPlanRepository;
 import com.company.project.repositories.CommissionRuleRepository;
 import com.company.project.repositories.LeadRepository;
+import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.ReceiptRepository;
 import com.company.project.repositories.SaleTransactionItemRepository;
 import com.company.project.repositories.SaleTransactionRepository;
@@ -55,18 +57,24 @@ public class StaffProgressCalculator {
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final TrainingSessionRepository trainingSessionRepository;
+    private final MemberAddonRepository memberAddonRepository;
+    private final AddonPlanRepository addonPlanRepository;
 
     public StaffProgressCalculator(ReceiptRepository receiptRepository, LeadRepository leadRepository,
                                    CommissionRuleRepository commissionRuleRepository,
                                    SaleTransactionRepository saleTransactionRepository,
                                    SaleTransactionItemRepository saleTransactionItemRepository,
-                                   TrainingSessionRepository trainingSessionRepository) {
+                                   TrainingSessionRepository trainingSessionRepository,
+                                   MemberAddonRepository memberAddonRepository,
+                                   AddonPlanRepository addonPlanRepository) {
         this.receiptRepository = receiptRepository;
         this.leadRepository = leadRepository;
         this.commissionRuleRepository = commissionRuleRepository;
         this.saleTransactionRepository = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.trainingSessionRepository = trainingSessionRepository;
+        this.memberAddonRepository = memberAddonRepository;
+        this.addonPlanRepository = addonPlanRepository;
     }
 
     /** The commission rule configured for the staff member's role, if any. */
@@ -193,7 +201,7 @@ public class StaffProgressCalculator {
      * they rang up (net of refunds). Both ways of selling fill the same target.
      */
     public BigDecimal computeRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        return computeMembershipRevenue(staff, username, start, end).add(computePosRevenue(username, start, end));
+        return computeRevenueBreakdown(staff, username, start, end).total();
     }
 
     /** Money received on membership receipts (admissions, renewals, add-ons, walk-ins) only. */
@@ -225,6 +233,99 @@ public class StaffProgressCalculator {
         return receipts.stream()
                 .map(StaffProgressCalculator::receivedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // ── Revenue by category (Set Targets › membership / POS / PT revenue targets) ──
+
+    /**
+     * Revenue split by sales category. memberships = membership receipts that aren't personal
+     * training (admissions, renewals, other add-ons, walk-ins); pos = completed POS sales net of
+     * refunds; pt = receipts paying for personal training. The three add up to computeRevenue.
+     */
+    public record RevenueBreakdown(BigDecimal memberships, BigDecimal pos, BigDecimal pt) {
+        public BigDecimal total() { return memberships.add(pos).add(pt); }
+    }
+
+    /**
+     * The staff member's revenue by category: receipts they took, plus payments for bookings on
+     * PT sessions they train. Members book PT in the app, where the receipt is processed by
+     * "Mobile App" — the trainer of the booked session is who it counts for.
+     */
+    public RevenueBreakdown computeRevenueBreakdown(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        return breakdown(staffReceipts(staff, username, start, end), computePosRevenue(username, start, end));
+    }
+
+    private List<Receipt> staffReceipts(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        List<Receipt> taken = receiptRepository.findAll(receiptSpec(staff, username, start, end, null));
+        if (staff == null || staff.getId() == null) return taken;
+        List<Long> trained = trainingSessionRepository.findPtBookingReceiptIdsByTrainer(staff.getId());
+        if (trained.isEmpty()) return taken;
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        taken.forEach(r -> seen.add(r.getId()));
+        Specification<Receipt> trainerSpec = receiptSpec(null, null, start, end, null)
+                .and((root, query, cb) -> root.get("id").in(trained));
+        List<Receipt> out = new ArrayList<>(taken);
+        for (Receipt r : receiptRepository.findAll(trainerSpec)) {
+            if (seen.add(r.getId())) out.add(r);
+        }
+        return out;
+    }
+
+    /** Whole-gym revenue by category (institution-wide targets). */
+    public RevenueBreakdown computeGymRevenueBreakdown(LocalDateTime start, LocalDateTime end) {
+        BigDecimal pos = completedSales(null, start, end).stream()
+                .map(StaffProgressCalculator::posNet)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return breakdown(receiptRepository.findAll(receiptSpec(null, null, start, end, null)), pos);
+    }
+
+    /** Money received on PT in the range: PT they sold plus bookings on PT sessions they train. */
+    public BigDecimal computePtRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
+        return breakdown(staffReceipts(staff, username, start, end), BigDecimal.ZERO).pt();
+    }
+
+    private RevenueBreakdown breakdown(List<Receipt> receipts, BigDecimal pos) {
+        java.util.Set<Long> ptIds = ptReceiptIds(receipts);
+        BigDecimal memberships = BigDecimal.ZERO;
+        BigDecimal pt = BigDecimal.ZERO;
+        for (Receipt r : receipts) {
+            BigDecimal received = receivedAmount(r);
+            if (r.getId() != null && ptIds.contains(r.getId())) pt = pt.add(received);
+            else memberships = memberships.add(received);
+        }
+        return new RevenueBreakdown(memberships, pos, pt);
+    }
+
+    private static final java.util.regex.Pattern PT_NAME =
+            java.util.regex.Pattern.compile("(?i)(personal\\s*training|\\bpt\\b)");
+
+    /**
+     * Receipts that pay for personal training: the plan name reads as PT ("Personal Training",
+     * "PT - 10 sessions"), it names a PT add-on plan, or the add-on bought on it is in the
+     * "Personal Training"/"Training" category, or it paid for a booking on a PT session (the
+     * app's "Class Booking" receipts are named after the session, which needn't say PT).
+     * Instalment receipts carry the plan name too.
+     */
+    private java.util.Set<Long> ptReceiptIds(List<Receipt> receipts) {
+        java.util.Set<Long> out = new java.util.HashSet<>();
+        if (receipts.isEmpty()) return out;
+        java.util.Set<String> ptPlanNames = new java.util.HashSet<>(addonPlanRepository.findPtPlanNamesLower());
+        List<Long> addonReceipts = new ArrayList<>();
+        List<Long> bookingReceipts = new ArrayList<>();
+        for (Receipt r : receipts) {
+            if (r.getId() == null) continue;
+            String name = r.getPlanName();
+            if (name != null && (PT_NAME.matcher(name).find() || ptPlanNames.contains(name.trim().toLowerCase()))) {
+                out.add(r.getId());
+            } else if ("Add-on".equals(r.getTransactionType())) {
+                addonReceipts.add(r.getId());
+            } else if (ReceiptService.TXN_CLASS_BOOKING.equals(r.getTransactionType())) {
+                bookingReceipts.add(r.getId());
+            }
+        }
+        if (!addonReceipts.isEmpty()) out.addAll(memberAddonRepository.findPtReceiptIds(addonReceipts));
+        if (!bookingReceipts.isEmpty()) out.addAll(trainingSessionRepository.findPtBookingReceiptIds(bookingReceipts));
+        return out;
     }
 
     /** Unit types a target can count (Set Targets › unit targets), keyed as stored in unit_targets_json. */
@@ -273,9 +374,9 @@ public class StaffProgressCalculator {
             java.time.LocalDate to = lastDay.isAfter(today) ? today : lastDay;
             if (!to.isBefore(from)) {
                 int pt = wholeGym
-                        ? (int) trainingSessionRepository.countPtSessionsBetween(from, to)
+                        ? (int) trainingSessionRepository.countBookedPtSessionsBetween(from, to)
                         : trainingSessionRepository
-                                .countPtSessionsByTrainerBetween(List.of(staff.getId()), from, to).stream()
+                                .countBookedPtSessionsByTrainerBetween(List.of(staff.getId()), from, to).stream()
                                 .mapToInt(row -> ((Number) row[1]).intValue())
                                 .sum();
                 units.put("pt_sessions", pt);
@@ -284,11 +385,23 @@ public class StaffProgressCalculator {
         return units;
     }
 
+    /**
+     * A mobile Cash/Credit/Mixed payment keeps status Paid/Partial while reception hasn't
+     * approved it yet (approvalStatus PENDING) and after they reject it (REJECTED) — neither
+     * is money received, so neither counts until approved.
+     */
+    private static Predicate notAwaitingOrRejected(jakarta.persistence.criteria.Root<Receipt> root,
+                                                   jakarta.persistence.criteria.CriteriaBuilder cb) {
+        return cb.or(cb.isNull(root.get("approvalStatus")),
+                cb.not(cb.upper(root.get("approvalStatus")).in("PENDING", "REJECTED")));
+    }
+
     private Specification<Receipt> receiptSpec(Staff staff, String username, LocalDateTime start, LocalDateTime end,
                                                String transactionType) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(root.get("status").in(REVENUE_RECEIPT_STATUSES));
+            predicates.add(notAwaitingOrRejected(root, cb));
             predicates.add(cb.or(
                     cb.and(cb.isNotNull(root.get("transactionDate")),
                             cb.greaterThanOrEqualTo(root.get("transactionDate"), start),
@@ -335,6 +448,7 @@ public class StaffProgressCalculator {
         Specification<Receipt> receiptSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("status"), "Paid"));
+            predicates.add(notAwaitingOrRejected(root, cb));
             predicates.add(cb.or(
                     cb.and(cb.isNotNull(root.get("transactionDate")),
                             cb.greaterThanOrEqualTo(root.get("transactionDate"), start),

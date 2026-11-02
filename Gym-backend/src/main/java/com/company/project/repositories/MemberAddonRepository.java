@@ -33,4 +33,9 @@ public interface MemberAddonRepository extends JpaRepository<MemberAddon, Long>,
     List<MemberAddon> findByStatusOrderByPurchaseDateAsc(String status);
 
     List<MemberAddon> findByMemberDbIdOrderByPurchaseDateAsc(Long memberDbId);
+
+    // Receipts (among the given ids) that paid for a personal-training add-on
+    @Query("SELECT a.receiptId FROM MemberAddon a WHERE a.receiptId IN :receiptIds " +
+           "AND LOWER(a.category) IN ('personal training', 'training')")
+    List<Long> findPtReceiptIds(@Param("receiptIds") java.util.Collection<Long> receiptIds);
 }

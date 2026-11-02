@@ -64,6 +64,21 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to perform this action.");
     }
 
+    /**
+     * A wrong username/password at /api/auth/login. The catch-all below answered it
+     * with a 500 "Bad credentials", so the web login showed the generic "Login failed"
+     * as if the server were broken (e.g. when a browser autofilled an old saved password).
+     */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthentication(org.springframework.security.core.AuthenticationException ex) {
+        if (ex instanceof org.springframework.security.authentication.DisabledException) {
+            // 409 so the web login shows the reason instead of "Invalid credentials".
+            return build(HttpStatus.CONFLICT, "ACCOUNT_DISABLED",
+                    "This login has been disabled. Please contact your gym administrator.");
+        }
+        return build(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid username or password.");
+    }
+
     @ExceptionHandler(SupervisorApprovalRequiredException.class)
     public ResponseEntity<Map<String, Object>> handleSupervisorApprovalRequired(SupervisorApprovalRequiredException ex) {
         return build(HttpStatus.FORBIDDEN, "SUPERVISOR_APPROVAL_REQUIRED", ex.getMessage());
