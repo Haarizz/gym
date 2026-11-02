@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { TrainerLedgerScreen } from '@/domains/ledger';
 import { View } from 'react-native';
 import { useProfile } from '@/domains/profile';
@@ -6,6 +6,7 @@ import { Loader } from '@/shared/components';
 
 export default function TrainerLedgerRoute() {
   const { profile, isLoading } = useProfile();
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
 
   if (isLoading || !profile) {
     return (
@@ -16,7 +17,7 @@ export default function TrainerLedgerRoute() {
   }
 
   if (profile.role === 'STAFF') {
-    return <Redirect href="/(staff)/ledger" />;
+    return <Redirect href={tab === 'advances' ? '/(staff)/ledger?tab=advances' : '/(staff)/ledger'} />;
   }
 
   return <TrainerLedgerScreen />;

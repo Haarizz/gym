@@ -32,6 +32,9 @@ public class SalaryAdvanceResponseDTO {
     private String approvedBy;
     private LocalDate approvedDate;
     private String attachment;
+    private String requestedVia;
+    private Long requestedByUserId;
+    private String rejectionNote;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
@@ -63,6 +66,9 @@ public class SalaryAdvanceResponseDTO {
         dto.setApprovedBy(a.getApprovedBy());
         dto.setApprovedDate(a.getApprovedDate());
         dto.setAttachment(a.getAttachment());
+        dto.setRequestedVia(a.getRequestedVia() != null ? a.getRequestedVia() : "web");
+        dto.setRequestedByUserId(a.getRequestedByUserId());
+        dto.setRejectionNote(a.getRejectionNote());
         dto.setCreatedAt(a.getCreatedAt());
         dto.setUpdatedAt(a.getUpdatedAt());
         return dto;
@@ -133,6 +139,15 @@ public class SalaryAdvanceResponseDTO {
 
     public String getAttachment() { return attachment; }
     public void setAttachment(String attachment) { this.attachment = attachment; }
+
+    public String getRequestedVia() { return requestedVia; }
+    public void setRequestedVia(String requestedVia) { this.requestedVia = requestedVia; }
+
+    public Long getRequestedByUserId() { return requestedByUserId; }
+    public void setRequestedByUserId(Long requestedByUserId) { this.requestedByUserId = requestedByUserId; }
+
+    public String getRejectionNote() { return rejectionNote; }
+    public void setRejectionNote(String rejectionNote) { this.rejectionNote = rejectionNote; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

@@ -27,6 +27,7 @@ public class MemberController {
     private final MemberAppAccountService appAccountService;
     private final com.company.project.services.payments.StripePaymentService stripePaymentService;
     private final com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService;
+    private final com.company.project.services.StaffService staffService;
 
     public MemberController(MemberService memberService, MembershipFreezeService freezeService,
                             LeadService leadService,
@@ -34,7 +35,9 @@ public class MemberController {
                             TenantDataSources tenantDataSources,
                             MemberAppAccountService appAccountService,
                             com.company.project.services.payments.StripePaymentService stripePaymentService,
-                            com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService) {
+                            com.company.project.services.MemberSubscriptionTimelineService subscriptionTimelineService,
+                            com.company.project.services.StaffService staffService) {
+        this.staffService = staffService;
         this.stripePaymentService = stripePaymentService;
         this.memberService = memberService;
         this.freezeService = freezeService;
@@ -193,7 +196,8 @@ public class MemberController {
      * POST /api/members
      */
     @PostMapping
-    public ResponseEntity<MemberResponseDTO> createMember(@RequestBody MemberRequestDTO request) {
+    public ResponseEntity<MemberResponseDTO> createMember(@RequestBody MemberRequestDTO request,
+                                                          @AuthenticationPrincipal UserDetailsImpl principal) {
         // Registering a converted lead: credit the sale to the lead's staff unless someone
         // else was picked as "Processed By", and close the lead out as converted.
         Long leadId = request.getLeadId();
@@ -201,6 +205,19 @@ public class MemberController {
             leadService.assertNotRegistered(leadId);
             if (request.getProcessedByStaffId() == null) {
                 request.setProcessedByStaffId(leadService.resolveCreditedStaffId(leadId));
+            }
+        }
+        // Nobody picked (the mobile app has no picker): a staff member or trainer registering
+        // the member is credited themselves, so the sale counts toward their targets.
+        if (request.getProcessedByStaffId() == null) {
+            Long selfCredit = staffService.resolveSelfCreditStaffId(principal);
+            if (selfCredit != null) {
+                request.setProcessedByStaffId(selfCredit);
+                if (request.getFamilyMembers() != null) {
+                    request.getFamilyMembers().stream()
+                            .filter(fm -> fm.getProcessedByStaffId() == null)
+                            .forEach(fm -> fm.setProcessedByStaffId(selfCredit));
+                }
             }
         }
         // Shared with the web desk: only Stripe legs from the mobile app are checked.

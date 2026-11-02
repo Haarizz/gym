@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.Filter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
@@ -75,7 +76,33 @@ public class SalaryAdvance extends BaseEntity implements BranchAware {
 
     private String attachment;
 
+    /** "web" (entered by admin/HR) or "app" (requested by the employee from the mobile app). */
+    @Column(name = "requested_via", nullable = false, length = 20)
+    private String requestedVia = "web";
+
+    /** The user to notify when the request is approved or rejected. */
+    @Column(name = "requested_by_user_id")
+    private Long requestedByUserId;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "rejection_note", columnDefinition = "TEXT")
+    private String rejectionNote;
+
     public SalaryAdvance() {}
+
+    public String getRequestedVia() { return requestedVia; }
+    public void setRequestedVia(String requestedVia) { this.requestedVia = requestedVia; }
+
+    public Long getRequestedByUserId() { return requestedByUserId; }
+    public void setRequestedByUserId(Long requestedByUserId) { this.requestedByUserId = requestedByUserId; }
+
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+
+    public String getRejectionNote() { return rejectionNote; }
+    public void setRejectionNote(String rejectionNote) { this.rejectionNote = rejectionNote; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

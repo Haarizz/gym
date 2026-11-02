@@ -55,9 +55,7 @@ class MobileStaffLedgerControllerTest {
                         new CommissionStructureItemDTO("MEMBERSHIP_SALE", "Membership Sale", "₹1,500"),
                         new CommissionStructureItemDTO("PT_PACKAGE_SALE", "PT Package Sale", "₹1,000")
                 ),
-                Collections.emptyList(),
-                new TaxInfoDTO("2026", new BigDecimal("268000"), new BigDecimal("8040"), new BigDecimal("200000"), new BigDecimal("68000"), 42),
-                List.of(new TaxDocumentDTO("1", "Q1 2026 Statement", "Q1 2026", "/api/mobile/staff/ledger/tax-documents/1"))
+                Collections.emptyList()
         );
 
         when(ledgerService.getStaffLedger(testPrincipal)).thenReturn(mockDTO);
@@ -70,7 +68,6 @@ class MobileStaffLedgerControllerTest {
         assertEquals(new BigDecimal("24000"), response.getBody().getSummary().getThisMonth());
         assertEquals(9, response.getBody().getSummary().getGrowthPercentage());
         assertEquals(3, response.getBody().getBreakdown().size());
-        assertEquals("2026", response.getBody().getTaxInfo().getTaxYear());
     }
 
     @Test
@@ -102,31 +99,6 @@ class MobileStaffLedgerControllerTest {
     @DisplayName("GET /api/mobile/staff/ledger/salary-slip returns 401 Unauthorized when unauthenticated")
     void testGetSalarySlipUnauthenticated() {
         ResponseEntity<byte[]> response = controller.getSalarySlip(null, 2026, 3);
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertNull(response.getBody());
-        verifyNoInteractions(ledgerService);
-    }
-
-    @Test
-    @DisplayName("GET /api/mobile/staff/ledger/tax-documents/{id} returns 200 OK with tax document when authenticated")
-    void testGetTaxDocumentSuccess() {
-        byte[] mockBytes = "GYMBIOS TAX CERTIFICATE".getBytes(StandardCharsets.UTF_8);
-        when(ledgerService.getTaxDocument(testPrincipal, "1")).thenReturn(mockBytes);
-
-        ResponseEntity<byte[]> response = controller.getTaxDocument(testPrincipal, "1");
-
-        assertNotNull(response);
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertArrayEquals(mockBytes, response.getBody());
-        assertTrue(response.getHeaders().getFirst("Content-Disposition").contains("tax-statement-1.txt"));
-    }
-
-    @Test
-    @DisplayName("GET /api/mobile/staff/ledger/tax-documents/{id} returns 401 Unauthorized when unauthenticated")
-    void testGetTaxDocumentUnauthenticated() {
-        ResponseEntity<byte[]> response = controller.getTaxDocument(null, "1");
 
         assertNotNull(response);
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());

@@ -1,5 +1,4 @@
 import Feather from '@expo/vector-icons/Feather';
-import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { useTranslation } from 'react-i18next';
@@ -7,59 +6,33 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
-import { Dropdown } from '@/shared/components/Dropdown';
 import { Typography } from '@/shared/components/Typography';
 import { MemberTypeSelector } from '@/domains/members/presentation/components/membership/MemberTypeSelector';
 import { MembershipPlanSelector } from '@/domains/members/presentation/components/membership/MembershipPlanSelector';
 import { MembershipPlanSummary } from '@/domains/members/presentation/components/membership/MembershipPlanSummary';
 import { useMembershipPlans, type MembershipPlan } from '@/domains/membershipPlans';
-import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
 import { computeEndDate } from '@/domains/members/hooks/useMemberWizard';
 
 import { FormCard } from './FormCard';
 import type { MemberStepProps } from './stepTypes';
 
+// No "Processed By" picker: the server credits the sale to whoever registers the member
+// (Admin for admins, the staff member or trainer themselves otherwise) or, for a converted
+// lead, to the lead's staff.
 interface MembershipStepProps extends MemberStepProps {
-  /** Show the "Processed By" sale-credit picker (new registrations only). */
-  showProcessedBy?: boolean;
   /** New registrations can't be backdated; existing members keep their history. */
   allowPastDates?: boolean;
 }
-
-const STAFF_FILTERS = { limit: 500 };
 
 export function MembershipStep({
   data,
   updateField,
   errors,
-  showProcessedBy = false,
   allowPastDates = false,
 }: MembershipStepProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const { plans, loading, error } = useMembershipPlans();
-  const { staff } = useStaff(STAFF_FILTERS);
-
-  const staffOptions = useMemo(
-    () => [
-      { label: t('members.form.membershipStep.noneOption'), value: '' },
-      ...staff.map((s) => ({
-        label: s.role ? `${s.name} (${s.role})` : s.name,
-        value: String(s.id),
-      })),
-    ],
-    [staff, t],
-  );
-
-  // A converted lead's sale belongs to the staff member who worked it — preselect them
-  // (still changeable) once the staff list arrives.
-  useEffect(() => {
-    if (!showProcessedBy || data.processedByStaffId || !data.leadAssignedStaff) return;
-    const assigned = data.leadAssignedStaff.trim().toLowerCase();
-    const match = staff.find((s) => s.name?.trim().toLowerCase() === assigned);
-    if (match) updateField('processedByStaffId', String(match.id));
-  }, [showProcessedBy, staff, data.processedByStaffId, data.leadAssignedStaff, updateField]);
-
   const selectedPlan = plans.find((p) => String(p.id) === data.membershipPlanId);
   const today = startOfDay(new Date());
   const minimumDate = allowPastDates ? undefined : today;
@@ -157,21 +130,6 @@ export function MembershipStep({
         ) : null}
       </FormCard>
 
-      {showProcessedBy && (
-        <FormCard
-          icon="award"
-          title={t('members.form.membershipStep.saleCreditTitle')}
-          description={t('members.form.membershipStep.saleCreditDescription')}
-        >
-          <Dropdown
-            label={t('members.form.membershipStep.processedBy')}
-            placeholder={t('members.form.membershipStep.processedByPlaceholder')}
-            value={data.processedByStaffId}
-            options={staffOptions}
-            onChange={(v) => updateField('processedByStaffId', v)}
-          />
-        </FormCard>
-      )}
     </View>
   );
 }

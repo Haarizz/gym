@@ -13,6 +13,7 @@ import { useBranchContext } from '@/shared/providers/BranchProvider';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 import { leadKeys } from '@/domains/leads/hooks/leadKeys';
 import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance';
+import { dashboardKeys } from '@/domains/dashboard/hooks/useStaffDashboard';
 import { validateDateOfBirth } from '@/domains/profile/domain/dateOfBirthRules';
 import i18n from '@/core/i18n/i18n';
 
@@ -22,8 +23,6 @@ export interface MemberPrefill {
   name?: string;
   email?: string;
   phone?: string;
-  /** The lead's assigned staff name — preselected as "Processed By". */
-  assignedStaff?: string;
 }
 
 export interface DraftFamilyMember {
@@ -60,12 +59,9 @@ export interface MemberWizardData {
   membershipFee: string;
   paymentStatus: string;
   discount: string;
-  /** Staff DB id credited with this sale toward their revenue target ('' = none). */
-  processedByStaffId: string;
 
   // Source lead (create from a converted lead only)
   leadId: number | null;
-  leadAssignedStaff: string;
 
   // Step 3: Medical
   bloodGroup: string;
@@ -234,10 +230,8 @@ function mapMemberToWizardData(member?: Member, prefill?: MemberPrefill): Member
       : '',
     paymentStatus: member?.paymentStatus ?? 'PAID',
     discount: '',
-    processedByStaffId: '',
 
     leadId: prefill?.leadId ?? null,
-    leadAssignedStaff: prefill?.assignedStaff ?? '',
 
     bloodGroup: member?.bloodGroup ?? '',
     height: member?.height ?? '',
@@ -294,7 +288,6 @@ function buildCreateRequest(
     outstandingBalance: paymentResult?.outstandingBalance,
     bankAccountCode: paymentResult?.bankAccountCode,
     bankAccountName: paymentResult?.bankAccountName,
-    processedByStaffId: data.processedByStaffId ? Number(data.processedByStaffId) : undefined,
     leadId: data.leadId ?? undefined,
 
     bloodGroup: data.bloodGroup || undefined,
@@ -317,8 +310,8 @@ function buildCreateRequest(
 }
 
 function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
-  // Sale credit and lead linking only apply when the member is first registered.
-  const { processedByStaffId: _processedBy, leadId: _leadId, ...base } = buildCreateRequest(data);
+  // Lead linking only applies when the member is first registered.
+  const { leadId: _leadId, ...base } = buildCreateRequest(data);
   return {
     ...base,
     endDate: formatDateStr(data.endDate),
@@ -436,10 +429,13 @@ export function useMemberWizard({
             request.branchId = selectedBranchId;
           }
           await createMember(request);
+          // The sale was credited to a staff member (the lead's, or the staff member or
+          // trainer who registered it), so their targets and dashboard figures moved.
+          queryClient.invalidateQueries({ queryKey: performanceKeys.all });
+          queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
           if (request.leadId) {
-            // The backend marked the lead converted and credited the sale to a staff member.
+            // The backend marked the lead converted.
             queryClient.invalidateQueries({ queryKey: leadKeys.all });
-            queryClient.invalidateQueries({ queryKey: performanceKeys.all });
           }
         } else if (mode === 'edit' && memberId) {
           const request = buildUpdateRequest(data);

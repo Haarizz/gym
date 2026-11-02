@@ -33,6 +33,7 @@ const dashboard = {
         messageMember: 'सदस्य को संदेश भेजें',
         createWorkout: 'वर्कआउट बनाएं',
         memberCheckIn: 'सदस्य चेक-इन',
+        addMember: 'सदस्य जोड़ें',
         viewLedger: 'बहीखाता देखें',
       },
     },
@@ -49,6 +50,7 @@ const dashboard = {
       quickActions: {
         addNewLead: 'नया लीड जोड़ें',
         memberCheckIn: 'सदस्य चेक-इन',
+        addMember: 'सदस्य जोड़ें',
       },
       urgentFollowUps: {
         title: 'जरूरी फॉलो-अप',

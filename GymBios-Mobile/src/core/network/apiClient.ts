@@ -90,8 +90,23 @@ apiClient.interceptors.response.use(
     // already shows a full-screen offline wall in that case.
     const isNetworkError = !error.response;
 
-    if (!isNetworkError && !error.config?.skipGlobalErrorToast) {
-      toast.error(message);
+    // A background read refused because this gym's membership is locked (pending
+    // approval, rejected, suspended — TenantContextFilter answers MEMBERSHIP_*). Expected
+    // right after a Cash/Credit/Mixed purchase: switching into the gym refetches every
+    // query on screen, and each one would toast the same refusal. MemberApprovalGate
+    // already shows the locked state, so only actions (non-GET) still toast it.
+    const isMembershipLockedRead =
+      status === 403 &&
+      typeof body?.code === 'string' &&
+      body.code.startsWith('MEMBERSHIP_') &&
+      (error.config?.method ?? 'get').toLowerCase() === 'get';
+
+    if (!isNetworkError && !isMembershipLockedRead && !error.config?.skipGlobalErrorToast) {
+      // Keyed by the error so a burst of identical failures (several queries refetching
+      // at once) replaces one toast instead of stacking copies.
+      // A purchase awaiting approval is a normal state, not a failure: say so as info.
+      const isAwaitingApproval = status === 403 && body?.code === 'MEMBERSHIP_PENDING_APPROVAL';
+      (isAwaitingApproval ? toast.info : toast.error)(message, { id: `api-error-${status}-${message}` });
     }
 
     return Promise.reject(new ApiError(message, status, body));

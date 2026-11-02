@@ -148,11 +148,6 @@ class MobileStaffLedgerServiceTest {
         assertEquals("5%", response.getCommissionStructure().get(1).getAmount());
 
         assertTrue(response.getRecentEarnings().isEmpty());
-        assertTrue(response.getTaxDocuments().isEmpty());
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getTaxInfo().getYtdEarnings()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getTaxInfo().getTdsDeducted()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getTaxInfo().getTotalCommission()));
-        assertEquals(0, response.getTaxInfo().getConversions());
     }
 
     @Test
@@ -227,10 +222,6 @@ class MobileStaffLedgerServiceTest {
                 .filter(e -> "SALARY".equals(e.getType())).findFirst().orElseThrow();
         assertEquals(0, new BigDecimal("20000").compareTo(salary.getAmount()));
         assertEquals("paid", salary.getStatus());
-
-        assertEquals(3, response.getTaxInfo().getConversions());
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getTaxInfo().getTdsDeducted()));
-        assertTrue(response.getTaxDocuments().isEmpty());
     }
 
     @Test
@@ -257,11 +248,5 @@ class MobileStaffLedgerServiceTest {
         assertTrue(slipContent.contains("March 2026"));
         assertTrue(slipContent.contains("Not yet processed"));
         assertFalse(slipContent.contains("TDS"));
-    }
-
-    @Test
-    @DisplayName("Tax documents are not issued, so requesting one is not found")
-    void testGetTaxDocumentNotFound() {
-        assertThrows(EntityNotFoundException.class, () -> ledgerService.getTaxDocument(testPrincipal, "1"));
     }
 }

@@ -26,6 +26,10 @@ export interface SalaryAdvance {
   approvedBy: string | null;
   approvedDate: Date | null;
   attachment: string | null;
+  /** "web" (entered by admin/HR) or "app" (requested by the employee from the mobile app). */
+  requestedVia: "web" | "app";
+  requestedByUserId: number | null;
+  rejectionNote: string | null;
 }
 
 export interface SalaryAdvanceCreateRequest {
@@ -83,6 +87,9 @@ function mapAdvance(r: any): SalaryAdvance {
     approvedBy: r.approved_by ?? r.approvedBy ?? null,
     approvedDate: toDate(r.approved_date ?? r.approvedDate),
     attachment: r.attachment ?? null,
+    requestedVia: (r.requested_via ?? r.requestedVia) === "app" ? "app" : "web",
+    requestedByUserId: r.requested_by_user_id ?? r.requestedByUserId ?? null,
+    rejectionNote: r.rejection_note ?? r.rejectionNote ?? null,
   };
 }
 

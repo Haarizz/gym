@@ -142,6 +142,22 @@ public class StaffService {
     }
 
     /**
+     * The staff record to credit when a signed-in staff member or trainer registers a sale
+     * without picking anyone as "Processed By" (the mobile app hides that picker): their own.
+     * Admins, members and accounts with no linked staff record get null, which receipts show
+     * as "Admin".
+     */
+    @Transactional(readOnly = true)
+    public Long resolveSelfCreditStaffId(com.company.project.security.UserDetailsImpl principal) {
+        if (principal == null || principal.getId() == null || principal.isGlobal()) return null;
+        boolean isAdmin = principal.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_ADMIN") || a.equals("ROLE_SUPER_ADMIN") || a.equals("ROLE_GYMBIOS_ADMIN"));
+        if (isAdmin) return null;
+        return staffRepository.findByUserId(principal.getId()).map(Staff::getId).orElse(null);
+    }
+
+    /**
      * Self-service contact update from the mobile profile screen. Only phone and
      * address are staff-editable — everything else (name, email, role, salary,
      * certifications, schedule…) stays admin-managed via the Staffs & Trainers page.

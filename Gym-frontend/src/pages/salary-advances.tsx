@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Wallet, Plus, Eye, CheckCircle, XCircle, Clock, AlertCircle, Search, Download, CalendarDays, TrendingDown,
-  Receipt, Settings2, Pause, Play, SkipForward, Banknote, BarChart3, Trash2, Pencil, Undo2, Ban, Send, ArrowRight,
+  Receipt, Settings2, Pause, Play, SkipForward, Banknote, BarChart3, Trash2, Pencil, Undo2, Ban, Send, ArrowRight, Smartphone, Inbox,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,7 +26,21 @@ import {
 
 interface SalaryAdvancesProps { onNavigate?: (section: string, params?: Record<string, any>) => void; }
 
-type TabId = "overview" | "advances" | "deductions" | "schedule" | "transactions";
+type TabId = "overview" | "requests" | "advances" | "deductions" | "schedule" | "transactions";
+const TAB_IDS: TabId[] = ["overview", "requests", "advances", "deductions", "schedule", "transactions"];
+
+/** Requests tab filter: app requests by status. */
+type RequestFilter = "Pending" | "Approved" | "Rejected" | "Cancelled" | "All";
+const REQUEST_FILTERS: RequestFilter[] = ["Pending", "Approved", "Rejected", "Cancelled", "All"];
+const matchesRequestFilter = (a: SalaryAdvance, f: RequestFilter) =>
+  f === "All" ? true
+    : f === "Pending" ? a.status === "Pending Approval"
+    : f === "Approved" ? ["Approved", "Active", "Fully Repaid"].includes(a.status)
+    : a.status === f;
+
+/** Small "App" badge for advances the employee requested from the mobile app. */
+const AppSourceBadge = ({ a }: { a: SalaryAdvance }) =>
+  a.requestedVia === "app" ? <Badge tone="violet" title="Requested by the employee from the mobile app"><Smartphone size={11} />App</Badge> : null;
 
 const ADVANCE_TYPES = ["Salary Advance", "Emergency Advance", "Personal Loan", "Other"];
 const ADV_TONE: Record<string, Tone> = {
@@ -58,7 +73,17 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
   const canApprove = hasPermission("SALARY_ADVANCES_APPROVE") || hasPermission("PAYROLL_APPROVE");
   const canDelete = hasPermission("SALARY_ADVANCES_DELETE") || hasPermission("PAYROLL_DELETE");
 
-  const [tab, setTab] = useState<TabId>("overview");
+  const location = useLocation();
+  const [tab, setTab] = useState<TabId>(() => {
+    const t = new URLSearchParams(window.location.search).get("tab") as TabId | null;
+    return t && TAB_IDS.includes(t) ? t : "overview";
+  });
+  // Notifications deep-link here with ?tab=requests: follow it on arrival and whenever it changes.
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get("tab") as TabId | null;
+    if (t && TAB_IDS.includes(t)) setTab(t);
+  }, [location.search, location.key]);
+  const [requestFilter, setRequestFilter] = useState<RequestFilter>("Pending");
   const [advances, setAdvances] = useState<SalaryAdvance[]>([]);
   const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
   const [types, setTypes] = useState<DeductionType[]>([]);
@@ -207,7 +232,11 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
       setAdvDetail(null);
       load();
     } catch (e) {
+      // e.g. 422 "already processed" / "withdrawn by the employee" when someone else acted first.
       toast.error(errorMessage(e, "Failed to approve advance"));
+      setApproveFor(null);
+      setAdvDetail(null);
+      load();
     } finally {
       setSaving(false);
     }
@@ -226,7 +255,11 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
       setAdvDetail(null);
       load();
     } catch (e) {
+      // e.g. 422 "already processed" / "withdrawn by the employee" when someone else acted first.
       toast.error(errorMessage(e, "Failed to reject advance"));
+      setRejectFor(null);
+      setAdvDetail(null);
+      load();
     } finally {
       setSaving(false);
     }
@@ -344,6 +377,14 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
   }, [schedule]);
   const repaidCount = (id: number) => schedule.filter(i => i.advance_id === id && i.status === "Processed").length;
 
+  const appRequests = advances.filter(a => a.requestedVia === "app");
+  const pendingAppRequests = appRequests.filter(a => a.status === "Pending Approval");
+  const filteredRequests = appRequests.filter(a => matchesRequestFilter(a, requestFilter)
+    && (!search || `${a.employeeName} ${a.employeeId}`.toLowerCase().includes(search.toLowerCase())));
+  const outstandingFor = (employeeId: string) =>
+    advances.filter(a => a.employeeId === employeeId).reduce((t, a) => t + outstandingOf(a), 0);
+  const roleOf = (st?: Staff) => (st && /trainer/i.test(`${st.app_role ?? ""} ${st.role ?? ""}`) ? "Trainer" : "Staff");
+
   const activeAdvances = advances.filter(a => a.status === "Active" || a.status === "Approved");
   const pendingAdvances = advances.filter(a => a.status === "Pending Approval");
   const pendingDeds = deductions.filter(d => d.status === "Pending");
@@ -382,6 +423,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
         onChange={v => { setTab(v); setStatusFilter("all"); }}
         tabs={[
           { id: "overview", label: "Overview", icon: BarChart3, count: pendingAdvances.length + pendingDeds.length, countTone: "violet" },
+          { id: "requests", label: "Requests", icon: Inbox, count: pendingAppRequests.length, countTone: "amber" },
           { id: "advances", label: "Employee Advances", icon: Wallet },
           { id: "deductions", label: "Other Deductions", icon: TrendingDown },
           { id: "schedule", label: "Repayment Schedule", icon: CalendarDays },
@@ -389,7 +431,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
         ]}
       />
 
-      {tab !== "overview" && (
+      {tab !== "overview" && tab !== "requests" && (
         <Panel flush>
           <div className={s.filterBar}>
             <div className={s.search}>
@@ -446,15 +488,18 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
 
           {(pendingAdvances.length > 0 || pendingDeds.length > 0) && (
             <Panel title={<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><AlertCircle size={16} />Waiting for approval</span>}
-              description="Pending items are not deducted from payroll until approved.">
+              description="Pending items are not deducted from payroll until approved."
+              actions={pendingAppRequests.length > 0
+                ? <Button variant="outline" size="sm" onClick={() => setTab("requests")}>View all requests<ArrowRight className="h-4 w-4 ml-1" /></Button>
+                : undefined}>
               <div className={s.stack} style={{ gap: "0.5rem" }}>
                 {pendingAdvances.map(a => (
                   <div key={`a${a.id}`} className={s.listCard} data-tone="amber" style={{ alignItems: "center" }}>
                     <div className={s.listIcon}><Wallet size={18} /></div>
                     <div className={s.listMain} style={{ gap: "0.125rem" }}>
-                      <span className={s.strong}>{a.employeeName} — {a.advanceType}</span>
+                      <span className={s.strong} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{a.employeeName} — {a.advanceType}<AppSourceBadge a={a} /></span>
                       <span className={cx(s.small, s.muted)}>
-                        {money(a.requestedAmount)} · {a.installmentCount || "?"} installments{a.remarks ? ` · ${a.remarks}` : ""} · requested {formatDate(toISODate(new Date(a.requestDate)))}
+                        {money(a.requestedAmount)} · {a.installmentCount ? `${a.installmentCount} installments` : "plan set on approval"}{a.remarks ? ` · ${a.remarks}` : ""} · requested {formatDate(toISODate(new Date(a.requestDate)))}
                       </span>
                     </div>
                     {canApprove && (
@@ -525,6 +570,83 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
         </>
       )}
 
+      {/* ── Requests (from the mobile app) ─────────────────────────────────── */}
+      {tab === "requests" && (
+        <>
+          <Panel flush>
+            <div className={s.filterBar}>
+              <div className={s.search}>
+                <Search size={14} />
+                <Input className="h-9" placeholder="Search employee…" value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap" }}>
+                {REQUEST_FILTERS.map(f => {
+                  const count = appRequests.filter(a => matchesRequestFilter(a, f)).length;
+                  return (
+                    <Button key={f} size="sm" className="h-8" variant={requestFilter === f ? "default" : "outline"} onClick={() => setRequestFilter(f)}>
+                      {f}{f !== "All" && count > 0 ? ` (${count})` : ""}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          </Panel>
+          <Panel flush>
+            <div className={s.tableWrap}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th>Request</th><th>Employee</th><th>Role</th><th className={s.right}>Requested</th><th>Reason</th><th>Date</th>
+                    <th className={s.right}>Base Salary</th><th className={s.right}>Outstanding</th><th>Status</th>{canApprove && <th className={s.right}>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRequests.map(a => {
+                    const st = staffByCode.get(a.employeeId);
+                    const pending = a.status === "Pending Approval";
+                    const base = Number(st?.base_salary || 0);
+                    const outstanding = outstandingFor(a.employeeId);
+                    const overCap = pending && base > 0 && a.requestedAmount > base - outstanding;
+                    return (
+                      <tr key={a.id} className={s.clickable} onClick={() => setAdvDetail(a)}>
+                        <td className={cx(s.mono, s.muted)}>ADV-{a.id}<div><AppSourceBadge a={a} /></div></td>
+                        <td><Person name={a.employeeName} sub={[a.employeeId, a.department].filter(Boolean).join(" · ")} photo={st?.photo_url} size="sm" /></td>
+                        <td><Badge plain>{roleOf(st)}</Badge></td>
+                        <td className={s.right}><span className={s.strong}><Money value={a.requestedAmount} /></span>
+                          {overCap && <div className={s.cellSub} data-tone="red" title="More than base salary minus outstanding balance">over limit</div>}
+                        </td>
+                        <td className={s.muted} style={{ maxWidth: "16rem", whiteSpace: "normal" }}>{a.remarks || "—"}
+                          {a.status === "Rejected" && a.rejectionNote && <div className={s.cellSub} data-tone="red">Rejected: {a.rejectionNote}</div>}
+                        </td>
+                        <td>{formatDate(toISODate(new Date(a.requestDate)))}</td>
+                        <td className={s.right}>{base > 0 ? <Money value={base} /> : <span className={s.muted}>not set</span>}</td>
+                        <td className={s.right}><span data-tone={outstanding ? "amber" : "green"} className={s.toneText}><Money value={outstanding} dash /></span></td>
+                        <td><Badge tone={ADV_TONE[a.status] ?? "gray"}>{a.status}</Badge></td>
+                        {canApprove && (
+                          <td className={s.right} onClick={e => e.stopPropagation()}>
+                            {pending && (
+                              <div className={s.actions} style={{ justifyContent: "flex-end" }}>
+                                <Button variant="outline" size="sm" onClick={() => { setRejectFor(a); setRejectNote(""); }}><XCircle className="h-4 w-4 mr-1" />Reject</Button>
+                                <Button size="sm" onClick={() => openApprove(a)}><CheckCircle className="h-4 w-4 mr-1" />Approve</Button>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {!loading && filteredRequests.length === 0 && (
+                <Empty icon={Inbox} title={requestFilter === "Pending" ? "No requests waiting" : "No requests"}>
+                  Salary advances staff and trainers request from the mobile app appear here.
+                </Empty>
+              )}
+            </div>
+          </Panel>
+        </>
+      )}
+
       {/* ── Advances ──────────────────────────────────────────────────────── */}
       {tab === "advances" && (
         <Panel flush>
@@ -544,7 +666,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                   const pending = a.status === "Pending Approval";
                   return (
                     <tr key={a.id} className={s.clickable} onClick={() => setAdvDetail(a)}>
-                      <td className={cx(s.mono, s.muted)}>ADV-{a.id}</td>
+                      <td className={cx(s.mono, s.muted)}>ADV-{a.id}<div><AppSourceBadge a={a} /></div></td>
                       <td><Person name={a.employeeName} sub={a.employeeId} photo={st?.photo_url} size="sm" /></td>
                       <td>{formatDate(toISODate(new Date(a.requestDate)))}</td>
                       <td><Badge plain>{a.advanceType}</Badge></td>
@@ -883,6 +1005,8 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
                     </div>
                   )}
                   {advDetail.remarks && <div className={cx(s.small)} style={{ whiteSpace: "pre-wrap" }}><span className={s.strong}>Notes: </span>{advDetail.remarks}</div>}
+                  {advDetail.rejectionNote && <div className={cx(s.small)} style={{ whiteSpace: "pre-wrap" }}><span className={s.strong}>Rejection note: </span>{advDetail.rejectionNote}</div>}
+                  {advDetail.requestedVia === "app" && <div className={cx(s.small, s.muted)} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><AppSourceBadge a={advDetail} />Requested by the employee from the mobile app</div>}
                   {items.length > 0 && (
                     <div className={s.panel} style={{ boxShadow: "none" }}>
                       <div className={s.tableWrap}>

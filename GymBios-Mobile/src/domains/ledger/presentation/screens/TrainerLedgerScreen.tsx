@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -9,16 +10,30 @@ import { TrainerLedgerSummaryCard } from '../components/TrainerLedgerSummaryCard
 import { TrainerLedgerStatsGrid } from '../components/TrainerLedgerStatsGrid';
 import { TrainerLedgerBreakdownSection } from '../components/TrainerLedgerBreakdownSection';
 import { TrainerLedgerTransactionsSection } from '../components/TrainerLedgerTransactionsSection';
-import { TrainerLedgerTaxSection } from '../components/TrainerLedgerTaxSection';
+import { SalaryAdvanceSection } from '../components/SalaryAdvanceSection';
+import { useSalaryAdvances } from '../../hooks/useSalaryAdvances';
 
 import { useTranslation } from 'react-i18next';
 
-type LedgerTab = 'breakdown' | 'transactions' | 'tax';
+type LedgerTab = 'breakdown' | 'transactions' | 'advances';
 
 export function TrainerLedgerScreen() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
+  // ?tab=advances opens the Advances tab (e.g. from an approve/reject notification).
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<LedgerTab>(tab === 'advances' ? 'advances' : 'breakdown');
+  // A later notification tap while the screen is open changes the param: follow it.
+  const [seenTab, setSeenTab] = useState(tab);
+  if (tab !== seenTab) {
+    setSeenTab(tab);
+    if (tab === 'advances') setActiveTab('advances');
+  }
   const { data, isLoading, isError, refetch, isRefetching } = useTrainerLedger();
+  const advances = useSalaryAdvances('trainer');
+  const refreshAll = () => {
+    refetch();
+    advances.refetch();
+  };
 
   if (isLoading && !data) {
     return (
@@ -48,8 +63,8 @@ export function TrainerLedgerScreen() {
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => refetch()}
+          refreshing={isRefetching || advances.isRefetching}
+          onRefresh={refreshAll}
           tintColor={BrandColors.trainerAmber}
           colors={[BrandColors.trainerAmber]}
         />
@@ -84,11 +99,11 @@ export function TrainerLedgerScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.tabButton, activeTab === 'tax' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('tax')}
+          style={[styles.tabButton, activeTab === 'advances' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('advances')}
         >
-          <Text style={[styles.tabText, activeTab === 'tax' && styles.tabTextActive]}>
-            {t('ledger.tabs.tax')}
+          <Text style={[styles.tabText, activeTab === 'advances' && styles.tabTextActive]}>
+            {t('ledger.tabs.advances')}
           </Text>
         </Pressable>
       </View>
@@ -108,11 +123,8 @@ export function TrainerLedgerScreen() {
         />
       )}
 
-      {activeTab === 'tax' && (
-        <TrainerLedgerTaxSection
-          taxInfo={data.taxInfo}
-          taxDocuments={data.taxDocuments}
-        />
+      {activeTab === 'advances' && (
+        <SalaryAdvanceSection role="trainer" accentColor={BrandColors.trainerAmber} />
       )}
     </ScrollView>
   );

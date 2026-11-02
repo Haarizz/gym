@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { BrandColors } from '@/core/theme';
+import { useCanCreateMembers } from '@/domains/members/hooks/useCanCreateMembers';
 import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
 
 interface TrainerQuickActionsProps {
@@ -18,6 +19,7 @@ export function TrainerQuickActions({
 }: TrainerQuickActionsProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const canCreateMembers = useCanCreateMembers();
 
   const handleMessage = () => {
     if (onMessageMember) onMessageMember();
@@ -45,6 +47,15 @@ export function TrainerQuickActions({
     { label: t('dashboard.trainer.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleCheckIn },
     { label: t('dashboard.trainer.quickActions.viewLedger'), icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
   ];
+  if (canCreateMembers) {
+    actions.push({
+      label: t('dashboard.trainer.quickActions.addMember'),
+      icon: 'user-plus',
+      color: '#3B82F6',
+      textColor: '#1D4ED8',
+      onPress: () => router.push('/(trainer)/members/create' as any),
+    });
+  }
 
   return <QuickActionsGrid actions={actions} />;
 }

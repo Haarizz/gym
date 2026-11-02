@@ -26,23 +26,9 @@ export interface TrainerRecentTransaction {
   status: 'paid' | 'pending';
 }
 
-export interface TrainerTaxInformation {
-  ytdEarnings: number | null;
-  totalSessions: number;
-  avgPerSession: number | null;
-  activeClients: number;
-}
-
-export interface TrainerTaxDocument {
-  id: string | number;
-  title: string;
-}
-
 export interface TrainerLedgerData {
   summary: TrainerEarningsSummary;
   quickStats: TrainerQuickLedgerStats;
   breakdown: TrainerEarningsBreakdownItem[];
   recentTransactions: TrainerRecentTransaction[];
-  taxInfo: TrainerTaxInformation;
-  taxDocuments: TrainerTaxDocument[];
 }

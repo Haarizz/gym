@@ -33,6 +33,7 @@ const dashboard = {
         messageMember: 'Enviar mensaje a miembro',
         createWorkout: 'Crear entrenamiento',
         memberCheckIn: 'Registro de miembro',
+        addMember: 'Añadir miembro',
         viewLedger: 'Ver libro contable',
       },
     },
@@ -49,6 +50,7 @@ const dashboard = {
       quickActions: {
         addNewLead: 'Nuevo prospecto',
         memberCheckIn: 'Registro de miembro',
+        addMember: 'Añadir miembro',
       },
       urgentFollowUps: {
         title: 'Seguimientos urgentes',

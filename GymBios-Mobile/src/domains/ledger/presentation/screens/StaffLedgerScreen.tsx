@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -6,23 +7,36 @@ import { Loader } from '@/shared/components';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { useStaffLedger } from '../../hooks/useStaffLedger';
 import { staffLedgerRepository } from '../../infrastructure/ApiStaffLedgerRepository';
-import type { TaxDocument } from '../../domain/StaffLedgerData';
+import { useSalaryAdvances } from '../../hooks/useSalaryAdvances';
 import { StaffLedgerSummaryCard } from '../components/StaffLedgerSummaryCard';
 import { StaffLedgerStatsGrid } from '../components/StaffLedgerStatsGrid';
 import { StaffLedgerBreakdownSection } from '../components/StaffLedgerBreakdownSection';
 import { StaffLedgerEarningsSection } from '../components/StaffLedgerEarningsSection';
-import { StaffLedgerTaxSection } from '../components/StaffLedgerTaxSection';
+import { SalaryAdvanceSection } from '../components/SalaryAdvanceSection';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
 import { useTranslation } from 'react-i18next';
 
-type LedgerTab = 'breakdown' | 'earnings' | 'tax';
+type LedgerTab = 'breakdown' | 'earnings' | 'advances';
 
 export function StaffLedgerScreen() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<LedgerTab>('breakdown');
+  // ?tab=advances opens the Advances tab (e.g. from an approve/reject notification).
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<LedgerTab>(tab === 'advances' ? 'advances' : 'breakdown');
+  // A later notification tap while the screen is open changes the param: follow it.
+  const [seenTab, setSeenTab] = useState(tab);
+  if (tab !== seenTab) {
+    setSeenTab(tab);
+    if (tab === 'advances') setActiveTab('advances');
+  }
   const { data, isLoading, isError, refetch, isRefetching } = useStaffLedger();
+  const advances = useSalaryAdvances('staff');
+  const refreshAll = () => {
+    refetch();
+    advances.refetch();
+  };
 
   const handleDownloadSalarySlip = async () => {
     try {
@@ -33,19 +47,6 @@ export function StaffLedgerScreen() {
     } catch (err) {
       toast.info(t('ledger.earnings.salarySlipNoticeDesc'), {
         title: t('ledger.earnings.salarySlipNoticeTitle'),
-      });
-    }
-  };
-
-  const handleDocumentPress = async (doc: TaxDocument) => {
-    try {
-      await staffLedgerRepository.downloadTaxDocument(doc.id);
-      toast.info(t('ledger.earnings.taxDocSuccessDesc', { title: doc.title }), {
-        title: t('ledger.earnings.taxDocSuccessTitle'),
-      });
-    } catch (err) {
-      toast.info(t('ledger.earnings.taxDocNoticeDesc', { title: doc.title }), {
-        title: t('ledger.earnings.taxDocNoticeTitle'),
       });
     }
   };
@@ -78,8 +79,8 @@ export function StaffLedgerScreen() {
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => refetch()}
+          refreshing={isRefetching || advances.isRefetching}
+          onRefresh={refreshAll}
           tintColor={BrandColors.teal}
           colors={[BrandColors.teal]}
         />
@@ -114,11 +115,11 @@ export function StaffLedgerScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.tabButton, activeTab === 'tax' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('tax')}
+          style={[styles.tabButton, activeTab === 'advances' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('advances')}
         >
-          <Text style={[styles.tabText, activeTab === 'tax' && styles.tabTextActive]}>
-            {t('ledger.tabs.tax')}
+          <Text style={[styles.tabText, activeTab === 'advances' && styles.tabTextActive]}>
+            {t('ledger.tabs.advances')}
           </Text>
         </Pressable>
       </View>
@@ -138,12 +139,8 @@ export function StaffLedgerScreen() {
         />
       )}
 
-      {activeTab === 'tax' && (
-        <StaffLedgerTaxSection
-          taxInfo={data.taxInfo}
-          taxDocuments={data.taxDocuments}
-          onDocumentPress={handleDocumentPress}
-        />
+      {activeTab === 'advances' && (
+        <SalaryAdvanceSection role="staff" accentColor={BrandColors.teal} />
       )}
     </ScrollView>
   );

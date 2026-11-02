@@ -33,25 +33,10 @@ export interface RecentEarningTransaction {
   status: 'paid' | 'pending';
 }
 
-export interface TaxInformation {
-  ytdEarnings: number;
-  tdsDeducted: number;
-  baseSalaryPaid: number;
-  totalCommission: number;
-  conversions: number;
-}
-
-export interface TaxDocument {
-  id: string | number;
-  title: string;
-}
-
 export interface StaffLedgerData {
   summary: EarningsSummary;
   quickStats: QuickLedgerStats;
   breakdown: EarningsBreakdownItem[];
   commissionStructure: CommissionStructureItem[];
   recentEarnings: RecentEarningTransaction[];
-  taxInfo: TaxInformation;
-  taxDocuments: TaxDocument[];
 }

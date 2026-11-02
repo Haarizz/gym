@@ -12,7 +12,6 @@ export default function CreateMemberRoute() {
     name?: string;
     email?: string;
     phone?: string;
-    assignedStaff?: string;
   }>();
 
   const prefill = useMemo<MemberPrefill | undefined>(() => {
@@ -23,9 +22,8 @@ export default function CreateMemberRoute() {
       name: params.name,
       email: params.email,
       phone: params.phone,
-      assignedStaff: params.assignedStaff,
     };
-  }, [params.leadId, params.name, params.email, params.phone, params.assignedStaff]);
+  }, [params.leadId, params.name, params.email, params.phone]);
 
   const handleSuccess = useCallback(() => {
     router.back();

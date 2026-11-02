@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
@@ -28,6 +28,8 @@ import { MedicalStep } from '../components/form/MedicalStep';
 import { FamilyStep } from '../components/form/FamilyStep';
 import { AppAccessStep } from '../components/form/AppAccessStep';
 
+import { useAuthStore } from '@/domains/auth/store/authStore';
+import { getRoleHomeHref } from '@/domains/auth/presentation/navigation/routes';
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { translateValue } from '@/core/i18n/format';
 
@@ -52,6 +54,7 @@ export function MemberFormScreen({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
+  const appRole = useAuthStore((s) => s.appRole);
 
   const steps = useMemo(
     () => [
@@ -123,9 +126,12 @@ export function MemberFormScreen({
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/members');
+      // Staff and trainers open the form from their dashboard, not a members list.
+      router.replace(
+        !appRole || appRole === 'admin' ? ('/(admin)/members' as Href) : getRoleHomeHref(appRole),
+      );
     }
-  }, [router]);
+  }, [router, appRole]);
 
   // Android back: step back through the wizard, then confirm before leaving.
   useEffect(() => {
@@ -215,7 +221,6 @@ export function MemberFormScreen({
             data={data}
             updateField={updateField}
             errors={errors}
-            showProcessedBy={mode === 'create'}
             allowPastDates={mode === 'edit'}
           />
         );

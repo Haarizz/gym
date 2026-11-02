@@ -9,8 +9,6 @@ public class TrainerLedgerResponseDTO {
     private TrainerQuickLedgerStatsDTO quickStats;
     private List<TrainerEarningsBreakdownItemDTO> breakdown;
     private List<TrainerRecentTransactionDTO> recentTransactions;
-    private TrainerTaxInformationDTO taxInfo;
-    private List<TrainerTaxDocumentDTO> taxDocuments;
 
     public TrainerLedgerResponseDTO() {}
 
@@ -18,15 +16,11 @@ public class TrainerLedgerResponseDTO {
             TrainerEarningsSummaryDTO summary,
             TrainerQuickLedgerStatsDTO quickStats,
             List<TrainerEarningsBreakdownItemDTO> breakdown,
-            List<TrainerRecentTransactionDTO> recentTransactions,
-            TrainerTaxInformationDTO taxInfo,
-            List<TrainerTaxDocumentDTO> taxDocuments) {
+            List<TrainerRecentTransactionDTO> recentTransactions) {
         this.summary = summary;
         this.quickStats = quickStats;
         this.breakdown = breakdown;
         this.recentTransactions = recentTransactions;
-        this.taxInfo = taxInfo;
-        this.taxDocuments = taxDocuments;
     }
 
     public TrainerEarningsSummaryDTO getSummary() { return summary; }
@@ -40,12 +34,6 @@ public class TrainerLedgerResponseDTO {
 
     public List<TrainerRecentTransactionDTO> getRecentTransactions() { return recentTransactions; }
     public void setRecentTransactions(List<TrainerRecentTransactionDTO> recentTransactions) { this.recentTransactions = recentTransactions; }
-
-    public TrainerTaxInformationDTO getTaxInfo() { return taxInfo; }
-    public void setTaxInfo(TrainerTaxInformationDTO taxInfo) { this.taxInfo = taxInfo; }
-
-    public List<TrainerTaxDocumentDTO> getTaxDocuments() { return taxDocuments; }
-    public void setTaxDocuments(List<TrainerTaxDocumentDTO> taxDocuments) { this.taxDocuments = taxDocuments; }
 
     // Nested DTOs
     public static class TrainerEarningsSummaryDTO {
@@ -146,47 +134,5 @@ public class TrainerLedgerResponseDTO {
         public void setAmount(BigDecimal amount) { this.amount = amount; }
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
-    }
-
-    public static class TrainerTaxInformationDTO {
-        private String ytdEarnings;
-        private int totalSessions;
-        private String avgPerSession;
-        private int activeClients;
-
-        public TrainerTaxInformationDTO() {}
-
-        public TrainerTaxInformationDTO(String ytdEarnings, int totalSessions, String avgPerSession, int activeClients) {
-            this.ytdEarnings = ytdEarnings;
-            this.totalSessions = totalSessions;
-            this.avgPerSession = avgPerSession;
-            this.activeClients = activeClients;
-        }
-
-        public String getYtdEarnings() { return ytdEarnings; }
-        public void setYtdEarnings(String ytdEarnings) { this.ytdEarnings = ytdEarnings; }
-        public int getTotalSessions() { return totalSessions; }
-        public void setTotalSessions(int totalSessions) { this.totalSessions = totalSessions; }
-        public String getAvgPerSession() { return avgPerSession; }
-        public void setAvgPerSession(String avgPerSession) { this.avgPerSession = avgPerSession; }
-        public int getActiveClients() { return activeClients; }
-        public void setActiveClients(int activeClients) { this.activeClients = activeClients; }
-    }
-
-    public static class TrainerTaxDocumentDTO {
-        private String id;
-        private String title;
-
-        public TrainerTaxDocumentDTO() {}
-
-        public TrainerTaxDocumentDTO(String id, String title) {
-            this.id = id;
-            this.title = title;
-        }
-
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
     }
 }

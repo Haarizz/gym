@@ -5,7 +5,6 @@ import com.company.project.dto.mobile.ledger.trainer.TrainerLedgerResponseDTO.*;
 import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.StaffRepository;
-import com.company.project.repositories.TrainingSessionRepository;
 import com.company.project.security.UserDetailsImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,14 +25,11 @@ import java.util.*;
 public class MobileTrainerLedgerService {
 
     private final StaffRepository staffRepository;
-    private final TrainingSessionRepository trainingSessionRepository;
     private final LedgerEarningsCalculator earnings;
 
     public MobileTrainerLedgerService(StaffRepository staffRepository,
-                                      TrainingSessionRepository trainingSessionRepository,
                                       LedgerEarningsCalculator earnings) {
         this.staffRepository = staffRepository;
-        this.trainingSessionRepository = trainingSessionRepository;
         this.earnings = earnings;
     }
 
@@ -104,39 +100,16 @@ public class MobileTrainerLedgerService {
             ));
         }
 
-        TrainerTaxInformationDTO taxInfo = computeTaxInfo(staff, username, current, payments);
-
         return new TrainerLedgerResponseDTO(
                 summary,
                 quickStats,
                 breakdown,
-                recentTransactions,
-                taxInfo,
-                // No tax documents are issued anywhere in the system yet.
-                Collections.emptyList()
+                recentTransactions
         );
     }
 
     private static TrainerEarningsBreakdownItemDTO breakdownItem(String category, BigDecimal amount, BigDecimal total) {
         return new TrainerEarningsBreakdownItemDTO(category, amount,
                 (int) Math.round(LedgerEarningsCalculator.percentOf(amount, total)));
-    }
-
-    private TrainerTaxInformationDTO computeTaxInfo(Staff staff, String username, YearMonth current, List<SalaryPayment> payments) {
-        BigDecimal ytdEarnings = earnings.salaryPaidInYear(payments, current.getYear())
-                .add(earnings.ytdCommission(staff, username, current));
-
-        LocalDate startOfYear = LocalDate.of(current.getYear(), 1, 1);
-        int completedSessions = (int) trainingSessionRepository
-                .countByTrainer_IdAndStatusAndDateBetween(staff.getId(), "completed", startOfYear, LocalDate.now());
-
-        return new TrainerTaxInformationDTO(
-                ytdEarnings.toPlainString(),
-                completedSessions,
-                // Per-session pay is not calculated anywhere in the system.
-                null,
-                // No trainer-client assignment exists in the schema (same as Trainer Performance).
-                0
-        );
     }
 }

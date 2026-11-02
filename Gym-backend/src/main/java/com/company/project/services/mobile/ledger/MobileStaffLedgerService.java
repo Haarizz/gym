@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
@@ -90,7 +89,6 @@ public class MobileStaffLedgerService {
         List<BreakdownItemDTO> breakdown = computeBreakdown(baseSalary, commission, allowances, thisMonthTotal);
         List<CommissionStructureItemDTO> commissionStructure = computeCommissionStructure(staff);
         List<RecentEarningDTO> recentEarnings = computeRecentEarnings(staff, username, payments);
-        TaxInfoDTO taxInfo = computeTaxInfo(staff, username, current, payments);
 
         return new StaffLedgerResponseDTO(
                 period,
@@ -99,10 +97,7 @@ public class MobileStaffLedgerService {
                 nextPayout,
                 breakdown,
                 commissionStructure,
-                recentEarnings,
-                taxInfo,
-                // No tax documents are issued anywhere in the system yet.
-                Collections.emptyList()
+                recentEarnings
         );
     }
 
@@ -167,11 +162,6 @@ public class MobileStaffLedgerService {
         sb.append("This is a computer-generated advice from GymBios.\n");
 
         return sb.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
-    public byte[] getTaxDocument(UserDetailsImpl principal, String documentId) {
-        requireStaff(principal);
-        throw new EntityNotFoundException("Tax document not found: " + documentId);
     }
 
     private Staff requireStaff(UserDetailsImpl principal) {
@@ -247,26 +237,6 @@ public class MobileStaffLedgerService {
             ));
         }
         return list;
-    }
-
-    private TaxInfoDTO computeTaxInfo(Staff staff, String username, YearMonth current, List<SalaryPayment> payments) {
-        int year = current.getYear();
-        BigDecimal salaryPaid = earnings.salaryPaidInYear(payments, year);
-        BigDecimal totalCommission = earnings.ytdCommission(staff, username, current);
-
-        LocalDateTime startOfYear = LocalDate.of(year, 1, 1).atStartOfDay();
-        LocalDateTime startOfNextMonth = current.plusMonths(1).atDay(1).atStartOfDay();
-        int conversions = progressCalculator.computeConversions(staff, username, startOfYear, startOfNextMonth);
-
-        return new TaxInfoDTO(
-                String.valueOf(year),
-                salaryPaid.add(totalCommission),
-                // Payroll does not record tax withholding.
-                BigDecimal.ZERO,
-                salaryPaid,
-                totalCommission,
-                conversions
-        );
     }
 
     private static BigDecimal nz(BigDecimal value) {

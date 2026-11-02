@@ -37,6 +37,7 @@ const dashboard = {
         messageMember: 'مراسلة العضو',
         createWorkout: 'إنشاء تمرين',
         memberCheckIn: 'تسجيل حضور العضو',
+        addMember: 'إضافة عضو',
         viewLedger: 'عرض السجل المالي',
       },
     },
@@ -53,6 +54,7 @@ const dashboard = {
       quickActions: {
         addNewLead: 'إضافة عميل محتمل',
         memberCheckIn: 'تسجيل حضور العضو',
+        addMember: 'إضافة عضو',
       },
       urgentFollowUps: {
         title: 'متابعات عاجلة',

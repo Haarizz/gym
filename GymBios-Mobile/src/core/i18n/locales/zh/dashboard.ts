@@ -33,6 +33,7 @@ const dashboard = {
         messageMember: '联系会员',
         createWorkout: '创建训练计划',
         memberCheckIn: '会员签到',
+        addMember: '添加会员',
         viewLedger: '查看账本',
       },
     },
@@ -49,6 +50,7 @@ const dashboard = {
       quickActions: {
         addNewLead: '添加新潜客',
         memberCheckIn: '会员签到',
+        addMember: '添加会员',
       },
       urgentFollowUps: {
         title: '紧急跟进',

@@ -13,9 +13,6 @@ public class StaffLedgerResponseDTO {
     private List<BreakdownItemDTO> breakdown = new ArrayList<>();
     private List<CommissionStructureItemDTO> commissionStructure = new ArrayList<>();
     private List<RecentEarningDTO> recentEarnings = new ArrayList<>();
-    private TaxInfoDTO taxInfo;
-    private TaxInfoDTO tax; // alias for contract flexibility
-    private List<TaxDocumentDTO> taxDocuments = new ArrayList<>();
 
     public StaffLedgerResponseDTO() {}
 
@@ -26,9 +23,7 @@ public class StaffLedgerResponseDTO {
             NextPayoutDTO nextPayout,
             List<BreakdownItemDTO> breakdown,
             List<CommissionStructureItemDTO> commissionStructure,
-            List<RecentEarningDTO> recentEarnings,
-            TaxInfoDTO taxInfo,
-            List<TaxDocumentDTO> taxDocuments) {
+            List<RecentEarningDTO> recentEarnings) {
         this.period = period;
         this.summary = summary;
         this.quickStats = quickStats;
@@ -36,9 +31,6 @@ public class StaffLedgerResponseDTO {
         this.breakdown = breakdown != null ? breakdown : new ArrayList<>();
         this.commissionStructure = commissionStructure != null ? commissionStructure : new ArrayList<>();
         this.recentEarnings = recentEarnings != null ? recentEarnings : new ArrayList<>();
-        this.taxInfo = taxInfo;
-        this.tax = taxInfo;
-        this.taxDocuments = taxDocuments != null ? taxDocuments : new ArrayList<>();
     }
 
     public PeriodDTO getPeriod() {
@@ -95,32 +87,6 @@ public class StaffLedgerResponseDTO {
 
     public void setRecentEarnings(List<RecentEarningDTO> recentEarnings) {
         this.recentEarnings = recentEarnings != null ? recentEarnings : new ArrayList<>();
-    }
-
-    public TaxInfoDTO getTaxInfo() {
-        return taxInfo;
-    }
-
-    public void setTaxInfo(TaxInfoDTO taxInfo) {
-        this.taxInfo = taxInfo;
-        this.tax = taxInfo;
-    }
-
-    public TaxInfoDTO getTax() {
-        return tax;
-    }
-
-    public void setTax(TaxInfoDTO tax) {
-        this.tax = tax;
-        this.taxInfo = tax;
-    }
-
-    public List<TaxDocumentDTO> getTaxDocuments() {
-        return taxDocuments;
-    }
-
-    public void setTaxDocuments(List<TaxDocumentDTO> taxDocuments) {
-        this.taxDocuments = taxDocuments != null ? taxDocuments : new ArrayList<>();
     }
 
     // ── Nested DTOs ─────────────────────────────────────────────────────────────
@@ -307,69 +273,5 @@ public class StaffLedgerResponseDTO {
         public void setAmount(BigDecimal amount) { this.amount = amount; }
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
-    }
-
-    public static class TaxInfoDTO {
-        private String taxYear;
-        private BigDecimal ytdEarnings;
-        private BigDecimal tdsDeducted;
-        private BigDecimal baseSalaryPaid;
-        private BigDecimal totalCommission;
-        private int conversions;
-
-        public TaxInfoDTO() {}
-
-        public TaxInfoDTO(
-                String taxYear,
-                BigDecimal ytdEarnings,
-                BigDecimal tdsDeducted,
-                BigDecimal baseSalaryPaid,
-                BigDecimal totalCommission,
-                int conversions) {
-            this.taxYear = taxYear;
-            this.ytdEarnings = ytdEarnings != null ? ytdEarnings : BigDecimal.ZERO;
-            this.tdsDeducted = tdsDeducted != null ? tdsDeducted : BigDecimal.ZERO;
-            this.baseSalaryPaid = baseSalaryPaid != null ? baseSalaryPaid : BigDecimal.ZERO;
-            this.totalCommission = totalCommission != null ? totalCommission : BigDecimal.ZERO;
-            this.conversions = conversions;
-        }
-
-        public String getTaxYear() { return taxYear; }
-        public void setTaxYear(String taxYear) { this.taxYear = taxYear; }
-        public BigDecimal getYtdEarnings() { return ytdEarnings; }
-        public void setYtdEarnings(BigDecimal ytdEarnings) { this.ytdEarnings = ytdEarnings; }
-        public BigDecimal getTdsDeducted() { return tdsDeducted; }
-        public void setTdsDeducted(BigDecimal tdsDeducted) { this.tdsDeducted = tdsDeducted; }
-        public BigDecimal getBaseSalaryPaid() { return baseSalaryPaid; }
-        public void setBaseSalaryPaid(BigDecimal baseSalaryPaid) { this.baseSalaryPaid = baseSalaryPaid; }
-        public BigDecimal getTotalCommission() { return totalCommission; }
-        public void setTotalCommission(BigDecimal totalCommission) { this.totalCommission = totalCommission; }
-        public int getConversions() { return conversions; }
-        public void setConversions(int conversions) { this.conversions = conversions; }
-    }
-
-    public static class TaxDocumentDTO {
-        private String id;
-        private String title;
-        private String period;
-        private String documentUrl;
-
-        public TaxDocumentDTO() {}
-
-        public TaxDocumentDTO(String id, String title, String period, String documentUrl) {
-            this.id = id;
-            this.title = title;
-            this.period = period;
-            this.documentUrl = documentUrl;
-        }
-
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-        public String getPeriod() { return period; }
-        public void setPeriod(String period) { this.period = period; }
-        public String getDocumentUrl() { return documentUrl; }
-        public void setDocumentUrl(String documentUrl) { this.documentUrl = documentUrl; }
     }
 }

@@ -12,7 +12,7 @@ public class TestSerialization {
             "+5%", "Dec 1", "5 days");
 
         TrainerLedgerResponseDTO dto = new TrainerLedgerResponseDTO(
-            summary, stats, Collections.emptyList(), Collections.emptyList(), null, Collections.emptyList());
+            summary, stats, Collections.emptyList(), Collections.emptyList());
 
         ObjectMapper mapper = new ObjectMapper();
         System.out.println(mapper.writeValueAsString(dto));

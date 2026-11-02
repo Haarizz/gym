@@ -39,8 +39,6 @@ class MobileTrainerLedgerServiceTest {
     @Mock
     private StaffRepository staffRepository;
 
-    @Mock
-    private TrainingSessionRepository trainingSessionRepository;
 
     @Mock
     private StaffTargetRepository staffTargetRepository;
@@ -68,7 +66,7 @@ class MobileTrainerLedgerServiceTest {
         LedgerEarningsCalculator earnings = new LedgerEarningsCalculator(
                 staffTargetRepository, salaryPaymentRepository, salaryPaymentEmployeeRepository,
                 receiptRepository, progressCalculator);
-        ledgerService = new MobileTrainerLedgerService(staffRepository, trainingSessionRepository, earnings);
+        ledgerService = new MobileTrainerLedgerService(staffRepository, earnings);
 
         testPrincipal = new UserDetailsImpl(200L, "trainer", "trainer@gymbios.com", "password", Collections.emptyList(), true);
 
@@ -90,8 +88,6 @@ class MobileTrainerLedgerServiceTest {
         when(salaryPaymentRepository.findAll()).thenReturn(Collections.emptyList());
         when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
-        when(trainingSessionRepository.countByTrainer_IdAndStatusAndDateBetween(anyLong(), anyString(), any(), any()))
-                .thenReturn(0L);
 
         when(progressCalculator.computeCommission(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
         when(progressCalculator.findCommissionRule(any())).thenReturn(Optional.empty());
@@ -123,9 +119,6 @@ class MobileTrainerLedgerServiceTest {
         assertEquals(100, response.getBreakdown().get(0).getPercentage());
 
         assertTrue(response.getRecentTransactions().isEmpty());
-        assertEquals("0", response.getTaxInfo().getYtdEarnings());
-        assertNull(response.getTaxInfo().getAvgPerSession());
-        assertTrue(response.getTaxDocuments().isEmpty());
     }
 
     @Test
@@ -138,8 +131,6 @@ class MobileTrainerLedgerServiceTest {
         when(salaryPaymentRepository.findAll()).thenReturn(List.of(lastMonth, thisMonth));
         when(progressCalculator.computeCommission(eq(trainer), eq("trainer"), eq(current.atDay(1).atStartOfDay()), any()))
                 .thenReturn(new BigDecimal("1000"));
-        when(trainingSessionRepository.countByTrainer_IdAndStatusAndDateBetween(eq(20L), eq("completed"), any(), any()))
-                .thenReturn(12L);
 
         TrainerLedgerResponseDTO response = ledgerService.getTrainerLedger(testPrincipal);
 
@@ -149,9 +140,7 @@ class MobileTrainerLedgerServiceTest {
         assertEquals(0, new BigDecimal("6000").compareTo(response.getSummary().getPending()));
         assertEquals("+11%", response.getQuickStats().getGrowth());
 
-        assertEquals(2, response.getRecentTransactions().size());
-        assertEquals(12, response.getTaxInfo().getTotalSessions());
-    }
+        assertEquals(2, response.getRecentTransactions().size());    }
 
     private SalaryPayment payment(Long id, YearMonth period, String net) {
         SalaryPayment p = new SalaryPayment();

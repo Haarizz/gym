@@ -1,5 +1,4 @@
 import { apiClient } from '@/core/network/apiClient';
-import { parseAmount } from '@/core/providers/currencyDefinitions';
 import type { TrainerLedgerData } from '../domain/TrainerLedgerData';
 
 export const trainerLedgerRepository = {
@@ -8,7 +7,6 @@ export const trainerLedgerRepository = {
 
     const summaryRaw = raw.summary || {};
     const quickStatsRaw = raw.quickStats || raw.quick_stats || {};
-    const taxInfoRaw = raw.taxInfo || raw.tax_info || {};
 
     return {
       summary: {
@@ -34,17 +32,6 @@ export const trainerLedgerRepository = {
         member: item.member,
         amount: item.amount,
         status: item.status,
-      })),
-      taxInfo: {
-        // Sent as strings; null when the figure isn't tracked (shown as "—").
-        ytdEarnings: parseAmount(taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings),
-        totalSessions: taxInfoRaw.totalSessions ?? taxInfoRaw.total_sessions ?? 0,
-        avgPerSession: parseAmount(taxInfoRaw.avgPerSession ?? taxInfoRaw.avg_per_session),
-        activeClients: taxInfoRaw.activeClients ?? taxInfoRaw.active_clients ?? 0,
-      },
-      taxDocuments: (raw.taxDocuments || raw.tax_documents || []).map((item: any) => ({
-        id: item.id,
-        title: item.title,
       })),
     };
   },

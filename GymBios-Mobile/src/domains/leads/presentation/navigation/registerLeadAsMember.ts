@@ -14,7 +14,6 @@ export function registerLeadAsMember(router: ReturnType<typeof useRouter>, lead:
       name: `${lead.firstName ?? ''} ${lead.lastName ?? ''}`.trim(),
       email: lead.email ?? '',
       phone: lead.phone ?? '',
-      assignedStaff: lead.assignedStaff ?? '',
     },
   } as any);
 }

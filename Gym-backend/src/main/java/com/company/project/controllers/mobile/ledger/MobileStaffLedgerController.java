@@ -59,24 +59,4 @@ public class MobileStaffLedgerController {
                 .contentType(MediaType.TEXT_PLAIN)
                 .body(payslipBytes);
     }
-
-    /**
-     * GET /api/mobile/staff/ledger/tax-documents/{documentId}
-     * Securely downloads/retrieves the tax compliance statement for the authenticated staff member.
-     */
-    @GetMapping("/tax-documents/{documentId}")
-    public ResponseEntity<byte[]> getTaxDocument(
-            @AuthenticationPrincipal UserDetailsImpl principal,
-            @PathVariable String documentId) {
-        if (principal == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        byte[] docBytes = ledgerService.getTaxDocument(principal, documentId);
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"tax-statement-" + documentId + ".txt\"")
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(docBytes);
-    }
 }

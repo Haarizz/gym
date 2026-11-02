@@ -254,7 +254,9 @@ const styles = StyleSheet.create({
     padding: 16,
     justifyContent: 'space-between',
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    // Opaque on purpose: Android paints the elevation shadow behind the card, so a
+    // translucent background shows it through as a grey inner box.
+    backgroundColor: '#fcfcfd',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.8)',
     shadowColor: INK,

@@ -44,27 +44,6 @@ interface RawRecentEarning {
   status: string;
 }
 
-interface RawTaxInfo {
-  taxYear?: string;
-  tax_year?: string;
-  ytdEarnings?: number;
-  ytd_earnings?: number;
-  tdsDeducted?: number;
-  tds_deducted?: number;
-  baseSalaryPaid?: number;
-  base_salary_paid?: number;
-  totalCommission?: number;
-  total_commission?: number;
-  conversions?: number;
-}
-
-interface RawTaxDocument {
-  id: string | number;
-  title: string;
-  documentUrl?: string;
-  document_url?: string;
-}
-
 interface RawLedgerResponse {
   period?: {
     year: number;
@@ -79,10 +58,6 @@ interface RawLedgerResponse {
   commission_structure?: RawCommissionItem[];
   recentEarnings?: RawRecentEarning[];
   recent_earnings?: RawRecentEarning[];
-  taxInfo?: RawTaxInfo;
-  tax_info?: RawTaxInfo;
-  taxDocuments?: RawTaxDocument[];
-  tax_documents?: RawTaxDocument[];
 }
 
 export class ApiStaffLedgerRepository {
@@ -96,7 +71,6 @@ export class ApiStaffLedgerRepository {
 
     const summaryRaw: RawLedgerSummary = raw.summary || {};
     const quickStatsRaw: RawQuickStats = raw.quickStats || raw.quick_stats || {};
-    const taxInfoRaw: RawTaxInfo = raw.taxInfo || raw.tax_info || {};
 
     const thisMonth = summaryRaw.thisMonth ?? summaryRaw.this_month ?? 0;
     const lastMonth = summaryRaw.lastMonth ?? summaryRaw.last_month ?? 0;
@@ -137,17 +111,6 @@ export class ApiStaffLedgerRepository {
         amount: item.amount,
         status: (item.status?.toLowerCase() === 'paid' ? 'paid' : 'pending') as 'paid' | 'pending',
       })),
-      taxInfo: {
-        ytdEarnings: taxInfoRaw.ytdEarnings ?? taxInfoRaw.ytd_earnings ?? 0,
-        tdsDeducted: taxInfoRaw.tdsDeducted ?? taxInfoRaw.tds_deducted ?? 0,
-        baseSalaryPaid: taxInfoRaw.baseSalaryPaid ?? taxInfoRaw.base_salary_paid ?? 0,
-        totalCommission: taxInfoRaw.totalCommission ?? taxInfoRaw.total_commission ?? 0,
-        conversions: taxInfoRaw.conversions ?? 0,
-      },
-      taxDocuments: (raw.taxDocuments || raw.tax_documents || []).map((doc) => ({
-        id: doc.id,
-        title: doc.title,
-      })),
     };
   }
 
@@ -163,15 +126,6 @@ export class ApiStaffLedgerRepository {
     const response = await apiClient.get<string>(
       `/mobile/staff/ledger/salary-slip${params.toString() ? `?${params.toString()}` : ''}`
     );
-    return response.data;
-  }
-
-  /**
-   * GET /api/mobile/staff/ledger/tax-documents/{id}
-   * Retrieves tax document content from backend.
-   */
-  async downloadTaxDocument(docId: string | number): Promise<string> {
-    const response = await apiClient.get<string>(`/mobile/staff/ledger/tax-documents/${docId}`);
     return response.data;
   }
 }
