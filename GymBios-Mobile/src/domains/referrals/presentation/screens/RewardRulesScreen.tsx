@@ -15,6 +15,7 @@ import { CurrencyValue } from '@/core/providers';
 import { ReferralHeader } from '../components/ReferralHeader';
 import { useReferralRules } from '../../hooks/useReferrals';
 import { useTranslation } from 'react-i18next';
+import { translateValue, tOr } from '@/core/i18n/format';
 
 export function RewardRulesScreen() {
   const { t } = useTranslation();
@@ -78,7 +79,7 @@ export function RewardRulesScreen() {
                       {rule.name}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {t('adminReferrals.targetLabel')} {rule.eligibility || 'Referrer'} {t('adminReferrals.triggerLabel')} {rule.conditionTrigger || 'Payment'}
+                      {t('adminReferrals.targetLabel')} {rule.eligibility ? tOr(`adminReferrals.${rule.eligibility.toLowerCase()}`, rule.eligibility) : t('adminReferrals.referrer')} {t('adminReferrals.triggerLabel')} {rule.conditionTrigger || t('adminReferrals.msg.payment')}
                     </Typography>
                   </View>
 
@@ -95,7 +96,7 @@ export function RewardRulesScreen() {
                         rule.isActive ? { color: '#15803d' } : { color: '#475569' },
                       ]}
                     >
-                      {rule.isActive ? 'Active' : 'Inactive'}
+                      {rule.isActive ? translateValue('status', 'active') : translateValue('status', 'inactive')}
                     </Typography>
                   </View>
                 </View>

@@ -142,8 +142,12 @@ public class MobileProfileService {
 
     private UserProfile newProfile(Long userId) {
         UserProfile profile = new UserProfile();
-        profile.setUser(userRepository.getReferenceById(userId));
-        profile.setFullName("Member"); // Add a default since fullName is non-null
+        // full_name is required; start from the login username so staff/admin
+        // accounts never show a placeholder name. The person can change it later.
+        com.company.project.entities.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        profile.setUser(user);
+        profile.setFullName(user.getUsername());
         return profile;
     }
 

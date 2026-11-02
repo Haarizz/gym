@@ -84,7 +84,11 @@ export class ApiProfileRepository implements ProfileRepository {
 
     // Members have no staff_name on /auth/me, so primaryName would be their
     // username — the full name from /mobile/profile/me comes first.
-    const name = staff?.name || remoteProfile?.fullName || localProfile.name || primaryName;
+    // Admins are known by their login username. Their /mobile/profile/me row is
+    // auto-created with a "Member" placeholder name, so it must not be used here.
+    const name = roleDisplay === 'ADMIN'
+      ? username
+      : staff?.name || remoteProfile?.fullName || localProfile.name || primaryName;
     const email = staff?.email || remoteProfile?.email || localProfile.email || currentUser?.email || `${username}@gymbios.local`;
     const phone = staff?.phone || remoteProfile?.phone || localProfile.phone || '';
     const address = staff?.address || remoteProfile?.address || localProfile.address || '';
@@ -297,6 +301,19 @@ export class ApiProfileRepository implements ProfileRepository {
 
   async updateProfile(data: UpdateProfileDto): Promise<Profile> {
     const current = await this.getProfile();
+
+    // getProfile() reads name/phone/address from /mobile/profile/me first, so a
+    // local-only save never showed. Members already save there via
+    // useMobileProfile; everyone else saves here. Email isn't part of that
+    // endpoint, so it stays in the local copy below.
+    if (current.role !== 'MEMBER') {
+      await this.api.updateMobileProfile({
+        fullName: data.name,
+        phone: data.phone,
+        address: data.address,
+      });
+    }
+
     const updated: Profile = {
       ...current,
       name: data.name,

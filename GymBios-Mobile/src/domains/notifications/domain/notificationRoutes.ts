@@ -1,6 +1,7 @@
 // Leaf import (not the domain index) so this stays free of screen/hook imports.
 import { membershipPaymentPath } from '@/domains/membershipPayment/domain/routes';
 import { MEMBER_ENQUIRY_PUSH_TYPE } from '@/domains/memberPortal/enquiries/enquiriesApi';
+import { CONVERSATION_PUSH_TYPE } from '@/domains/conversations/domain/types';
 
 /** Sent by the backend's MemberPaymentApprovalNotifier when staff approve a Cash/Credit/Mixed purchase. */
 export const PAYMENT_APPROVED_NOTIFICATION_TYPE = 'membership_payment_approved';
@@ -13,10 +14,15 @@ export const BOOKING_PAYMENT_REJECTED_NOTIFICATION_TYPE = 'booking_payment_rejec
 /**
  * Maps a push notification's data payload to the in-app route it opens.
  * Only known notification types are routed — a payload can never send the
- * member to an arbitrary screen.
+ * member to an arbitrary screen. appRole picks the app area for the one push both
+ * apps get (a chat message); every other type is member-only.
  */
-export function resolveNotificationPath(data: Record<string, unknown> | null | undefined): string | null {
+export function resolveNotificationPath(
+  data: Record<string, unknown> | null | undefined,
+  appRole?: string | null,
+): string | null {
   if (!data) return null;
+  const staffGroup = appRole === 'staff' ? '(staff)' : appRole === 'trainer' ? '(trainer)' : null;
 
   switch (data.type) {
     case 'outstanding_balance': {
@@ -29,6 +35,15 @@ export function resolveNotificationPath(data: Record<string, unknown> | null | u
       return Number.isInteger(enquiryId) && enquiryId > 0
         ? `/(member)/profile?view=enquiries&enquiryId=${enquiryId}`
         : '/(member)/profile?view=enquiries';
+    }
+    // A chat message: from staff to a member, or from a member to staff / the front desk.
+    case CONVERSATION_PUSH_TYPE: {
+      const conversationId = Number(data.conversationId);
+      const valid = Number.isInteger(conversationId) && conversationId > 0;
+      if (staffGroup) {
+        return valid ? `/${staffGroup}/messaging/chat?conversationId=${conversationId}` : `/${staffGroup}/messaging/chats`;
+      }
+      return valid ? `/(member)/team/chat?conversationId=${conversationId}` : '/(member)/team';
     }
     // A rejected booking is listed (with the reason) on the Bookings screen.
     case BOOKING_PAYMENT_APPROVED_NOTIFICATION_TYPE:

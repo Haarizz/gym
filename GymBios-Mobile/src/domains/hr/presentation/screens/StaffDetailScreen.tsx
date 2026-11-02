@@ -64,11 +64,11 @@ export function StaffDetailScreen({
       onDeleted();
     } catch {
       setDeleteConfirmVisible(false);
-      toast.error('Failed to delete staff member.', {
-        title: 'Error'
+      toast.error(t('hr.msg.deleteFailed'), {
+        title: t('common.error')
       });
     }
-  }, [staffId, deleteStaff, onDeleted]);
+  }, [staffId, deleteStaff, onDeleted, t]);
 
   const handleChangeStatus = useCallback(
     async (status: string) => {
@@ -76,20 +76,20 @@ export function StaffDetailScreen({
       if (selectedStaff?.status?.toLowerCase() === status) return;
       try {
         await updateStaffStatus(staffId, status);
-        toast.success('Staff status updated.');
+        toast.success(t('hr.msg.statusUpdated'));
         onUpdated();
       } catch {
-        toast.error('Failed to update staff status.', { title: 'Error' });
+        toast.error(t('hr.msg.statusFailed'), { title: t('common.error') });
       }
     },
-    [selectedStaff?.status, staffId, updateStaffStatus, onUpdated],
+    [selectedStaff?.status, staffId, updateStaffStatus, onUpdated, t],
   );
 
   const handleSetTarget = useCallback(() => {
-    toast.info('Setting targets from the app is coming in an upcoming update.', {
-      title: 'Coming soon',
+    toast.info(t('hr.msg.targetsComingSoon'), {
+      title: t('common.comingSoon'),
     });
-  }, []);
+  }, [t]);
 
   const handleEdit = useCallback(() => {
     router.push(`/(admin)/staff/edit/${staffId}` as any);

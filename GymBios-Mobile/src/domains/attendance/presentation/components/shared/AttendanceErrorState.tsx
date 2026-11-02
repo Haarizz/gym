@@ -30,7 +30,7 @@ export function AttendanceErrorState({
         {errorMessage}
       </Typography>
       {onRetry ? (
-        <Button label={t('common.retry', { defaultValue: 'Try Again' })} onPress={onRetry} variant="secondary" style={styles.button} />
+        <Button label={t('common.retry')} onPress={onRetry} variant="secondary" style={styles.button} />
       ) : null}
     </View>
   );

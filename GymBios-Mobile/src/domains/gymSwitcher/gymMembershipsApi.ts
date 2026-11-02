@@ -110,3 +110,16 @@ export async function enterPurchasedGym(tenantSlug: string, branchId: number | n
   await switchGym({ tenantSlug, branchId }, { goHome: false });
   await refreshMyGymMemberships();
 }
+
+/**
+ * The member's membership at a gym, at any of its branches. A rejected purchase isn't a
+ * membership — the server lets the member buy there again — so it doesn't count.
+ */
+export function membershipAtGym(gyms: GymMembership[] | undefined, tenantSlug: string): GymMembership | undefined {
+  return gyms?.find((g) => g.tenantSlug === tenantSlug && g.status !== 'PAYMENT_REJECTED');
+}
+
+/** The member's memberships at gyms other than this one (rejected purchases left out). */
+export function membershipsElsewhere(gyms: GymMembership[] | undefined, tenantSlug: string): GymMembership[] {
+  return (gyms ?? []).filter((g) => g.tenantSlug !== tenantSlug && g.status !== 'PAYMENT_REJECTED');
+}

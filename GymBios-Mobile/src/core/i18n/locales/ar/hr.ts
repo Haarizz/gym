@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "عرض التفاصيل",
       "onLeave": "في إجازة"
     },
-    "datePlaceholder": "YYYY-MM-DD"
+    "datePlaceholder": "YYYY-MM-DD",
+    "wizardSteps": {
+      "personal": "المعلومات الشخصية",
+      "employment": "التوظيف",
+      "compensation": "التعويضات",
+      "schedule": "الجدول والشهادات",
+      "access": "الوصول إلى التطبيق والمراجعة"
+    },
+    "msg": {
+      "deleteFailed": "تعذر حذف الموظف.",
+      "statusUpdated": "تم تحديث حالة الموظف.",
+      "statusFailed": "تعذر تحديث حالة الموظف.",
+      "targetsComingSoon": "ستتوفر إمكانية تعيين الأهداف من التطبيق في تحديث قادم.",
+      "branchRequiredTitle": "الفرع مطلوب",
+      "branchRequired": "يرجى اختيار فرع محدد من قائمة الرأس قبل إنشاء موظف جديد.",
+      "staffNoPhone": "لا يوجد رقم هاتف مسجل لهذا الموظف.",
+      "messageA11y": "مراسلة {{name}}",
+      "workingDaysValue": "{{count}} في الأسبوع"
+    },
+    "review": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "role": "الدور",
+      "department": "القسم",
+      "branch": "الفرع",
+      "joined": "تاريخ الانضمام",
+      "salary": "الراتب",
+      "target": "الهدف",
+      "workingDays": "أيام العمل",
+      "certifications": "الشهادات",
+      "needsAttention": "يحتاج إلى مراجعة",
+      "edit": "تعديل {{title}}"
+    },
+    "days": {
+      "monday": "الاثنين",
+      "tuesday": "الثلاثاء",
+      "wednesday": "الأربعاء",
+      "thursday": "الخميس",
+      "friday": "الجمعة",
+      "saturday": "السبت",
+      "sunday": "الأحد"
+    },
+    "shifts": {
+      "Morning": "صباحي (6 ص – 12 م)",
+      "Afternoon": "بعد الظهر (12 م – 5 م)",
+      "Evening": "مسائي (5 م – 10 م)"
+    }
   }
 };
 

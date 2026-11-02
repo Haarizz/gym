@@ -46,7 +46,7 @@ export function useNotificationDeepLinks() {
           openGymRatingSheet();
           return;
         }
-        const path = resolveNotificationPath(data);
+        const path = resolveNotificationPath(data, useAuthStore.getState().appRole);
         if (path) router.push(path as Href);
       });
   }, [response, router]);

@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/core/providers/currencyDefinitions';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
+import i18n from '@/core/i18n/i18n';
 
 export interface PromotionStatisticsData {
   totalPromotions: number;
@@ -82,10 +83,10 @@ export function formatDiscountDisplay(
   // Plain text (share messages); cards render fixed discounts with <CurrencyValue> instead.
   const val = discountValue ?? 0;
   if (discountType === 'percentage') {
-    return `${val}% OFF`;
+    return i18n.t('promotions.msg.percentOff', { value: val });
   }
   if (discountType === 'fixed') {
-    return `${formatCurrency(val)} OFF`;
+    return i18n.t('promotions.msg.amountOff', { value: formatCurrency(val) });
   }
-  return val > 0 ? `${val} OFF` : 'SPECIAL OFFER';
+  return val > 0 ? i18n.t('promotions.msg.amountOff', { value: val }) : i18n.t('promotions.msg.specialOffer');
 }

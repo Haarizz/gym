@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { MoneyText } from './MoneyText';
+import { useTranslation } from 'react-i18next';
 
 interface PaymentSummaryRow {
   label: string;
@@ -21,7 +22,9 @@ interface PaymentSummaryCardProps {
  * Breakdown of amounts in the payment settlement confirmation screen.
  * Purely presentational.
  */
-export function PaymentSummaryCard({ rows, title = 'Payment Summary' }: PaymentSummaryCardProps) {
+export function PaymentSummaryCard({ rows, title: titleProp }: PaymentSummaryCardProps) {
+  const { t } = useTranslation();
+  const title = titleProp ?? t('billing.msg.paymentSummary');
   return (
     <View style={styles.card}>
       <Typography variant="bodySmallBold" style={styles.title}>

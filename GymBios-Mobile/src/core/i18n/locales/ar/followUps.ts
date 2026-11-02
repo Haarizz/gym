@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "لا توجد مهام متابعة تطابق معايير البحث أو التصفية الحالية.",
     "rescheduleTitle": "إعادة جدولة المتابعة",
     "reschedulingFor": "إعادة جدولة المتابعة لـ",
-    "newDueDate": "تاريخ الاستحقاق الجديد"
+    "newDueDate": "تاريخ الاستحقاق الجديد",
+    "outcomes": {
+      "successful": "ناجحة",
+      "no_response": "لا يوجد رد",
+      "callback_requested": "طلب معاودة الاتصال",
+      "not_interested": "غير مهتم",
+      "converted": "تم التحويل",
+      "rescheduled": "أعيدت جدولته"
+    },
+    "filters": {
+      "allStatuses": "جميع الحالات",
+      "allTypes": "جميع الأنواع",
+      "allPriorities": "جميع الأولويات",
+      "allStaff": "جميع الموظفين"
+    },
+    "msg": {
+      "selectMemberOrLead": "يرجى اختيار عضو أو عميل محتمل.",
+      "subjectRequired": "موضوع المتابعة مطلوب.",
+      "dueDateRequired": "تاريخ الاستحقاق مطلوب.",
+      "newDueDateRequired": "تاريخ الاستحقاق الجديد مطلوب.",
+      "notesRequired": "الملاحظات مطلوبة لسجل التواصل.",
+      "addRecordFailed": "تعذر إضافة سجل التواصل.",
+      "deleteRecordTitle": "حذف السجل",
+      "deleteRecordBody": "هل أنت متأكد من حذف سجل التواصل هذا؟",
+      "saveRecord": "حفظ السجل",
+      "detailsTitle": "تفاصيل المتابعة",
+      "completing": "جارٍ الإكمال...",
+      "rescheduling": "جارٍ إعادة الجدولة...",
+      "noDueDate": "لا يوجد تاريخ استحقاق",
+      "leadNoPhone": "لا يوجد رقم هاتف مسجل لهذا العميل المحتمل.",
+      "leadNoEmail": "لا يوجد بريد إلكتروني مسجل لهذا العميل المحتمل.",
+      "deleteTitle": "حذف المتابعة",
+      "deleteBody": "هل أنت متأكد من حذف المتابعة \"{{subject}}\" الخاصة بـ {{name}}؟",
+      "deleteFailed": "تعذر حذف المتابعة.",
+      "cancelTitle": "إلغاء المتابعة",
+      "cancelBody": "هل أنت متأكد من إلغاء المتابعة \"{{subject}}\"؟",
+      "yesCancel": "نعم، إلغاء",
+      "cancelFailed": "تعذر إلغاء المتابعة.",
+      "updateFailed": "تعذر تحديث المتابعة.",
+      "createFailed": "تعذر إنشاء المتابعة.",
+      "completeFailed": "تعذر إكمال المتابعة.",
+      "rescheduleFailed": "تعذرت إعادة جدولة المتابعة.",
+      "leadConvertedTitle": "تم تحويل العميل المحتمل",
+      "leadConvertedBody": "تم وضع علامة على العميل المحتمل كمحوَّل. سجّله كعضو في الاستقبال ليُحتسب البيع لك."
+    }
   }
 };
 

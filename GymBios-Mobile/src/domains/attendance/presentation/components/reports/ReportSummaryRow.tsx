@@ -4,23 +4,25 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { ReportSummary } from '../../../domain/AttendanceReport';
 import { AttendanceSection } from '../shared';
+import { useTranslation } from 'react-i18next';
 
 interface ReportSummaryRowProps {
   summary: ReportSummary;
 }
 
 export function ReportSummaryRow({ summary }: ReportSummaryRowProps) {
+  const { t } = useTranslation();
   const cards = [
-    { label: 'Total Check-ins', value: String(summary.totalVisits ?? 0) },
-    { label: 'Avg Daily', value: String(summary.avgDailyVisits ?? 0) },
-    { label: 'Rate', value: summary.attendanceRate != null ? `${summary.attendanceRate}%` : '—' },
-    { label: 'Peak Hour', value: summary.peakHour || '—' },
-    { label: 'Active Members', value: String(summary.totalActiveMembers ?? 0) },
-    { label: 'Days in Range', value: String(summary.daysInRange ?? 0) },
+    { label: t('attendance.summary.totalCheckIns'), value: String(summary.totalVisits ?? 0) },
+    { label: t('attendance.summary.avgDaily'), value: String(summary.avgDailyVisits ?? 0) },
+    { label: t('attendance.summary.rate'), value: summary.attendanceRate != null ? `${summary.attendanceRate}%` : '—' },
+    { label: t('attendance.summary.peakHour'), value: summary.peakHour || '—' },
+    { label: t('attendance.summary.activeMembers'), value: String(summary.totalActiveMembers ?? 0) },
+    { label: t('attendance.summary.daysInRange'), value: String(summary.daysInRange ?? 0) },
   ];
 
   return (
-    <AttendanceSection title="Summary">
+    <AttendanceSection title={t('attendance.summary.title')}>
       <View style={styles.grid}>
         {cards.map(card => (
           <View key={card.label} style={styles.card}>

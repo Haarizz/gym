@@ -12,6 +12,9 @@ interface MessagingFlowHeaderProps {
   step?: 1 | 2;
   onBack?: () => void;
   showStepper?: boolean;
+  /** Optional info button on the right, e.g. the chat rules. */
+  onInfo?: () => void;
+  infoLabel?: string;
 }
 
 export function MessagingFlowHeader({
@@ -20,6 +23,8 @@ export function MessagingFlowHeader({
   step,
   onBack,
   showStepper = true,
+  onInfo,
+  infoLabel,
 }: MessagingFlowHeaderProps) {
   const { t } = useTranslation();
 
@@ -38,6 +43,11 @@ export function MessagingFlowHeader({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
+        {onInfo && (
+          <Pressable style={styles.backBtn} onPress={onInfo} hitSlop={8} accessibilityRole="button" accessibilityLabel={infoLabel}>
+            <Feather name="info" size={18} color="#ffffff" />
+          </Pressable>
+        )}
       </View>
       
       {showStepper && (

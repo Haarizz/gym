@@ -92,6 +92,33 @@ const attendance = {
       "active": "Aktiv",
       "done": "Erledigt",
       "completed": "Beendet"
+    },
+    "summary": {
+      "title": "Übersicht",
+      "totalCheckIns": "Check-ins gesamt",
+      "avgDaily": "Ø pro Tag",
+      "rate": "Quote",
+      "peakHour": "Stoßzeit",
+      "activeMembers": "Aktive Mitglieder",
+      "daysInRange": "Tage im Zeitraum"
+    },
+    "periods": {
+      "7d": "7 Tage",
+      "30d": "30 Tage",
+      "90d": "90 Tage",
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "this-week": "Diese Woche"
+    },
+    "misc": {
+      "insights": "Erkenntnisse",
+      "other": "Sonstiges",
+      "open": "Öffnen",
+      "quickStats": "Kurzstatistik",
+      "noStaffClockedIn": "Kein Mitarbeiter eingestempelt",
+      "noStaffClockedInDesc": "Heute wurden keine Anwesenheitseinträge für Mitarbeiter oder Trainer gefunden.",
+      "visitor": "Besucher",
+      "user": "Benutzer"
     }
   }
 };

@@ -4,7 +4,7 @@ In-app chat between members and their gym's staff and trainers. This is the **Me
 
 It is a separate thing from the existing `messaging` domain, which handles bulk SMS, email and WhatsApp sent by staff.
 
-_Last updated: 2026-10-31_
+_Last updated: 2026-11-01_
 
 ## Progress
 
@@ -14,8 +14,9 @@ _Last updated: 2026-10-31_
 | Backend: migration, entities, services, APIs | Done, not committed |
 | Backend unit tests (36 new) | Passing |
 | Backend run against a real database | **Not done yet.** See [Before running the app](#before-running-the-app) |
-| Mobile app (member side, staff side, push handling) | Not started |
-| Web admin page for chat reports | Not started (the API exists) |
+| Mobile app: chat screens, staff Chats list, member Message buttons + front desk | Done, not committed, not yet tried on a device |
+| Mobile app: chat switches (Settings), staff push registration and chat deep links | Done, not committed, not yet tried on a device |
+| Web admin page for chat reports (Member Connect → Chat Reports, gym owners only) | Done, not committed |
 
 ## The rules
 
@@ -132,6 +133,7 @@ Same as the member API, with these differences:
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/?inbox=all\|mine\|front_desk` | Trainers only ever see their own conversations |
+| GET | `/members?search=&limit=` | Active members of the branch with an app login, by name (100 by default, up to 200), with `conversation_id`, `unread` and `can_start` / `cannot_start_code` per row. Feeds the app's Chats list |
 | GET | `/lookup?member_id=` | |
 | POST | `/` | `{ "member_id", "body" }`. Staff always start as themselves, never as the front desk |
 | POST / DELETE | `/{id}/mute` | Stops the member sending for 7 days (instead of block) |
@@ -172,16 +174,6 @@ Push notifications for chat have `data.type = "conversation_message"` and `data.
 
 ## Still to do
 
-1. **Mobile, member side:**
-   - turn on the Message button in `StaffCard` and `StaffProfileScreen` using `can_message`
-   - a list of conversations and a chat screen
-   - a front-desk entry point
-   - the "Let staff start chats" setting
-2. **Mobile, staff side:**
-   - an inbox with the `mine` and `front_desk` filters, and a chat screen
-   - mute and report
-   - the "Accept messages from members" setting
-   - registering the device for push
-3. **Push handling:** open the right chat when a `conversation_message` push is tapped.
-4. **Web admin:** a page for chat reports.
-5. **Defaults to confirm with the product owner:** minors are blocked, both daily limits are 20, the front desk can't be blocked, and on-duty hours are 6am–10pm when no schedule is set.
+1. **Try it on devices:** member and staff chat end to end, push taps on a cold start, and the Android keyboard over the composer.
+2. **Defaults to confirm with the product owner:** minors are blocked, both daily limits are 20, the front desk can't be blocked, and on-duty hours are 6am–10pm when no schedule is set.
+3. **Not in v1:** a members' list of their own conversations (members reach chats from Staff & Trainers and the front-desk card), and same-gym multi-branch staff (chats follow the active branch).

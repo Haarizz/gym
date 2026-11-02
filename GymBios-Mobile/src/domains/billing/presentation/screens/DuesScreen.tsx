@@ -57,28 +57,28 @@ export function DuesScreen({
   const handleSendReminders = useCallback(() => {
     const overdueCount = dues.filter((d) => d.status === DueStatus.Overdue || d.daysOverdue > 0).length;
     Alert.alert(
-      'Send Overdue Reminders',
-      `Send payment reminder notification to ${overdueCount} overdue member(s)?`,
+      t('billing.msg.remindersTitle'),
+      t('billing.msg.remindersBody', { count: overdueCount }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Send Reminders',
+          text: t('billing.dues.sendReminders'),
           onPress: () => {
-            toast.success(`Reminders dispatched via SMS & Email to ${overdueCount} members.`, {
-              title: 'Success'
+            toast.success(t('billing.msg.remindersSent', { count: overdueCount }), {
+              title: t('common.success')
             });
           },
         },
       ],
     );
-  }, [dues]);
+  }, [dues, t]);
 
   const handleExport = useCallback(() => {
     const overdueList = dues.filter((d) => d.status === DueStatus.Overdue || d.daysOverdue > 0);
-    toast.info(`Exported ${overdueList.length} overdue member record(s) to CSV.`, {
-      title: 'Export Overdue Report'
+    toast.info(t('billing.msg.overdueExported', { count: overdueList.length }), {
+      title: t('billing.msg.overdueExportTitle')
     });
-  }, [dues]);
+  }, [dues, t]);
 
   const overdueCount = stats?.overdueCount ?? dues.filter((d) => d.status === DueStatus.Overdue || d.daysOverdue > 0).length;
   const dueSoonCount = stats?.dueSoonCount ?? dues.filter((d) => d.status === DueStatus.DueSoon || d.daysOverdue === 0).length;

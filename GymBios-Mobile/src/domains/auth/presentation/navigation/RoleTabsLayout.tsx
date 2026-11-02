@@ -11,7 +11,7 @@ import {
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 
-import { BrandColors, Glass, heroTint } from '@/core/theme';
+import { BrandColors, heroTint } from '@/core/theme';
 import { AppBottomSheet, GlassSurface, ModuleSheet } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 import {
@@ -32,7 +32,7 @@ import {
 } from './layoutRoutes';
 import { TabIcon, type TabTitleKey } from './tabConfigs';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { RoleTabBar, TAB_BAR_HEIGHT, TAB_SCENE_TRANSITION_SPEC, forTabSlide } from './RoleTabBar';
+import { RoleTabBar, TAB_SCENE_TRANSITION_SPEC, forTabSlide } from './RoleTabBar';
 
 export type { TabIcon };
 export * from './layoutRoutes';
@@ -44,6 +44,7 @@ interface RoleTabsLayoutProps {
   headerColors?: string[];
   headerColor?: string;
   activeColor: string;
+  navColors: readonly [string, string];
   tabs: Array<{
     name: string;
     title: string;
@@ -74,7 +75,7 @@ export function RoleTabsLayout({
   subtitle,
   headerColors,
   headerColor,
-  activeColor,
+  navColors,
   tabs: tabConfigs,
 }: RoleTabsLayoutProps) {
   const router = useRouter();
@@ -137,6 +138,7 @@ export function RoleTabsLayout({
       : selectedBranchName;
 
   const isTabBarHidden = isFullScreen || isCommunityScreen;
+  const openModules = useCallback(() => setIsModulesOpen(true), []);
 
   // Stable renderer and options so header-only updates (unread count, branch)
   // don't re-render the tab bar or rebuild every screen's options.
@@ -146,12 +148,14 @@ export function RoleTabsLayout({
         state={state}
         navigation={navigation}
         tabs={tabs}
-        activeColor={activeColor}
+        colors={navColors}
         hidden={isTabBarHidden}
         bottom={tabBarBottom}
+        onCenterPress={isAdmin ? openModules : undefined}
+        centerOpen={isModulesOpen}
       />
     ),
-    [tabs, activeColor, isTabBarHidden, tabBarBottom],
+    [tabs, navColors, isTabBarHidden, tabBarBottom, isAdmin, openModules, isModulesOpen],
   );
 
   const screenOptions = useMemo(
@@ -280,35 +284,14 @@ export function RoleTabsLayout({
           ))}
         </Tabs>
 
-        {!isFullScreen && !isCommunityScreen && isAdmin && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.modulesFabContainer,
-              { bottom: tabBarBottom + MODULES_FAB_OFFSET },
-              pressed && styles.modulesFabPressed,
-            ]}
-            onPress={() => setIsModulesOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Open Modules"
-          >
-            <GlassSurface
-              tint={[heroTint(BrandColors.teal, 0.92), heroTint(BrandColors.tealDark, 0.78)]}
-              radius={MODULES_FAB_SIZE / 2}
-              style={styles.modulesFab}
-            >
-              <Feather name="grid" size={22} color="#FFF" />
-            </GlassSurface>
-          </Pressable>
-        )}
-
         {canSwitchGym && (
           <GymSwitcherSheet visible={isGymSwitcherOpen} onClose={() => setIsGymSwitcherOpen(false)} />
         )}
 
         <AppBottomSheet
           visible={isModulesOpen}
-          title="Modules"
-          subtitle="Quick Access"
+          title={t('shared.modules.sheetTitle')}
+          subtitle={t('shared.modules.sheetSubtitle')}
           onClose={() => setIsModulesOpen(false)}
         >
           <ModuleSheet onNavigate={() => setIsModulesOpen(false)} />
@@ -316,8 +299,8 @@ export function RoleTabsLayout({
 
         <AppBottomSheet
           visible={isBranchSelectorOpen}
-          title="Select Branch"
-          subtitle="Choose a branch context"
+          title={t('shared.branchPicker.title')}
+          subtitle={t('shared.branchPicker.subtitle')}
           onClose={() => setIsBranchSelectorOpen(false)}
         >
           <View style={{ padding: 16 }}>
@@ -328,7 +311,7 @@ export function RoleTabsLayout({
                 setIsBranchSelectorOpen(false);
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: selectedBranchId === 'ALL' ? '700' : '400', color: selectedBranchId === 'ALL' ? BrandColors.teal : '#000' }}>All Branches</Text>
+              <Text style={{ fontSize: 16, fontWeight: selectedBranchId === 'ALL' ? '700' : '400', color: selectedBranchId === 'ALL' ? BrandColors.teal : '#000' }}>{t('shared.branchPicker.allBranches')}</Text>
             </Pressable>
             {availableBranches.map((branch) => (
               <Pressable
@@ -354,17 +337,7 @@ export function RoleTabsLayout({
   );
 }
 
-// Normal design spacing below the tab bar's icon/label content — the actual
-// system nav/gesture clearance is added on top at runtime via insets.bottom.
-const TAB_BAR_BOTTOM_PADDING = 12;
-
-// The modules FAB is anchored to the tab bar: centred on it, then lifted so
-// it floats slightly proud of the pill's top edge.
 const HEADER_RADIUS = 24;
-
-const MODULES_FAB_SIZE = 56;
-const MODULES_FAB_LIFT = 14;
-const MODULES_FAB_OFFSET = TAB_BAR_HEIGHT / 2 - MODULES_FAB_SIZE / 2 + MODULES_FAB_LIFT;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -497,39 +470,5 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     lineHeight: 11,
-  },
-
-
-
-  modulesFabContainer: {
-    position: 'absolute',
-    alignSelf: 'center',
-    // bottom is set dynamically (see the Pressable above) to clear the
-    // device's actual system nav/gesture inset.
-    alignItems: 'center',
-    zIndex: 99,
-    elevation: 20,
-  },
-
-  modulesFabPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.96 }],
-  },
-
-  modulesFab: {
-    width: MODULES_FAB_SIZE,
-    height: MODULES_FAB_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Glass.border,
-    shadowColor: BrandColors.teal,
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    elevation: 10,
   },
 });

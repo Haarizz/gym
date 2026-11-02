@@ -39,10 +39,10 @@ export function PromotionForm({
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const handleError = useCallback((_error: Error) => {
-    toast.error('Failed to save promotion. Please check input data and try again.', {
-      title: 'Error'
+    toast.error(t('promotions.msg.saveFailed'), {
+      title: t('common.error')
     });
-  }, []);
+  }, [t]);
 
   const {
     step,
@@ -65,7 +65,7 @@ export function PromotionForm({
     onError: handleError,
   });
 
-  const stepLabels = steps.map((s) => s.title);
+  const stepLabels = steps.map((s) => t(`promotions.steps.${s.id}`, { defaultValue: s.title }));
 
   const renderStepContent = useCallback(() => {
     const stepId = steps[step - 1]?.id;
@@ -97,7 +97,8 @@ export function PromotionForm({
     onCancel();
   }, [onCancel]);
 
-  const currentStepTitle = steps[step - 1]?.title ?? '';
+  const currentStep = steps[step - 1];
+  const currentStepTitle = currentStep ? t(`promotions.steps.${currentStep.id}`, { defaultValue: currentStep.title }) : '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -111,7 +112,7 @@ export function PromotionForm({
         <View style={styles.wizardHeader}>
           <View style={styles.headerText}>
             <Typography variant="subtitle" style={styles.headerTitle}>
-              {mode === 'create' ? 'Create New Promotion' : 'Edit Promotion'}
+              {mode === 'create' ? t('promotions.msg.createTitle') : t('promotions.msg.editTitle')}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               {currentStepTitle}
@@ -172,7 +173,7 @@ export function PromotionForm({
             onPrevious={previous}
             onSubmit={submit}
             mode={mode}
-            submitLabelOverride={mode === 'edit' ? 'Save Changes' : 'Create Promotion'}
+            submitLabelOverride={mode === 'edit' ? t('common.saveChanges') : t('promotions.msg.createSubmit')}
           />
         </View>
       </KeyboardAvoidingView>
@@ -196,7 +197,7 @@ export function PromotionForm({
             <View style={styles.modalActions}>
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label={t('common.keepEditing', 'Keep Editing')}
+                  label={t('promotions.msg.keepEditing')}
                   variant="secondary"
                   onPress={handleKeepEditing}
                   size="lg"
@@ -206,7 +207,7 @@ export function PromotionForm({
               <View style={styles.modalButtonSpacer} />
               <View style={styles.modalButtonWrapper}>
                 <Button
-                  label={t('common.discard', 'Discard')}
+                  label={t('promotions.msg.discard')}
                   variant="primary"
                   onPress={handleDiscard}
                   size="lg"

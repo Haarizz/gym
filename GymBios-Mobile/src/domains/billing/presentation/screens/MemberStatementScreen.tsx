@@ -201,7 +201,7 @@ export function MemberStatementScreen({
                   variant="caption"
                   style={[styles.chipText, period === key && styles.chipTextActive]}
                 >
-                  {label}
+                  {key === 'all' ? t('common.all') : label}
                 </Typography>
               </Pressable>
             ))}

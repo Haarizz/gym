@@ -8,6 +8,7 @@ import { CurrencyValue } from '@/core/providers';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 export interface MemberReferralData {
   id: string;
@@ -54,26 +55,26 @@ export function ReferralMemberCard({
   };
 
   const handleWhatsAppShare = () => {
-    const msg = `Join our gym with my referral code: ${member.referralCode}! Get exclusive benefits!`;
+    const msg = t('adminReferrals.msg.whatsappMessage', { code: member.referralCode });
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     Linking.canOpenURL(url).then((supported) => {
       if (supported) {
         Linking.openURL(url);
       } else {
-        toast.info(`WhatsApp message prepared:\n${msg}`, {
-          title: 'Sharing'
+        toast.info(t('adminReferrals.msg.whatsappPrepared', { message: msg }), {
+          title: t('adminReferrals.msg.shareTitle')
         });
       }
     });
   };
 
   const handleEmailShare = () => {
-    const subject = 'Join Our Gym - Exclusive Invitation!';
-    const body = `Hi!\n\nJoin our gym using my referral code "${member.referralCode}" or link: https://${member.referralLink}\n\nBest regards,\n${member.memberName}`;
+    const subject = t('adminReferrals.msg.emailSubject');
+    const body = t('adminReferrals.msg.emailBody', { code: member.referralCode, link: member.referralLink, name: member.memberName });
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     Linking.openURL(url).catch(() => {
-      toast.info(`Email invitation:\n${body}`, {
-        title: 'Sharing'
+      toast.info(t('adminReferrals.msg.emailPrepared', { body }), {
+        title: t('adminReferrals.msg.shareTitle')
       });
     });
   };
@@ -96,7 +97,7 @@ export function ReferralMemberCard({
         <View style={[styles.tierBadge, { backgroundColor: tierStyle.bg }]}>
           <Feather name={tierStyle.icon} size={11} color={tierStyle.text} />
           <Typography variant="caption" style={[styles.tierText, { color: tierStyle.text }]}>
-            {member.tier}
+            {translateValue('tier', member.tier)}
           </Typography>
         </View>
       </View>

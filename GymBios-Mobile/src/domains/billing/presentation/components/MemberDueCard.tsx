@@ -9,6 +9,7 @@ import { Typography } from '@/shared/components/Typography';
 import type { MemberDue } from '../../domain/MemberDue';
 import { DueStatus } from '../../domain/MemberDue';
 import { MoneyText } from './MoneyText';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface MemberDueCardProps {
   due: MemberDue;
@@ -18,7 +19,7 @@ interface MemberDueCardProps {
 function formatDate(dateStr?: string) {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return new Date(dateStr).toLocaleDateString(getIntlLocale(), {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -45,7 +46,9 @@ export const MemberDueCard = memo(function MemberDueCard({
       onPress={() => onPress(due)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`Member ${due.memberName}, outstanding ${due.amount}, ${isOverdue ? `${due.daysOverdue} days overdue` : 'due soon'}`}
+      accessibilityLabel={isOverdue
+        ? t('billing.msg.dueA11yOverdue', { name: due.memberName, amount: due.amount, count: due.daysOverdue })
+        : t('billing.msg.dueA11ySoon', { name: due.memberName, amount: due.amount })}
     >
       {/* Left: initials avatar */}
       <View style={[styles.avatar, isOverdue && styles.avatarOverdue]}>

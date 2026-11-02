@@ -10,6 +10,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import { Typography } from '@/shared/components/Typography';
 import type { Staff } from '../../domain/Staff';
 import type { StaffPerformance, StaffPerformanceStatus } from '../../domain/StaffOverview';
+import { translateValue } from '@/core/i18n/format';
 
 interface StaffCardProps {
   staff: Staff;
@@ -51,7 +52,7 @@ export const StaffCard = memo(function StaffCard({
   const achievedText = performance
     ? formatCompactCurrency(performance.revenueAchieved)
     : '—';
-  const targetText = target > 0 ? formatCompactCurrency(target) : 'No target';
+  const targetText = target > 0 ? formatCompactCurrency(target) : t('hr.card.noTarget');
 
   return (
     <Pressable onPress={() => onPress?.(staff)}>
@@ -71,7 +72,7 @@ export const StaffCard = memo(function StaffCard({
                 {staff.name}
               </Typography>
               <Typography variant="caption" color="textSecondary" numberOfLines={1}>
-                {staff.role}{staff.branch ? ` · ${staff.branch}` : ''}
+                {translateValue('role', staff.role)}{staff.branch ? ` · ${staff.branch}` : ''}
               </Typography>
             </View>
           </View>
@@ -160,7 +161,7 @@ export const StaffCard = memo(function StaffCard({
             ]}
             onPress={() => onMessage?.(staff)}
             accessibilityRole="button"
-            accessibilityLabel={`Message ${staff.name}`}
+            accessibilityLabel={t('hr.msg.messageA11y', { name: staff.name })}
           >
             <Feather name="message-circle" size={16} color={theme.text} />
           </Pressable>

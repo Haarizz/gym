@@ -33,6 +33,15 @@ import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 import { PlanCard } from '../components/PlanCard';
 import { PlanDetailSheet } from '../components/PlanDetailSheet';
 import { PlanPurchaseModal } from '../components/PlanPurchaseModal';
+import { AlreadyMemberSheet } from '../components/AlreadyMemberSheet';
+import { MembershipNoticeSheet } from '../components/MembershipNoticeSheet';
+import {
+  getMyGymMemberships,
+  membershipAtGym,
+  membershipsElsewhere,
+  useMyGymMemberships,
+} from '@/domains/gymSwitcher/gymMembershipsApi';
+import { openMembershipAt } from '@/domains/gymSwitcher/openMembership';
 import { TermsAcceptSheet } from '../components/TermsAcceptSheet';
 import { TermsText } from '../components/TermsText';
 import { CENTER_DETAIL_TABS, CenterDetailTabs, type CenterDetailTab } from '../components/CenterDetailTabs';
@@ -97,6 +106,14 @@ export function CenterDetailScreen() {
   const [isPlanDetailVisible, setIsPlanDetailVisible] = useState(false);
   // Plan waiting on the member to accept the branch terms before checkout.
   const [termsPlan, setTermsPlan] = useState<CenterPlan | null>(null);
+  // The member's other memberships, checked before any purchase starts.
+  const { data: myGyms } = useMyGymMemberships();
+  const membershipHere = membershipAtGym(myGyms, tenantSlug);
+  const [showAlreadyMember, setShowAlreadyMember] = useState(false);
+  const [additionalPlan, setAdditionalPlan] = useState<CenterPlan | null>(null);
+  const [additionalGyms, setAdditionalGyms] = useState<string[]>([]);
+  const [additionalConfirmed, setAdditionalConfirmed] = useState(false);
+  const [openingMembership, setOpeningMembership] = useState(false);
   const [activeTab, setActiveTab] = useState<CenterDetailTab>(initialTab);
   const reduceMotion = useReducedMotion();
   // -1/1 while a panel enters from the left/right, settling at 0.
@@ -258,8 +275,45 @@ export function CenterDetailScreen() {
 
   const branchTerms = details?.termsAndPolicies?.trim() || '';
 
-  // Every purchase path goes through here: a branch with terms shows them first.
-  const handleSelectPlan = (plan: CenterPlan) => {
+  // Every purchase path goes through here. A gym the member already belongs to isn't
+  // bought again: they manage that membership instead. Joining a gym while holding a
+  // membership elsewhere asks first, since it adds a separate membership.
+  const handleSelectPlan = async (plan: CenterPlan) => {
+    const gyms = await getMyGymMemberships();
+    if (membershipAtGym(gyms, tenantSlug)) {
+      setShowAlreadyMember(true);
+      return;
+    }
+    const elsewhere = membershipsElsewhere(gyms, tenantSlug);
+    if (elsewhere.length > 0 && !additionalConfirmed) {
+      setAdditionalGyms(elsewhere.map((g) => g.gymName));
+      setAdditionalPlan(plan);
+      return;
+    }
+    showTermsOrPurchase(plan);
+  };
+
+  const handleConfirmAdditional = () => {
+    const plan = additionalPlan;
+    setAdditionalPlan(null);
+    setAdditionalConfirmed(true);
+    if (!plan) return;
+    // Brief delay so the sheet animates out before the next one opens.
+    setTimeout(() => showTermsOrPurchase(plan), 280);
+  };
+
+  const handleManageMembership = async () => {
+    if (!membershipHere || openingMembership) return;
+    setOpeningMembership(true);
+    try {
+      await openMembershipAt(membershipHere);
+    } finally {
+      setOpeningMembership(false);
+    }
+  };
+
+  // A branch with terms shows them first.
+  const showTermsOrPurchase = (plan: CenterPlan) => {
     if (branchTerms) {
       setTermsPlan(plan);
       return;
@@ -300,14 +354,14 @@ export function CenterDetailScreen() {
   const handleSubscribeFromSheet = (plan: CenterPlan) => {
     setIsPlanDetailVisible(false);
     // Brief delay so the sheet animates out before the modal opens.
-    setTimeout(() => handleSelectPlan(plan), 280);
+    setTimeout(() => void handleSelectPlan(plan), 280);
   };
 
   // With a single plan there's nothing to choose, so go straight to checkout;
   // otherwise show the plans to pick from.
   const handleBuyMembership = () => {
     if (plans && plans.length === 1) {
-      handleSelectPlan(plans[0]);
+      void handleSelectPlan(plans[0]);
       return;
     }
     selectTab('plans');
@@ -697,18 +751,29 @@ export function CenterDetailScreen() {
           pointerEvents="none"
         />
         <Pressable
-          onPress={handleBuyMembership}
+          onPress={membershipHere ? handleManageMembership : handleBuyMembership}
           style={({ pressed }) => [styles.ctaWrapper, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={t('centers.detail.subscribeA11y', { name: details.centerName })}
+          accessibilityLabel={
+            membershipHere
+              ? t('centers.membership.manageA11y', { name: details.centerName })
+              : t('centers.detail.subscribeA11y', { name: details.centerName })
+          }
+          accessibilityState={{ busy: openingMembership }}
         >
           <LinearGradient
-            colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
+            colors={membershipHere ? [BrandColors.teal, BrandColors.tealDark] : [BrandColors.memberGold, BrandColors.trainerAmber]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.ctaButton}
           >
-            <Text style={styles.ctaText}>{t('centers.detail.subscribe')}</Text>
+            {openingMembership ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.ctaText}>
+                {membershipHere ? t('centers.membership.manageMine') : t('centers.detail.subscribe')}
+              </Text>
+            )}
           </LinearGradient>
         </Pressable>
       </View>
@@ -739,6 +804,28 @@ export function CenterDetailScreen() {
         centerName={details.centerName}
         onClose={() => setTermsPlan(null)}
         onAccept={handleAcceptTerms}
+      />
+
+      <AlreadyMemberSheet
+        visible={showAlreadyMember}
+        centerName={details.centerName}
+        centerBranchId={branchId}
+        membership={membershipHere ?? null}
+        onClose={() => setShowAlreadyMember(false)}
+      />
+
+      <MembershipNoticeSheet
+        visible={!!additionalPlan}
+        icon="plus-circle"
+        title={t('centers.membership.addTitle')}
+        body={t('centers.membership.addBody', {
+          gyms: additionalGyms.join(', '),
+          center: details.centerName,
+        })}
+        primaryLabel={t('centers.membership.addContinue')}
+        onPrimary={handleConfirmAdditional}
+        secondaryLabel={t('centers.membership.cancel')}
+        onClose={() => setAdditionalPlan(null)}
       />
     </Animated.View>
   );

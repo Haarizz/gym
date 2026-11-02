@@ -24,10 +24,10 @@ export function ReferralAnalyticsFunnel({ data }: ReferralAnalyticsFunnelProps) 
   const redeemedPct = total > 0 ? Math.round((redeemed / total) * 100) : 0;
 
   const stages = [
-    { label: 'Referrals Created', count: total, pct: 100, color: BrandColors.teal },
-    { label: 'Signed Up (Successful)', count: successful, pct: successfulPct, color: '#16a34a' },
-    { label: 'Payment Recorded', count: paid, pct: paidPct, color: '#2563eb' },
-    { label: 'Reward Redeemed', count: redeemed, pct: redeemedPct, color: '#9333ea' },
+    { label: t('adminReferrals.funnel.created'), count: total, pct: 100, color: BrandColors.teal },
+    { label: t('adminReferrals.funnel.signedUp'), count: successful, pct: successfulPct, color: '#16a34a' },
+    { label: t('adminReferrals.funnel.paid'), count: paid, pct: paidPct, color: '#2563eb' },
+    { label: t('adminReferrals.funnel.redeemed'), count: redeemed, pct: redeemedPct, color: '#9333ea' },
   ];
 
   return (

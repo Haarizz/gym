@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "Kostenlose Personal-Training-Sitzung",
     "freePt": "Gratis-PT",
     "claimCredit": "Guthaben beanspruchen",
-    "bookPtSession": "PT-Sitzung buchen"
+    "bookPtSession": "PT-Sitzung buchen",
+    "hub": {
+      "overview": {
+        "title": "Übersicht",
+        "description": "Zusammenfassung des Empfehlungsprogramms und letzte Aktivitäten"
+      },
+      "members": {
+        "title": "Mitglieder",
+        "description": "Mitglieder und ihre Empfehlungsleistung ansehen"
+      },
+      "activity": {
+        "title": "Aktivität",
+        "description": "Empfehlungsaktivität verfolgen und verwalten"
+      },
+      "my-rewards": {
+        "title": "Meine Prämien",
+        "description": "Von Mitgliedern verdiente Prämien ansehen"
+      },
+      "reward-queue": {
+        "title": "Prämien-Warteschlange",
+        "description": "Ausstehende Prämieneinlösungen prüfen"
+      },
+      "reward-rules": {
+        "title": "Prämienregeln",
+        "description": "Prämienregeln für Empfehlungen verwalten"
+      },
+      "analytics": {
+        "title": "Analysen",
+        "description": "Empfehlungskonversion und -leistung analysieren"
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "description": "Empfehlungsprogramm konfigurieren"
+      }
+    },
+    "header": {
+      "title": "Empfehlungen",
+      "subtitle": "Empfehlungsprogramme und Prämien der Mitglieder verfolgen und verwalten"
+    },
+    "funnel": {
+      "created": "Erstellte Empfehlungen",
+      "signedUp": "Angemeldet (erfolgreich)",
+      "paid": "Zahlung erfasst",
+      "redeemed": "Prämie eingelöst"
+    },
+    "insights": {
+      "conversionTitle": "Konversionsrate",
+      "conversionText": "{{rate}} % der Empfehlungen werden zu erfolgreichen Anmeldungen ({{successful}} von {{total}}).",
+      "topRuleTitle": "Meistgenutzte Regel",
+      "topRuleText_one": "„{{name}}“ wurde auf {{count}} Empfehlung angewendet.",
+      "topRuleText_other": "„{{name}}“ wurde auf {{count}} Empfehlungen angewendet.",
+      "noRules": "Es wurden noch keine Prämienregeln auf Empfehlungen angewendet.",
+      "redemptionTitle": "Prämieneinlösung",
+      "redemptionText": "{{rate}} % der erfolgreichen Empfehlungen haben ihre Prämie eingelöst ({{redeemed}} von {{successful}})."
+    },
+    "stats": {
+      "total": "Empfehlungen gesamt",
+      "totalSub": "Alle erfassten Empfehlungen",
+      "successful": "Erfolgreich",
+      "successfulSub": "Konvertierte Empfehlungen",
+      "conversion": "Konversion",
+      "conversionSub": "Erfolgsquote der Empfehlungen",
+      "rewards": "Prämien gesamt",
+      "rewardsSub": "Ausgezahlte Prämien",
+      "programs": "Aktive Programme",
+      "programsSub": "Laufende Regeln",
+      "avgReward": "Ø Prämie",
+      "avgRewardSub": "Durchschnitt pro Empfehlung"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "Wallet-Guthaben",
+      "MEMBERSHIP_EXTENSION": "Mitgliedschaftsverlängerung",
+      "MEMBERSHIP_DISCOUNT": "Mitgliedschaftsrabatt",
+      "FREE_PT": "Kostenloses PT",
+      "FREE_CLASS": "Kostenloser Kurs",
+      "COUPON": "Gutschein",
+      "LOYALTY_POINTS": "Treuepunkte",
+      "GIFT": "Geschenk",
+      "CASH": "Bargeld"
+    },
+    "queue": {
+      "approveTitle": "Prämie genehmigen?",
+      "rejectTitle": "Prämie ablehnen?",
+      "redeemTitle": "Prämie als eingelöst markieren?",
+      "approved": "Prämie {{code}} genehmigt.",
+      "rejected": "Prämie {{code}} abgelehnt.",
+      "redeemed": "Prämie {{code}} als eingelöst markiert.",
+      "noRewards": "Noch keine Prämien erstellt.",
+      "noMatch": "Keine Prämien entsprechen diesem Filter.",
+      "days_one": "{{count}} Tag",
+      "days_other": "{{count}} Tage",
+      "points": "{{value}} Pkt."
+    },
+    "msg": {
+      "unknownReferrer": "Unbekannter Empfehlender",
+      "unknownReferee": "Unbekannter Empfohlener",
+      "unknownMember": "Unbekanntes Mitglied",
+      "viewDetails": "Empfehlungsdetails ansehen",
+      "editReferral": "Empfehlung bearbeiten",
+      "markSuccessfulA11y": "Empfehlung als erfolgreich markieren",
+      "deleteReferralA11y": "Empfehlung löschen",
+      "markedSuccessful": "Empfehlung als erfolgreich markiert.",
+      "markedExpired": "Empfehlung als abgelaufen markiert.",
+      "statusUpdateFailed": "Empfehlungsstatus konnte nicht aktualisiert werden.",
+      "namesRequired": "Bitte gib den Namen des Empfehlenden und der empfohlenen Person ein.",
+      "updated": "Empfehlung erfolgreich aktualisiert.",
+      "updateFailed": "Empfehlung konnte nicht aktualisiert werden.",
+      "created": "Empfehlung erfolgreich erfasst.",
+      "createFailed": "Empfehlung konnte nicht erstellt werden.",
+      "editTitle": "Empfehlung bearbeiten",
+      "addTitle": "Empfehlung hinzufügen",
+      "selectMember": "Mitglied auswählen...",
+      "selectMemberOrType": "Mitglied auswählen oder unten eingeben...",
+      "deleteTitle": "Empfehlung löschen",
+      "deleteBody": "Möchtest du die Empfehlung für {{name}} wirklich löschen?",
+      "deleted": "Empfehlung gelöscht.",
+      "deletedTitle": "Gelöscht",
+      "deleteFailed": "Empfehlung konnte nicht gelöscht werden.",
+      "refreshed": "Daten aktualisiert und Prämien korrigiert.",
+      "refreshedTitle": "Aktualisiert",
+      "refreshFailed": "Daten konnten nicht aktualisiert werden.",
+      "refreshFailedTitle": "Aktualisierung fehlgeschlagen",
+      "csvGenerated": "CSV-Bericht mit {{count}} Einträgen erstellt.",
+      "csvTitle": "CSV-Export",
+      "settingsSaved": "Programmeinstellungen gespeichert.",
+      "settingsFailed": "Einstellungen konnten nicht gespeichert werden.",
+      "codeCopied": "Empfehlungscode „{{code}}“ kopiert.",
+      "linkCopied": "Empfehlungslink „{{link}}“ kopiert.",
+      "allTiers": "Alle Stufen",
+      "redeemed": "{{label}} erfolgreich eingelöst.",
+      "redeemFailed": "Prämie konnte nicht eingelöst werden.",
+      "noPhone": "Kein Telefon",
+      "standardPlan": "Standard",
+      "ptSession": "PT-Einheit",
+      "walletCredit": "Wallet-Guthaben",
+      "shareTitle": "Teilen",
+      "whatsappMessage": "Werde Mitglied in unserem Studio mit meinem Empfehlungscode: {{code}}! Sichere dir exklusive Vorteile!",
+      "whatsappPrepared": "WhatsApp-Nachricht vorbereitet:\n{{message}}",
+      "emailSubject": "Werde Mitglied – exklusive Einladung!",
+      "emailBody": "Hallo!\n\nWerde Mitglied in unserem Studio mit meinem Empfehlungscode „{{code}}“ oder über den Link: https://{{link}}\n\nViele Grüße\n{{name}}",
+      "emailPrepared": "E-Mail-Einladung:\n{{body}}",
+      "payment": "Zahlung"
+    }
   },
 } satisfies LocaleResource;
 

@@ -263,7 +263,7 @@ export function AttendanceHubScreen({
         {/* ── Quick Stats ── */}
         <View style={styles.quickStatsCard}>
           <Typography variant="bodySmallBold" style={styles.quickStatsTitle}>
-            {t('common.quickStats', { defaultValue: 'Quick Stats' })}
+            {t('attendance.misc.quickStats')}
           </Typography>
           <View style={styles.quickStatsGrid}>
             <View style={styles.quickStat}>

@@ -130,3 +130,51 @@ export function formatClockTime(timeStr: string | null | undefined): string {
 export function tOr(key: string, fallback: string): string {
   return i18n.exists(key) ? (i18n.t(key as never) as string) : fallback;
 }
+
+export type ValueGroup =
+  | 'status'
+  | 'role'
+  | 'paymentMethod'
+  | 'priority'
+  | 'channel'
+  | 'gender'
+  | 'relation'
+  | 'membershipType'
+  | 'tier'
+  | 'department'
+  | 'shift';
+
+/** "Bank Transfer" / "BANK_TRANSFER" / "bank-transfer" → "bank_transfer". */
+function valueKey(raw: string): string {
+  return raw
+    .trim()
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Translates a value that arrives as English text or an enum (a status, role,
+ * payment method, …) using `shared.values.<group>.<key>`. Unknown values — a
+ * gym's custom role name, say — come back unchanged; `fallback` is used when the
+ * value is empty.
+ */
+export function translateValue(group: ValueGroup, raw: string | null | undefined, fallback = ''): string {
+  if (!raw) return fallback;
+  return tOr(`shared.values.${group}.${valueKey(raw)}`, raw);
+}
+
+/**
+ * Relabels `{ label, value }` option lists built from English constants: each
+ * option's value is looked up under `shared.values.<group>` (or under `prefix`
+ * when given, e.g. `followUps.outcomes`), keeping the English label when no
+ * translation exists. Options with an empty value ("All …") are left to the caller.
+ */
+export function localizeOptions<T extends { label: string; value: string }>(
+  options: readonly T[],
+  group: ValueGroup | { prefix: string },
+): T[] {
+  const prefix = typeof group === 'string' ? `shared.values.${group}` : group.prefix;
+  return options.map((o) => (o.value ? { ...o, label: tOr(`${prefix}.${valueKey(o.value)}`, o.label) } : o));
+}

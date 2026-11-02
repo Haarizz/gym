@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "الإحصائيات",
     "tryAgain": "إعادة المحاولة",
     "clearFilters": "مسح الفلاتر",
-    "createPromotion": "إنشاء عرض"
+    "createPromotion": "إنشاء عرض",
+    "opts": {
+      "types": {
+        "all": "جميع الأنواع",
+        "discount": "خصم",
+        "voucher": "قسيمة",
+        "combo": "باقة مجمعة",
+        "bogo": "اشترِ واحداً واحصل على آخر",
+        "seasonal": "موسمي",
+        "loyalty": "ولاء",
+        "promotional_access_days": "أيام وصول ترويجية",
+        "promo": "عرض"
+      },
+      "categories": {
+        "all": "جميع الفئات",
+        "membership": "العضوية",
+        "services": "الخدمات",
+        "special_events": "فعاليات خاصة",
+        "loyalty": "الولاء",
+        "demographics": "الفئات السكانية"
+      },
+      "discountTypes": {
+        "percentage": "نسبة مئوية",
+        "fixed": "مبلغ ثابت",
+        "free": "مجاني / اشترِ واحداً واحصل على آخر",
+        "promotional_access_days": "أيام وصول ترويجية"
+      },
+      "priorities": {
+        "1": "عالية (1)",
+        "2": "متوسطة (2)",
+        "3": "منخفضة (3)"
+      },
+      "audience": {
+        "all": "جميع الأعضاء",
+        "new_members": "الأعضاء الجدد",
+        "existing_members": "الأعضاء الحاليون",
+        "vip": "أعضاء VIP",
+        "specific": "أعضاء محددون"
+      },
+      "channels": {
+        "website": "الموقع الإلكتروني",
+        "app": "تطبيق الجوال",
+        "email": "البريد الإلكتروني",
+        "sms": "رسالة نصية",
+        "in_person": "حضورياً"
+      },
+      "allStatus": "جميع الحالات"
+    },
+    "steps": {
+      "basic": "المعلومات الأساسية",
+      "discount": "الخصم",
+      "targeting": "الاستهداف",
+      "settings": "الإعدادات"
+    },
+    "msg": {
+      "createTitle": "إنشاء عرض جديد",
+      "editTitle": "تعديل العرض",
+      "createSubmit": "إنشاء العرض",
+      "keepEditing": "متابعة التعديل",
+      "discard": "تجاهل",
+      "saveFailed": "تعذر حفظ العرض. يرجى التحقق من البيانات والمحاولة مرة أخرى.",
+      "shareCode": "استخدم رمز العرض \"{{code}}\" للحصول على {{discount}}!",
+      "duplicated": "تم إنشاء نسخة من \"{{name}}\".",
+      "duplicateFailed": "تعذر نسخ العرض.",
+      "deleteTitle": "حذف العرض",
+      "deleteBody": "هل أنت متأكد من حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+      "deleted": "تم حذف \"{{name}}\".",
+      "deleteFailed": "تعذر حذف العرض.",
+      "system": "النظام",
+      "normal": "عادية",
+      "noEndDate": "لا يوجد تاريخ انتهاء",
+      "percentOff": "خصم {{value}}%",
+      "amountOff": "خصم {{value}}",
+      "offSuffix": " خصم",
+      "specialOffer": "عرض خاص",
+      "revenueSuffix": " إيرادات",
+      "maxDiscount": "الحد الأقصى للخصم ({{currency}})"
+    }
   }
 };
 

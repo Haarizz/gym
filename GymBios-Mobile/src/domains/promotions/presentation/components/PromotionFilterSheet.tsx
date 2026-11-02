@@ -5,6 +5,7 @@ import { Text } from '@/shared/components/AppText';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
+import { localizeOptions } from '@/core/i18n/format';
 
 export interface PromotionFilterState {
   status: string;
@@ -99,7 +100,7 @@ export function PromotionFilterSheet({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('promotions.status')}</Text>
           <View style={styles.chipRow}>
-            {STATUS_OPTIONS.map((opt) => (
+            {localizeOptions(STATUS_OPTIONS, 'status').map((o) => (o.value === 'all' ? { ...o, label: t('promotions.opts.allStatus') } : o)).map((opt) => (
               <Pressable
                 key={opt.value}
                 style={[
@@ -125,7 +126,7 @@ export function PromotionFilterSheet({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('promotions.promoType')}</Text>
           <View style={styles.chipRow}>
-            {TYPE_OPTIONS.map((opt) => (
+            {localizeOptions(TYPE_OPTIONS, { prefix: 'promotions.opts.types' }).map((opt) => (
               <Pressable
                 key={opt.value}
                 style={[
@@ -151,7 +152,7 @@ export function PromotionFilterSheet({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('promotions.category')}</Text>
           <View style={styles.chipRow}>
-            {CATEGORY_OPTIONS.map((opt) => (
+            {localizeOptions(CATEGORY_OPTIONS, { prefix: 'promotions.opts.categories' }).map((opt) => (
               <Pressable
                 key={opt.value}
                 style={[

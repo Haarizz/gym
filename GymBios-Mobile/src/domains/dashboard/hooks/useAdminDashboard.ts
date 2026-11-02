@@ -81,11 +81,32 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
 };
 
 const HIGHLIGHT_I18N_KEYS: Record<string, string> = {
+  'staff-attendance': 'dashboard.admin.highlights.staffAttendance',
+  footfall: 'dashboard.admin.highlights.footfall',
   'renewals-due': 'dashboard.admin.highlights.renewalsDue',
   'pending-follow-ups': 'dashboard.admin.highlights.pendingFollowUps',
   'expiring-soon': 'dashboard.admin.highlights.expiringSoon',
   'birthdays-today': 'dashboard.admin.highlights.birthdaysToday',
 };
+
+// The backend sends values as English "<count> <unit>" text ("3 visits");
+// the unit is re-rendered here as a pluralised translation of the count.
+const HIGHLIGHT_UNIT_I18N_KEYS: Record<string, string> = {
+  footfall: 'dashboard.admin.highlights.visits',
+  'renewals-due': 'dashboard.admin.highlights.members',
+  'pending-follow-ups': 'dashboard.admin.highlights.leads',
+};
+
+// Alert text also arrives as English sentences; rebuild it from the numbers
+// it carries, keyed by the alert type.
+const ALERT_I18N_KEYS: Record<string, string> = {
+  membership_expiry: 'dashboard.admin.alerts.membershipExpiry',
+  follow_up: 'dashboard.admin.alerts.followUpsPending',
+};
+
+function extractNumbers(text: string): number[] {
+  return (text.match(/\d+/g) ?? []).map((n) => parseInt(n, 10));
+}
 
 export const adminDashboardKeys = {
   all: ['dashboard', 'admin'] as const,
@@ -118,15 +139,35 @@ function mapPaymentMix(api: AdminDashboardResponseApi): AdminPaymentMixItem[] {
 }
 
 function mapAlerts(api: AdminDashboardResponseApi): AdminAlertItem[] {
-  return api.alerts.map((a) => ({ text: a.text, urgent: a.urgent }));
+  return api.alerts.map((a) => {
+    const key = ALERT_I18N_KEYS[a.type];
+    const [count, days] = extractNumbers(a.text);
+    if (!key || count === undefined || !i18n.exists(`${key}_other`)) {
+      return { text: a.text, urgent: a.urgent };
+    }
+    return { text: String(i18n.t(key as never, { count, days } as never)), urgent: a.urgent };
+  });
 }
 
 function mapHighlights(api: AdminDashboardResponseApi): AdminOperationalHighlight[] {
-  return api.operational_highlights.map((h) => ({
-    label: HIGHLIGHT_I18N_KEYS[h.id] ? tOr(HIGHLIGHT_I18N_KEYS[h.id], h.label) : h.label,
-    value: h.value,
-    color: parseInt(h.value, 10) > 0 ? HIGHLIGHT_COLORS[h.id] : undefined,
-  }));
+  const isTodayRange = api.from === api.to && isToday(new Date(`${api.from}T00:00:00`));
+  return api.operational_highlights.map((h) => {
+    const labelKey =
+      h.id === 'footfall' && isTodayRange
+        ? 'dashboard.admin.highlights.todaysFootfall'
+        : HIGHLIGHT_I18N_KEYS[h.id];
+    const count = parseInt(h.value, 10);
+    const unitKey = HIGHLIGHT_UNIT_I18N_KEYS[h.id];
+    const value =
+      unitKey && !Number.isNaN(count) && i18n.exists(`${unitKey}_other`)
+        ? String(i18n.t(unitKey as never, { count } as never))
+        : h.value;
+    return {
+      label: labelKey ? tOr(labelKey, h.label) : h.label,
+      value,
+      color: count > 0 ? HIGHLIGHT_COLORS[h.id] : undefined,
+    };
+  });
 }
 
 function formatDateText(fromIso: string, toIso: string): string {

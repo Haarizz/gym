@@ -93,6 +93,33 @@ const attendance = {
       done: 'Done',
       completed: 'Completed',
     },
+    "summary": {
+      "title": "Summary",
+      "totalCheckIns": "Total Check-ins",
+      "avgDaily": "Avg Daily",
+      "rate": "Rate",
+      "peakHour": "Peak Hour",
+      "activeMembers": "Active Members",
+      "daysInRange": "Days in Range"
+    },
+    "periods": {
+      "7d": "7 Days",
+      "30d": "30 Days",
+      "90d": "90 Days",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "this-week": "This Week"
+    },
+    "misc": {
+      "insights": "Insights",
+      "other": "Other",
+      "open": "Open",
+      "quickStats": "Quick Stats",
+      "noStaffClockedIn": "No staff clocked in",
+      "noStaffClockedInDesc": "No staff or trainer attendance records found for today.",
+      "visitor": "Visitor",
+      "user": "User"
+    }
   },
 };
 

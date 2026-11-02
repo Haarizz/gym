@@ -22,6 +22,7 @@ import { useAddLeadInteraction } from '../../hooks/useLeadMutations';
 import { useLead } from '../../hooks/useLeads';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface LeadDetailsSheetProps {
   visible: boolean;
@@ -461,7 +462,7 @@ export function LeadDetailsSheet({
                       {item.type}
                     </Text>
                     <Text style={[styles.historyDate, { color: theme.textSecondary }]}>
-                      {item.date ? new Date(item.date).toLocaleDateString() : ''}
+                      {item.date ? new Date(item.date).toLocaleDateString(getIntlLocale()) : ''}
                     </Text>
                   </View>
                   <Text style={[styles.historyNotes, { color: theme.textSecondary }]}>

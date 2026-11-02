@@ -19,6 +19,8 @@ export interface HeaderConfig {
   subtitle: string;
   headerColors: string[];
   activeColor: string;
+  /** Bottom tab bar gradient, top to bottom. */
+  navColors: readonly [string, string];
 }
 
 export const ADMIN_TABS: TabConfig[] = [
@@ -59,6 +61,7 @@ export const ADMIN_HEADER: HeaderConfig = {
   subtitle: 'Command Center',
   headerColors: [BrandColors.teal, BrandColors.teal],
   activeColor: BrandColors.teal,
+  navColors: ['#2F7A68', '#1E5446'],
 };
 
 export const MEMBER_HEADER: HeaderConfig = {
@@ -66,6 +69,7 @@ export const MEMBER_HEADER: HeaderConfig = {
   subtitle: 'Your Fitness Journey',
   headerColors: [BrandColors.memberGold, BrandColors.trainerAmber],
   activeColor: BrandColors.memberGold,
+  navColors: ['#F5C742', '#DDA623'],
 };
 
 export const TRAINER_HEADER: HeaderConfig = {
@@ -73,6 +77,7 @@ export const TRAINER_HEADER: HeaderConfig = {
   subtitle: 'Coach Portal',
   headerColors: [BrandColors.trainerAmber, '#ea580c'],
   activeColor: BrandColors.trainerAmber,
+  navColors: ['#F97316', '#C2410C'],
 };
 
 export const STAFF_HEADER: HeaderConfig = {
@@ -80,4 +85,5 @@ export const STAFF_HEADER: HeaderConfig = {
   subtitle: 'Front Desk',
   headerColors: [BrandColors.teal, BrandColors.tealDark],
   activeColor: BrandColors.teal,
+  navColors: ['#1F4F4A', '#0F2F2C'],
 };

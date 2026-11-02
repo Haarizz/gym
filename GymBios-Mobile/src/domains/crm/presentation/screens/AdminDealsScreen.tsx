@@ -17,6 +17,7 @@ import { useReferrals } from '@/domains/referrals/hooks/useReferrals';
 import { useMembershipPlans } from '@/domains/membershipPlans';
 import type { MembershipPlan } from '@/domains/membershipPlans';
 import { formatCompactCurrency, formatCount } from '@/domains/dashboard/utils/adminDashboardFormat';
+import { getIntlLocale, translateValue } from '@/core/i18n/format';
 
 // Local yyyy-MM-dd, matching the date-only format the backend sends.
 function todayIso(): string {
@@ -179,7 +180,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
                         <Text style={styles.detailValue}>
-                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString() : t('crm.noExpiry')}
+                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString(getIntlLocale()) : t('crm.noExpiry')}
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
@@ -253,7 +254,7 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
                           <Text style={styles.detailValue}>
-                            {deal.endDate ? new Date(deal.endDate).toLocaleDateString() : t('crm.noExpiry')}
+                            {deal.endDate ? new Date(deal.endDate).toLocaleDateString(getIntlLocale()) : t('crm.noExpiry')}
                           </Text>
                         </View>
                         <View style={styles.detailRow}>
@@ -304,20 +305,20 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                 {referralsList.map((referral) => (
                   <View key={referral.id} style={styles.referralCard}>
                     <View style={styles.referralHeader}>
-                      <Text style={styles.referralCode}>{referral.referralCode || 'N/A'}</Text>
+                      <Text style={styles.referralCode}>{referral.referralCode || '—'}</Text>
                       <Text style={styles.referralOwner}>{referral.referrerName || t('crm.unknown')}</Text>
                     </View>
                     <View style={styles.referralMetrics}>
                       <View style={styles.referralMetricBox}>
                         <Text style={styles.referralMetricLabel}>{t('crm.status')}</Text>
                         <Text style={styles.referralMetricValue}>
-                          {referral.status ? referral.status.charAt(0).toUpperCase() + referral.status.slice(1) : t('crm.unknown')}
+                          {translateValue('status', referral.status, t('crm.unknown'))}
                         </Text>
                       </View>
                       <View style={styles.referralMetricBox}>
                         <Text style={styles.referralMetricLabel}>{t('crm.date')}</Text>
                         <Text style={styles.referralMetricValue}>
-                          {referral.date ? new Date(referral.date).toLocaleDateString() : 'N/A'}
+                          {referral.date ? new Date(referral.date).toLocaleDateString(getIntlLocale()) : '—'}
                         </Text>
                       </View>
                       {referral.rewardAmount !== undefined && referral.rewardAmount !== null ? (

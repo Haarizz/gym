@@ -33,24 +33,24 @@ export function ReferralInsightCard({ data }: ReferralInsightCardProps) {
 
   const insights = [
     {
-      title: 'Conversion Rate',
-      text: `${conversionRate}% of referrals become successful signups (${successfulCount} of ${totalCount}).`,
+      title: t('adminReferrals.insights.conversionTitle'),
+      text: t('adminReferrals.insights.conversionText', { rate: conversionRate, successful: successfulCount, total: totalCount }),
       icon: 'trending-up' as const,
       color: '#2563eb',
       bg: '#eff6ff',
     },
     {
-      title: 'Most-Used Rule',
+      title: t('adminReferrals.insights.topRuleTitle'),
       text: topRuleName
-        ? `"${topRuleName}" has been applied to ${topRuleCount} referral${topRuleCount === 1 ? '' : 's'}.`
-        : 'No reward rules have been applied to any referral yet.',
+        ? t('adminReferrals.insights.topRuleText', { name: topRuleName, count: topRuleCount })
+        : t('adminReferrals.insights.noRules'),
       icon: 'users' as const,
       color: '#9333ea',
       bg: '#faf5ff',
     },
     {
-      title: 'Reward Redemption',
-      text: `${redemptionRate}% of successful referrals have redeemed their reward (${redeemedCount} of ${successfulCount}).`,
+      title: t('adminReferrals.insights.redemptionTitle'),
+      text: t('adminReferrals.insights.redemptionText', { rate: redemptionRate, redeemed: redeemedCount, successful: successfulCount }),
       icon: 'gift' as const,
       color: '#ea580c',
       bg: '#fff7ed',

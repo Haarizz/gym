@@ -11,11 +11,21 @@ interface AdminKpiGridProps {
   onSelectKpi: (reportId: AdminReportType) => void;
 }
 
+const UP = '#16A34A';
+const DOWN = '#DC2626';
+const FLAT = '#94A3B8';
+
+/** "+0.0%", "0%", "-0.0%" etc. read as no change and render neutral. */
+function isFlat(change: string) {
+  return !/[1-9]/.test(change);
+}
+
 export function AdminKpiGrid({ kpis, onSelectKpi }: AdminKpiGridProps) {
   return (
     <View style={styles.grid}>
       {kpis.map((kpi) => {
-        const isUp = kpi.trend === 'up';
+        const flat = isFlat(kpi.change);
+        const trendColor = flat ? FLAT : kpi.trend === 'up' ? UP : DOWN;
         const isClickable = kpi.clickable;
 
         return (
@@ -30,37 +40,29 @@ export function AdminKpiGrid({ kpis, onSelectKpi }: AdminKpiGridProps) {
             accessibilityRole={isClickable ? 'button' : 'none'}
             accessibilityLabel={`${kpi.label}, ${kpi.valueText}, ${kpi.change}`}
           >
-            <GlassSurface radius={Radius.lg} style={styles.card}>
-              {/* Icon Box */}
-              <View style={[styles.iconBox, { backgroundColor: kpi.color }]}>
-                <FeatherIcon name={kpi.icon as any} size={18} color="#FFFFFF" />
+            <GlassSurface radius={Radius.md} style={styles.card}>
+              <View style={styles.labelRow}>
+                <FeatherIcon name={kpi.icon as any} size={13} color={kpi.color} />
+                <Text style={styles.label} numberOfLines={1}>
+                  {kpi.label}
+                </Text>
               </View>
 
-              {/* Label */}
-              <Text style={styles.label} numberOfLines={1}>
-                {kpi.label}
+              <Text style={styles.value} numberOfLines={1}>
+                {kpi.value}
               </Text>
 
-              {/* Value & Trend Row */}
-              <View style={styles.valueRow}>
-                <Text style={styles.value} numberOfLines={1}>
-                  {kpi.value}
-                </Text>
-                <View style={styles.trendBox}>
+              <View style={styles.trendRow}>
+                {!flat && (
                   <Feather
-                    name={isUp ? 'arrow-up-right' : 'arrow-down-right'}
-                    size={14}
-                    color={isUp ? '#16A34A' : '#DC2626'}
+                    name={kpi.trend === 'up' ? 'arrow-up-right' : 'arrow-down-right'}
+                    size={11}
+                    color={trendColor}
                   />
-                  <Text
-                    style={[
-                      styles.changeText,
-                      { color: isUp ? '#16A34A' : '#DC2626' },
-                    ]}
-                  >
-                    {kpi.change}
-                  </Text>
-                </View>
+                )}
+                <Text style={[styles.changeText, { color: trendColor }]}>
+                  {flat ? '—' : kpi.change}
+                </Text>
               </View>
             </GlassSurface>
           </Pressable>
@@ -80,44 +82,36 @@ const styles = StyleSheet.create({
     width: '48.5%',
   },
   card: {
-    padding: Spacing.three + 2,
+    paddingVertical: Spacing.two + 4,
+    paddingHorizontal: Spacing.three,
+    gap: 4,
   },
   cardPressed: {
     opacity: 0.85,
-    transform: [{ scale: 0.98 }],
   },
-  iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+  labelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.two + 2,
+    gap: 6,
   },
   label: {
+    flex: 1,
     fontSize: 12,
     color: '#64748B',
-    marginBottom: 4,
     fontWeight: '500',
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
   },
   value: {
     fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
-    flex: 1,
   },
-  trendBox: {
+  trendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
   changeText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });

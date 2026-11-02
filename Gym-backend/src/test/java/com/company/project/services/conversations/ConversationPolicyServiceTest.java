@@ -275,6 +275,30 @@ class ConversationPolicyServiceTest {
         assertEquals(MINOR, policy.teamCardVerdict(minor, trainer, true).code());
     }
 
+    @Test
+    @DisplayName("Staff member list: matches canStaffStart, and an existing thread is always openable")
+    void staffDirectory() {
+        Verdict ok = policy.staffStartLevel(trainer, BRANCH, NOW);
+        assertTrue(ok.allowed());
+        assertTrue(policy.staffDirectoryVerdict(ok, member, BRANCH, false).allowed());
+
+        member.setAllowStaffChats(false);
+        assertEquals(MEMBER_OPTED_OUT, policy.staffDirectoryVerdict(ok, member, BRANCH, false).code());
+        assertEquals(policy.canStaffStart(trainer, member, BRANCH, NOW).code(),
+                policy.staffDirectoryVerdict(ok, member, BRANCH, false).code());
+        assertTrue(policy.staffDirectoryVerdict(ok, member, BRANCH, true).allowed());
+
+        member.setIsMinor(true);
+        assertEquals(MEMBER_UNAVAILABLE, policy.staffDirectoryVerdict(ok, member, BRANCH, false).code());
+
+        when(conversationRepository.countByStartedByStaffIdAndCreatedAtGreaterThanEqual(eq(12L), any()))
+                .thenReturn((long) STAFF_DAILY_NEW_CONVERSATIONS);
+        Verdict capped = policy.staffStartLevel(trainer, BRANCH, NOW);
+        assertEquals(DAILY_LIMIT, capped.code());
+        assertEquals(DAILY_LIMIT, policy.staffDirectoryVerdict(capped, member, BRANCH, false).code());
+        assertTrue(policy.staffDirectoryVerdict(capped, member, BRANCH, true).allowed());
+    }
+
     // ── Who's who ───────────────────────────────────────────────────────────
 
     @Test

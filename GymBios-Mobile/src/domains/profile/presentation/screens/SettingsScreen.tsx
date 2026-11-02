@@ -7,6 +7,9 @@ import { getLanguage, useLanguageStore } from '@/core/i18n';
 import { BrandColors, Spacing } from '@/core/theme';
 import { useFontSizeStore } from '@/core/theme/fontSizeStore';
 import { GlassBlob, GlassHeader } from '@/shared/components';
+import { useAuthStore } from '@/domains/auth/store/authStore';
+import { useMemberTenantAccess } from '@/domains/discovery/hooks/useMembershipApprovalStatus';
+import { useChatSwitch, useSetChatSwitch } from '@/domains/conversations/hooks/useConversations';
 
 import { useMySettings } from '../../hooks/useMySettings';
 import { useProfileMutations } from '../../hooks/useProfileMutations';
@@ -30,6 +33,17 @@ export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenP
   const language = useLanguageStore((s) => s.language);
   const fontSize = useFontSizeStore((s) => s.fontSize);
   const [fontSizeSheetVisible, setFontSizeSheetVisible] = useState(false);
+
+  // Member ↔ staff chat switch: staff and trainers choose whether members can start
+  // chats with them; members whether staff can. Members need access to the gym first.
+  const appRole = useAuthStore((s) => s.appRole);
+  const hasTenantAccess = useMemberTenantAccess();
+  const chatSide = appRole === 'staff' || appRole === 'trainer' ? 'staff' : appRole === 'member' ? 'member' : null;
+  const { data: chatSwitchOn, isSuccess: chatSwitchLoaded } = useChatSwitch(
+    chatSide ?? 'member',
+    chatSide === 'staff' || (chatSide === 'member' && hasTenantAccess),
+  );
+  const setChatSwitch = useSetChatSwitch(chatSide ?? 'member');
 
   // Local state initialized with query data
   const [notifications, setNotifications] = useState(settings.notifications);
@@ -80,6 +94,21 @@ export function SettingsScreen({ onBack, onNavigateToLanguage }: SettingsScreenP
             divider={false}
           />
         </SettingsCard>
+
+        {/* Chat */}
+        {chatSide && chatSwitchLoaded && (
+          <SettingsCard title={t('conversations.settings.card')} icon="message-circle">
+            <SettingSwitchRow
+              label={t(chatSide === 'staff' ? 'conversations.settings.acceptMessages' : 'conversations.settings.allowStaffChats')}
+              description={t(chatSide === 'staff'
+                ? 'conversations.settings.acceptMessagesDescription'
+                : 'conversations.settings.allowStaffChatsDescription')}
+              value={!!chatSwitchOn}
+              onValueChange={(val) => setChatSwitch.mutate(val)}
+              divider={false}
+            />
+          </SettingsCard>
+        )}
 
         {/* Notification Preferences */}
         <SettingsCard title={t('settings.notificationsCard')} icon="bell">

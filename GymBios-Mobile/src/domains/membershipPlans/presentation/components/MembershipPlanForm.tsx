@@ -66,7 +66,7 @@ export function MembershipPlanForm({
     onError: handleError,
   });
 
-  const stepLabels = steps.map((s) => s.title);
+  const stepLabels = steps.map((s) => t(`membershipPlans.misc2.wizardSteps.${s.id}`, { defaultValue: s.title }));
 
   // Determine which step index maps to which component.
   // Steps order: basic(1), duration(2), sessions(3), [family(4)?], freeze(4|5), assign(5|6)
@@ -105,7 +105,7 @@ export function MembershipPlanForm({
     onCancel();
   }, [onCancel]);
 
-  const currentStepTitle = steps[step - 1]?.title ?? '';
+  const currentStepTitle = stepLabels[step - 1] ?? '';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -116,7 +116,7 @@ export function MembershipPlanForm({
         {/* Header */}
         <View style={styles.wizardHeader}>
           <Typography variant="subtitle" color="text">
-            {mode === 'create' ? 'New Plan' : 'Edit Plan'}
+            {mode === 'create' ? t('membershipPlans.form.newPlan') : t('membershipPlans.form.editPlan')}
           </Typography>
           <Typography variant="caption" color="textSecondary">
             {currentStepTitle}

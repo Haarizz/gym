@@ -63,8 +63,8 @@ export function StaffWizardScreen({
   const handleError = useCallback((error: Error) => {
     // API failures are already toasted (with the server's reason) by apiClient.
     if (error instanceof ApiError) return;
-    toast.error('An error occurred. Please try again.', { title: 'Error' });
-  }, []);
+    toast.error(t('common.tryAgainError'), { title: t('common.error') });
+  }, [t]);
 
   const wizard = useStaffWizard({
     mode,
@@ -130,8 +130,8 @@ export function StaffWizardScreen({
   }, [step, navigateTo]);
 
   const warnInvalid = useCallback(() => {
-    toast.warning('Please fix the highlighted fields to continue.');
-  }, []);
+    toast.warning(t('common.fixHighlighted'));
+  }, [t]);
 
   /** Jumps to the first step (up to `upTo`, exclusive) with errors. Returns true if one was found. */
   const goToFirstInvalidStep = useCallback(
@@ -227,7 +227,7 @@ export function StaffWizardScreen({
               onPress={() => setShowDiscardDialog(true)}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Close form"
+              accessibilityLabel={t('shared.closeForm')}
               style={({ pressed }) => [
                 styles.iconButton,
                 { borderColor: theme.border },
@@ -275,7 +275,7 @@ export function StaffWizardScreen({
                   disabled={!reachable || active}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active, disabled: !reachable }}
-                  accessibilityLabel={`Step ${n}: ${s.title}`}
+                  accessibilityLabel={t('members.form.stepA11y', { step: n, title: s.title })}
                   style={styles.stepItem}
                 >
                   <View

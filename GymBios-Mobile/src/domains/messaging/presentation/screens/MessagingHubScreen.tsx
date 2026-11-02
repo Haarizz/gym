@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import { useMessagingAnalytics } from '../../hooks/useMessagingHooks';
+import { useUnreadChatCount } from '@/domains/conversations';
 
 type MessagingModule = {
   id: string;
@@ -14,6 +15,7 @@ type MessagingModule = {
   icon: keyof typeof Feather.glyphMap;
   route: string;
   description?: string;
+  badge?: number;
 };
 
 export function MessagingHubScreen() {
@@ -23,6 +25,9 @@ export function MessagingHubScreen() {
   const { data: analytics } = useMessagingAnalytics();
   
   const roleGroup = segments[0] || '(admin)';
+  // Member chats are for the staff and trainer apps; admins use the web reports.
+  const hasChats = roleGroup === '(staff)' || roleGroup === '(trainer)';
+  const { data: unreadChats = 0 } = useUnreadChatCount('staff', hasChats);
 
   let brandColor: string = BrandColors.teal;
   let bgOverlay: string = 'rgba(50, 127, 116, 0.1)';
@@ -39,11 +44,14 @@ export function MessagingHubScreen() {
   }
 
   const messagingModules: MessagingModule[] = useMemo(() => [
+    ...(hasChats
+      ? [{ id: 'chats', title: t('conversations.hubTitle'), icon: 'message-circle' as const, route: `/${roleGroup}/messaging/chats`, description: t('conversations.hubDesc'), badge: unreadChats }]
+      : []),
     { id: 'compose', title: t('messaging.hub.composeTitle'), icon: 'edit', route: `/${roleGroup}/messaging/compose`, description: t('messaging.hub.composeDesc') },
     { id: 'history', title: t('messaging.hub.historyTitle'), icon: 'clock', route: `/${roleGroup}/messaging/history`, description: t('messaging.hub.historyDesc') },
     { id: 'templates', title: t('messaging.hub.templatesTitle'), icon: 'layout', route: `/${roleGroup}/messaging/templates`, description: t('messaging.hub.templatesDesc') },
     { id: 'analytics', title: t('messaging.hub.analyticsTitle'), icon: 'bar-chart-2', route: `/${roleGroup}/messaging/analytics`, description: t('messaging.hub.analyticsDesc') },
-  ], [roleGroup, t]);
+  ], [roleGroup, t, hasChats, unreadChats]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -86,6 +94,11 @@ export function MessagingHubScreen() {
                     )}
                   </View>
                 </View>
+                {!!item.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.badge > 99 ? '99+' : item.badge}</Text>
+                  </View>
+                )}
                 <Feather name="chevron-right" size={20} color={BrandColors.textSecondary} />
               </Pressable>
             ))}
@@ -187,6 +200,21 @@ const styles = StyleSheet.create({
     fontSize: TypographyScale.body,
     fontWeight: '600',
     color: BrandColors.textPrimary,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BrandColors.danger,
+    marginEnd: Spacing.two,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   itemSubtitle: {
     fontSize: TypographyScale.small,

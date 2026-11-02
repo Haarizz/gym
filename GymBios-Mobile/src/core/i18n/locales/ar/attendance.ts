@@ -100,6 +100,33 @@ const attendance = {
       "active": "نشط",
       "done": "منجز",
       "completed": "مكتمل"
+    },
+    "summary": {
+      "title": "الملخص",
+      "totalCheckIns": "إجمالي تسجيلات الدخول",
+      "avgDaily": "المتوسط اليومي",
+      "rate": "المعدل",
+      "peakHour": "ساعة الذروة",
+      "activeMembers": "الأعضاء النشطون",
+      "daysInRange": "الأيام في النطاق"
+    },
+    "periods": {
+      "7d": "7 أيام",
+      "30d": "30 يوماً",
+      "90d": "90 يوماً",
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "this-week": "هذا الأسبوع"
+    },
+    "misc": {
+      "insights": "رؤى",
+      "other": "أخرى",
+      "open": "فتح",
+      "quickStats": "إحصاءات سريعة",
+      "noStaffClockedIn": "لم يسجل أي موظف حضوره",
+      "noStaffClockedInDesc": "لا توجد سجلات حضور للموظفين أو المدربين اليوم.",
+      "visitor": "زائر",
+      "user": "مستخدم"
     }
   }
 };

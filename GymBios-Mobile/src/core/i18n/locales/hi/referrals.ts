@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "मुफ्त व्यक्तिगत प्रशिक्षण सत्र",
     "freePt": "मुफ्त पीटी",
     "claimCredit": "क्रेडिट का दावा करें",
-    "bookPtSession": "पीटी सत्र बुक करें"
+    "bookPtSession": "पीटी सत्र बुक करें",
+    "hub": {
+      "overview": {
+        "title": "अवलोकन",
+        "description": "रेफ़रल प्रोग्राम सारांश और हालिया गतिविधि"
+      },
+      "members": {
+        "title": "सदस्य",
+        "description": "सदस्य और उनका रेफ़रल प्रदर्शन देखें"
+      },
+      "activity": {
+        "title": "गतिविधि",
+        "description": "रेफ़रल गतिविधि ट्रैक और प्रबंधित करें"
+      },
+      "my-rewards": {
+        "title": "मेरे रिवॉर्ड",
+        "description": "सदस्यों द्वारा अर्जित रिवॉर्ड देखें"
+      },
+      "reward-queue": {
+        "title": "रिवॉर्ड कतार",
+        "description": "लंबित रिवॉर्ड रिडेम्पशन की समीक्षा करें"
+      },
+      "reward-rules": {
+        "title": "रिवॉर्ड नियम",
+        "description": "रेफ़रल रिवॉर्ड नियम प्रबंधित करें"
+      },
+      "analytics": {
+        "title": "एनालिटिक्स",
+        "description": "रेफ़रल रूपांतरण और प्रदर्शन का विश्लेषण करें"
+      },
+      "settings": {
+        "title": "सेटिंग्स",
+        "description": "रेफ़रल प्रोग्राम कॉन्फ़िगर करें"
+      }
+    },
+    "header": {
+      "title": "रेफ़रल",
+      "subtitle": "सदस्य रेफ़रल प्रोग्राम और रिवॉर्ड ट्रैक व प्रबंधित करें"
+    },
+    "funnel": {
+      "created": "बनाए गए रेफ़रल",
+      "signedUp": "साइन अप (सफल)",
+      "paid": "भुगतान दर्ज",
+      "redeemed": "रिवॉर्ड भुनाया गया"
+    },
+    "insights": {
+      "conversionTitle": "रूपांतरण दर",
+      "conversionText": "{{rate}}% रेफ़रल सफल साइनअप बनते हैं ({{total}} में से {{successful}})।",
+      "topRuleTitle": "सबसे ज़्यादा उपयोग किया गया नियम",
+      "topRuleText_one": "\"{{name}}\" {{count}} रेफ़रल पर लागू किया गया है।",
+      "topRuleText_other": "\"{{name}}\" {{count}} रेफ़रल पर लागू किया गया है।",
+      "noRules": "अभी तक किसी रेफ़रल पर कोई रिवॉर्ड नियम लागू नहीं हुआ है।",
+      "redemptionTitle": "रिवॉर्ड रिडेम्पशन",
+      "redemptionText": "{{rate}}% सफल रेफ़रल ने अपना रिवॉर्ड भुनाया है ({{successful}} में से {{redeemed}})।"
+    },
+    "stats": {
+      "total": "कुल रेफ़रल",
+      "totalSub": "सभी दर्ज रेफ़रल",
+      "successful": "सफल",
+      "successfulSub": "परिवर्तित रेफ़रल",
+      "conversion": "रूपांतरण",
+      "conversionSub": "रेफ़रल सफलता दर",
+      "rewards": "कुल रिवॉर्ड",
+      "rewardsSub": "वितरित रिवॉर्ड",
+      "programs": "सक्रिय प्रोग्राम",
+      "programsSub": "चल रहे नियम",
+      "avgReward": "औसत रिवॉर्ड",
+      "avgRewardSub": "प्रति रेफ़रल औसत"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "वॉलेट क्रेडिट",
+      "MEMBERSHIP_EXTENSION": "सदस्यता विस्तार",
+      "MEMBERSHIP_DISCOUNT": "सदस्यता छूट",
+      "FREE_PT": "मुफ़्त PT",
+      "FREE_CLASS": "मुफ़्त क्लास",
+      "COUPON": "कूपन",
+      "LOYALTY_POINTS": "लॉयल्टी पॉइंट",
+      "GIFT": "उपहार",
+      "CASH": "नकद"
+    },
+    "queue": {
+      "approveTitle": "रिवॉर्ड स्वीकृत करें?",
+      "rejectTitle": "रिवॉर्ड अस्वीकार करें?",
+      "redeemTitle": "रिवॉर्ड को भुनाया गया चिह्नित करें?",
+      "approved": "रिवॉर्ड {{code}} स्वीकृत।",
+      "rejected": "रिवॉर्ड {{code}} अस्वीकृत।",
+      "redeemed": "रिवॉर्ड {{code}} को भुनाया गया चिह्नित किया।",
+      "noRewards": "अभी तक कोई रिवॉर्ड नहीं बना।",
+      "noMatch": "इस फ़िल्टर से कोई रिवॉर्ड मेल नहीं खाता।",
+      "days_one": "{{count}} दिन",
+      "days_other": "{{count}} दिन",
+      "points": "{{value}} अंक"
+    },
+    "msg": {
+      "unknownReferrer": "अज्ञात रेफ़रर",
+      "unknownReferee": "अज्ञात रेफ़री",
+      "unknownMember": "अज्ञात सदस्य",
+      "viewDetails": "रेफ़रल विवरण देखें",
+      "editReferral": "रेफ़रल संपादित करें",
+      "markSuccessfulA11y": "रेफ़रल को सफल चिह्नित करें",
+      "deleteReferralA11y": "रेफ़रल हटाएँ",
+      "markedSuccessful": "रेफ़रल को सफल चिह्नित किया गया।",
+      "markedExpired": "रेफ़रल को समाप्त चिह्नित किया गया।",
+      "statusUpdateFailed": "रेफ़रल स्थिति अपडेट नहीं हो सकी।",
+      "namesRequired": "कृपया रेफ़रर का नाम और रेफ़र किए गए व्यक्ति का नाम दोनों दर्ज करें।",
+      "updated": "रेफ़रल सफलतापूर्वक अपडेट हुआ।",
+      "updateFailed": "रेफ़रल अपडेट नहीं हो सका।",
+      "created": "रेफ़रल सफलतापूर्वक दर्ज हुआ।",
+      "createFailed": "रेफ़रल बनाया नहीं जा सका।",
+      "editTitle": "रेफ़रल संपादित करें",
+      "addTitle": "रेफ़रल जोड़ें",
+      "selectMember": "एक सदस्य चुनें...",
+      "selectMemberOrType": "सदस्य चुनें या नीचे टाइप करें...",
+      "deleteTitle": "रेफ़रल हटाएँ",
+      "deleteBody": "क्या आप वाकई {{name}} का रेफ़रल हटाना चाहते हैं?",
+      "deleted": "रेफ़रल हटाया गया।",
+      "deletedTitle": "हटाया गया",
+      "deleteFailed": "रेफ़रल हटाया नहीं जा सका।",
+      "refreshed": "डेटा रीफ़्रेश हुआ और रिवॉर्ड ठीक किए गए।",
+      "refreshedTitle": "रीफ़्रेश हुआ",
+      "refreshFailed": "डेटा रीफ़्रेश नहीं हो सका।",
+      "refreshFailedTitle": "रीफ़्रेश विफल",
+      "csvGenerated": "{{count}} रिकॉर्ड के साथ CSV रिपोर्ट बनाई गई।",
+      "csvTitle": "CSV निर्यात",
+      "settingsSaved": "प्रोग्राम सेटिंग्स सहेजी गईं।",
+      "settingsFailed": "सेटिंग्स सहेजी नहीं जा सकीं।",
+      "codeCopied": "रेफ़रल कोड \"{{code}}\" कॉपी हुआ।",
+      "linkCopied": "रेफ़रल लिंक \"{{link}}\" कॉपी हुआ।",
+      "allTiers": "सभी स्तर",
+      "redeemed": "{{label}} सफलतापूर्वक भुनाया गया।",
+      "redeemFailed": "रिवॉर्ड भुनाया नहीं जा सका।",
+      "noPhone": "कोई फ़ोन नहीं",
+      "standardPlan": "स्टैंडर्ड",
+      "ptSession": "PT सत्र",
+      "walletCredit": "वॉलेट क्रेडिट",
+      "shareTitle": "शेयर करना",
+      "whatsappMessage": "मेरे रेफ़रल कोड {{code}} के साथ हमारे जिम से जुड़ें! खास लाभ पाएँ!",
+      "whatsappPrepared": "WhatsApp संदेश तैयार:\n{{message}}",
+      "emailSubject": "हमारे जिम से जुड़ें - विशेष निमंत्रण!",
+      "emailBody": "नमस्ते!\n\nमेरे रेफ़रल कोड \"{{code}}\" या लिंक https://{{link}} से हमारे जिम से जुड़ें\n\nशुभकामनाएँ,\n{{name}}",
+      "emailPrepared": "ईमेल निमंत्रण:\n{{body}}",
+      "payment": "भुगतान"
+    }
   },
 } satisfies LocaleResource;
 

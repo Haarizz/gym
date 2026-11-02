@@ -13,6 +13,7 @@ import {
   type Option,
   type StepProps,
 } from './formControls';
+import { localizeOptions } from '@/core/i18n/format';
 
 // Option lists mirror the web promotion form (Gym-frontend promotions-campaign.tsx).
 const TYPE_OPTIONS: Option[] = [
@@ -66,7 +67,7 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
         label={t('promotions.promoType')}
         placeholder={t('promotions.selectType')}
         required
-        options={TYPE_OPTIONS}
+        options={localizeOptions(TYPE_OPTIONS, { prefix: 'promotions.opts.types' })}
         value={values.type}
         onChange={handleTypeChange}
       />
@@ -99,7 +100,7 @@ export function BasicInfoStep({ values, onChange }: StepProps) {
       <Dropdown
         label={t('promotions.category')}
         placeholder={t('promotions.selectCategory')}
-        options={CATEGORY_OPTIONS}
+        options={localizeOptions(CATEGORY_OPTIONS, { prefix: 'promotions.opts.categories' })}
         value={values.category}
         onChange={(val) => onChange('category', val)}
       />

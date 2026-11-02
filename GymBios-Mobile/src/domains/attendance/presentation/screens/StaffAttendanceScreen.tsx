@@ -19,6 +19,7 @@ import {
   StaffAttendanceCard,
 } from '../components';
 import type { StaffAttendanceRecord } from '../hooks/useStaffAttendance';
+import { useTranslation } from 'react-i18next';
 
 interface StaffAttendanceScreenProps {
   onBack?: () => void;
@@ -33,6 +34,7 @@ interface StaffAttendanceScreenProps {
  * into a sticky header.
  */
 export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
+  const { t } = useTranslation();
   const { staffRecords, loading, error, refresh } = useStaffAttendance();
   const [search, setSearch] = useState('');
   const bottomInset = useTabBarBottomInset() + Spacing.six;
@@ -65,8 +67,8 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Staff & Trainers"
-          subtitle="Today's clock-in / clock-out records"
+          title={t('attendance.staff.title')}
+          subtitle={t('attendance.staff.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -74,7 +76,7 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search staff..."
+            placeholder={t('attendance.staff.searchPlaceholder')}
           />
         </View>
         <AttendanceSkeleton variant="list" count={5} />
@@ -88,8 +90,8 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Staff & Trainers"
-          subtitle="Today's clock-in / clock-out records"
+          title={t('attendance.staff.title')}
+          subtitle={t('attendance.staff.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -97,7 +99,7 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search staff..."
+            placeholder={t('attendance.staff.searchPlaceholder')}
           />
         </View>
         <AttendanceErrorState
@@ -114,8 +116,8 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
     return (
       <ScreenLayout>
         <AppHeader
-          title="Staff & Trainers"
-          subtitle="Today's clock-in / clock-out records"
+          title={t('attendance.staff.title')}
+          subtitle={t('attendance.staff.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -123,12 +125,12 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
           <SearchBar
             value={search}
             onChangeText={setSearch}
-            placeholder="Search staff..."
+            placeholder={t('attendance.staff.searchPlaceholder')}
           />
         </View>
         <EmptyState
-          title="No staff clocked in"
-          description="No staff or trainer attendance records found for today."
+          title={t('attendance.misc.noStaffClockedIn')}
+          description={t('attendance.misc.noStaffClockedInDesc')}
           icon="briefcase"
         />
       </ScreenLayout>
@@ -140,8 +142,8 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
   return (
     <ScreenLayout>
       <AppHeader
-        title="Staff & Trainers"
-        subtitle="Today's clock-in / clock-out records"
+        title={t('attendance.staff.title')}
+        subtitle={t('attendance.staff.subtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
@@ -150,7 +152,7 @@ export function StaffAttendanceScreen({ onBack }: StaffAttendanceScreenProps) {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Search staff..."
+          placeholder={t('attendance.staff.searchPlaceholder')}
         />
       </View>
 

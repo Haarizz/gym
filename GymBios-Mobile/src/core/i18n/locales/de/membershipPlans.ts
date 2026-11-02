@@ -152,6 +152,59 @@ const membershipPlans = {
         "selectedCount": "{{count}} ausgewählt",
         "none": "Keine"
       }
+    },
+    "misc": {
+      "draft": "Entwurf",
+      "offerValueRequired": "Gib einen Angebotswert größer als 0 ein",
+      "offerPercentMax": "Ein Prozentangebot darf 100 % nicht überschreiten",
+      "offerEndBeforeStart": "Das Enddatum darf nicht vor dem Startdatum liegen"
+    },
+    "misc2": {
+      "options": {
+        "day": "Tag",
+        "week": "Woche",
+        "month": "Monat",
+        "year": "Jahr",
+        "unlimited": "Unbegrenzt",
+        "limited": "Begrenzt",
+        "none": "Keine",
+        "per_day": "Pro Tag",
+        "per_week": "Pro Woche",
+        "per_month": "Pro Monat",
+        "standard": "Standard",
+        "premium": "Premium",
+        "vip": "VIP",
+        "student": "Student",
+        "corporate": "Firmen",
+        "individual": "Einzel",
+        "couple": "Paar",
+        "family": "Familie",
+        "walk_in": "Laufkundschaft",
+        "active": "Aktiv",
+        "inactive": "Inaktiv",
+        "draft": "Entwurf",
+        "archived": "Archiviert",
+        "all": "Alle"
+      },
+      "wizardSteps": {
+        "basic": "Grunddaten",
+        "duration": "Preise",
+        "sessions": "Kapazität",
+        "family": "Familie",
+        "freeze": "Pausieren",
+        "assignments": "Zuweisen"
+      },
+      "family": {
+        "coupleHeadPays": "Hauptmitglied zahlt für beide",
+        "familyHeadPays": "Familienoberhaupt zahlt für alle",
+        "coupleHeadDesc": "Der Partner wird unter dem Hauptmitglied angelegt und der gesamte Plan wird diesem in einer Rechnung berechnet.",
+        "familyHeadDesc": "Familienmitglieder werden unter dem Familienoberhaupt angelegt und der gesamte Plan wird diesem in einer Rechnung berechnet.",
+        "coupleAutoHint": "Mit „Automatisch berechnen“ beträgt die Rechnung diesen Preis × 2; leer lassen, um den Abopreis für das Paar zu berechnen.",
+        "familyAutoHint": "Mit „Automatisch berechnen“ beträgt die Rechnung diesen Preis × Mitglieder; leer lassen, um den Abopreis für die ganze Familie zu berechnen.",
+        "example": "Beispiel: {{price}} × {{count}} Mitglieder = {{total}} auf EINER Rechnung an das Hauptmitglied.",
+        "wholeCouple": "Der Abopreis ({{price}}) ist EINE Rechnung für das ganze Paar an das Hauptmitglied.",
+        "wholeFamily": "Der Abopreis ({{price}}) ist EINE Rechnung für die ganze Familie an das Familienoberhaupt."
+      }
     }
   }
 };

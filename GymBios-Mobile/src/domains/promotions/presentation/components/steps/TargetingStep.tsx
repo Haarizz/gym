@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Dropdown } from '@/shared/components/Dropdown';
 import { CheckboxGroup, stepStyles, type Option, type StepProps } from './formControls';
+import { localizeOptions } from '@/core/i18n/format';
 
 const AUDIENCE_OPTIONS: Option[] = [
   { label: 'All Members', value: 'all' },
@@ -36,14 +37,14 @@ export function TargetingStep({ values, onChange }: StepProps) {
       <Dropdown
         label={t('promotions.targetAudience')}
         placeholder={t('promotions.selectTargetAudience')}
-        options={AUDIENCE_OPTIONS}
+        options={localizeOptions(AUDIENCE_OPTIONS, { prefix: 'promotions.opts.audience' })}
         value={values.targetAudience}
         onChange={(val) => onChange('targetAudience', val)}
       />
 
       <CheckboxGroup
         label={t('promotions.distributionChannels')}
-        options={CHANNEL_OPTIONS}
+        options={localizeOptions(CHANNEL_OPTIONS, { prefix: 'promotions.opts.channels' })}
         selected={values.channels}
         onChange={(next) => onChange('channels', next)}
       />

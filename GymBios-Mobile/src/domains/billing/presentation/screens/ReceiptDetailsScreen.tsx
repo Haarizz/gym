@@ -25,6 +25,7 @@ import {
 import { downloadReceiptPdf, emailReceiptPdf, printReceipt, smsReceiptPdf } from '../utils/receiptInvoice';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { getIntlLocale, translateValue, tOr } from '@/core/i18n/format';
 
 interface ReceiptDetailsScreenProps {
   receiptId: number;
@@ -34,7 +35,7 @@ interface ReceiptDetailsScreenProps {
 function formatDate(dateStr?: string) {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return new Date(dateStr).toLocaleDateString(getIntlLocale(), {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -108,11 +109,11 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
     try {
       const result = await downloadReceiptPdf(receipt, currencyCode);
       if (result.status === 'saved') {
-        toast.success(`${result.filename} saved to ${result.folder}.`, { title: 'Receipt Downloaded' });
+        toast.success(t('billing.msg.downloaded', { file: result.filename, folder: result.folder }), { title: t('billing.msg.downloadedTitle') });
       }
     } catch (err) {
       console.error('Receipt download failed', err);
-      toast.error('Could not generate the receipt PDF. Please try again.', { title: 'Download Failed' });
+      toast.error(t('billing.msg.downloadFailed'), { title: t('billing.msg.downloadFailedTitle') });
     } finally {
       setBusyAction(null);
     }
@@ -140,7 +141,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
         }
       } catch (err) {
         console.error(`Receipt ${channel} failed`, err);
-        toast.error('Could not share the receipt PDF. Please try again.', { title: 'Share Failed' });
+        toast.error(t('billing.msg.shareFailed'), { title: t('billing.msg.shareFailedTitle') });
       } finally {
         setBusyAction(null);
       }
@@ -183,8 +184,8 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
   return (
     <ScreenLayout>
       <AppHeader
-        title={receipt?.receiptNo ?? `Receipt #${receiptId}`}
-        subtitle={receipt?.transactionType ?? 'Transaction'}
+        title={receipt?.receiptNo ?? t('billing.msg.receiptNumber', { id: receiptId })}
+        subtitle={tOr(`billing.txnTypes.${(receipt?.transactionType ?? 'transaction').toLowerCase().replace(/[\s-]+/g, '_')}`, receipt?.transactionType ?? '')}
         colors={['#327f74', '#2a6b62']}
         onBack={onBack}
       />
@@ -226,7 +227,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
             <Divider />
             <InfoRow label={t('billing.receipts.transactionDate')} value={formatDate(receipt?.transactionDate)} />
             <Divider />
-            <InfoRow label={t('billing.receipts.transactionType')} value={receipt?.transactionType} />
+            <InfoRow label={t('billing.receipts.transactionType')} value={receipt?.transactionType ? tOr(`billing.txnTypes.${receipt.transactionType.toLowerCase().replace(/[\s-]+/g, '_')}`, receipt.transactionType) : undefined} />
             <Divider />
             <InfoRow label={t('billing.receipts.subscription')} value={receipt?.planName} />
             <Divider />
@@ -298,7 +299,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
                   <View style={styles.minorChargeRow}>
                     <View>
                       <Typography variant="bodySmall" style={{ fontWeight: '600' }}>
-                        {charge.name ?? 'Dependent'}
+                        {charge.name ?? t('billing.msg.dependent')}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
                         {charge.memberId}
@@ -326,7 +327,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
               rows={[
                 ...breakdownRows,
                 {
-                  label: 'Total',
+                  label: t('common.total'),
                   amount: receipt?.amount ?? 0,
                   bold: true,
                   color: BrandColors.teal,
@@ -362,7 +363,7 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
                 {t('billing.receipts.shareReceipt')}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                {t('billing.receipts.chooseHowToSend')} {receipt?.receiptNo ?? `Receipt #${receiptId}`}
+                {t('billing.receipts.chooseHowToSend')} {receipt?.receiptNo ?? t('billing.msg.receiptNumber', { id: receiptId })}
               </Typography>
             </View>
 
@@ -377,9 +378,9 @@ export function ReceiptDetailsScreen({ receiptId, onBack }: ReceiptDetailsScreen
                     <Feather name={item.icon} size={18} color={item.color} />
                   </View>
                   <View style={styles.channelInfo}>
-                    <Typography variant="bodySmallBold">{item.name}</Typography>
+                    <Typography variant="bodySmallBold">{t(`billing.msg.share${item.name === 'Email' ? 'Email' : item.name === 'SMS' ? 'Sms' : 'Print'}`)}</Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {item.detail}
+                      {t(`billing.msg.share${item.name === 'Email' ? 'Email' : item.name === 'SMS' ? 'Sms' : 'Print'}Detail`)}
                     </Typography>
                   </View>
                   <Feather name="chevron-right" size={16} color={BrandColors.textSecondary} />

@@ -158,13 +158,13 @@ export function MembershipPlansScreen({
           ListHeaderComponent={listHeader}
           emptyTitle={
             search || statusFilter !== 'All'
-              ? 'No Subscriptions Found'
-              : 'No Subscriptions'
+              ? t('membershipPlans.list.noPlansFound')
+              : t('membershipPlans.list.noPlans')
           }
           emptyDescription={
             search || statusFilter !== 'All'
-              ? 'Try adjusting your search or filters.'
-              : 'Create your first subscription to get started.'
+              ? t('membershipPlans.list.emptyFiltered')
+              : t('membershipPlans.list.emptyUnfiltered')
           }
         />
       </View>

@@ -13,6 +13,8 @@ public record ConversationReportDTO(
         Long branchId,
         String branchName,
         Long conversationId,
+        /** For lifting the member's chat ban. */
+        Long memberId,
         String memberName,
         String memberCode,
         /** "Front desk" for the shared inbox. */

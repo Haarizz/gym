@@ -1,5 +1,6 @@
 import { apiClient } from '@/core/network/apiClient';
 import type { StaffScheduleData, ScheduleTask, UpcomingFollowUp } from '../domain/StaffScheduleData';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface BackendContact {
   id: number;
@@ -59,7 +60,7 @@ export class ApiStaffScheduleRepository {
     const response = await apiClient.get<BackendStaffScheduleResponse>(url);
     const data = response.data;
 
-    const formattedDate = new Date(data.date).toLocaleDateString('en-US', {
+    const formattedDate = new Date(data.date).toLocaleDateString(getIntlLocale(), {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -78,7 +79,7 @@ export class ApiStaffScheduleRepository {
         try {
           if (task.scheduled_at) {
             const dateObj = new Date(task.scheduled_at);
-            time = dateObj.toLocaleTimeString('en-US', {
+            time = dateObj.toLocaleTimeString(getIntlLocale(), {
               hour: '2-digit',
               minute: '2-digit',
               hour12: true,
@@ -110,7 +111,7 @@ export class ApiStaffScheduleRepository {
           if (fu.scheduled_at) {
             const dateObj = new Date(fu.scheduled_at);
             dateStr = dateObj.toISOString().split('T')[0];
-            time = dateObj.toLocaleTimeString('en-US', {
+            time = dateObj.toLocaleTimeString(getIntlLocale(), {
               hour: '2-digit',
               minute: '2-digit',
               hour12: true,

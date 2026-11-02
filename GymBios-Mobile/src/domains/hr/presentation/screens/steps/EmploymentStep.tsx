@@ -9,6 +9,7 @@ import { FormCard } from '@/domains/members/presentation/components/form/FormCar
 import { useRoles } from '@/domains/roles/hooks/useRoles';
 import { useAllBranches } from '@/domains/branch';
 import type { StaffStepProps } from './stepTypes';
+import { localizeOptions } from '@/core/i18n/format';
 
 const DEPARTMENTS = [
   { label: 'Sales', value: 'Sales' },
@@ -43,7 +44,7 @@ export function EmploymentStep({ data, updateField, errors }: StaffStepProps) {
           label={t('hr.employment.department')}
           required
           value={data.department}
-          options={DEPARTMENTS}
+          options={localizeOptions(DEPARTMENTS, 'department')}
           onChange={(v) => updateField('department', v)}
           placeholder={t('hr.employment.selectDepartment')}
           error={errors?.department}

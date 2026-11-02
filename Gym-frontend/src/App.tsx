@@ -67,6 +67,7 @@ import { GymManagement } from "./pages/gym-management";
 import { GymImport } from "./pages/gym-import";
 import { GymRatings } from "./pages/ratings";
 import { Enquiries } from "./pages/enquiries";
+import { ChatReports } from "./pages/chat-reports";
 import { PlatformRatings } from "./pages/platform-ratings";
 import { AssetTransactions } from "./pages/asset-transactions";
 import { AssetHistoryPage } from "./pages/asset-history";
@@ -209,6 +210,7 @@ import {
   Warehouse,
   Star,
   Inbox,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
@@ -218,6 +220,12 @@ import {
   AvatarImage,
 } from "./components/ui/avatar";
 import { Toaster } from "./components/ui/sonner";
+
+/**
+ * Pseudo permission for pages only the gym owner (ADMIN / SUPER_ADMIN role) may open,
+ * matching a role check on the backend rather than a catalog permission key.
+ */
+const GYM_OWNER_ONLY = "GYM_OWNER_ONLY";
 
 const menuItems = [
   {
@@ -382,6 +390,15 @@ const menuItems = [
         id: "enquiries",
         path: "/enquiries",
         permission: "MEMBER_CONNECT_VIEW",
+      },
+      {
+        // Reported member ↔ staff chat messages (mobile app). A report is the only way to
+        // see a chat, so it's for the gym owner, as on the backend, not a Member Connect role.
+        title: "Chat Reports",
+        icon: ShieldAlert,
+        id: "chat-reports",
+        path: "/chat-reports",
+        permission: GYM_OWNER_ONLY,
       },
       {
         title: "Reports",
@@ -916,11 +933,15 @@ export default function App() {
   const canViewAllBranches = isGymbiosAdmin
     || roles.some(r => r.toLowerCase().replace('role_', '') === 'admin')
     || sessionStorage.getItem('gymbios_role_name')?.toLowerCase().replace('role_', '') === 'admin';
+  // The gym owner: what GYM_OWNER_ONLY pages require (ADMIN / SUPER_ADMIN on the backend).
+  const isGymOwner = !isGymbiosAdmin && (canViewAllBranches
+    || roles.some(r => r.toLowerCase().replace('role_', '') === 'super_admin'));
+  const canUse = (key: string) => (key === GYM_OWNER_ONLY ? isGymOwner : hasPermission(key));
   const visibleMenuItems = useMemo(
-    () => filterMenuByPermission(menuItems, hasPermission).filter(
+    () => filterMenuByPermission(menuItems, canUse).filter(
       (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : true
     ),
-    [permissions, isGymbiosAdmin],
+    [permissions, isGymbiosAdmin, isGymOwner], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const globalSearchPages = useMemo<GlobalSearchPage[]>(() => {
     const seen = new Set<string>();
@@ -978,7 +999,7 @@ export default function App() {
   const requiredRoutePermission = routePermissionMap[location.pathname];
   const routeAllowed = isGymbiosAdmin
     ? isGymbiosAdminPath(location.pathname)
-    : (!requiredRoutePermission || permissions.includes(requiredRoutePermission));
+    : (!requiredRoutePermission || canUse(requiredRoutePermission));
 
   // Provide navigation params from location state if available
   const navigationParams = location.state || {};
@@ -1059,7 +1080,7 @@ export default function App() {
       const canOpenReturnTo = !!returnTo && returnTo.startsWith('/') && !returnTo.startsWith('/login')
         && (isGymbiosAdmin
           ? isGymbiosAdminPath(returnPath)
-          : !requiredPermission || hasPermission(requiredPermission));
+          : !requiredPermission || canUse(requiredPermission));
       navigate(canOpenReturnTo ? returnTo! : '/dashboard', { replace: true });
     }
   }, [isAuthenticated, isLoading, isEmergencyRoute, location.pathname, location.search, navigate]);
@@ -1147,6 +1168,7 @@ export default function App() {
         "post-workout-checkin",
         "ratings",
         "enquiries",
+        "chat-reports",
         "member-connect-reports",
         "member-connect-analytics",
       ];
@@ -1387,6 +1409,7 @@ export default function App() {
       <Route path="/ratings" element={<GymRatings />} />
       <Route path="/ratings/:branchId" element={<GymRatings />} />
       <Route path="/enquiries" element={<Enquiries />} />
+      <Route path="/chat-reports" element={<ChatReports />} />
       <Route path="/pending-approval" element={<PendingApproval />} />
       <Route path="/platform-leads" element={<PlatformLeads />} />
       <Route path="/platform-follow-up" element={<PlatformFollowUp />} />

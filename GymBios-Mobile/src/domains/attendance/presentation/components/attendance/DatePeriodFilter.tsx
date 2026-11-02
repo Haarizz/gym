@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { DatePeriod } from '../../hooks/useAttendanceFilters';
+import { useTranslation } from 'react-i18next';
 
 const PERIOD_OPTIONS: { value: DatePeriod; label: string }[] = [
   { value: 'today', label: 'Today' },
@@ -16,6 +17,7 @@ interface DatePeriodFilterProps {
 }
 
 export function DatePeriodFilter({ value, onChange }: DatePeriodFilterProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {PERIOD_OPTIONS.map(option => (
@@ -29,7 +31,7 @@ export function DatePeriodFilter({ value, onChange }: DatePeriodFilterProps) {
             variant="caption"
             style={[styles.chipText, value === option.value && styles.chipTextActive]}
           >
-            {option.label}
+            {t(`attendance.periods.${option.value}`, { defaultValue: option.label })}
           </Typography>
         </Pressable>
       ))}

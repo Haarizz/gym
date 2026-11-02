@@ -218,7 +218,149 @@ const referrals = {
     "freePtSession": "Free Personal Training Session",
     "freePt": "Free PT",
     "claimCredit": "Claim Credit",
-    "bookPtSession": "Book PT Session"
+    "bookPtSession": "Book PT Session",
+    "hub": {
+      "overview": {
+        "title": "Overview",
+        "description": "Referral program summary and recent activity"
+      },
+      "members": {
+        "title": "Members",
+        "description": "View members and their referral performance"
+      },
+      "activity": {
+        "title": "Activity",
+        "description": "Track and manage referral activity"
+      },
+      "my-rewards": {
+        "title": "My Rewards",
+        "description": "View member-earned rewards"
+      },
+      "reward-queue": {
+        "title": "Reward Queue",
+        "description": "Review pending reward redemptions"
+      },
+      "reward-rules": {
+        "title": "Reward Rules",
+        "description": "Manage referral reward rules"
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Analyze referral conversion and performance"
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Configure the referral program"
+      }
+    },
+    "header": {
+      "title": "Referrals",
+      "subtitle": "Track and manage member referral programs and rewards"
+    },
+    "funnel": {
+      "created": "Referrals Created",
+      "signedUp": "Signed Up (Successful)",
+      "paid": "Payment Recorded",
+      "redeemed": "Reward Redeemed"
+    },
+    "insights": {
+      "conversionTitle": "Conversion Rate",
+      "conversionText": "{{rate}}% of referrals become successful signups ({{successful}} of {{total}}).",
+      "topRuleTitle": "Most-Used Rule",
+      "topRuleText_one": "\"{{name}}\" has been applied to {{count}} referral.",
+      "topRuleText_other": "\"{{name}}\" has been applied to {{count}} referrals.",
+      "noRules": "No reward rules have been applied to any referral yet.",
+      "redemptionTitle": "Reward Redemption",
+      "redemptionText": "{{rate}}% of successful referrals have redeemed their reward ({{redeemed}} of {{successful}})."
+    },
+    "stats": {
+      "total": "Total Referrals",
+      "totalSub": "All referrals recorded",
+      "successful": "Successful",
+      "successfulSub": "Converted referrals",
+      "conversion": "Conversion",
+      "conversionSub": "Referral success rate",
+      "rewards": "Total Rewards",
+      "rewardsSub": "Rewards distributed",
+      "programs": "Active Programs",
+      "programsSub": "Running rules",
+      "avgReward": "Avg Reward",
+      "avgRewardSub": "Average per referral"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "Wallet Credit",
+      "MEMBERSHIP_EXTENSION": "Membership Extension",
+      "MEMBERSHIP_DISCOUNT": "Membership Discount",
+      "FREE_PT": "Free PT",
+      "FREE_CLASS": "Free Class",
+      "COUPON": "Coupon",
+      "LOYALTY_POINTS": "Loyalty Points",
+      "GIFT": "Gift",
+      "CASH": "Cash"
+    },
+    "queue": {
+      "approveTitle": "Approve reward?",
+      "rejectTitle": "Reject reward?",
+      "redeemTitle": "Mark reward as redeemed?",
+      "approved": "Reward {{code}} approved.",
+      "rejected": "Reward {{code}} rejected.",
+      "redeemed": "Reward {{code}} marked as redeemed.",
+      "noRewards": "No rewards generated yet.",
+      "noMatch": "No rewards match this filter.",
+      "days_one": "{{count}} Day",
+      "days_other": "{{count}} Days",
+      "points": "{{value}} pts"
+    },
+    "msg": {
+      "unknownReferrer": "Unknown Referrer",
+      "unknownReferee": "Unknown Referee",
+      "unknownMember": "Unknown Member",
+      "viewDetails": "View referral details",
+      "editReferral": "Edit referral",
+      "markSuccessfulA11y": "Mark referral as successful",
+      "deleteReferralA11y": "Delete referral",
+      "markedSuccessful": "Referral marked as successful.",
+      "markedExpired": "Referral marked as expired.",
+      "statusUpdateFailed": "Failed to update referral status.",
+      "namesRequired": "Please enter both Referrer Name and Referred Person Name.",
+      "updated": "Referral updated successfully.",
+      "updateFailed": "Failed to update referral.",
+      "created": "Referral registered successfully.",
+      "createFailed": "Failed to create referral.",
+      "editTitle": "Edit Referral",
+      "addTitle": "Add a Referral",
+      "selectMember": "Select a member...",
+      "selectMemberOrType": "Select member or type below...",
+      "deleteTitle": "Delete Referral",
+      "deleteBody": "Are you sure you want to delete referral for {{name}}?",
+      "deleted": "Referral deleted.",
+      "deletedTitle": "Deleted",
+      "deleteFailed": "Failed to delete referral.",
+      "refreshed": "Data refreshed and rewards fixed.",
+      "refreshedTitle": "Refreshed",
+      "refreshFailed": "Failed to refresh data.",
+      "refreshFailedTitle": "Refresh Failed",
+      "csvGenerated": "Generated CSV report with {{count}} records.",
+      "csvTitle": "CSV Export",
+      "settingsSaved": "Program settings saved successfully.",
+      "settingsFailed": "Failed to save settings.",
+      "codeCopied": "Referral code \"{{code}}\" copied.",
+      "linkCopied": "Referral link \"{{link}}\" copied.",
+      "allTiers": "All Tiers",
+      "redeemed": "{{label}} redeemed successfully.",
+      "redeemFailed": "Failed to redeem reward.",
+      "noPhone": "No phone",
+      "standardPlan": "Standard",
+      "ptSession": "PT Session",
+      "walletCredit": "Wallet credit",
+      "shareTitle": "Sharing",
+      "whatsappMessage": "Join our gym with my referral code: {{code}}! Get exclusive benefits!",
+      "whatsappPrepared": "WhatsApp message prepared:\n{{message}}",
+      "emailSubject": "Join Our Gym - Exclusive Invitation!",
+      "emailBody": "Hi!\n\nJoin our gym using my referral code \"{{code}}\" or link: https://{{link}}\n\nBest regards,\n{{name}}",
+      "emailPrepared": "Email invitation:\n{{body}}",
+      "payment": "Payment"
+    }
   },
 };
 

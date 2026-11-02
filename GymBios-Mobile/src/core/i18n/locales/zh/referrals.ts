@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "免费私教课",
     "freePt": "免费私教",
     "claimCredit": "领取积分",
-    "bookPtSession": "预约私教课"
+    "bookPtSession": "预约私教课",
+    "hub": {
+      "overview": {
+        "title": "概览",
+        "description": "推荐计划摘要和近期动态"
+      },
+      "members": {
+        "title": "会员",
+        "description": "查看会员及其推荐表现"
+      },
+      "activity": {
+        "title": "动态",
+        "description": "跟踪和管理推荐动态"
+      },
+      "my-rewards": {
+        "title": "我的奖励",
+        "description": "查看会员获得的奖励"
+      },
+      "reward-queue": {
+        "title": "奖励队列",
+        "description": "审核待兑换的奖励"
+      },
+      "reward-rules": {
+        "title": "奖励规则",
+        "description": "管理推荐奖励规则"
+      },
+      "analytics": {
+        "title": "分析",
+        "description": "分析推荐转化和表现"
+      },
+      "settings": {
+        "title": "设置",
+        "description": "配置推荐计划"
+      }
+    },
+    "header": {
+      "title": "推荐",
+      "subtitle": "跟踪和管理会员推荐计划与奖励"
+    },
+    "funnel": {
+      "created": "已创建推荐",
+      "signedUp": "已注册（成功）",
+      "paid": "已记录付款",
+      "redeemed": "奖励已兑换"
+    },
+    "insights": {
+      "conversionTitle": "转化率",
+      "conversionText": "{{rate}}% 的推荐成功注册（{{total}} 个中的 {{successful}} 个）。",
+      "topRuleTitle": "最常用规则",
+      "topRuleText_one": "“{{name}}”已应用于 {{count}} 个推荐。",
+      "topRuleText_other": "“{{name}}”已应用于 {{count}} 个推荐。",
+      "noRules": "尚未有推荐应用奖励规则。",
+      "redemptionTitle": "奖励兑换",
+      "redemptionText": "{{rate}}% 的成功推荐已兑换奖励（{{successful}} 个中的 {{redeemed}} 个）。"
+    },
+    "stats": {
+      "total": "推荐总数",
+      "totalSub": "所有已记录推荐",
+      "successful": "成功",
+      "successfulSub": "已转化推荐",
+      "conversion": "转化",
+      "conversionSub": "推荐成功率",
+      "rewards": "奖励总额",
+      "rewardsSub": "已发放奖励",
+      "programs": "进行中的计划",
+      "programsSub": "运行中的规则",
+      "avgReward": "平均奖励",
+      "avgRewardSub": "每个推荐平均"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "钱包余额",
+      "MEMBERSHIP_EXTENSION": "会籍延期",
+      "MEMBERSHIP_DISCOUNT": "会籍折扣",
+      "FREE_PT": "免费私教",
+      "FREE_CLASS": "免费课程",
+      "COUPON": "优惠券",
+      "LOYALTY_POINTS": "积分",
+      "GIFT": "礼品",
+      "CASH": "现金"
+    },
+    "queue": {
+      "approveTitle": "批准奖励？",
+      "rejectTitle": "拒绝奖励？",
+      "redeemTitle": "将奖励标记为已兑换？",
+      "approved": "奖励 {{code}} 已批准。",
+      "rejected": "奖励 {{code}} 已拒绝。",
+      "redeemed": "奖励 {{code}} 已标记为兑换。",
+      "noRewards": "尚未生成奖励。",
+      "noMatch": "没有符合此筛选条件的奖励。",
+      "days_one": "{{count}} 天",
+      "days_other": "{{count}} 天",
+      "points": "{{value}} 分"
+    },
+    "msg": {
+      "unknownReferrer": "未知推荐人",
+      "unknownReferee": "未知被推荐人",
+      "unknownMember": "未知会员",
+      "viewDetails": "查看推荐详情",
+      "editReferral": "编辑推荐",
+      "markSuccessfulA11y": "将推荐标记为成功",
+      "deleteReferralA11y": "删除推荐",
+      "markedSuccessful": "推荐已标记为成功。",
+      "markedExpired": "推荐已标记为过期。",
+      "statusUpdateFailed": "更新推荐状态失败。",
+      "namesRequired": "请填写推荐人姓名和被推荐人姓名。",
+      "updated": "推荐已更新。",
+      "updateFailed": "更新推荐失败。",
+      "created": "推荐已登记。",
+      "createFailed": "创建推荐失败。",
+      "editTitle": "编辑推荐",
+      "addTitle": "添加推荐",
+      "selectMember": "选择会员...",
+      "selectMemberOrType": "选择会员或在下方输入...",
+      "deleteTitle": "删除推荐",
+      "deleteBody": "确定要删除 {{name}} 的推荐吗？",
+      "deleted": "推荐已删除。",
+      "deletedTitle": "已删除",
+      "deleteFailed": "删除推荐失败。",
+      "refreshed": "数据已刷新，奖励已修正。",
+      "refreshedTitle": "已刷新",
+      "refreshFailed": "刷新数据失败。",
+      "refreshFailedTitle": "刷新失败",
+      "csvGenerated": "已生成包含 {{count}} 条记录的 CSV 报告。",
+      "csvTitle": "CSV 导出",
+      "settingsSaved": "计划设置已保存。",
+      "settingsFailed": "保存设置失败。",
+      "codeCopied": "已复制推荐码“{{code}}”。",
+      "linkCopied": "已复制推荐链接“{{link}}”。",
+      "allTiers": "所有等级",
+      "redeemed": "{{label}} 兑换成功。",
+      "redeemFailed": "兑换奖励失败。",
+      "noPhone": "无电话",
+      "standardPlan": "标准",
+      "ptSession": "私教课",
+      "walletCredit": "钱包余额",
+      "shareTitle": "分享",
+      "whatsappMessage": "使用我的推荐码 {{code}} 加入我们的健身房，享受专属福利！",
+      "whatsappPrepared": "WhatsApp 消息已准备：\n{{message}}",
+      "emailSubject": "加入我们的健身房 - 专属邀请！",
+      "emailBody": "你好！\n\n使用我的推荐码“{{code}}”或链接 https://{{link}} 加入我们的健身房\n\n此致，\n{{name}}",
+      "emailPrepared": "邮件邀请：\n{{body}}",
+      "payment": "付款"
+    }
   },
 } satisfies LocaleResource;
 

@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "आपके वर्तमान खोज या फ़िल्टर मानदंडों से मेल खाने वाला कोई कार्य नहीं है।",
     "rescheduleTitle": "फ़ॉलो-अप पुनर्निर्धारित करें",
     "reschedulingFor": "के लिए फ़ॉलो-अप पुनर्निर्धारित करना",
-    "newDueDate": "नई नियत तिथि"
+    "newDueDate": "नई नियत तिथि",
+    "outcomes": {
+      "successful": "सफल",
+      "no_response": "कोई जवाब नहीं",
+      "callback_requested": "कॉलबैक का अनुरोध",
+      "not_interested": "रुचि नहीं",
+      "converted": "परिवर्तित",
+      "rescheduled": "पुनर्निर्धारित"
+    },
+    "filters": {
+      "allStatuses": "सभी स्थितियाँ",
+      "allTypes": "सभी प्रकार",
+      "allPriorities": "सभी प्राथमिकताएँ",
+      "allStaff": "सभी स्टाफ"
+    },
+    "msg": {
+      "selectMemberOrLead": "कृपया कोई सदस्य या लीड चुनें।",
+      "subjectRequired": "फॉलो-अप का विषय आवश्यक है।",
+      "dueDateRequired": "नियत तारीख आवश्यक है।",
+      "newDueDateRequired": "नई नियत तारीख आवश्यक है।",
+      "notesRequired": "संचार रिकॉर्ड के लिए नोट्स आवश्यक हैं।",
+      "addRecordFailed": "संचार रिकॉर्ड जोड़ा नहीं जा सका।",
+      "deleteRecordTitle": "रिकॉर्ड हटाएँ",
+      "deleteRecordBody": "क्या आप वाकई यह संचार रिकॉर्ड हटाना चाहते हैं?",
+      "saveRecord": "रिकॉर्ड सहेजें",
+      "detailsTitle": "फॉलो-अप विवरण",
+      "completing": "पूरा हो रहा है...",
+      "rescheduling": "पुनर्निर्धारित हो रहा है...",
+      "noDueDate": "कोई नियत तारीख नहीं",
+      "leadNoPhone": "इस लीड का कोई फ़ोन नंबर दर्ज नहीं है।",
+      "leadNoEmail": "इस लीड का कोई ईमेल पता दर्ज नहीं है।",
+      "deleteTitle": "फॉलो-अप हटाएँ",
+      "deleteBody": "क्या आप वाकई {{name}} के लिए फॉलो-अप \"{{subject}}\" हटाना चाहते हैं?",
+      "deleteFailed": "फॉलो-अप हटाया नहीं जा सका।",
+      "cancelTitle": "फॉलो-अप रद्द करें",
+      "cancelBody": "क्या आप वाकई फॉलो-अप \"{{subject}}\" रद्द करना चाहते हैं?",
+      "yesCancel": "हाँ, रद्द करें",
+      "cancelFailed": "फॉलो-अप रद्द नहीं हो सका।",
+      "updateFailed": "फॉलो-अप अपडेट नहीं हो सका।",
+      "createFailed": "फॉलो-अप बनाया नहीं जा सका।",
+      "completeFailed": "फॉलो-अप पूरा नहीं हो सका।",
+      "rescheduleFailed": "फॉलो-अप पुनर्निर्धारित नहीं हो सका।",
+      "leadConvertedTitle": "लीड परिवर्तित",
+      "leadConvertedBody": "लीड को परिवर्तित चिह्नित किया गया। बिक्री का श्रेय पाने के लिए उन्हें फ्रंट डेस्क पर सदस्य के रूप में पंजीकृत करें।"
+    }
   }
 };
 

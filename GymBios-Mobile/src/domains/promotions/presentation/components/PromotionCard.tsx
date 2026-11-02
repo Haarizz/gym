@@ -9,6 +9,7 @@ import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { PromotionCampaignResponse } from '../../domain/PromotionCampaign';
 import { formatDiscountDisplay } from '../utils/promotionStatistics';
+import { getIntlLocale, translateValue, tOr } from '@/core/i18n/format';
 
 interface PromotionCardProps {
   promotion: PromotionCampaignResponse;
@@ -19,19 +20,19 @@ interface PromotionCardProps {
 export function PromotionCard({ promotion, onPress, style }: PromotionCardProps) {
   const { t } = useTranslation();
   const statusColor = getStatusColor(promotion.status);
-  const typeLabel = promotion.type ? promotion.type.toUpperCase() : 'PROMO';
+  const typeLabel = tOr(`promotions.opts.types.${(promotion.type || 'promo').replace(/-/g, '_')}`, promotion.type ?? 'PROMO').toUpperCase();
   const discountText = formatDiscountDisplay(
     promotion.discountType,
     promotion.discountValue,
   );
 
   const formattedEndDate = promotion.endDate
-    ? new Date(promotion.endDate).toLocaleDateString(undefined, {
+    ? new Date(promotion.endDate).toLocaleDateString(getIntlLocale(), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       })
-    : 'No end date';
+    : t('promotions.msg.noEndDate');
 
   const usageText =
     promotion.usageLimit !== null && promotion.usageLimit !== undefined
@@ -60,7 +61,7 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
         <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
           <View style={[styles.statusDot, { backgroundColor: statusColor.fg }]} />
           <Text style={[styles.statusBadgeText, { color: statusColor.fg }]}>
-            {promotion.status}
+            {translateValue('status', promotion.status)}
           </Text>
         </View>
       </View>
@@ -79,7 +80,7 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
       <View style={styles.discountContainer}>
         <Text style={styles.discountText}>
           {promotion.discountType === 'fixed'
-            ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix=" OFF" />
+            ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix={t('promotions.msg.offSuffix')} />
             : discountText}
         </Text>
       </View>
@@ -114,7 +115,7 @@ export function PromotionCard({ promotion, onPress, style }: PromotionCardProps)
         <View style={styles.metaRow}>
           <CurrencyIcon size={13} color="#059669" />
           <Text style={styles.revenueText} numberOfLines={1}>
-            <CurrencyValue amount={promotion.totalRevenue ?? 0} suffix=" rev" />
+            <CurrencyValue amount={promotion.totalRevenue ?? 0} suffix={t('promotions.msg.revenueSuffix')} />
           </Text>
         </View>
       </View>

@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "विवरण देखें",
       "onLeave": "छुट्टी पर"
     },
-    "datePlaceholder": "YYYY-MM-DD"
+    "datePlaceholder": "YYYY-MM-DD",
+    "wizardSteps": {
+      "personal": "व्यक्तिगत जानकारी",
+      "employment": "रोज़गार",
+      "compensation": "पारिश्रमिक",
+      "schedule": "शेड्यूल और प्रमाणपत्र",
+      "access": "ऐप एक्सेस और समीक्षा"
+    },
+    "msg": {
+      "deleteFailed": "स्टाफ सदस्य हटाया नहीं जा सका।",
+      "statusUpdated": "स्टाफ स्थिति अपडेट हुई।",
+      "statusFailed": "स्टाफ स्थिति अपडेट नहीं हो सकी।",
+      "targetsComingSoon": "ऐप से लक्ष्य सेट करना आने वाले अपडेट में उपलब्ध होगा।",
+      "branchRequiredTitle": "शाखा आवश्यक",
+      "branchRequired": "नया स्टाफ बनाने से पहले हेडर मेनू से एक शाखा चुनें।",
+      "staffNoPhone": "इस स्टाफ सदस्य का कोई फ़ोन नंबर दर्ज नहीं है।",
+      "messageA11y": "{{name}} को संदेश भेजें",
+      "workingDaysValue": "प्रति सप्ताह {{count}}"
+    },
+    "review": {
+      "name": "नाम",
+      "email": "ईमेल",
+      "phone": "फ़ोन",
+      "role": "भूमिका",
+      "department": "विभाग",
+      "branch": "शाखा",
+      "joined": "जुड़े",
+      "salary": "वेतन",
+      "target": "लक्ष्य",
+      "workingDays": "कार्य दिवस",
+      "certifications": "प्रमाणपत्र",
+      "needsAttention": "ध्यान दें",
+      "edit": "{{title}} संपादित करें"
+    },
+    "days": {
+      "monday": "सोमवार",
+      "tuesday": "मंगलवार",
+      "wednesday": "बुधवार",
+      "thursday": "गुरुवार",
+      "friday": "शुक्रवार",
+      "saturday": "शनिवार",
+      "sunday": "रविवार"
+    },
+    "shifts": {
+      "Morning": "सुबह (6–12 बजे)",
+      "Afternoon": "दोपहर (12–5 बजे)",
+      "Evening": "शाम (5–10 बजे)"
+    }
   }
 };
 

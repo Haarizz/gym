@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { PaymentMethod } from '../../domain/Receipt';
+import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 interface PaymentMethodBadgeProps {
   method: PaymentMethod | string | undefined;
@@ -24,12 +26,13 @@ const DEFAULT_CONFIG = { bg: '#f3f4f6', text: '#374151', icon: '💰' };
 
 export function PaymentMethodBadge({ method }: PaymentMethodBadgeProps) {
   const config = method ? METHOD_CONFIG[method] ?? DEFAULT_CONFIG : DEFAULT_CONFIG;
-  const label = method ?? '—';
+  const { t } = useTranslation();
+  const label = method ? translateValue('paymentMethod', method) : '—';
 
   return (
     <View
       style={[styles.badge, { backgroundColor: config.bg }]}
-      accessibilityLabel={`Payment method: ${label}`}
+      accessibilityLabel={t('billing.msg.methodA11y', { method: label })}
     >
       <Typography variant="caption" style={[styles.text, { color: config.text }]}>
         {config.icon} {label}

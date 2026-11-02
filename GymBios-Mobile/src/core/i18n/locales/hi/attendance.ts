@@ -92,6 +92,33 @@ const attendance = {
       "active": "सक्रिय",
       "done": "पूर्ण",
       "completed": "समाप्त"
+    },
+    "summary": {
+      "title": "सारांश",
+      "totalCheckIns": "कुल चेक-इन",
+      "avgDaily": "दैनिक औसत",
+      "rate": "दर",
+      "peakHour": "पीक घंटा",
+      "activeMembers": "सक्रिय सदस्य",
+      "daysInRange": "सीमा में दिन"
+    },
+    "periods": {
+      "7d": "7 दिन",
+      "30d": "30 दिन",
+      "90d": "90 दिन",
+      "today": "आज",
+      "yesterday": "कल",
+      "this-week": "इस सप्ताह"
+    },
+    "misc": {
+      "insights": "इनसाइट्स",
+      "other": "अन्य",
+      "open": "खोलें",
+      "quickStats": "त्वरित आँकड़े",
+      "noStaffClockedIn": "किसी स्टाफ ने क्लॉक इन नहीं किया",
+      "noStaffClockedInDesc": "आज के लिए स्टाफ या ट्रेनर का कोई उपस्थिति रिकॉर्ड नहीं मिला।",
+      "visitor": "आगंतुक",
+      "user": "उपयोगकर्ता"
     }
   }
 };

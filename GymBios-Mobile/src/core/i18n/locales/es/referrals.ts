@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "Sesión de entrenamiento personal gratis",
     "freePt": "PT gratis",
     "claimCredit": "Reclamar crédito",
-    "bookPtSession": "Reservar sesión de PT"
+    "bookPtSession": "Reservar sesión de PT",
+    "hub": {
+      "overview": {
+        "title": "Resumen",
+        "description": "Resumen del programa de referidos y actividad reciente"
+      },
+      "members": {
+        "title": "Miembros",
+        "description": "Ver miembros y su rendimiento de referidos"
+      },
+      "activity": {
+        "title": "Actividad",
+        "description": "Sigue y gestiona la actividad de referidos"
+      },
+      "my-rewards": {
+        "title": "Mis recompensas",
+        "description": "Ver recompensas obtenidas por los miembros"
+      },
+      "reward-queue": {
+        "title": "Cola de recompensas",
+        "description": "Revisa los canjes de recompensas pendientes"
+      },
+      "reward-rules": {
+        "title": "Reglas de recompensas",
+        "description": "Gestiona las reglas de recompensas por referidos"
+      },
+      "analytics": {
+        "title": "Análisis",
+        "description": "Analiza la conversión y el rendimiento de referidos"
+      },
+      "settings": {
+        "title": "Configuración",
+        "description": "Configura el programa de referidos"
+      }
+    },
+    "header": {
+      "title": "Referidos",
+      "subtitle": "Sigue y gestiona los programas de referidos y recompensas"
+    },
+    "funnel": {
+      "created": "Referidos creados",
+      "signedUp": "Registrados (exitosos)",
+      "paid": "Pago registrado",
+      "redeemed": "Recompensa canjeada"
+    },
+    "insights": {
+      "conversionTitle": "Tasa de conversión",
+      "conversionText": "El {{rate}} % de los referidos se registran con éxito ({{successful}} de {{total}}).",
+      "topRuleTitle": "Regla más usada",
+      "topRuleText_one": "\"{{name}}\" se ha aplicado a {{count}} referido.",
+      "topRuleText_other": "\"{{name}}\" se ha aplicado a {{count}} referidos.",
+      "noRules": "Aún no se ha aplicado ninguna regla de recompensa a ningún referido.",
+      "redemptionTitle": "Canje de recompensas",
+      "redemptionText": "El {{rate}} % de los referidos exitosos han canjeado su recompensa ({{redeemed}} de {{successful}})."
+    },
+    "stats": {
+      "total": "Referidos totales",
+      "totalSub": "Todos los referidos registrados",
+      "successful": "Exitosos",
+      "successfulSub": "Referidos convertidos",
+      "conversion": "Conversión",
+      "conversionSub": "Tasa de éxito de referidos",
+      "rewards": "Recompensas totales",
+      "rewardsSub": "Recompensas entregadas",
+      "programs": "Programas activos",
+      "programsSub": "Reglas en curso",
+      "avgReward": "Recompensa media",
+      "avgRewardSub": "Promedio por referido"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "Saldo del monedero",
+      "MEMBERSHIP_EXTENSION": "Extensión de membresía",
+      "MEMBERSHIP_DISCOUNT": "Descuento en membresía",
+      "FREE_PT": "PT gratis",
+      "FREE_CLASS": "Clase gratis",
+      "COUPON": "Cupón",
+      "LOYALTY_POINTS": "Puntos de fidelidad",
+      "GIFT": "Regalo",
+      "CASH": "Efectivo"
+    },
+    "queue": {
+      "approveTitle": "¿Aprobar recompensa?",
+      "rejectTitle": "¿Rechazar recompensa?",
+      "redeemTitle": "¿Marcar recompensa como canjeada?",
+      "approved": "Recompensa {{code}} aprobada.",
+      "rejected": "Recompensa {{code}} rechazada.",
+      "redeemed": "Recompensa {{code}} marcada como canjeada.",
+      "noRewards": "Aún no se han generado recompensas.",
+      "noMatch": "Ninguna recompensa coincide con este filtro.",
+      "days_one": "{{count}} día",
+      "days_other": "{{count}} días",
+      "points": "{{value}} pts"
+    },
+    "msg": {
+      "unknownReferrer": "Referente desconocido",
+      "unknownReferee": "Referido desconocido",
+      "unknownMember": "Miembro desconocido",
+      "viewDetails": "Ver detalles del referido",
+      "editReferral": "Editar referido",
+      "markSuccessfulA11y": "Marcar referido como exitoso",
+      "deleteReferralA11y": "Eliminar referido",
+      "markedSuccessful": "Referido marcado como exitoso.",
+      "markedExpired": "Referido marcado como vencido.",
+      "statusUpdateFailed": "No se pudo actualizar el estado del referido.",
+      "namesRequired": "Introduce el nombre del referente y de la persona referida.",
+      "updated": "Referido actualizado correctamente.",
+      "updateFailed": "No se pudo actualizar el referido.",
+      "created": "Referido registrado correctamente.",
+      "createFailed": "No se pudo crear el referido.",
+      "editTitle": "Editar referido",
+      "addTitle": "Añadir un referido",
+      "selectMember": "Selecciona un miembro...",
+      "selectMemberOrType": "Selecciona un miembro o escribe abajo...",
+      "deleteTitle": "Eliminar referido",
+      "deleteBody": "¿Seguro que quieres eliminar el referido de {{name}}?",
+      "deleted": "Referido eliminado.",
+      "deletedTitle": "Eliminado",
+      "deleteFailed": "No se pudo eliminar el referido.",
+      "refreshed": "Datos actualizados y recompensas corregidas.",
+      "refreshedTitle": "Actualizado",
+      "refreshFailed": "No se pudieron actualizar los datos.",
+      "refreshFailedTitle": "Error al actualizar",
+      "csvGenerated": "Informe CSV generado con {{count}} registros.",
+      "csvTitle": "Exportación CSV",
+      "settingsSaved": "Configuración del programa guardada.",
+      "settingsFailed": "No se pudo guardar la configuración.",
+      "codeCopied": "Código de referido \"{{code}}\" copiado.",
+      "linkCopied": "Enlace de referido \"{{link}}\" copiado.",
+      "allTiers": "Todos los niveles",
+      "redeemed": "{{label}} canjeado correctamente.",
+      "redeemFailed": "No se pudo canjear la recompensa.",
+      "noPhone": "Sin teléfono",
+      "standardPlan": "Estándar",
+      "ptSession": "Sesión de PT",
+      "walletCredit": "Saldo del monedero",
+      "shareTitle": "Compartir",
+      "whatsappMessage": "¡Únete a nuestro gimnasio con mi código de referido: {{code}}! ¡Obtén beneficios exclusivos!",
+      "whatsappPrepared": "Mensaje de WhatsApp preparado:\n{{message}}",
+      "emailSubject": "¡Únete a nuestro gimnasio - Invitación exclusiva!",
+      "emailBody": "¡Hola!\n\nÚnete a nuestro gimnasio con mi código de referido \"{{code}}\" o el enlace: https://{{link}}\n\nSaludos,\n{{name}}",
+      "emailPrepared": "Invitación por correo:\n{{body}}",
+      "payment": "Pago"
+    }
   },
 } satisfies LocaleResource;
 

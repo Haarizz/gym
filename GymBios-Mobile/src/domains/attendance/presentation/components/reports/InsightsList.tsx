@@ -5,6 +5,7 @@ import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { ReportInsight } from '../../../domain/AttendanceReport';
 import { AttendanceSection } from '../shared';
+import { useTranslation } from 'react-i18next';
 
 interface InsightsListProps {
   insights: ReportInsight[];
@@ -44,12 +45,13 @@ function getInsightStyle(type?: string): InsightStyle {
 }
 
 export function InsightsList({ insights }: InsightsListProps) {
+  const { t } = useTranslation();
   if (insights.length === 0) {
     return null;
   }
 
   return (
-    <AttendanceSection title="Insights">
+    <AttendanceSection title={t('attendance.misc.insights')}>
       <View style={styles.list}>
         {insights.map((insight) => {
           const { container, iconName, iconColor } = getInsightStyle(insight.type);

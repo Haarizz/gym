@@ -4,12 +4,14 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { ActivityBreakdown } from '../../../domain/AttendanceReport';
 import { AttendanceSection } from '../shared';
+import { useTranslation } from 'react-i18next';
 
 interface ActivityBreakdownListProps {
   items: ActivityBreakdown[];
 }
 
 export function ActivityBreakdownList({ items }: ActivityBreakdownListProps) {
+  const { t } = useTranslation();
   const total = items.reduce((sum, item) => sum + (item.count ?? 0), 0);
 
   if (items.length === 0) {
@@ -17,7 +19,7 @@ export function ActivityBreakdownList({ items }: ActivityBreakdownListProps) {
   }
 
   return (
-    <AttendanceSection title="Activity Breakdown">
+    <AttendanceSection title={t('attendance.reports.activityBreakdown')}>
       <View style={styles.list}>
         {items.map((item, index) => {
           const count = item.count ?? 0;
@@ -28,7 +30,7 @@ export function ActivityBreakdownList({ items }: ActivityBreakdownListProps) {
           return (
             <View key={`${item.type}-${index}`} style={styles.item}>
               <View style={styles.header}>
-                <Typography variant="bodySmallBold">{item.type || 'Other'}</Typography>
+                <Typography variant="bodySmallBold">{item.type || t('attendance.misc.other')}</Typography>
                 <Typography variant="caption" color="textSecondary">
                   {count} · {pct}%
                 </Typography>

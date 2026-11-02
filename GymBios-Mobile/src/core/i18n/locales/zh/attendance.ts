@@ -92,6 +92,33 @@ const attendance = {
       "active": "在馆",
       "done": "完成",
       "completed": "已离场"
+    },
+    "summary": {
+      "title": "摘要",
+      "totalCheckIns": "签到总数",
+      "avgDaily": "日均",
+      "rate": "比率",
+      "peakHour": "高峰时段",
+      "activeMembers": "活跃会员",
+      "daysInRange": "区间天数"
+    },
+    "periods": {
+      "7d": "7 天",
+      "30d": "30 天",
+      "90d": "90 天",
+      "today": "今天",
+      "yesterday": "昨天",
+      "this-week": "本周"
+    },
+    "misc": {
+      "insights": "洞察",
+      "other": "其他",
+      "open": "打开",
+      "quickStats": "快速统计",
+      "noStaffClockedIn": "暂无员工打卡",
+      "noStaffClockedInDesc": "今天没有员工或教练的出勤记录。",
+      "visitor": "访客",
+      "user": "用户"
     }
   }
 };

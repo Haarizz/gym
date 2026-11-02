@@ -305,7 +305,7 @@ public class MobileDiscoveryController {
     }
 
     @PostMapping("/{tenantSlug}/{branchId}/purchase")
-    public ResponseEntity<MemberResponseDTO> purchaseMembership(
+    public ResponseEntity<?> purchaseMembership(
             @PathVariable String tenantSlug,
             @PathVariable Long branchId,
             @RequestBody MobilePurchaseRequestDTO request) {
@@ -340,13 +340,6 @@ public class MobileDiscoveryController {
             // Verify branch
             Branch branch = branchRepository.findById(branchId)
                     .orElseThrow(() -> new RuntimeException("Branch not found in tenant DB"));
-
-            // Check if member already exists. A rejected earlier purchase here isn't a
-            // membership — the member may retry (same or another plan); it's released
-            // together with the new purchase in createMemberReplacingRejected below.
-            if (memberRepository.existsUnrejectedMembership(globalUserId, userDetails.getEmail())) {
-                return ResponseEntity.status(409).build(); // Conflict
-            }
 
             // Get plan (will throw if not found/active)
             MembershipPlanResponseDTO plan = planService.getPlanById(request.getPlanId());
@@ -433,10 +426,23 @@ public class MobileDiscoveryController {
 
             // Execute create (generates invoice/payment)
             // Card / UPI / Net banking legs are checked with Stripe first, and refunded
-            // if the membership can't be created.
-            MemberResponseDTO createdMember = stripePaymentService.withVerifiedPayments(
-                    request.getPaymentBreakdown(), true, null,
-                    () -> memberService.createMemberReplacingRejected(memberRequest, globalUserId, userDetails.getEmail()));
+            // if the membership can't be created. The "already a member here?" check runs
+            // inside, so a refused purchase whose card was already charged on the device
+            // is refunded too. A rejected earlier purchase here isn't a membership — the
+            // member may retry; createMemberReplacingRejected releases it.
+            MemberResponseDTO createdMember;
+            try {
+                createdMember = stripePaymentService.withVerifiedPayments(
+                        request.getPaymentBreakdown(), true, null,
+                        () -> {
+                            memberRepository.findUnrejectedMembership(globalUserId, userDetails.getEmail())
+                                    .ifPresent(existing -> { throw new AlreadyMemberException(existing); });
+                            return memberService.createMemberReplacingRejected(
+                                    memberRequest, globalUserId, userDetails.getEmail());
+                        });
+            } catch (AlreadyMemberException e) {
+                return ResponseEntity.status(409).body(e.body());
+            }
 
             // Note: Currently, createMember doesn't take globalUserId in the DTO,
             // we should technically set it on the Member entity.
@@ -492,6 +498,30 @@ public class MobileDiscoveryController {
         } finally {
             BranchContextHolder.clear();
             TenantContextHolder.clear();
+        }
+    }
+
+    /**
+     * The account already holds a membership at this gym. Answered as 409 with
+     * {@code { code: "ALREADY_MEMBER", branchId, status }} so the app can point the member
+     * at their existing membership (renew / change plan) instead of a new purchase.
+     */
+    static final class AlreadyMemberException extends RuntimeException {
+        private final MemberRepository.ExistingMembershipView existing;
+
+        AlreadyMemberException(MemberRepository.ExistingMembershipView existing) {
+            super("Already a member of this gym");
+            this.existing = existing;
+        }
+
+        java.util.Map<String, Object> body() {
+            java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("code", "ALREADY_MEMBER");
+            body.put("message", getMessage());
+            body.put("branchId", existing.getBranchId());
+            String approval = existing.getApprovalStatus();
+            body.put("status", "PENDING".equalsIgnoreCase(approval) ? "pending_approval" : existing.getMembershipStatus());
+            return body;
         }
     }
 }

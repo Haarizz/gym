@@ -32,14 +32,14 @@ export function ReferralsOverviewScreen() {
   const handleRefreshData = () => {
     fixRewardsMutation.mutate(undefined, {
       onSuccess: () => {
-        toast.info('Data refreshed and rewards fixed.', {
-          title: 'Refreshed'
+        toast.info(t('adminReferrals.msg.refreshed'), {
+          title: t('adminReferrals.msg.refreshedTitle')
         });
         refetch();
       },
       onError: (err) => {
-        toast.error(err.message || 'Failed to refresh data.', {
-          title: 'Refresh Failed'
+        toast.error(err.message || t('adminReferrals.msg.refreshFailed'), {
+          title: t('adminReferrals.msg.refreshFailedTitle')
         });
       },
     });
@@ -53,16 +53,16 @@ export function ReferralsOverviewScreen() {
           `"${r.referrerName}","${r.refereeName}","${r.refereeEmail || ''}","${r.status}","${r.rewardAmount || 0}","${r.date || r.createdAt}"`
       ),
     ];
-    toast.info(`Generated CSV report with ${referrals.length} records.`, {
-      title: 'CSV Export'
+    toast.info(t('adminReferrals.msg.csvGenerated', { count: referrals.length }), {
+      title: t('adminReferrals.msg.csvTitle')
     });
   };
 
   const handleMarkSuccessful = (referral: Referral) => {
     markSuccessfulMutation.mutate({ id: Number(referral.id) }, {
       onSuccess: () => {
-        toast.success('Referral marked as successful.', {
-          title: 'Success'
+        toast.success(t('adminReferrals.msg.markedSuccessful'), {
+          title: t('common.success')
         });
         refetch();
       },

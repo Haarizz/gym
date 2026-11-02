@@ -130,7 +130,7 @@ export const MemberCard = memo(function MemberCard({
             ]}
             onPress={() => onCall?.(member)}
             accessibilityRole="button"
-            accessibilityLabel={`Call ${member.name}`}
+            accessibilityLabel={t('members.callA11y', { name: member.name })}
           >
             <Feather name="phone" size={16} color={theme.text} />
           </Pressable>

@@ -17,6 +17,7 @@ import type {
 } from '@/domains/members/hooks/useMemberWizard';
 
 import { FormCard } from './FormCard';
+import { localizeOptions } from '@/core/i18n/format';
 
 interface FamilyStepProps {
   data: MemberWizardData;
@@ -113,7 +114,7 @@ export function FamilyStep({
             label={t('members.form.familyStep.relationLabel')}
             placeholder={t('members.form.familyStep.relationPlaceholder')}
             value={data.relationshipToHead}
-            options={RELATIONSHIPS}
+            options={localizeOptions(RELATIONSHIPS, 'relation')}
             onChange={(v) => updateField('relationshipToHead', v)}
           />
         ) : null}
@@ -165,7 +166,7 @@ export function FamilyStep({
           <Dropdown
             label={t('members.form.familyStep.relationReq')}
             value={memberRelationship}
-            options={RELATIONSHIPS}
+            options={localizeOptions(RELATIONSHIPS, 'relation')}
             onChange={setMemberRelationship}
           />
           <Input

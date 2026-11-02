@@ -403,7 +403,26 @@ const members = {
       "daysLeft_other": "{{count}} दिन शेष",
       "expiredAgo_one": "{{count}} दिन पहले समाप्त हुआ",
       "expiredAgo_other": "{{count}} दिन पहले समाप्त हुआ"
-    }
+    },
+    "wizardSteps": {
+      "personal": "व्यक्तिगत जानकारी",
+      "membership": "सदस्यता जानकारी",
+      "medical": "चिकित्सा जानकारी",
+      "family": "परिवार कॉन्फ़िगरेशन",
+      "access": "ऐप एक्सेस और समीक्षा"
+    },
+    "reviewSections": {
+      "personal": "व्यक्तिगत",
+      "membership": "सदस्यता",
+      "health": "स्वास्थ्य",
+      "family": "परिवार",
+      "familyHead": "परिवार प्रमुख"
+    },
+    "registrationTitle": "सदस्यता पंजीकरण",
+    "renewalLabel": "नवीनीकरण",
+    "renewalWithPlan": "नवीनीकरण · {{plan}}",
+    "callA11y": "{{name}} को कॉल करें",
+    "memberSubtitle": "सदस्य: {{name}}"
   }
 };
 

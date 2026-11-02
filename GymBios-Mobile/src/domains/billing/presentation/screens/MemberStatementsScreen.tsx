@@ -71,8 +71,8 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
 
   const handleGenerateStatement = useCallback(() => {
     if (!selectedMember) {
-      toast.info('Please select a member first to generate a statement.', {
-        title: 'Selection Required'
+      toast.info(t('billing.msg.selectMemberFirst'), {
+        title: t('billing.msg.selectionRequired')
       });
       return;
     }
@@ -81,19 +81,19 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
       from: fromDate.trim() || undefined,
       to: toDate.trim() || undefined,
     });
-  }, [selectedMember, fromDate, toDate]);
+  }, [selectedMember, fromDate, toDate, t]);
 
   const handleExportCSV = useCallback(() => {
     if (!statement || !statement.lines.length) {
-      toast.info('No statement lines available to export.', {
-        title: 'Export CSV'
+      toast.info(t('billing.msg.noStatementLines'), {
+        title: t('common.exportCsv')
       });
       return;
     }
     toast.info(
-      `Exported statement of account for ${statement.memberName ?? 'Member'} to CSV.`,
+      t('billing.msg.statementExported', { name: statement.memberName ?? t('billing.msg.member') }),
       {
-        title: 'Export Statement CSV'
+        title: t('billing.msg.statementExportTitle')
       }
     );
   }, [statement]);
@@ -207,7 +207,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
               </Typography>
               <TextInput
                 style={styles.dateInput}
-                placeholder="YYYY-MM-DD"
+                placeholder={t('common.dateFormatHint')}
                 placeholderTextColor={BrandColors.textSecondary}
                 value={fromDate}
                 onChangeText={setFromDate}
@@ -219,7 +219,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
               </Typography>
               <TextInput
                 style={styles.dateInput}
-                placeholder="YYYY-MM-DD"
+                placeholder={t('common.dateFormatHint')}
                 placeholderTextColor={BrandColors.textSecondary}
                 value={toDate}
                 onChangeText={setToDate}
@@ -255,7 +255,7 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
                 <Typography variant="caption" style={styles.warningText}>
                   {statement.memberName} {t('billing.statements.isBilledToGuardian')}{' '}
                   <Typography variant="caption" style={{ fontWeight: '700' }}>
-                    {statement.familyHeadName ?? 'Family Head'}
+                    {statement.familyHeadName ?? t('billing.msg.familyHead')}
                   </Typography>
                   {t('billing.statements.feesManagedUnderMain')}
                 </Typography>

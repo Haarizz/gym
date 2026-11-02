@@ -8,6 +8,8 @@ import type { Receipt } from '../../domain/Receipt';
 import { MoneyText } from './MoneyText';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
 import { PaymentMethodBadge } from './PaymentMethodBadge';
+import { getIntlLocale } from '@/core/i18n/format';
+import { useTranslation } from 'react-i18next';
 
 interface ReceiptCardProps {
   receipt: Receipt;
@@ -17,7 +19,7 @@ interface ReceiptCardProps {
 function formatDate(dateStr?: string) {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return new Date(dateStr).toLocaleDateString(getIntlLocale(), {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -32,12 +34,13 @@ function formatDate(dateStr?: string) {
  * amount, method, status, and date. Purely presentational.
  */
 export const ReceiptCard = memo(function ReceiptCard({ receipt, onPress }: ReceiptCardProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={() => onPress(receipt)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`Receipt ${receipt.receiptNo ?? receipt.id}, ${receipt.memberName}, amount ${receipt.amount}`}
+      accessibilityLabel={t('billing.msg.receiptA11y', { receipt: receipt.receiptNo ?? receipt.id, name: receipt.memberName, amount: receipt.amount })}
     >
       {/* Header row */}
       <View style={styles.header}>

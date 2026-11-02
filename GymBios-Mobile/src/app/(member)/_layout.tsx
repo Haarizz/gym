@@ -32,6 +32,7 @@ export default function MemberLayout() {
         subtitle={MEMBER_HEADER.subtitle}
         headerColors={MEMBER_HEADER.headerColors}
         activeColor={MEMBER_HEADER.activeColor}
+        navColors={MEMBER_HEADER.navColors}
         tabs={MEMBER_TABS}
       />
     </BranchProvider>

@@ -92,6 +92,33 @@ const attendance = {
       "active": "Actif",
       "done": "Terminé",
       "completed": "Complété"
+    },
+    "summary": {
+      "title": "Résumé",
+      "totalCheckIns": "Total des passages",
+      "avgDaily": "Moy. journalière",
+      "rate": "Taux",
+      "peakHour": "Heure de pointe",
+      "activeMembers": "Membres actifs",
+      "daysInRange": "Jours de la période"
+    },
+    "periods": {
+      "7d": "7 jours",
+      "30d": "30 jours",
+      "90d": "90 jours",
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "this-week": "Cette semaine"
+    },
+    "misc": {
+      "insights": "Analyses",
+      "other": "Autre",
+      "open": "Ouvrir",
+      "quickStats": "Statistiques rapides",
+      "noStaffClockedIn": "Aucun membre du personnel pointé",
+      "noStaffClockedInDesc": "Aucun pointage du personnel ou des coachs aujourd'hui.",
+      "visitor": "Visiteur",
+      "user": "Utilisateur"
     }
   }
 };

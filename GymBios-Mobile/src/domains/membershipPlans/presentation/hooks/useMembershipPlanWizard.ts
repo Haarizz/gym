@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { MembershipPlan } from '../../domain/MembershipPlan';
 import type { MembershipPlanRequest } from '../../application/MembershipPlanRepository';
 import { useCreatePlan, useUpdatePlan } from './useMembershipPlans';
+import i18n from '@/core/i18n/i18n';
 
 export interface PlanWizardData {
   // Step 1: Basic Info
@@ -214,10 +215,10 @@ function buildRequest(data: PlanWizardData): MembershipPlanRequest {
 export function offerError(d: PlanWizardData): string | null {
   if (d.offerType === 'none') return null;
   const value = Number(d.offerValue);
-  if (!d.offerValue.trim() || !(value > 0)) return 'Enter an offer value greater than 0';
-  if (d.offerType === 'percentage' && value > 100) return "A percentage offer can't be more than 100%";
+  if (!d.offerValue.trim() || !(value > 0)) return i18n.t('membershipPlans.misc.offerValueRequired');
+  if (d.offerType === 'percentage' && value > 100) return i18n.t('membershipPlans.misc.offerPercentMax');
   if (d.offerStartDate && d.offerEndDate && d.offerEndDate < d.offerStartDate) {
-    return "The end date can't be before the start date";
+    return i18n.t('membershipPlans.misc.offerEndBeforeStart');
   }
   return null;
 }

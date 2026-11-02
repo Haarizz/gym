@@ -85,8 +85,8 @@ export function ReferralFormModal({
 
   const handleSubmit = () => {
     if (!referrerName.trim() || !refereeName.trim()) {
-      toast.info('Please enter both Referrer Name and Referred Person Name.', {
-        title: 'Required Fields'
+      toast.info(t('adminReferrals.msg.namesRequired'), {
+        title: t('common.requiredFields')
       });
       return;
     }
@@ -108,15 +108,15 @@ export function ReferralFormModal({
         },
         {
           onSuccess: () => {
-            toast.success('Referral updated successfully.', {
-              title: 'Success'
+            toast.success(t('adminReferrals.msg.updated'), {
+              title: t('common.success')
             });
             onClose();
             onSuccess?.();
           },
           onError: (err) => {
-            toast.error(err.message || 'Failed to update referral.', {
-              title: 'Error'
+            toast.error(err.message || t('adminReferrals.msg.updateFailed'), {
+              title: t('common.error')
             });
           },
         }
@@ -137,15 +137,15 @@ export function ReferralFormModal({
         },
         {
           onSuccess: () => {
-            toast.success('Referral registered successfully.', {
-              title: 'Success'
+            toast.success(t('adminReferrals.msg.created'), {
+              title: t('common.success')
             });
             onClose();
             onSuccess?.();
           },
           onError: (err) => {
-            toast.error(err.message || 'Failed to create referral.', {
-              title: 'Error'
+            toast.error(err.message || t('adminReferrals.msg.createFailed'), {
+              title: t('common.error')
             });
           },
         }
@@ -160,7 +160,7 @@ export function ReferralFormModal({
           {/* Header */}
           <View style={styles.modalHeader}>
             <Typography variant="title" style={styles.modalTitle}>
-              {isEditing ? 'Edit Referral' : 'Add a Referral'}
+              {isEditing ? t('adminReferrals.msg.editTitle') : t('adminReferrals.msg.addTitle')}
             </Typography>
             <Pressable onPress={onClose} hitSlop={8}>
               <Feather name="x" size={22} color={BrandColors.textPrimary} />
@@ -177,7 +177,7 @@ export function ReferralFormModal({
               onPress={() => setShowReferrerPicker(!showReferrerPicker)}
             >
               <Typography variant="bodySmall" style={referrerName ? styles.pickerValue : styles.pickerPlaceholder}>
-                {referrerName || 'Select a member...'}
+                {referrerName || t('adminReferrals.msg.selectMember')}
               </Typography>
               <Feather name="chevron-down" size={18} color={BrandColors.textSecondary} />
             </Pressable>
@@ -215,7 +215,7 @@ export function ReferralFormModal({
               onPress={() => setShowRefereePicker(!showRefereePicker)}
             >
               <Typography variant="bodySmall" style={refereeName ? styles.pickerValue : styles.pickerPlaceholder}>
-                {refereeName || 'Select member or type below...'}
+                {refereeName || t('adminReferrals.msg.selectMemberOrType')}
               </Typography>
               <Feather name="chevron-down" size={18} color={BrandColors.textSecondary} />
             </Pressable>
@@ -383,7 +383,7 @@ export function ReferralFormModal({
               style={{ flex: 1, marginRight: Spacing.two }}
             />
             <Button
-              title={isEditing ? (t('shared.wizard.saveChanges') || 'Save Changes') : (t('common.save') || 'Save')}
+              title={isEditing ? t('common.saveChanges') : t('common.save')}
               onPress={handleSubmit}
               loading={isSubmitting}
               style={{ flex: 1 }}

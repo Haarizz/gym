@@ -9,6 +9,7 @@ import { Typography } from '@/shared/components/Typography';
 import type { StatementLine } from '../../domain/Statement';
 import { StatementLineType } from '../../domain/Statement';
 import { MoneyText } from './MoneyText';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface StatementRowProps {
   line: StatementLine;
@@ -18,7 +19,7 @@ interface StatementRowProps {
 function formatDate(dateStr?: string) {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return new Date(dateStr).toLocaleDateString(getIntlLocale(), {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -59,7 +60,7 @@ export const StatementRow = memo(function StatementRow({
         <View style={styles.topRow}>
           <View style={styles.descBlock}>
             <Typography variant="bodySmall" style={styles.description}>
-              {line.description ?? (isPayment ? 'Payment Received' : 'Invoice')}
+              {line.description ?? (isPayment ? t('billing.msg.paymentReceived') : t('billing.msg.invoice'))}
             </Typography>
             <Typography variant="caption" color="textSecondary">
               {formatDate(line.date)}

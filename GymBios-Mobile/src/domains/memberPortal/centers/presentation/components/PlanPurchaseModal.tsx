@@ -8,7 +8,13 @@ import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
 import type { CenterPlan, CenterSummary } from '@/domains/discovery';
 import { usePurchaseMembership } from '@/domains/discovery/hooks/usePurchaseMembership';
-import { enterPurchasedGym } from '@/domains/gymSwitcher/gymMembershipsApi';
+import {
+  enterPurchasedGym,
+  getMyGymMemberships,
+  membershipAtGym,
+  refreshMyGymMemberships,
+} from '@/domains/gymSwitcher/gymMembershipsApi';
+import { AlreadyMemberSheet, type ExistingMembership } from './AlreadyMemberSheet';
 import { PaymentBottomSheet } from '@/shared/payment/presentation/bottomSheets/PaymentBottomSheet';
 import type { PaymentResult } from '@/shared/payment/types';
 import {
@@ -36,15 +42,19 @@ export function PlanPurchaseModal({
   const { t } = useTranslation();
   const purchaseMutation = usePurchaseMembership();
   // Step 1 offers a promotion or referral coupon code; step 2 is the payment sheet at the net price.
-  // 'already-member' is shown when the server rejects the purchase with 409 because
-  // this account already has a membership at this gym.
+  // 'already-member' is shown when the server refuses the purchase (409 ALREADY_MEMBER)
+  // because this account already has a membership at this gym. The centers screens check
+  // the member's gyms before opening this modal, so it's only reached when that list was
+  // out of date — and the server has refunded any gateway payment taken for it.
   const [step, setStep] = useState<'offer' | 'pay' | 'already-member'>('offer');
   const [couponSel, setCouponSel] = useState<RewardSelection>(null);
+  const [existing, setExisting] = useState<ExistingMembership | null>(null);
 
   // Reset on the way out so the next open starts at the coupon step again.
   const close = () => {
     setStep('offer');
     setCouponSel(null);
+    setExisting(null);
     onClose();
   };
 
@@ -56,6 +66,22 @@ export function PlanPurchaseModal({
   const couponDiscount = selectionDiscount(couponSel, offerPrice);
   const totalAmount = Math.max(0, offerPrice - couponDiscount);
   const couponCode = couponSel?.kind === 'coupon' ? couponSel.coupon.code : undefined;
+
+  const showAlreadyMember = async (branchId: unknown) => {
+    // The list was stale (that's how the member got this far), so refresh it for the
+    // gym and branch names.
+    await refreshMyGymMemberships();
+    const gyms = await getMyGymMemberships();
+    setExisting(
+      membershipAtGym(gyms, center.tenantSlug) ?? {
+        tenantSlug: center.tenantSlug,
+        branchId: typeof branchId === 'number' ? branchId : null,
+        gymName: center.centerName,
+        branchName: null,
+      },
+    );
+    setStep('already-member');
+  };
 
   const handlePayNow = (result: PaymentResult) => {
     purchaseMutation.mutate(
@@ -96,7 +122,7 @@ export function PlanPurchaseModal({
         },
         onError: (err: any) => {
           if (err?.status === 409) {
-            setStep('already-member');
+            void showAlreadyMember(err?.body?.branchId);
             return;
           }
           toast.error(err?.message || t('centers.purchase.failed'), { title: t('centers.purchase.failedTitle') });
@@ -181,27 +207,14 @@ export function PlanPurchaseModal({
         onComplete={handlePayNow}
       />
 
-      <Modal visible={visible && step === 'already-member'} animationType="slide" transparent onRequestClose={close}>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <View style={styles.noticeBody}>
-              <View style={styles.noticeIcon}>
-                <Feather name="user-check" size={28} color={BrandColors.memberGold} />
-              </View>
-              <Text style={styles.noticeTitle}>{t('centers.purchase.alreadyTitle')}</Text>
-              <Text style={styles.noticeText}>
-                {t('centers.purchase.alreadyBody', { center: center.centerName })}
-              </Text>
-            </View>
-
-            <View style={styles.footer}>
-              <Pressable style={styles.continueButton} onPress={close}>
-                <Text style={styles.continueText}>{t('centers.purchase.gotIt')}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AlreadyMemberSheet
+        visible={visible && step === 'already-member'}
+        centerName={center.centerName}
+        centerBranchId={center.branchId}
+        membership={existing}
+        afterRefusedPayment
+        onClose={close}
+      />
     </>
   );
 }
@@ -288,33 +301,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: BrandColors.memberGold,
-  },
-  noticeBody: {
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.four,
-    gap: Spacing.two,
-  },
-  noticeIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
-    backgroundColor: BrandColors.screenBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
-  },
-  noticeTitle: {
-    fontSize: TypographyScale.title,
-    fontWeight: '800',
-    color: BrandColors.textPrimary,
-    textAlign: 'center',
-  },
-  noticeText: {
-    fontSize: 14,
-    color: BrandColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
   },
   footer: {
     padding: Spacing.four,

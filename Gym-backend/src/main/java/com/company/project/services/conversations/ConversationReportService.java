@@ -147,6 +147,7 @@ public class ConversationReportService {
         return new ConversationReportDTO(r.getId(), r.getBranchId(),
                 branchRepository.findById(r.getBranchId()).map(Branch::getBranchName).orElse(null),
                 c.getId(),
+                c.getMemberId(),
                 member != null ? member.getName() : null,
                 member != null ? member.getMemberId() : null,
                 c.isFrontDesk() ? "Front desk" : staff != null ? staff.getName() : null,

@@ -39,7 +39,7 @@ export function ErrorState({
 
       {onRetry && (
         <Button
-          label={t('common.retry', { defaultValue: 'Try Again' })}
+          label={t('common.retry')}
           onPress={onRetry}
           variant="secondary"
           style={styles.button}

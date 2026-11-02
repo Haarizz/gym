@@ -29,6 +29,7 @@ import { FamilyStep } from '../components/form/FamilyStep';
 import { AppAccessStep } from '../components/form/AppAccessStep';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { translateValue } from '@/core/i18n/format';
 
 interface MemberFormScreenProps {
   mode: 'create' | 'edit';
@@ -256,7 +257,7 @@ export function MemberFormScreen({
               onPress={() => setShowDiscardDialog(true)}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Close form"
+              accessibilityLabel={t('shared.closeForm')}
               style={({ pressed }) => [
                 styles.iconButton,
                 { borderColor: theme.border },
@@ -376,7 +377,7 @@ export function MemberFormScreen({
       <PaymentBottomSheet
         visible={showPaymentSheet}
         amount={parseFloat(data.membershipFee || '0')}
-        title={data.membershipType || 'Membership Registration'}
+        title={data.membershipType ? translateValue('membershipType', data.membershipType) : t('members.registrationTitle')}
         subtitle={data.name ? `Member: ${data.name}` : undefined}
         payer="staff"
         onClose={() => setShowPaymentSheet(false)}

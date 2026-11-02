@@ -21,6 +21,7 @@ import type { FollowUp } from '../../domain/FollowUp';
 import type { FollowUpRequest } from '../../domain/FollowUpRequest';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { localizeOptions, translateValue, tOr } from '@/core/i18n/format';
 
 interface AddFollowUpSheetProps {
   visible: boolean;
@@ -70,11 +71,11 @@ export function AddFollowUpSheet({
 
   const staffOptions = useMemo(() => {
     const list = (staff || []).map(s => ({
-      label: s.name ? `${s.name}${s.role ? ` (${s.role})` : ''}` : s.email,
+      label: s.name ? `${s.name}${s.role ? ` (${translateValue('role', s.role)})` : ''}` : s.email,
       value: s.name || s.email,
     }));
-    return [{ label: 'Unassigned', value: '' }, ...list];
-  }, [staff]);
+    return [{ label: t('common.unassigned'), value: '' }, ...list];
+  }, [staff, t]);
 
   // Form states
   const [leadId, setLeadId] = useState('');
@@ -115,20 +116,20 @@ export function AddFollowUpSheet({
 
   const handleSubmit = () => {
     if (!leadId) {
-      toast.error('Please select a member or lead.', {
-        title: 'Validation Error'
+      toast.error(t('followUps.msg.selectMemberOrLead'), {
+        title: t('common.validationError')
       });
       return;
     }
     if (!subject.trim()) {
-      toast.error('Follow-up subject is required.', {
-        title: 'Validation Error'
+      toast.error(t('followUps.msg.subjectRequired'), {
+        title: t('common.validationError')
       });
       return;
     }
     if (!dueDate) {
-      toast.error('Due date is required.', {
-        title: 'Validation Error'
+      toast.error(t('followUps.msg.dueDateRequired'), {
+        title: t('common.validationError')
       });
       return;
     }
@@ -182,7 +183,7 @@ export function AddFollowUpSheet({
             <Dropdown
               label={t('followUps.followUpType')}
               value={type}
-              options={TYPE_OPTIONS}
+              options={localizeOptions(TYPE_OPTIONS, 'channel')}
               onChange={setType}
             />
 
@@ -198,7 +199,7 @@ export function AddFollowUpSheet({
             <Dropdown
               label={t('followUps.priority')}
               value={priority}
-              options={PRIORITY_OPTIONS}
+              options={localizeOptions(PRIORITY_OPTIONS, 'priority')}
               onChange={setPriority}
             />
 
@@ -276,7 +277,7 @@ export function AddFollowUpSheet({
             >
               <Text style={styles.submitBtnText}>
                 {submitting
-                  ? t('common.pleaseWait', 'Saving...')
+                  ? t('common.saving')
                   : editingFollowUp
                   ? t('common.saveChanges', 'Save Changes')
                   : t('followUps.addFollowUp')}

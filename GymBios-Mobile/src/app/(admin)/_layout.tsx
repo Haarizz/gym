@@ -14,6 +14,7 @@ export default function AdminLayout() {
         subtitle={ADMIN_HEADER.subtitle}
         headerColors={ADMIN_HEADER.headerColors}
         activeColor={ADMIN_HEADER.activeColor}
+        navColors={ADMIN_HEADER.navColors}
         tabs={ADMIN_TABS}
       />
     </BranchProvider>

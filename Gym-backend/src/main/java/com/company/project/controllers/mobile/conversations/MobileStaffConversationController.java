@@ -38,6 +38,15 @@ public class MobileStaffConversationController {
         return ResponseEntity.ok(Map.of("count", service.staffUnreadTotal(principal)));
     }
 
+    /** GET ?search=&limit=100 — members the caller can start a chat with (or already chats with), by name. */
+    @GetMapping("/members")
+    public ResponseEntity<List<ChatMemberDTO>> members(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer limit) {
+        return ResponseEntity.ok(service.staffMembers(principal, search, limit));
+    }
+
     /** GET ?member_id=40 — the caller's own thread with that member, and whether one can be started. */
     @GetMapping("/lookup")
     public ResponseEntity<ConversationLookupDTO> lookup(

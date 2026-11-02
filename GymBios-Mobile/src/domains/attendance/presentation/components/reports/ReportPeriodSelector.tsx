@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { ReportPeriod } from '../../hooks/useReportDateRange';
+import { useTranslation } from 'react-i18next';
 
 const PERIOD_OPTIONS: { value: ReportPeriod; label: string }[] = [
   { value: '7d', label: '7 Days' },
@@ -16,6 +17,7 @@ interface ReportPeriodSelectorProps {
 }
 
 export function ReportPeriodSelector({ value, onChange }: ReportPeriodSelectorProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {PERIOD_OPTIONS.map(option => (
@@ -29,7 +31,7 @@ export function ReportPeriodSelector({ value, onChange }: ReportPeriodSelectorPr
             variant="caption"
             style={[styles.tabText, value === option.value && styles.tabTextActive]}
           >
-            {option.label}
+            {t(`attendance.periods.${option.value}`, { defaultValue: option.label })}
           </Typography>
         </Pressable>
       ))}

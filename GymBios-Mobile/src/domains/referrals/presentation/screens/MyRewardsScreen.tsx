@@ -14,6 +14,7 @@ import type { Member } from '@/domains/members';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 export function MyRewardsScreen() {
   const { t } = useTranslation();
@@ -36,13 +37,13 @@ export function MyRewardsScreen() {
   const handleRedeem = (rewardId: number, label: string) => {
     redeemMutation.mutate(rewardId, {
       onSuccess: () => {
-        toast.success(`${label} redeemed successfully.`, {
-          title: 'Success'
+        toast.success(t('adminReferrals.msg.redeemed', { label }), {
+          title: t('common.success')
         });
       },
       onError: (err) => {
-        toast.error(err.message || 'Failed to redeem reward.', {
-          title: 'Error'
+        toast.error(err.message || t('adminReferrals.msg.redeemFailed'), {
+          title: t('common.error')
         });
       },
     });
@@ -92,7 +93,7 @@ export function MyRewardsScreen() {
                     {m.name}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
-                    {m.memberId || m.id} • {m.phone || 'No phone'}
+                    {m.memberId || m.id} • {m.phone || t('adminReferrals.msg.noPhone')}
                   </Typography>
                 </Pressable>
               ))}
@@ -116,7 +117,7 @@ export function MyRewardsScreen() {
                 </View>
                 <View style={styles.activeBadge}>
                   <Typography variant="caption" style={styles.activeBadgeText}>
-                    {selectedMember.status || 'Active'}
+                    {translateValue('status', selectedMember.status || 'active')}
                   </Typography>
                 </View>
               </View>
@@ -127,7 +128,7 @@ export function MyRewardsScreen() {
                     {t('adminReferrals.planLabel')}
                   </Typography>
                   <Typography variant="bodySmall" style={styles.infoVal}>
-                    {selectedMember.membershipPlanName || selectedMember.membershipType || 'Standard'}
+                    {selectedMember.membershipPlanName || selectedMember.membershipType || t('adminReferrals.msg.standardPlan')}
                   </Typography>
                 </View>
                 <View style={styles.infoCol}>
@@ -196,7 +197,7 @@ export function MyRewardsScreen() {
                 <View style={styles.rewardActionRow}>
                   <Button
                     title={t('adminReferrals.claimCredit')}
-                    onPress={() => handleRedeem(1, 'Wallet credit')}
+                    onPress={() => handleRedeem(1, t('adminReferrals.msg.walletCredit'))}
                     loading={redeemMutation.isPending}
                     style={styles.claimBtn}
                   />
@@ -222,7 +223,7 @@ export function MyRewardsScreen() {
                 <View style={styles.rewardActionRow}>
                   <Button
                     title={t('adminReferrals.bookPtSession')}
-                    onPress={() => handleRedeem(2, 'PT Session')}
+                    onPress={() => handleRedeem(2, t('adminReferrals.msg.ptSession'))}
                     loading={redeemMutation.isPending}
                     style={styles.claimBtn}
                   />

@@ -15,6 +15,7 @@ import { BillingSkeleton, ErrorState, MoneyText } from '../components';
 import { exportCollectionCsv } from '../utils/exportCollectionReport';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { translateValue } from '@/core/i18n/format';
 
 interface CollectionReportsScreenProps {
   onBack: () => void;
@@ -44,18 +45,18 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
     try {
       const { receipts } = await billingService.getMemberReceipts({ limit: EXPORT_RECEIPT_LIMIT });
       if (receipts.length === 0) {
-        toast.info('No receipts to export', { title: 'Export CSV' });
+        toast.info(t('billing.msg.noReceiptsExport'), { title: t('common.exportCsv') });
         return;
       }
       const filename = await exportCollectionCsv(receipts);
-      toast.success(`Exported ${receipts.length} receipt(s) to ${filename}`, { title: 'Export CSV' });
+      toast.success(t('billing.msg.receiptsExported', { count: receipts.length, file: filename }), { title: t('common.exportCsv') });
     } catch (e) {
       console.error('Collection report export failed:', e);
-      toast.error('Failed to export collection report.', { title: 'Export CSV' });
+      toast.error(t('billing.msg.reportExportFailed'), { title: t('common.exportCsv') });
     } finally {
       setExporting(false);
     }
-  }, [exporting]);
+  }, [exporting, t]);
 
   const monthlyCollection = stats?.monthlyCollection ?? 0;
   const collectionRate = stats?.collectionRate ?? 0;
@@ -130,7 +131,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
                 variant="caption"
                 style={[styles.periodTabText, period === p && styles.periodTabTextActive]}
               >
-                {p} {t('billing.reports.report')}
+                {t(`billing.periods.${p}`)} {t('billing.reports.report')}
               </Typography>
             </Pressable>
           ))}
@@ -140,7 +141,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
         <View style={styles.cardRow}>
           <View style={styles.statCard}>
             <Typography variant="caption" color="textSecondary">
-              {t('billing.reports.totalCollection')} ({period})
+              {t('billing.reports.totalCollection')} ({t(`billing.periods.${period}`)})
             </Typography>
             <MoneyText amount={monthlyCollection} variant="bodySmallBold" color={BrandColors.teal} />
           </View>
@@ -185,7 +186,7 @@ export function CollectionReportsScreen({ onBack }: CollectionReportsScreenProps
               <View key={item.method} style={styles.breakdownItem}>
                 <View style={styles.breakdownHeader}>
                   <Typography variant="caption" style={styles.methodName}>
-                    {item.method}
+                    {translateValue('paymentMethod', item.method)}
                   </Typography>
                   <View style={styles.breakdownValues}>
                     <MoneyText amount={item.amount} variant="caption" color={BrandColors.textPrimary} />

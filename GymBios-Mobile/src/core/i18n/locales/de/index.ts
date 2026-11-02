@@ -25,6 +25,7 @@ import schedule from './schedule';
 import performance from './performance';
 import ledger from './ledger';
 import messaging from './messaging';
+import conversations from './conversations';
 import leads from './leads';
 import members from './members';
 import attendance from './attendance';
@@ -67,6 +68,7 @@ const de: LocaleResource = {
   ...performance,
   ...ledger,
   ...messaging,
+  ...conversations,
   ...leads,
   ...members,
   ...attendance,

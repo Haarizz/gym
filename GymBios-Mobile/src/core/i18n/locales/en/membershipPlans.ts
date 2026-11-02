@@ -153,6 +153,59 @@ const membershipPlans = {
         none: 'None',
       },
     },
+    "misc": {
+      "draft": "Draft",
+      "offerValueRequired": "Enter an offer value greater than 0",
+      "offerPercentMax": "A percentage offer can't be more than 100%",
+      "offerEndBeforeStart": "The end date can't be before the start date"
+    },
+    "misc2": {
+      "options": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "year": "Year",
+        "unlimited": "Unlimited",
+        "limited": "Limited",
+        "none": "None",
+        "per_day": "Per Day",
+        "per_week": "Per Week",
+        "per_month": "Per Month",
+        "standard": "Standard",
+        "premium": "Premium",
+        "vip": "VIP",
+        "student": "Student",
+        "corporate": "Corporate",
+        "individual": "Individual",
+        "couple": "Couple",
+        "family": "Family",
+        "walk_in": "Walk-In",
+        "active": "Active",
+        "inactive": "Inactive",
+        "draft": "Draft",
+        "archived": "Archived",
+        "all": "All"
+      },
+      "wizardSteps": {
+        "basic": "Basic Info",
+        "duration": "Pricing",
+        "sessions": "Capacity",
+        "family": "Family",
+        "freeze": "Freeze",
+        "assignments": "Assign"
+      },
+      "family": {
+        "coupleHeadPays": "Couple head pays for both",
+        "familyHeadPays": "Family head pays for everyone",
+        "coupleHeadDesc": "The partner is added under the couple head and the whole plan is billed to the head on one invoice.",
+        "familyHeadDesc": "Family members are added under the family head and the whole plan is billed to the head on one invoice.",
+        "coupleAutoHint": "With Auto Calculate on, the invoice is this price × 2; leave blank to charge the subscription price for the couple.",
+        "familyAutoHint": "With Auto Calculate on, the invoice is this price × members; leave blank to charge the subscription price for the whole family.",
+        "example": "Example: {{price}} × {{count}} members = {{total}} on ONE invoice billed to the head.",
+        "wholeCouple": "The subscription price ({{price}}) is the whole couple's ONE invoice, billed to the head.",
+        "wholeFamily": "The subscription price ({{price}}) is the whole family's ONE invoice, billed to the head."
+      }
+    }
   },
 };
 

@@ -403,7 +403,26 @@ const members = {
       "daysLeft_other": "Noch {{count}} Tage",
       "expiredAgo_one": "Vor {{count}} Tag abgelaufen",
       "expiredAgo_other": "Vor {{count}} Tagen abgelaufen"
-    }
+    },
+    "wizardSteps": {
+      "personal": "Persönliche Daten",
+      "membership": "Mitgliedschaftsdaten",
+      "medical": "Medizinische Daten",
+      "family": "Familienkonfiguration",
+      "access": "App-Zugang & Prüfung"
+    },
+    "reviewSections": {
+      "personal": "Persönlich",
+      "membership": "Mitgliedschaft",
+      "health": "Gesundheit",
+      "family": "Familie",
+      "familyHead": "Familienoberhaupt"
+    },
+    "registrationTitle": "Mitgliedschaftsanmeldung",
+    "renewalLabel": "Verlängerung",
+    "renewalWithPlan": "Verlängerung · {{plan}}",
+    "callA11y": "{{name}} anrufen",
+    "memberSubtitle": "Mitglied: {{name}}"
   }
 };
 

@@ -25,6 +25,7 @@ import {
 import { useFollowUp } from '../../hooks/useFollowUps';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { getIntlLocale, localizeOptions, translateValue, tOr } from '@/core/i18n/format';
 
 interface FollowUpDetailsSheetProps {
   visible: boolean;
@@ -88,8 +89,8 @@ export function FollowUpDetailsSheet({
 
   const handleCall = () => {
     if (!followUp?.leadPhone) {
-      toast.info('No phone number available.', {
-        title: 'No Phone'
+      toast.info(t('common.noPhoneAvailable'), {
+        title: t('common.noPhoneNumber')
       });
       return;
     }
@@ -98,8 +99,8 @@ export function FollowUpDetailsSheet({
 
   const handleEmail = () => {
     if (!followUp?.leadEmail) {
-      toast.info('No email address available.', {
-        title: 'No Email'
+      toast.info(t('common.noEmailAvailable'), {
+        title: t('common.noEmailAddress')
       });
       return;
     }
@@ -108,8 +109,8 @@ export function FollowUpDetailsSheet({
 
   const handleAddRecordSubmit = () => {
     if (!recordNotes.trim()) {
-      toast.error('Notes are required for communication record.', {
-        title: 'Validation Error'
+      toast.error(t('followUps.msg.notesRequired'), {
+        title: t('common.validationError')
       });
       return;
     }
@@ -134,8 +135,8 @@ export function FollowUpDetailsSheet({
           setRecordNextAction('');
         },
         onError: err => {
-          toast.error(err.message || 'Failed to add communication record.', {
-            title: 'Error'
+          toast.error(err.message || t('followUps.msg.addRecordFailed'), {
+            title: t('common.error')
           });
         },
       },
@@ -144,12 +145,12 @@ export function FollowUpDetailsSheet({
 
   const handleDeleteRecord = (record: CommunicationRecord) => {
     Alert.alert(
-      'Delete Record',
-      'Are you sure you want to delete this communication record?',
+      t('followUps.msg.deleteRecordTitle'),
+      t('followUps.msg.deleteRecordBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteRecordMutation.mutate({
@@ -178,7 +179,7 @@ export function FollowUpDetailsSheet({
           <View style={styles.modalHeader}>
             <View>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {followUp?.subject || 'Follow-up Details'}
+                {followUp?.subject || t('followUps.msg.detailsTitle')}
               </Text>
               <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
                 {followUp?.leadName}
@@ -238,28 +239,28 @@ export function FollowUpDetailsSheet({
                   <View style={styles.gridItem}>
                     <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.type')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
-                      {followUp.type.toUpperCase()}
+                      {translateValue('channel', followUp.type)}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
                     <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.status')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
-                      {followUp.status.toUpperCase()}
+                      {translateValue('status', followUp.status)}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
                     <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.priority')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
-                      {followUp.priority.toUpperCase()}
+                      {translateValue('priority', followUp.priority)}
                     </Text>
                   </View>
 
                   <View style={styles.gridItem}>
                     <Text style={[styles.gridLabel, { color: theme.textSecondary }]}>{t('followUps.dueDate')}</Text>
                     <Text style={[styles.gridValue, { color: theme.text }]}>
-                      {new Date(followUp.dueDate).toLocaleDateString()}
+                      {new Date(followUp.dueDate).toLocaleDateString(getIntlLocale())}
                     </Text>
                   </View>
                 </View>
@@ -310,7 +311,7 @@ export function FollowUpDetailsSheet({
                         <View style={styles.recordTypeTag}>
                           <Feather name="message-square" size={12} color={BrandColors.teal} />
                           <Text style={[styles.recordTypeText, { color: BrandColors.teal }]}>
-                            {record.type} • {record.outcome}
+                            {translateValue('channel', record.type)} • {tOr(`followUps.outcomes.${record.outcome.replace(/-/g, '_')}`, record.outcome)}
                           </Text>
                         </View>
                         <TouchableOpacity onPress={() => handleDeleteRecord(record)}>
@@ -323,8 +324,8 @@ export function FollowUpDetailsSheet({
                       </Text>
 
                       <Text style={[styles.recordMeta, { color: theme.textSecondary }]}>
-                        {new Date(record.date).toLocaleString()}
-                        {record.staffMember ? ` by ${record.staffMember}` : ''}
+                        {new Date(record.date).toLocaleString(getIntlLocale())}
+                        {record.staffMember ? ` · ${record.staffMember}` : ''}
                       </Text>
                     </View>
                   ))
@@ -409,14 +410,14 @@ export function FollowUpDetailsSheet({
               <Dropdown
                 label={t('followUps.communicationType')}
                 value={recordType}
-                options={RECORD_TYPE_OPTIONS}
+                options={localizeOptions(RECORD_TYPE_OPTIONS, 'channel')}
                 onChange={setRecordType}
               />
 
               <Dropdown
                 label={t('followUps.outcome')}
                 value={recordOutcome}
-                options={OUTCOME_OPTIONS}
+                options={localizeOptions(OUTCOME_OPTIONS, { prefix: 'followUps.outcomes' })}
                 onChange={setRecordOutcome}
               />
 
@@ -486,7 +487,7 @@ export function FollowUpDetailsSheet({
                 disabled={addRecordMutation.isPending}
               >
                 <Text style={styles.footerBtnText}>
-                  {addRecordMutation.isPending ? 'Saving...' : 'Save Record'}
+                  {addRecordMutation.isPending ? t('common.saving') : t('followUps.msg.saveRecord')}
                 </Text>
               </TouchableOpacity>
             </View>

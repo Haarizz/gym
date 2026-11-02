@@ -42,13 +42,13 @@ export function ReferralSettingsScreen() {
   const handleSave = () => {
     updateSettingsMutation.mutate(settings, {
       onSuccess: () => {
-        toast.success('Program settings saved successfully.', {
-          title: 'Success'
+        toast.success(t('adminReferrals.msg.settingsSaved'), {
+          title: t('common.success')
         });
       },
       onError: (err) => {
-        toast.error(err.message || 'Failed to save settings.', {
-          title: 'Error'
+        toast.error(err.message || t('adminReferrals.msg.settingsFailed'), {
+          title: t('common.error')
         });
       },
     });

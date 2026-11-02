@@ -12,6 +12,10 @@ export interface TeamMember {
   ratingCount: number;
   /** The signed-in member's own rating, if they've rated this person. */
   myRating: number | null;
+  /** Whether the Message button can start / continue a chat; if not, why (a refusal code + message). */
+  canMessage: boolean;
+  messageUnavailableCode: string | null;
+  messageUnavailableReason: string | null;
 }
 
 export interface StaffReview {

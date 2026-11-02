@@ -4,6 +4,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { PeakHourRow } from '../../../domain/AttendanceReport';
 import { AttendanceSection } from '../shared';
+import { useTranslation } from 'react-i18next';
 
 interface PeakHoursListProps {
   rows: PeakHourRow[];
@@ -17,6 +18,7 @@ function rowTotal(row: PeakHourRow): number {
 }
 
 export function PeakHoursList({ rows }: PeakHoursListProps) {
+  const { t } = useTranslation();
   // Sort by total visits descending and show top 8 hours.
   const sorted = [...rows]
     .sort((a, b) => rowTotal(b) - rowTotal(a))
@@ -29,7 +31,7 @@ export function PeakHoursList({ rows }: PeakHoursListProps) {
   }
 
   return (
-    <AttendanceSection title="Peak Hours">
+    <AttendanceSection title={t('attendance.reports.peakHours')}>
       <View style={styles.list}>
         {sorted.map((row, index) => {
           const visits = rowTotal(row);

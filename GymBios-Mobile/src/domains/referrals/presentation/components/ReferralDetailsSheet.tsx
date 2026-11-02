@@ -43,15 +43,15 @@ export function ReferralDetailsSheet({
       { id: Number(referral.id) },
       {
         onSuccess: () => {
-          toast.success('Referral marked as successful!', {
-            title: 'Success'
+          toast.success(t('adminReferrals.msg.markedSuccessful'), {
+            title: t('common.success')
           });
           onClose();
           onSuccess?.();
         },
         onError: (err) => {
-          toast.error(err.message || 'Failed to update referral status.', {
-            title: 'Error'
+          toast.error(err.message || t('adminReferrals.msg.statusUpdateFailed'), {
+            title: t('common.error')
           });
         },
       }
@@ -61,15 +61,15 @@ export function ReferralDetailsSheet({
   const handleMarkExpired = () => {
     markExpiredMutation.mutate(Number(referral.id), {
       onSuccess: () => {
-        toast.success('Referral marked as expired.', {
-          title: 'Success'
+        toast.success(t('adminReferrals.msg.markedExpired'), {
+          title: t('common.success')
         });
         onClose();
         onSuccess?.();
       },
       onError: (err) => {
-        toast.error(err.message || 'Failed to update referral status.', {
-          title: 'Error'
+        toast.error(err.message || t('adminReferrals.msg.statusUpdateFailed'), {
+          title: t('common.error')
         });
       },
     });

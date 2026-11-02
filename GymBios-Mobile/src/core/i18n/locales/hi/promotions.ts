@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "सांख्यिकी",
     "tryAgain": "पुनः प्रयास करें",
     "clearFilters": "फ़िल्टर साफ़ करें",
-    "createPromotion": "प्रमोशन बनाएं"
+    "createPromotion": "प्रमोशन बनाएं",
+    "opts": {
+      "types": {
+        "all": "सभी प्रकार",
+        "discount": "छूट",
+        "voucher": "वाउचर",
+        "combo": "कॉम्बो",
+        "bogo": "एक के साथ एक मुफ़्त",
+        "seasonal": "मौसमी",
+        "loyalty": "लॉयल्टी",
+        "promotional_access_days": "प्रमोशनल एक्सेस दिन",
+        "promo": "प्रोमो"
+      },
+      "categories": {
+        "all": "सभी श्रेणियाँ",
+        "membership": "सदस्यता",
+        "services": "सेवाएँ",
+        "special_events": "विशेष कार्यक्रम",
+        "loyalty": "लॉयल्टी",
+        "demographics": "जनसांख्यिकी"
+      },
+      "discountTypes": {
+        "percentage": "प्रतिशत",
+        "fixed": "निश्चित राशि",
+        "free": "मुफ़्त/एक के साथ एक",
+        "promotional_access_days": "प्रमोशनल एक्सेस दिन"
+      },
+      "priorities": {
+        "1": "उच्च (1)",
+        "2": "मध्यम (2)",
+        "3": "निम्न (3)"
+      },
+      "audience": {
+        "all": "सभी सदस्य",
+        "new_members": "नए सदस्य",
+        "existing_members": "मौजूदा सदस्य",
+        "vip": "VIP सदस्य",
+        "specific": "चुनिंदा सदस्य"
+      },
+      "channels": {
+        "website": "वेबसाइट",
+        "app": "मोबाइल ऐप",
+        "email": "ईमेल",
+        "sms": "SMS",
+        "in_person": "व्यक्तिगत रूप से"
+      },
+      "allStatus": "सभी स्थितियाँ"
+    },
+    "steps": {
+      "basic": "मूल जानकारी",
+      "discount": "छूट",
+      "targeting": "लक्ष्यीकरण",
+      "settings": "सेटिंग्स"
+    },
+    "msg": {
+      "createTitle": "नया प्रमोशन बनाएँ",
+      "editTitle": "प्रमोशन संपादित करें",
+      "createSubmit": "प्रमोशन बनाएँ",
+      "keepEditing": "संपादन जारी रखें",
+      "discard": "छोड़ें",
+      "saveFailed": "प्रमोशन सहेजा नहीं जा सका। कृपया डेटा जाँचें और फिर से कोशिश करें।",
+      "shareCode": "{{discount}} के लिए प्रमोशन कोड \"{{code}}\" का उपयोग करें!",
+      "duplicated": "\"{{name}}\" की प्रतिलिपि बनाई गई।",
+      "duplicateFailed": "प्रमोशन की प्रतिलिपि नहीं बन सकी।",
+      "deleteTitle": "प्रमोशन हटाएँ",
+      "deleteBody": "क्या आप वाकई \"{{name}}\" हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।",
+      "deleted": "\"{{name}}\" हटाया गया।",
+      "deleteFailed": "प्रमोशन हटाया नहीं जा सका।",
+      "system": "सिस्टम",
+      "normal": "सामान्य",
+      "noEndDate": "कोई समाप्ति तिथि नहीं",
+      "percentOff": "{{value}}% छूट",
+      "amountOff": "{{value}} छूट",
+      "offSuffix": " छूट",
+      "specialOffer": "विशेष ऑफ़र",
+      "revenueSuffix": " राजस्व",
+      "maxDiscount": "अधिकतम छूट ({{currency}})"
+    }
   }
 };
 

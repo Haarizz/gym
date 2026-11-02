@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "Statistiken",
     "tryAgain": "Erneut versuchen",
     "clearFilters": "Filter löschen",
-    "createPromotion": "Aktion erstellen"
+    "createPromotion": "Aktion erstellen",
+    "opts": {
+      "types": {
+        "all": "Alle Typen",
+        "discount": "Rabatt",
+        "voucher": "Gutschein",
+        "combo": "Kombi",
+        "bogo": "1+1 gratis",
+        "seasonal": "Saisonal",
+        "loyalty": "Treue",
+        "promotional_access_days": "Aktions-Zugangstage",
+        "promo": "Aktion"
+      },
+      "categories": {
+        "all": "Alle Kategorien",
+        "membership": "Mitgliedschaft",
+        "services": "Leistungen",
+        "special_events": "Sonderveranstaltungen",
+        "loyalty": "Treue",
+        "demographics": "Demografie"
+      },
+      "discountTypes": {
+        "percentage": "Prozent",
+        "fixed": "Fester Betrag",
+        "free": "Gratis/1+1",
+        "promotional_access_days": "Aktions-Zugangstage"
+      },
+      "priorities": {
+        "1": "Hoch (1)",
+        "2": "Mittel (2)",
+        "3": "Niedrig (3)"
+      },
+      "audience": {
+        "all": "Alle Mitglieder",
+        "new_members": "Neue Mitglieder",
+        "existing_members": "Bestehende Mitglieder",
+        "vip": "VIP-Mitglieder",
+        "specific": "Bestimmte Mitglieder"
+      },
+      "channels": {
+        "website": "Website",
+        "app": "Mobile App",
+        "email": "E-Mail",
+        "sms": "SMS",
+        "in_person": "Persönlich"
+      },
+      "allStatus": "Alle Status"
+    },
+    "steps": {
+      "basic": "Grunddaten",
+      "discount": "Rabatt",
+      "targeting": "Zielgruppe",
+      "settings": "Einstellungen"
+    },
+    "msg": {
+      "createTitle": "Neue Aktion erstellen",
+      "editTitle": "Aktion bearbeiten",
+      "createSubmit": "Aktion erstellen",
+      "keepEditing": "Weiter bearbeiten",
+      "discard": "Verwerfen",
+      "saveFailed": "Aktion konnte nicht gespeichert werden. Bitte prüfe die Eingaben und versuche es erneut.",
+      "shareCode": "Nutze den Aktionscode „{{code}}“ für {{discount}}!",
+      "duplicated": "Kopie von „{{name}}“ erstellt.",
+      "duplicateFailed": "Aktion konnte nicht dupliziert werden.",
+      "deleteTitle": "Aktion löschen",
+      "deleteBody": "Möchtest du „{{name}}“ wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
+      "deleted": "„{{name}}“ gelöscht.",
+      "deleteFailed": "Aktion konnte nicht gelöscht werden.",
+      "system": "System",
+      "normal": "Normal",
+      "noEndDate": "Kein Enddatum",
+      "percentOff": "{{value}} % RABATT",
+      "amountOff": "{{value}} RABATT",
+      "offSuffix": " Rabatt",
+      "specialOffer": "SONDERANGEBOT",
+      "revenueSuffix": " Umsatz",
+      "maxDiscount": "Maximaler Rabatt ({{currency}})"
+    }
   }
 };
 

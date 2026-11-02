@@ -37,7 +37,7 @@ export function MemberTrendsList({
             </View>
             <View style={styles.info}>
               <Typography variant="bodySmallBold" numberOfLines={1}>
-                {row.name || 'Unknown'}
+                {row.name || t('common.unknown')}
               </Typography>
               <Typography variant="caption" color="textSecondary">
                 {`${row.visits ?? 0} `}{t('attendance.reports.visits')}

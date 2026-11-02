@@ -8,6 +8,7 @@ import { AppHeader } from '@/shared/components/AppHeader';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { BrandColors, Spacing, TypographyScale, Radius } from '@/core/theme';
 import { useMessagingHistory } from '../../hooks/useMessagingHooks';
+import { getIntlLocale } from '@/core/i18n/format';
 
 export function MessagingHistoryScreen() {
   const { t } = useTranslation();
@@ -59,7 +60,7 @@ export function MessagingHistoryScreen() {
               <View style={styles.stat}>
                 <Text style={styles.statLabel}>{t('messaging.history.sentDate')}</Text>
                 <Text style={styles.statValue}>
-                  {new Date(item.sentDate).toLocaleDateString()}
+                  {new Date(item.sentDate).toLocaleDateString(getIntlLocale())}
                 </Text>
               </View>
             </View>

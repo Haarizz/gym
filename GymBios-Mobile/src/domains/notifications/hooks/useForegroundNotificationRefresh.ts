@@ -10,6 +10,7 @@ import {
   PAYMENT_APPROVED_NOTIFICATION_TYPE,
   PAYMENT_REJECTED_NOTIFICATION_TYPE,
 } from '../domain/notificationRoutes';
+import { CONVERSATION_PUSH_TYPE } from '@/domains/conversations/domain/types';
 
 const PAYMENT_DECISION_TYPES: unknown[] = [PAYMENT_APPROVED_NOTIFICATION_TYPE, PAYMENT_REJECTED_NOTIFICATION_TYPE];
 const BOOKING_PAYMENT_DECISION_TYPES: unknown[] = [
@@ -29,6 +30,11 @@ export function useForegroundNotificationRefresh() {
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const type = notification.request.content.data?.type;
+      // A new chat message: an open chat or list shows it now instead of on the next poll.
+      if (type === CONVERSATION_PUSH_TYPE) {
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        return;
+      }
       if (BOOKING_PAYMENT_DECISION_TYPES.includes(type)) {
         queryClient.invalidateQueries({ queryKey: bookingKeys.all });
         queryClient.invalidateQueries({ queryKey: notificationKeys.all });

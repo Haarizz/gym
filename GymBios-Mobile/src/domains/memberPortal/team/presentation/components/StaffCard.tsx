@@ -13,9 +13,10 @@ interface StaffCardProps {
   member: TeamMember;
   onOpen: () => void;
   onRate: () => void;
+  onMessage: () => void;
 }
 
-export function StaffCard({ member, onOpen, onRate }: StaffCardProps) {
+export function StaffCard({ member, onOpen, onRate, onMessage }: StaffCardProps) {
   const { t } = useTranslation();
 
   return (
@@ -71,15 +72,21 @@ export function StaffCard({ member, onOpen, onRate }: StaffCardProps) {
         >
           <MaterialCommunityIcons name={member.myRating ? 'star' : 'star-outline'} size={20} color="#8A5A00" />
         </Pressable>
-        {/* Messaging isn't built yet — the button holds its place. */}
-        <View
-          style={[styles.iconButton, styles.messageButton, styles.disabled]}
-          accessible
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel={`${t('team.messageA11y', { name: member.name })}, ${t('team.profile.messageSoon')}`}
+        {/* Still opens when messaging is unavailable: the chat explains why (and shows any past messages). */}
+        <Pressable
+          onPress={onMessage}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.iconButton,
+            styles.messageButton,
+            !member.canMessage && styles.disabled,
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={t('team.messageA11y', { name: member.name })}
         >
           <Feather name="message-circle" size={19} color="#FFFFFF" />
-        </View>
+        </Pressable>
       </View>
     </GlassSurface>
   );

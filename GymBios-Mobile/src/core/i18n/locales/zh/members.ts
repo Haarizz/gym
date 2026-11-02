@@ -403,7 +403,26 @@ const members = {
       "daysLeft_other": "还剩 {{count}} 天",
       "expiredAgo_one": "已过期 {{count}} 天",
       "expiredAgo_other": "已过期 {{count}} 天"
-    }
+    },
+    "wizardSteps": {
+      "personal": "个人信息",
+      "membership": "会籍信息",
+      "medical": "医疗信息",
+      "family": "家庭设置",
+      "access": "应用访问与确认"
+    },
+    "reviewSections": {
+      "personal": "个人",
+      "membership": "会籍",
+      "health": "健康",
+      "family": "家庭",
+      "familyHead": "家庭主账户"
+    },
+    "registrationTitle": "会籍登记",
+    "renewalLabel": "续费",
+    "renewalWithPlan": "续费 · {{plan}}",
+    "callA11y": "致电 {{name}}",
+    "memberSubtitle": "会员：{{name}}"
   }
 };
 

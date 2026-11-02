@@ -254,6 +254,41 @@ public class ConversationService {
                 .toList();
     }
 
+    static final int MEMBER_LIST_DEFAULT_LIMIT = 100;
+    static final int MEMBER_LIST_MAX_LIMIT = 200;
+
+    /**
+     * Members the caller can chat with: active members of the branch with an app login,
+     * by name, optionally narrowed by name or member code. Each row says whether a chat
+     * can be started and links the caller's own thread with them, if there is one.
+     */
+    public List<ChatMemberDTO> staffMembers(UserDetailsImpl principal, String search, Integer limit) {
+        StaffActor actor = requireStaffActor(principal);
+        int size = limit == null || limit <= 0 ? MEMBER_LIST_DEFAULT_LIMIT : Math.min(limit, MEMBER_LIST_MAX_LIMIT);
+        String q = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+
+        Map<Long, Conversation> threads = conversationRepository
+                .findStaffInbox(actor.branchId(), actor.staff().getId(), false).stream()
+                .filter(c -> !c.isFrontDesk())
+                .collect(Collectors.toMap(Conversation::getMemberId, Function.identity(), (a, b) -> a));
+        Verdict staffLevel = policy.staffStartLevel(actor.staff(), actor.branchId(), LocalDateTime.now());
+
+        return memberRepository.findActiveAppMembersByBranchId(actor.branchId()).stream()
+                .filter(m -> q.isEmpty()
+                        || (m.getName() != null && m.getName().toLowerCase(Locale.ROOT).contains(q))
+                        || (m.getMemberId() != null && m.getMemberId().toLowerCase(Locale.ROOT).contains(q)))
+                .sorted(Comparator.comparing(m -> m.getName() == null ? "" : m.getName().toLowerCase(Locale.ROOT)))
+                .limit(size)
+                .map(m -> {
+                    Conversation c = threads.get(m.getId());
+                    Verdict v = policy.staffDirectoryVerdict(staffLevel, m, actor.branchId(), c != null);
+                    return new ChatMemberDTO(m.getId(), m.getName(), m.getPhotoUrl(), m.getMemberId(),
+                            c == null ? null : c.getId(), c == null ? 0 : c.getStaffUnread(),
+                            v.allowed(), v.code(), v.message());
+                })
+                .toList();
+    }
+
     public int staffUnreadTotal(UserDetailsImpl principal) {
         return staffList(principal, INBOX_ALL).stream().mapToInt(ConversationDTO::unread).sum();
     }

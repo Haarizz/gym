@@ -173,6 +173,41 @@ public class ConversationPolicyService {
         return Verdict.OK;
     }
 
+    /**
+     * The staff member list's cheap form of canStaffStart, part one: the checks about the
+     * staff member alone (at the branch, daily cap on new conversations), worked out once
+     * for the whole list.
+     */
+    public Verdict staffStartLevel(Staff staff, Long branchId, LocalDateTime now) {
+        if (!"active".equalsIgnoreCase(staff.getStatus())
+                || !staffBranchRepository.existsByStaffIdAndBranchId(staff.getId(), branchId)) {
+            return Verdict.no(NOT_AT_BRANCH, "You aren't assigned to this branch.");
+        }
+        long startedToday = conversationRepository.countByStartedByStaffIdAndCreatedAtGreaterThanEqual(
+                staff.getId(), now.toLocalDate().atStartOfDay());
+        if (startedToday >= STAFF_DAILY_NEW_CONVERSATIONS) {
+            return Verdict.no(DAILY_LIMIT, "You've started " + STAFF_DAILY_NEW_CONVERSATIONS
+                    + " conversations today. Try again tomorrow.");
+        }
+        return Verdict.OK;
+    }
+
+    /**
+     * Part two, per member. A member who already has a thread with this staff member is
+     * always openable: what may be sent there shows once the chat is open (canStaffSend).
+     */
+    public Verdict staffDirectoryVerdict(Verdict staffLevel, Member member, Long branchId, boolean hasThread) {
+        if (hasThread) return Verdict.OK;
+        if (!staffLevel.allowed()) return staffLevel;
+        if (!branchId.equals(member.getBranchId()) || !memberMaySend(member).allowed()) {
+            return Verdict.no(MEMBER_UNAVAILABLE, "This member can't receive messages.");
+        }
+        if (!member.isAllowStaffChats()) {
+            return Verdict.no(MEMBER_OPTED_OUT, "This member doesn't accept chats started by staff.");
+        }
+        return Verdict.OK;
+    }
+
     // ── Sending in a conversation ───────────────────────────────────────────
 
     /** staff = the conversation's staff member, null for the front desk. */

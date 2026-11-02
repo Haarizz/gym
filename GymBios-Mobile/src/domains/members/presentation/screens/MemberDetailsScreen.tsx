@@ -291,8 +291,8 @@ export function MemberDetailsScreen({
       <PaymentBottomSheet
         visible={paymentVisible}
         amount={renewPlan ? planPrice(renewPlan) : 0}
-        title={renewPlan ? `Renewal · ${renewPlan.name}` : 'Renewal'}
-        subtitle={`Member: ${selectedMember.name}`}
+        title={renewPlan ? t('members.renewalWithPlan', { plan: renewPlan.name }) : t('members.renewalLabel')}
+        subtitle={t('members.memberSubtitle', { name: selectedMember.name })}
         // The plan's offer is already in its price; reward passes aren't supported here yet.
         allowDiscount={false}
         payer="staff"

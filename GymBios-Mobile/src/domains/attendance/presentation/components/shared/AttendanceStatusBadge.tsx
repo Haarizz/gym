@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { AttendanceStatus } from '../../../domain/Attendance';
+import { useTranslation } from 'react-i18next';
 
 interface AttendanceStatusBadgeProps {
   status?: AttendanceStatus | string;
@@ -14,11 +15,12 @@ export function AttendanceStatusBadge({
   status,
   variant = 'member',
 }: AttendanceStatusBadgeProps) {
+  const { t } = useTranslation();
   const isActive =
     status === AttendanceStatus.Active || status === 'active' || status === 'working';
 
-  const activeLabel = variant === 'staff' ? 'Working' : 'Active';
-  const completedLabel = variant === 'staff' ? 'Done' : 'Completed';
+  const activeLabel = variant === 'staff' ? t('attendance.cards.working') : t('attendance.cards.active');
+  const completedLabel = variant === 'staff' ? t('attendance.cards.done') : t('attendance.cards.completed');
 
   return (
     <View

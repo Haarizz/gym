@@ -8,6 +8,7 @@ import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { Lead, LeadPriority } from '../../domain/Lead';
 import { LeadActionButtons } from './LeadActionButtons';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface LeadCardProps {
   lead: Lead;
@@ -50,7 +51,7 @@ export function LeadCard({
     try {
       const date = new Date(lead.nextFollowUp);
       if (isNaN(date.getTime())) return t('leads.card.notScheduled');
-      return date.toLocaleDateString(undefined, {
+      return date.toLocaleDateString(getIntlLocale(), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',

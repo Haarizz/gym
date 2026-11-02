@@ -12,6 +12,7 @@ import { Typography } from '@/shared/components/Typography';
 import { FormCard, RequiredLabel } from '@/domains/members/presentation/components/form/FormCard';
 import type { StaffStepErrors } from '../../hooks/useStaffWizard';
 import type { StaffStepProps } from './stepTypes';
+import { translateValue } from '@/core/i18n/format';
 
 interface AppAccessStepProps extends StaffStepProps {
   mode: 'create' | 'edit';
@@ -113,9 +114,9 @@ export function AppAccessStep({
         goToStep={goToStep}
         invalid={Object.keys(validateStep(1)).length > 0}
         rows={[
-          ['Name', data.name || '—'],
-          ['Email', data.email || '—'],
-          ['Phone', data.phone || '—'],
+          [t('hr.review.name'), data.name || '—'],
+          [t('hr.review.email'), data.email || '—'],
+          [t('hr.review.phone'), data.phone || '—'],
         ]}
       />
 
@@ -126,10 +127,10 @@ export function AppAccessStep({
         goToStep={goToStep}
         invalid={Object.keys(validateStep(2)).length > 0}
         rows={[
-          ['Role', data.role || '—'],
-          ['Department', data.department || '—'],
-          ['Branch', data.branch || '—'],
-          ['Joined', formatDate(data.joinDate)],
+          [t('hr.review.role'), data.role ? translateValue('role', data.role) : '—'],
+          [t('hr.review.department'), data.department ? translateValue('department', data.department) : '—'],
+          [t('hr.review.branch'), data.branch || '—'],
+          [t('hr.review.joined'), formatDate(data.joinDate)],
         ]}
       />
 
@@ -140,8 +141,8 @@ export function AppAccessStep({
         goToStep={goToStep}
         invalid={Object.keys(validateStep(3)).length > 0}
         rows={[
-          ['Salary', formatAmount(data.salary)],
-          ['Target', formatAmount(data.monthlyTarget)],
+          [t('hr.review.salary'), formatAmount(data.salary)],
+          [t('hr.review.target'), formatAmount(data.monthlyTarget)],
         ]}
       />
 
@@ -151,8 +152,8 @@ export function AppAccessStep({
         step={4}
         goToStep={goToStep}
         rows={[
-          ['Working days', workingDays ? `${workingDays} per week` : 'Not set'],
-          ['Certifications', certNames.length ? certNames.join(', ') : 'None'],
+          [t('hr.review.workingDays'), workingDays ? t('hr.msg.workingDaysValue', { count: workingDays }) : t('common.notSet')],
+          [t('hr.review.certifications'), certNames.length ? certNames.join(', ') : t('common.none')],
         ]}
       />
     </View>
@@ -177,13 +178,13 @@ function ReviewCard({ icon, title, step, rows, goToStep, invalid }: ReviewCardPr
     <FormCard
       icon={icon}
       title={title}
-      description={invalid ? 'Needs attention' : undefined}
+      description={invalid ? t('hr.review.needsAttention') : undefined}
       action={
         <Pressable
           onPress={() => goToStep(step)}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel={`Edit ${title}`}
+          accessibilityLabel={t('hr.review.edit', { title })}
           style={({ pressed }) => [styles.editLink, pressed && { opacity: 0.6 }]}
         >
           <Feather name="edit-2" size={13} color={theme.primary} />

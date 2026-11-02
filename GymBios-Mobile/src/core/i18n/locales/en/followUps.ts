@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "There are no follow-up tasks matching your current search or filter criteria.",
     "rescheduleTitle": "Reschedule Follow-up",
     "reschedulingFor": "Rescheduling follow-up for",
-    "newDueDate": "New Due Date"
+    "newDueDate": "New Due Date",
+    "outcomes": {
+      "successful": "Successful",
+      "no_response": "No Response",
+      "callback_requested": "Callback Requested",
+      "not_interested": "Not Interested",
+      "converted": "Converted",
+      "rescheduled": "Rescheduled"
+    },
+    "filters": {
+      "allStatuses": "All Statuses",
+      "allTypes": "All Types",
+      "allPriorities": "All Priorities",
+      "allStaff": "All Staff"
+    },
+    "msg": {
+      "selectMemberOrLead": "Please select a member or lead.",
+      "subjectRequired": "Follow-up subject is required.",
+      "dueDateRequired": "Due date is required.",
+      "newDueDateRequired": "New due date is required.",
+      "notesRequired": "Notes are required for communication record.",
+      "addRecordFailed": "Failed to add communication record.",
+      "deleteRecordTitle": "Delete Record",
+      "deleteRecordBody": "Are you sure you want to delete this communication record?",
+      "saveRecord": "Save Record",
+      "detailsTitle": "Follow-up Details",
+      "completing": "Completing...",
+      "rescheduling": "Rescheduling...",
+      "noDueDate": "No due date",
+      "leadNoPhone": "This lead does not have a phone number recorded.",
+      "leadNoEmail": "This lead does not have an email address recorded.",
+      "deleteTitle": "Delete Follow-up",
+      "deleteBody": "Are you sure you want to delete the follow-up \"{{subject}}\" for {{name}}?",
+      "deleteFailed": "Failed to delete follow-up.",
+      "cancelTitle": "Cancel Follow-up",
+      "cancelBody": "Are you sure you want to cancel the follow-up \"{{subject}}\"?",
+      "yesCancel": "Yes, Cancel",
+      "cancelFailed": "Failed to cancel follow-up.",
+      "updateFailed": "Failed to update follow-up.",
+      "createFailed": "Failed to create follow-up.",
+      "completeFailed": "Failed to complete follow-up.",
+      "rescheduleFailed": "Failed to reschedule follow-up.",
+      "leadConvertedTitle": "Lead Converted",
+      "leadConvertedBody": "Lead marked as converted. Register them as a member at the front desk to credit the sale to you."
+    }
   }
 };
 

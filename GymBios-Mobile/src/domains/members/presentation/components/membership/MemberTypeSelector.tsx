@@ -5,6 +5,7 @@ import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { MEMBERSHIP_TYPES, type MembershipTypeOption } from '@/domains/members/constants';
+import { localizeOptions } from '@/core/i18n/format';
 
 interface MemberTypeSelectorProps {
   value: string;
@@ -21,7 +22,7 @@ export function MemberTypeSelector({
 
   return (
     <View style={styles.grid}>
-      {MEMBERSHIP_TYPES.map((option: MembershipTypeOption) => {
+      {localizeOptions(MEMBERSHIP_TYPES, 'membershipType').map((option: MembershipTypeOption) => {
         const isSelected = option.value === value;
         return (
           <Pressable

@@ -26,6 +26,7 @@ import {
 } from '../components';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { translateValue, tOr } from '@/core/i18n/format';
 
 interface CreateReceiptScreenProps {
   onBack: () => void;
@@ -123,13 +124,13 @@ export function CreateReceiptScreen({
 
   const handleProceedToPayment = useCallback(() => {
     if (selectedBillIds.size === 0) {
-      toast.info('Please select at least one pending bill to proceed.', {
-        title: 'Bill Required'
+      toast.info(t('billing.msg.billRequired'), {
+        title: t('billing.msg.billRequiredTitle')
       });
       return;
     }
     setPaymentSheetVisible(true);
-  }, [selectedBillIds.size]);
+  }, [selectedBillIds.size, t]);
 
   const handleGenerateReceipt = useCallback(() => {
     if (!selectedMember || selectedBillsList.length === 0) return;
@@ -148,21 +149,21 @@ export function CreateReceiptScreen({
       onSuccess: (newReceipt: Receipt) => {
         setPaymentSheetVisible(false);
         Alert.alert(
-          'Receipt Generated!',
-          `Payment of ${formatCurrency(totalSelectedAmount)} collected for ${selectedMember.name}. Receipt ${newReceipt?.receiptNo ?? ''} issued.`,
+          t('billing.msg.receiptGeneratedTitle'),
+          t('billing.msg.receiptGeneratedBody', { amount: formatCurrency(totalSelectedAmount), name: selectedMember.name, receipt: newReceipt?.receiptNo ?? '' }),
           [
             {
-              text: 'View Receipt',
+              text: t('billing.msg.viewReceipt'),
               onPress: () => onReceiptCreated?.(newReceipt.id ?? '1'),
             },
-            { text: 'Done', onPress: onBack },
+            { text: t('common.done'), onPress: onBack },
           ],
         );
       },
       onError: () => {
         setPaymentSheetVisible(false);
-        toast.error('Could not record payment. Please try again.', {
-          title: 'Payment Error'
+        toast.error(t('billing.msg.recordFailed'), {
+          title: t('billing.msg.paymentErrorTitle')
         });
       },
     });
@@ -175,13 +176,14 @@ export function CreateReceiptScreen({
     totalSelectedAmount,
     onReceiptCreated,
     onBack,
+    t,
   ]);
 
   const paymentMethodsList = [
-    { method: PaymentMethod.Cash, label: 'Cash', icon: 'dollar-sign' as const },
-    { method: PaymentMethod.Card, label: 'Card', icon: 'credit-card' as const },
-    { method: PaymentMethod.BankTransfer, label: 'Bank Transfer', icon: 'home' as const },
-    { method: PaymentMethod.Online, label: 'Online / UPI', icon: 'globe' as const },
+    { method: PaymentMethod.Cash, label: translateValue('paymentMethod', 'cash'), icon: 'dollar-sign' as const },
+    { method: PaymentMethod.Card, label: translateValue('paymentMethod', 'card'), icon: 'credit-card' as const },
+    { method: PaymentMethod.BankTransfer, label: translateValue('paymentMethod', 'bank_transfer'), icon: 'home' as const },
+    { method: PaymentMethod.Online, label: translateValue('paymentMethod', 'online_upi'), icon: 'globe' as const },
   ];
 
   return (
@@ -376,7 +378,7 @@ export function CreateReceiptScreen({
                         </View>
 
                         <Typography variant="caption" color="textSecondary">
-                          {t('billing.createReceipt.type')} {bill.transactionType} · {t('billing.createReceipt.due')} <CurrencyValue amount={bill.dueAmount} />
+                          {t('billing.createReceipt.type')} {tOr(`billing.txnTypes.${(bill.transactionType ?? '').toLowerCase().replace(/[\s-]+/g, '_')}`, bill.transactionType ?? '')} · {t('billing.createReceipt.due')} <CurrencyValue amount={bill.dueAmount} />
                         </Typography>
                       </View>
 
@@ -471,7 +473,7 @@ export function CreateReceiptScreen({
               style={styles.dateInput}
               value={paymentDate}
               onChangeText={setPaymentDate}
-              placeholder="YYYY-MM-DD"
+              placeholder={t('common.dateFormatHint')}
             />
 
             {/* Receipt Summary Box */}

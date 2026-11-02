@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "Es gibt keine Follow-ups, die Ihren Kriterien entsprechen.",
     "rescheduleTitle": "Follow-up verschieben",
     "reschedulingFor": "Follow-up verschieben für",
-    "newDueDate": "Neues Fälligkeitsdatum"
+    "newDueDate": "Neues Fälligkeitsdatum",
+    "outcomes": {
+      "successful": "Erfolgreich",
+      "no_response": "Keine Antwort",
+      "callback_requested": "Rückruf erbeten",
+      "not_interested": "Kein Interesse",
+      "converted": "Konvertiert",
+      "rescheduled": "Verschoben"
+    },
+    "filters": {
+      "allStatuses": "Alle Status",
+      "allTypes": "Alle Typen",
+      "allPriorities": "Alle Prioritäten",
+      "allStaff": "Alle Mitarbeiter"
+    },
+    "msg": {
+      "selectMemberOrLead": "Bitte wähle ein Mitglied oder einen Lead aus.",
+      "subjectRequired": "Betreff der Nachfassung ist erforderlich.",
+      "dueDateRequired": "Fälligkeitsdatum ist erforderlich.",
+      "newDueDateRequired": "Neues Fälligkeitsdatum ist erforderlich.",
+      "notesRequired": "Für den Kommunikationseintrag sind Notizen erforderlich.",
+      "addRecordFailed": "Kommunikationseintrag konnte nicht hinzugefügt werden.",
+      "deleteRecordTitle": "Eintrag löschen",
+      "deleteRecordBody": "Möchtest du diesen Kommunikationseintrag wirklich löschen?",
+      "saveRecord": "Eintrag speichern",
+      "detailsTitle": "Details der Nachfassung",
+      "completing": "Wird abgeschlossen...",
+      "rescheduling": "Wird verschoben...",
+      "noDueDate": "Kein Fälligkeitsdatum",
+      "leadNoPhone": "Für diesen Lead ist keine Telefonnummer hinterlegt.",
+      "leadNoEmail": "Für diesen Lead ist keine E-Mail-Adresse hinterlegt.",
+      "deleteTitle": "Nachfassung löschen",
+      "deleteBody": "Möchtest du die Nachfassung „{{subject}}“ für {{name}} wirklich löschen?",
+      "deleteFailed": "Nachfassung konnte nicht gelöscht werden.",
+      "cancelTitle": "Nachfassung stornieren",
+      "cancelBody": "Möchtest du die Nachfassung „{{subject}}“ wirklich stornieren?",
+      "yesCancel": "Ja, stornieren",
+      "cancelFailed": "Nachfassung konnte nicht storniert werden.",
+      "updateFailed": "Nachfassung konnte nicht aktualisiert werden.",
+      "createFailed": "Nachfassung konnte nicht erstellt werden.",
+      "completeFailed": "Nachfassung konnte nicht abgeschlossen werden.",
+      "rescheduleFailed": "Nachfassung konnte nicht verschoben werden.",
+      "leadConvertedTitle": "Lead konvertiert",
+      "leadConvertedBody": "Lead als konvertiert markiert. Registriere ihn am Empfang als Mitglied, damit dir der Verkauf gutgeschrieben wird."
+    }
   }
 };
 

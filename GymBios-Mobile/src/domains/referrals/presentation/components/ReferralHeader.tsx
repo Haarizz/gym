@@ -3,6 +3,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface ReferralHeaderProps {
   title?: string;
@@ -11,10 +12,13 @@ interface ReferralHeaderProps {
 }
 
 export function ReferralHeader({
-  title = 'Referrals',
-  subtitle = 'Track and manage member referral programs and rewards',
+  title,
+  subtitle,
   onBack,
 }: ReferralHeaderProps) {
+  const { t } = useTranslation();
+  title ??= t('adminReferrals.header.title');
+  subtitle ??= t('adminReferrals.header.subtitle');
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>

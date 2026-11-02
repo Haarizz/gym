@@ -1,5 +1,6 @@
 import { apiClient } from '@/core/network/apiClient';
 import type { TrainerDashboardData, TrainerTodaySession } from '../domain/TrainerDashboardData';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface BackendTrainerSession {
   id: string | number;
@@ -57,7 +58,7 @@ export class ApiTrainerDashboardRepository {
         let formattedTime = '';
         try {
           const date = new Date(session.start_time);
-          formattedTime = date.toLocaleTimeString('en-US', {
+          formattedTime = date.toLocaleTimeString(getIntlLocale(), {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,

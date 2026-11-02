@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { ReceiptStatus } from '../../domain/Receipt';
+import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 interface PaymentStatusBadgeProps {
   status: ReceiptStatus | string | undefined;
@@ -44,7 +46,9 @@ const DEFAULT_CONFIG = {
 };
 
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
+  const { t } = useTranslation();
   const config = status ? STATUS_CONFIG[status] ?? DEFAULT_CONFIG : DEFAULT_CONFIG;
+  const label = config === DEFAULT_CONFIG ? config.label : translateValue('status', config.label);
 
   return (
     <View
@@ -52,10 +56,10 @@ export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
         styles.badge,
         { backgroundColor: config.bg, borderColor: config.border },
       ]}
-      accessibilityLabel={`Status: ${config.label}`}
+      accessibilityLabel={t('billing.msg.statusA11y', { status: label })}
     >
       <Typography variant="caption" style={[styles.text, { color: config.text }]}>
-        {config.label}
+        {label}
       </Typography>
     </View>
   );

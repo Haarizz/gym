@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { getIntlLocale, tOr } from '@/core/i18n';
 import React, { useState } from 'react';
 import { ActivityIndicator, View, Pressable, Alert, Platform } from 'react-native';
 import { Text } from '@/shared/components/AppText';
@@ -16,6 +15,7 @@ import { useMemberReceipt } from '@/domains/memberPortal/membership/hooks/useMem
 
 import { styles } from './ReceiptBottomSheet.styles';
 import type { ReceiptBottomSheetProps } from './ReceiptBottomSheet.types';
+import { getIntlLocale, tOr } from '@/core/i18n/format';
 
 const SUCCESS = '#16a34a';
 const WARNING = '#d97706';

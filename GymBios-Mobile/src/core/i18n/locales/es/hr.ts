@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "Ver detalles",
       "onLeave": "De permiso"
     },
-    "datePlaceholder": "AAAA-MM-DD"
+    "datePlaceholder": "AAAA-MM-DD",
+    "wizardSteps": {
+      "personal": "Información personal",
+      "employment": "Empleo",
+      "compensation": "Compensación",
+      "schedule": "Horario y certificaciones",
+      "access": "Acceso a la app y revisión"
+    },
+    "msg": {
+      "deleteFailed": "No se pudo eliminar al empleado.",
+      "statusUpdated": "Estado del empleado actualizado.",
+      "statusFailed": "No se pudo actualizar el estado del empleado.",
+      "targetsComingSoon": "Pronto podrás fijar objetivos desde la app.",
+      "branchRequiredTitle": "Sucursal obligatoria",
+      "branchRequired": "Selecciona una sucursal en el menú superior antes de crear un empleado.",
+      "staffNoPhone": "Este empleado no tiene un número de teléfono registrado.",
+      "messageA11y": "Enviar mensaje a {{name}}",
+      "workingDaysValue": "{{count}} por semana"
+    },
+    "review": {
+      "name": "Nombre",
+      "email": "Correo",
+      "phone": "Teléfono",
+      "role": "Rol",
+      "department": "Departamento",
+      "branch": "Sucursal",
+      "joined": "Alta",
+      "salary": "Salario",
+      "target": "Objetivo",
+      "workingDays": "Días laborables",
+      "certifications": "Certificaciones",
+      "needsAttention": "Requiere atención",
+      "edit": "Editar {{title}}"
+    },
+    "days": {
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes",
+      "saturday": "Sábado",
+      "sunday": "Domingo"
+    },
+    "shifts": {
+      "Morning": "Mañana (6–12 h)",
+      "Afternoon": "Tarde (12–17 h)",
+      "Evening": "Noche (17–22 h)"
+    }
   }
 };
 

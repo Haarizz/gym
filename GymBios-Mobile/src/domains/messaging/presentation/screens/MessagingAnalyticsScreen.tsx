@@ -13,11 +13,12 @@ import { useCurrency } from '@/core/providers';
 import { useMessagingAnalytics, useMessagingHistory } from '../../hooks/useMessagingHooks';
 import { MESSAGING_CHANNELS, getChannel } from '../channels';
 import { MessagingColors } from '../theme';
+import { getIntlLocale } from '@/core/i18n/format';
 
 const formatPct = (value: number) => `${(Number.isFinite(value) ? value : 0).toFixed(1)}%`;
 
 const formatShortDate = (date: Date) =>
-  date.toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
+  date.toLocaleDateString(getIntlLocale(), { month: 'short', day: '2-digit' });
 
 /**
  * Mobile counterpart of the Analytics tab on the web messaging page

@@ -19,6 +19,7 @@ import {
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useTranslation } from 'react-i18next';
+import { translateValue, tOr } from '@/core/i18n/format';
 
 interface ReceiptsScreenProps {
   onBack: () => void;
@@ -57,9 +58,9 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
   const handleExportCSV = useCallback(() => {
     const totalCount = pagination?.total ?? receipts.length;
     toast.info(
-      `Exporting entire receipt list (${totalCount} record${totalCount !== 1 ? 's' : ''}) to CSV file.`,
+      t('billing.msg.receiptsExportInfo', { count: totalCount }),
       {
-        title: 'Export Receipts CSV'
+        title: t('billing.msg.receiptsExportTitle')
       }
     );
   }, [pagination?.total, receipts.length]);
@@ -130,7 +131,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
                   variant="caption"
                   style={[styles.chipText, selectedType === item && styles.chipTextActive]}
                 >
-                  {item}
+                  {item === 'All' ? t('common.all') : tOr(`billing.txnTypes.${item.toLowerCase().replace(/[\s-]+/g, '_')}`, item)}
                 </Typography>
               </Pressable>
             )}
@@ -154,7 +155,7 @@ export function ReceiptsScreen({ onBack, onNavigateToReceipt }: ReceiptsScreenPr
                   variant="caption"
                   style={[styles.chipText, selectedStatus === item && styles.chipTextActive]}
                 >
-                  {item}
+                  {item === 'All' ? t('common.all') : translateValue('status', item)}
                 </Typography>
               </Pressable>
             )}

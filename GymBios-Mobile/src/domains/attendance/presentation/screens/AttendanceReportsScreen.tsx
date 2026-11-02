@@ -25,6 +25,7 @@ import {
   ReportPeriodSelector,
   ReportSummaryRow,
 } from '../components';
+import { useTranslation } from 'react-i18next';
 
 interface AttendanceReportsScreenProps {
   onBack?: () => void;
@@ -40,6 +41,7 @@ interface AttendanceReportsScreenProps {
  * screen.  The period selector stays sticky at the top.
  */
 export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps) {
+  const { t } = useTranslation();
   const bottomInset = useTabBarBottomInset() + Spacing.six;
   const { period, apiRange, setPeriod } = useReportDateRange();
 
@@ -72,8 +74,8 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
     return (
       <ScreenLayout>
         <AppHeader
-          title="Reports"
-          subtitle="Detailed analytics & exports"
+          title={t('attendance.reports.title')}
+          subtitle={t('attendance.reports.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -96,8 +98,8 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
     return (
       <ScreenLayout>
         <AppHeader
-          title="Reports"
-          subtitle="Detailed analytics & exports"
+          title={t('attendance.reports.title')}
+          subtitle={t('attendance.reports.subtitle')}
           colors={[BrandColors.teal, BrandColors.tealDark]}
           onBack={onBack}
         />
@@ -129,8 +131,8 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
   return (
     <ScreenLayout>
       <AppHeader
-        title="Reports"
-        subtitle="Detailed analytics & exports"
+        title={t('attendance.reports.title')}
+        subtitle={t('attendance.reports.subtitle')}
         colors={[BrandColors.teal, BrandColors.tealDark]}
         onBack={onBack}
       />
@@ -173,7 +175,7 @@ export function AttendanceReportsScreen({ onBack }: AttendanceReportsScreenProps
         {/* ── Export Actions ── */}
         <View style={styles.exportSection}>
           <Button
-            label="Export CSV"
+            label={t('common.exportCsv')}
             onPress={handleRefresh}
             variant="secondary"
             style={styles.exportButton}

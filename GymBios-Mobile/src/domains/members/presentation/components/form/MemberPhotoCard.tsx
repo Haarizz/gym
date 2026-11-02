@@ -45,9 +45,10 @@ export function MemberPhotoCard({
   data,
   updateField,
   errors,
-  hint = 'Optional · helps staff recognise the member at check-in',
+  hint: hintProp,
 }: PhotoCardProps) {
   const { t } = useTranslation();
+  const hint = hintProp ?? t('shared.photoCard.hint');
   const theme = useTheme();
   const { takePhoto, chooseFromGallery } = usePhotoPicker();
   // Guards against a slow earlier upload overwriting a newer pick.
@@ -92,11 +93,11 @@ export function MemberPhotoCard({
   }, [updateField]);
 
   const statusText = uploading
-    ? 'Uploading photo…'
+    ? t('shared.photoCard.uploading')
     : failed
-      ? 'Upload failed — tap Retry or pick another photo'
+      ? t('shared.photoCard.failed')
       : currentImage
-        ? 'Looks good. You can change it any time.'
+        ? t('shared.photoCard.done')
         : hint;
 
   return (
@@ -120,7 +121,7 @@ export function MemberPhotoCard({
             hitSlop={8}
             style={[styles.removeBadge, { backgroundColor: theme.error }]}
             accessibilityRole="button"
-            accessibilityLabel="Remove photo"
+            accessibilityLabel={t('shared.photoCard.remove')}
           >
             <Feather name="x" size={12} color={BrandColors.white} />
           </Pressable>
@@ -138,18 +139,18 @@ export function MemberPhotoCard({
 
         <View style={styles.actions}>
           {failed && data.photoUri ? (
-            <PhotoAction icon="refresh-cw" label="Retry" onPress={() => upload(data.photoUri!)} />
+            <PhotoAction icon="refresh-cw" label={t('common.retry')} onPress={() => upload(data.photoUri!)} />
           ) : (
             <PhotoAction
               icon="camera"
-              label="Camera"
+              label={t('shared.photoCard.camera')}
               disabled={uploading}
               onPress={() => pickWith(takePhoto)}
             />
           )}
           <PhotoAction
             icon="image"
-            label="Gallery"
+            label={t('shared.photoCard.gallery')}
             disabled={uploading}
             onPress={() => pickWith(chooseFromGallery)}
           />

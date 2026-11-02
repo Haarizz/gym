@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "Details anzeigen",
       "onLeave": "Im Urlaub"
     },
-    "datePlaceholder": "JJJJ-MM-TT"
+    "datePlaceholder": "JJJJ-MM-TT",
+    "wizardSteps": {
+      "personal": "Persönliche Daten",
+      "employment": "Anstellung",
+      "compensation": "Vergütung",
+      "schedule": "Dienstplan & Zertifikate",
+      "access": "App-Zugang & Prüfung"
+    },
+    "msg": {
+      "deleteFailed": "Mitarbeiter konnte nicht gelöscht werden.",
+      "statusUpdated": "Mitarbeiterstatus aktualisiert.",
+      "statusFailed": "Mitarbeiterstatus konnte nicht aktualisiert werden.",
+      "targetsComingSoon": "Ziele in der App festzulegen kommt mit einem der nächsten Updates.",
+      "branchRequiredTitle": "Filiale erforderlich",
+      "branchRequired": "Bitte wähle oben im Menü eine bestimmte Filiale aus, bevor du einen Mitarbeiter anlegst.",
+      "staffNoPhone": "Für diesen Mitarbeiter ist keine Telefonnummer hinterlegt.",
+      "messageA11y": "{{name}} eine Nachricht senden",
+      "workingDaysValue": "{{count}} pro Woche"
+    },
+    "review": {
+      "name": "Name",
+      "email": "E-Mail",
+      "phone": "Telefon",
+      "role": "Rolle",
+      "department": "Abteilung",
+      "branch": "Filiale",
+      "joined": "Eingetreten",
+      "salary": "Gehalt",
+      "target": "Ziel",
+      "workingDays": "Arbeitstage",
+      "certifications": "Zertifikate",
+      "needsAttention": "Prüfung nötig",
+      "edit": "{{title}} bearbeiten"
+    },
+    "days": {
+      "monday": "Montag",
+      "tuesday": "Dienstag",
+      "wednesday": "Mittwoch",
+      "thursday": "Donnerstag",
+      "friday": "Freitag",
+      "saturday": "Samstag",
+      "sunday": "Sonntag"
+    },
+    "shifts": {
+      "Morning": "Morgens (6–12 Uhr)",
+      "Afternoon": "Nachmittags (12–17 Uhr)",
+      "Evening": "Abends (17–22 Uhr)"
+    }
   }
 };
 

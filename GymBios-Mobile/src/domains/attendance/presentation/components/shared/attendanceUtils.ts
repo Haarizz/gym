@@ -1,3 +1,5 @@
+import { getIntlLocale } from '@/core/i18n/format';
+
 /**
  * Shared formatting helpers for the Attendance presentation layer.
  */
@@ -14,7 +16,7 @@ export function getInitials(name = ''): string {
 
 export function formatTime(iso?: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-US', {
+  return new Date(iso).toLocaleTimeString(getIntlLocale(), {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -29,7 +31,7 @@ export function formatAvgDuration(minutes?: number): string {
 
 export function formatDateLabel(iso?: string): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString(getIntlLocale(), {
     month: 'short',
     day: 'numeric',
   });

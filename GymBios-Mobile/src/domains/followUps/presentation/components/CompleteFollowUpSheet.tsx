@@ -15,6 +15,7 @@ import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
 import { Dropdown } from '@/shared/components/Dropdown';
 import type { FollowUp } from '../../domain/FollowUp';
+import { localizeOptions } from '@/core/i18n/format';
 
 interface CompleteFollowUpSheetProps {
   visible: boolean;
@@ -91,7 +92,7 @@ export function CompleteFollowUpSheet({
             <Dropdown
               label={t('followUps.outcome')}
               value={outcome}
-              options={OUTCOME_OPTIONS}
+              options={localizeOptions(OUTCOME_OPTIONS, { prefix: 'followUps.outcomes' })}
               onChange={setOutcome}
             />
 
@@ -130,7 +131,7 @@ export function CompleteFollowUpSheet({
               disabled={submitting}
             >
               <Text style={styles.submitBtnText}>
-                {submitting ? t('common.pleaseWait', 'Completing...') : t('followUps.complete')}
+                {submitting ? t('followUps.msg.completing') : t('followUps.complete')}
               </Text>
             </TouchableOpacity>
           </View>

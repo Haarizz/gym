@@ -14,6 +14,7 @@ import { useTeam } from '../../hooks/useTeam';
 import { StaffCard, avatarColor } from '../components/StaffCard';
 import { RateStaffSheet } from '../components/RateStaffSheet';
 import { StarRow } from '../components/StarRow';
+import { openFrontDeskChat, openStaffChat } from '../openStaffChat';
 
 type Filter = 'all' | 'trainers' | 'staff';
 const FILTERS: Filter[] = ['all', 'trainers', 'staff'];
@@ -106,6 +107,25 @@ export function MemberTeamScreen() {
           ))}
         </ScrollView>
 
+        {!isError && (
+          <Pressable
+            onPress={() => openFrontDeskChat(router)}
+            style={({ pressed }) => [pressed && styles.pressed]}
+            accessibilityRole="button"
+          >
+            <GlassSurface radius={Radius.xl} style={styles.desk}>
+              <View style={styles.deskIcon}>
+                <Feather name="headphones" size={20} color="#6B4700" />
+              </View>
+              <View style={styles.deskBody}>
+                <Text style={styles.deskTitle}>{t('conversations.frontDesk')}</Text>
+                <Text style={styles.deskSub} numberOfLines={1}>{t('conversations.frontDeskDesc')}</Text>
+              </View>
+              <Feather name="message-circle" size={19} color={BrandColors.textSecondary} />
+            </GlassSurface>
+          </Pressable>
+        )}
+
         {isError ? (
           <View style={styles.message}>
             <Text style={styles.messageText}>{t('team.loadFailed')}</Text>
@@ -160,7 +180,13 @@ export function MemberTeamScreen() {
             ) : (
               <View style={styles.list}>
                 {rows.map(m => (
-                  <StaffCard key={m.id} member={m} onOpen={() => openProfile(m)} onRate={() => setRating(m)} />
+                  <StaffCard
+                    key={m.id}
+                    member={m}
+                    onOpen={() => openProfile(m)}
+                    onRate={() => setRating(m)}
+                    onMessage={() => openStaffChat(router, m)}
+                  />
                 ))}
               </View>
             )}
@@ -309,6 +335,36 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.md,
+  },
+  desk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: 14,
+    marginBottom: Spacing.md,
+  },
+  deskIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FDF0CF',
+  },
+  deskBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  deskTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: BrandColors.textPrimary,
+  },
+  deskSub: {
+    fontSize: TypographyScale.small,
+    fontWeight: '600',
+    color: BrandColors.textSecondary,
+    marginTop: 1,
   },
   message: {
     alignItems: 'center',

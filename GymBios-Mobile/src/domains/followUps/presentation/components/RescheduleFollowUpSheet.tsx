@@ -38,8 +38,8 @@ export function RescheduleFollowUpSheet({
 
   const handleSubmit = () => {
     if (!dueDate) {
-      toast.error('New due date is required.', {
-        title: 'Validation Error'
+      toast.error(t('followUps.msg.newDueDateRequired'), {
+        title: t('common.validationError')
       });
       return;
     }
@@ -105,7 +105,7 @@ export function RescheduleFollowUpSheet({
               disabled={submitting}
             >
               <Text style={styles.submitBtnText}>
-                {submitting ? t('common.pleaseWait', 'Rescheduling...') : t('followUps.reschedule')}
+                {submitting ? t('followUps.msg.rescheduling') : t('followUps.reschedule')}
               </Text>
             </TouchableOpacity>
           </View>

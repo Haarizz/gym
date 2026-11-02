@@ -11,11 +11,11 @@ export class PushNotificationsService {
   ) {}
 
   /**
-   * Registers this device for the signed-in member at each of these gyms, so a gym's
-   * notifications arrive whichever gym the app is showing. No-op if push is
-   * unavailable. One gym failing doesn't stop the others.
+   * Registers this device for the signed-in user at each of these gyms (null = the gym
+   * the app is working in), so a gym's notifications arrive whichever gym the app is
+   * showing. No-op if push is unavailable. One gym failing doesn't stop the others.
    */
-  async registerCurrentDevice(tenantSlugs: string[]): Promise<void> {
+  async registerCurrentDevice(tenantSlugs: (string | null)[]): Promise<void> {
     if (tenantSlugs.length === 0) return;
     const registration = await this.device.getToken({ askPermission: true });
     if (!registration) return;

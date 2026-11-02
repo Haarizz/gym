@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "查看详情",
       "onLeave": "休假中"
     },
-    "datePlaceholder": "YYYY-MM-DD"
+    "datePlaceholder": "YYYY-MM-DD",
+    "wizardSteps": {
+      "personal": "个人信息",
+      "employment": "雇佣信息",
+      "compensation": "薪酬",
+      "schedule": "排班与证书",
+      "access": "应用访问与确认"
+    },
+    "msg": {
+      "deleteFailed": "删除员工失败。",
+      "statusUpdated": "员工状态已更新。",
+      "statusFailed": "更新员工状态失败。",
+      "targetsComingSoon": "应用内设置目标功能将在后续更新中推出。",
+      "branchRequiredTitle": "需要选择分店",
+      "branchRequired": "创建员工前，请先在顶部菜单中选择具体分店。",
+      "staffNoPhone": "该员工没有登记电话号码。",
+      "messageA11y": "给 {{name}} 发消息",
+      "workingDaysValue": "每周 {{count}} 天"
+    },
+    "review": {
+      "name": "姓名",
+      "email": "邮箱",
+      "phone": "电话",
+      "role": "角色",
+      "department": "部门",
+      "branch": "分店",
+      "joined": "入职",
+      "salary": "薪资",
+      "target": "目标",
+      "workingDays": "工作日",
+      "certifications": "证书",
+      "needsAttention": "需要处理",
+      "edit": "编辑{{title}}"
+    },
+    "days": {
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "saturday": "星期六",
+      "sunday": "星期日"
+    },
+    "shifts": {
+      "Morning": "早班 (6:00–12:00)",
+      "Afternoon": "午班 (12:00–17:00)",
+      "Evening": "晚班 (17:00–22:00)"
+    }
   }
 };
 

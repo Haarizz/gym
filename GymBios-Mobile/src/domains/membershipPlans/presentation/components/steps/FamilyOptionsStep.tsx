@@ -34,12 +34,12 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
         {/* One billing model, same as the web plan form: the head pays for everyone. */}
         <View style={[styles.modeCard, { backgroundColor: theme.primary + '14', borderColor: theme.primary }]}>
           <Typography variant="bodySmallBold" style={{ color: theme.primary }}>
-            {isCouple ? 'Couple head pays for both' : 'Family head pays for everyone'}
+            {isCouple ? t('membershipPlans.misc2.family.coupleHeadPays') : t('membershipPlans.misc2.family.familyHeadPays')}
           </Typography>
           <Typography variant="caption" color="textSecondary">
             {isCouple
-              ? 'The partner is added under the couple head and the whole plan is billed to the head on one invoice.'
-              : 'Family members are added under the family head and the whole plan is billed to the head on one invoice.'}
+              ? t('membershipPlans.misc2.family.coupleHeadDesc')
+              : t('membershipPlans.misc2.family.familyHeadDesc')}
           </Typography>
         </View>
 
@@ -52,8 +52,8 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
         />
         <Typography variant="caption" color="textSecondary">
           {isCouple
-            ? 'With Auto Calculate on, the invoice is this price × 2; leave blank to charge the subscription price for the couple.'
-            : 'With Auto Calculate on, the invoice is this price × members; leave blank to charge the subscription price for the whole family.'}
+            ? t('membershipPlans.misc2.family.coupleAutoHint')
+            : t('membershipPlans.misc2.family.familyAutoHint')}
         </Typography>
       </FormSection>
 
@@ -148,8 +148,8 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
             </Typography>
             <Typography variant="caption" color="textSecondary">
               {values.autoCalculateTotal && pricePerMember > 0
-                ? `Example: ${pricePerMember} × ${isCouple ? 2 : 5} members = ${(pricePerMember * (isCouple ? 2 : 5)).toFixed(2)} on ONE invoice billed to the head.`
-                : `The subscription price (${planPrice.toFixed(2)}) is the whole ${isCouple ? 'couple' : 'family'}'s ONE invoice, billed to the head.`}
+                ? t('membershipPlans.misc2.family.example', { price: pricePerMember, count: isCouple ? 2 : 5, total: (pricePerMember * (isCouple ? 2 : 5)).toFixed(2) })
+                : t(isCouple ? 'membershipPlans.misc2.family.wholeCouple' : 'membershipPlans.misc2.family.wholeFamily', { price: planPrice.toFixed(2) })}
             </Typography>
           </View>
         )}

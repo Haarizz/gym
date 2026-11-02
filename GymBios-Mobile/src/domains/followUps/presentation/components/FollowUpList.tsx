@@ -73,7 +73,7 @@ export function FollowUpList({
           {t('followUps.failedLoadFollowUps')}
         </Text>
         <Text style={[styles.errorSubtitle, { color: theme.textSecondary }]}>
-          {error.message || 'An unexpected network error occurred.'}
+          {error.message || t('common.networkError')}
         </Text>
         {onRefresh ? (
           <TouchableOpacity

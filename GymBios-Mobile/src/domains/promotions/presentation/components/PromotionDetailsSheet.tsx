@@ -21,6 +21,7 @@ import {
 import { formatDiscountDisplay } from '../utils/promotionStatistics';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { getIntlLocale, localizeOptions, translateValue, tOr } from '@/core/i18n/format';
 
 interface PromotionDetailsSheetProps {
   visible: boolean;
@@ -47,11 +48,11 @@ export function PromotionDetailsSheet({
   );
 
   const formatDate = (rawDate?: string | null) => {
-    if (!rawDate) return 'N/A';
+    if (!rawDate) return '—';
     const d = new Date(rawDate);
     return isNaN(d.getTime())
       ? rawDate
-      : d.toLocaleDateString(undefined, {
+      : d.toLocaleDateString(getIntlLocale(), {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
@@ -62,7 +63,7 @@ export function PromotionDetailsSheet({
     if (!promotion.code) return;
     try {
       await Share.share({
-        message: `Use promotion code "${promotion.code}" for ${discountDisplay} at Gym!`,
+        message: t('promotions.msg.shareCode', { code: promotion.code, discount: discountDisplay }),
       });
     } catch {
       // Ignored
@@ -72,36 +73,36 @@ export function PromotionDetailsSheet({
   const handleDuplicate = async () => {
     try {
       await duplicateMutation.mutateAsync(promotion.id);
-      toast.success(`Created duplicate of "${promotion.name}".`, {
-        title: 'Success'
+      toast.success(t('promotions.msg.duplicated', { name: promotion.name }), {
+        title: t('common.success')
       });
       onClose();
     } catch {
-      toast.error('Failed to duplicate promotion.', {
-        title: 'Error'
+      toast.error(t('promotions.msg.duplicateFailed'), {
+        title: t('common.error')
       });
     }
   };
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Promotion',
-      `Are you sure you want to delete "${promotion.name}"? This action cannot be undone.`,
+      t('promotions.msg.deleteTitle'),
+      t('promotions.msg.deleteBody', { name: promotion.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteMutation.mutateAsync(promotion.id);
-              toast.success(`Deleted "${promotion.name}".`, {
-                title: 'Success'
+              toast.success(t('promotions.msg.deleted', { name: promotion.name }), {
+                title: t('common.success')
               });
               onClose();
             } catch {
-              toast.error('Failed to delete promotion.', {
-                title: 'Error'
+              toast.error(t('promotions.msg.deleteFailed'), {
+                title: t('common.error')
               });
             }
           },
@@ -117,7 +118,7 @@ export function PromotionDetailsSheet({
       visible={visible}
       onClose={onClose}
       title={promotion.name}
-      subtitle={`${promotion.type?.toUpperCase() ?? 'PROMO'} • ${promotion.status}`}
+      subtitle={`${tOr(`promotions.opts.types.${(promotion.type || 'promo').replace(/-/g, '_')}`, promotion.type ?? 'PROMO')} • ${translateValue('status', promotion.status)}`}
     >
       <View style={styles.content}>
         {/* Discount highlight */}
@@ -125,7 +126,7 @@ export function PromotionDetailsSheet({
           <Text style={styles.highlightLabel}>{t('promotions.discountValue')}</Text>
           <Text style={styles.highlightText}>
             {promotion.discountType === 'fixed'
-              ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix=" OFF" />
+              ? <CurrencyValue amount={promotion.discountValue ?? 0} suffix={t('promotions.msg.offSuffix')} />
               : discountDisplay}
           </Text>
         </View>
@@ -144,11 +145,11 @@ export function PromotionDetailsSheet({
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.category')}</Text>
-              <Text style={styles.value}>{promotion.category || 'N/A'}</Text>
+              <Text style={styles.value}>{promotion.category ? tOr(`promotions.opts.categories.${promotion.category.toLowerCase().replace(/[\s-]+/g, '_')}`, promotion.category) : '—'}</Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.code')}</Text>
-              <Text style={styles.codeValue}>{promotion.code || 'None'}</Text>
+              <Text style={styles.codeValue}>{promotion.code || t('common.none')}</Text>
             </View>
           </View>
 
@@ -218,7 +219,7 @@ export function PromotionDetailsSheet({
                 {promotion.minimumPurchase !== null &&
                 promotion.minimumPurchase !== undefined
                   ? <CurrencyValue amount={promotion.minimumPurchase} />
-                  : 'None'}
+                  : t('common.none')}
               </Text>
             </View>
           </View>
@@ -268,23 +269,23 @@ export function PromotionDetailsSheet({
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.targetAudience')}</Text>
               <Text style={styles.value}>
-                {promotion.targetAudience || 'All Members'}
+                {tOr(`promotions.opts.audience.${(promotion.targetAudience || 'all').replace(/-/g, '_')}`, promotion.targetAudience || '')}
               </Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.createdBy')}</Text>
-              <Text style={styles.value}>{promotion.createdBy || 'System'}</Text>
+              <Text style={styles.value}>{promotion.createdBy || t('promotions.msg.system')}</Text>
             </View>
           </View>
 
           <View style={styles.gridRow}>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.autoApplyLabel')}</Text>
-              <Text style={styles.value}>{promotion.autoApply ? 'Yes' : 'No'}</Text>
+              <Text style={styles.value}>{promotion.autoApply ? t('common.yes') : t('common.no')}</Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.stackable')}</Text>
-              <Text style={styles.value}>{promotion.stackable ? 'Yes' : 'No'}</Text>
+              <Text style={styles.value}>{promotion.stackable ? t('common.yes') : t('common.no')}</Text>
             </View>
           </View>
 
@@ -294,19 +295,19 @@ export function PromotionDetailsSheet({
               <Text style={styles.value}>
                 {promotion.priority !== null && promotion.priority !== undefined
                   ? promotion.priority
-                  : 'Normal'}
+                  : t('promotions.msg.normal')}
               </Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.label}>{t('promotions.public')}</Text>
-              <Text style={styles.value}>{promotion.isPublic ? 'Yes' : 'No'}</Text>
+              <Text style={styles.value}>{promotion.isPublic ? t('common.yes') : t('common.no')}</Text>
             </View>
           </View>
 
           {promotion.channels && promotion.channels.length > 0 && (
             <View style={styles.detailRow}>
               <Text style={styles.label}>{t('promotions.distributionChannels')}</Text>
-              <Text style={styles.value}>{promotion.channels.join(', ')}</Text>
+              <Text style={styles.value}>{promotion.channels.map((c) => tOr(`promotions.opts.channels.${c.replace(/-/g, '_')}`, c)).join(', ')}</Text>
             </View>
           )}
 

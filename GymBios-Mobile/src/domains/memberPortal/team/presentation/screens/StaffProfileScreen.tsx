@@ -14,6 +14,7 @@ import { initialsOf, type StaffReview } from '../../domain/TeamMember';
 import { useStaffProfile } from '../../hooks/useTeam';
 import { avatarColor } from '../components/StaffCard';
 import { RateStaffSheet } from '../components/RateStaffSheet';
+import { openStaffChat } from '../openStaffChat';
 import { StarRow } from '../components/StarRow';
 
 /** One staff member: who they are, their rating breakdown and members' reviews. */
@@ -165,19 +166,20 @@ export function StaffProfileScreen() {
             {staff.myRating ? t('team.profile.updateRating') : t('team.profile.rate')}
           </Text>
         </Pressable>
-        <View
-          style={[styles.action, styles.messageAction, styles.disabled]}
-          accessible
+        <Pressable
+          onPress={() => openStaffChat(router, staff)}
+          style={({ pressed }) => [
+            styles.action,
+            styles.messageAction,
+            !staff.canMessage && styles.disabled,
+            pressed && styles.pressed,
+          ]}
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel={`${t('team.profile.message')}, ${t('team.profile.messageSoon')}`}
+          accessibilityLabel={t('team.messageA11y', { name: staff.name })}
         >
           <Feather name="message-circle" size={19} color="#FFFFFF" />
-          <View>
-            <Text style={styles.messageActionText}>{t('team.profile.message')}</Text>
-            <Text style={styles.messageSoon}>{t('team.profile.messageSoon')}</Text>
-          </View>
-        </View>
+          <Text style={styles.messageActionText}>{t('team.profile.message')}</Text>
+        </Pressable>
       </GlassSurface>
 
       <RateStaffSheet member={rateOpen ? staff : null} onClose={() => setRateOpen(false)} />
@@ -483,11 +485,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-  },
-  messageSoon: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.85)',
   },
   disabled: {
     opacity: 0.5,

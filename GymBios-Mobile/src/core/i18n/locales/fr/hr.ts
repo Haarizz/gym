@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "Voir les détails",
       "onLeave": "En congé"
     },
-    "datePlaceholder": "AAAA-MM-JJ"
+    "datePlaceholder": "AAAA-MM-JJ",
+    "wizardSteps": {
+      "personal": "Informations personnelles",
+      "employment": "Emploi",
+      "compensation": "Rémunération",
+      "schedule": "Planning et certifications",
+      "access": "Accès à l'app et vérification"
+    },
+    "msg": {
+      "deleteFailed": "Impossible de supprimer le membre du personnel.",
+      "statusUpdated": "Statut du membre du personnel mis à jour.",
+      "statusFailed": "Impossible de mettre à jour le statut.",
+      "targetsComingSoon": "La définition d'objectifs depuis l'app arrive dans une prochaine mise à jour.",
+      "branchRequiredTitle": "Agence requise",
+      "branchRequired": "Sélectionnez une agence dans le menu d'en-tête avant de créer un membre du personnel.",
+      "staffNoPhone": "Ce membre du personnel n'a pas de numéro de téléphone enregistré.",
+      "messageA11y": "Envoyer un message à {{name}}",
+      "workingDaysValue": "{{count}} par semaine"
+    },
+    "review": {
+      "name": "Nom",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "role": "Rôle",
+      "department": "Service",
+      "branch": "Agence",
+      "joined": "Arrivée",
+      "salary": "Salaire",
+      "target": "Objectif",
+      "workingDays": "Jours travaillés",
+      "certifications": "Certifications",
+      "needsAttention": "À vérifier",
+      "edit": "Modifier {{title}}"
+    },
+    "days": {
+      "monday": "Lundi",
+      "tuesday": "Mardi",
+      "wednesday": "Mercredi",
+      "thursday": "Jeudi",
+      "friday": "Vendredi",
+      "saturday": "Samedi",
+      "sunday": "Dimanche"
+    },
+    "shifts": {
+      "Morning": "Matin (6 h–12 h)",
+      "Afternoon": "Après-midi (12 h–17 h)",
+      "Evening": "Soir (17 h–22 h)"
+    }
   }
 };
 

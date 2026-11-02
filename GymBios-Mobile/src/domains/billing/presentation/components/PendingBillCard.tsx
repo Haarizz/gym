@@ -10,6 +10,7 @@ import type { Bill } from '../../domain/Bill';
 import { ReceiptStatus } from '../../domain/Receipt';
 import { MoneyText } from './MoneyText';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
+import { getIntlLocale } from '@/core/i18n/format';
 
 interface PendingBillCardProps {
   bill: Bill;
@@ -20,7 +21,7 @@ interface PendingBillCardProps {
 function formatDate(dateStr?: string) {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    return new Date(dateStr).toLocaleDateString(getIntlLocale(), {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -53,7 +54,7 @@ export const PendingBillCard = memo(function PendingBillCard({
       ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: isSelected }}
-      accessibilityLabel={`Bill ${bill.receiptNo ?? bill.id}, ${bill.planName}, due ${bill.dueAmount}`}
+      accessibilityLabel={t('billing.msg.billA11y', { bill: bill.receiptNo ?? bill.id, plan: bill.planName, amount: bill.dueAmount })}
     >
       {/* Checkbox */}
       <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
@@ -64,13 +65,13 @@ export const PendingBillCard = memo(function PendingBillCard({
       <View style={styles.content}>
         <View style={styles.topRow}>
           <Typography variant="bodySmall" style={styles.billNo}>
-            {bill.receiptNo ?? `Bill #${bill.id}`}
+            {bill.receiptNo ?? t('billing.msg.billNumber', { id: bill.id })}
           </Typography>
           <PaymentStatusBadge status={bill.status} />
         </View>
 
         <Typography variant="caption" color="textSecondary">
-          {bill.planName ?? 'Subscription'}
+          {bill.planName ?? t('billing.msg.subscriptionFallback')}
         </Typography>
 
         <View style={styles.bottomRow}>

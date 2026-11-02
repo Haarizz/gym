@@ -20,6 +20,7 @@ import {
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 type StatusFilter = 'all' | 'PENDING' | 'AVAILABLE' | 'REDEEMED';
 
@@ -51,11 +52,11 @@ const STATUS_COLORS: Record<RewardStatus, { bg: string; fg: string }> = {
   CANCELLED: { bg: '#fee2e2', fg: '#b91c1c' },
 };
 
-const ACTION_COPY: Record<RewardAction, { title: string; confirm: string; done: string }> = {
-  approve: { title: 'Approve reward?', confirm: 'Approve', done: 'approved' },
-  reject: { title: 'Reject reward?', confirm: 'Reject', done: 'rejected' },
-  redeem: { title: 'Mark reward as redeemed?', confirm: 'Mark Redeemed', done: 'marked as redeemed' },
-};
+const ACTION_COPY = {
+  approve: { title: 'adminReferrals.queue.approveTitle', confirm: 'adminReferrals.approve', done: 'adminReferrals.queue.approved' },
+  reject: { title: 'adminReferrals.queue.rejectTitle', confirm: 'adminReferrals.reject', done: 'adminReferrals.queue.rejected' },
+  redeem: { title: 'adminReferrals.queue.redeemTitle', confirm: 'adminReferrals.markRedeemed', done: 'adminReferrals.queue.redeemed' },
+} as const satisfies Record<RewardAction, { title: string; confirm: string; done: string }>;
 
 // Mirrors the web Reward Queue's action rules.
 function canApproveOrReject(reward: ReferralReward) {
@@ -73,6 +74,7 @@ function RewardValue({
 }: {
   reward: ReferralReward;
 }) {
+  const { t } = useTranslation();
   const value = reward.rewardValue;
   if (value === undefined || value === null) {
     return <Typography variant="bodySmall" style={{ fontWeight: '700' }}>—</Typography>;
@@ -86,9 +88,9 @@ function RewardValue({
     );
   }
   let text = String(value);
-  if (reward.rewardType === 'MEMBERSHIP_EXTENSION') text = `${value} Day${value === 1 ? '' : 's'}`;
+  if (reward.rewardType === 'MEMBERSHIP_EXTENSION') text = t('adminReferrals.queue.days', { count: Number(value) });
   else if (reward.rewardUnit === 'PERCENT') text = `${value}%`;
-  else if (reward.rewardType === 'LOYALTY_POINTS') text = `${value} pts`;
+  else if (reward.rewardType === 'LOYALTY_POINTS') text = t('adminReferrals.queue.points', { value });
   return <Typography variant="bodySmall" style={{ fontWeight: '700' }}>{text}</Typography>;
 }
 
@@ -126,7 +128,7 @@ export function RewardQueueScreen() {
       { id: reward.id, action },
       {
         onSuccess: () => {
-          toast.success(`Reward ${reward.rewardCode} ${ACTION_COPY[action].done}.`);
+          toast.success(t(ACTION_COPY[action].done, { code: reward.rewardCode }));
           setPendingAction(null);
         },
         onError: () => setPendingAction(null),
@@ -196,7 +198,7 @@ export function RewardQueueScreen() {
 
           {/* Filter Tabs */}
           <View style={styles.filterRow}>
-            {FILTERS.map(({ key, label }) => (
+            {FILTERS.map(({ key }) => (
               <Pressable
                 key={key}
                 style={[styles.filterTab, statusFilter === key && styles.filterTabActive]}
@@ -206,7 +208,7 @@ export function RewardQueueScreen() {
                   variant="caption"
                   style={[styles.filterTabText, statusFilter === key && styles.filterTabTextActive]}
                 >
-                  {label}
+                  {key === 'all' ? t('common.all').toUpperCase() : translateValue('status', key).toUpperCase()}
                 </Typography>
               </Pressable>
             ))}
@@ -225,7 +227,7 @@ export function RewardQueueScreen() {
             </Typography>
           ) : rewards.length === 0 ? (
             <Typography variant="bodySmall" color="textSecondary" style={styles.stateBlock}>
-              {statusFilter === 'all' ? 'No rewards generated yet.' : 'No rewards match this filter.'}
+              {statusFilter === 'all' ? t('adminReferrals.queue.noRewards') : t('adminReferrals.queue.noMatch')}
             </Typography>
           ) : (
             rewards.map((item) => {
@@ -242,13 +244,13 @@ export function RewardQueueScreen() {
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
                         {item.memberId}
-                        {item.memberType ? ` · ${item.memberType === 'REFERRER' ? 'Referrer' : 'Referee'}` : ''}
+                        {item.memberType ? ` · ${item.memberType === 'REFERRER' ? t('adminReferrals.referrer') : t('adminReferrals.referee')}` : ''}
                       </Typography>
                     </View>
 
                     <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
                       <Typography variant="caption" style={[styles.statusBadgeText, { color: statusColor.fg }]}>
-                        {item.status}
+                        {translateValue('status', item.status)}
                       </Typography>
                     </View>
                   </View>
@@ -257,7 +259,7 @@ export function RewardQueueScreen() {
                     <Typography variant="bodySmall">
                       {t('adminReferrals.typeLabel')}{' '}
                       <Typography variant="bodySmall" style={{ fontWeight: '600' }}>
-                        {REWARD_TYPE_LABELS[item.rewardType] ?? item.rewardType}
+                        {t(`adminReferrals.rewardTypes.${item.rewardType}`, { defaultValue: REWARD_TYPE_LABELS[item.rewardType] ?? item.rewardType })}
                       </Typography>
                     </Typography>
                     <Typography variant="bodySmall">
@@ -303,13 +305,13 @@ export function RewardQueueScreen() {
 
       <ConfirmationModal
         visible={!!pendingAction}
-        title={pendingAction ? ACTION_COPY[pendingAction.action].title : ''}
+        title={pendingAction ? t(ACTION_COPY[pendingAction.action].title) : ''}
         message={
           pendingAction
             ? `${pendingAction.reward.rewardCode} · ${pendingAction.reward.memberId}`
             : ''
         }
-        confirmText={pendingAction ? ACTION_COPY[pendingAction.action].confirm : 'Confirm'}
+        confirmText={pendingAction ? t(ACTION_COPY[pendingAction.action].confirm) : t('common.confirm')}
         variant={pendingAction?.action === 'reject' ? 'danger' : 'primary'}
         icon={pendingAction?.action === 'reject' ? 'x-circle' : 'check-circle'}
         loading={rewardAction.isPending}

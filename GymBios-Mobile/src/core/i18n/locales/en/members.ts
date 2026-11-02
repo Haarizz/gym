@@ -404,6 +404,25 @@ const members = {
       expiredAgo_one: 'Expired {{count}} day ago',
       expiredAgo_other: 'Expired {{count}} days ago',
     },
+    "wizardSteps": {
+      "personal": "Personal Information",
+      "membership": "Membership Information",
+      "medical": "Medical Information",
+      "family": "Family Configuration",
+      "access": "App Access & Review"
+    },
+    "reviewSections": {
+      "personal": "Personal",
+      "membership": "Membership",
+      "health": "Health",
+      "family": "Family",
+      "familyHead": "Family head"
+    },
+    "registrationTitle": "Membership Registration",
+    "renewalLabel": "Renewal",
+    "renewalWithPlan": "Renewal · {{plan}}",
+    "callA11y": "Call {{name}}",
+    "memberSubtitle": "Member: {{name}}"
   },
 };
 

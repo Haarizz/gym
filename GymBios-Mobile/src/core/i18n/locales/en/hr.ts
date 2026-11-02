@@ -159,7 +159,54 @@ const hr = {
       "viewDetails": "View Details",
       "onLeave": "On Leave"
     },
-    "datePlaceholder": "YYYY-MM-DD"
+    "datePlaceholder": "YYYY-MM-DD",
+    "wizardSteps": {
+      "personal": "Personal Information",
+      "employment": "Employment",
+      "compensation": "Compensation",
+      "schedule": "Schedule & Certifications",
+      "access": "App Access & Review"
+    },
+    "msg": {
+      "deleteFailed": "Failed to delete staff member.",
+      "statusUpdated": "Staff status updated.",
+      "statusFailed": "Failed to update staff status.",
+      "targetsComingSoon": "Setting targets from the app is coming in an upcoming update.",
+      "branchRequiredTitle": "Branch Required",
+      "branchRequired": "Please select a specific branch from the header menu before creating a new staff.",
+      "staffNoPhone": "This staff member does not have a phone number recorded.",
+      "messageA11y": "Message {{name}}",
+      "workingDaysValue": "{{count}} per week"
+    },
+    "review": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "role": "Role",
+      "department": "Department",
+      "branch": "Branch",
+      "joined": "Joined",
+      "salary": "Salary",
+      "target": "Target",
+      "workingDays": "Working days",
+      "certifications": "Certifications",
+      "needsAttention": "Needs attention",
+      "edit": "Edit {{title}}"
+    },
+    "days": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "shifts": {
+      "Morning": "Morning (6am–12pm)",
+      "Afternoon": "Afternoon (12pm–5pm)",
+      "Evening": "Evening (5pm–10pm)"
+    }
   }
 };
 

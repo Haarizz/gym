@@ -92,6 +92,33 @@ const attendance = {
       "active": "Activo",
       "done": "Listo",
       "completed": "Completado"
+    },
+    "summary": {
+      "title": "Resumen",
+      "totalCheckIns": "Registros totales",
+      "avgDaily": "Media diaria",
+      "rate": "Tasa",
+      "peakHour": "Hora punta",
+      "activeMembers": "Miembros activos",
+      "daysInRange": "Días en el rango"
+    },
+    "periods": {
+      "7d": "7 días",
+      "30d": "30 días",
+      "90d": "90 días",
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "this-week": "Esta semana"
+    },
+    "misc": {
+      "insights": "Información",
+      "other": "Otro",
+      "open": "Abrir",
+      "quickStats": "Estadísticas rápidas",
+      "noStaffClockedIn": "Ningún empleado ha fichado",
+      "noStaffClockedInDesc": "No hay registros de asistencia de personal o entrenadores para hoy.",
+      "visitor": "Visitante",
+      "user": "Usuario"
     }
   }
 };

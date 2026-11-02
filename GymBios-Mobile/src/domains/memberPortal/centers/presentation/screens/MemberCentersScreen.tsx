@@ -31,6 +31,12 @@ import { useCenters, type CenterSummary } from '@/domains/discovery';
 import { useNearbyDistance } from '../hooks/useNearbyDistance';
 import { useCentersReturnEntrance } from '../hooks/useCentersReturnEntrance';
 import { getDistanceKm } from '../../utils/distance';
+import {
+  membershipAtGym,
+  useMyGymMemberships,
+  type GymMembership,
+} from '@/domains/gymSwitcher/gymMembershipsApi';
+import { openMembershipAt } from '@/domains/gymSwitcher/openMembership';
 
 export function MemberCentersScreen({
   initialDeepLink,
@@ -49,6 +55,8 @@ export function MemberCentersScreen({
   const { data: centers = [], isLoading, isRefetching, refetch } = useCenters();
   const { coords, locationLabel, isLocating, requestLocation, clearLocation } = useNearbyDistance();
   const isLocationOn = coords != null;
+  // Gyms the member already belongs to show "Manage" instead of "Subscribe".
+  const { data: myGyms } = useMyGymMemberships();
 
   const goToDetail = (center: CenterSummary, tab: 'overview' | 'plans' = 'overview') => {
     // Location only lives on this screen, so hand the already-computed distance to
@@ -140,6 +148,10 @@ export function MemberCentersScreen({
 
   const handleBuyMembership = (center: CenterSummary) => {
     goToDetail(center, 'plans');
+  };
+
+  const handleManageMembership = (membership: GymMembership) => {
+    void openMembershipAt(membership);
   };
 
   const handleUseMyLocation = () => {
@@ -331,6 +343,8 @@ export function MemberCentersScreen({
               center={center}
               onViewDetails={handleViewDetails}
               onBuyMembership={handleBuyMembership}
+              membership={membershipAtGym(myGyms, center.tenantSlug)}
+              onManageMembership={handleManageMembership}
               distanceKm={
                 coords && center.lat != null && center.lng != null
                   ? getDistanceKm(coords.latitude, coords.longitude, center.lat, center.lng)

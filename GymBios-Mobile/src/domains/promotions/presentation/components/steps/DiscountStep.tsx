@@ -9,6 +9,7 @@ import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { isAccessDaysPromotion, PROMO_ACCESS_DAYS } from '../../hooks/usePromotionWizard';
 import { stepStyles, type Option, type StepProps } from './formControls';
+import { localizeOptions } from '@/core/i18n/format';
 
 const DISCOUNT_TYPE_OPTIONS: Option[] = [
   { label: 'Percentage', value: 'percentage' },
@@ -27,7 +28,7 @@ export function DiscountStep({ values, onChange }: StepProps) {
       <Dropdown
         label={t('promotions.discountType')}
         placeholder={t('promotions.selectDiscountType')}
-        options={DISCOUNT_TYPE_OPTIONS}
+        options={localizeOptions(DISCOUNT_TYPE_OPTIONS, { prefix: 'promotions.opts.discountTypes' })}
         value={values.discountType}
         onChange={(val) => onChange('discountType', val)}
       />
@@ -54,7 +55,7 @@ export function DiscountStep({ values, onChange }: StepProps) {
         </View>
         <View style={stepStyles.gridCol}>
           <Input
-            label={`Maximum Discount (${currencyCode})`}
+            label={t('promotions.msg.maxDiscount', { currency: currencyCode })}
             placeholder={t('promotions.optional')}
             keyboardType="decimal-pad"
             value={values.maximumDiscount}

@@ -427,7 +427,26 @@ const members = {
       "expiredAgo_few": "انتهت الصلاحية منذ {{count}} أيام",
       "expiredAgo_many": "انتهت الصلاحية منذ {{count}} يوماً",
       "expiredAgo_other": "انتهت الصلاحية منذ {{count}} يوم"
-    }
+    },
+    "wizardSteps": {
+      "personal": "المعلومات الشخصية",
+      "membership": "معلومات العضوية",
+      "medical": "المعلومات الطبية",
+      "family": "إعداد العائلة",
+      "access": "الوصول إلى التطبيق والمراجعة"
+    },
+    "reviewSections": {
+      "personal": "الشخصية",
+      "membership": "العضوية",
+      "health": "الصحة",
+      "family": "العائلة",
+      "familyHead": "رب العائلة"
+    },
+    "registrationTitle": "تسجيل العضوية",
+    "renewalLabel": "تجديد",
+    "renewalWithPlan": "تجديد · {{plan}}",
+    "callA11y": "الاتصال بـ {{name}}",
+    "memberSubtitle": "العضو: {{name}}"
   }
 };
 

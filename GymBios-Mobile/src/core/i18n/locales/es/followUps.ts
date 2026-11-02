@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "No hay tareas de seguimiento que coincidan con sus criterios.",
     "rescheduleTitle": "Reprogramar seguimiento",
     "reschedulingFor": "Reprogramando seguimiento para",
-    "newDueDate": "Nueva fecha de vencimiento"
+    "newDueDate": "Nueva fecha de vencimiento",
+    "outcomes": {
+      "successful": "Exitoso",
+      "no_response": "Sin respuesta",
+      "callback_requested": "Solicitó devolución de llamada",
+      "not_interested": "No interesado",
+      "converted": "Convertido",
+      "rescheduled": "Reprogramado"
+    },
+    "filters": {
+      "allStatuses": "Todos los estados",
+      "allTypes": "Todos los tipos",
+      "allPriorities": "Todas las prioridades",
+      "allStaff": "Todo el personal"
+    },
+    "msg": {
+      "selectMemberOrLead": "Selecciona un miembro o prospecto.",
+      "subjectRequired": "El asunto del seguimiento es obligatorio.",
+      "dueDateRequired": "La fecha de vencimiento es obligatoria.",
+      "newDueDateRequired": "La nueva fecha de vencimiento es obligatoria.",
+      "notesRequired": "Las notas son obligatorias para el registro de comunicación.",
+      "addRecordFailed": "No se pudo añadir el registro de comunicación.",
+      "deleteRecordTitle": "Eliminar registro",
+      "deleteRecordBody": "¿Seguro que quieres eliminar este registro de comunicación?",
+      "saveRecord": "Guardar registro",
+      "detailsTitle": "Detalles del seguimiento",
+      "completing": "Completando...",
+      "rescheduling": "Reprogramando...",
+      "noDueDate": "Sin fecha de vencimiento",
+      "leadNoPhone": "Este prospecto no tiene un número de teléfono registrado.",
+      "leadNoEmail": "Este prospecto no tiene un correo electrónico registrado.",
+      "deleteTitle": "Eliminar seguimiento",
+      "deleteBody": "¿Seguro que quieres eliminar el seguimiento \"{{subject}}\" de {{name}}?",
+      "deleteFailed": "No se pudo eliminar el seguimiento.",
+      "cancelTitle": "Cancelar seguimiento",
+      "cancelBody": "¿Seguro que quieres cancelar el seguimiento \"{{subject}}\"?",
+      "yesCancel": "Sí, cancelar",
+      "cancelFailed": "No se pudo cancelar el seguimiento.",
+      "updateFailed": "No se pudo actualizar el seguimiento.",
+      "createFailed": "No se pudo crear el seguimiento.",
+      "completeFailed": "No se pudo completar el seguimiento.",
+      "rescheduleFailed": "No se pudo reprogramar el seguimiento.",
+      "leadConvertedTitle": "Prospecto convertido",
+      "leadConvertedBody": "Prospecto marcado como convertido. Regístralo como miembro en recepción para que la venta se te acredite."
+    }
   }
 };
 

@@ -15,6 +15,7 @@ import type { StepErrors } from '@/domains/members/hooks/useMemberWizard';
 
 import { FormCard, RequiredLabel } from './FormCard';
 import type { MemberStepProps } from './stepTypes';
+import { localizeOptions } from '@/core/i18n/format';
 
 interface AppAccessStepProps extends MemberStepProps {
   mode: 'create' | 'edit';
@@ -46,9 +47,9 @@ export function AppAccessStep({
   const isFamily = data.membershipType?.toUpperCase() === 'FAMILY';
   const fee = parseFloat(data.membershipFee || '');
   const bodyStats = [
-    data.bloodGroup && `Blood ${data.bloodGroup}`,
-    data.height && `${data.height} cm`,
-    data.weight && `${data.weight} kg`,
+    data.bloodGroup && t('shared.bloodGroupValue', { group: data.bloodGroup }),
+    data.height && t('shared.cmValue', { value: data.height }),
+    data.weight && t('shared.kgValue', { value: data.weight }),
   ].filter(Boolean);
   const healthNotesCount = [
     data.medicalConditions,
@@ -139,7 +140,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="user"
-        title="Personal"
+        title={t('members.reviewSections.personal')}
         step={1}
         goToStep={goToStep}
         invalid={Object.keys(validateStep(1)).length > 0}
@@ -147,19 +148,19 @@ export function AppAccessStep({
           [t('members.form.appAccessStep.nameRow'), data.name || '—'],
           [t('members.form.appAccessStep.phoneRow'), data.phone || '—'],
           [t('members.form.appAccessStep.emailRow'), data.email || '—'],
-          [t('members.form.appAccessStep.genderRow'), data.gender ? labelOf(GENDERS, data.gender) : '—'],
+          [t('members.form.appAccessStep.genderRow'), data.gender ? labelOf(localizeOptions(GENDERS, 'gender'), data.gender) : '—'],
           [t('members.form.appAccessStep.dobRow'), formatD(data.dateOfBirth)],
         ]}
       />
 
       <ReviewCard
         icon="credit-card"
-        title="Membership"
+        title={t('members.reviewSections.membership')}
         step={2}
         goToStep={goToStep}
         invalid={Object.keys(validateStep(2)).length > 0}
         rows={[
-          [t('members.form.appAccessStep.typeRow'), data.membershipType ? labelOf(MEMBERSHIP_TYPES, data.membershipType) : '—'],
+          [t('members.form.appAccessStep.typeRow'), data.membershipType ? labelOf(localizeOptions(MEMBERSHIP_TYPES, 'membershipType'), data.membershipType) : '—'],
           [t('members.form.appAccessStep.planRow'), plan?.name ?? '—'],
           [t('members.form.appAccessStep.joiningRow'), formatD(data.joinDate)],
           [t('members.form.appAccessStep.periodRow'), `${formatD(data.startDate)} → ${formatD(data.endDate)}`],
@@ -169,7 +170,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="heart"
-        title="Health"
+        title={t('members.reviewSections.health')}
         step={3}
         goToStep={goToStep}
         rows={[
@@ -185,7 +186,7 @@ export function AppAccessStep({
 
       <ReviewCard
         icon="users"
-        title="Family"
+        title={t('members.reviewSections.family')}
         step={4}
         goToStep={goToStep}
         rows={
@@ -193,7 +194,7 @@ export function AppAccessStep({
             ? [
                 [
                   t('members.form.appAccessStep.roleRow'),
-                  data.isFamilyHead ? 'Family head' : labelOf(RELATIONSHIPS, data.relationshipToHead),
+                  data.isFamilyHead ? t('members.reviewSections.familyHead') : labelOf(localizeOptions(RELATIONSHIPS, 'relation'), data.relationshipToHead),
                 ],
                 ...(data.isFamilyHead
                   ? [

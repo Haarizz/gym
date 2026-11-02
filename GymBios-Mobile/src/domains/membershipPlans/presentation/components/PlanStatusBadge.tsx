@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { tOr } from '@/core/i18n/format';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   ACTIVE:   { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0' },
@@ -35,7 +36,7 @@ export function PlanStatusBadge({ status }: PlanStatusBadgeProps) {
       ]}
     >
       <Typography variant="caption" style={[styles.text, { color: style.text }]}>
-        {status.toUpperCase()}
+        {tOr(`membershipPlans.misc2.options.${status.toLowerCase()}`, status).toUpperCase()}
       </Typography>
     </View>
   );

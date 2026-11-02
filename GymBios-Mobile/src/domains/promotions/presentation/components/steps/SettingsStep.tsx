@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Dropdown } from '@/shared/components/Dropdown';
 import { Input } from '@/shared/components/Input';
 import { stepStyles, ToggleRow, type Option, type StepProps } from './formControls';
+import { localizeOptions } from '@/core/i18n/format';
 
 const PRIORITY_OPTIONS: Option[] = [
   { label: 'High (1)', value: '1' },
@@ -20,7 +21,7 @@ export function SettingsStep({ values, onChange }: StepProps) {
       <Dropdown
         label={t('promotions.priorityLevel')}
         placeholder={t('promotions.selectPriority')}
-        options={PRIORITY_OPTIONS}
+        options={localizeOptions(PRIORITY_OPTIONS, { prefix: 'promotions.opts.priorities' })}
         value={values.priority}
         onChange={(val) => onChange('priority', val)}
       />

@@ -6,6 +6,7 @@ import { Typography } from '@/shared/components/Typography';
 import type { MembershipPlan } from '../../domain/MembershipPlan';
 import { useMembershipPlans } from '../hooks/useMembershipPlans';
 import { MembershipPlanForm } from '../components/MembershipPlanForm';
+import { useTranslation } from 'react-i18next';
 
 interface EditMembershipPlanScreenProps {
   planId: number;
@@ -18,6 +19,7 @@ export function EditMembershipPlanScreen({
   onSuccess,
   onCancel,
 }: EditMembershipPlanScreenProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const { loadPlanById, loading } = useMembershipPlans();
   const [plan, setPlan] = useState<MembershipPlan | null>(null);
@@ -26,8 +28,8 @@ export function EditMembershipPlanScreen({
   useEffect(() => {
     loadPlanById(planId)
       .then((result) => setPlan(result))
-      .catch(() => setLoadError('Failed to load subscription. Please go back and try again.'));
-  }, [planId, loadPlanById]);
+      .catch(() => setLoadError(t('membershipPlans.list.loadError')));
+  }, [planId, loadPlanById, t]);
 
   if (loading && !plan) {
     return (

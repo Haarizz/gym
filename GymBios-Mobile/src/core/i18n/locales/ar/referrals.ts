@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "جلسة تدريب شخصي مجانية",
     "freePt": "تدريب شخصي مجاني",
     "claimCredit": "المطالبة بالرصيد",
-    "bookPtSession": "حجز جلسة تدريب شخصي"
+    "bookPtSession": "حجز جلسة تدريب شخصي",
+    "hub": {
+      "overview": {
+        "title": "نظرة عامة",
+        "description": "ملخص برنامج الإحالة والنشاط الأخير"
+      },
+      "members": {
+        "title": "الأعضاء",
+        "description": "عرض الأعضاء وأداء إحالاتهم"
+      },
+      "activity": {
+        "title": "النشاط",
+        "description": "تتبع نشاط الإحالة وإدارته"
+      },
+      "my-rewards": {
+        "title": "مكافآتي",
+        "description": "عرض المكافآت التي حصل عليها الأعضاء"
+      },
+      "reward-queue": {
+        "title": "قائمة انتظار المكافآت",
+        "description": "مراجعة طلبات استرداد المكافآت المعلقة"
+      },
+      "reward-rules": {
+        "title": "قواعد المكافآت",
+        "description": "إدارة قواعد مكافآت الإحالة"
+      },
+      "analytics": {
+        "title": "التحليلات",
+        "description": "تحليل تحويل الإحالات وأدائها"
+      },
+      "settings": {
+        "title": "الإعدادات",
+        "description": "إعداد برنامج الإحالة"
+      }
+    },
+    "header": {
+      "title": "الإحالات",
+      "subtitle": "تتبع برامج إحالة الأعضاء ومكافآتها وإدارتها"
+    },
+    "funnel": {
+      "created": "الإحالات المنشأة",
+      "signedUp": "سجلوا (ناجحة)",
+      "paid": "تم تسجيل الدفع",
+      "redeemed": "تم استرداد المكافأة"
+    },
+    "insights": {
+      "conversionTitle": "معدل التحويل",
+      "conversionText": "{{rate}}% من الإحالات تتحول إلى تسجيلات ناجحة ({{successful}} من {{total}}).",
+      "topRuleTitle": "القاعدة الأكثر استخداماً",
+      "topRuleText_one": "طُبقت \"{{name}}\" على إحالة واحدة.",
+      "topRuleText_other": "طُبقت \"{{name}}\" على {{count}} إحالة.",
+      "noRules": "لم تُطبق أي قواعد مكافآت على أي إحالة بعد.",
+      "redemptionTitle": "استرداد المكافآت",
+      "redemptionText": "{{rate}}% من الإحالات الناجحة استردت مكافأتها ({{redeemed}} من {{successful}})."
+    },
+    "stats": {
+      "total": "إجمالي الإحالات",
+      "totalSub": "جميع الإحالات المسجلة",
+      "successful": "ناجحة",
+      "successfulSub": "الإحالات المحولة",
+      "conversion": "التحويل",
+      "conversionSub": "معدل نجاح الإحالة",
+      "rewards": "إجمالي المكافآت",
+      "rewardsSub": "المكافآت الموزعة",
+      "programs": "البرامج النشطة",
+      "programsSub": "القواعد قيد التشغيل",
+      "avgReward": "متوسط المكافأة",
+      "avgRewardSub": "المتوسط لكل إحالة"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "رصيد المحفظة",
+      "MEMBERSHIP_EXTENSION": "تمديد العضوية",
+      "MEMBERSHIP_DISCOUNT": "خصم العضوية",
+      "FREE_PT": "تدريب شخصي مجاني",
+      "FREE_CLASS": "حصة مجانية",
+      "COUPON": "قسيمة",
+      "LOYALTY_POINTS": "نقاط الولاء",
+      "GIFT": "هدية",
+      "CASH": "نقداً"
+    },
+    "queue": {
+      "approveTitle": "اعتماد المكافأة؟",
+      "rejectTitle": "رفض المكافأة؟",
+      "redeemTitle": "وضع علامة على المكافأة كمستردة؟",
+      "approved": "تم اعتماد المكافأة {{code}}.",
+      "rejected": "تم رفض المكافأة {{code}}.",
+      "redeemed": "تم وضع علامة على المكافأة {{code}} كمستردة.",
+      "noRewards": "لم تُنشأ أي مكافآت بعد.",
+      "noMatch": "لا توجد مكافآت تطابق هذا الفلتر.",
+      "days_one": "يوم واحد",
+      "days_other": "{{count}} يوم",
+      "points": "{{value}} نقطة"
+    },
+    "msg": {
+      "unknownReferrer": "مُحيل غير معروف",
+      "unknownReferee": "مُحال غير معروف",
+      "unknownMember": "عضو غير معروف",
+      "viewDetails": "عرض تفاصيل الإحالة",
+      "editReferral": "تعديل الإحالة",
+      "markSuccessfulA11y": "وضع علامة على الإحالة كناجحة",
+      "deleteReferralA11y": "حذف الإحالة",
+      "markedSuccessful": "تم وضع علامة على الإحالة كناجحة.",
+      "markedExpired": "تم وضع علامة على الإحالة كمنتهية.",
+      "statusUpdateFailed": "تعذر تحديث حالة الإحالة.",
+      "namesRequired": "يرجى إدخال اسم المُحيل واسم الشخص المُحال.",
+      "updated": "تم تحديث الإحالة بنجاح.",
+      "updateFailed": "تعذر تحديث الإحالة.",
+      "created": "تم تسجيل الإحالة بنجاح.",
+      "createFailed": "تعذر إنشاء الإحالة.",
+      "editTitle": "تعديل الإحالة",
+      "addTitle": "إضافة إحالة",
+      "selectMember": "اختر عضواً...",
+      "selectMemberOrType": "اختر عضواً أو اكتب أدناه...",
+      "deleteTitle": "حذف الإحالة",
+      "deleteBody": "هل أنت متأكد من حذف إحالة {{name}}؟",
+      "deleted": "تم حذف الإحالة.",
+      "deletedTitle": "تم الحذف",
+      "deleteFailed": "تعذر حذف الإحالة.",
+      "refreshed": "تم تحديث البيانات وتصحيح المكافآت.",
+      "refreshedTitle": "تم التحديث",
+      "refreshFailed": "تعذر تحديث البيانات.",
+      "refreshFailedTitle": "فشل التحديث",
+      "csvGenerated": "تم إنشاء تقرير CSV يحتوي على {{count}} سجل.",
+      "csvTitle": "تصدير CSV",
+      "settingsSaved": "تم حفظ إعدادات البرنامج بنجاح.",
+      "settingsFailed": "تعذر حفظ الإعدادات.",
+      "codeCopied": "تم نسخ رمز الإحالة \"{{code}}\".",
+      "linkCopied": "تم نسخ رابط الإحالة \"{{link}}\".",
+      "allTiers": "جميع المستويات",
+      "redeemed": "تم استرداد {{label}} بنجاح.",
+      "redeemFailed": "تعذر استرداد المكافأة.",
+      "noPhone": "لا يوجد هاتف",
+      "standardPlan": "قياسي",
+      "ptSession": "جلسة تدريب شخصي",
+      "walletCredit": "رصيد المحفظة",
+      "shareTitle": "مشاركة",
+      "whatsappMessage": "انضم إلى نادينا باستخدام رمز الإحالة الخاص بي: {{code}}! واحصل على مزايا حصرية!",
+      "whatsappPrepared": "تم تجهيز رسالة واتساب:\n{{message}}",
+      "emailSubject": "انضم إلى نادينا - دعوة حصرية!",
+      "emailBody": "مرحباً!\n\nانضم إلى نادينا باستخدام رمز الإحالة الخاص بي \"{{code}}\" أو الرابط: https://{{link}}\n\nمع أطيب التحيات،\n{{name}}",
+      "emailPrepared": "دعوة البريد الإلكتروني:\n{{body}}",
+      "payment": "الدفع"
+    }
   },
 } satisfies LocaleResource;
 

@@ -62,7 +62,7 @@ export function MembershipPlanSummary({ plan }: MembershipPlanSummaryProps) {
                 : '—'
               : plan.maxSessions !== undefined
                 ? String(plan.maxSessions)
-                : 'Unlimited'}
+                : t('common.unlimited')}
           </Typography>
         </View>
       </View>

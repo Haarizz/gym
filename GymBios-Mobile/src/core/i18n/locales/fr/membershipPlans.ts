@@ -152,6 +152,59 @@ const membershipPlans = {
         "selectedCount": "{{count}} sélectionnés",
         "none": "Aucun"
       }
+    },
+    "misc": {
+      "draft": "Brouillon",
+      "offerValueRequired": "Saisissez une valeur d'offre supérieure à 0",
+      "offerPercentMax": "Une offre en pourcentage ne peut pas dépasser 100 %",
+      "offerEndBeforeStart": "La date de fin ne peut pas précéder la date de début"
+    },
+    "misc2": {
+      "options": {
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois",
+        "year": "Année",
+        "unlimited": "Illimité",
+        "limited": "Limité",
+        "none": "Aucun",
+        "per_day": "Par jour",
+        "per_week": "Par semaine",
+        "per_month": "Par mois",
+        "standard": "Standard",
+        "premium": "Premium",
+        "vip": "VIP",
+        "student": "Étudiant",
+        "corporate": "Entreprise",
+        "individual": "Individuel",
+        "couple": "Couple",
+        "family": "Famille",
+        "walk_in": "Visite libre",
+        "active": "Actif",
+        "inactive": "Inactif",
+        "draft": "Brouillon",
+        "archived": "Archivé",
+        "all": "Tous"
+      },
+      "wizardSteps": {
+        "basic": "Informations de base",
+        "duration": "Tarifs",
+        "sessions": "Capacité",
+        "family": "Famille",
+        "freeze": "Gel",
+        "assignments": "Attribuer"
+      },
+      "family": {
+        "coupleHeadPays": "Le titulaire paie pour les deux",
+        "familyHeadPays": "Le chef de famille paie pour tous",
+        "coupleHeadDesc": "Le partenaire est ajouté sous le titulaire et toute la formule lui est facturée sur une seule facture.",
+        "familyHeadDesc": "Les membres de la famille sont ajoutés sous le chef de famille et toute la formule lui est facturée sur une seule facture.",
+        "coupleAutoHint": "Avec le calcul automatique, la facture vaut ce prix × 2 ; laissez vide pour facturer le prix de l'abonnement au couple.",
+        "familyAutoHint": "Avec le calcul automatique, la facture vaut ce prix × membres ; laissez vide pour facturer le prix de l'abonnement à toute la famille.",
+        "example": "Exemple : {{price}} × {{count}} membres = {{total}} sur UNE facture adressée au titulaire.",
+        "wholeCouple": "Le prix de l'abonnement ({{price}}) constitue UNE facture pour tout le couple, adressée au titulaire.",
+        "wholeFamily": "Le prix de l'abonnement ({{price}}) constitue UNE facture pour toute la famille, adressée au chef de famille."
+      }
     }
   }
 };

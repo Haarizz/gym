@@ -6,6 +6,7 @@ import { EmptyState } from '@/shared/components/EmptyState';
 import { Loader } from '@/shared/components/Loader';
 import type { MembershipPlan } from '../../domain/MembershipPlan';
 import { MembershipPlanCard } from './MembershipPlanCard';
+import { useTranslation } from 'react-i18next';
 
 interface MembershipPlanListProps {
   plans: MembershipPlan[];
@@ -29,9 +30,12 @@ export function MembershipPlanList({
   onDuplicate,
   onDelete,
   ListHeaderComponent,
-  emptyTitle = 'No Subscriptions Found',
-  emptyDescription = 'Create your first subscription to get started.',
+  emptyTitle: emptyTitleProp,
+  emptyDescription: emptyDescriptionProp,
 }: MembershipPlanListProps) {
+  const { t } = useTranslation();
+  const emptyTitle = emptyTitleProp ?? t('membershipPlans.list.noPlansFound');
+  const emptyDescription = emptyDescriptionProp ?? t('membershipPlans.list.emptyUnfiltered');
   const renderItem = useCallback(
     ({ item }: { item: MembershipPlan }) => (
       <MembershipPlanCard

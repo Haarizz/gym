@@ -83,28 +83,28 @@ export function FollowUpManagementScreen() {
   // Quick Action Handlers
   const handleCall = useCallback((followUp: FollowUp) => {
     if (!followUp.leadPhone) {
-      toast.info('This lead does not have a phone number recorded.', {
-        title: 'No Phone Number'
+      toast.info(t('followUps.msg.leadNoPhone'), {
+        title: t('common.noPhoneNumber')
       });
       return;
     }
     Linking.openURL(`tel:${followUp.leadPhone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to launch phone dialer on this device.', {
-        title: 'Error'
+      toast.error(t('common.cannotOpenDialer'), {
+        title: t('common.error')
       });
     });
   }, []);
 
   const handleEmail = useCallback((followUp: FollowUp) => {
     if (!followUp.leadEmail) {
-      toast.info('This lead does not have an email address recorded.', {
-        title: 'No Email Address'
+      toast.info(t('followUps.msg.leadNoEmail'), {
+        title: t('common.noEmailAddress')
       });
       return;
     }
     Linking.openURL(`mailto:${followUp.leadEmail}`).catch(() => {
-      toast.error('Unable to launch mail client on this device.', {
-        title: 'Error'
+      toast.error(t('common.cannotOpenMail'), {
+        title: t('common.error')
       });
     });
   }, []);
@@ -122,18 +122,18 @@ export function FollowUpManagementScreen() {
   const handleDelete = useCallback(
     (followUp: FollowUp) => {
       Alert.alert(
-        'Delete Follow-up',
-        `Are you sure you want to delete the follow-up "${followUp.subject}" for ${followUp.leadName}?`,
+        t('followUps.msg.deleteTitle'),
+        t('followUps.msg.deleteBody', { subject: followUp.subject, name: followUp.leadName }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('common.delete'),
             style: 'destructive',
             onPress: () => {
               deleteMutation.mutate(followUp.id, {
                 onError: err => {
-                  toast.error(err.message || 'Failed to delete follow-up.', {
-                    title: 'Error'
+                  toast.error(err.message || t('followUps.msg.deleteFailed'), {
+                    title: t('common.error')
                   });
                 },
               });
@@ -148,18 +148,18 @@ export function FollowUpManagementScreen() {
   const handleCancelAction = useCallback(
     (followUp: FollowUp) => {
       Alert.alert(
-        'Cancel Follow-up',
-        `Are you sure you want to cancel the follow-up "${followUp.subject}"?`,
+        t('followUps.msg.cancelTitle'),
+        t('followUps.msg.cancelBody', { subject: followUp.subject }),
         [
-          { text: 'No', style: 'cancel' },
+          { text: t('common.no'), style: 'cancel' },
           {
-            text: 'Yes, Cancel',
+            text: t('followUps.msg.yesCancel'),
             style: 'destructive',
             onPress: () => {
               cancelMutation.mutate(followUp.id, {
                 onError: err => {
-                  toast.error(err.message || 'Failed to cancel follow-up.', {
-                    title: 'Error'
+                  toast.error(err.message || t('followUps.msg.cancelFailed'), {
+                    title: t('common.error')
                   });
                 },
               });
@@ -192,8 +192,8 @@ export function FollowUpManagementScreen() {
             setEditingFollowUp(null);
           },
           onError: err => {
-            toast.error(err.message || 'Failed to update follow-up.', {
-              title: 'Error'
+            toast.error(err.message || t('followUps.msg.updateFailed'), {
+              title: t('common.error')
             });
           },
         },
@@ -204,8 +204,8 @@ export function FollowUpManagementScreen() {
           setAddSheetVisible(false);
         },
         onError: err => {
-          toast.error(err.message || 'Failed to create follow-up.', {
-            title: 'Error'
+          toast.error(err.message || t('followUps.msg.createFailed'), {
+            title: t('common.error')
           });
         },
       });
@@ -226,14 +226,14 @@ export function FollowUpManagementScreen() {
           if (outcome === 'converted') {
             // The lead now counts as a conversion, but revenue only moves once the member
             // is registered and pays — which happens at the front desk, not in the app.
-            toast.success('Lead marked as converted. Register them as a member at the front desk to credit the sale to you.', {
-              title: 'Lead Converted'
+            toast.success(t('followUps.msg.leadConvertedBody'), {
+              title: t('followUps.msg.leadConvertedTitle')
             });
           }
         },
         onError: err => {
-          toast.error(err.message || 'Failed to complete follow-up.', {
-            title: 'Error'
+          toast.error(err.message || t('followUps.msg.completeFailed'), {
+            title: t('common.error')
           });
         },
       },
@@ -253,8 +253,8 @@ export function FollowUpManagementScreen() {
           setReschedulingFollowUp(null);
         },
         onError: err => {
-          toast.error(err.message || 'Failed to reschedule follow-up.', {
-            title: 'Error'
+          toast.error(err.message || t('followUps.msg.rescheduleFailed'), {
+            title: t('common.error')
           });
         },
       },

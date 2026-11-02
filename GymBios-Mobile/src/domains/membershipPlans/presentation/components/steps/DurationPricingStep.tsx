@@ -10,6 +10,7 @@ import { FormSection } from '@/shared/components/FormSection';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import { offerError, type PlanWizardData } from '../../hooks/useMembershipPlanWizard';
+import { tOr } from '@/core/i18n/format';
 
 const DURATION_TYPES = ['Day', 'Week', 'Month', 'Year'];
 
@@ -44,9 +45,10 @@ interface OptionRowProps {
   options: string[];
   selected: string;
   onSelect: (value: string) => void;
+  getLabel?: (value: string) => string;
 }
 
-function OptionRow({ options, selected, onSelect }: OptionRowProps) {
+function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
   const theme = useTheme();
   return (
     <View style={styles.optionRow}>
@@ -54,7 +56,7 @@ function OptionRow({ options, selected, onSelect }: OptionRowProps) {
         const isActive = opt === selected;
         return (
           <View
-            key={opt}
+            key={getLabel ? getLabel(opt) : opt}
             style={[
               styles.optionChip,
               {
@@ -104,6 +106,7 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
         </Typography>
         <OptionRow
           options={DURATION_TYPES}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.durationType}
           onSelect={(v) => onChange('durationType', v)}
         />

@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Pressable, View } from 'react-native';
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { tOr } from '@/core/i18n/format';
 
 const STATUS_OPTIONS = ['All', 'Active', 'Inactive', 'Draft', 'Archived'] as const;
 export type StatusFilter = typeof STATUS_OPTIONS[number];
@@ -42,7 +43,7 @@ export function MembershipPlanFilter({ selected, onSelect }: MembershipPlanFilte
                 { color: isActive ? BrandColors.white : theme.textSecondary },
               ]}
             >
-              {option}
+              {tOr(`membershipPlans.misc2.options.${option.toLowerCase()}`, option)}
             </Typography>
           </Pressable>
         );

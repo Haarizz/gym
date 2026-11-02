@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "Statistics",
     "tryAgain": "Try Again",
     "clearFilters": "Clear Filters",
-    "createPromotion": "Create Promotion"
+    "createPromotion": "Create Promotion",
+    "opts": {
+      "types": {
+        "all": "All Types",
+        "discount": "Discount",
+        "voucher": "Voucher",
+        "combo": "Combo",
+        "bogo": "BOGO",
+        "seasonal": "Seasonal",
+        "loyalty": "Loyalty",
+        "promotional_access_days": "Promotional Access Days",
+        "promo": "Promo"
+      },
+      "categories": {
+        "all": "All Categories",
+        "membership": "Membership",
+        "services": "Services",
+        "special_events": "Special Events",
+        "loyalty": "Loyalty",
+        "demographics": "Demographics"
+      },
+      "discountTypes": {
+        "percentage": "Percentage",
+        "fixed": "Fixed Amount",
+        "free": "Free/BOGO",
+        "promotional_access_days": "Promotional Access Days"
+      },
+      "priorities": {
+        "1": "High (1)",
+        "2": "Medium (2)",
+        "3": "Low (3)"
+      },
+      "audience": {
+        "all": "All Members",
+        "new_members": "New Members",
+        "existing_members": "Existing Members",
+        "vip": "VIP Members",
+        "specific": "Specific Members"
+      },
+      "channels": {
+        "website": "Website",
+        "app": "Mobile App",
+        "email": "Email",
+        "sms": "SMS",
+        "in_person": "In-Person"
+      },
+      "allStatus": "All Status"
+    },
+    "steps": {
+      "basic": "Basic Info",
+      "discount": "Discount",
+      "targeting": "Targeting",
+      "settings": "Settings"
+    },
+    "msg": {
+      "createTitle": "Create New Promotion",
+      "editTitle": "Edit Promotion",
+      "createSubmit": "Create Promotion",
+      "keepEditing": "Keep Editing",
+      "discard": "Discard",
+      "saveFailed": "Failed to save promotion. Please check input data and try again.",
+      "shareCode": "Use promotion code \"{{code}}\" for {{discount}}!",
+      "duplicated": "Created duplicate of \"{{name}}\".",
+      "duplicateFailed": "Failed to duplicate promotion.",
+      "deleteTitle": "Delete Promotion",
+      "deleteBody": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "deleted": "Deleted \"{{name}}\".",
+      "deleteFailed": "Failed to delete promotion.",
+      "system": "System",
+      "normal": "Normal",
+      "noEndDate": "No end date",
+      "percentOff": "{{value}}% OFF",
+      "amountOff": "{{value}} OFF",
+      "offSuffix": " OFF",
+      "specialOffer": "SPECIAL OFFER",
+      "revenueSuffix": " rev",
+      "maxDiscount": "Maximum Discount ({{currency}})"
+    }
   }
 };
 

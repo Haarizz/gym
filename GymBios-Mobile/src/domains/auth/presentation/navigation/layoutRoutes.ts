@@ -34,6 +34,8 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
   ['promotions', 'edit'],
   ['messaging', 'compose-message'],
   ['messaging', 'compose'],
+  // Member ↔ staff chat: own header and composer pinned to the bottom
+  ['messaging', 'chat'],
 
   // Profile Hub & Sub-screens
   ['profile'],
@@ -57,6 +59,7 @@ export const FULL_SCREEN_ROUTES: readonly RoutePattern[] = [
 
   // Member staff profile — has its own back button and Rate/Message bar
   ['team', '[staffId]'],
+  ['team', 'chat'],
 ] as const;
 
 /**
@@ -135,6 +138,7 @@ export const HIDE_ROLE_HEADER_ROUTES: readonly (readonly [string, string])[] = [
   ['messaging','compose-message'],
   ['messaging','templates'],
   ['messaging','analytics'],
+  ['messaging','chats'],
 
   ['roles', '[id]']
 ] as const;

@@ -20,6 +20,7 @@ import { useReferralFilters, type TierFilter } from '../hooks/useReferralFilters
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 export function ReferralMembersScreen() {
   const { t } = useTranslation();
@@ -101,14 +102,14 @@ export function ReferralMembersScreen() {
   }, [refetch]);
 
   const handleCopyCode = (code: string) => {
-    toast.info(`Referral code "${code}" copied.`, {
-      title: 'Referral Code'
+    toast.info(t('adminReferrals.msg.codeCopied', { code }), {
+      title: t('adminReferrals.referralCode')
     });
   };
 
   const handleCopyLink = (link: string) => {
-    toast.info(`Referral link "${link}" copied.`, {
-      title: 'Referral Link'
+    toast.info(t('adminReferrals.msg.linkCopied', { link }), {
+      title: t('adminReferrals.referralLink')
     });
   };
 
@@ -161,7 +162,7 @@ export function ReferralMembersScreen() {
                   variant="caption"
                   style={[styles.tierTabText, tierFilter === tier && styles.tierTabTextActive]}
                 >
-                  {tier === 'all' ? 'All Tiers' : tier.charAt(0).toUpperCase() + tier.slice(1)}
+                  {tier === 'all' ? t('adminReferrals.msg.allTiers') : translateValue('tier', tier)}
                 </Typography>
               </Pressable>
             ))}

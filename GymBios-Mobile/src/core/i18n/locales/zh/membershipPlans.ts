@@ -152,6 +152,59 @@ const membershipPlans = {
         "selectedCount": "已选 {{count}} 项",
         "none": "未指定"
       }
+    },
+    "misc": {
+      "draft": "草稿",
+      "offerValueRequired": "请输入大于 0 的优惠值",
+      "offerPercentMax": "百分比优惠不能超过 100%",
+      "offerEndBeforeStart": "结束日期不能早于开始日期"
+    },
+    "misc2": {
+      "options": {
+        "day": "天",
+        "week": "周",
+        "month": "月",
+        "year": "年",
+        "unlimited": "不限",
+        "limited": "有限",
+        "none": "无",
+        "per_day": "每天",
+        "per_week": "每周",
+        "per_month": "每月",
+        "standard": "标准",
+        "premium": "高级",
+        "vip": "VIP",
+        "student": "学生",
+        "corporate": "企业",
+        "individual": "个人",
+        "couple": "情侣",
+        "family": "家庭",
+        "walk_in": "散客",
+        "active": "有效",
+        "inactive": "未启用",
+        "draft": "草稿",
+        "archived": "已归档",
+        "all": "全部"
+      },
+      "wizardSteps": {
+        "basic": "基本信息",
+        "duration": "定价",
+        "sessions": "容量",
+        "family": "家庭",
+        "freeze": "冻结",
+        "assignments": "分配"
+      },
+      "family": {
+        "coupleHeadPays": "主账户为两人付款",
+        "familyHeadPays": "家庭主账户为所有人付款",
+        "coupleHeadDesc": "伴侣添加在主账户下，整个方案以一张发票向主账户收费。",
+        "familyHeadDesc": "家庭成员添加在家庭主账户下，整个方案以一张发票向主账户收费。",
+        "coupleAutoHint": "开启自动计算后，发票金额为此价格 × 2；留空则按订阅价格向情侣收费。",
+        "familyAutoHint": "开启自动计算后，发票金额为此价格 × 人数；留空则按订阅价格向整个家庭收费。",
+        "example": "示例：{{price}} × {{count}} 人 = {{total}}，以一张发票向主账户收费。",
+        "wholeCouple": "订阅价格（{{price}}）为情侣的一张发票，向主账户收费。",
+        "wholeFamily": "订阅价格（{{price}}）为整个家庭的一张发票，向主账户收费。"
+      }
     }
   }
 };

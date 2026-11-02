@@ -16,6 +16,7 @@ import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
 import { Dropdown } from '@/shared/components/Dropdown';
 import type { FollowUpFilters as FollowUpFiltersType } from '../../domain/FollowUpFilters';
+import { localizeOptions, translateValue, tOr } from '@/core/i18n/format';
 
 interface FollowUpFiltersProps {
   filters: FollowUpFiltersType;
@@ -66,11 +67,11 @@ export function FollowUpFilters({
   const { staff } = useStaff();
   const staffOptions = useMemo(() => {
     const options = (staff || []).map(s => ({
-      label: s.name ? `${s.name}${s.role ? ` (${s.role})` : ''}` : s.email,
+      label: s.name ? `${s.name}${s.role ? ` (${translateValue('role', s.role)})` : ''}` : s.email,
       value: s.name || s.email,
     }));
-    return [{ label: 'All Staff', value: '' }, ...options];
-  }, [staff]);
+    return [{ label: t('followUps.filters.allStaff'), value: '' }, ...options];
+  }, [staff, t]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -196,21 +197,21 @@ export function FollowUpFilters({
               <Dropdown
                 label={t('followUps.status')}
                 value={localStatus}
-                options={STATUS_OPTIONS}
+                options={localizeOptions(STATUS_OPTIONS, 'status').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allStatuses') }))}
                 onChange={setLocalStatus}
               />
 
               <Dropdown
                 label={t('followUps.type')}
                 value={localType}
-                options={TYPE_OPTIONS}
+                options={localizeOptions(TYPE_OPTIONS, 'channel').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allTypes') }))}
                 onChange={setLocalType}
               />
 
               <Dropdown
                 label={t('followUps.priority')}
                 value={localPriority}
-                options={PRIORITY_OPTIONS}
+                options={localizeOptions(PRIORITY_OPTIONS, 'priority').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allPriorities') }))}
                 onChange={setLocalPriority}
               />
 

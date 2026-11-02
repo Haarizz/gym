@@ -15,6 +15,9 @@ function mapMember(d: any): TeamMember {
     averageRating: d.average_rating ?? null,
     ratingCount: d.rating_count ?? 0,
     myRating: d.my_rating ?? null,
+    canMessage: !!d.can_message,
+    messageUnavailableCode: d.message_unavailable_code ?? null,
+    messageUnavailableReason: d.message_unavailable_reason ?? null,
   };
 }
 

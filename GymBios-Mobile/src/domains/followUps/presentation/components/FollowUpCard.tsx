@@ -12,6 +12,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { FollowUp } from '../../domain/FollowUp';
+import { getIntlLocale, translateValue } from '@/core/i18n/format';
 
 interface FollowUpCardProps {
   followUp: FollowUp;
@@ -69,38 +70,38 @@ export function FollowUpCard({
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
       case 'pending':
-        return { bg: '#dbeafe', text: '#1e40af', label: 'Pending' };
+        return { bg: '#dbeafe', text: '#1e40af', label: translateValue('status', 'pending') };
       case 'completed':
-        return { bg: '#dcfce7', text: '#15803d', label: 'Completed' };
+        return { bg: '#dcfce7', text: '#15803d', label: translateValue('status', 'completed') };
       case 'overdue':
-        return { bg: '#fee2e2', text: '#b91c1c', label: 'Overdue' };
+        return { bg: '#fee2e2', text: '#b91c1c', label: translateValue('status', 'overdue') };
       case 'cancelled':
-        return { bg: '#f3f4f6', text: '#4b5563', label: 'Cancelled' };
+        return { bg: '#f3f4f6', text: '#4b5563', label: translateValue('status', 'cancelled') };
       case 'rescheduled':
-        return { bg: '#fef3c7', text: '#b45309', label: 'Rescheduled' };
+        return { bg: '#fef3c7', text: '#b45309', label: translateValue('status', 'rescheduled') };
       default:
-        return { bg: '#f3f4f6', text: '#4b5563', label: status };
+        return { bg: '#f3f4f6', text: '#4b5563', label: translateValue('status', status) };
     }
   };
 
   const getPriorityBadgeStyle = (priority: string) => {
     switch (priority) {
       case 'high':
-        return { bg: '#fee2e2', text: '#b91c1c', label: 'High' };
+        return { bg: '#fee2e2', text: '#b91c1c', label: translateValue('priority', 'high') };
       case 'medium':
-        return { bg: '#fef3c7', text: '#b45309', label: 'Medium' };
+        return { bg: '#fef3c7', text: '#b45309', label: translateValue('priority', 'medium') };
       case 'low':
-        return { bg: '#dcfce7', text: '#15803d', label: 'Low' };
+        return { bg: '#dcfce7', text: '#15803d', label: translateValue('priority', 'low') };
       default:
-        return { bg: '#f3f4f6', text: '#4b5563', label: priority };
+        return { bg: '#f3f4f6', text: '#4b5563', label: translateValue('priority', priority) };
     }
   };
 
   const formatDueDate = (dateStr?: string) => {
-    if (!dateStr) return 'No due date';
+    if (!dateStr) return t('followUps.msg.noDueDate');
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString(undefined, {
+      return date.toLocaleDateString(getIntlLocale(), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',

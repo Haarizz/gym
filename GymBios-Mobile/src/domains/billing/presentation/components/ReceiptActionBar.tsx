@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface ReceiptActionBarProps {
   onDownload?: () => void;
@@ -22,12 +23,13 @@ export function ReceiptActionBar({
   onShare,
   busyAction = null,
 }: ReceiptActionBarProps) {
+  const { t } = useTranslation();
   const busy = busyAction !== null;
   return (
     <View style={styles.bar}>
       <ActionButton
         iconName="download"
-        label="Download"
+        label={t('common.download')}
         onPress={onDownload}
         disabled={!onDownload || busy}
         loading={busyAction === 'download'}
@@ -35,7 +37,7 @@ export function ReceiptActionBar({
       <View style={styles.divider} />
       <ActionButton
         iconName="share-2"
-        label="Share"
+        label={t('common.share')}
         onPress={onShare}
         disabled={!onShare || busy}
         loading={busyAction === 'share'}

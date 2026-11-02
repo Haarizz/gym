@@ -50,10 +50,10 @@ export function ReferralActivityList({
             <View style={styles.topRow}>
               <View style={styles.namesCol}>
                 <Typography variant="subtitle" style={styles.referrerName}>
-                  {item.referrerName || 'Unknown Referrer'}
+                  {item.referrerName || t('adminReferrals.msg.unknownReferrer')}
                 </Typography>
                 <Typography variant="bodySmall" color="textSecondary">
-                  {t('adminReferrals.referred')} {item.refereeName || 'Unknown Referee'}
+                  {t('adminReferrals.referred')} {item.refereeName || t('adminReferrals.msg.unknownReferee')}
                 </Typography>
                 {item.refereeEmail ? (
                   <Typography variant="caption" color="textSecondary">
@@ -82,7 +82,7 @@ export function ReferralActivityList({
                     onPress={() => onView(item)}
                     hitSlop={6}
                     accessibilityRole="button"
-                    accessibilityLabel="View referral details"
+                    accessibilityLabel={t('adminReferrals.msg.viewDetails')}
                   >
                     <Feather name="eye" size={16} color={BrandColors.teal} />
                   </Pressable>
@@ -94,7 +94,7 @@ export function ReferralActivityList({
                     onPress={() => onEdit(item)}
                     hitSlop={6}
                     accessibilityRole="button"
-                    accessibilityLabel="Edit referral"
+                    accessibilityLabel={t('adminReferrals.msg.editReferral')}
                   >
                     <Feather name="edit-2" size={16} color="#2563eb" />
                   </Pressable>
@@ -106,7 +106,7 @@ export function ReferralActivityList({
                     onPress={() => onMarkSuccessful(item)}
                     hitSlop={6}
                     accessibilityRole="button"
-                    accessibilityLabel="Mark referral as successful"
+                    accessibilityLabel={t('adminReferrals.msg.markSuccessfulA11y')}
                   >
                     <Feather name="check" size={16} color="#16a34a" />
                   </Pressable>
@@ -118,7 +118,7 @@ export function ReferralActivityList({
                     onPress={() => onDelete(item)}
                     hitSlop={6}
                     accessibilityRole="button"
-                    accessibilityLabel="Delete referral"
+                    accessibilityLabel={t('adminReferrals.msg.deleteReferralA11y')}
                   >
                     <Feather name="trash-2" size={16} color="#dc2626" />
                   </Pressable>

@@ -6,6 +6,7 @@ import { Typography } from '@/shared/components/Typography';
 import { Avatar } from '@/shared/components/Avatar';
 import { useTranslation } from 'react-i18next';
 import type { Referral } from '../../domain/Referral';
+import { translateValue } from '@/core/i18n/format';
 
 interface LeaderboardMember {
   id: string;
@@ -116,7 +117,7 @@ export function ReferralLeaderboard({ referrals }: ReferralLeaderboardProps) {
                   <View style={[styles.tierBadge, { backgroundColor: tierStyle.bg }]}>
                     <Feather name={tierStyle.icon} size={10} color={tierStyle.text} />
                     <Typography variant="caption" style={[styles.tierText, { color: tierStyle.text }]}>
-                      {item.tier}
+                      {translateValue('tier', item.tier)}
                     </Typography>
                   </View>
                 </View>

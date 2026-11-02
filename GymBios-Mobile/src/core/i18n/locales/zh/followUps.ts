@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "没有匹配当前搜索或筛选条件的跟进任务。",
     "rescheduleTitle": "更改跟进时间",
     "reschedulingFor": "更改跟进时间：",
-    "newDueDate": "新截止日期"
+    "newDueDate": "新截止日期",
+    "outcomes": {
+      "successful": "成功",
+      "no_response": "无回应",
+      "callback_requested": "要求回电",
+      "not_interested": "不感兴趣",
+      "converted": "已转化",
+      "rescheduled": "已改期"
+    },
+    "filters": {
+      "allStatuses": "所有状态",
+      "allTypes": "所有类型",
+      "allPriorities": "所有优先级",
+      "allStaff": "所有员工"
+    },
+    "msg": {
+      "selectMemberOrLead": "请选择会员或潜在客户。",
+      "subjectRequired": "跟进主题为必填项。",
+      "dueDateRequired": "截止日期为必填项。",
+      "newDueDateRequired": "新的截止日期为必填项。",
+      "notesRequired": "沟通记录需要填写备注。",
+      "addRecordFailed": "添加沟通记录失败。",
+      "deleteRecordTitle": "删除记录",
+      "deleteRecordBody": "确定要删除这条沟通记录吗？",
+      "saveRecord": "保存记录",
+      "detailsTitle": "跟进详情",
+      "completing": "正在完成...",
+      "rescheduling": "正在改期...",
+      "noDueDate": "无截止日期",
+      "leadNoPhone": "该潜在客户没有登记电话号码。",
+      "leadNoEmail": "该潜在客户没有登记邮箱地址。",
+      "deleteTitle": "删除跟进",
+      "deleteBody": "确定要删除 {{name}} 的跟进“{{subject}}”吗？",
+      "deleteFailed": "删除跟进失败。",
+      "cancelTitle": "取消跟进",
+      "cancelBody": "确定要取消跟进“{{subject}}”吗？",
+      "yesCancel": "是，取消",
+      "cancelFailed": "取消跟进失败。",
+      "updateFailed": "更新跟进失败。",
+      "createFailed": "创建跟进失败。",
+      "completeFailed": "完成跟进失败。",
+      "rescheduleFailed": "跟进改期失败。",
+      "leadConvertedTitle": "潜在客户已转化",
+      "leadConvertedBody": "潜在客户已标记为转化。请在前台将其登记为会员，销售业绩才会记在你名下。"
+    }
   }
 };
 

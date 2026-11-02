@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { BrandColors } from '@/core/theme';
@@ -19,6 +20,7 @@ export function ModuleSubmoduleView({
   onClose,
   onSelectSubmodule,
 }: ModuleSubmoduleViewProps) {
+  const { t } = useTranslation();
   const children = module.children || [];
 
   return (
@@ -29,11 +31,11 @@ export function ModuleSubmoduleView({
             onPress={onBack}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Back to modules"
+            accessibilityLabel={t('shared.goBack')}
           >
             <Feather name="arrow-left" size={24} color={BrandColors.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>{module.title}</Text>
+          <Text style={styles.headerTitle}>{t(`shared.modules.${module.id}`, { defaultValue: module.title })}</Text>
         </View>
 
         <Pressable
@@ -55,13 +57,13 @@ export function ModuleSubmoduleView({
             onPress={() => onSelectSubmodule(child)}
             android_ripple={{ color: '#F3F4F6', borderless: true, radius: 40 }}
             accessibilityRole="button"
-            accessibilityLabel={child.title}
+            accessibilityLabel={t(`shared.modules.${child.id}`, { defaultValue: child.title })}
           >
             <View style={styles.gridIconContainer}>
               <Feather name={child.icon} size={24} color={BrandColors.teal} />
             </View>
             <Text style={styles.gridItemTitle} numberOfLines={2}>
-              {child.title}
+              {t(`shared.modules.${child.id}`, { defaultValue: child.title })}
             </Text>
           </Pressable>
         ))}

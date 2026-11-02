@@ -120,7 +120,7 @@ export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() => handlePress(item)}
             accessibilityRole="button"
-            accessibilityLabel={item.title}
+            accessibilityLabel={t(`adminReferrals.hub.${item.id}.title`, { defaultValue: item.title })}
           >
             <View style={[styles.iconContainer, { backgroundColor: item.iconBg }]}>
               <Feather name={item.icon} size={22} color={item.iconColor} />
@@ -128,10 +128,10 @@ export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
 
             <View style={styles.contentContainer}>
               <Typography variant="subtitle" style={styles.itemTitle}>
-                {item.title}
+                {t(`adminReferrals.hub.${item.id}.title`, { defaultValue: item.title })}
               </Typography>
               <Typography variant="bodySmall" color="textSecondary" style={styles.itemDescription}>
-                {item.description}
+                {t(`adminReferrals.hub.${item.id}.description`, { defaultValue: item.description })}
               </Typography>
             </View>
 

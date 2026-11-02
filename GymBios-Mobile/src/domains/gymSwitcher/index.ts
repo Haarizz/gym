@@ -8,10 +8,14 @@ export {
   useMyGymMemberships,
   getMyGymMemberships,
   fetchMyGymMemberships,
+  refreshMyGymMemberships,
+  membershipAtGym,
+  membershipsElsewhere,
   gymMembershipKeys,
   type GymMembership,
   type GymMembershipStatus,
 } from './gymMembershipsApi';
 export { switchGym } from './switchGym';
+export { openMembershipAt } from './openMembership';
 export { GymSwitcherSheet } from './presentation/GymSwitcherSheet';
 export { ChooseGymScreen } from './presentation/ChooseGymScreen';

@@ -113,7 +113,11 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             Map.entry("V90__staff_ratings_tags_anonymous.sql", "V97__staff_ratings_tags_anonymous.sql"),
             Map.entry("V91__gym_review_requests.sql", "V98__gym_review_requests.sql"),
             Map.entry("V92__member_enquiries.sql", "V99__member_enquiries.sql"),
-            Map.entry("V93__attendance_workout_timer.sql", "V100__attendance_workout_timer.sql")
+            Map.entry("V93__attendance_workout_timer.sql", "V100__attendance_workout_timer.sql"),
+            // dc0910f: main took V109 (family/couple plans bill head) after tenants had run
+            // these two as V109/V110. Only the header comment changed.
+            Map.entry("V109__member_addon_payments.sql", "V110__member_addon_payments.sql"),
+            Map.entry("V110__booking_payment_rejection_reason.sql", "V111__booking_payment_rejection_reason.sql")
     );
 
     /**
@@ -134,7 +138,10 @@ public class TenantFlywayHistoryRepairRunner implements CommandLineRunner {
             // 86-94 land below the relabelled V95-V100: ADD COLUMN / CREATE ... IF NOT
             // EXISTS, receipt_id backfills guarded by IS NULL, an idempotent status
             // normalisation, and a deduction_types seed guarded by NOT EXISTS.
-            "86", "87", "88", "89", "90", "91", "92", "93", "94");
+            "86", "87", "88", "89", "90", "91", "92", "93", "94",
+            // 109 lands below the relabelled V110/V111: a single UPDATE guarded by
+            // family_billing_mode <> 'family_head', so re-running it is a no-op.
+            "109");
 
     /**
      * Migrations that may have been applied by hand, outside Flyway: a query

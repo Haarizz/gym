@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "数据统计",
     "tryAgain": "重试",
     "clearFilters": "清除筛选",
-    "createPromotion": "创建促销"
+    "createPromotion": "创建促销",
+    "opts": {
+      "types": {
+        "all": "所有类型",
+        "discount": "折扣",
+        "voucher": "代金券",
+        "combo": "组合",
+        "bogo": "买一送一",
+        "seasonal": "季节性",
+        "loyalty": "忠诚",
+        "promotional_access_days": "促销通行天数",
+        "promo": "促销"
+      },
+      "categories": {
+        "all": "所有类别",
+        "membership": "会籍",
+        "services": "服务",
+        "special_events": "特别活动",
+        "loyalty": "忠诚",
+        "demographics": "人群"
+      },
+      "discountTypes": {
+        "percentage": "百分比",
+        "fixed": "固定金额",
+        "free": "免费/买一送一",
+        "promotional_access_days": "促销通行天数"
+      },
+      "priorities": {
+        "1": "高 (1)",
+        "2": "中 (2)",
+        "3": "低 (3)"
+      },
+      "audience": {
+        "all": "所有会员",
+        "new_members": "新会员",
+        "existing_members": "现有会员",
+        "vip": "VIP 会员",
+        "specific": "指定会员"
+      },
+      "channels": {
+        "website": "网站",
+        "app": "移动应用",
+        "email": "邮件",
+        "sms": "短信",
+        "in_person": "现场"
+      },
+      "allStatus": "所有状态"
+    },
+    "steps": {
+      "basic": "基本信息",
+      "discount": "折扣",
+      "targeting": "目标设置",
+      "settings": "设置"
+    },
+    "msg": {
+      "createTitle": "创建新促销",
+      "editTitle": "编辑促销",
+      "createSubmit": "创建促销",
+      "keepEditing": "继续编辑",
+      "discard": "放弃",
+      "saveFailed": "保存促销失败，请检查输入后重试。",
+      "shareCode": "使用促销码“{{code}}”享受 {{discount}}！",
+      "duplicated": "已创建“{{name}}”的副本。",
+      "duplicateFailed": "复制促销失败。",
+      "deleteTitle": "删除促销",
+      "deleteBody": "确定要删除“{{name}}”吗？此操作无法撤销。",
+      "deleted": "已删除“{{name}}”。",
+      "deleteFailed": "删除促销失败。",
+      "system": "系统",
+      "normal": "普通",
+      "noEndDate": "无结束日期",
+      "percentOff": "{{value}}% 折扣",
+      "amountOff": "减 {{value}}",
+      "offSuffix": " 折扣",
+      "specialOffer": "特别优惠",
+      "revenueSuffix": " 收入",
+      "maxDiscount": "最高折扣（{{currency}}）"
+    }
   }
 };
 

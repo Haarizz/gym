@@ -40,7 +40,7 @@ interface CommunityBottomNavProps {
 
 export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNavProps) {
   const { t } = useTranslation();
-  const { primaryColor } = useCommunityTheme();
+  const { navColors } = useCommunityTheme();
   const bottom = useCommunityNavBottom();
 
   const tabs = useMemo<PillTab[]>(
@@ -57,7 +57,7 @@ export function CommunityBottomNav({ activeTab, onTabPress }: CommunityBottomNav
     <PillTabBar
       tabs={tabs}
       activeName={activeTab}
-      activeColor={primaryColor}
+      colors={navColors}
       hidden={false}
       bottom={bottom}
       onTabPress={handlePress}

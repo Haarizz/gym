@@ -69,6 +69,7 @@ export function ProfileHubScreen({
   const isEmployee = appRole === 'staff' || appRole === 'trainer';
   // Only members have a wallet (booking refunds, reward credit).
   const isMember = appRole === 'member';
+  const isAdmin = appRole === 'admin';
   // The wallet endpoint is 403'd while a purchase awaits approval (or was rejected).
   const hasTenantAccess = useMemberTenantAccess();
   const { data: wallet } = useMyWallet(isMember && hasTenantAccess);
@@ -135,14 +136,17 @@ export function ProfileHubScreen({
 
           {/* Navigation Items (5 Destinations) */}
           <View style={styles.navSection}>
-            <ProfileNavigationRow
-              icon="user"
-              title={t('profileHub.myProfile')}
-              subtitle={t('profileHub.myProfileSubtitle')}
-              iconBgColor="#eef7f6"
-              iconColor={BrandColors.teal}
-              onPress={onNavigateToProfile}
-            />
+            {/* Admins are identified by their username and manage their account on the web. */}
+            {!isAdmin && (
+              <ProfileNavigationRow
+                icon="user"
+                title={t('profileHub.myProfile')}
+                subtitle={t('profileHub.myProfileSubtitle')}
+                iconBgColor="#eef7f6"
+                iconColor={BrandColors.teal}
+                onPress={onNavigateToProfile}
+              />
+            )}
 
             {canSwitchGym && (
               <ProfileNavigationRow

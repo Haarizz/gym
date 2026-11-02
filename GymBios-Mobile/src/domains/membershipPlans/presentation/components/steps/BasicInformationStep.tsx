@@ -7,6 +7,7 @@ import { FormSection } from '@/shared/components/FormSection';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import { PLAN_TYPES, type PlanWizardData } from '../../hooks/useMembershipPlanWizard';
+import { tOr } from '@/core/i18n/format';
 
 const MEMBERSHIP_TYPES = ['Standard', 'Premium', 'VIP', 'Student', 'Corporate'];
 const STATUSES = ['ACTIVE', 'INACTIVE', 'DRAFT'];
@@ -15,9 +16,10 @@ interface OptionRowProps {
   options: string[];
   selected: string;
   onSelect: (value: string) => void;
+  getLabel?: (value: string) => string;
 }
 
-function OptionRow({ options, selected, onSelect }: OptionRowProps) {
+function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
   const theme = useTheme();
   return (
     <View style={styles.optionRow}>
@@ -25,7 +27,7 @@ function OptionRow({ options, selected, onSelect }: OptionRowProps) {
         const isActive = opt === selected;
         return (
           <View
-            key={opt}
+            key={getLabel ? getLabel(opt) : opt}
             style={[
               styles.optionChip,
               {
@@ -86,6 +88,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
         </Typography>
         <OptionRow
           options={PLAN_TYPES}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.planType}
           onSelect={(v) => onChange('planType', v)}
         />
@@ -95,6 +98,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
         </Typography>
         <OptionRow
           options={MEMBERSHIP_TYPES}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.type}
           onSelect={(v) => onChange('type', v)}
         />
@@ -104,6 +108,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
         </Typography>
         <OptionRow
           options={STATUSES}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.status}
           onSelect={(v) => onChange('status', v)}
         />

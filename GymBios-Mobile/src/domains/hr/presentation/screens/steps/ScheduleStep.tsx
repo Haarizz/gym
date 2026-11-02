@@ -12,6 +12,7 @@ import { DatePicker } from '@/shared/components/DatePicker';
 import { FormCard } from '@/domains/members/presentation/components/form/FormCard';
 import type { StaffCertification } from '@/domains/hr/domain/Staff';
 import type { StaffStepProps } from './stepTypes';
+import { formatDate, translateValue } from '@/core/i18n/format';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 // `value` is what gets stored on the schedule, so it must not change.
@@ -91,7 +92,7 @@ export function ScheduleStep({
                 variant="bodySmallBold"
                 style={[styles.dayLabel, { color: activeSlots.length ? theme.text : theme.textSecondary }]}
               >
-                {day.slice(0, 3)}
+                {formatDate(new Date(2024, 0, 1 + DAYS.indexOf(day)), 'EEE')}
               </Typography>
               <View style={styles.slots}>
                 {SLOTS.map((slot) => {
@@ -102,7 +103,7 @@ export function ScheduleStep({
                       onPress={() => toggleSlot(day, slot.value)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: selected }}
-                      accessibilityLabel={`${day} ${slot.label} ${slot.hint}`}
+                      accessibilityLabel={`${t(`hr.days.${day.toLowerCase()}`, { defaultValue: day })} ${t(`hr.shifts.${slot.label}`, { defaultValue: slot.value })}`}
                       style={({ pressed }) => [
                         styles.slot,
                         {
@@ -117,7 +118,7 @@ export function ScheduleStep({
                         numberOfLines={1}
                         style={[styles.slotLabel, { color: selected ? theme.primary : theme.textSecondary }]}
                       >
-                        {slot.label}
+                        {translateValue('shift', slot.label)}
                       </Typography>
                     </Pressable>
                   );

@@ -152,6 +152,59 @@ const membershipPlans = {
         "selectedCount": "{{count}} seleccionados",
         "none": "Ninguno"
       }
+    },
+    "misc": {
+      "draft": "Borrador",
+      "offerValueRequired": "Introduce un valor de oferta mayor que 0",
+      "offerPercentMax": "Una oferta porcentual no puede superar el 100 %",
+      "offerEndBeforeStart": "La fecha de fin no puede ser anterior a la de inicio"
+    },
+    "misc2": {
+      "options": {
+        "day": "Día",
+        "week": "Semana",
+        "month": "Mes",
+        "year": "Año",
+        "unlimited": "Ilimitado",
+        "limited": "Limitado",
+        "none": "Ninguno",
+        "per_day": "Por día",
+        "per_week": "Por semana",
+        "per_month": "Por mes",
+        "standard": "Estándar",
+        "premium": "Premium",
+        "vip": "VIP",
+        "student": "Estudiante",
+        "corporate": "Corporativo",
+        "individual": "Individual",
+        "couple": "Pareja",
+        "family": "Familiar",
+        "walk_in": "Sin cita",
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "draft": "Borrador",
+        "archived": "Archivado",
+        "all": "Todos"
+      },
+      "wizardSteps": {
+        "basic": "Información básica",
+        "duration": "Precios",
+        "sessions": "Capacidad",
+        "family": "Familia",
+        "freeze": "Congelación",
+        "assignments": "Asignar"
+      },
+      "family": {
+        "coupleHeadPays": "El titular paga por ambos",
+        "familyHeadPays": "El titular paga por todos",
+        "coupleHeadDesc": "La pareja se añade bajo el titular y todo el plan se factura al titular en una sola factura.",
+        "familyHeadDesc": "Los familiares se añaden bajo el titular y todo el plan se factura al titular en una sola factura.",
+        "coupleAutoHint": "Con el cálculo automático activado, la factura es este precio × 2; déjalo vacío para cobrar el precio de la suscripción por la pareja.",
+        "familyAutoHint": "Con el cálculo automático activado, la factura es este precio × miembros; déjalo vacío para cobrar el precio de la suscripción por toda la familia.",
+        "example": "Ejemplo: {{price}} × {{count}} miembros = {{total}} en UNA factura al titular.",
+        "wholeCouple": "El precio de la suscripción ({{price}}) es UNA factura para toda la pareja, cobrada al titular.",
+        "wholeFamily": "El precio de la suscripción ({{price}}) es UNA factura para toda la familia, cobrada al titular."
+      }
     }
   }
 };

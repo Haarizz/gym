@@ -7,6 +7,7 @@ import { FormSection } from '@/shared/components/FormSection';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
+import { tOr } from '@/core/i18n/format';
 
 const CAPACITY_OPTIONS = ['Unlimited', 'Limited'];
 const ATTENDANCE_LIMITS = ['None', 'Per Day', 'Per Week', 'Per Month'];
@@ -16,9 +17,10 @@ interface OptionRowProps {
   options: string[];
   selected: string;
   onSelect: (value: string) => void;
+  getLabel?: (value: string) => string;
 }
 
-function OptionRow({ options, selected, onSelect }: OptionRowProps) {
+function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
   const theme = useTheme();
   return (
     <View style={styles.optionRow}>
@@ -26,7 +28,7 @@ function OptionRow({ options, selected, onSelect }: OptionRowProps) {
         const isActive = opt === selected;
         return (
           <View
-            key={opt}
+            key={getLabel ? getLabel(opt) : opt}
             style={[
               styles.optionChip,
               {
@@ -76,6 +78,7 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
         </Typography>
         <OptionRow
           options={CAPACITY_OPTIONS}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.membershipCapacity || 'Unlimited'}
           onSelect={(v) => onChange('membershipCapacity', v)}
         />
@@ -96,6 +99,7 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
         </Typography>
         <OptionRow
           options={ATTENDANCE_LIMITS}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
           selected={values.attendanceLimit || 'None'}
           onSelect={(v) => onChange('attendanceLimit', v)}
         />
@@ -113,6 +117,7 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
             </Typography>
             <OptionRow
               options={ATTENDANCE_PERIODS}
+          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
               selected={values.attendancePeriod || 'Day'}
               onSelect={(v) => onChange('attendancePeriod', v)}
             />

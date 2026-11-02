@@ -220,7 +220,149 @@ const referrals = {
     "freePtSession": "Séance de coaching personnel gratuite",
     "freePt": "Coaching offert",
     "claimCredit": "Réclamer le crédit",
-    "bookPtSession": "Réserver une séance de coaching"
+    "bookPtSession": "Réserver une séance de coaching",
+    "hub": {
+      "overview": {
+        "title": "Vue d'ensemble",
+        "description": "Résumé du programme de parrainage et activité récente"
+      },
+      "members": {
+        "title": "Membres",
+        "description": "Voir les membres et leurs performances de parrainage"
+      },
+      "activity": {
+        "title": "Activité",
+        "description": "Suivre et gérer l'activité de parrainage"
+      },
+      "my-rewards": {
+        "title": "Mes récompenses",
+        "description": "Voir les récompenses gagnées par les membres"
+      },
+      "reward-queue": {
+        "title": "File des récompenses",
+        "description": "Examiner les récompenses en attente"
+      },
+      "reward-rules": {
+        "title": "Règles de récompense",
+        "description": "Gérer les règles de récompense de parrainage"
+      },
+      "analytics": {
+        "title": "Analyses",
+        "description": "Analyser la conversion et les performances des parrainages"
+      },
+      "settings": {
+        "title": "Paramètres",
+        "description": "Configurer le programme de parrainage"
+      }
+    },
+    "header": {
+      "title": "Parrainages",
+      "subtitle": "Suivre et gérer les programmes de parrainage et les récompenses"
+    },
+    "funnel": {
+      "created": "Parrainages créés",
+      "signedUp": "Inscrits (réussis)",
+      "paid": "Paiement enregistré",
+      "redeemed": "Récompense utilisée"
+    },
+    "insights": {
+      "conversionTitle": "Taux de conversion",
+      "conversionText": "{{rate}} % des parrainages aboutissent à une inscription ({{successful}} sur {{total}}).",
+      "topRuleTitle": "Règle la plus utilisée",
+      "topRuleText_one": "« {{name}} » a été appliquée à {{count}} parrainage.",
+      "topRuleText_other": "« {{name}} » a été appliquée à {{count}} parrainages.",
+      "noRules": "Aucune règle de récompense n'a encore été appliquée.",
+      "redemptionTitle": "Utilisation des récompenses",
+      "redemptionText": "{{rate}} % des parrainages réussis ont utilisé leur récompense ({{redeemed}} sur {{successful}})."
+    },
+    "stats": {
+      "total": "Total des parrainages",
+      "totalSub": "Tous les parrainages enregistrés",
+      "successful": "Réussis",
+      "successfulSub": "Parrainages convertis",
+      "conversion": "Conversion",
+      "conversionSub": "Taux de réussite des parrainages",
+      "rewards": "Total des récompenses",
+      "rewardsSub": "Récompenses distribuées",
+      "programs": "Programmes actifs",
+      "programsSub": "Règles en cours",
+      "avgReward": "Récompense moy.",
+      "avgRewardSub": "Moyenne par parrainage"
+    },
+    "rewardTypes": {
+      "WALLET_CREDIT": "Crédit portefeuille",
+      "MEMBERSHIP_EXTENSION": "Prolongation d'abonnement",
+      "MEMBERSHIP_DISCOUNT": "Remise sur l'abonnement",
+      "FREE_PT": "Coaching gratuit",
+      "FREE_CLASS": "Cours gratuit",
+      "COUPON": "Coupon",
+      "LOYALTY_POINTS": "Points de fidélité",
+      "GIFT": "Cadeau",
+      "CASH": "Espèces"
+    },
+    "queue": {
+      "approveTitle": "Approuver la récompense ?",
+      "rejectTitle": "Rejeter la récompense ?",
+      "redeemTitle": "Marquer la récompense comme utilisée ?",
+      "approved": "Récompense {{code}} approuvée.",
+      "rejected": "Récompense {{code}} rejetée.",
+      "redeemed": "Récompense {{code}} marquée comme utilisée.",
+      "noRewards": "Aucune récompense générée pour l'instant.",
+      "noMatch": "Aucune récompense ne correspond à ce filtre.",
+      "days_one": "{{count}} jour",
+      "days_other": "{{count}} jours",
+      "points": "{{value}} pts"
+    },
+    "msg": {
+      "unknownReferrer": "Parrain inconnu",
+      "unknownReferee": "Filleul inconnu",
+      "unknownMember": "Membre inconnu",
+      "viewDetails": "Voir les détails du parrainage",
+      "editReferral": "Modifier le parrainage",
+      "markSuccessfulA11y": "Marquer le parrainage comme réussi",
+      "deleteReferralA11y": "Supprimer le parrainage",
+      "markedSuccessful": "Parrainage marqué comme réussi.",
+      "markedExpired": "Parrainage marqué comme expiré.",
+      "statusUpdateFailed": "Impossible de mettre à jour le statut du parrainage.",
+      "namesRequired": "Veuillez saisir le nom du parrain et celui de la personne parrainée.",
+      "updated": "Parrainage mis à jour.",
+      "updateFailed": "Impossible de mettre à jour le parrainage.",
+      "created": "Parrainage enregistré.",
+      "createFailed": "Impossible de créer le parrainage.",
+      "editTitle": "Modifier le parrainage",
+      "addTitle": "Ajouter un parrainage",
+      "selectMember": "Sélectionnez un membre...",
+      "selectMemberOrType": "Sélectionnez un membre ou saisissez ci-dessous...",
+      "deleteTitle": "Supprimer le parrainage",
+      "deleteBody": "Voulez-vous vraiment supprimer le parrainage de {{name}} ?",
+      "deleted": "Parrainage supprimé.",
+      "deletedTitle": "Supprimé",
+      "deleteFailed": "Impossible de supprimer le parrainage.",
+      "refreshed": "Données actualisées et récompenses corrigées.",
+      "refreshedTitle": "Actualisé",
+      "refreshFailed": "Impossible d'actualiser les données.",
+      "refreshFailedTitle": "Échec de l'actualisation",
+      "csvGenerated": "Rapport CSV généré avec {{count}} enregistrements.",
+      "csvTitle": "Export CSV",
+      "settingsSaved": "Paramètres du programme enregistrés.",
+      "settingsFailed": "Impossible d'enregistrer les paramètres.",
+      "codeCopied": "Code de parrainage « {{code}} » copié.",
+      "linkCopied": "Lien de parrainage « {{link}} » copié.",
+      "allTiers": "Tous les niveaux",
+      "redeemed": "{{label}} utilisé avec succès.",
+      "redeemFailed": "Impossible d'utiliser la récompense.",
+      "noPhone": "Pas de téléphone",
+      "standardPlan": "Standard",
+      "ptSession": "Séance de coaching",
+      "walletCredit": "Crédit portefeuille",
+      "shareTitle": "Partage",
+      "whatsappMessage": "Rejoignez notre salle avec mon code de parrainage : {{code}} ! Profitez d'avantages exclusifs !",
+      "whatsappPrepared": "Message WhatsApp préparé :\n{{message}}",
+      "emailSubject": "Rejoignez notre salle – Invitation exclusive !",
+      "emailBody": "Bonjour !\n\nRejoignez notre salle avec mon code de parrainage « {{code}} » ou le lien : https://{{link}}\n\nCordialement,\n{{name}}",
+      "emailPrepared": "Invitation par e-mail :\n{{body}}",
+      "payment": "Paiement"
+    }
   },
 } satisfies LocaleResource;
 

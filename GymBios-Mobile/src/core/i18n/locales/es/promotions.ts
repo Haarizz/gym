@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "Estadísticas",
     "tryAgain": "Reintentar",
     "clearFilters": "Borrar filtros",
-    "createPromotion": "Crear promoción"
+    "createPromotion": "Crear promoción",
+    "opts": {
+      "types": {
+        "all": "Todos los tipos",
+        "discount": "Descuento",
+        "voucher": "Cupón",
+        "combo": "Combo",
+        "bogo": "2x1",
+        "seasonal": "De temporada",
+        "loyalty": "Fidelidad",
+        "promotional_access_days": "Días de acceso promocionales",
+        "promo": "Promo"
+      },
+      "categories": {
+        "all": "Todas las categorías",
+        "membership": "Membresía",
+        "services": "Servicios",
+        "special_events": "Eventos especiales",
+        "loyalty": "Fidelidad",
+        "demographics": "Demografía"
+      },
+      "discountTypes": {
+        "percentage": "Porcentaje",
+        "fixed": "Monto fijo",
+        "free": "Gratis/2x1",
+        "promotional_access_days": "Días de acceso promocionales"
+      },
+      "priorities": {
+        "1": "Alta (1)",
+        "2": "Media (2)",
+        "3": "Baja (3)"
+      },
+      "audience": {
+        "all": "Todos los miembros",
+        "new_members": "Miembros nuevos",
+        "existing_members": "Miembros actuales",
+        "vip": "Miembros VIP",
+        "specific": "Miembros específicos"
+      },
+      "channels": {
+        "website": "Sitio web",
+        "app": "App móvil",
+        "email": "Correo",
+        "sms": "SMS",
+        "in_person": "En persona"
+      },
+      "allStatus": "Todos los estados"
+    },
+    "steps": {
+      "basic": "Información básica",
+      "discount": "Descuento",
+      "targeting": "Segmentación",
+      "settings": "Configuración"
+    },
+    "msg": {
+      "createTitle": "Crear nueva promoción",
+      "editTitle": "Editar promoción",
+      "createSubmit": "Crear promoción",
+      "keepEditing": "Seguir editando",
+      "discard": "Descartar",
+      "saveFailed": "No se pudo guardar la promoción. Revisa los datos e inténtalo de nuevo.",
+      "shareCode": "¡Usa el código \"{{code}}\" para obtener {{discount}}!",
+      "duplicated": "Se creó una copia de \"{{name}}\".",
+      "duplicateFailed": "No se pudo duplicar la promoción.",
+      "deleteTitle": "Eliminar promoción",
+      "deleteBody": "¿Seguro que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+      "deleted": "Se eliminó \"{{name}}\".",
+      "deleteFailed": "No se pudo eliminar la promoción.",
+      "system": "Sistema",
+      "normal": "Normal",
+      "noEndDate": "Sin fecha de fin",
+      "percentOff": "{{value}} % DE DESCUENTO",
+      "amountOff": "{{value}} DE DESCUENTO",
+      "offSuffix": " de descuento",
+      "specialOffer": "OFERTA ESPECIAL",
+      "revenueSuffix": " ingresos",
+      "maxDiscount": "Descuento máximo ({{currency}})"
+    }
   }
 };
 

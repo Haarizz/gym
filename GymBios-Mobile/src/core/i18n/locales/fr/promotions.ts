@@ -89,7 +89,84 @@ const promotions = {
     "statisticsTab": "Statistiques",
     "tryAgain": "Réessayer",
     "clearFilters": "Effacer les filtres",
-    "createPromotion": "Créer une promotion"
+    "createPromotion": "Créer une promotion",
+    "opts": {
+      "types": {
+        "all": "Tous les types",
+        "discount": "Remise",
+        "voucher": "Bon d'achat",
+        "combo": "Formule combinée",
+        "bogo": "1 acheté = 1 offert",
+        "seasonal": "Saisonnier",
+        "loyalty": "Fidélité",
+        "promotional_access_days": "Jours d'accès promotionnels",
+        "promo": "Promo"
+      },
+      "categories": {
+        "all": "Toutes les catégories",
+        "membership": "Abonnement",
+        "services": "Services",
+        "special_events": "Événements spéciaux",
+        "loyalty": "Fidélité",
+        "demographics": "Démographie"
+      },
+      "discountTypes": {
+        "percentage": "Pourcentage",
+        "fixed": "Montant fixe",
+        "free": "Gratuit/1 acheté = 1 offert",
+        "promotional_access_days": "Jours d'accès promotionnels"
+      },
+      "priorities": {
+        "1": "Haute (1)",
+        "2": "Moyenne (2)",
+        "3": "Basse (3)"
+      },
+      "audience": {
+        "all": "Tous les membres",
+        "new_members": "Nouveaux membres",
+        "existing_members": "Membres existants",
+        "vip": "Membres VIP",
+        "specific": "Membres spécifiques"
+      },
+      "channels": {
+        "website": "Site web",
+        "app": "Application mobile",
+        "email": "E-mail",
+        "sms": "SMS",
+        "in_person": "En personne"
+      },
+      "allStatus": "Tous les statuts"
+    },
+    "steps": {
+      "basic": "Informations de base",
+      "discount": "Remise",
+      "targeting": "Ciblage",
+      "settings": "Paramètres"
+    },
+    "msg": {
+      "createTitle": "Créer une promotion",
+      "editTitle": "Modifier la promotion",
+      "createSubmit": "Créer la promotion",
+      "keepEditing": "Continuer la modification",
+      "discard": "Abandonner",
+      "saveFailed": "Impossible d'enregistrer la promotion. Vérifiez les données et réessayez.",
+      "shareCode": "Utilisez le code promo « {{code}} » pour {{discount}} !",
+      "duplicated": "Copie de « {{name}} » créée.",
+      "duplicateFailed": "Impossible de dupliquer la promotion.",
+      "deleteTitle": "Supprimer la promotion",
+      "deleteBody": "Voulez-vous vraiment supprimer « {{name}} » ? Cette action est irréversible.",
+      "deleted": "« {{name}} » supprimée.",
+      "deleteFailed": "Impossible de supprimer la promotion.",
+      "system": "Système",
+      "normal": "Normale",
+      "noEndDate": "Pas de date de fin",
+      "percentOff": "-{{value}} %",
+      "amountOff": "-{{value}}",
+      "offSuffix": " de remise",
+      "specialOffer": "OFFRE SPÉCIALE",
+      "revenueSuffix": " de CA",
+      "maxDiscount": "Remise maximale ({{currency}})"
+    }
   }
 };
 

@@ -12,6 +12,7 @@ import { getMaxBirthDate, getMinBirthDate } from '@/domains/profile/domain/dateO
 import { FormCard, RequiredLabel } from './FormCard';
 import { MemberPhotoCard } from './MemberPhotoCard';
 import type { MemberStepProps } from './stepTypes';
+import { localizeOptions } from '@/core/i18n/format';
 
 export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
   const { t } = useTranslation();
@@ -38,7 +39,7 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
             {t('members.form.personalStep.gender')}
           </Typography>
           <View style={styles.chips}>
-            {GENDERS.map((option) => {
+            {localizeOptions(GENDERS, 'gender').map((option) => {
               const selected = data.gender === option.value;
               return (
                 <Pressable

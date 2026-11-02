@@ -14,6 +14,7 @@ import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 import { leadKeys } from '@/domains/leads/hooks/leadKeys';
 import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance';
 import { validateDateOfBirth } from '@/domains/profile/domain/dateOfBirthRules';
+import i18n from '@/core/i18n/i18n';
 
 /** Contact details carried over when a converted lead is registered as a member. */
 export interface MemberPrefill {
@@ -105,43 +106,43 @@ const MIN_PASSWORD_LENGTH = 6;
 
 function validatePersonal(data: MemberWizardData): StepErrors {
   const errors: StepErrors = {};
-  if (data.name.trim().length < 2) errors.name = 'Enter the member\'s full name';
+  if (data.name.trim().length < 2) errors.name = i18n.t('shared.formErrors.memberName');
 
   const phone = data.phone.trim();
-  if (!phone) errors.phone = 'Phone number is required';
+  if (!phone) errors.phone = i18n.t('shared.formErrors.phoneRequired');
   else if (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, '').length < 7) {
-    errors.phone = 'Enter a valid phone number';
+    errors.phone = i18n.t('shared.formErrors.phoneInvalid');
   }
 
   const email = data.email.trim();
-  if (email && !EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
+  if (email && !EMAIL_PATTERN.test(email)) errors.email = i18n.t('shared.formErrors.emailInvalid');
 
   const dobError = data.dateOfBirth ? validateDateOfBirth(format(data.dateOfBirth, 'yyyy-MM-dd')) : null;
   if (dobError) errors.dateOfBirth = dobError;
 
-  if (data.photoStatus === 'uploading') errors.photoUrl = 'Wait for the photo to finish uploading';
+  if (data.photoStatus === 'uploading') errors.photoUrl = i18n.t('shared.formErrors.photoUploading');
   return errors;
 }
 
 function validateMembership(data: MemberWizardData, mode: WizardMode): StepErrors {
   const errors: StepErrors = {};
-  if (!data.membershipType.trim()) errors.membershipType = 'Choose a membership type';
-  if (!data.membershipPlanId.trim()) errors.membershipPlanId = 'Choose a membership plan';
+  if (!data.membershipType.trim()) errors.membershipType = i18n.t('shared.formErrors.chooseMembershipType');
+  if (!data.membershipPlanId.trim()) errors.membershipPlanId = i18n.t('shared.formErrors.choosePlan');
 
   const today = startOfDay(new Date());
   if (!data.joinDate) {
-    errors.joinDate = 'Joining date is required';
+    errors.joinDate = i18n.t('shared.formErrors.joinDateRequired');
   } else if (mode === 'create' && isBefore(startOfDay(data.joinDate), today)) {
     // Existing members keep their historical join date; new ones can't be backdated.
-    errors.joinDate = 'Joining date can\'t be in the past';
+    errors.joinDate = i18n.t('shared.formErrors.joinDatePast');
   }
 
   if (!data.startDate) {
-    errors.startDate = 'Start date is required';
+    errors.startDate = i18n.t('shared.formErrors.startDateRequired');
   } else if (mode === 'create' && isBefore(startOfDay(data.startDate), today)) {
-    errors.startDate = 'Start date can\'t be in the past';
+    errors.startDate = i18n.t('shared.formErrors.startDatePast');
   } else if (data.joinDate && isBefore(startOfDay(data.startDate), startOfDay(data.joinDate))) {
-    errors.startDate = 'Start date can\'t be before the joining date';
+    errors.startDate = i18n.t('shared.formErrors.startBeforeJoin');
   }
   return errors;
 }
@@ -151,30 +152,30 @@ function validateAccess(data: MemberWizardData, mode: WizardMode): StepErrors {
   if (!data.appAccessEnabled) return errors;
 
   const username = data.username.trim();
-  if (!username) errors.username = 'Username is required';
-  else if (/\s/.test(username)) errors.username = 'Username can\'t contain spaces';
-  else if (username.length < 3) errors.username = 'Username must be at least 3 characters';
+  if (!username) errors.username = i18n.t('shared.formErrors.usernameRequired');
+  else if (/\s/.test(username)) errors.username = i18n.t('shared.formErrors.usernameSpaces');
+  else if (username.length < 3) errors.username = i18n.t('shared.formErrors.usernameShort');
 
   // The backend only sets credentials on registration, so an existing login
   // can be left alone when editing.
   const passwordOptional = mode === 'edit';
   if (!data.password) {
-    if (!passwordOptional) errors.password = 'Password is required';
+    if (!passwordOptional) errors.password = i18n.t('shared.formErrors.passwordRequired');
   } else if (data.password.length < MIN_PASSWORD_LENGTH) {
-    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+    errors.password = i18n.t('shared.formErrors.passwordShort', { min: MIN_PASSWORD_LENGTH });
   }
   if ((data.password || data.confirmPassword) && data.password !== data.confirmPassword) {
-    errors.confirmPassword = 'Passwords don\'t match';
+    errors.confirmPassword = i18n.t('shared.formErrors.passwordMismatch');
   }
   return errors;
 }
 
 export const STEPS: WizardStep[] = [
-  { id: 'personal', title: 'Personal Information', validate: validatePersonal },
-  { id: 'membership', title: 'Membership Information', validate: validateMembership },
-  { id: 'medical', title: 'Medical Information', validate: () => ({}) },
-  { id: 'family', title: 'Family Configuration', validate: () => ({}) },
-  { id: 'access', title: 'App Access & Review', validate: validateAccess },
+  { id: 'personal', get title() { return i18n.t('members.wizardSteps.personal'); }, validate: validatePersonal },
+  { id: 'membership', get title() { return i18n.t('members.wizardSteps.membership'); }, validate: validateMembership },
+  { id: 'medical', get title() { return i18n.t('members.wizardSteps.medical'); }, validate: () => ({}) },
+  { id: 'family', get title() { return i18n.t('members.wizardSteps.family'); }, validate: () => ({}) },
+  { id: 'access', get title() { return i18n.t('members.wizardSteps.access'); }, validate: validateAccess },
 ];
 
 /** Membership end date for a plan starting on `start`, or null if the duration is unknown. */

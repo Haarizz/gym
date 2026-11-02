@@ -48,22 +48,22 @@ export function AdminStaffScreen({
 
   const handleCreate = useCallback(() => {
     if (selectedBranchId === 'ALL') {
-      toast.error('Please select a specific branch from the header menu before creating a new staff.', { title: 'Branch Required' });
+      toast.error(t('hr.msg.branchRequired'), { title: t('hr.msg.branchRequiredTitle') });
       return;
     }
     onNavigateToCreate();
-  }, [selectedBranchId, onNavigateToCreate]);
+  }, [selectedBranchId, onNavigateToCreate, t]);
 
   const handleMessage = useCallback((member: Staff) => {
     if (!member.phone) {
-      toast.info('This staff member does not have a phone number recorded.', {
-        title: 'No Phone Number',
+      toast.info(t('hr.msg.staffNoPhone'), {
+        title: t('common.noPhoneNumber'),
       });
       return;
     }
     Linking.openURL(`sms:${member.phone.replace(/\s+/g, '')}`).catch(() => {
-      toast.error('Unable to launch SMS messaging on this device.', {
-        title: 'Error',
+      toast.error(t('common.cannotOpenSms'), {
+        title: t('common.error'),
       });
     });
   }, []);

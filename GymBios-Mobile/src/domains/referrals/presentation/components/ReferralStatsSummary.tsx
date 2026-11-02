@@ -6,8 +6,10 @@ import { Typography } from '@/shared/components/Typography';
 import { CurrencyValue } from '@/core/providers';
 import { useReferralStats } from '../../hooks/useReferrals';
 import { useRewardStats } from '@/domains/rewards';
+import { useTranslation } from 'react-i18next';
 
 export function ReferralStatsSummary() {
+  const { t } = useTranslation();
   const { data: stats, isLoading: isStatsLoading } = useReferralStats();
   const { data: rewardStats, isLoading: isRewardsLoading } = useRewardStats();
 
@@ -29,51 +31,51 @@ export function ReferralStatsSummary() {
 
   const kpis = [
     {
-      label: 'Total Referrals',
+      label: t('adminReferrals.stats.total'),
       value: `${totalReferrals}`,
-      subtext: 'All referrals recorded',
+      subtext: t('adminReferrals.stats.totalSub'),
       icon: 'users' as const,
       iconColor: '#3b82f6',
       iconBg: '#dbeafe',
     },
     {
-      label: 'Successful',
+      label: t('adminReferrals.stats.successful'),
       value: `${successfulReferrals}`,
-      subtext: 'Converted referrals',
+      subtext: t('adminReferrals.stats.successfulSub'),
       icon: 'check-circle' as const,
       iconColor: '#16a34a',
       iconBg: '#dcfce7',
     },
     {
-      label: 'Conversion',
+      label: t('adminReferrals.stats.conversion'),
       value: `${conversionRate}%`,
-      subtext: 'Referral success rate',
+      subtext: t('adminReferrals.stats.conversionSub'),
       icon: 'trending-up' as const,
       iconColor: '#9333ea',
       iconBg: '#f3e8ff',
     },
     {
-      label: 'Total Rewards',
+      label: t('adminReferrals.stats.rewards'),
       value: totalRewards,
       isCurrency: true,
-      subtext: 'Rewards distributed',
+      subtext: t('adminReferrals.stats.rewardsSub'),
       icon: 'gift' as const,
       iconColor: '#ea580c',
       iconBg: '#ffedd5',
     },
     {
-      label: 'Active Programs',
+      label: t('adminReferrals.stats.programs'),
       value: `${activePrograms}`,
-      subtext: 'Running rules',
+      subtext: t('adminReferrals.stats.programsSub'),
       icon: 'zap' as const,
       iconColor: '#0284c7',
       iconBg: '#e0f2fe',
     },
     {
-      label: 'Avg Reward',
+      label: t('adminReferrals.stats.avgReward'),
       value: avgReward,
       isCurrency: true,
-      subtext: 'Average per referral',
+      subtext: t('adminReferrals.stats.avgRewardSub'),
       icon: 'dollar-sign' as const,
       iconColor: BrandColors.teal,
       iconBg: '#ccfbf1',

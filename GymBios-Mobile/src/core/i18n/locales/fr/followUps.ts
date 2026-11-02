@@ -76,7 +76,51 @@ const followUps = {
     "noFollowUpsFoundDesc": "Aucune tâche de relance ne correspond à vos critères actuels.",
     "rescheduleTitle": "Reporter la relance",
     "reschedulingFor": "Report de la relance pour",
-    "newDueDate": "Nouvelle date d’échéance"
+    "newDueDate": "Nouvelle date d’échéance",
+    "outcomes": {
+      "successful": "Réussi",
+      "no_response": "Pas de réponse",
+      "callback_requested": "Rappel demandé",
+      "not_interested": "Pas intéressé",
+      "converted": "Converti",
+      "rescheduled": "Reprogrammé"
+    },
+    "filters": {
+      "allStatuses": "Tous les statuts",
+      "allTypes": "Tous les types",
+      "allPriorities": "Toutes les priorités",
+      "allStaff": "Tout le personnel"
+    },
+    "msg": {
+      "selectMemberOrLead": "Veuillez sélectionner un membre ou un prospect.",
+      "subjectRequired": "L'objet de la relance est obligatoire.",
+      "dueDateRequired": "La date d'échéance est obligatoire.",
+      "newDueDateRequired": "La nouvelle date d'échéance est obligatoire.",
+      "notesRequired": "Les notes sont obligatoires pour l'enregistrement de la communication.",
+      "addRecordFailed": "Impossible d'ajouter l'enregistrement de communication.",
+      "deleteRecordTitle": "Supprimer l'enregistrement",
+      "deleteRecordBody": "Voulez-vous vraiment supprimer cet enregistrement de communication ?",
+      "saveRecord": "Enregistrer",
+      "detailsTitle": "Détails de la relance",
+      "completing": "Finalisation...",
+      "rescheduling": "Reprogrammation...",
+      "noDueDate": "Pas de date d'échéance",
+      "leadNoPhone": "Ce prospect n'a pas de numéro de téléphone enregistré.",
+      "leadNoEmail": "Ce prospect n'a pas d'adresse e-mail enregistrée.",
+      "deleteTitle": "Supprimer la relance",
+      "deleteBody": "Voulez-vous vraiment supprimer la relance « {{subject}} » pour {{name}} ?",
+      "deleteFailed": "Impossible de supprimer la relance.",
+      "cancelTitle": "Annuler la relance",
+      "cancelBody": "Voulez-vous vraiment annuler la relance « {{subject}} » ?",
+      "yesCancel": "Oui, annuler",
+      "cancelFailed": "Impossible d'annuler la relance.",
+      "updateFailed": "Impossible de mettre à jour la relance.",
+      "createFailed": "Impossible de créer la relance.",
+      "completeFailed": "Impossible de terminer la relance.",
+      "rescheduleFailed": "Impossible de reprogrammer la relance.",
+      "leadConvertedTitle": "Prospect converti",
+      "leadConvertedBody": "Prospect marqué comme converti. Inscrivez-le comme membre à l'accueil pour que la vente vous soit attribuée."
+    }
   }
 };
 

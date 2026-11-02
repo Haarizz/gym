@@ -4,34 +4,37 @@ import Feather from '@expo/vector-icons/Feather';
 import { Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import type { ReferralStatus } from '../../domain/Referral';
+import { useTranslation } from 'react-i18next';
+import { translateValue } from '@/core/i18n/format';
 
 interface ReferralStatusBadgeProps {
   status: ReferralStatus | string;
 }
 
 export function ReferralStatusBadge({ status }: ReferralStatusBadgeProps) {
+  const { t } = useTranslation();
   const normalized = (status || '').toLowerCase();
 
   let bg = '#f1f5f9';
   let color = '#475569';
   let icon: keyof typeof Feather.glyphMap = 'help-circle';
-  let label = status || 'Unknown';
+  let label = translateValue('status', status, t('shared.values.status.unknown'));
 
   if (normalized === 'successful') {
     bg = '#dcfce7';
     color = '#15803d';
     icon = 'check-circle';
-    label = 'Successful';
+    label = t('shared.values.status.successful');
   } else if (normalized === 'pending') {
     bg = '#fef9c3';
     color = '#a16207';
     icon = 'clock';
-    label = 'Pending';
+    label = t('shared.values.status.pending');
   } else if (normalized === 'expired') {
     bg = '#fee2e2';
     color = '#b91c1c';
     icon = 'x-circle';
-    label = 'Expired';
+    label = t('shared.values.status.expired');
   }
 
   return (

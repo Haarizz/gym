@@ -25,6 +25,7 @@ import type { Referral } from '../../domain/Referral';
 import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { translateValue } from '@/core/i18n/format';
 
 export function ReferralActivityScreen() {
   const { t } = useTranslation();
@@ -58,24 +59,24 @@ export function ReferralActivityScreen() {
 
   const handleDelete = (referral: Referral) => {
     Alert.alert(
-      'Delete Referral',
-      `Are you sure you want to delete referral for ${referral.refereeName}?`,
+      t('adminReferrals.msg.deleteTitle'),
+      t('adminReferrals.msg.deleteBody', { name: referral.refereeName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             deleteMutation.mutate(Number(referral.id), {
               onSuccess: () => {
-                toast.info('Referral deleted.', {
-                  title: 'Deleted'
+                toast.info(t('adminReferrals.msg.deleted'), {
+                  title: t('adminReferrals.msg.deletedTitle')
                 });
                 refetch();
               },
               onError: (err) => {
-                toast.error(err.message || 'Failed to delete referral.', {
-                  title: 'Error'
+                toast.error(err.message || t('adminReferrals.msg.deleteFailed'), {
+                  title: t('common.error')
                 });
               },
             });
@@ -90,14 +91,14 @@ export function ReferralActivityScreen() {
       { id: Number(referral.id) },
       {
         onSuccess: () => {
-          toast.success('Referral marked as successful.', {
-            title: 'Success'
+          toast.success(t('adminReferrals.msg.markedSuccessful'), {
+            title: t('common.success')
           });
           refetch();
         },
         onError: (err) => {
-          toast.error(err.message || 'Failed to update referral.', {
-            title: 'Error'
+          toast.error(err.message || t('adminReferrals.msg.updateFailed'), {
+            title: t('common.error')
           });
         },
       }
@@ -137,7 +138,7 @@ export function ReferralActivityScreen() {
                   variant="caption"
                   style={[styles.filterTabText, statusFilter === st && styles.filterTabTextActive]}
                 >
-                  {st === 'all' ? 'All' : st.charAt(0).toUpperCase() + st.slice(1)}
+                  {st === 'all' ? t('common.all') : translateValue('status', st)}
                 </Typography>
               </Pressable>
             ))}

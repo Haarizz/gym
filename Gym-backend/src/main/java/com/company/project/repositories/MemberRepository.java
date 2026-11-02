@@ -220,10 +220,23 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + "AND r.validFrom < :asOf AND r.validTill >= :asOf))")
     long countEstimatedActiveAt(@Param("asOf") LocalDateTime asOf);
 
-    // "Already a member here?" for a mobile purchase — a rejected purchase doesn't count.
-    @Query("SELECT COUNT(m) > 0 FROM Member m WHERE (m.globalUserId = :globalUserId OR LOWER(m.email) = LOWER(:email)) "
-            + "AND (m.approvalStatus IS NULL OR m.approvalStatus <> 'REJECTED')")
-    boolean existsUnrejectedMembership(@Param("globalUserId") Long globalUserId, @Param("email") String email);
+    /** The branch and status of an account's existing membership at this gym. */
+    interface ExistingMembershipView {
+        Long getBranchId();
+        String getMembershipStatus();
+        String getApprovalStatus();
+    }
+
+    // "Already a member here?" for a mobile purchase, at any branch of this gym — a
+    // rejected purchase doesn't count. Native so the branchFilter (set to the branch
+    // being bought at) can't hide a membership held at another branch.
+    @Query(value = "SELECT branch_id AS branchId, membership_status AS membershipStatus, "
+            + "approval_status AS approvalStatus FROM members "
+            + "WHERE (global_user_id = :globalUserId OR LOWER(email) = LOWER(:email)) "
+            + "AND (approval_status IS NULL OR approval_status <> 'REJECTED') "
+            + "ORDER BY id LIMIT 1", nativeQuery = true)
+    Optional<ExistingMembershipView> findUnrejectedMembership(@Param("globalUserId") Long globalUserId,
+                                                              @Param("email") String email);
 
     // A rejected mobile purchase never became a membership, but its row still holds the
     // account's global_user_id/email, which every purchase/claim path checks for "already

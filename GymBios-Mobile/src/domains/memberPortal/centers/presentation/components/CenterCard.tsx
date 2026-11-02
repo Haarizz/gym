@@ -9,6 +9,7 @@ import { CurrencyValue } from '@/core/providers';
 import { BrandColors, Glass, Radius, Spacing } from '@/core/theme';
 import { GlassSurface } from '@/shared/components';
 import type { CenterSummary } from '@/domains/discovery';
+import type { GymMembership } from '@/domains/gymSwitcher/gymMembershipsApi';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
 
 const PAYMENT_ICON: Record<string, keyof typeof Feather.glyphMap> = {
@@ -34,10 +35,23 @@ interface CenterCardProps {
   center: CenterSummary;
   onViewDetails: (center: CenterSummary) => void;
   onBuyMembership: (center: CenterSummary) => void;
+  /**
+   * The member's membership at this center's gym (any branch), if they hold one. The
+   * card then offers to manage it instead of subscribing again.
+   */
+  membership?: GymMembership;
+  onManageMembership?: (membership: GymMembership) => void;
   distanceKm?: number;
 }
 
-export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm }: CenterCardProps) {
+export function CenterCard({
+  center,
+  onViewDetails,
+  onBuyMembership,
+  membership,
+  onManageMembership,
+  distanceKm,
+}: CenterCardProps) {
   const { t } = useTranslation();
   const coverUrl = resolveImageUrl(center.coverImageUrl);
   const showGenderBadge = !!center.accessType && center.accessType !== 'Mixed';
@@ -46,6 +60,12 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
   const categoryStyle = center.centerType ? (CATEGORY_STYLE[center.centerType] || DEFAULT_CATEGORY_STYLE) : null;
   const genderStyle = center.accessType ? GENDER_STYLE[center.accessType] : undefined;
   const paymentMethods = center.acceptedPaymentMethods ?? [];
+  const memberHere = membership && (membership.branchId == null || membership.branchId === center.branchId);
+  const memberBadge = membership
+    ? memberHere
+      ? t('centers.membership.yourGym')
+      : t('centers.membership.memberAtBranch', { branch: membership.branchName || membership.gymName })
+    : null;
 
   return (
     <GlassSurface strong radius={20} style={styles.card}>
@@ -67,8 +87,16 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
 
         {/* Info */}
         <View style={styles.info}>
-          {(categoryStyle || showGenderBadge) && (
+          {(categoryStyle || showGenderBadge || memberBadge) && (
             <View style={styles.tagsRow}>
+              {memberBadge && (
+                <View style={[styles.tag, styles.memberTag]}>
+                  <Feather name="user-check" size={10} color="#FFFFFF" />
+                  <Text style={[styles.tagText, styles.memberTagText]} numberOfLines={1}>
+                    {memberBadge}
+                  </Text>
+                </View>
+              )}
               {categoryStyle && (
                 <View style={[styles.tag, { backgroundColor: categoryStyle.bg }]}>
                   <Text style={[styles.tagText, { color: categoryStyle.text }]} numberOfLines={1}>
@@ -152,21 +180,39 @@ export function CenterCard({ center, onViewDetails, onBuyMembership, distanceKm 
         >
           <Text style={styles.viewDetailsText}>{t('centers.card.viewDetails')}</Text>
         </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
-          onPress={() => onBuyMembership(center)}
-          accessibilityRole="button"
-          accessibilityLabel={t('centers.card.subscribeA11y', { name: center.centerName })}
-        >
-          <LinearGradient
-            colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.buyButton}
+        {membership && onManageMembership ? (
+          <Pressable
+            style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
+            onPress={() => onManageMembership(membership)}
+            accessibilityRole="button"
+            accessibilityLabel={t('centers.membership.manageA11y', { name: center.centerName })}
           >
-            <Text style={styles.buyButtonText}>{t('centers.card.subscribe')}</Text>
-          </LinearGradient>
-        </Pressable>
+            <LinearGradient
+              colors={[BrandColors.teal, BrandColors.tealDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buyButton}
+            >
+              <Text style={styles.buyButtonText}>{t('centers.membership.manage')}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [styles.buyButtonWrapper, pressed && styles.pressed]}
+            onPress={() => onBuyMembership(center)}
+            accessibilityRole="button"
+            accessibilityLabel={t('centers.card.subscribeA11y', { name: center.centerName })}
+          >
+            <LinearGradient
+              colors={[BrandColors.memberGold, BrandColors.trainerAmber]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buyButton}
+            >
+              <Text style={styles.buyButtonText}>{t('centers.card.subscribe')}</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
       </View>
     </GlassSurface>
   );
@@ -230,6 +276,17 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  memberTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: BrandColors.teal,
+    maxWidth: '100%',
+  },
+  memberTagText: {
+    color: '#FFFFFF',
+    flexShrink: 1,
   },
   centerName: {
     fontSize: 16,

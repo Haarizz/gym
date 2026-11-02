@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
+import { useTranslation } from 'react-i18next';
 
 interface WizardNavigationProps {
   isFirst: boolean;
@@ -26,7 +27,8 @@ export function WizardNavigation({
   onSubmit,
   mode,
 }: WizardNavigationProps) {
-  const submitLabel = mode === 'edit' ? 'Save Changes' : 'Create Plan';
+  const { t } = useTranslation();
+  const submitLabel = mode === 'edit' ? t('membershipPlans.form.saveChanges') : t('membershipPlans.form.createPlan');
 
   return (
     <View style={styles.container}>
@@ -34,7 +36,7 @@ export function WizardNavigation({
         <View style={styles.buttonWrapper}>
           {isFirst ? (
             <Button
-              label="Cancel"
+              label={t('membershipPlans.form.cancel')}
               variant="secondary"
               onPress={onCancel}
               size="lg"
@@ -42,7 +44,7 @@ export function WizardNavigation({
             />
           ) : (
             <Button
-              label="Back"
+              label={t('membershipPlans.form.back')}
               variant="secondary"
               onPress={onPrevious}
               size="lg"
@@ -65,7 +67,7 @@ export function WizardNavigation({
             />
           ) : (
             <Button
-              label="Next"
+              label={t('membershipPlans.form.next')}
               onPress={onNext}
               disabled={!canProceed}
               size="lg"

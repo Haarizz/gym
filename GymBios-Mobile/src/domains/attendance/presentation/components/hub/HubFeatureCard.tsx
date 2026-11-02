@@ -3,6 +3,7 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
+import { useTranslation } from 'react-i18next';
 
 interface HubFeatureCardProps {
   title: string;
@@ -25,6 +26,7 @@ export function HubFeatureCard({
   countLabel,
   children,
 }: HubFeatureCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -43,7 +45,7 @@ export function HubFeatureCard({
         </View>
         <Pressable onPress={onPress} style={styles.openBtn} accessibilityRole="button">
           <Typography variant="caption" style={styles.openText}>
-            {countLabel ?? 'Open'}
+            {countLabel ?? t('attendance.misc.open')}
           </Typography>
           <Feather name="arrow-right" size={14} color={BrandColors.teal} />
         </Pressable>

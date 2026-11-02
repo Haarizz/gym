@@ -108,11 +108,11 @@ export function PaymentSettlementScreen({
       onSuccess(response.id);
     } catch (err: any) {
       form.hideReview();
-      toast.error(err?.message ?? 'Something went wrong. Please try again.', {
-        title: 'Payment Failed'
+      toast.error(err?.message ?? t('common.somethingWentWrong'), {
+        title: t('billing.msg.paymentFailedTitle')
       });
     }
-  }, [memberId, form, settlePayment, onSuccess]);
+  }, [memberId, form, settlePayment, onSuccess, t]);
 
   if (billsLoading && selectedBills.length === 0) {
     return (
@@ -148,7 +148,7 @@ export function PaymentSettlementScreen({
   const summaryRows = selectedBills.map((bill) => {
     const entry = form.billAmounts.find((e) => e.receiptId === Number(bill.id));
     return {
-      label: bill.receiptNo ?? `Bill #${bill.id}`,
+      label: bill.receiptNo ?? t('billing.msg.billNumber', { id: bill.id }),
       amount: parseFloat(entry?.payAmount ?? '0') || 0,
     };
   });
@@ -181,10 +181,10 @@ export function PaymentSettlementScreen({
                 >
                   <View style={styles.billInfo}>
                     <Typography variant="bodySmall" style={styles.billNo}>
-                      {bill.receiptNo ?? `Bill #${bill.id}`}
+                      {bill.receiptNo ?? t('billing.msg.billNumber', { id: bill.id })}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {bill.planName ?? 'Membership'}
+                      {bill.planName ?? t('billing.msg.membershipFallback')}
                     </Typography>
                     <View style={styles.dueRow}>
                       <Typography variant="caption" color="textSecondary">
@@ -212,7 +212,7 @@ export function PaymentSettlementScreen({
                       }
                       placeholder="0.00"
                       placeholderTextColor={BrandColors.textSecondary}
-                      accessibilityLabel={`Payment amount for ${bill.receiptNo ?? bill.id}`}
+                      accessibilityLabel={t('billing.msg.amountForA11y', { bill: bill.receiptNo ?? bill.id })}
                     />
                   </View>
                 </View>
@@ -261,9 +261,9 @@ export function PaymentSettlementScreen({
                 style={styles.formInput}
                 value={form.paymentDate}
                 onChangeText={form.setPaymentDate}
-                placeholder="YYYY-MM-DD"
+                placeholder={t('common.dateFormatHint')}
                 placeholderTextColor={BrandColors.textSecondary}
-                accessibilityLabel="Payment date"
+                accessibilityLabel={t('billing.msg.paymentDateA11y')}
               />
             </View>
 
@@ -276,9 +276,9 @@ export function PaymentSettlementScreen({
                 style={styles.formInput}
                 value={form.transactionRef}
                 onChangeText={form.setTransactionRef}
-                placeholder="Transaction Reference (optional)"
+                placeholder={t('billing.msg.txnRefPlaceholder')}
                 placeholderTextColor={BrandColors.textSecondary}
-                accessibilityLabel="Transaction reference"
+                accessibilityLabel={t('billing.msg.txnRefA11y')}
               />
             </View>
 
@@ -291,11 +291,11 @@ export function PaymentSettlementScreen({
                 style={[styles.formInput, styles.remarksInput]}
                 value={form.remarks}
                 onChangeText={form.setRemarks}
-                placeholder="Remarks (optional)"
+                placeholder={t('billing.msg.remarksPlaceholder')}
                 placeholderTextColor={BrandColors.textSecondary}
                 multiline
                 numberOfLines={2}
-                accessibilityLabel="Remarks"
+                accessibilityLabel={t('billing.msg.remarksA11y')}
               />
             </View>
           </View>
@@ -322,7 +322,7 @@ export function PaymentSettlementScreen({
       <AppBottomSheet
         visible={form.isReviewVisible}
         title={t('billing.settlement.confirmPayment')}
-        subtitle={`Settling ${selectedBills.length} bill${selectedBills.length !== 1 ? 's' : ''} for ${memberName ?? 'member'}`}
+        subtitle={t('billing.msg.settlingBills', { count: selectedBills.length, name: memberName ?? t('billing.msg.memberLower') })}
         onClose={form.hideReview}
       >
         <View style={styles.reviewContent}>
@@ -330,7 +330,7 @@ export function PaymentSettlementScreen({
             rows={[
               ...summaryRows,
               {
-                label: 'Total',
+                label: t('common.total'),
                 amount: form.totalAmount,
                 bold: true,
                 color: BrandColors.teal,

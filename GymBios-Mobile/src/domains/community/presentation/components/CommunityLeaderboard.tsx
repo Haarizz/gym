@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { getIntlLocale } from '@/core/i18n';
 import { StyleSheet, View } from 'react-native';
 import { useCommunityTheme } from '../../hooks/useCommunityTheme';
 import Feather from '@expo/vector-icons/Feather';
@@ -10,6 +9,7 @@ import { Typography } from '@/shared/components';
 import { Avatar } from '@/shared/components/Avatar';
 
 import type { LeaderboardEntry } from '../../domain/community.types';
+import { getIntlLocale } from '@/core/i18n/format';
 
 /* const RANK_COLORS = ['#F59E0B', '#94A3B8', '#CD7F32']; */
 

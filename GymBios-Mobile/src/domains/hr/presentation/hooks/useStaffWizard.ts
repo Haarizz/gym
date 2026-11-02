@@ -4,6 +4,7 @@ import type { Staff, StaffCertification, WeeklySchedule } from '../../domain/Sta
 import type { CreateStaffRequest, UpdateStaffRequest } from '../../application/StaffRepository';
 import { useCreateStaff, useUpdateStaff } from './useStaff';
 import { resolveImageUrl } from '@/shared/utils/resolveImageUrl';
+import i18n from '@/core/i18n/i18n';
 
 export interface StaffWizardData {
   name: string;
@@ -45,36 +46,36 @@ const MIN_PASSWORD_LENGTH = 6;
 
 function validatePersonal(data: StaffWizardData): StaffStepErrors {
   const errors: StaffStepErrors = {};
-  if (data.name.trim().length < 2) errors.name = 'Enter the staff member\'s full name';
+  if (data.name.trim().length < 2) errors.name = i18n.t('shared.formErrors.staffName');
 
   const email = data.email.trim();
-  if (!email) errors.email = 'Email is required';
-  else if (!EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
+  if (!email) errors.email = i18n.t('shared.formErrors.emailRequired');
+  else if (!EMAIL_PATTERN.test(email)) errors.email = i18n.t('shared.formErrors.emailInvalid');
 
   const phone = data.phone.trim();
-  if (!phone) errors.phone = 'Phone number is required';
+  if (!phone) errors.phone = i18n.t('shared.formErrors.phoneRequired');
   else if (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, '').length < 7) {
-    errors.phone = 'Enter a valid phone number';
+    errors.phone = i18n.t('shared.formErrors.phoneInvalid');
   }
 
-  if (data.photoStatus === 'uploading') errors.photoUrl = 'Wait for the photo to finish uploading';
+  if (data.photoStatus === 'uploading') errors.photoUrl = i18n.t('shared.formErrors.photoUploading');
   return errors;
 }
 
 function validateEmployment(data: StaffWizardData): StaffStepErrors {
   const errors: StaffStepErrors = {};
-  if (!data.role.trim()) errors.role = 'Choose a role';
-  if (!data.department.trim()) errors.department = 'Choose a department';
-  if (!data.branch.trim()) errors.branch = 'Choose a branch';
+  if (!data.role.trim()) errors.role = i18n.t('shared.formErrors.chooseRole');
+  if (!data.department.trim()) errors.department = i18n.t('shared.formErrors.chooseDepartment');
+  if (!data.branch.trim()) errors.branch = i18n.t('shared.formErrors.chooseBranch');
   return errors;
 }
 
 function validateCompensation(data: StaffWizardData): StaffStepErrors {
   const errors: StaffStepErrors = {};
   const salary = data.salary.trim();
-  if (salary && !(Number(salary) >= 0)) errors.salary = 'Enter a valid amount';
+  if (salary && !(Number(salary) >= 0)) errors.salary = i18n.t('shared.formErrors.invalidAmount');
   const target = data.monthlyTarget.trim();
-  if (target && !(Number(target) >= 0)) errors.monthlyTarget = 'Enter a valid amount';
+  if (target && !(Number(target) >= 0)) errors.monthlyTarget = i18n.t('shared.formErrors.invalidAmount');
   return errors;
 }
 
@@ -83,29 +84,29 @@ function validateAccess(data: StaffWizardData, mode: WizardMode): StaffStepError
   if (!data.appAccessEnabled) return errors;
 
   const username = data.username.trim();
-  if (!username) errors.username = 'Username is required';
-  else if (/\s/.test(username)) errors.username = 'Username can\'t contain spaces';
-  else if (username.length < 3) errors.username = 'Username must be at least 3 characters';
+  if (!username) errors.username = i18n.t('shared.formErrors.usernameRequired');
+  else if (/\s/.test(username)) errors.username = i18n.t('shared.formErrors.usernameSpaces');
+  else if (username.length < 3) errors.username = i18n.t('shared.formErrors.usernameShort');
 
   // An existing login keeps its password when this is left blank on edit.
   const passwordOptional = mode === 'edit';
   if (!data.password) {
-    if (!passwordOptional) errors.password = 'Password is required';
+    if (!passwordOptional) errors.password = i18n.t('shared.formErrors.passwordRequired');
   } else if (data.password.length < MIN_PASSWORD_LENGTH) {
-    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
+    errors.password = i18n.t('shared.formErrors.passwordShort', { min: MIN_PASSWORD_LENGTH });
   }
   if ((data.password || data.confirmPassword) && data.password !== data.confirmPassword) {
-    errors.confirmPassword = 'Passwords don\'t match';
+    errors.confirmPassword = i18n.t('shared.formErrors.passwordMismatch');
   }
   return errors;
 }
 
 const STEPS: WizardStep[] = [
-  { id: 'personal', title: 'Personal Information', validate: validatePersonal },
-  { id: 'employment', title: 'Employment', validate: validateEmployment },
-  { id: 'compensation', title: 'Compensation', validate: validateCompensation },
-  { id: 'schedule', title: 'Schedule & Certifications', validate: () => ({}) },
-  { id: 'access', title: 'App Access & Review', validate: validateAccess },
+  { id: 'personal', get title() { return i18n.t('hr.wizardSteps.personal'); }, validate: validatePersonal },
+  { id: 'employment', get title() { return i18n.t('hr.wizardSteps.employment'); }, validate: validateEmployment },
+  { id: 'compensation', get title() { return i18n.t('hr.wizardSteps.compensation'); }, validate: validateCompensation },
+  { id: 'schedule', get title() { return i18n.t('hr.wizardSteps.schedule'); }, validate: () => ({}) },
+  { id: 'access', get title() { return i18n.t('hr.wizardSteps.access'); }, validate: validateAccess },
 ];
 
 function mapStaffToWizardData(staff?: Staff): StaffWizardData {
