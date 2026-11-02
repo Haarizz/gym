@@ -73,6 +73,7 @@ import { MemberAnalyticsDialog } from "../components/members/MemberAnalyticsDial
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
 import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
+import { PhotoZoomViewer } from "../components/members/PhotoZoomViewer";
 import type { DueFilter, DueStats } from "../components/members/DueForRenewalList";
 import type { RenewalHistoryFilter, RenewalHistoryStats } from "../components/members/RenewalTransactionHistory";
 import type { FreezeFilter, FreezeStats } from "../components/members/FreezeTransactionHistory";
@@ -1965,23 +1966,12 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                 </TableBody>
               </Table>
 
-              <Dialog open={isPhotoViewerOpen} onOpenChange={setIsPhotoViewerOpen}>
-                <DialogContent className="w-[300px] sm:max-w-[300px] p-5">
-                  <DialogHeader>
-                    <DialogTitle>Member Photo</DialogTitle>
-                    <DialogDescription>{photoViewer?.name}</DialogDescription>
-                  </DialogHeader>
-                  <div className="flex items-center justify-center py-2">
-                    {photoViewer && (
-                      <img
-                        src={photoViewer.src}
-                        alt={photoViewer.name}
-                        className="h-48 w-48 rounded-lg object-cover shadow-md"
-                      />
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <PhotoZoomViewer
+                open={isPhotoViewerOpen}
+                onOpenChange={setIsPhotoViewerOpen}
+                src={photoViewer?.src}
+                name={photoViewer?.name}
+              />
 
               {/* Renew Family Dialog — family_head billing mode: one invoice for
                   the whole family, recalculated from price-per-member × headcount */}
