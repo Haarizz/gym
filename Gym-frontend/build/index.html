@@ -3,15 +3,38 @@
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
+      <!-- A browser that kept an old cached copy of this page after a deploy asks for
+           bundle files the deploy deleted (404) and shows a blank page / dead login.
+           Reload once: a reload revalidates this page, picking up the new bundle names. -->
+      <script>
+        (function () {
+          var KEY = 'gymbios_stale_bundle_reload';
+          var failed = false;
+          window.addEventListener('error', function (e) {
+            var t = e.target;
+            if (!t || (t.tagName !== 'SCRIPT' && t.tagName !== 'LINK')) return;
+            if ((t.src || t.href || '').indexOf('/assets/') === -1) return;
+            failed = true;
+            try {
+              if (sessionStorage.getItem(KEY)) return;
+              sessionStorage.setItem(KEY, '1');
+            } catch (_) { return; }
+            location.reload();
+          }, true);
+          window.addEventListener('load', function () {
+            if (!failed) { try { sessionStorage.removeItem(KEY); } catch (_) {} }
+          });
+        })();
+      </script>
       <!-- Adjusted per route at runtime — see src/utils/responsive-scope.ts. -->
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <meta name="theme-color" content="#2B7A78" />
       <title>GymBios</title>
-      <script type="module" crossorigin src="/assets/index-hn7nhb94.js"></script>
-      <link rel="stylesheet" crossorigin href="/assets/index-BSH1RIS1.css">
+      <script type="module" crossorigin src="/assets/index-BpEexem9.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-BiWHNGX7.css">
     </head>
 
     <body>
-      <div id="root"></div>
+      <div id="root"></div>
     </body>
   </html>
