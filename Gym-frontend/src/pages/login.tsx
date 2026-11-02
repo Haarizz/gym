@@ -132,8 +132,9 @@ export function Login({ onLogin }: LoginProps) {
 
     try {
       // Call the authentication service
+      // Trimmed: a saved/autofilled username with a stray trailing space matched no account.
       const result = await onLogin(
-        formData.email,
+        formData.email.trim(),
         formData.password,
         formData.rememberMe,
       );
@@ -317,7 +318,9 @@ export function Login({ onLogin }: LoginProps) {
                   <div className="relative">
                     <Input
                       id="email"
+                      name="username"
                       type="text"
+                      autoComplete="username"
                       autoCapitalize="none"
                       autoCorrect="off"
                       placeholder="Username or you@example.com"
@@ -356,6 +359,8 @@ export function Login({ onLogin }: LoginProps) {
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
+                      autoComplete="current-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={formData.password}
