@@ -40,6 +40,10 @@ public class Shift extends BaseEntity implements BranchAware {
     @Column(name = "break_end")
     private LocalTime breakEnd;
 
+    /** Unpaid break allowed per day, taken whenever the employee needs it (V116). Null on shifts saved before it: the old break window applies. */
+    @Column(name = "break_minutes")
+    private Integer breakMinutes;
+
     @Column(name = "grace_in_minutes", nullable = false)
     private Integer graceInMinutes = 10;
 
@@ -91,6 +95,8 @@ public class Shift extends BaseEntity implements BranchAware {
     public void setBreakStart(LocalTime breakStart) { this.breakStart = breakStart; }
     public LocalTime getBreakEnd() { return breakEnd; }
     public void setBreakEnd(LocalTime breakEnd) { this.breakEnd = breakEnd; }
+    public Integer getBreakMinutes() { return breakMinutes; }
+    public void setBreakMinutes(Integer breakMinutes) { this.breakMinutes = breakMinutes; }
     public Integer getGraceInMinutes() { return graceInMinutes; }
     public void setGraceInMinutes(Integer graceInMinutes) { this.graceInMinutes = graceInMinutes; }
     public Integer getGraceOutMinutes() { return graceOutMinutes; }

@@ -87,6 +87,7 @@ public class ShiftService {
         s.setCheckOut(src.getCheckOut());
         s.setBreakStart(src.getBreakStart());
         s.setBreakEnd(src.getBreakEnd());
+        s.setBreakMinutes(src.getBreakMinutes());
         s.setGraceInMinutes(src.getGraceInMinutes());
         s.setGraceOutMinutes(src.getGraceOutMinutes());
         s.setOtAfterMinutes(src.getOtAfterMinutes());
@@ -128,6 +129,14 @@ public class ShiftService {
         if (b.containsKey("check_out")) s.setCheckOut(time(b.get("check_out")));
         if (b.containsKey("break_start")) s.setBreakStart(time(b.get("break_start")));
         if (b.containsKey("break_end")) s.setBreakEnd(time(b.get("break_end")));
+        // A break is a duration taken whenever needed; setting it replaces any old fixed window.
+        if (b.containsKey("break_minutes")) {
+            int minutes = intOr(b.get("break_minutes"), 0);
+            if (minutes < 0) throw new BusinessRuleViolationException("The break can't be negative");
+            s.setBreakMinutes(minutes);
+            s.setBreakStart(null);
+            s.setBreakEnd(null);
+        }
         if (b.containsKey("grace_in_minutes")) s.setGraceInMinutes(intOr(b.get("grace_in_minutes"), 0));
         if (b.containsKey("grace_out_minutes")) s.setGraceOutMinutes(intOr(b.get("grace_out_minutes"), 0));
         if (b.containsKey("ot_after_minutes")) s.setOtAfterMinutes(intOr(b.get("ot_after_minutes"), 0));
@@ -159,7 +168,7 @@ public class ShiftService {
             throw new BusinessRuleViolationException("Give both a break start and a break end, or neither");
         }
         if (ShiftAttendanceService.netMinutes(s) <= 0) {
-            throw new BusinessRuleViolationException("The break is as long as the shift — check the times");
+            throw new BusinessRuleViolationException("The break is as long as the shift — shorten the break or check the times");
         }
     }
 

@@ -18,6 +18,62 @@ export interface TrainingSessionApi {
   price?: number | null;
   status?: string | null;
   description?: string | null;
+  checkedIn?: number;
+  waitlisted?: number;
+  reviewCount?: number;
+  averageRating?: number | null;
+  trainerPhotoUrl?: string | null;
+}
+
+/** active = scheduled; the Trainings & Classes row actions move it along. */
+export type SessionStatus = "active" | "in_progress" | "completed" | "cancelled";
+
+export interface SessionTrainerProfile {
+  id: number;
+  name: string;
+  role?: string | null;
+  photoUrl?: string | null;
+  yearsAtGym?: number | null;
+  rating?: number | null;
+  ratingCount?: number;
+  certifications: string[];
+}
+
+export interface SessionParticipant {
+  bookingId: string;
+  memberDbId?: number | null;
+  memberCode?: string | null;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  photoUrl?: string | null;
+  plan?: string | null;
+  membershipStatus?: string | null;
+  guest: boolean;
+  /** confirmed | checked-in | no-show | pending_approval | waitlisted */
+  status: string;
+  paymentStatus?: string | null;
+  price?: number | null;
+  waitlistPosition?: number | null;
+  checkedInAt?: string | null;
+  bookedAt?: string | null;
+}
+
+export interface SessionReviewItem {
+  id: number;
+  memberDbId?: number | null;
+  memberName?: string | null;
+  memberPhotoUrl?: string | null;
+  rating: number;
+  comment?: string | null;
+  createdAt?: string | null;
+}
+
+export interface SessionOverview {
+  session: TrainingSessionApi;
+  trainer: SessionTrainerProfile | null;
+  participants: SessionParticipant[];
+  reviews: SessionReviewItem[];
 }
 
 export interface TrainingSessionRequest {
@@ -53,7 +109,17 @@ class TrainingService {
       price: raw.price ?? null,
       status: raw.status ?? null,
       description: raw.description ?? null,
+      checkedIn: Number(raw.checked_in ?? raw.checkedIn ?? 0),
+      waitlisted: Number(raw.waitlisted ?? 0),
+      reviewCount: Number(raw.review_count ?? raw.reviewCount ?? 0),
+      averageRating: raw.average_rating ?? raw.averageRating ?? null,
+      trainerPhotoUrl: raw.trainer_photo_url ?? raw.trainerPhotoUrl ?? null,
     };
+  }
+
+  private async failure(response: Response, fallback: string): Promise<Error> {
+    const err = await response.json().catch(() => ({}));
+    return new Error((err as any)?.message || fallback);
   }
 
   async getSessions(params: {
@@ -122,6 +188,74 @@ class TrainingService {
     );
     if (!response.ok) throw new Error(`Failed to update session: ${response.status}`);
     return this.normalizeSession(await response.json());
+  }
+
+  async updateStatus(id: string, status: SessionStatus): Promise<TrainingSessionApi> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/sessions/${id}/status`,
+      { method: "PATCH", body: JSON.stringify({ status }) }
+    );
+    if (!response.ok) throw await this.failure(response, `Failed to update session: ${response.status}`);
+    return this.normalizeSession(await response.json());
+  }
+
+  /** Session + trainer profile + participants (incl. waitlist) + reviews, for the session dialog. */
+  async getOverview(id: string): Promise<SessionOverview> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/sessions/${id}/overview`);
+    if (!response.ok) throw await this.failure(response, `Failed to load session: ${response.status}`);
+    const raw = await response.json();
+    const t = raw.trainer;
+    return {
+      session: this.normalizeSession(raw.session),
+      trainer: t ? {
+        id: t.id,
+        name: t.name,
+        role: t.role ?? null,
+        photoUrl: t.photo_url ?? null,
+        yearsAtGym: t.years_at_gym ?? null,
+        rating: t.rating ?? null,
+        ratingCount: t.rating_count ?? 0,
+        certifications: t.certifications ?? [],
+      } : null,
+      participants: (raw.participants ?? []).map((p: any): SessionParticipant => ({
+        bookingId: String(p.booking_id),
+        memberDbId: p.member_db_id ?? null,
+        memberCode: p.member_code ?? null,
+        name: p.name ?? "",
+        phone: p.phone ?? null,
+        email: p.email ?? null,
+        photoUrl: p.photo_url ?? null,
+        plan: p.plan ?? null,
+        membershipStatus: p.membership_status ?? null,
+        guest: Boolean(p.guest),
+        status: p.status ?? "confirmed",
+        paymentStatus: p.payment_status ?? null,
+        price: p.price ?? null,
+        waitlistPosition: p.waitlist_position ?? null,
+        checkedInAt: p.checked_in_at ?? null,
+        bookedAt: p.booked_at ?? null,
+      })),
+      reviews: (raw.reviews ?? []).map((v: any): SessionReviewItem => ({
+        id: v.id,
+        memberDbId: v.member_db_id ?? null,
+        memberName: v.member_name ?? null,
+        memberPhotoUrl: v.member_photo_url ?? null,
+        rating: Number(v.rating ?? 0),
+        comment: v.comment ?? null,
+        createdAt: v.created_at ?? null,
+      })),
+    };
+  }
+
+  /** In-app + push reminder to everyone holding a seat. Resolves to how many members it reached. */
+  async sendReminder(id: string, note?: string): Promise<number> {
+    const response = await authService.makeAuthenticatedRequest(
+      `${backendBaseUrl}/sessions/${id}/remind`,
+      { method: "POST", body: JSON.stringify({ note: note ?? null }) }
+    );
+    if (!response.ok) throw await this.failure(response, `Failed to send reminder: ${response.status}`);
+    const raw = await response.json();
+    return Number(raw.sent ?? 0);
   }
 
   async deleteSession(id: string): Promise<void> {

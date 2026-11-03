@@ -32,7 +32,7 @@ const TONES: Record<StatTone, {
     iconBg: "bg-gradient-light",
     iconColor: "text-primary",
     valueColor: "text-primary",
-    ring: "#2B7A78",
+    ring: "var(--gb-primary)",
   },
   green: {
     iconBg: "bg-green-50",
@@ -82,7 +82,9 @@ export function MemberStatCards({ cards, activeKey, onSelect }: MemberStatCardsP
       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
       // More than 5 cards (e.g. All Members with Suspended/Pending Approval)
       // would wrap a lone card or two onto a second row; let them share the row.
-      style={cards.length > 5 ? { gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" } : undefined}
+      // Fewer than 5 (e.g. 4 on Trainings & Classes) would leave an empty column at xl; let them fill it.
+      style={cards.length > 5 ? { gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }
+        : cards.length < 5 ? { gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" } : undefined}
     >
       {cards.map((card) => {
         const Icon = card.icon;

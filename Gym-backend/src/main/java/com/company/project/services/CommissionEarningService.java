@@ -317,9 +317,15 @@ public class CommissionEarningService {
 
     /** Marks the month's approved commission paid by the given payroll run. */
     public void markPaidByPayroll(YearMonth period, Long runId, List<Long> staffIds) {
+        markPaidByPayroll(period, runId, staffIds, null);
+    }
+
+    /** As above, limited to the categories the payroll line included (null = all). */
+    public void markPaidByPayroll(YearMonth period, Long runId, List<Long> staffIds, List<String> categories) {
         for (CommissionEarning e : earningRepository.findByPeriodYearAndPeriodMonthAndStatusIn(
                 period.getYear(), period.getMonthValue(), List.of("approved"))) {
             if (!staffIds.contains(e.getStaffId())) continue;
+            if (categories != null && !categories.contains(e.getCategory())) continue;
             e.setStatus("paid");
             e.setPaidAt(LocalDateTime.now());
             e.setPayrollRunId(runId);

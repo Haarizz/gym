@@ -68,6 +68,19 @@ public class MobileMemberBookingsController {
                 () -> bookingsService.createBooking(principal, request)));
     }
 
+    /** Body: { "rating": 1-5, "comment": "optional" }. Rate a session the member booked, once it started. */
+    @PostMapping("/{bookingId}/review")
+    public ResponseEntity<com.company.project.dto.SessionOverviewDTO.Review> reviewBooking(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @PathVariable Long bookingId,
+            @RequestBody java.util.Map<String, Object> body) {
+        Object rating = body.get("rating");
+        Integer stars = rating instanceof Number n ? n.intValue() : null;
+        Object comment = body.get("comment");
+        return ResponseEntity.ok(bookingsService.reviewBooking(principal, bookingId, stars,
+                comment == null ? null : String.valueOf(comment)));
+    }
+
     /** Body (optional): { "refund_method": "WALLET" } — WALLET is the only one available for now. */
     @PostMapping("/{bookingId}/cancel")
     public ResponseEntity<MemberBookingDTO> cancelBooking(

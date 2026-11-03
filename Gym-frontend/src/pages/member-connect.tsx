@@ -1,672 +1,381 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Progress } from "../components/ui/progress";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-  Users,
-  Target,
-  Activity,
-  ArrowUpRight,
-  Eye,
-  Share,
-  Phone,
-  Megaphone,
-  CheckCircle,
-  BarChart3,
-  MessageSquare,
-  RefreshCw,
-  AlertCircle
-} from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, BarChart, Bar, Pie, Legend } from 'recharts';
-import { toast } from "sonner";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
-import { cn } from "../components/ui/utils";
-import { membersService, Member } from '../utils/supabase/members-service';
-import { leadService, LeadStats, LeadResponse } from '../utils/supabase/lead-service';
-import { referralService, ReferralStats, ReferralResponse } from '../utils/supabase/referral-service';
-import { followUpService, FollowUpStats, FollowUpResponse } from '../utils/supabase/follow-up-service';
-import { messagingService, MessagingAnalyticsApi } from '../utils/supabase/messaging-service';
-import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
+  AlertTriangle, BarChart3, CalendarClock, Filter, Gift, Megaphone, MessageSquare, RefreshCw, Send, Share2, Target, UserPlus, Users,
+} from "lucide-react";
+import { Button } from "../components/ui/button";
+import { useBranch } from "../utils/branch-context";
+import { leadService, LeadResponse, LeadStats } from "../utils/supabase/lead-service";
+import { referralService, ReferralResponse, ReferralStats } from "../utils/supabase/referral-service";
+import { followUpService, FollowUpResponse } from "../utils/supabase/follow-up-service";
+import { messagingService, MessageHistoryApi } from "../utils/supabase/messaging-service";
+import { promotionsService, PromotionApi } from "../utils/supabase/promotions-service";
+import {
+  styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Seg, Status, Delta,
+  pctChange, fmtInt, fmtDate, Period, periodRange, PERIOD_OPTIONS,
+} from "../components/overview/overview-kit";
+
+type Tab = "due" | "leads" | "referrals" | "promotions";
 
 const SOURCE_LABELS: Record<string, string> = {
-  website: 'Website',
-  referral: 'Referral',
-  'walk-in': 'Walk-in',
-  'social-media': 'Social Media',
-  'google-ads': 'Google Ads',
-  'facebook-ads': 'Facebook Ads',
-  instagram: 'Instagram',
-  other: 'Other',
+  website: "Website", referral: "Referral", "walk-in": "Walk-in", "social-media": "Social media",
+  "google-ads": "Google Ads", "facebook-ads": "Facebook Ads", instagram: "Instagram", other: "Other",
 };
-const SOURCE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#dd4477', '#22c55e', '#a855f7'];
+const OPEN_FOLLOW_UP = new Set(["pending", "overdue", "rescheduled"]);
+const day = (s?: string | null) => (s || "").slice(0, 10);
+const inRange = (s: string | undefined | null, from: string, to: string) => { const d = day(s); return !!d && d >= from && d <= to; };
+const leadName = (l: LeadResponse) => `${l.firstName ?? ""} ${l.lastName ?? ""}`.trim() || l.leadId;
+/** When a referral turned into a member (falls back to when it was logged). */
+const referralWon = (r: ReferralResponse) => r.paymentDate || r.signupDate || r.updatedAt || r.createdAt;
 
-// Where each dashboard tile/button should take the user — all real routes
-// registered in App.tsx under the Member Connect section.
-const SECTION_ROUTES: Record<string, string> = {
-  campaigns: '/promotions-campaign',
-  members: '/members',
-  'promotions-campaign': '/promotions-campaign',
-  referrals: '/referrals',
-  leads: '/leads',
-  'follow-ups': '/follow-ups',
-  messaging: '/messaging',
-  analytics: '/member-connect-analytics',
-  trends: '/member-connect-analytics',
-};
+/** Every page of a 1-based paged list (capped, so a huge tenant can't hang the page). */
+async function allPages<T>(fetchPage: (page: number) => Promise<{ items: T[]; totalPages: number }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const r = await fetchPage(page);
+    out.push(...r.items);
+    if (page >= (r.totalPages || 1) || r.items.length === 0) break;
+  }
+  return out;
+}
 
+/**
+ * Member Connect overview: leads, referrals, follow-ups, messaging and promotions. Lead conversion
+ * is measured on the leads that came in during the period (how many of them have converted since),
+ * so every number is a count of real records, not a blended "engagement score".
+ */
 export function MemberConnect() {
   const navigate = useNavigate();
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
+  const { activeBranchId } = useBranch();
+  const palette = usePalette();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  // ── Real data, fetched from the backend ─────────────────────────────────
-  const [members, setMembers] = useState<Member[]>([]);
-  const [leadStats, setLeadStats] = useState<LeadStats | null>(null);
+  const [period, setPeriod] = useState<Period>("mtd");
+  const [tab, setTab] = useState<Tab>("due");
   const [leads, setLeads] = useState<LeadResponse[]>([]);
-  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  const [leadStats, setLeadStats] = useState<LeadStats | null>(null);
   const [referrals, setReferrals] = useState<ReferralResponse[]>([]);
-  const [followUpStats, setFollowUpStats] = useState<FollowUpStats | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [followUps, setFollowUps] = useState<FollowUpResponse[]>([]);
-  const [messagingAnalytics, setMessagingAnalytics] = useState<MessagingAnalyticsApi | null>(null);
-  const [promotions, setPromotions] = useState<PromotionApi[]>([]);
+  const [messages, setMessages] = useState<MessageHistoryApi[] | null>(null);
+  const [promotions, setPromotions] = useState<PromotionApi[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState<string[]>([]);
+  const range = useMemo(() => periodRange(period), [period]);
 
-  const fetchDashboardData = useCallback(async () => {
-    const results = await Promise.allSettled([
-      membersService.getMembers({}, { limit: 1000 }),
+  const load = useCallback(async () => {
+    setLoading(true);
+    const r = await Promise.allSettled([
+      allPages(async page => { const x = await leadService.getLeads({ page, size: 500 }); return { items: x.leads, totalPages: x.pagination.totalPages }; }),
       leadService.getStats(),
-      leadService.getLeads({ size: 500 }),
+      allPages(async page => { const x = await referralService.getReferrals({ page, size: 500 }); return { items: x.referrals, totalPages: x.pagination.totalPages }; }),
       referralService.getStats(),
-      referralService.getReferrals({ size: 500 }),
-      followUpService.getStats(),
-      followUpService.getFollowUps({ size: 500 }),
-      messagingService.getAnalytics(),
+      allPages(async page => { const x = await followUpService.getFollowUps({ page, size: 500 }); return { items: x.followUps, totalPages: x.pagination.totalPages }; }),
+      messagingService.getHistory(),
       promotionsService.getPromotions(),
     ]);
+    const errors: string[] = [];
+    if (r[0].status === "fulfilled") setLeads(r[0].value); else errors.push("leads");
+    if (r[1].status === "fulfilled") setLeadStats(r[1].value);
+    if (r[2].status === "fulfilled") setReferrals(r[2].value); else errors.push("referrals");
+    if (r[3].status === "fulfilled") setReferralStats(r[3].value);
+    if (r[4].status === "fulfilled") setFollowUps(r[4].value); else errors.push("follow-ups");
+    setMessages(r[5].status === "fulfilled" ? r[5].value : null);
+    setPromotions(r[6].status === "fulfilled" ? r[6].value : null);
+    setFailed(errors);
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
+  useEffect(() => { load(); }, [load]);
 
-    const [
-      membersRes, leadStatsRes, leadsRes, referralStatsRes, referralsRes,
-      followUpStatsRes, followUpsRes, messagingRes, promotionsRes,
-    ] = results;
+  const today = new Date().toISOString().slice(0, 10);
+  const in7 = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
 
-    if (membersRes.status === 'fulfilled') setMembers(membersRes.value.members || []);
-    if (leadStatsRes.status === 'fulfilled') setLeadStats(leadStatsRes.value);
-    if (leadsRes.status === 'fulfilled') setLeads(leadsRes.value.leads || []);
-    if (referralStatsRes.status === 'fulfilled') setReferralStats(referralStatsRes.value);
-    if (referralsRes.status === 'fulfilled') setReferrals(referralsRes.value.referrals || []);
-    if (followUpStatsRes.status === 'fulfilled') setFollowUpStats(followUpStatsRes.value);
-    if (followUpsRes.status === 'fulfilled') setFollowUps(followUpsRes.value.followUps || []);
-    if (messagingRes.status === 'fulfilled') setMessagingAnalytics(messagingRes.value);
-    if (promotionsRes.status === 'fulfilled') setPromotions(promotionsRes.value || []);
-
-    const failedCount = results.filter(r => r.status === 'rejected').length;
-    setLoadError(failedCount > 0 ? `${failedCount} of ${results.length} data source(s) failed to load — showing partial data.` : null);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      await fetchDashboardData();
-      if (!cancelled) setIsLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [fetchDashboardData]);
-
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await fetchDashboardData();
-      toast.success('Data refreshed!');
-    } catch {
-      toast.error('Failed to refresh some data');
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [fetchDashboardData]);
-
-  const handleViewDetails = (section: string) => {
-    const route = SECTION_ROUTES[section];
-    if (route) navigate(route);
+  // ── Period figures ──
+  const cohort = (from: string, to: string) => {
+    const created = leads.filter(l => inRange(l.createdAt, from, to));
+    const converted = created.filter(l => l.status === "converted" || l.memberId != null).length;
+    return { created: created.length, converted, rate: created.length ? Math.round((converted / created.length) * 1000) / 10 : null, list: created };
   };
+  const cur = useMemo(() => cohort(range.from, range.to), [leads, range]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prev = useMemo(() => cohort(range.compareFrom, range.compareTo), [leads, range]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wonReferrals = (from: string, to: string) => referrals.filter(r => r.status === "successful" && inRange(referralWon(r), from, to)).length;
+  const refCur = useMemo(() => wonReferrals(range.from, range.to), [referrals, range]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refPrev = useMemo(() => wonReferrals(range.compareFrom, range.compareTo), [referrals, range]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Real KPIs, derived from the fetched data ────────────────────────────
+  const openFollowUps = useMemo(() => followUps.filter(f => OPEN_FOLLOW_UP.has(f.status)), [followUps]);
+  const overdue = openFollowUps.filter(f => day(f.dueDate) && day(f.dueDate) < today);
+  const dueToday = openFollowUps.filter(f => day(f.dueDate) === today);
+  const doneInPeriod = followUps.filter(f => f.status === "completed" && inRange(f.completedDate, range.from, range.to)).length;
+  const dueList = useMemo(() => openFollowUps.filter(f => day(f.dueDate) && day(f.dueDate) <= in7)
+    .sort((a, b) => day(a.dueDate).localeCompare(day(b.dueDate))), [openFollowUps, in7]);
 
-  const activeMembersCount = useMemo(
-    () => members.filter(m => (m.membership_status || '').toLowerCase() === 'active').length,
-    [members]
-  );
+  const sentMsgs = (messages ?? []).filter(m => m.status !== "scheduled" && inRange(m.sent_date, range.from, range.to));
+  const reached = sentMsgs.reduce((s, m) => s + (Number(m.recipient_count) || 0), 0);
+  const withDelivery = sentMsgs.filter(m => m.delivery_rate != null);
+  const deliveryRate = withDelivery.length ? Math.round(withDelivery.reduce((s, m) => s + Number(m.delivery_rate), 0) / withDelivery.length) : null;
+  const scheduled = (messages ?? []).filter(m => m.status === "scheduled").length;
 
-  const campaignConversions = useMemo(() => {
-    const promoRedemptions = promotions.reduce((sum, p) => sum + (p.usageCount ?? 0), 0);
-    return promoRedemptions + (referralStats?.successfulReferrals ?? 0) + (leadStats?.convertedLeads ?? 0);
-  }, [promotions, referralStats, leadStats]);
+  const activePromos = (promotions ?? []).filter(p => (p.status || "").toLowerCase() === "active");
+  const redemptions = activePromos.reduce((s, p) => s + (Number(p.usageCount) || 0), 0);
 
-  const followUpCompletionRate = Math.round(followUpStats?.completionRate ?? 0);
-
-  const messagingEffectiveness = useMemo(() => {
-    if (!messagingAnalytics) return 0;
-    const open = messagingAnalytics.open_rate ?? 0;
-    const click = messagingAnalytics.click_rate ?? 0;
-    return Math.round((open + click) / 2);
-  }, [messagingAnalytics]);
-
-  // Engagement Score: a weighted-average index across five real signals —
-  // visit engagement, messaging response, referral conversion, follow-up
-  // completion, and lead conversion.
-  const checkInEngagementPct = useMemo(() => {
-    if (!members.length) return 0;
-    const withVisits = members.filter(m => (m.total_visits ?? 0) > 0).length;
-    return Math.round((withVisits / members.length) * 100);
-  }, [members]);
-  const referralActivityPct = Math.round(referralStats?.conversionRate ?? 0);
-  const leadConversionPct = Math.round(leadStats?.conversionRate ?? 0);
-
-  const engagementScore = useMemo(() => {
-    const parts = [checkInEngagementPct, messagingEffectiveness, referralActivityPct, followUpCompletionRate, leadConversionPct];
-    return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
-  }, [checkInEngagementPct, messagingEffectiveness, referralActivityPct, followUpCompletionRate, leadConversionPct]);
-
-  const engagementLabel = engagementScore >= 80 ? 'Excellent Performance'
-    : engagementScore >= 60 ? 'Good Performance'
-    : engagementScore >= 40 ? 'Needs Attention'
-    : 'Low Engagement';
-
-  // ── Charts, derived from the same real records ──────────────────────────
-
-  // 6-month trend of new leads created, referral conversions (by payment/signup
-  // date), and follow-ups completed — all bucketed from real timestamps.
-  const engagementTrendData = useMemo(() => {
+  // ── Trend: last 6 months ──
+  const trend = useMemo(() => {
     const now = new Date();
-    const months = Array.from({ length: 6 }, (_, i) => subMonths(now, 5 - i));
-    const inRange = (dateStr: string | undefined | null, start: Date, end: Date) => {
-      if (!dateStr) return false;
-      const t = new Date(dateStr);
-      return t >= start && t <= end;
-    };
-    return months.map(d => {
-      const start = startOfMonth(d);
-      const end = endOfMonth(d);
-      const newLeads = leads.filter(l => inRange(l.createdAt, start, end)).length;
-      const conversions = referrals.filter(r => r.status === 'successful' && inRange(r.paymentDate || r.signupDate || r.createdAt, start, end)).length;
-      const followUpsCompleted = followUps.filter(f => f.status === 'completed' && inRange(f.completedDate, start, end)).length;
-      return { month: format(d, 'MMM'), newLeads, conversions, followUpsCompleted };
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const created = leads.filter(l => (l.createdAt || "").startsWith(key));
+      return {
+        label: d.toLocaleDateString(undefined, { month: "short" }),
+        tipLabel: d.toLocaleDateString(undefined, { month: "long", year: "numeric" }) + (i === 5 ? " (so far)" : ""),
+        leads: created.length,
+        converted: created.filter(l => l.status === "converted" || l.memberId != null).length,
+        referrals: referrals.filter(r => r.status === "successful" && (referralWon(r) || "").startsWith(key)).length,
+        followUps: followUps.filter(f => f.status === "completed" && (f.completedDate || "").startsWith(key)).length,
+      };
     });
   }, [leads, referrals, followUps]);
 
-  // Real lead-source distribution (Lead.source), not fabricated percentages.
-  const leadSourceData = useMemo(() => {
-    const counts = new Map<string, number>();
-    leads.forEach(l => {
-      const key = l.source || 'other';
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-    const total = leads.length || 1;
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, value], i) => ({
-        name: SOURCE_LABELS[key] || key,
-        value,
-        percent: Math.round((value / total) * 100),
-        fill: SOURCE_COLORS[i % SOURCE_COLORS.length],
-      }));
-  }, [leads]);
+  const pipelineRows = leadStats ? [
+    { key: "new", label: "New", value: leadStats.newLeads, color: palette.s1 },
+    { key: "contacted", label: "Contacted", value: leadStats.contactedLeads, color: palette.s1 },
+    { key: "follow", label: "Following up", value: leadStats.followUpLeads, color: palette.s1 },
+    { key: "converted", label: "Converted", value: leadStats.convertedLeads, color: palette.s3 },
+    { key: "lost", label: "Lost", value: leadStats.lostLeads, color: palette.axis },
+  ] : [];
 
-  // Real lead funnel straight from LeadStatsDTO.
-  const leadFunnelData = useMemo(() => {
-    if (!leadStats) return [];
-    return [
-      { name: 'New', value: leadStats.newLeads, fill: '#2563eb' },
-      { name: 'Contacted', value: leadStats.contactedLeads, fill: '#3b82f6' },
-      { name: 'Follow-up', value: leadStats.followUpLeads, fill: '#60a5fa' },
-      { name: 'Converted', value: leadStats.convertedLeads, fill: '#22c55e' },
-    ];
-  }, [leadStats]);
+  const sourceRows = useMemo(() => {
+    const by = new Map<string, { n: number; won: number }>();
+    for (const l of cur.list) {
+      const k = l.source || "other";
+      const v = by.get(k) ?? { n: 0, won: 0 };
+      v.n++; if (l.status === "converted" || l.memberId != null) v.won++;
+      by.set(k, v);
+    }
+    return [...by.entries()].sort((a, b) => b[1].n - a[1].n)
+      .map(([k, v]) => ({ key: k, label: SOURCE_LABELS[k] || k, value: v.n, color: palette.s4, meta: `${v.won} converted · ${Math.round((v.won / v.n) * 100)}%` }));
+  }, [cur, palette]);
+
+  const staffRows = useMemo(() => {
+    const by = new Map<string, { done: number; open: number; late: number }>();
+    for (const f of followUps) {
+      const k = f.assignedStaff || "Unassigned";
+      const v = by.get(k) ?? { done: 0, open: 0, late: 0 };
+      if (f.status === "completed" && inRange(f.completedDate, range.from, range.to)) v.done++;
+      if (OPEN_FOLLOW_UP.has(f.status)) { v.open++; if (day(f.dueDate) && day(f.dueDate) < today) v.late++; }
+      by.set(k, v);
+    }
+    return [...by.entries()].filter(([, v]) => v.done || v.open).sort((a, b) => b[1].done - a[1].done || b[1].open - a[1].open).slice(0, 6)
+      .map(([k, v]) => ({ key: k, label: k, value: v.done, color: palette.s3, meta: `${v.open} open${v.late ? ` · ${v.late} overdue` : ""}` }));
+  }, [followUps, range, palette, today]);
+
+  const latestLeads = useMemo(() => [...leads].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 15), [leads]);
+  const latestReferrals = useMemo(() => [...referrals].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 15), [referrals]);
+
+  const tabs: { id: Tab; label: string; icon: typeof Users; count?: number }[] = [
+    { id: "due", label: "Follow-ups due", icon: CalendarClock, count: overdue.length + dueToday.length },
+    { id: "leads", label: "Latest leads", icon: UserPlus },
+    { id: "referrals", label: "Referrals", icon: Share2, count: referralStats?.pendingReferrals },
+    { id: "promotions", label: "Promotions", icon: Gift, count: activePromos.length },
+  ];
+
+  if (loading && !leads.length && !followUps.length) {
+    return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading Member Connect…</div></div>;
+  }
 
   return (
-      <div className="p-6 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className={styles.root}>
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold">Member Connect</h1>
-          <p className="text-muted-foreground">Overall Performance Dashboard - Strategic insights across all connect features</p>
+          <h1 className={styles.title}>Member Connect</h1>
+          <div className={styles.subtitle}>{range.label} · {fmtDate(range.from)} – {fmtDate(range.to)} · changes {range.vs}</div>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
-            Refresh
+        <div className={styles.actions}>
+          <Seg value={period} onChange={setPeriod} label="Period" options={PERIOD_OPTIONS} />
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          <Button onClick={() => handleViewDetails('campaigns')}>
-            <ArrowUpRight className="mr-2 h-4 w-4" />
-            View All Campaigns
-          </Button>
+          <Button size="sm" onClick={() => navigate("/leads")}><UserPlus className="h-4 w-4 mr-2" />Leads</Button>
         </div>
       </div>
 
-      {loadError && (
-        <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-900 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-200 flex items-center">
-          <AlertCircle className="mr-2 h-4 w-4 shrink-0" />
-          {loadError}
+      {failed.length > 0 && (
+        <div className={`${styles.card} ${styles.filters}`} style={{ color: "var(--destructive)" }}>
+          <AlertTriangle size={16} />Couldn't load {failed.join(", ")}. The rest of the page is up to date.
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Active Members</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{isLoading ? '—' : activeMembersCount.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Members currently active out of {members.length.toLocaleString()} total
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start p-0 h-auto"
-              onClick={() => handleViewDetails('members')}
-            >
-              <Eye className="mr-1 h-3 w-3" />
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
+      <div className={loading ? styles.loadingVeil : undefined} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div className={styles.kpis}>
+          <Kpi icon={UserPlus} tone="blue" label="New leads" value={fmtInt(cur.created)} delta={<Delta pct={pctChange(cur.created, prev.created)} />}
+            hint={prev.created ? undefined : "nothing to compare"} onClick={() => navigate("/leads")} />
+          <Kpi icon={Target} tone="green" label="Lead conversion" value={cur.rate != null ? `${cur.rate}%` : "—"}
+            hint={cur.created ? `${cur.converted} of ${cur.created} became members${prev.rate != null ? ` · was ${prev.rate}%` : ""}` : "no leads in this period"}
+            title="Share of this period's leads that have converted so far" />
+          <Kpi icon={Share2} tone="violet" label="Referrals won" value={fmtInt(refCur)} delta={<Delta pct={pctChange(refCur, refPrev)} />}
+            hint={`${fmtInt(referralStats?.pendingReferrals)} pending`} onClick={() => navigate("/referrals")} />
+          <Kpi icon={CalendarClock} tone={overdue.length ? "red" : "amber"} label="Follow-ups overdue" value={fmtInt(overdue.length)}
+            hint={`${dueToday.length} due today · ${doneInPeriod} done`} onClick={() => setTab("due")} />
+          <Kpi icon={Send} tone="teal" label="People messaged" value={messages ? fmtInt(reached) : "—"}
+            hint={messages ? `${sentMsgs.length} campaign${sentMsgs.length === 1 ? "" : "s"}${deliveryRate != null ? ` · ${deliveryRate}% delivered` : ""}${scheduled ? ` · ${scheduled} scheduled` : ""}` : "unavailable"}
+            onClick={() => navigate("/messaging")} />
+          <Kpi icon={Gift} tone="orange" label="Active promotions" value={promotions ? fmtInt(activePromos.length) : "—"}
+            hint={promotions ? `${fmtInt(redemptions)} redemption${redemptions === 1 ? "" : "s"} so far` : "unavailable"} onClick={() => navigate("/promotions-campaign")} />
+        </div>
 
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Campaign Conversions</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <Target className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">{isLoading ? '—' : campaignConversions.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Promotions + referrals + leads converted
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start p-0 h-auto"
-              onClick={() => handleViewDetails('promotions-campaign')}
-            >
-              <Eye className="mr-1 h-3 w-3" />
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Follow-up Completion</CardTitle>
-            <div className="bg-orange-50 p-2 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-600">{isLoading ? '—' : `${followUpCompletionRate}%`}</div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Done vs pending across staff
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start p-0 h-auto"
-              onClick={() => handleViewDetails('follow-ups')}
-            >
-              <Eye className="mr-1 h-3 w-3" />
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Messaging Effectiveness</CardTitle>
-            <div className="bg-purple-50 p-2 rounded-lg">
-              <MessageSquare className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{isLoading ? '—' : `${messagingEffectiveness}%`}</div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Avg open/response rate across campaigns
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start p-0 h-auto"
-              onClick={() => handleViewDetails('messaging')}
-            >
-              <Eye className="mr-1 h-3 w-3" />
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Engagement Score</CardTitle>
-            <div className="bg-indigo-50 p-2 rounded-lg">
-              <Activity className="h-4 w-4 text-indigo-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-indigo-600">{isLoading ? '—' : `${engagementScore}/100`}</div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Weighted index combining all metrics
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start p-0 h-auto"
-              onClick={() => handleViewDetails('analytics')}
-            >
-              <Eye className="mr-1 h-3 w-3" />
-              View Details
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Engagement Trends Chart */}
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Engagement Trends</CardTitle>
-              <CardDescription>New leads, referral conversions and completed follow-ups by month</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleViewDetails('trends')}
-            >
-              <BarChart3 className="mr-2 h-4 w-4" />
-              View Details
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={engagementTrendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="newLeads"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  name="New Leads"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="conversions"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  name="Referral Conversions"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="followUpsCompleted"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  name="Follow-ups Completed"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Lead Sources Pie Chart */}
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Lead Sources</CardTitle>
-              <CardDescription>Distribution of leads by acquisition source</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleViewDetails('leads')}
-            >
-              <Share className="mr-2 h-4 w-4" />
-              View Details
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {leadSourceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsPieChart>
-                  <Pie
-                    data={leadSourceData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${percent}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {leadSourceData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RechartsPieChart>
-              </ResponsiveContainer>
+        <div className={styles.row2}>
+          <Panel title="Outreach results" icon={BarChart3} scope="Last 6 months" sub="Leads in and converted (by the month they came in), referrals won and follow-ups completed">
+            {trend.every(t => !t.leads && !t.referrals && !t.followUps) ? (
+              <Empty icon={BarChart3} title="No outreach activity yet" text="Leads, referrals and follow-ups show here as they're recorded." />
             ) : (
-              <p className="text-sm text-muted-foreground py-24 text-center">
-                {isLoading ? 'Loading lead data…' : 'No lead data available yet.'}
-              </p>
+              <>
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <ComposedChart data={trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={3}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="label" tick={axisTick(palette)} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick(palette)} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                      <Tooltip content={<ChartTip />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                      <Bar isAnimationActive={false} dataKey="leads" name="New leads" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                      <Bar isAnimationActive={false} dataKey="converted" name="Converted" fill={palette.s3} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                      <Bar isAnimationActive={false} dataKey="referrals" name="Referrals won" fill={palette.s4} radius={[4, 4, 0, 0]} maxBarSize={22} />
+                      <Line isAnimationActive={false} dataKey="followUps" name="Follow-ups done" stroke={palette.s2} strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <Legend items={[
+                  { label: "New leads", color: palette.s1 }, { label: "Converted", color: palette.s3 },
+                  { label: "Referrals won", color: palette.s4 }, { label: "Follow-ups done", color: palette.s2, line: true },
+                ]} />
+              </>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </Panel>
 
-      {/* Lead Funnel Chart */}
-      <Card className={cardShell}>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Lead Conversion Funnel</CardTitle>
-            <CardDescription>Track prospects through the conversion journey</CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewDetails('leads')}
-          >
-            <Target className="mr-2 h-4 w-4" />
-            View Details
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {leadFunnelData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart
-                data={leadFunnelData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#8884d8">
-                  {leadFunnelData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground py-24 text-center">
-              {isLoading ? 'Loading lead data…' : 'No lead data available yet.'}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          <Panel title="Lead pipeline" icon={Filter} sub={`${fmtInt(leadStats?.totalLeads)} leads by where they are now`}>
+            <BarRows rows={pipelineRows} fmt={n => fmtInt(n)} empty="No leads yet." />
+            <div className={styles.facts} style={{ marginTop: "auto", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
+              <div className={styles.fact}><span className={styles.factLabel}>All-time conversion</span><span className={styles.factValue}>{leadStats ? `${Math.round(leadStats.conversionRate * 10) / 10}%` : "—"}</span></div>
+              <div className={styles.fact}><span className={styles.factLabel}>Referral success</span><span className={styles.factValue}>{referralStats ? `${Math.round(referralStats.conversionRate * 10) / 10}%` : "—"}</span></div>
+            </div>
+          </Panel>
+        </div>
 
-      {/* Engagement Score Gauge */}
-      <Card className={cardShell}>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Engagement Score Overview</CardTitle>
-            <CardDescription>Weighted index combining visit engagement, messaging response, referral activity, follow-up completion, and lead conversion</CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewDetails('analytics')}
-          >
-            <Activity className="mr-2 h-4 w-4" />
-            View Full Analytics
-          </Button>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Engagement Score Circle */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="relative w-40 h-40">
-                <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 160 160">
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    className="text-gray-200"
-                  />
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    strokeDasharray={`${2 * Math.PI * 70}`}
-                    strokeDashoffset={`${2 * Math.PI * 70 * (1 - engagementScore / 100)}`}
-                    className="text-indigo-600 transition-all duration-1000 ease-out"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-indigo-600">{isLoading ? '—' : engagementScore}</div>
-                    <div className="text-sm text-muted-foreground">Score</div>
-                  </div>
-                </div>
+        <div className={styles.cols2}>
+          <Panel title="Where leads came from" icon={Megaphone} scope={range.label} sub="This period's leads by source, and how many converted">
+            <BarRows rows={sourceRows} fmt={n => `${n} lead${n === 1 ? "" : "s"}`} empty="No leads in this period." />
+          </Panel>
+          <Panel title="Team follow-ups" icon={Users} scope={range.label} sub="Follow-ups completed per staff member, with what's still open">
+            <BarRows rows={staffRows} fmt={n => `${n} done`} empty="No follow-ups assigned yet." />
+          </Panel>
+        </div>
+
+        <SectionTabs tabs={tabs} value={tab} onChange={setTab} label="Member Connect details" />
+
+        {tab === "due" && (
+          <Panel title="Follow-ups to do" icon={CalendarClock} sub="Overdue, today and the next 7 days"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/follow-ups")}>Follow-ups</Button>}>
+            {dueList.length === 0 ? <Empty icon={CalendarClock} title="Nothing due in the next 7 days" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Lead</th><th>Subject</th><th>Type</th><th>Staff</th><th>Due</th></tr></thead>
+                  <tbody>
+                    {dueList.slice(0, 25).map(f => {
+                      const d = day(f.dueDate);
+                      return (
+                        <tr key={f.id}>
+                          <td style={{ fontWeight: 600 }}>{f.leadName}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{f.leadPhone || f.leadEmail || ""}</div></td>
+                          <td className={styles.muted}>{f.subject || f.followUpReason || "—"}</td>
+                          <td style={{ textTransform: "capitalize" }}>{(f.type || "").replace("_", " ")}</td>
+                          <td className={styles.muted}>{f.assignedStaff || "Unassigned"}</td>
+                          <td><Status kind={d < today ? "critical" : d === today ? "warning" : "info"}>{d < today ? "overdue · " : d === today ? "today · " : ""}{fmtDate(d)}</Status></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <div className="mt-4 text-center">
-                <div className="font-medium">Overall Engagement</div>
-                <div className="text-sm text-muted-foreground">{isLoading ? 'Loading…' : engagementLabel}</div>
+            )}
+          </Panel>
+        )}
+
+        {tab === "leads" && (
+          <Panel title="Latest leads" icon={UserPlus} sub="Newest enquiries first" action={<Button variant="outline" size="sm" onClick={() => navigate("/leads")}>All leads</Button>}>
+            {latestLeads.length === 0 ? <Empty icon={UserPlus} title="No leads yet" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Lead</th><th>Source</th><th>Interest</th><th>Staff</th><th>Received</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {latestLeads.map(l => (
+                      <tr key={l.id}>
+                        <td style={{ fontWeight: 600 }}>{leadName(l)}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{l.phone || l.email || l.leadId}</div></td>
+                        <td>{SOURCE_LABELS[l.source || "other"] || l.source}</td>
+                        <td className={styles.muted}>{l.membershipInterest || "—"}</td>
+                        <td className={styles.muted}>{l.assignedStaff || "—"}</td>
+                        <td>{fmtDate(l.createdAt)}</td>
+                        <td><Status kind={l.status === "converted" ? "good" : l.status === "lost" ? "critical" : l.status === "new" ? "info" : "warning"}>{l.status.replace("-", " ")}</Status></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            )}
+          </Panel>
+        )}
 
-            {/* Score Breakdown */}
-            <div className="col-span-2 space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Member Check-ins</span>
-                  <span className="text-sm text-muted-foreground">{checkInEngagementPct}%</span>
-                </div>
-                <Progress value={checkInEngagementPct} className="h-2" />
+        {tab === "referrals" && (
+          <Panel title="Referrals" icon={Share2} sub={`${fmtInt(referralStats?.successfulReferrals)} won of ${fmtInt(referralStats?.totalReferrals)} · newest first`}
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/referrals")}>Referrals</Button>}>
+            {latestReferrals.length === 0 ? <Empty icon={Share2} title="No referrals yet" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Friend</th><th>Referred by</th><th>Referred</th><th>Status</th><th className={styles.num}>Reward</th></tr></thead>
+                  <tbody>
+                    {latestReferrals.map(r => (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight: 600 }}>{r.refereeName}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{r.referralId}</div></td>
+                        <td>{r.referrerName}</td>
+                        <td>{fmtDate(r.date || r.createdAt)}</td>
+                        <td><Status kind={r.status === "successful" ? "good" : r.status === "expired" ? "critical" : "warning"}>{r.status}</Status></td>
+                        <td className={styles.num}>{r.rewardAmount ? fmtInt(r.rewardAmount) + (r.rewardRedeemed ? " · redeemed" : "") : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            )}
+          </Panel>
+        )}
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Campaign Response Rate</span>
-                  <span className="text-sm text-muted-foreground">{messagingEffectiveness}%</span>
-                </div>
-                <Progress value={messagingEffectiveness} className="h-2" />
+        {tab === "promotions" && (
+          <Panel title="Active promotions" icon={Gift} sub="Running offers and how often they've been used"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/promotions-campaign")}>Promotions & Campaigns</Button>}>
+            {!promotions ? <Empty title="Promotions unavailable" /> : activePromos.length === 0 ? <Empty icon={Gift} title="No active promotions" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Promotion</th><th>Code</th><th>Runs</th><th style={{ width: "28%" }}>Used</th></tr></thead>
+                  <tbody>
+                    {activePromos.map(p => {
+                      const used = Number(p.usageCount) || 0;
+                      const limit = Number(p.usageLimit) || 0;
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ fontWeight: 600 }}>{p.name}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400, textTransform: "capitalize" }}>{(p.type || "").replace(/_/g, " ")}</div></td>
+                          <td>{p.code || "—"}</td>
+                          <td className={styles.muted}>{fmtDate(p.startDate)} – {p.endDate ? fmtDate(p.endDate) : "open"}</td>
+                          <td>
+                            {limit > 0 && <span className={styles.miniTrack}><span className={styles.miniFill} style={{ display: "block", width: `${Math.min(100, (used / limit) * 100)}%`, ["--fill" as any]: palette.s2 }} /></span>}
+                            {fmtInt(used)}{limit > 0 ? ` / ${fmtInt(limit)}` : ""}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Referral Activity</span>
-                  <span className="text-sm text-muted-foreground">{referralActivityPct}%</span>
-                </div>
-                <Progress value={referralActivityPct} className="h-2" />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Follow-up Success</span>
-                  <span className="text-sm text-muted-foreground">{followUpCompletionRate}%</span>
-                </div>
-                <Progress value={followUpCompletionRate} className="h-2" />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Lead Conversion</span>
-                  <span className="text-sm text-muted-foreground">{leadConversionPct}%</span>
-                </div>
-                <Progress value={leadConversionPct} className="h-2" />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('promotions-campaign')}>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Megaphone className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <div className="font-medium">Promotions</div>
-              <div className="text-sm text-muted-foreground">Manage campaigns</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('referrals')}>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Share className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <div className="font-medium">Referrals</div>
-              <div className="text-sm text-muted-foreground">Track referrals</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('leads')}>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Target className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <div className="font-medium">Leads</div>
-              <div className="text-sm text-muted-foreground">Manage prospects</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className={`${cardShell} p-4 cursor-pointer`} onClick={() => handleViewDetails('follow-ups')}>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Phone className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <div className="font-medium">Follow-ups</div>
-              <div className="text-sm text-muted-foreground">Schedule calls</div>
-            </div>
-          </div>
-        </Card>
+            )}
+          </Panel>
+        )}
       </div>
     </div>
   );

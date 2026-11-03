@@ -315,7 +315,7 @@ export function BenchmarkingDialog({
                     <PolarGrid />
                     <PolarAngleAxis dataKey="metric" />
                     <PolarRadiusAxis angle={90} domain={[0, 150]} />
-                    <Radar name="Your Gym" dataKey="you" stroke="#0F766E" fill="#0F766E" fillOpacity={0.6} />
+                    <Radar name="Your Gym" dataKey="you" stroke="var(--gb-primary-deep)" fill="var(--gb-primary-deep)" fillOpacity={0.6} />
                     <Radar name="Your Target" dataKey="industry" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
                     <Legend />
                   </RadarChart>

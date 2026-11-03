@@ -1,0 +1,66 @@
+/* Approvals queue — request cards on top of the overview kit (community-analytics.module.css). */
+
+.queue { display: flex; flex-direction: column; gap: 0.625rem; }
+
+.item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 0.875rem;
+  background: var(--card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.item:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 8%, transparent); }
+.item[data-late="true"] { border-left: 3px solid var(--status-warning); }
+
+.avatar {
+  width: 2.5rem; height: 2.5rem; border-radius: 999px; display: grid; place-items: center;
+  font-size: var(--text-sm); font-weight: 700; color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent); overflow: hidden; flex-shrink: 0;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.who { min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.name { font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.what { font-size: var(--text-sm); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 0.625rem; font-size: var(--text-xs); color: var(--muted-foreground); }
+.meta > span { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+.money { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.moneyCell { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.moneyLabel { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
+.moneyValue { font-size: var(--text-sm); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.moneyValue[data-tone="bad"] { color: var(--status-critical); }
+.moneyValue[data-tone="good"] { color: var(--status-good); }
+.moneySub { font-size: var(--text-xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.approve { background: var(--status-good) !important; color: #fff !important; border-color: transparent !important; }
+.approve:hover { filter: brightness(0.95); }
+.reject { color: var(--status-critical) !important; border-color: color-mix(in srgb, var(--status-critical) 35%, transparent) !important; }
+.reject:hover { background: color-mix(in srgb, var(--status-critical) 8%, transparent) !important; }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted-foreground); padding-top: 0.25rem; }
+.pagerBtns { display: flex; align-items: center; gap: 0.5rem; }
+
+.summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; padding: 0.75rem 0.875rem; border-radius: 0.75rem; background: var(--muted); font-size: var(--text-sm); }
+.summary dt { color: var(--muted-foreground); font-size: var(--text-xs); }
+.summary dd { margin: 0; font-weight: 600; }
+
+.caughtUp { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2.5rem 1rem; text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); }
+.caughtUpIcon { width: 3rem; height: 3rem; border-radius: 999px; display: grid; place-items: center; color: var(--status-good); background: color-mix(in srgb, var(--status-good) 12%, transparent); }
+.caughtUp strong { color: var(--foreground); font-size: var(--text-base); }
+
+@media (max-width: 1100px) {
+  .item { grid-template-columns: auto minmax(0, 1fr); }
+  .money { grid-column: 1 / -1; }
+  .actions { grid-column: 1 / -1; justify-content: stretch; }
+  .actions > * { flex: 1 1 0; }
+}
+@media (max-width: 480px) {
+  .money { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary { grid-template-columns: minmax(0, 1fr); }
+}

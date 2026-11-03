@@ -44,6 +44,8 @@ class BookingRewardPassTest {
     @Mock private com.company.project.repositories.ReceiptRepository receiptRepository;
     @Mock private FinancialEventService financialEventService;
 
+    @Mock private com.company.project.services.mobile.push.SessionMemberNotifier sessionMemberNotifier;
+
     private BookingService service;
     private TrainingSession session;
 
@@ -54,7 +56,7 @@ class BookingRewardPassTest {
                 walletService, receiptService, receiptRepository, memberRepository, financialEventService,
                 notificationService, bookingPaymentNotifier);
         service = new BookingService(bookingRepository, sessionRepository, memberRepository,
-                notificationService, qrCodeService, rewardRedemptionService, payments);
+                notificationService, qrCodeService, rewardRedemptionService, payments, sessionMemberNotifier);
 
         session = new TrainingSession();
         session.setId(1L);
@@ -136,7 +138,7 @@ class BookingRewardPassTest {
     @Test
     void fullSessionIsRefusedWithSessionFull() {
         session.setCapacity(1);
-        when(bookingRepository.countBySessionIdAndStatusNot(1L, "cancelled")).thenReturn(1L);
+        when(bookingRepository.countBySessionIdAndStatusNotIn(1L, com.company.project.services.BookingService.NO_SEAT_STATUSES)).thenReturn(1L);
         assertThrows(com.company.project.exceptions.SessionFullException.class,
                 () -> service.createBooking(request(10L, null)));
         verify(bookingRepository, never()).save(any());

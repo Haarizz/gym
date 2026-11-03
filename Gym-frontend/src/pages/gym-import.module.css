@@ -5,7 +5,7 @@
   --good: #15803d;
   --warn: #b45309;
   --bad: #dc2626;
-  --ink-strong: #1f5e5c;
+  --ink-strong: var(--gb-primary-darker);
   padding: 1.5rem;
   min-height: 100%;
   display: flex;

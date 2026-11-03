@@ -4,7 +4,7 @@
 [data-tone="amber"] { --tone: #b45309; }
 [data-tone="green"] { --tone: #15803d; }
 [data-tone="gray"] { --tone: #64748b; }
-[data-tone="teal"] { --tone: #2B7A78; }
+[data-tone="teal"] { --tone: var(--gb-primary); }
 :global(.dark) [data-tone="amber"] { --tone: #fbbf24; }
 :global(.dark) [data-tone="green"] { --tone: #4ade80; }
 :global(.dark) [data-tone="gray"] { --tone: #94a3b8; }

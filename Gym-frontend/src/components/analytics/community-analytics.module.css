@@ -90,7 +90,7 @@ button.kpi:focus-visible { outline: 2px solid var(--primary); outline-offset: 2p
 .delta[data-tone="bad"] { color: var(--bad-ink); }
 .delta[data-tone="flat"] { color: var(--muted-foreground); }
 
-[data-tone="teal"] { --tone: #2B7A78; }
+[data-tone="teal"] { --tone: var(--gb-primary); }
 [data-tone="blue"] { --tone: #2a78d6; }
 [data-tone="orange"] { --tone: #c2410c; }
 [data-tone="green"] { --tone: #15803d; }

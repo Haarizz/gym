@@ -10,7 +10,7 @@ export interface BookingApi {
   date?: string | null;
   startTime?: string | null;
   type?: 'class' | 'pt' | 'facility' | null;
-  status?: 'confirmed' | 'pending_approval' | 'checked-in' | 'no-show' | 'cancelled' | null;
+  status?: 'confirmed' | 'pending_approval' | 'checked-in' | 'no-show' | 'cancelled' | 'waitlisted' | null;
   paymentStatus?: 'paid' | 'partial' | 'pending' | 'pay_later' | null;
   price?: number | null;
   // Mobile self-booking payment (see BookingPaymentService on the backend).
@@ -43,6 +43,8 @@ export interface BookingRequest {
   status?: string;
   // A Free PT / Class Reward Pass that pays for the booking.
   rewardPassId?: number;
+  // Staff: put the member on the waitlist when the session is full.
+  waitlist?: boolean;
 }
 
 class BookingService {
@@ -113,6 +115,7 @@ class BookingService {
       guest_phone: payload.guestPhone ?? null,
       status: payload.status ?? null,
       reward_pass_id: payload.rewardPassId ?? null,
+      waitlist: payload.waitlist ?? null,
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/bookings`,

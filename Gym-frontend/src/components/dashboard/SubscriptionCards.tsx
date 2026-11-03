@@ -29,7 +29,7 @@ const CARDS: CardDef[] = [
   { key: 'upgrade', title: 'Subscriptions\n(Upgrades)', icon: TrendingUp, colors: ['#86198f', '#c026d3'],
     section: 'members', params: { tab: 'renewals' }, hint: 'Upgrade a member to a higher plan' },
   { key: 'addons', title: 'Subscriptions\n(Add-Ons)', icon: Gift, colors: ['#be123c', '#ea580c'],
-    section: 'members', params: { tab: 'addons' }, hint: 'Sell an add-on' },
+    section: 'manage-plans', params: { tab: 'addons' }, hint: 'Sell an add-on' },
   { key: 'dayPass', title: 'Day-Pass', icon: Ticket, colors: ['#3730a3', '#6d28d9'],
     section: 'check-in', params: { tab: 'daily' }, hint: 'Check in a walk-in / daily visitor' },
 ];

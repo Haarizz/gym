@@ -337,7 +337,7 @@ public class DashboardService {
         List<TrainingSession> recentSessions = trainingSessionRepository.findTop5ByStatusOrderByDateDescStartTimeDesc("active");
         List<ClassAttendance> attList = new ArrayList<>();
         for (TrainingSession session : recentSessions) {
-            long count = bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
+            long count = bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), com.company.project.services.BookingService.NO_SEAT_STATUSES);
             int capacity = session.getCapacity() != null ? session.getCapacity() : 20;
             int percentage = capacity > 0 ? (int) (((double) count / capacity) * 100) : 0;
             attList.add(new ClassAttendance(session.getName(), capacity, (int) count, percentage));

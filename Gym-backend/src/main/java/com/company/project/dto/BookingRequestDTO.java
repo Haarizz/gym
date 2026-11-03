@@ -8,6 +8,11 @@ public class BookingRequestDTO {
     private String guestEmail;
     private String guestPhone;
     private String status;
+    // Staff only: book a full session onto its waitlist instead of failing.
+    private Boolean waitlist;
+
+    public Boolean getWaitlist() { return waitlist; }
+    public void setWaitlist(Boolean waitlist) { this.waitlist = waitlist; }
 
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }

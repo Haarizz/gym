@@ -217,7 +217,7 @@ public class MobileMemberDashboardService {
                 continue;
             }
 
-            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
+            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), com.company.project.services.BookingService.NO_SEAT_STATUSES);
             int capacity = session.getCapacity() != null ? session.getCapacity() : 0;
             int availableSpots = Math.max(0, capacity - bookedCount);
 

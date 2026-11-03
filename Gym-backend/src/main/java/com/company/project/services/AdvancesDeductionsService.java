@@ -512,7 +512,8 @@ public class AdvancesDeductionsService {
                 JsonNode breakdown = readJson(line.getBreakdownJson());
                 if (breakdown == null) continue;
                 for (JsonNode d : breakdown.path("deductions")) {
-                    out.add(tx(paidOn, line.getEmployeeName(), "DED-" + d.path("deduction_id").asText(),
+                    if (new BigDecimal(d.path("amount").asText("0")).signum() <= 0) continue; // deferred, not taken
+                    out.add(tx(paidOn, line.getEmployeeName(), "DED-" + d.path("deduction_id").asLong(),
                             d.path("type").asText("Deduction") + (d.hasNonNull("reason") ? " — " + d.path("reason").asText() : ""),
                             new BigDecimal(d.path("amount").asText("0")).negate(), ym, "Other Deduction"));
                 }

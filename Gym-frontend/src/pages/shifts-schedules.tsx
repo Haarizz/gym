@@ -31,9 +31,12 @@ const STATUS_TONE: Record<string, Tone> = { active: "green", draft: "amber", ina
 const OT_LABEL: Record<OvertimePolicy, string> = { eligible: "OT paid automatically", approval: "OT needs approval", none: "No overtime" };
 const EXCEPTION_STATUSES = new Set(["Late", "Early Departure", "Absent", "Incomplete Punch", "Half Day"]);
 
+/** Break presets (minutes). The break is an unpaid allowance taken whenever the employee needs it. */
+const BREAK_PRESETS = [0, 15, 30, 45, 60, 90, 120];
+
 interface ShiftForm {
   name: string; code: string; shift_type: ShiftType; status: string;
-  check_in: string; check_out: string; break_start: string; break_end: string;
+  check_in: string; check_out: string; break_minutes: string;
   grace_in_minutes: string; grace_out_minutes: string; ot_after_minutes: string;
   max_daily_ot_hours: string; max_weekly_hours: string; overtime_policy: OvertimePolicy;
   work_days: string[]; departments: string[]; effective_from: string; effective_to: string;
@@ -41,7 +44,7 @@ interface ShiftForm {
 
 const emptyForm = (): ShiftForm => ({
   name: "", code: "", shift_type: "fixed", status: "active",
-  check_in: "08:00", check_out: "17:00", break_start: "13:00", break_end: "14:00",
+  check_in: "08:00", check_out: "17:00", break_minutes: "60",
   grace_in_minutes: "10", grace_out_minutes: "15", ot_after_minutes: "15",
   max_daily_ot_hours: "3", max_weekly_hours: "48", overtime_policy: "approval",
   work_days: ["Mon", "Tue", "Wed", "Thu", "Fri"], departments: [], effective_from: toISODate(new Date()), effective_to: "",
@@ -180,7 +183,7 @@ export function ShiftsSchedules({ onNavigate }: ShiftsSchedulesProps) {
     setEditing(x);
     setForm({
       name: x.name, code: x.code ?? "", shift_type: x.shift_type, status: x.status,
-      check_in: x.check_in, check_out: x.check_out, break_start: x.break_start ?? "", break_end: x.break_end ?? "",
+      check_in: x.check_in, check_out: x.check_out, break_minutes: String(x.break_minutes ?? 0),
       grace_in_minutes: String(x.grace_in_minutes ?? 0), grace_out_minutes: String(x.grace_out_minutes ?? 0),
       ot_after_minutes: String(x.ot_after_minutes ?? 0), max_daily_ot_hours: x.max_daily_ot_hours != null ? String(x.max_daily_ot_hours) : "",
       max_weekly_hours: x.max_weekly_hours != null ? String(x.max_weekly_hours) : "", overtime_policy: x.overtime_policy,
@@ -192,21 +195,21 @@ export function ShiftsSchedules({ onNavigate }: ShiftsSchedulesProps) {
   const netMinutes = useMemo(() => {
     if (!form.check_in || !form.check_out) return 0;
     const span = minutesBetween(form.check_in, form.check_out);
-    const brk = form.break_start && form.break_end ? minutesBetween(form.break_start, form.break_end) : 0;
-    return Math.max(0, span - (brk >= 24 * 60 ? 0 : brk));
-  }, [form.check_in, form.check_out, form.break_start, form.break_end]);
+    return Math.max(0, span - (Number(form.break_minutes) || 0));
+  }, [form.check_in, form.check_out, form.break_minutes]);
+  const breakMinutes = Math.max(0, Math.round(Number(form.break_minutes) || 0));
 
   const saveShift = async (status?: string) => {
     if (!form.name.trim()) { toast.error("Give the shift a name"); return; }
     if (!form.work_days.length) { toast.error("Pick at least one work day"); return; }
+    if (netMinutes <= 0) { toast.error("The break is as long as the shift — shorten the break or check the times"); return; }
     setSaving(true);
     try {
       const body: any = {
         ...form,
         status: status ?? form.status,
         code: form.code.trim() || null,
-        break_start: form.break_start || null,
-        break_end: form.break_end || null,
+        break_minutes: breakMinutes,
         effective_from: form.effective_from || null,
         effective_to: form.effective_to || null,
         max_daily_ot_hours: form.max_daily_ot_hours || null,
@@ -415,7 +418,7 @@ export function ShiftsSchedules({ onNavigate }: ShiftsSchedulesProps) {
                     </div>
                     <div className={s.metaRow}>
                       <span><Clock size={13} /><strong>{x.check_in} – {x.check_out}</strong></span>
-                      {x.break_start && <span><Coffee size={13} />Break {x.break_start} – {x.break_end}</span>}
+                      {x.break_minutes > 0 && <span title="Unpaid, taken any time during the shift"><Coffee size={13} />{minutesLabel(x.break_minutes)} break</span>}
                       <span><Timer size={13} /><strong>{minutesLabel(x.net_minutes)}</strong> net / day</span>
                       <span><Users size={13} /><strong>{x.assigned_count}</strong> employee{x.assigned_count === 1 ? "" : "s"}</span>
                       <span><ShieldCheck size={13} />Grace +{x.grace_in_minutes}m in / −{x.grace_out_minutes}m out</span>
@@ -773,12 +776,28 @@ export function ShiftsSchedules({ onNavigate }: ShiftsSchedulesProps) {
 
             <hr className={s.divider} />
             <span className={s.sectionLabel}>Time configuration</span>
-            <div className={s.grid4}>
+            <div className={s.grid2}>
               <Field label="Check-in"><Input type="time" value={form.check_in} onChange={e => setForm(f => ({ ...f, check_in: e.target.value }))} /></Field>
               <Field label="Check-out"><Input type="time" value={form.check_out} onChange={e => setForm(f => ({ ...f, check_out: e.target.value }))} /></Field>
-              <Field label="Break start"><Input type="time" value={form.break_start} onChange={e => setForm(f => ({ ...f, break_start: e.target.value }))} /></Field>
-              <Field label="Break end"><Input type="time" value={form.break_end} onChange={e => setForm(f => ({ ...f, break_end: e.target.value }))} /></Field>
             </div>
+            <Field
+              label="Break time (taken any time)"
+              hint="Unpaid break the employee can take whenever they need it. Time clocked out during the shift counts toward it; on days they work at least half the shift, any break not clocked out is deducted from worked hours."
+            >
+              <div className={s.dayToggles} style={{ alignItems: "center" }}>
+                {BREAK_PRESETS.map(m => (
+                  <button key={m} type="button" className={cx(s.dayToggle, breakMinutes === m && s.dayToggleOn)}
+                    aria-pressed={breakMinutes === m} onClick={() => setForm(f => ({ ...f, break_minutes: String(m) }))}>
+                    {m === 0 ? "No break" : minutesLabel(m)}
+                  </button>
+                ))}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
+                  <Input type="number" min={0} step={5} aria-label="Break minutes" style={{ width: "5.5rem" }}
+                    value={form.break_minutes} onChange={e => setForm(f => ({ ...f, break_minutes: e.target.value }))} />
+                  <span className={cx(s.small, s.muted)}>min</span>
+                </span>
+              </div>
+            </Field>
             <div className={s.section} data-tone="teal">
               <div className={s.spread}>
                 <div>
@@ -786,7 +805,7 @@ export function ShiftsSchedules({ onNavigate }: ShiftsSchedulesProps) {
                   <div className={s.netValue} style={{ fontSize: "1.25rem" }}>{minutesLabel(netMinutes)} / day</div>
                 </div>
                 <div className={cx(s.small, s.muted)}>
-                  {form.check_in} → {form.check_out}{form.check_out <= form.check_in ? " (next day)" : ""}{form.break_start && form.break_end ? ", break deducted" : ""}
+                  {form.check_in} → {form.check_out}{form.check_out <= form.check_in ? " (next day)" : ""}{breakMinutes > 0 ? `, ${minutesLabel(breakMinutes)} break deducted` : ", no break"}
                 </div>
               </div>
             </div>
