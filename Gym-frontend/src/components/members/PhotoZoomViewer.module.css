@@ -65,8 +65,8 @@
 
 .toolButton:hover:not(:disabled) {
   background: #f8fafc;
-  border-color: var(--primary, #2b7a78);
-  color: var(--primary, #2b7a78);
+  border-color: var(--primary, var(--gb-primary));
+  color: var(--primary, var(--gb-primary));
 }
 
 .toolButton:disabled {

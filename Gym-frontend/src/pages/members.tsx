@@ -18,7 +18,6 @@ import { Checkbox } from "../components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../components/ui/tooltip";
 import { MemberApprovalModal } from "../components/shared/member-approval-modal";
-import { MemberAddons } from "./member-addons";
 import { MemberReceipts } from "./member-receipts";
 import { rewardService, walletService, type ReferralReward, type Wallet as RewardWallet } from "../utils/supabase/reward-service";
 import {
@@ -28,7 +27,6 @@ import {
   CalendarX,
   Coins,
   Hourglass,
-  Puzzle,
   Receipt as ReceiptIcon,
   UserRoundPlus,
   Plus,
@@ -77,7 +75,6 @@ import { PhotoZoomViewer } from "../components/members/PhotoZoomViewer";
 import type { DueFilter, DueStats } from "../components/members/DueForRenewalList";
 import type { RenewalHistoryFilter, RenewalHistoryStats } from "../components/members/RenewalTransactionHistory";
 import type { FreezeFilter, FreezeStats } from "../components/members/FreezeTransactionHistory";
-import type { AddonStats } from "./member-addons";
 import type { ReceiptStats } from "./member-receipts";
 import { FaCircleCheck, FaCircleArrowUp, FaCircleArrowDown, FaArrowsRotate, FaArrowUp, FaArrowDown, FaArrowRight } from 'react-icons/fa6';
 import { toast } from 'sonner';
@@ -162,10 +159,19 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState((location.state as any)?.tab || initialTab);
+  // Add-ons moved to Manage Plans; old links to the Members add-ons tab land there.
+  const movedTab = (tab: unknown) => tab === 'addons';
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = (location.state as any)?.tab;
+    return tab && !movedTab(tab) ? tab : initialTab;
+  });
   
   useEffect(() => {
     const state = location.state as any;
+    if (movedTab(state?.tab)) {
+      navigate('/manage-plans', { state, replace: true });
+      return;
+    }
     if (state?.tab) {
       setActiveTab(state.tab);
     }
@@ -259,8 +265,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const [renewalCardFilter, setRenewalCardFilter] = useState<DueFilter | RenewalHistoryFilter | null>(null);
   const [dueStats, setDueStats] = useState<DueStats | null>(null);
   const [renewalStats, setRenewalStats] = useState<RenewalHistoryStats | null>(null);
-  const [addonFilter, setAddonFilter] = useState("all");
-  const [addonStats, setAddonStats] = useState<AddonStats | null>(null);
   const [receiptFilter, setReceiptFilter] = useState("all");
   const [receiptStats, setReceiptStats] = useState<ReceiptStats | null>(null);
   const [freezeFilter, setFreezeFilter] = useState<FreezeFilter | null>(null);
@@ -1417,24 +1421,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           },
         };
       }
-      case "addons":
-        return {
-          cards: [
-            {
-              key: "all", label: "Total Add-ons", value: addonStats?.total ?? null, icon: Puzzle, tone: "primary",
-              sub: addonStats ? `${money(addonStats.revenue)} revenue` : "All add-on purchases",
-            },
-            { key: "Active", label: "Active", value: addonStats?.active ?? null, sub: "Currently running", icon: CheckCircle, tone: "green" },
-            { key: "expiring", label: "Expiring in 7 Days", value: addonStats?.expiring ?? null, sub: "Active, ending soon", icon: Hourglass, tone: "amber" },
-            { key: "Expired", label: "Expired", value: addonStats?.expired ?? null, sub: "Past their expiry date", icon: CalendarX, tone: "red" },
-            { key: "Cancelled", label: "Cancelled", value: addonStats?.cancelled ?? null, sub: "Cancelled purchases", icon: Ban, tone: "cyan" },
-          ],
-          activeKey: addonFilter,
-          onSelect: (key) => {
-            setAddonFilter(addonFilter === key ? "all" : key);
-            scrollToSection("addon-transactions");
-          },
-        };
       case "receipts":
         return {
           cards: [
@@ -1557,7 +1543,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
           <TabsTrigger value="members" className="flex-1">All Members</TabsTrigger>
           <TabsTrigger value="new-members" className="flex-1">New Members</TabsTrigger>
           <TabsTrigger value="renewals" className="flex-1">Renewals & Upgrades</TabsTrigger>
-          <TabsTrigger value="addons" className="flex-1">Add-ons</TabsTrigger>
           <TabsTrigger value="receipts" className="flex-1">Member Receipts</TabsTrigger>
           <TabsTrigger value="freeze" className="flex-1">Freeze/Unfreeze</TabsTrigger>
           <TabsTrigger value="reports" className="flex-1">Reports</TabsTrigger>
@@ -2982,10 +2967,6 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="addons">
-          <MemberAddons embedded statusFilter={addonFilter} onStatusFilterChange={setAddonFilter} onStats={setAddonStats} />
         </TabsContent>
 
         <TabsContent value="receipts">

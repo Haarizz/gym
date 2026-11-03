@@ -47,6 +47,13 @@ export function AppSettings() {
   const handleTabChange = (tab: string) => {
     setSearchParams(tab === "currency" ? {} : { tab }, { replace: true });
   };
+  // On phones/tablets the tab list is a swipeable strip — keep the active tab in view
+  // (e.g. a deep link to ?tab=terms, the last tab).
+  useEffect(() => {
+    document
+      .querySelector('.sp-tabs-list [data-slot="tabs-trigger"][data-state="active"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTab]);
   const [pendingCode, setPendingCode] = useState<CurrencyCode>(currencyCode);
 
   // Currency + Company Details are branch-scoped — keep the pending currency

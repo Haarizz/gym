@@ -1,224 +1,173 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useCurrency, CurrencyGlyph } from "../utils/currency";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Badge } from "../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Progress } from "../components/ui/progress";
-import { Separator } from "../components/ui/separator";
-import { Switch } from "../components/ui/switch";
-import { 
-  User, 
-  Settings, 
-  Bell, 
-  LogOut, 
-  Camera, 
-  Edit3, 
-  Save, 
-  X, 
-  Target, 
-  TrendingUp, 
-  Award, 
-  Calendar, 
-  CreditCard, 
-  Download, 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Shield, 
-  Smartphone, 
-  Link, 
-  Clock, 
-  BarChart3, 
-  Activity, 
-  Zap, 
-  CheckCircle, 
-  Star, 
-  Trophy, 
-  Flame, 
-  Heart, 
-  CircleDollarSign, 
-  Calendar as CalendarIcon,
-  FileText,
-  Info,
-  Users,
-  Dumbbell,
-  Timer,
-  BookOpen,
-  PieChart,
-  ArrowUpRight,
-  ArrowDownRight,
-  Plus,
-  Loader2
-} from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { format, subDays, subMonths } from "date-fns";
+import { format } from "date-fns";
+import {
+  Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts";
+import {
+  Activity, ArrowDownRight, ArrowUpRight, Bell, BriefcaseBusiness, Calendar, Camera, CircleDollarSign, Clock, Download,
+  Edit3, Eye, EyeOff, IdCard, Info, Loader2, Lock, LogOut, Mail, MapPin, Minus, Palette, Phone, Receipt as ReceiptIcon,
+  RefreshCw, Save, Settings as SettingsIcon, ShieldCheck, ShoppingCart, Target, TrendingUp, Trophy, User, UserCheck, Users,
+  Wallet, X,
+} from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { useCurrency } from "../utils/currency";
 import { authService } from "../utils/supabase/auth-service";
-import { staffService, Staff, StaffTarget } from "../utils/supabase/staff-service";
+import {
+  staffService, Staff, StaffTarget, StaffPerformance, MyTransactions, MyAttendance,
+} from "../utils/supabase/staff-service";
+import { ThemeSettings } from "../components/settings/ThemeSettings";
+import styles from "../components/analytics/community-analytics.module.css";
+import rs from "../components/reports/reports-analytics.module.css";
+import pf from "../components/profile/my-profile.module.css";
 
 interface MyProfileProps {
   onNavigate?: (section: string) => void;
+  /** Tab to open when the URL has no ?tab= (e.g. the sidebar's My Profile › Settings). */
+  initialTab?: ProfileTab;
 }
 
-interface EditableProfileFields {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-}
+type ProfileTab = "personal" | "performance" | "targets" | "transactions" | "settings";
+type IconT = React.ComponentType<{ size?: number; className?: string }>;
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  earnedDate: Date;
-  category: 'performance' | 'attendance' | 'targets' | 'special';
-}
-
-interface Transaction {
-  id: string;
-  type: 'salary' | 'bonus' | 'purchase' | 'attendance';
-  description: string;
-  amount?: number;
-  date: Date;
-  status: 'completed' | 'pending' | 'failed';
-}
-
-// Trial Data — achievements/transactions are not yet backed by real
-// endpoints, so these stay illustrative until those modules are wired up.
-// Targets/performance are now driven by the real /api/staff-targets data (see myTargets below).
-const achievements: Achievement[] = [
-  {
-    id: "A001",
-    title: "Top Performer",
-    description: "Achieved 95%+ performance score for 3 consecutive months",
-    icon: "trophy",
-    earnedDate: new Date(2024, 9, 15),
-    category: 'performance'
-  },
-  {
-    id: "A002",
-    title: "Perfect Attendance",
-    description: "100% attendance for the entire quarter",
-    icon: "calendar",
-    earnedDate: new Date(2024, 8, 30),
-    category: 'attendance'
-  },
-  {
-    id: "A003",
-    title: "Target Achiever",
-    description: "Completed all assigned targets ahead of schedule",
-    icon: "target",
-    earnedDate: new Date(2024, 7, 20),
-    category: 'targets'
-  },
-  {
-    id: "A004",
-    title: "Client Favorite",
-    description: "Received 50+ five-star reviews from clients",
-    icon: "heart",
-    earnedDate: new Date(2024, 6, 10),
-    category: 'special'
-  }
-];
-
-const recentTransactions: Transaction[] = [
-  {
-    id: "T001",
-    type: 'salary',
-    description: "October 2024 Salary",
-    amount: 4285,
-    date: new Date(2024, 9, 30),
-    status: 'completed'
-  },
-  {
-    id: "T002",
-    type: 'bonus',
-    description: "Performance Bonus Q3",
-    amount: 500,
-    date: new Date(2024, 8, 31),
-    status: 'completed'
-  },
-  {
-    id: "T003",
-    type: 'attendance',
-    description: "Morning Shift - October 30",
-    date: new Date(2024, 9, 30),
-    status: 'completed'
-  },
-  {
-    id: "T004",
-    type: 'purchase',
-    description: "Staff Meal - Cafeteria",
-    amount: 25,
-    date: new Date(2024, 9, 29),
-    status: 'completed'
-  }
+const TABS: { id: ProfileTab; label: string; icon: IconT }[] = [
+  { id: "personal", label: "Personal", icon: User },
+  { id: "performance", label: "Performance", icon: Activity },
+  { id: "targets", label: "Targets", icon: Target },
+  { id: "transactions", label: "Transactions", icon: Wallet },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const STATUS_TONE: Record<string, string> = {
+  Present: "green", Overtime: "blue", Late: "amber", "Early Departure": "amber", "Half Day": "orange", Absent: "red",
+  "Incomplete Punch": "red", "Paid Leave": "violet", "Unpaid Leave": "gray", Holiday: "violet", "Weekly Off": "gray",
+  Working: "blue", Scheduled: "gray", "No Shift": "gray",
+};
 
 function targetLabel(t: StaffTarget): string {
-  const timeframeLabel = t.timeframe ? t.timeframe.charAt(0).toUpperCase() + t.timeframe.slice(1) : "Revenue";
+  const timeframe = t.timeframe ? t.timeframe.charAt(0).toUpperCase() + t.timeframe.slice(1) : "Revenue";
   const period = t.month ? `${MONTH_NAMES[t.month - 1]} ${t.year}` : `${t.year || ""}`;
-  const prefix = t.scope === 'institution' ? 'Institution-wide' : timeframeLabel;
-  return `${prefix} Target${period ? ` — ${period}` : ''}`;
+  return `${t.scope === "institution" ? "Institution-wide" : timeframe} target${period ? ` — ${period}` : ""}`;
 }
 
-function targetStatus(t: StaffTarget): 'active' | 'completed' | 'overdue' {
-  if ((t.percentage ?? 0) >= 100) return 'completed';
-  if (t.end_date && new Date(t.end_date) < new Date()) return 'overdue';
-  return 'active';
+function targetStatus(t: StaffTarget): { label: string; tone: string } {
+  if ((t.percentage ?? 0) >= 100) return { label: "Completed", tone: "green" };
+  if (t.end_date && new Date(t.end_date) < new Date()) return { label: "Overdue", tone: "red" };
+  return { label: "Active", tone: "blue" };
 }
 
-export function MyProfile({ onNavigate }: MyProfileProps) {
-  const { currencyCode, currencySymbol } = useCurrency();
+const fmtDate = (iso?: string | null, withTime = false) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return format(d, withTime ? "d MMM yyyy, HH:mm" : "d MMM yyyy");
+};
+
+function tenure(join: Date | null): string | null {
+  if (!join) return null;
+  const now = new Date();
+  let months = (now.getFullYear() - join.getFullYear()) * 12 + (now.getMonth() - join.getMonth());
+  if (now.getDate() < join.getDate()) months -= 1;
+  if (months < 1) return "Joined this month";
+  const y = Math.floor(months / 12), m = months % 12;
+  return [y ? `${y} yr${y > 1 ? "s" : ""}` : "", m ? `${m} mo` : ""].filter(Boolean).join(" ") + " with the gym";
+}
+
+function Delta({ pct }: { pct: number | null | undefined }) {
+  if (pct == null || Number.isNaN(pct)) return null;
+  if (Math.abs(pct) < 0.5) return <span className={styles.delta} data-tone="flat"><Minus size={12} />0%</span>;
+  const up = pct > 0;
+  return (
+    <span className={styles.delta} data-tone={up ? "good" : "bad"}>
+      {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(pct)}%
+    </span>
+  );
+}
+
+function Panel({ title, sub, icon: Icon, action, children }: {
+  title: string; sub?: React.ReactNode; icon?: IconT; action?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <div className={`${styles.card} ${styles.panel}`}>
+      <div className={styles.panelHead}>
+        <div>
+          <h3 className={styles.panelTitle} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {Icon && <span className={`${styles.kpiIcon} ${styles.kpiIconSm}`} data-tone="teal"><Icon size={14} /></span>}{title}
+          </h3>
+          {sub && <div className={styles.panelSub}>{sub}</div>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ icon: Icon, title, text, action }: { icon: IconT; title: string; text: string; action?: React.ReactNode }) {
+  return (
+    <div className={styles.empty}>
+      <Icon size={28} />
+      <div style={{ fontWeight: 600, color: "var(--foreground)" }}>{title}</div>
+      <div style={{ maxWidth: "28rem", fontSize: "var(--text-xs)" }}>{text}</div>
+      {action}
+    </div>
+  );
+}
+
+function Tile({ icon: Icon, tone, label, value, hint, delta }: {
+  icon: IconT; tone: string; label: string; value: string; hint?: React.ReactNode; delta?: React.ReactNode;
+}) {
+  return (
+    <div className={`${styles.card} ${styles.kpi}`}>
+      <div className={styles.kpiTop}>
+        <span className={styles.kpiLabel}>{label}</span>
+        <span className={`${styles.kpiIcon} ${styles.kpiIconSm}`} data-tone={tone}><Icon size={14} /></span>
+      </div>
+      <div className={styles.kpiValueSm}>{value}</div>
+      <div className={styles.kpiFoot}>{delta}{hint && <span>{hint}</span>}</div>
+    </div>
+  );
+}
+
+function Meter({ value, color }: { value: number; color?: string }) {
+  return (
+    <div className={pf.meter}>
+      <div className={pf.meterFill} style={{ width: `${Math.max(0, Math.min(100, value))}%`, ["--fill" as any]: color }} />
+    </div>
+  );
+}
+
+function passwordStrength(p: string): number {
+  let s = 0;
+  if (p.length >= 8) s++;
+  if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
+  if (/\d/.test(p)) s++;
+  if (/[^A-Za-z0-9]/.test(p) || p.length >= 12) s++;
+  return s;
+}
+
+export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProps) {
+  const { formatCurrency } = useCurrency();
+  const money = useCallback((n: number | null | undefined) => formatCurrency(Number(n) || 0, { maximumFractionDigits: 0 }), [formatCurrency]);
+  const money2 = useCallback((n: number | null | undefined) => formatCurrency(Number(n) || 0, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [formatCurrency]);
   const authUser = useMemo(() => authService.getCurrentUser(), []);
 
-  const [activeTab, setActiveTab] = useState("personal");
+  // Active tab lives in the URL (?tab=performance) so tabs can be linked to and survive a refresh.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") as ProfileTab | null;
+  const activeTab: ProfileTab = tabParam && TABS.some(t => t.id === tabParam) ? tabParam : initialTab;
+  const openTab = (tab: ProfileTab) => setSearchParams(tab === initialTab ? {} : { tab }, { replace: true });
+
+  // ── Profile ──
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [staffProfile, setStaffProfile] = useState<Staff | null>(null);
-
   const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [editedProfile, setEditedProfile] = useState<EditableProfileFields>({
-    name: "", email: "", phone: "", address: ""
-  });
-
-  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (authUser?.id) {
-      const savedPhoto = localStorage.getItem(`gymbios_photo_${authUser.id}`);
-      if (savedPhoto) setLocalPhoto(savedPhoto);
-    }
-  }, [authUser]);
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  const [notificationSettings, setNotificationSettings] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    performance: true,
-    targets: true,
-    payroll: true
-  });
+  const [edited, setEdited] = useState({ name: "", email: "", phone: "", address: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -236,86 +185,120 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
     return () => { cancelled = true; };
   }, []);
 
+  // ── Photo (staff record, else saved on this device for the account) ──
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!authUser?.id) return;
+    try {
+      const saved = localStorage.getItem(`gymbios_photo_${authUser.id}`);
+      if (saved) setLocalPhoto(saved);
+    } catch { /* storage blocked */ }
+  }, [authUser]);
+
+  // ── Performance, attendance, targets, transactions ──
+  const [performance, setPerformance] = useState<StaffPerformance | null>(null);
+  const [perfState, setPerfState] = useState<"loading" | "ready" | "error">("loading");
+  const loadPerformance = useCallback(async () => {
+    setPerfState("loading");
+    try {
+      setPerformance(await staffService.getMyPerformance());
+      setPerfState("ready");
+    } catch (e) {
+      console.error(e);
+      setPerfState("error");
+    }
+  }, []);
+  useEffect(() => { loadPerformance(); }, [loadPerformance]);
+
+  const [attendance, setAttendance] = useState<MyAttendance | null>(null);
+  useEffect(() => {
+    staffService.getMyAttendance().then(setAttendance).catch(e => console.error("attendance", e));
+  }, []);
+
   const [myTargets, setMyTargets] = useState<StaffTarget[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
-
   useEffect(() => {
     if (!staffProfile?.id) { setMyTargets([]); return; }
     let cancelled = false;
-    (async () => {
-      setLoadingTargets(true);
-      try {
-        const targets = await staffService.getTargets(undefined, undefined, undefined, Number(staffProfile.id));
-        if (!cancelled) setMyTargets(targets);
-      } catch (error) {
-        console.error("Failed to load targets:", error);
-      } finally {
-        if (!cancelled) setLoadingTargets(false);
-      }
-    })();
+    setLoadingTargets(true);
+    staffService.getTargets(undefined, undefined, undefined, Number(staffProfile.id))
+      .then(t => { if (!cancelled) setMyTargets(t); })
+      .catch(e => console.error("targets", e))
+      .finally(() => { if (!cancelled) setLoadingTargets(false); });
     return () => { cancelled = true; };
   }, [staffProfile?.id]);
 
-  const targetsSummary = useMemo(() => {
-    const total = myTargets.length;
-    const completed = myTargets.filter(t => (t.percentage ?? 0) >= 100).length;
-    const active = total - completed;
-    const avgPerformance = total > 0
-      ? Math.round(myTargets.reduce((sum, t) => sum + (t.percentage ?? 0), 0) / total)
-      : 0;
-    const revenueAchieved = myTargets.reduce((sum, t) => sum + (Number(t.revenue_achieved) || 0), 0);
-    const revenueTarget = myTargets.reduce((sum, t) => sum + (Number(t.revenue_target) || 0), 0);
-    const sessionsAchieved = myTargets.reduce((sum, t) => sum + (Number(t.sessions_achieved) || 0), 0);
-    const newClientsAchieved = myTargets.reduce((sum, t) => sum + (Number(t.new_clients_achieved) || 0), 0);
-    return { total, completed, active, avgPerformance, revenueAchieved, revenueTarget, sessionsAchieved, newClientsAchieved };
-  }, [myTargets]);
+  const [txDays, setTxDays] = useState(90);
+  const [txView, setTxView] = useState<"salary" | "advances" | "receipts" | "pos">("receipts");
+  const [tx, setTx] = useState<MyTransactions | null>(null);
+  const [txState, setTxState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const loadTransactions = useCallback(async (days: number) => {
+    setTxState("loading");
+    try {
+      const data = await staffService.getMyTransactions(days);
+      setTx(data);
+      setTxState("ready");
+    } catch (e) {
+      console.error(e);
+      setTxState("error");
+    }
+  }, []);
+  // Loaded when the tab is first opened (and when the period changes).
+  useEffect(() => { if (activeTab === "transactions") loadTransactions(txDays); }, [activeTab, txDays, loadTransactions]);
+  useEffect(() => {
+    if (tx?.linked && tx.salary_payments.length > 0 && txView === "receipts" && tx.receipts.length === 0) setTxView("salary");
+  }, [tx]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Real identity fields — staff record wins when linked, falls back to the account.
+  // ── Password ──
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // ── Derived identity ──
   const displayName = staffProfile?.name || authUser?.name || "User";
   const displayEmail = staffProfile?.email || authUser?.email || "";
   const displayPhone = staffProfile?.phone || "";
   const displayAddress = staffProfile?.address || "";
-  const displayRole = staffProfile?.role || (authUser?.role ? authUser.role.replace(/^\w/, c => c.toUpperCase()) : "");
-  const displayDepartment = staffProfile?.department || "";
-  const displayEmployeeId = staffProfile?.staff_id || "";
-  const displayJoinDate = staffProfile?.join_date ? new Date(staffProfile.join_date) : null;
+  const roleName = (authUser as any)?.roleName || authUser?.role || "";
+  const displayRole = staffProfile?.role || (roleName ? String(roleName).replace(/^ROLE_/i, "").replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase()) : "");
+  const joinDate = staffProfile?.join_date ? new Date(staffProfile.join_date) : null;
   const displayPhoto = staffProfile?.photo_url || localPhoto || "";
-  const displayInitials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  const initials = displayName.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?";
 
-  // Calculate progress percentages
-  const targetsProgress = targetsSummary.total > 0 ? (targetsSummary.completed / targetsSummary.total) * 100 : 0;
-  const performanceColor = targetsSummary.avgPerformance >= 90 ? 'text-green-600' :
-                          targetsSummary.avgPerformance >= 75 ? 'text-yellow-600' : 'text-red-600';
-  // Attendance isn't backed by a real endpoint yet — stays illustrative until that module is wired up.
-  const attendanceRate = 98;
+  const targetsSummary = useMemo(() => {
+    const total = myTargets.length;
+    const completed = myTargets.filter(t => (t.percentage ?? 0) >= 100).length;
+    return { total, completed, active: total - completed };
+  }, [myTargets]);
 
+  const attSummary = attendance?.summary;
+  const attendanceRate = attSummary?.attendance_rate ?? null;
+  const rev = performance?.revenue_target;
+  const conv = performance?.conversion_target;
+
+  // ── Actions ──
   const startEditing = () => {
-    setEditedProfile({
-      name: displayName,
-      email: displayEmail,
-      phone: displayPhone,
-      address: displayAddress
-    });
+    setEdited({ name: displayName, email: displayEmail, phone: displayPhone, address: displayAddress });
     setIsEditing(true);
   };
 
   const saveProfile = async () => {
     if (!staffProfile) return;
-    if (!editedProfile.name.trim() || !editedProfile.email.trim()) {
-      toast.error("Name and email are required.");
-      return;
-    }
+    if (!edited.name.trim() || !edited.email.trim()) { toast.error("Name and email are required."); return; }
+    if (!/^\S+@\S+\.\S+$/.test(edited.email.trim())) { toast.error("Enter a valid email address."); return; }
     setSavingProfile(true);
     try {
       const updated = await staffService.updateStaff(staffProfile.id, {
-        name: editedProfile.name.trim(),
-        email: editedProfile.email.trim(),
-        phone: editedProfile.phone.trim(),
-        address: editedProfile.address.trim()
+        name: edited.name.trim(), email: edited.email.trim(), phone: edited.phone.trim(), address: edited.address.trim(),
       });
       setStaffProfile(updated);
       setIsEditing(false);
-      toast.success("Profile updated successfully!");
+      toast.success("Profile updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update profile.");
     } finally {
@@ -324,1054 +307,675 @@ export function MyProfile({ onNavigate }: MyProfileProps) {
   };
 
   const changePassword = async () => {
-    if (!currentPassword) {
-      toast.error("Enter your current password.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match!");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters!");
-      return;
-    }
-
+    if (!currentPassword) { toast.error("Enter your current password."); return; }
+    if (newPassword.length < 8) { toast.error("The new password must be at least 8 characters."); return; }
+    if (newPassword !== confirmPassword) { toast.error("The new passwords don't match."); return; }
+    if (newPassword === currentPassword) { toast.error("Choose a password different from the current one."); return; }
     setChangingPassword(true);
     const result = await authService.changePassword(currentPassword, newPassword);
     setChangingPassword(false);
-
     if (result.success) {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast.success("Password changed successfully!");
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      toast.success("Password changed");
     } else {
       toast.error(result.error || "Failed to change password.");
     }
   };
 
-  const resizeImageToDataUrl = (file: File, size = 400): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("Failed to read the selected file."));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error("Failed to load the selected image."));
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) { reject(new Error("Canvas is not supported in this browser.")); return; }
-          const scale = Math.max(size / img.width, size / img.height);
-          const w = img.width * scale;
-          const h = img.height * scale;
-          ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-          resolve(canvas.toDataURL("image/jpeg", 0.85));
-        };
-        img.src = reader.result as string;
+  const resizeImageToDataUrl = (file: File, size = 400): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read the selected file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load the selected image."));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas is not supported in this browser.")); return; }
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
-      reader.readAsDataURL(file);
-    });
-  };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 
-  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPhotoChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be under 5MB.");
-      return;
-    }
-
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("The image must be under 5 MB."); return; }
     setUploadingPhoto(true);
     try {
       const dataUrl = await resizeImageToDataUrl(file, 400);
       if (staffProfile) {
-        const updated = await staffService.updateStaff(staffProfile.id, { photo_url: dataUrl });
-        setStaffProfile(updated);
+        setStaffProfile(await staffService.updateStaff(staffProfile.id, { photo_url: dataUrl }));
       } else if (authUser?.id) {
         localStorage.setItem(`gymbios_photo_${authUser.id}`, dataUrl);
         setLocalPhoto(dataUrl);
-        window.dispatchEvent(new Event('profile_photo_updated'));
+        window.dispatchEvent(new Event("profile_photo_updated"));
       }
-      setAvatarDialogOpen(false);
-      toast.success("Profile picture updated!");
+      setAvatarOpen(false);
+      toast.success("Profile picture updated");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update profile picture.");
+      toast.error(error instanceof Error ? error.message : "Failed to update the profile picture.");
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  const handleSignOut = async () => {
+  const signOut = async () => {
     await authService.signOut();
     window.location.href = "/";
   };
 
-  const getAchievementIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'trophy': return <Trophy className="h-5 w-5" />;
-      case 'calendar': return <CalendarIcon className="h-5 w-5" />;
-      case 'target': return <Target className="h-5 w-5" />;
-      case 'heart': return <Heart className="h-5 w-5" />;
-      default: return <Award className="h-5 w-5" />;
+  const exportTransactions = () => {
+    if (!tx) return;
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    let header: string[] = [];
+    let rows: unknown[][] = [];
+    if (txView === "salary") {
+      header = ["Month", "Year", "Net salary", "Gross", "Deductions", "Paid on", "Method", "Status"];
+      rows = tx.salary_payments.map(p => [p.month, p.year, p.net_salary, p.gross ?? "", p.total_deductions ?? "", p.payment_date ?? "", p.method ?? "", p.status ?? ""]);
+    } else if (txView === "advances") {
+      header = ["Advance", "Type", "Requested", "Approved", "Recovered", "Balance", "Installments", "Status", "Requested on"];
+      rows = tx.advances.map(a => [`ADV-${a.id}`, a.advance_type ?? "", a.requested_amount ?? "", a.approved_amount ?? "", a.total_deducted ?? "", a.balance ?? "", a.installment_count ?? "", a.status ?? "", a.request_date ?? ""]);
+    } else if (txView === "receipts") {
+      header = ["Receipt", "Date", "Member", "Plan / item", "Type", "Paid", "Billed", "Method", "Status"];
+      rows = tx.receipts.map(r => [r.receipt_no ?? r.id, r.date ?? "", r.member_name ?? "", r.plan_name ?? "", r.transaction_type ?? "", r.paid_amount ?? "", r.amount ?? "", r.payment_method ?? "", r.status ?? ""]);
+    } else {
+      header = ["Sale", "Date", "Customer", "Method", "Total", "Refunded", "Net"];
+      rows = tx.pos_sales.map(s => [s.transaction_number ?? s.id, s.date ?? "", s.member_name ?? "", s.payment_method ?? "", s.total, s.refunded, s.net]);
     }
+    if (!rows.length) { toast.info("Nothing to export in this list."); return; }
+    const csv = [header, ...rows].map(r => r.map(esc).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `my-${txView}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'salary': return <CircleDollarSign className="h-5 w-5 text-green-600" />;
-      case 'bonus': return <Star className="h-5 w-5 text-yellow-600" />;
-      case 'attendance': return <Clock className="h-5 w-5 text-blue-600" />;
-      case 'purchase': return <CreditCard className="h-5 w-5 text-purple-600" />;
-      default: return <FileText className="h-5 w-5" />;
-    }
-  };
+  const strength = passwordStrength(newPassword);
+  const strengthColor = ["#d03b3b", "#d03b3b", "#c98a00", "#0ca30c", "#0ca30c"][strength];
+  const strengthText = ["Too short", "Weak", "Fair", "Good", "Strong"][strength];
 
-  const panelCardShell = "bg-white border-0 shadow-sm";
-  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
-
+  // ── Render ──
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div className={styles.root}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your personal information, targets, performance, and account settings
-          </p>
+          <h1 className={styles.title}>My Profile</h1>
+          <div className={styles.subtitle}>Your details, performance, targets, pay and account settings in one place</div>
         </div>
-        
-        {/* Quick Actions */}
-        <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={() => onNavigate?.("notifications")}>
+            <Bell className="h-4 w-4 mr-2" />Notifications
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-sm hover:shadow-md transition-all"
-            onClick={() => onNavigate?.('settings')}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-sm hover:shadow-md transition-all"
-            onClick={handleSignOut}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+          <Button variant="outline" size="sm" onClick={signOut}>
+            <LogOut className="h-4 w-4 mr-2" />Sign Out
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Profile & Stats Summary */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Profile Card */}
-          <Card className={panelCardShell}>
-            <CardContent className="p-6">
-              <div className="text-center space-y-4">
-                <div className="relative inline-block">
-                  <Avatar className="w-24 h-24 border-4 border-primary/20">
-                    {displayPhoto && <AvatarImage src={displayPhoto} alt={displayName} />}
-                    <AvatarFallback className="bg-gradient-primary text-white text-2xl">
-                      {displayInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-gradient-primary"
-                        title="Update profile picture"
-                      >
-                        <Camera className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Update Profile Picture</DialogTitle>
-                        <DialogDescription>
-                          Upload a new profile picture. Recommended size: 400x400px
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarFileChange}
-                        />
-                        <div
-                          className="border-2 border-dashed border-primary/20 rounded-lg p-8 text-center cursor-pointer hover:bg-gradient-light transition-colors"
-                          onClick={() => !uploadingPhoto && fileInputRef.current?.click()}
-                        >
-                          {uploadingPhoto ? (
-                            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-                          ) : (
-                            <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          )}
-                          <p className="text-sm text-gray-600">
-                            {uploadingPhoto ? "Uploading..." : "Click to upload a photo"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
-                        </div>
-                        <Button variant="outline" className="w-full" onClick={() => setAvatarDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+      {/* Identity + this month at a glance */}
+      <div className={`${styles.card} ${pf.hero}`}>
+        <div className={pf.who}>
+          <div className={pf.avatarWrap}>
+            <div className={pf.avatar}>
+              {displayPhoto ? <img src={displayPhoto} alt={displayName} /> : initials}
+            </div>
+            <button type="button" className={pf.cameraBtn} onClick={() => setAvatarOpen(true)} title="Change profile picture" aria-label="Change profile picture">
+              <Camera size={14} />
+            </button>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            {loadingProfile ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : (
+              <>
+                <h2 className={pf.name}>{displayName}</h2>
+                <div className={pf.roleRow}>
+                  {displayRole && <span className={pf.pill}><BriefcaseBusiness size={12} />{displayRole}</span>}
+                  {staffProfile?.department && <span className={pf.pill} style={{ ["--tone" as any]: "#6250d6" }}>{staffProfile.department}</span>}
+                  {staffProfile
+                    ? <span className={pf.pill} style={{ ["--tone" as any]: "#0ca30c" }}><UserCheck size={12} />Staff record linked</span>
+                    : <span className={pf.pill} style={{ ["--tone" as any]: "#64748b" }}><ShieldCheck size={12} />Account only</span>}
                 </div>
-
-                <div>
-                  {loadingProfile ? (
-                    <div className="flex justify-center py-1">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <>
-                      <h3 className="text-xl font-semibold capitalize">{displayName}</h3>
-                      {displayRole && <p className="text-primary font-medium">{displayRole}</p>}
-                      {displayDepartment && <p className="text-sm text-gray-600">{displayDepartment}</p>}
-                      {!staffProfile && (
-                        <Badge className="mt-2 bg-gradient-light text-primary border-primary/20">
-                          {(authUser?.role || "User").replace(/^\w/, c => c.toUpperCase())} Account
-                        </Badge>
-                      )}
-                    </>
-                  )}
+                <div className={pf.meta}>
+                  {displayEmail && <span><Mail size={14} />{displayEmail}</span>}
+                  {staffProfile?.staff_id && <span><IdCard size={14} />{staffProfile.staff_id}</span>}
+                  {joinDate && <span><Calendar size={14} />{tenure(joinDate)}</span>}
                 </div>
-
-                {staffProfile && (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-gray-600">Employee ID</div>
-                      <div className="font-medium">{displayEmployeeId || '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-600">Join Date</div>
-                      <div className="font-medium">{displayJoinDate ? format(displayJoinDate, 'MMM yyyy') : '—'}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center space-x-2">
-                <BarChart3 className="h-5 w-5" />
-                <span>Quick Stats</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Performance Score */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Performance Score</span>
-                  <span className={`text-sm font-bold ${performanceColor}`}>
-                    {targetsSummary.avgPerformance}%
-                  </span>
-                </div>
-                <Progress value={targetsSummary.avgPerformance} className="h-2" />
-              </div>
-
-              {/* Targets Progress */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Targets Progress</span>
-                  <span className="text-sm font-bold text-primary">
-                    {targetsSummary.completed}/{targetsSummary.total}
-                  </span>
-                </div>
-                <Progress value={targetsProgress} className="h-2" />
-              </div>
-
-              {/* Attendance Rate */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Attendance Rate</span>
-                  <span className="text-sm font-bold text-green-600">
-                    {attendanceRate}%
-                  </span>
-                </div>
-                <Progress value={attendanceRate} className="h-2" />
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{targetsSummary.sessionsAchieved}</div>
-                  <div className="text-xs text-gray-600">Sessions</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{targetsSummary.newClientsAchieved}</div>
-                  <div className="text-xs text-gray-600">New Clients</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Achievements */}
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center space-x-2">
-                <Trophy className="h-5 w-5" />
-                <span>Recent Achievements</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {achievements.slice(0, 3).map((achievement) => (
-                <div key={achievement.id} className="flex items-center space-x-3 p-3 bg-gradient-light rounded-lg">
-                  <div className="bg-gradient-primary text-white rounded-full p-2">
-                    {getAchievementIcon(achievement.icon)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{achievement.title}</div>
-                    <div className="text-xs text-gray-600 truncate">{achievement.description}</div>
-                  </div>
-                </div>
-              ))}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => onNavigate?.('achievements')}
-              >
-                View All Achievements
-              </Button>
-            </CardContent>
-          </Card>
+              </>
+            )}
+          </div>
         </div>
+        <div className={pf.heroStats}>
+          <div className={pf.heroStat}>
+            <div className={pf.heroStatValue}>{perfState === "ready" && rev ? money(rev.achieved) : "—"}</div>
+            <div className={pf.heroStatLabel}>Revenue · {performance?.period.label ?? "this month"}</div>
+          </div>
+          <div className={pf.heroStat}>
+            <div className={pf.heroStatValue}>{perfState === "ready" && conv ? conv.achieved : "—"}</div>
+            <div className={pf.heroStatLabel}>Conversions</div>
+          </div>
+          <div className={pf.heroStat}>
+            <div className={pf.heroStatValue}>{staffProfile ? `${targetsSummary.completed}/${targetsSummary.total}` : "—"}</div>
+            <div className={pf.heroStatLabel}>Targets met</div>
+          </div>
+          <div className={pf.heroStat}>
+            <div className={pf.heroStatValue}>{attendanceRate != null ? `${attendanceRate}%` : "—"}</div>
+            <div className={pf.heroStatLabel}>{attendance?.linked ? "Attendance this month" : "Attendance"}</div>
+          </div>
+        </div>
+      </div>
 
-        {/* Right Column - Detailed Sections */}
-        <div className="lg:col-span-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="personal">
-                <User className="h-4 w-4 mr-2" />
-                Personal
-              </TabsTrigger>
-              <TabsTrigger value="performance">
-                <Activity className="h-4 w-4 mr-2" />
-                Performance
-              </TabsTrigger>
-              <TabsTrigger value="targets">
-                <Target className="h-4 w-4 mr-2" />
-                Targets
-              </TabsTrigger>
-              <TabsTrigger value="transactions">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Transactions
-              </TabsTrigger>
-              <TabsTrigger value="settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </TabsTrigger>
-            </TabsList>
+      {/* Tabs */}
+      <div className={`${styles.card} ${rs.tabsBar}`} role="tablist" aria-label="Profile sections">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} type="button" role="tab" aria-selected={activeTab === id} data-active={activeTab === id} className={rs.tab} onClick={() => openTab(id)}>
+            <Icon size={15} />{label}
+          </button>
+        ))}
+      </div>
 
-            {/* Personal Info Tab */}
-            <TabsContent value="personal" className={tabContentShell}>
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-primary">Personal Information</CardTitle>
-                    {staffProfile && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={savingProfile}
-                        onClick={() => isEditing ? saveProfile() : startEditing()}
-                      >
-                        {savingProfile ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : isEditing ? (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Changes
-                          </>
-                        ) : (
-                          <>
-                            <Edit3 className="h-4 w-4 mr-2" />
-                            Edit
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {!loadingProfile && !staffProfile && (
-                    <div className="flex items-start space-x-2 p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>
-                        No staff record is linked to this account, so name/phone/address 
-                        aren't editable here. You can still change your profile picture and password below.
-                      </span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label className="form-label">Full Name</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editedProfile.name}
-                          onChange={(e) => setEditedProfile({...editedProfile, name: e.target.value})}
-                          className="input-focus"
-                        />
-                      ) : (
-                        <div className="p-3 bg-gradient-light rounded-lg capitalize">{displayName}</div>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label className="form-label">Email Address</Label>
-                      {isEditing ? (
-                        <Input
-                          type="email"
-                          value={editedProfile.email}
-                          onChange={(e) => setEditedProfile({...editedProfile, email: e.target.value})}
-                          className="input-focus"
-                        />
-                      ) : (
-                        <div className="p-3 bg-gradient-light rounded-lg flex items-center">
-                          <Mail className="h-4 w-4 mr-2 text-primary" />
-                          {displayEmail || '—'}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label className="form-label">Phone Number</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editedProfile.phone}
-                          onChange={(e) => { const v = e.target.value; if (/^[\d+\-\s()]*$/.test(v)) setEditedProfile({...editedProfile, phone: v}); }}
-                          className="input-focus"
-                        />
-                      ) : (
-                        <div className="p-3 bg-gradient-light rounded-lg flex items-center">
-                          <Phone className="h-4 w-4 mr-2 text-primary" />
-                          {displayPhone || '—'}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label className="form-label">Address</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editedProfile.address}
-                          onChange={(e) => setEditedProfile({...editedProfile, address: e.target.value})}
-                          className="input-focus"
-                        />
-                      ) : (
-                        <div className="p-3 bg-gradient-light rounded-lg flex items-center">
-                          <MapPin className="h-4 w-4 mr-2 text-primary" />
-                          {displayAddress || '—'}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {isEditing && (
-                    <div className="flex space-x-3">
-                      <Button
-                        className="btn-primary"
-                        onClick={saveProfile}
-                        disabled={savingProfile}
-                      >
-                        {savingProfile ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Save Changes
-                      </Button>
-                      <Button
-                        variant="outline"
-                        disabled={savingProfile}
-                        onClick={() => setIsEditing(false)}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Change Password */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary flex items-center space-x-2">
-                    <Lock className="h-5 w-5" />
-                    <span>Change Password</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="form-label">Current Password</Label>
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="Enter current password"
-                      className="input-focus"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="form-label">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Enter new password"
-                          className="input-focus pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="form-label">Confirm Password</Label>
+      {/* ── Personal ── */}
+      {activeTab === "personal" && (
+        <div className={rs.tabBody} key="personal">
+          <div className={pf.grid2}>
+            <Panel
+              title="Personal information" icon={User}
+              sub={staffProfile ? "Your contact details on the staff record" : "From your login account"}
+              action={staffProfile && !isEditing ? <Button variant="outline" size="sm" onClick={startEditing}><Edit3 className="h-4 w-4 mr-2" />Edit</Button> : undefined}
+            >
+              {!loadingProfile && !staffProfile && (
+                <div className={pf.notice} style={{ ["--tone" as any]: "#c98a00" }}>
+                  <Info size={16} />
+                  <span>This login isn't linked to a staff record, so name, phone and address can't be edited here. Ask an admin to link it in Staffs &amp; Trainers. Your picture and password can still be changed.</span>
+                </div>
+              )}
+              <div className={pf.info}>
+                {([
+                  ["Full name", "name", User, displayName],
+                  ["Email address", "email", Mail, displayEmail],
+                  ["Phone number", "phone", Phone, displayPhone],
+                  ["Address", "address", MapPin, displayAddress],
+                ] as const).map(([label, key, Icon, value]) => (
+                  <label key={key} className={`${pf.infoItem} ${key === "address" ? "" : ""}`}>
+                    <span className={pf.infoLabel}>{label}</span>
+                    {isEditing ? (
                       <Input
-                        type={showPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                        className="input-focus"
+                        type={key === "email" ? "email" : "text"}
+                        value={edited[key]}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (key === "phone" && !/^[\d+\-\s()]*$/.test(v)) return;
+                          setEdited(p => ({ ...p, [key]: v }));
+                        }}
                       />
-                    </div>
-                  </div>
-
-                  <Button
-                    className="btn-primary"
-                    onClick={changePassword}
-                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                  >
-                    {changingPassword ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <Lock className="h-4 w-4 mr-2" />
+                      <span className={pf.infoValue}><Icon size={15} />{value || "—"}</span>
                     )}
-                    Change Password
+                  </label>
+                ))}
+              </div>
+              {isEditing && (
+                <div className={pf.formActions}>
+                  <Button variant="outline" size="sm" disabled={savingProfile} onClick={() => setIsEditing(false)}><X className="h-4 w-4 mr-2" />Cancel</Button>
+                  <Button size="sm" disabled={savingProfile} onClick={saveProfile}>
+                    {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}Save changes
                   </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              )}
+            </Panel>
 
-            {/* Performance Tab */}
-            <TabsContent value="performance" className={tabContentShell}>
-              {/* Performance Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="border-0 shadow-sm overflow-hidden relative">
-                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <div className="text-3xl font-bold mb-1">{targetsSummary.avgPerformance}%</div>
-                        <div className="text-white/90 font-medium">Performance Score</div>
-                      </div>
-                      <TrendingUp className="h-8 w-8 text-white/80" />
+            <Panel title="Employment" icon={BriefcaseBusiness} sub={staffProfile ? "As recorded by your gym" : "Not linked to a staff record"}>
+              {staffProfile ? (
+                <div className={pf.info}>
+                  {([
+                    ["Employee ID", staffProfile.staff_id || "—"],
+                    ["Role", staffProfile.role || "—"],
+                    ["Department", staffProfile.department || "—"],
+                    ["Branch", staffProfile.branch || "—"],
+                    ["Joined", joinDate ? format(joinDate, "d MMM yyyy") : "—"],
+                    ["Status", staffProfile.status ? staffProfile.status.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase()) : "—"],
+                  ] as const).map(([label, value]) => (
+                    <div key={label} className={pf.infoItem}>
+                      <span className={pf.infoLabel}>{label}</span>
+                      <span className={pf.infoValue} style={{ textTransform: label === "Role" ? "capitalize" : undefined }}>{value}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
+              ) : (
+                <Empty icon={BriefcaseBusiness} title="No staff record" text={`You're signed in as ${displayRole || "a user"}. Employment details, shifts and payslips appear once this login is linked to a staff member.`} />
+              )}
+            </Panel>
+          </div>
 
-                <Card className="border-0 shadow-sm overflow-hidden relative">
-                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <div className="text-3xl font-bold mb-1"><CurrencyGlyph /> {targetsSummary.revenueAchieved.toLocaleString()}</div>
-                        <div className="text-white/90 font-medium">Revenue Achieved</div>
-                      </div>
-                      <CircleDollarSign className="h-8 w-8 text-white/80" />
+          <Panel
+            title="My attendance" icon={Clock}
+            sub={attendance?.linked ? `${format(new Date(), "MMMM yyyy")} so far · from your clock-ins and shift` : "Shift attendance for staff members"}
+          >
+            {!attendance ? (
+              <div className={styles.empty}><Loader2 className="h-5 w-5 animate-spin" /></div>
+            ) : !attendance.linked ? (
+              <Empty icon={Clock} title="No attendance to show" text="Attendance is tracked for logins linked to a staff record with a shift." />
+            ) : !attendance.days || attendance.days.every(d => d.status === "No Shift") ? (
+              <Empty icon={Clock} title="No shift assigned" text="Once a shift is assigned in Shifts & Schedules, your days, hours and lateness show here." />
+            ) : (
+              <>
+                <div className={rs.kpis4}>
+                  <Tile icon={UserCheck} tone="green" label="Present" value={String(attSummary?.present ?? 0)} hint={`of ${(attSummary?.scheduled_days ?? 0) - (attSummary?.upcoming_days ?? 0)} days so far`} />
+                  <Tile icon={X} tone="red" label="Absent" value={String(attSummary?.absent ?? 0)} hint={attSummary?.unpaid_leave ? `${attSummary.unpaid_leave} unpaid leave` : "days"} />
+                  <Tile icon={Clock} tone="amber" label="Late arrivals" value={String(attSummary?.late_count ?? 0)} hint="days" />
+                  <Tile icon={TrendingUp} tone="blue" label="Hours worked" value={`${attSummary?.actual_hours ?? 0}h`} hint={attSummary?.ot_hours ? `${attSummary.ot_hours}h overtime` : "this month"} />
+                </div>
+                <div className={pf.days}>
+                  {[...attendance.days].filter(d => d.status !== "No Shift").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map(d => (
+                    <div key={d.date} className={pf.day}>
+                      <span className={pf.dayDate}>{format(new Date(`${d.date}T00:00:00`), "EEE d MMM")}</span>
+                      <span className={pf.dayTimes}>
+                        {d.actual_in ? `${d.actual_in} – ${d.actual_out ?? "…"}` : d.scheduled ? `Shift ${d.scheduled_in}–${d.scheduled_out}` : "Day off"}
+                        {d.worked_minutes ? ` · ${Math.floor(d.worked_minutes / 60)}h ${d.worked_minutes % 60}m` : ""}
+                        {d.late_minutes ? ` · ${d.late_minutes} min late` : ""}
+                      </span>
+                      <span className={styles.status} data-tone={STATUS_TONE[d.status] ?? "gray"}
+                        style={{ ["--st" as any]: `var(--tone)` }}>{d.status}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
+              </>
+            )}
+          </Panel>
+        </div>
+      )}
 
-                <Card className="border-0 shadow-sm overflow-hidden relative">
-                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <div className="text-3xl font-bold mb-1">{targetsSummary.sessionsAchieved}</div>
-                        <div className="text-white/90 font-medium">Sessions Completed</div>
-                      </div>
-                      <Dumbbell className="h-8 w-8 text-white/80" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm overflow-hidden relative">
-                  <div className="absolute inset-0 bg-gradient-primary opacity-95"></div>
-                  <CardContent className="p-6 relative z-10">
-                    <div className="flex items-center justify-between text-white">
-                      <div>
-                        <div className="text-3xl font-bold mb-1">{targetsSummary.newClientsAchieved}</div>
-                        <div className="text-white/90 font-medium">New Clients Acquired</div>
-                      </div>
-                      <Users className="h-8 w-8 text-white/80" />
-                    </div>
-                  </CardContent>
-                </Card>
+      {/* ── Performance ── */}
+      {activeTab === "performance" && (
+        <div className={rs.tabBody} key="performance">
+          {perfState === "loading" ? (
+            <div className={`${styles.card} ${styles.empty}`}><Loader2 className="h-5 w-5 animate-spin" />Loading your performance…</div>
+          ) : perfState === "error" || !performance ? (
+            <div className={styles.card}>
+              <Empty icon={Activity} title="Couldn't load your performance" text="Something went wrong while calculating your figures."
+                action={<Button variant="outline" size="sm" onClick={loadPerformance}><RefreshCw className="h-4 w-4 mr-2" />Try again</Button>} />
+            </div>
+          ) : (
+            <>
+              {!staffProfile && (
+                <div className={pf.notice}>
+                  <Info size={16} />
+                  <span>These figures come from the activity recorded under your login — receipts, leads and follow-ups you created and POS sales you rang up.</span>
+                </div>
+              )}
+              <div className={rs.kpis4}>
+                <Tile icon={CircleDollarSign} tone="green" label="Revenue" value={money(performance.revenue_target.achieved)}
+                  delta={<Delta pct={performance.summary.growth_percentage} />}
+                  hint={performance.revenue_target.target > 0 ? `${performance.revenue_target.percentage}% of ${money(performance.revenue_target.target)}` : "vs last month"} />
+                <Tile icon={UserCheck} tone="blue" label="Conversions" value={String(performance.conversion_target.achieved)}
+                  hint={performance.conversion_target.target > 0 ? `${performance.conversion_target.percentage}% of ${performance.conversion_target.target}` : "no target set"} />
+                <Tile icon={Users} tone="violet" label="Leads" value={String(performance.summary.lead_count)} hint={`${performance.breakdown.conversion_rate}% converted`} />
+                <Tile icon={Trophy} tone="amber" label="Member rating" value={performance.summary.rating > 0 ? `${performance.summary.rating} / 5` : "—"}
+                  hint={performance.summary.rating > 0 ? "from workout feedback" : "no ratings yet"} />
               </div>
 
-              {/* Performance Charts */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary">Performance Trends</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex items-center justify-center bg-gradient-light rounded-lg">
-                    <div className="text-center">
-                      <PieChart className="h-16 w-16 text-primary mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-primary mb-2">Performance Analytics</h3>
-                      <p className="text-gray-600">Detailed performance charts and trends coming soon</p>
-                    </div>
+              <div className={styles.row2}>
+                <Panel title="Last 6 months" icon={TrendingUp} sub="Revenue (bars) and conversions (line) credited to you">
+                  <div className={styles.chart}>
+                    <ResponsiveContainer>
+                      <ComposedChart data={performance.trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid vertical={false} stroke="#e9e8e3" />
+                        <XAxis dataKey="label" tick={{ fill: "#898781", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#e9e8e3" }} />
+                        <YAxis yAxisId="rev" tick={{ fill: "#898781", fontSize: 11 }} tickLine={false} axisLine={false} width={64}
+                          tickFormatter={v => formatCurrency(Number(v), { notation: "compact", maximumFractionDigits: 1 } as Intl.NumberFormatOptions)} />
+                        <YAxis yAxisId="conv" orientation="right" allowDecimals={false} tick={{ fill: "#898781", fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
+                        <Tooltip formatter={(v: number, name: string) => name === "Revenue" ? money(v) : v} />
+                        <Bar yAxisId="rev" dataKey="revenue" name="Revenue" fill="#2a78d6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        <Line yAxisId="conv" type="monotone" dataKey="conversions" name="Conversions" stroke="#eb6834" strokeWidth={2.5} dot={{ r: 3 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Target Achievement Breakdown */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary">Target Achievement Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-primary mb-2">
-                        {targetsSummary.revenueTarget > 0 ? Math.round((targetsSummary.revenueAchieved / targetsSummary.revenueTarget) * 100) : 0}%
+                </Panel>
+                <Panel title="Quality" icon={ShieldCheck} sub="How well leads and follow-ups turn out">
+                  {([
+                    ["Lead conversion", performance.breakdown.conversion_rate, "#2a78d6"],
+                    ["Follow-ups completed", performance.breakdown.follow_up_completion, "#1baf7a"],
+                    ["Member satisfaction", performance.breakdown.customer_satisfaction, "#6250d6"],
+                  ] as const).map(([label, value, color]) => (
+                    <div key={label}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", marginBottom: 6 }}>
+                        <span>{label}</span><b>{value}%</b>
                       </div>
-                      <div className="text-sm font-medium">Revenue Target Achieved</div>
-                      <div className="text-xs text-gray-600">
-                        <CurrencyGlyph /> {targetsSummary.revenueAchieved.toLocaleString()} of <CurrencyGlyph /> {targetsSummary.revenueTarget.toLocaleString()}
-                      </div>
+                      <Meter value={value} color={color} />
                     </div>
+                  ))}
+                  {performance.motivation?.message && (
+                    <div className={pf.notice} style={{ ["--tone" as any]: performance.motivation.status === "AT_RISK" ? "#d03b3b" : performance.motivation.status === "ACHIEVED" ? "#0ca30c" : "var(--primary)" }}>
+                      <Target size={16} /><span>{performance.motivation.message}</span>
+                    </div>
+                  )}
+                </Panel>
+              </div>
 
-                    <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-primary mb-2">
-                        {targetsSummary.completed}/{targetsSummary.total}
-                      </div>
-                      <div className="text-sm font-medium">Targets Completed</div>
-                      <div className="text-xs text-gray-600">across all assigned periods</div>
-                    </div>
-
-                    <div className="text-center p-4 bg-gradient-light rounded-lg">
-                      <div className="text-2xl font-bold text-primary mb-2">{targetsSummary.sessionsAchieved}</div>
-                      <div className="text-sm font-medium">Sessions Logged</div>
-                      <div className="text-xs text-gray-600">against target sessions</div>
-                    </div>
+              {performance.leaderboard.length > 0 && (
+                <Panel title="Branch leaderboard" icon={Trophy} sub={`${performance.period.label} · ranked by conversions, then revenue`}>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>#</th><th>Staff member</th><th className={styles.num}>Conversions</th><th className={styles.num}>Revenue</th></tr></thead>
+                      <tbody>
+                        {performance.leaderboard.map(l => (
+                          <tr key={l.staff_id} style={l.current_user ? { background: "color-mix(in srgb, var(--primary) 7%, transparent)" } : undefined}>
+                            <td style={{ fontWeight: 700 }}>{l.rank}</td>
+                            <td style={{ fontWeight: l.current_user ? 700 : 500 }}>{l.staff_name}{l.current_user && <span className={pf.pill} style={{ marginLeft: 8 }}>You</span>}</td>
+                            <td className={styles.num}>{l.conversion_count}</td>
+                            <td className={styles.num}>{money(l.revenue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </Panel>
+              )}
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Button variant="outline" size="sm" onClick={() => onNavigate?.("my-performance")}><Activity className="h-4 w-4 mr-2" />Open full performance page</Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
-            {/* Targets Tab */}
-            <TabsContent value="targets" className={tabContentShell}>
-              {/* Current Targets */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-primary">Current Targets</CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => onNavigate?.('my-targets')}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      View All
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {loadingTargets ? (
-                    <div className="flex items-center justify-center py-10 text-gray-500">
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Loading targets...
-                    </div>
-                  ) : myTargets.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500">
-                      <Target className="h-10 w-10 mx-auto mb-2 text-gray-300" />
-                      No targets assigned yet. Your admin hasn't set any targets for you.
-                    </div>
-                  ) : (
-                    myTargets.map((target) => {
-                      const status = targetStatus(target);
+      {/* ── Targets ── */}
+      {activeTab === "targets" && (
+        <div className={rs.tabBody} key="targets">
+          {!staffProfile && !loadingProfile ? (
+            <div className={styles.card}>
+              <Empty icon={Target} title="No targets for this login" text="Targets are set per staff member in Set Targets. Link this login to a staff record to receive targets." />
+            </div>
+          ) : (
+            <>
+              <div className={rs.kpis4}>
+                <Tile icon={Target} tone="blue" label="Targets" value={String(targetsSummary.total)} hint="assigned to you" />
+                <Tile icon={Activity} tone="amber" label="In progress" value={String(targetsSummary.active)} hint="not yet met" />
+                <Tile icon={Trophy} tone="green" label="Met" value={String(targetsSummary.completed)} hint="100% or more" />
+                <Tile icon={TrendingUp} tone="violet" label="Success rate" value={targetsSummary.total ? `${Math.round(targetsSummary.completed / targetsSummary.total * 100)}%` : "—"} hint="targets met" />
+              </div>
+              <Panel title="My targets" icon={Target} sub="Revenue, sessions and new-client goals set for you"
+                action={<Button variant="outline" size="sm" onClick={() => onNavigate?.("my-targets")}>Open My Targets</Button>}>
+                {loadingTargets ? (
+                  <div className={styles.empty}><Loader2 className="h-5 w-5 animate-spin" />Loading targets…</div>
+                ) : myTargets.length === 0 ? (
+                  <Empty icon={Target} title="No targets yet" text="Your manager hasn't set any targets for you." />
+                ) : (
+                  <div className={pf.targets}>
+                    {myTargets.map(t => {
+                      const st = targetStatus(t);
+                      const pct = Number(t.percentage ?? 0);
                       return (
-                        <div key={target.id} className="p-4 bg-gradient-light rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center space-x-3">
-                              <div className="bg-gradient-primary text-white rounded-full p-2">
-                                <Target className="h-4 w-4" />
-                              </div>
-                              <div>
-                                <div className="font-medium">{targetLabel(target)}</div>
-                                <div className="text-sm text-gray-600">
-                                  <CurrencyGlyph /> {Number(target.revenue_achieved || 0).toLocaleString()} of <CurrencyGlyph /> {Number(target.revenue_target || 0).toLocaleString()} revenue
-                                  {target.sessions_target ? ` · ${target.sessions_achieved || 0}/${target.sessions_target} sessions` : ''}
-                                  {target.new_clients_target ? ` · ${target.new_clients_achieved || 0}/${target.new_clients_target} new clients` : ''}
-                                </div>
+                        <div key={t.id} className={pf.target}>
+                          <div className={pf.targetHead}>
+                            <div>
+                              <div className={pf.targetTitle}>{targetLabel(t)}</div>
+                              <div className={pf.targetSub}>
+                                {money(t.revenue_achieved)} of {money(t.revenue_target)} revenue
+                                {t.sessions_target ? ` · ${t.sessions_achieved || 0}/${t.sessions_target} sessions` : ""}
+                                {t.new_clients_target ? ` · ${t.new_clients_achieved || 0}/${t.new_clients_target} new clients` : ""}
                               </div>
                             </div>
-                            <Badge className={`${
-                              status === 'completed' ? 'bg-green-100 text-green-800' :
-                              status === 'overdue' ? 'bg-red-100 text-red-800' :
-                              'bg-blue-100 text-blue-800'
-                            }`}>
-                              {status}
-                            </Badge>
+                            <span className={pf.pill} style={{ ["--tone" as any]: st.tone === "green" ? "#0ca30c" : st.tone === "red" ? "#d03b3b" : "#2a78d6" }}>{st.label}</span>
                           </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span>Revenue progress</span>
-                              <span className="font-medium">{target.percentage ?? 0}%</span>
-                            </div>
-                            <Progress value={Math.min(target.percentage ?? 0, 100)} className="h-2" />
-                            <div className="text-xs text-gray-600">
-                              {target.end_date
-                                ? `Deadline: ${format(new Date(target.end_date), 'MMM dd, yyyy')}`
-                                : `Period: ${target.month ? `${MONTH_NAMES[target.month - 1]} ${target.year}` : target.year}`}
-                            </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ flex: 1 }}><Meter value={pct} color={pct >= 100 ? "#0ca30c" : undefined} /></div>
+                            <b style={{ fontSize: "var(--text-sm)", minWidth: "3rem", textAlign: "right" }}>{Math.round(pct)}%</b>
+                          </div>
+                          <div className={pf.targetSub}>
+                            {t.end_date ? `Deadline ${fmtDate(t.end_date)}` : `Period ${t.month ? `${MONTH_NAMES[t.month - 1]} ${t.year}` : t.year}`}
                           </div>
                         </div>
                       );
-                    })
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Targets Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className={panelCardShell}>
-                  <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">{targetsSummary.active}</div>
-                    <div className="text-sm text-gray-600">Active Targets</div>
-                  </CardContent>
-                </Card>
-
-                <Card className={panelCardShell}>
-                  <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-green-600 mb-2">{targetsSummary.completed}</div>
-                    <div className="text-sm text-gray-600">Completed</div>
-                  </CardContent>
-                </Card>
-
-                <Card className={panelCardShell}>
-                  <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">{Math.round(targetsProgress)}%</div>
-                    <div className="text-sm text-gray-600">Success Rate</div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            {/* Transactions Tab */}
-            <TabsContent value="transactions" className={tabContentShell}>
-              {/* Recent Transactions */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-primary">Recent Transactions</CardTitle>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4 mr-2" />
-                        Export CSV
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Export PDF
-                      </Button>
-                    </div>
+                    })}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {recentTransactions.map((transaction) => (
-                      <div key={transaction.id} className="flex items-center justify-between p-4 bg-gradient-light rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          {getTransactionIcon(transaction.type)}
-                          <div>
-                            <div className="font-medium">{transaction.description}</div>
-                            <div className="text-sm text-gray-600">
-                              {format(transaction.date, 'MMM dd, yyyy • HH:mm')}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {transaction.amount && (
-                            <div className={`font-semibold ${
-                              transaction.type === 'purchase' ? 'text-red-600' : 'text-green-600'
-                            }`}>
-                              {transaction.type === 'purchase' ? '-' : '+'}
-                              <CurrencyGlyph /> {transaction.amount.toLocaleString()}
-                            </div>
-                          )}
-                          <Badge className={`text-xs ${
-                            transaction.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {transaction.status}
-                          </Badge>
-                        </div>
-                      </div>
+                )}
+              </Panel>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Transactions ── */}
+      {activeTab === "transactions" && (
+        <div className={rs.tabBody} key="transactions">
+          <div className={`${styles.card} ${styles.filters}`}>
+            <div className={styles.chips} role="group" aria-label="Period">
+              {[30, 90, 365].map(d => (
+                <button key={d} type="button" className={styles.chip} data-active={txDays === d} aria-pressed={txDays === d} onClick={() => setTxDays(d)}>
+                  {d === 365 ? "Last 12 months" : `Last ${d} days`}
+                </button>
+              ))}
+            </div>
+            <div className={styles.filterEnd} style={{ gap: 8 }}>
+              <Button variant="outline" size="sm" onClick={() => loadTransactions(txDays)} disabled={txState === "loading"}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${txState === "loading" ? "animate-spin" : ""}`} />Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportTransactions} disabled={!tx}><Download className="h-4 w-4 mr-2" />Export CSV</Button>
+            </div>
+          </div>
+
+          {txState === "error" ? (
+            <div className={styles.card}>
+              <Empty icon={Wallet} title="Couldn't load your transactions" text="Please try again in a moment."
+                action={<Button variant="outline" size="sm" onClick={() => loadTransactions(txDays)}><RefreshCw className="h-4 w-4 mr-2" />Try again</Button>} />
+            </div>
+          ) : !tx ? (
+            <div className={`${styles.card} ${styles.empty}`}><Loader2 className="h-5 w-5 animate-spin" />Loading…</div>
+          ) : (
+            <>
+              <div className={rs.kpis4}>
+                <Tile icon={Wallet} tone="green" label="Salary received" value={tx.linked ? money(tx.summary.salary_paid_ytd) : "—"} hint={tx.linked ? `${new Date().getFullYear()} so far` : "no staff record"} />
+                <Tile icon={CircleDollarSign} tone="orange" label="Advance owed" value={tx.linked ? money(tx.summary.advance_balance) : "—"} hint="still to be recovered" />
+                <Tile icon={ReceiptIcon} tone="blue" label="Collected by you" value={money(tx.summary.collected)} hint={`${tx.summary.receipt_count} receipt${tx.summary.receipt_count === 1 ? "" : "s"}`} />
+                <Tile icon={ShoppingCart} tone="violet" label="POS sales" value={money(tx.summary.pos_net)} hint={`${tx.summary.pos_count} sale${tx.summary.pos_count === 1 ? "" : "s"}, net of refunds`} />
+              </div>
+
+              <Panel title="Activity" icon={Wallet}
+                sub={txView === "salary" || txView === "advances" ? "All time" : `Recorded under your login · last ${txDays === 365 ? "12 months" : `${txDays} days`}`}
+                action={
+                  <div className={styles.seg} role="tablist" aria-label="Transaction type">
+                    {([
+                      ["receipts", `Receipts (${tx.receipts.length})`],
+                      ["pos", `POS sales (${tx.pos_sales.length})`],
+                      ["salary", `Salary (${tx.salary_payments.length})`],
+                      ["advances", `Advances (${tx.advances.length})`],
+                    ] as const).map(([v, label]) => (
+                      <button key={v} type="button" role="tab" aria-selected={txView === v} data-active={txView === v} className={styles.segBtn} onClick={() => setTxView(v)}>{label}</button>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                }
+              >
+                {txView === "salary" && (!tx.linked ? (
+                  <Empty icon={Wallet} title="No payslips for this login" text="Salary payments are recorded against a staff member. Link this login to a staff record to see yours." />
+                ) : tx.salary_payments.length === 0 ? (
+                  <Empty icon={Wallet} title="No salary payments yet" text="Salary paid to you through Salary Payments shows here." />
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Month</th><th>Paid on</th><th>Method</th><th className={styles.num}>Gross</th><th className={styles.num}>Deductions</th><th className={styles.num}>Net paid</th></tr></thead>
+                      <tbody>
+                        {tx.salary_payments.map(p => (
+                          <tr key={p.id}>
+                            <td style={{ fontWeight: 600 }}>{p.month} {p.year}</td>
+                            <td>{fmtDate(p.payment_date)}</td>
+                            <td className={styles.muted}>{p.method ?? "—"}</td>
+                            <td className={styles.num}>{p.gross != null ? money2(p.gross) : "—"}</td>
+                            <td className={styles.num}>{p.total_deductions != null ? money2(p.total_deductions) : "—"}</td>
+                            <td className={styles.num} style={{ fontWeight: 700 }}>{money2(p.net_salary)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
 
-              {/* Transaction Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className={panelCardShell}>
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600 mb-1">4,785</div>
-                    <div className="text-sm text-gray-600">Total Earnings ({currencySymbol})</div>
-                    <div className="text-xs text-green-600">This month</div>
-                  </CardContent>
-                </Card>
-                
-                <Card className={panelCardShell}>
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600 mb-1">156</div>
-                    <div className="text-sm text-gray-600">Transactions</div>
-                    <div className="text-xs text-blue-600">This month</div>
-                  </CardContent>
-                </Card>
-                
-                <Card className={panelCardShell}>
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-600 mb-1">89</div>
-                    <div className="text-sm text-gray-600">Purchases</div>
-                    <div className="text-xs text-purple-600">This month</div>
-                  </CardContent>
-                </Card>
-                
-                <Card className={panelCardShell}>
-                  <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600 mb-1">2</div>
-                    <div className="text-sm text-gray-600">Bonuses</div>
-                    <div className="text-xs text-yellow-600">This month</div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+                {txView === "advances" && (!tx.linked ? (
+                  <Empty icon={CircleDollarSign} title="No advances for this login" text="Salary advances are recorded against a staff member." />
+                ) : tx.advances.length === 0 ? (
+                  <Empty icon={CircleDollarSign} title="No salary advances" text="Advances you request and their repayments show here." />
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Advance</th><th>Requested on</th><th>Status</th><th className={styles.num}>Approved</th><th className={styles.num}>Recovered</th><th className={styles.num}>Balance</th></tr></thead>
+                      <tbody>
+                        {tx.advances.map(a => (
+                          <tr key={a.id}>
+                            <td style={{ fontWeight: 600 }}>ADV-{a.id}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{a.advance_type ?? "Advance"}{a.installment_count ? ` · ${a.installment_count} installment${a.installment_count > 1 ? "s" : ""}` : ""}</div></td>
+                            <td>{fmtDate(a.request_date)}</td>
+                            <td><span className={pf.pill} style={{ ["--tone" as any]: a.status === "Fully Repaid" ? "#0ca30c" : a.status === "Rejected" ? "#d03b3b" : a.status === "Active" ? "#2a78d6" : "#c98a00" }}>{a.status ?? "—"}</span></td>
+                            <td className={styles.num}>{a.approved_amount ? money2(a.approved_amount) : "—"}</td>
+                            <td className={styles.num}>{money2(a.total_deducted)}</td>
+                            <td className={styles.num} style={{ fontWeight: 700 }}>{money2(a.balance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
 
-            {/* Settings Tab */}
-            <TabsContent value="settings" className={tabContentShell}>
-              {/* Notification Preferences */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary flex items-center space-x-2">
-                    <Bell className="h-5 w-5" />
-                    <span>Notification Preferences</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Email Notifications</div>
-                        <div className="text-sm text-gray-600">Receive notifications via email</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.email}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, email: checked }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Push Notifications</div>
-                        <div className="text-sm text-gray-600">Receive push notifications on your device</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.push}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, push: checked }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">SMS Notifications</div>
-                        <div className="text-sm text-gray-600">Receive notifications via SMS</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.sms}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, sms: checked }))
-                        }
-                      />
-                    </div>
+                {txView === "receipts" && (tx.receipts.length === 0 ? (
+                  <Empty icon={ReceiptIcon} title="No receipts recorded" text="Member payments you take at the front desk show here." />
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Receipt</th><th>Date</th><th>Member</th><th>For</th><th>Method</th><th>Status</th><th className={styles.num}>Paid</th></tr></thead>
+                      <tbody>
+                        {tx.receipts.map(r => (
+                          <tr key={r.id}>
+                            <td style={{ fontWeight: 600 }}>{r.receipt_no ?? `#${r.id}`}</td>
+                            <td>{fmtDate(r.date)}</td>
+                            <td>{r.member_name ?? "—"}</td>
+                            <td className={styles.muted}>{r.plan_name ?? r.transaction_type ?? "—"}</td>
+                            <td className={styles.muted}>{r.payment_method ?? "—"}</td>
+                            <td><span className={pf.pill} style={{ ["--tone" as any]: r.status === "Paid" ? "#0ca30c" : r.status === "Partial" ? "#c98a00" : "#64748b" }}>{r.status ?? "—"}</span></td>
+                            <td className={styles.num} style={{ fontWeight: 700 }}>{money2(r.paid_amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                ))}
 
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-primary">Notification Categories</h4>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Performance Updates</div>
-                        <div className="text-sm text-gray-600">Updates about your performance metrics</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.performance}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, performance: checked }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Target Reminders</div>
-                        <div className="text-sm text-gray-600">Reminders about upcoming target deadlines</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.targets}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, targets: checked }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">Payroll Notifications</div>
-                        <div className="text-sm text-gray-600">Updates about salary and payment processing</div>
-                      </div>
-                      <Switch 
-                        checked={notificationSettings.payroll}
-                        onCheckedChange={(checked) => 
-                          setNotificationSettings(prev => ({ ...prev, payroll: checked }))
-                        }
-                      />
-                    </div>
+                {txView === "pos" && (tx.pos_sales.length === 0 ? (
+                  <Empty icon={ShoppingCart} title="No POS sales" text="Completed sales you ring up at the point of sale show here." />
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead><tr><th>Sale</th><th>Date</th><th>Customer</th><th>Method</th><th className={styles.num}>Total</th><th className={styles.num}>Refunded</th><th className={styles.num}>Net</th></tr></thead>
+                      <tbody>
+                        {tx.pos_sales.map(s => (
+                          <tr key={s.id}>
+                            <td style={{ fontWeight: 600 }}>{s.transaction_number ?? `#${s.id}`}</td>
+                            <td>{fmtDate(s.date, true)}</td>
+                            <td>{s.member_name || "Walk-in"}</td>
+                            <td className={styles.muted}>{s.payment_method ?? "—"}</td>
+                            <td className={styles.num}>{money2(s.total)}</td>
+                            <td className={styles.num}>{Number(s.refunded) > 0 ? money2(s.refunded) : "—"}</td>
+                            <td className={styles.num} style={{ fontWeight: 700 }}>{money2(s.net)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Linked Accounts */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary flex items-center space-x-2">
-                    <Link className="h-5 w-5" />
-                    <span>Linked Accounts</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gradient-light rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Mail className="h-5 w-5 text-primary" />
-                      <div>
-                        <div className="font-medium">Email Account</div>
-                        <div className="text-sm text-gray-600">{displayEmail || '—'}</div>
-                      </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gradient-light rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Smartphone className="h-5 w-5 text-primary" />
-                      <div>
-                        <div className="font-medium">Mobile Device</div>
-                        <div className="text-sm text-gray-600">iPhone 15 Pro</div>
-                      </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 bg-gradient-light rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                      <div>
-                        <div className="font-medium">Bank Account</div>
-                        <div className="text-sm text-gray-600">ADCB ****1234</div>
-                      </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Privacy Settings */}
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle className="text-primary flex items-center space-x-2">
-                    <Shield className="h-5 w-5" />
-                    <span>Privacy Settings</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">Profile Visibility</div>
-                      <div className="text-sm text-gray-600">Allow others to view your profile</div>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">Performance Visibility</div>
-                      <div className="text-sm text-gray-600">Show performance metrics to managers</div>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">Activity Status</div>
-                      <div className="text-sm text-gray-600">Show when you're online or active</div>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                ))}
+              </Panel>
+            </>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* ── Settings ── */}
+      {activeTab === "settings" && (
+        <div className={rs.tabBody} key="settings">
+          <div className={pf.grid2}>
+            <Panel title="Change password" icon={Lock} sub="Use at least 8 characters; a mix of letters, numbers and symbols is stronger">
+              <label className={pf.infoItem}>
+                <span className={pf.infoLabel}>Current password</span>
+                <div className={pf.pwField}>
+                  <Input type={showPassword ? "text" : "password"} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} autoComplete="current-password" />
+                  <button type="button" className={pf.pwToggle} onClick={() => setShowPassword(s => !s)} aria-label={showPassword ? "Hide passwords" : "Show passwords"}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </label>
+              <label className={pf.infoItem}>
+                <span className={pf.infoLabel}>New password</span>
+                <Input type={showPassword ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)} autoComplete="new-password" />
+                {newPassword && (
+                  <>
+                    <div className={pf.strength} aria-hidden>
+                      {[1, 2, 3, 4].map(i => <span key={i} data-on={strength >= i} style={{ ["--st" as any]: strengthColor }} />)}
+                    </div>
+                    <span className={styles.note}>{strengthText}</span>
+                  </>
+                )}
+              </label>
+              <label className={pf.infoItem}>
+                <span className={pf.infoLabel}>Confirm new password</span>
+                <Input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+                {confirmPassword && confirmPassword !== newPassword && <span className={styles.note} style={{ color: "var(--bad-ink)" }}>Doesn't match the new password</span>}
+              </label>
+              <div className={pf.formActions}>
+                <Button size="sm" onClick={changePassword} disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
+                  {changingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Lock className="h-4 w-4 mr-2" />}Change password
+                </Button>
+              </div>
+            </Panel>
+
+            <Panel title="Account" icon={ShieldCheck} sub="Your login and session">
+              <div>
+                <div className={pf.settingRow}>
+                  <div><div className={pf.settingTitle}>Signed in as</div><div className={pf.settingText}>{displayEmail || displayName}{displayRole ? ` · ${displayRole}` : ""}</div></div>
+                </div>
+                <div className={pf.settingRow}>
+                  <div><div className={pf.settingTitle}>Profile picture</div><div className={pf.settingText}>{staffProfile ? "Saved on your staff record." : "Saved on this device for your login."}</div></div>
+                  <Button variant="outline" size="sm" onClick={() => setAvatarOpen(true)}><Camera className="h-4 w-4 mr-2" />Change</Button>
+                </div>
+                <div className={pf.settingRow}>
+                  <div><div className={pf.settingTitle}>Notifications</div><div className={pf.settingText}>Alerts for approvals, payments, follow-ups and more.</div></div>
+                  <Button variant="outline" size="sm" onClick={() => onNavigate?.("notifications")}><Bell className="h-4 w-4 mr-2" />Open</Button>
+                </div>
+                <div className={pf.settingRow}>
+                  <div><div className={pf.settingTitle}>Sign out</div><div className={pf.settingText}>End your session on this device.</div></div>
+                  <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4 mr-2" />Sign out</Button>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--text-lg)" }}>
+            <Palette size={18} className="text-primary" />Appearance
+          </div>
+          <ThemeSettings />
+        </div>
+      )}
+
+      {/* Profile picture */}
+      <Dialog open={avatarOpen} onOpenChange={o => !uploadingPhoto && setAvatarOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update profile picture</DialogTitle>
+            <DialogDescription>Square images work best. It's resized to 400 × 400.</DialogDescription>
+          </DialogHeader>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoChosen} />
+          <button type="button" className={pf.upload} disabled={uploadingPhoto} onClick={() => fileInputRef.current?.click()}>
+            {uploadingPhoto ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <Camera className="h-10 w-10 text-primary" />}
+            <span style={{ fontWeight: 600 }}>{uploadingPhoto ? "Uploading…" : "Choose a photo"}</span>
+            <span className={styles.note}>PNG or JPG, up to 5 MB</span>
+          </button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

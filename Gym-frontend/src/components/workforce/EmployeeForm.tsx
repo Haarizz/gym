@@ -618,7 +618,7 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
               ))}
             </div>
             <Line label="Hours" value={`${selectedShift.check_in} – ${selectedShift.check_out}${selectedShift.overnight ? " (overnight)" : ""}`} />
-            <Line label="Break" value={selectedShift.break_start ? `${selectedShift.break_start} – ${selectedShift.break_end}` : "None"} />
+            <Line label="Break" value={selectedShift.break_minutes > 0 ? `${minutesLabel(selectedShift.break_minutes)} (any time)` : "None"} />
             <Line label="Net working time" value={`${minutesLabel(selectedShift.net_minutes)} / day`} />
             <Line label="Grace" value={`+${selectedShift.grace_in_minutes}m in · −${selectedShift.grace_out_minutes}m out`} />
             <Line label="Overtime" value={selectedShift.overtime_policy === "eligible" ? "Paid automatically" : selectedShift.overtime_policy === "approval" ? "Needs manager approval" : "Not eligible"} />

@@ -106,7 +106,7 @@ interface MemberHistoryAnalyticsProps {
 
 const COLORS = ['#0047AB', '#00c5cb', '#4CAF50', '#FFC107', '#F44336'];
 // Sidebar payment-method donut: brand teal + the validated categorical slots used by Analytics.
-const PAYMENT_COLORS = ['#2B7A78', '#2a78d6', '#eb6834', '#6250d6', '#b45309'];
+const PAYMENT_COLORS = ['var(--gb-primary)', '#2a78d6', '#eb6834', '#6250d6', '#b45309'];
 
 // A bare "yyyy-MM-dd" carries no time. new Date() would read it as UTC midnight
 // (5:30 AM in IST, or the previous day west of UTC), so it is parsed as a local
@@ -1028,7 +1028,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <span className={s.actionLabel}>View receipts</span>
                 <ChevronRight className={s.chev} />
               </button>
-              <button type="button" className={s.action} onClick={() => onNavigate?.('members', { tab: 'addons', purchaseAddonFor: memberId })}>
+              <button type="button" className={s.action} onClick={() => onNavigate?.('manage-plans', { tab: 'addons', purchaseAddonFor: memberId })}>
                 <span className={s.actionIcon} data-tone="blue"><ShoppingCart /></span>
                 <span className={s.actionLabel}>Purchase add-on</span>
                 <ChevronRight className={s.chev} />

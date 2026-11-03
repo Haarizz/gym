@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -8,13 +8,15 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Calendar as CalendarIcon, Clock, Users, MapPin, QrCode, Plus, Search, Filter, CheckCircle, AlertCircle, User, UserPlus, Calendar, Dumbbell, Building, Phone, Mail, MessageSquare, Download, RotateCcw, Eye, Edit3, X, Zap, PieChart, ArrowRight } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, MapPin, QrCode, Plus, Search, Filter, CheckCircle, AlertCircle, User, UserPlus, Calendar, Dumbbell, Building, Phone, Mail, MessageSquare, Download, RotateCcw, Eye, Edit3, X, Zap, PieChart, ArrowRight, Check } from "lucide-react";
 import QRCode from "react-qr-code";
 import { toast } from "sonner";
 import { membersService } from "../utils/supabase/members-service";
 import { trainingService, TrainingSessionApi } from "../utils/supabase/training-service";
 import { bookingService, BookingApi } from "../utils/supabase/booking-service";
 import { rewardService, passLabel, type ReferralReward } from "../utils/supabase/reward-service";
+import { MemberAvatar, MemberStatusPill, memberPhoto } from "../components/members/MemberAvatar";
+import bd from "../components/bookings/BookingDialog.module.css";
 
 interface BookingsProps {
   onNavigate?: (section: string) => void;
@@ -27,7 +29,55 @@ interface Member {
   phone: string;
   membershipType: string;
   avatar?: string;
+  /** Member code shown to staff, e.g. MBR-0000000003 */
+  memberCode?: string;
+  status?: string;
+  endDate?: string;
 }
+
+const toBookingMember = (member: any): Member => ({
+  id: member.id,
+  name: member.name ?? "",
+  email: member.email ?? "",
+  phone: member.phone ?? "",
+  membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
+  avatar: memberPhoto(member) ?? undefined,
+  memberCode: member.member_id || undefined,
+  status: member.membership_status || undefined,
+  endDate: member.membership_end_date || undefined,
+});
+
+// Family members get placeholder @family.local emails; don't show those.
+const realEmail = (email?: string) => (email && !email.includes("@family.local") ? email : "");
+
+const memberMetaLine = (m: Member) => [m.memberCode, m.phone, realEmail(m.email)].filter(Boolean).join(" · ");
+
+const formatSessionDate = (value?: string) => {
+  if (!value) return "";
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+};
+
+const memberPlanLine = (m: Member) =>
+  [m.membershipType, m.endDate ? `till ${formatSessionDate(m.endDate)}` : ""].filter(Boolean).join(" · ");
+
+/** Wraps the first case-insensitive occurrence of the query in a <mark>. */
+const highlightMatch = (text: string, query: string): React.ReactNode => {
+  const q = query.trim();
+  if (!q || !text) return text;
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return text;
+  return <>{text.slice(0, i)}<mark className={bd.mark}>{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>;
+};
+
+const BOOKING_STEPS = ["Member or guest", "Session", "Confirm"];
+
+const SESSION_FILTERS: { id: 'all' | 'class' | 'pt' | 'facility'; label: string; icon?: React.ElementType }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'class', label: 'Classes', icon: Users },
+  { id: 'pt', label: 'Personal Training', icon: User },
+  { id: 'facility', label: 'Facility', icon: Building },
+];
 
 interface ClassSchedule {
   id: string;
@@ -182,29 +232,14 @@ export function Bookings({ onNavigate }: BookingsProps) {
 
   const fetchMembers = async () => {
     const result = await membersService.getMembers({}, { limit: 200 });
-    const mapped = result.members.map((member: any) => ({
-      id: member.id,
-      name: member.name ?? "",
-      email: member.email ?? "",
-      phone: member.phone ?? "",
-      membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
-      avatar: member.photo_url || member.photoUrl || undefined
-    }));
-    setMembers(mapped);
+    setMembers(result.members.map(toBookingMember));
   };
 
   useEffect(() => {
     const load = async () => {
       try {
         const result = await membersService.getMembers({}, { limit: 200 });
-        const mappedMembers = result.members.map((member: any) => ({
-          id: member.id,
-          name: member.name ?? "",
-          email: member.email ?? "",
-          phone: member.phone ?? "",
-          membershipType: member.membership_plan || member.membership_type || member.membershipType || "Member",
-          avatar: member.photo_url || member.photoUrl || undefined
-        }));
+        const mappedMembers = result.members.map(toBookingMember);
         setMembers(mappedMembers);
         await Promise.all([fetchSessions(), fetchBookings(mappedMembers)]);
       } catch (error: any) {
@@ -220,17 +255,76 @@ export function Bookings({ onNavigate }: BookingsProps) {
     }
   }, [members]);
 
-  // Filter members based on search. BG_125: members without an email/phone have
-  // null there, which crashed the page on the first keystroke — guard every field.
-  const filteredMembers = useMemo(() => {
+  // Member picker: typing filters the preloaded members instantly, and from 2 characters
+  // also searches the server (debounced) so members beyond the first 200 are found.
+  // BG_125: members without an email/phone have null there — guard every field.
+  const localMemberMatches = useMemo(() => {
     const lowered = searchTerm.trim().toLowerCase();
     if (!lowered) return members;
     return members.filter(member =>
       (member.name ?? "").toLowerCase().includes(lowered) ||
       (member.email ?? "").toLowerCase().includes(lowered) ||
-      (member.phone ?? "").includes(lowered)
+      (member.phone ?? "").includes(lowered) ||
+      (member.memberCode ?? "").toLowerCase().includes(lowered)
     );
   }, [members, searchTerm]);
+  const [remoteMembers, setRemoteMembers] = useState<Member[] | null>(null);
+  const [memberSearching, setMemberSearching] = useState(false);
+  const [activeMemberIndex, setActiveMemberIndex] = useState(0);
+  const memberSearchSeq = useRef(0);
+  useEffect(() => {
+    const q = searchTerm.trim();
+    const seq = ++memberSearchSeq.current;
+    setRemoteMembers(null);
+    if (q.length < 2) { setMemberSearching(false); return; }
+    setMemberSearching(true);
+    const timer = setTimeout(() => {
+      membersService.getMembers({ search: q }, { limit: 20 })
+        .then(res => { if (seq === memberSearchSeq.current) setRemoteMembers(res.members.map(toBookingMember)); })
+        .catch(() => { if (seq === memberSearchSeq.current) setRemoteMembers([]); })
+        .finally(() => { if (seq === memberSearchSeq.current) setMemberSearching(false); });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+  // Server results first (they cover everyone), then any local matches it didn't return.
+  const shownMembers = useMemo(() => {
+    if (!remoteMembers) return localMemberMatches.slice(0, 30);
+    const seen = new Set(remoteMembers.map(m => m.id));
+    return [...remoteMembers, ...localMemberMatches.filter(m => !seen.has(m.id))].slice(0, 30);
+  }, [remoteMembers, localMemberMatches]);
+  useEffect(() => {
+    if (activeMemberIndex >= shownMembers.length) setActiveMemberIndex(0);
+  }, [shownMembers.length, activeMemberIndex]);
+  const focusMemberSearch = () => document.getElementById("booking-member-search")?.focus();
+  const pickMember = (member: Member) => {
+    setSelectedMember(member);
+    setActiveMemberIndex(0);
+  };
+  const handleMemberSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!shownMembers.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const next = (activeMemberIndex + (e.key === "ArrowDown" ? 1 : -1) + shownMembers.length) % shownMembers.length;
+      setActiveMemberIndex(next);
+      document.getElementById(`booking-member-${shownMembers[next].id}`)?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      pickMember(shownMembers[activeMemberIndex] ?? shownMembers[0]);
+    }
+  };
+
+  // Sessions in the booking dialog: own search, soonest first.
+  const [dialogSessionQuery, setDialogSessionQuery] = useState("");
+  const dialogSessions = useMemo(() => {
+    const q = dialogSessionQuery.trim().toLowerCase();
+    return sessions
+      .filter(cls => selectedBookingType === 'all' || cls.type === selectedBookingType)
+      .filter(cls => !q ||
+        cls.name.toLowerCase().includes(q) ||
+        cls.instructor.toLowerCase().includes(q) ||
+        cls.location.toLowerCase().includes(q))
+      .sort((x, y) => `${x.date} ${x.startTime}`.localeCompare(`${y.date} ${y.startTime}`));
+  }, [sessions, selectedBookingType, dialogSessionQuery]);
 
   // Filter classes based on booking type
   const filteredClasses = useMemo(() => {
@@ -457,121 +551,160 @@ export function Bookings({ onNavigate }: BookingsProps) {
               New Booking
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl" style={{ color: 'var(--primary)' }}>
-                Create New Booking
-              </DialogTitle>
-              <DialogDescription>
-                Create a new booking for a member or guest. Follow the step-by-step process to select the member, choose a session, and confirm the booking details.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6">
-              {/* Step Progress */}
-              <div className="flex items-center space-x-2">
-                {[1, 2, 3].map((step) => (
-                  <div key={step} className="flex items-center">
-                    <div 
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium"
-                      style={bookingStep >= step 
-                        ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' } 
-                        : { backgroundColor: 'light-dark(#e5e7eb, var(--border))', color: 'light-dark(#4b5563, oklch(82% 0.026 256.8))' }
-                      }
-                    >
-                      {step}
-                    </div>
-                    {step < 3 && <div className="w-12 h-1" style={{ backgroundColor: bookingStep > step ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))' }} />}
-                  </div>
-                ))}
+          <DialogContent className={bd.dialog}>
+            <div className={bd.head}>
+              <div className={bd.headRow}>
+                <div className={bd.headIcon}><CalendarIcon /></div>
+                <div>
+                  <DialogTitle className={bd.title}>Create New Booking</DialogTitle>
+                  <DialogDescription className={bd.sub}>
+                    Pick who it's for, choose a session, then confirm. A QR pass is created for check-in.
+                  </DialogDescription>
+                </div>
               </div>
+              <div className={bd.stepper} aria-label={`Step ${bookingStep} of 3`}>
+                {BOOKING_STEPS.map((label, i) => {
+                  const step = i + 1;
+                  const state = bookingStep > step ? "done" : bookingStep === step ? "current" : "todo";
+                  return (
+                    <React.Fragment key={label}>
+                      <div className={bd.step} data-state={state}>
+                        <span className={bd.stepDot}>{state === "done" ? <Check /> : step}</span>
+                        <span className={bd.stepLabel}>{label}</span>
+                      </div>
+                      {step < 3 && <span className={bd.stepLine} data-done={bookingStep > step} />}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
 
-              {/* Step 1: Member Selection */}
+            <div className={bd.body}>
+              {/* Step 1: Member or guest */}
               {bookingStep === 1 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">Step 1: Select Member or Guest</h3>
-                  
-                  <div className="flex space-x-4 mb-4">
-                    <Button 
-                      variant={!isGuestBooking ? "default" : "outline"}
-                      onClick={() => setIsGuestBooking(false)}
-                      style={!isGuestBooking ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      Member
-                    </Button>
-                    <Button 
-                      variant={isGuestBooking ? "default" : "outline"}
-                      onClick={() => setIsGuestBooking(true)}
-                      style={isGuestBooking ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Guest
-                    </Button>
+                <>
+                  <div className={bd.segmented} role="group" aria-label="Booking for">
+                    <button type="button" className={bd.segBtn} data-active={!isGuestBooking} aria-pressed={!isGuestBooking} onClick={() => setIsGuestBooking(false)}>
+                      <User /> Member
+                    </button>
+                    <button type="button" className={bd.segBtn} data-active={isGuestBooking} aria-pressed={isGuestBooking} onClick={() => setIsGuestBooking(true)}>
+                      <UserPlus /> Guest
+                    </button>
                   </div>
 
                   {!isGuestBooking ? (
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="Search member by name, email, or phone..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
+                    selectedMember ? (
+                      <div className={bd.picked}>
+                        <MemberAvatar name={selectedMember.name} photo={selectedMember.avatar} size={48} />
+                        <div className={bd.pickedMain}>
+                          <div className={bd.pickedName}>
+                            {selectedMember.name}
+                            {selectedMember.status && <MemberStatusPill status={selectedMember.status} />}
+                          </div>
+                          <p className={bd.pickedMeta}>{memberMetaLine(selectedMember)}</p>
+                          <p className={bd.pickedMeta}>{memberPlanLine(selectedMember)}</p>
+                        </div>
+                        <button type="button" className={bd.linkBtn} onClick={() => { setSelectedMember(null); setTimeout(focusMemberSearch, 0); }}>
+                          Change
+                        </button>
                       </div>
-                      
-                      <div className="max-h-60 overflow-y-auto space-y-2">
-                        {filteredMembers.map((member) => (
-                          <div
-                            key={member.id}
-                            className="p-3 border rounded-lg cursor-pointer transition-all"
-                            style={{
-                              borderColor: selectedMember?.id === member.id ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))',
-                              backgroundColor: selectedMember?.id === member.id ? 'color-mix(in srgb, var(--primary) 6.3%, transparent)' : 'light-dark(#ffffff, var(--card))'
-                            }}
-                            onClick={() => setSelectedMember(member)}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm font-medium" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
-                                {member.name.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-medium">{member.name}</div>
-                                <div className="text-sm text-gray-500">{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</div>
-                                <div className="text-xs text-gray-400">{member.phone} • {member.membershipType}</div>
-                              </div>
+                    ) : (
+                      <>
+                        <div className={bd.search}>
+                          <Search className={bd.searchIcon} />
+                          <Input
+                            id="booking-member-search"
+                            autoFocus
+                            placeholder="Search by name, member ID, phone or email…"
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setActiveMemberIndex(0); }}
+                            onKeyDown={handleMemberSearchKey}
+                            role="combobox"
+                            aria-expanded={shownMembers.length > 0}
+                            aria-controls="booking-member-results"
+                            aria-activedescendant={shownMembers[activeMemberIndex] ? `booking-member-${shownMembers[activeMemberIndex].id}` : undefined}
+                          />
+                          <div className={bd.searchEnd}>
+                            {memberSearching ? <span className={bd.spinner} aria-label="Searching" /> : searchTerm && (
+                              <button type="button" className={bd.clearBtn} aria-label="Clear search" onClick={() => { setSearchTerm(""); focusMemberSearch(); }}>
+                                <X />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className={bd.listLabel}>
+                          <span>
+                            {searchTerm.trim()
+                              ? <><strong>{shownMembers.length}</strong> {shownMembers.length === 1 ? "match" : "matches"}{memberSearching ? " so far…" : ""}</>
+                              : "Recent members, or type to search everyone"}
+                          </span>
+                          {shownMembers.length > 0 && <span className={bd.keyHint}>↑ ↓ to move · Enter to pick</span>}
+                        </div>
+
+                        {shownMembers.length === 0 ? (
+                          <div className={bd.results}>
+                            <div className={bd.empty}>
+                              <div className={bd.emptyIcon}><Search /></div>
+                              <p className={bd.emptyTitle}>{memberSearching ? "Searching…" : searchTerm.trim() ? "No members found" : "No members yet"}</p>
+                              {!memberSearching && searchTerm.trim() && (
+                                <p className={bd.emptyText}>Nothing matches "{searchTerm.trim()}". Check the spelling, or book them as a guest.</p>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        ) : (
+                          <div className={bd.results} id="booking-member-results" role="listbox" aria-label="Members">
+                            {shownMembers.map((member, index) => (
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={index === activeMemberIndex}
+                                id={`booking-member-${member.id}`}
+                                key={member.id}
+                                className={bd.result}
+                                data-active={index === activeMemberIndex}
+                                onMouseEnter={() => setActiveMemberIndex(index)}
+                                onClick={() => pickMember(member)}
+                              >
+                                <MemberAvatar name={member.name} photo={member.avatar} />
+                                <span className={bd.resultMain}>
+                                  <span className={bd.resultName}>{highlightMatch(member.name, searchTerm)}</span>
+                                  <span className={bd.resultMeta}>{highlightMatch(memberMetaLine(member), searchTerm)}</span>
+                                </span>
+                                <span className={bd.resultSide}>
+                                  {member.status && <MemberStatusPill status={member.status} />}
+                                  <span className={bd.resultPlan}>{memberPlanLine(member)}</span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )
                   ) : (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="guest-name">Full Name *</Label>
-                          <Input
-                            id="guest-name"
-                            value={guestDetails.name}
-                            onChange={(e) => setGuestDetails(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Enter guest name"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="guest-email">Email *</Label>
-                          <Input
-                            id="guest-email"
-                            type="email"
-                            value={guestDetails.email}
-                            onChange={(e) => setGuestDetails(prev => ({ ...prev, email: e.target.value }))}
-                            placeholder="guest@email.com"
-                          />
-                        </div>
+                    <div className={bd.guestGrid}>
+                      <div className={`${bd.field} ${bd.guestWide}`}>
+                        <Label htmlFor="guest-name">Full name *</Label>
+                        <Input
+                          id="guest-name"
+                          autoFocus
+                          value={guestDetails.name}
+                          onChange={(e) => setGuestDetails(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Guest's full name"
+                        />
                       </div>
-                      <div>
-                        <Label htmlFor="guest-phone">WhatsApp Number *</Label>
+                      <div className={bd.field}>
+                        <Label htmlFor="guest-email">Email *</Label>
+                        <Input
+                          id="guest-email"
+                          type="email"
+                          value={guestDetails.email}
+                          onChange={(e) => setGuestDetails(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="guest@email.com"
+                        />
+                      </div>
+                      <div className={bd.field}>
+                        <Label htmlFor="guest-phone">WhatsApp number *</Label>
                         <Input
                           id="guest-phone"
                           value={guestDetails.phone}
@@ -579,212 +712,211 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           placeholder="+971-50-123-4567"
                         />
                       </div>
+                      <p className={`${bd.fieldHint} ${bd.guestWide}`}>The QR pass is sent to this WhatsApp number and email.</p>
                     </div>
                   )}
-
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={() => setBookingStep(2)}
-                      disabled={!isGuestBooking ? !selectedMember : !guestDetails.name || !guestDetails.email || !guestDetails.phone}
-                      style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
-                    >
-                      Next Step
-                    </Button>
-                  </div>
-                </div>
+                </>
               )}
 
-              {/* Step 2: Select Booking Type & Class */}
+              {/* Step 2: Session */}
               {bookingStep === 2 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">Step 2: Choose Session</h3>
-                  
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant={selectedBookingType === 'all' ? "default" : "outline"}
-                      onClick={() => setSelectedBookingType('all')}
-                      size="sm"
-                      style={selectedBookingType === 'all' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      All
-                    </Button>
-                    <Button 
-                      variant={selectedBookingType === 'class' ? "default" : "outline"}
-                      onClick={() => setSelectedBookingType('class')}
-                      size="sm"
-                      style={selectedBookingType === 'class' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Classes
-                    </Button>
-                    <Button 
-                      variant={selectedBookingType === 'pt' ? "default" : "outline"}
-                      onClick={() => setSelectedBookingType('pt')}
-                      size="sm"
-                      style={selectedBookingType === 'pt' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      <User className="h-4 w-4 mr-1" />
-                      Personal Training
-                    </Button>
-                    <Button 
-                      variant={selectedBookingType === 'facility' ? "default" : "outline"}
-                      onClick={() => setSelectedBookingType('facility')}
-                      size="sm"
-                      style={selectedBookingType === 'facility' ? { background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' } : {}}
-                    >
-                      <Building className="h-4 w-4 mr-1" />
-                      Facility
-                    </Button>
+                <>
+                  <div className={bd.sessionTools}>
+                    <div className={bd.segmented} role="group" aria-label="Session type">
+                      {SESSION_FILTERS.map(({ id, label, icon: Icon }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className={bd.segBtn}
+                          data-active={selectedBookingType === id}
+                          aria-pressed={selectedBookingType === id}
+                          onClick={() => setSelectedBookingType(id)}
+                        >
+                          {Icon && <Icon />} {label}
+                          <span className={bd.segCount}>{id === 'all' ? sessions.length : sessions.filter(s => s.type === id).length}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className={bd.search}>
+                      <Search className={bd.searchIcon} />
+                      <Input
+                        placeholder="Search sessions, trainers or rooms…"
+                        value={dialogSessionQuery}
+                        onChange={(e) => setDialogSessionQuery(e.target.value)}
+                      />
+                    </div>
                   </div>
 
-                  <div className="max-h-80 overflow-y-auto space-y-3">
-                    {filteredClasses.map((cls) => {
-                      const availability = getAvailability(cls);
-                      const isFull = availability !== "available";
-                      return (
-                      <div
-                        key={cls.id}
-                        className="p-4 border rounded-lg cursor-pointer transition-all"
-                        style={{
-                          borderColor: selectedClass?.id === cls.id ? 'var(--primary)' : 'light-dark(#e5e7eb, var(--border))',
-                          backgroundColor: selectedClass?.id === cls.id ? 'color-mix(in srgb, var(--primary) 6.3%, transparent)' : isFull ? 'light-dark(#f9fafb, var(--muted-bg))' : 'light-dark(#ffffff, var(--card))',
-                          opacity: isFull ? 0.5 : 1,
-                          cursor: isFull ? 'not-allowed' : 'pointer'
-                        }}
-                        onClick={() => !isFull && setSelectedClass(cls)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 rounded-lg text-white flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)' }}>
-                              {getTypeIcon(cls.type)}
-                            </div>
-                            <div>
-                              <div className="font-medium flex items-center space-x-2">
-                                <span>{cls.name}</span>
-                                {isFull && <Badge variant="destructive">Full</Badge>}
-                              </div>
-                              <div className="text-sm text-gray-500">{cls.instructor}</div>
-                              <div className="text-xs text-gray-400 flex items-center space-x-3">
-                                <span className="flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  {cls.startTime} ({cls.duration}min)
-                                </span>
-                                <span className="flex items-center">
-                                  <MapPin className="h-3 w-3 mr-1" />
-                                  {cls.location}
-                                </span>
-                                <span className="flex items-center">
-                                  <Users className="h-3 w-3 mr-1" />
-                                  {cls.booked}/{cls.capacity}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-lg" style={{ color: 'var(--primary)' }}><CurrencyGlyph /> {cls.price}</div>
-                          </div>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex justify-between">
-                    <Button variant="outline" onClick={() => setBookingStep(1)}>
-                      Previous
-                    </Button>
-                    <Button 
-                      onClick={() => setBookingStep(3)}
-                      disabled={!selectedClass}
-                      style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
-                    >
-                      Next Step
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Confirm Booking */}
-              {bookingStep === 3 && selectedClass && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">Step 3: Confirm Booking</h3>
-                  
-                  <Card style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)' }}>
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Booking for:</span>
-                          <span className="font-medium">
-                            {isGuestBooking ? `${guestDetails.name} (Guest)` : selectedMember?.name}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Session:</span>
-                          <span className="font-medium">{selectedClass.name}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Instructor:</span>
-                          <span className="font-medium">{selectedClass.instructor}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Date & Time:</span>
-                          <span className="font-medium">{selectedClass.date} {selectedClass.startTime}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Location:</span>
-                          <span className="font-medium">{selectedClass.location}</span>
-                        </div>
-                        {availablePasses.length > 0 && (
-                          <div className="border-t pt-3">
-                            <Label>Reward Pass</Label>
-                            <Select value={selectedPassId} onValueChange={setSelectedPassId}>
-                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Don't use a Reward Pass</SelectItem>
-                                {availablePasses.map((p) => (
-                                  <SelectItem key={p.id} value={String(p.id)}>{passLabel(p)}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center border-t pt-3">
-                          <span className="font-medium">Total Amount:</span>
-                          <span className="text-xl font-bold" style={{ color: 'var(--primary)' }}>
-                            {selectedPassId !== 'none'
-                              ? <>Free <span className="text-sm font-normal text-gray-500">(Reward Pass)</span></>
-                              : <><CurrencyGlyph /> {selectedClass.price}</>}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="p-4 rounded-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 6.3%, transparent)' }}>
-                    <div className="flex items-start space-x-3">
-                      <QrCode className="h-5 w-5 mt-1" style={{ color: 'var(--primary)' }} />
-                      <div className="text-sm">
-                        <p className="font-medium" style={{ color: 'var(--primary)' }}>QR Code Access</p>
-                        <p className="text-gray-600 mt-1">
-                          {isGuestBooking 
-                            ? "QR code will be sent via WhatsApp and email for facility access"
-                            : "QR code will be generated for face recognition system validation"
-                          }
+                  {dialogSessions.length === 0 ? (
+                    <div className={bd.results}>
+                      <div className={bd.empty}>
+                        <div className={bd.emptyIcon}><CalendarIcon /></div>
+                        <p className={bd.emptyTitle}>No sessions to show</p>
+                        <p className={bd.emptyText}>
+                          {sessions.length === 0 ? "Create classes or PT slots in Trainings & Classes first." : "Try another type or search."}
                         </p>
                       </div>
                     </div>
+                  ) : (
+                    <div className={bd.sessions} role="listbox" aria-label="Sessions">
+                      {dialogSessions.map((cls) => {
+                        const availability = getAvailability(cls);
+                        const isFull = availability !== "available";
+                        const left = cls.capacity > 0 ? Math.max(0, cls.capacity - cls.booked) : null;
+                        const selected = selectedClass?.id === cls.id;
+                        return (
+                          <button
+                            key={cls.id}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            className={bd.session}
+                            data-selected={selected}
+                            disabled={isFull}
+                            onClick={() => setSelectedClass(cls)}
+                          >
+                            <span className={bd.sessionIcon} data-type={cls.type}>{getTypeIcon(cls.type)}</span>
+                            <span className={bd.sessionMain}>
+                              <span className={bd.sessionName}>{cls.name}</span>
+                              <span className={bd.sessionMeta}>
+                                <span><User /> {cls.instructor}</span>
+                                <span><CalendarIcon /> {formatSessionDate(cls.date)}</span>
+                                <span><Clock /> {cls.startTime}{cls.duration ? ` · ${cls.duration} min` : ""}</span>
+                                {cls.location && <span><MapPin /> {cls.location}</span>}
+                              </span>
+                            </span>
+                            <span className={bd.sessionSide}>
+                              <span className={bd.price}>{cls.price > 0 ? formatCurrency(cls.price) : "Free"}</span>
+                              <span
+                                className={bd.spots}
+                                data-full={isFull}
+                                data-low={!isFull && left !== null && left <= 2}
+                              >
+                                {availability === "cancelled" ? "Cancelled" : isFull ? "Full" : left === null ? "Open" : `${left} ${left === 1 ? "spot" : "spots"} left`}
+                              </span>
+                            </span>
+                            <span className={bd.check}><Check /></span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Step 3: Confirm */}
+              {bookingStep === 3 && selectedClass && (
+                <>
+                  {isGuestBooking ? (
+                    <div className={bd.picked}>
+                      <MemberAvatar name={guestDetails.name} photo={null} size={48} />
+                      <div className={bd.pickedMain}>
+                        <div className={bd.pickedName}>{guestDetails.name} <span className={bd.totalNote}>Guest</span></div>
+                        <p className={bd.pickedMeta}>{[guestDetails.phone, guestDetails.email].filter(Boolean).join(" · ")}</p>
+                      </div>
+                    </div>
+                  ) : selectedMember && (
+                    <div className={bd.picked}>
+                      <MemberAvatar name={selectedMember.name} photo={selectedMember.avatar} size={48} />
+                      <div className={bd.pickedMain}>
+                        <div className={bd.pickedName}>
+                          {selectedMember.name}
+                          {selectedMember.status && <MemberStatusPill status={selectedMember.status} />}
+                        </div>
+                        <p className={bd.pickedMeta}>{memberMetaLine(selectedMember)}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={bd.summary}>
+                    <div className={bd.summaryRow}>
+                      <span className={bd.summaryLabel}>{getTypeIcon(selectedClass.type)} Session</span>
+                      <span className={bd.summaryValue}>{selectedClass.name}</span>
+                    </div>
+                    <div className={bd.summaryRow}>
+                      <span className={bd.summaryLabel}><User /> Trainer</span>
+                      <span className={bd.summaryValue}>{selectedClass.instructor}</span>
+                    </div>
+                    <div className={bd.summaryRow}>
+                      <span className={bd.summaryLabel}><CalendarIcon /> When</span>
+                      <span className={bd.summaryValue}>
+                        {formatSessionDate(selectedClass.date)} · {selectedClass.startTime}{selectedClass.endTime ? `–${selectedClass.endTime}` : ""}
+                      </span>
+                    </div>
+                    {selectedClass.location && (
+                      <div className={bd.summaryRow}>
+                        <span className={bd.summaryLabel}><MapPin /> Where</span>
+                        <span className={bd.summaryValue}>{selectedClass.location}</span>
+                      </div>
+                    )}
+                    {availablePasses.length > 0 && (
+                      <div className={bd.summaryRow}>
+                        <span className={bd.summaryLabel}><Zap /> Reward Pass</span>
+                        <Select value={selectedPassId} onValueChange={setSelectedPassId}>
+                          <SelectTrigger style={{ maxWidth: "16rem" }}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Don't use a Reward Pass</SelectItem>
+                            {availablePasses.map((p) => (
+                              <SelectItem key={p.id} value={String(p.id)}>{passLabel(p)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className={`${bd.summaryRow} ${bd.totalRow}`}>
+                      <span className={bd.summaryLabel}>Total</span>
+                      <span className={bd.total}>
+                        {selectedPassId !== 'none'
+                          ? <>Free<span className={bd.totalNote}>Reward Pass</span></>
+                          : selectedClass.price > 0 ? formatCurrency(selectedClass.price) : "Free"}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between">
-                    <Button variant="outline" onClick={() => setBookingStep(2)}>
-                      Previous
-                    </Button>
-                    <Button onClick={handleCreateBooking} style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}>
-                      Confirm Booking
-                    </Button>
+                  <div className={bd.note}>
+                    <QrCode />
+                    <div>
+                      <p className={bd.noteTitle}>QR code access</p>
+                      {isGuestBooking
+                        ? "The QR pass is sent by WhatsApp and email, and opens the door at check-in."
+                        : "A QR pass is generated for this booking and validated at check-in."}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
+            </div>
+
+            <div className={bd.foot}>
+              <span className={bd.footHint}>
+                {bookingStep === 1 && (isGuestBooking ? "Fill in all three guest fields" : selectedMember ? `Booking for ${selectedMember.name}` : "Select a member to continue")}
+                {bookingStep === 2 && (selectedClass ? `${selectedClass.name} selected` : "Pick a session to continue")}
+                {bookingStep === 3 && "Check the details, then confirm"}
+              </span>
+              <div className={bd.footActions}>
+                {bookingStep === 1 ? (
+                  <Button variant="outline" onClick={() => setShowBookingDialog(false)}>Cancel</Button>
+                ) : (
+                  <Button variant="outline" onClick={() => setBookingStep(bookingStep - 1)}>Back</Button>
+                )}
+                {bookingStep === 1 && (
+                  <Button
+                    onClick={() => setBookingStep(2)}
+                    disabled={!isGuestBooking ? !selectedMember : !guestDetails.name || !guestDetails.email || !guestDetails.phone}
+                  >
+                    Next: choose session <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+                {bookingStep === 2 && (
+                  <Button onClick={() => setBookingStep(3)} disabled={!selectedClass}>
+                    Next: confirm <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+                {bookingStep === 3 && (
+                  <Button onClick={handleCreateBooking}>
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Confirm Booking
+                  </Button>
+                )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -1015,7 +1147,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12.5%, transparent)' }}>
                     <Calendar className="h-12 w-12" style={{ color: 'var(--primary)' }} />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2" style={{ color: 'light-dark(#1E293B, oklch(82% 0.037 260))' }}>No bookings scheduled</h3>
+                  <h3 className="text-lg font-semibold mb-2" style={{ color: 'light-dark(var(--gb-text), oklch(82% 0.037 260))' }}>No bookings scheduled</h3>
                   <p className="text-gray-500 mb-6">Get started by creating your first booking</p>
                   <Button 
                     style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}

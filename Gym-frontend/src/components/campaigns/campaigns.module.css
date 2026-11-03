@@ -3,7 +3,7 @@
    soft shadow-md (shadow-lg on hover), tinted blocks inside cards. */
 
 [data-tone] { --tone: var(--primary); }
-[data-tone="teal"]   { --tone: #2B7A78; }
+[data-tone="teal"]   { --tone: var(--gb-primary); }
 [data-tone="green"]  { --tone: #15803d; }
 [data-tone="amber"]  { --tone: #b45309; }
 [data-tone="red"]    { --tone: #dc2626; }

@@ -29,7 +29,7 @@ import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { dashboardService, type RevenueGranularity, type RevenueSummary } from "../../utils/supabase/dashboard-service";
 
 const ISO = "yyyy-MM-dd";
-const CURRENT = "#0F766E";
+const CURRENT = "var(--gb-primary-deep)";
 const PREVIOUS = "#94a3b8";
 const EXPENSE = "#B91C1C";
 
@@ -419,7 +419,7 @@ export function PeriodComparison() {
                   <Legend />
                   <Bar dataKey="Collection" fill={CURRENT} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   <Bar dataKey="Expenses" fill={EXPENSE} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                  <Bar dataKey="Net Profit" fill="#0f766e" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="Net Profit" fill="var(--gb-primary-deep)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

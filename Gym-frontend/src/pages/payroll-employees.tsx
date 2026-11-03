@@ -1,623 +1,315 @@
-import React from 'react';
-import { useCurrency, CurrencyValue } from '../utils/currency';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  AlertTriangle, CalendarClock, CalendarDays, GraduationCap, HandCoins, RefreshCw, TrendingUp, UserPlus, Users, Wallet,
+} from "lucide-react";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Progress } from "../components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { 
-  Users, 
-  GraduationCap, 
-  Calendar, 
-  DollarSign, 
-  CreditCard, 
-  TrendingUp,
-  TrendingDown,
-  UserPlus,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  Eye,
-  Plus,
-  Filter,
-  Download,
-  RefreshCw,
-  Activity,
-  Award,
-  BookOpen,
-  UserCheck,
-  Wallet,
-  BarChart3
-} from 'lucide-react';
+import { useCurrency } from "../utils/currency";
+import { payrollAnalyticsService, PayrollDashboardData } from "../utils/supabase/payroll-analytics-service";
+import {
+  payrollReportService, PayrollDataset, addMonths, monthLabel, ym, totals,
+} from "../utils/supabase/payroll-report-service";
+import { salaryPaymentsService, SalaryPaymentEmployee } from "../utils/supabase/salary-payments-service";
+import {
+  styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Status, Delta,
+  pctChange, fmtInt, fmtDate,
+} from "../components/overview/overview-kit";
 
-import { useEffect, useState } from 'react';
-import { payrollAnalyticsService, PayrollDashboardData } from '../utils/supabase/payroll-analytics-service';
+type Tab = "hires" | "unpaid" | "advances" | "classes";
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+/**
+ * Payroll & Employees overview. Pay figures come from the payroll report (by salary month, the
+ * same numbers as Payroll Reports / Analytics); "unpaid" is Salary Payments' own status for last
+ * month; headcount, classes and bookings come from the payroll dashboard endpoint.
+ */
 export function PayrollEmployees() {
-  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
-  const [data, setData] = useState<PayrollDashboardData | null>(null);
+  const navigate = useNavigate();
+  const { formatCurrency } = useCurrency();
+  const palette = usePalette();
+  const money = useCallback((n: number) => formatCurrency(n, { maximumFractionDigits: 0 }), [formatCurrency]);
+  const compact = useCallback((n: number) => formatCurrency(n, { notation: "compact", maximumFractionDigits: 1 } as Intl.NumberFormatOptions), [formatCurrency]);
+
+  const thisMonth = ym(new Date());
+  const lastMonth = addMonths(thisMonth, -1);
+  const firstMonth = addMonths(thisMonth, -5);
+  const [lmYear, lmMonth] = lastMonth.split("-").map(Number);
+
+  const [dash, setDash] = useState<PayrollDashboardData | null>(null);
+  const [report, setReport] = useState<PayrollDataset | null>(null);
+  const [unpaid, setUnpaid] = useState<SalaryPaymentEmployee[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [tab, setTab] = useState<Tab>("unpaid");
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const load = useCallback(async () => {
+    setLoading(true);
+    const errors: string[] = [];
+    const [d, r, u] = await Promise.allSettled([
+      payrollAnalyticsService.getDashboardData(),
+      payrollReportService.get(firstMonth, thisMonth),
+      salaryPaymentsService.getEmployees({ month: MONTH_NAMES[lmMonth - 1], year: lmYear }),
+    ]);
+    if (d.status === "fulfilled") setDash(d.value); else errors.push("staff & classes");
+    if (r.status === "fulfilled") setReport(r.value); else errors.push("payroll");
+    if (u.status === "fulfilled") setUnpaid(u.value.filter(e => e.paymentStatus !== "Paid")); else errors.push("salary payments");
+    setFailed(errors);
+    setLoading(false);
+  }, [firstMonth, thisMonth, lmMonth, lmYear]);
+  useEffect(() => { load(); }, [load]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const res = await payrollAnalyticsService.getDashboardData();
-      setData(res);
-    } catch (error) {
-      console.error("Failed to load dashboard data", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ── Derived ──
+  const payrollByMonth = useMemo(() => {
+    if (!report) return [];
+    return report.months.map(m => {
+      const t = totals(report.records.filter(r => r.month === m.month));
+      return {
+        month: m.month, label: m.label, tipLabel: monthLabel(m.month, true) + (m.current ? " (running)" : ""),
+        basic: Math.round(t.basic), allowances: Math.round(t.allowances + t.unitemised), overtime: Math.round(t.overtime),
+        commission: Math.round(t.commission),
+        // The running month has no salaries until payroll runs; leave the line open instead of dropping to 0.
+        net: m.current && !t.rows ? null : Math.round(t.net), employees: t.employees, paid: t.paid, unpaid: t.unpaid, draft: t.draft,
+      };
+    });
+  }, [report]);
+  const lm = payrollByMonth.find(m => m.month === lastMonth);
+  const installmentsDue = (report?.advances.open ?? []).reduce((s, a) => s + Math.min(a.installment || a.balance, a.balance), 0);
+  const lm2 = payrollByMonth.find(m => m.month === addMonths(thisMonth, -2));
+  const unpaidTotal = (unpaid ?? []).reduce((s, e) => s + (Number(e.netSalary) || 0), 0);
+  const hiresThisMonth = (dash?.recentHires ?? []).filter(h => h.hireDate && h.hireDate.slice(0, 7) === thisMonth).length;
+  const hiresCapped = (dash?.recentHires ?? []).length >= 5 && hiresThisMonth >= 5;
+  const deptBasic = new Map((dash?.payrollDistribution ?? []).map(d => [d.category, Number(d.amount) || 0]));
+  const deptRows = (dash?.staffByDepartment ?? [])
+    .map(d => ({ key: d.department, label: d.department, value: Number(d.count) || 0, color: palette.s1, meta: `${money(deptBasic.get(d.department) ?? 0)} basic / mo` }))
+    .sort((a, b) => b.value - a.value);
+  const totalBasic = [...deptBasic.values()].reduce((s, v) => s + v, 0);
+  const classTrend = (dash?.classBookingTrends ?? []).map(t => ({ label: t.month, classes: Number(t.classes) || 0, bookings: Number(t.bookings) || 0 }));
 
-  if (loading || !data) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
-          <p className="text-gray-500 font-medium">Loading payroll and employee data...</p>
-        </div>
-      </div>
-    );
+  const tabs: { id: Tab; label: string; icon: typeof Users; count?: number }[] = [
+    { id: "unpaid", label: `Unpaid · ${monthLabel(lastMonth)}`, icon: Wallet, count: unpaid?.length },
+    { id: "advances", label: "Salary advances", icon: HandCoins, count: report?.advances.openCount },
+    { id: "hires", label: "Recent hires", icon: UserPlus },
+    { id: "classes", label: "Top classes", icon: GraduationCap },
+  ];
+
+  if (loading && !dash && !report) {
+    return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading payroll & employees…</div></div>;
   }
 
-  const {
-    kpiData,
-    classBookingTrends,
-    payrollDistribution,
-    staffByDepartment,
-    recentHires,
-    upcomingPayments,
-    salaryAdvances,
-    topPerformingClasses
-  } = data;
-
-  const getCurrentPeriod = () => {
-    return new Date().toLocaleDateString('en-GB', {
-      month: 'long',
-      year: 'numeric'
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active':
-      case 'Approved': 
-      case 'Completed': return 'bg-green-100 text-green-800';
-      case 'Pending': 
-      case 'Probation': return 'bg-yellow-100 text-yellow-800';
-      case 'Overdue': 
-      case 'Terminated': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className={styles.root}>
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Payroll & Employees</h1>
-          <p className="text-gray-600 mt-1">
-            Comprehensive staff management and payroll system for {getCurrentPeriod()}
-          </p>
+          <h1 className={styles.title}>Payroll & Employees</h1>
+          <div className={styles.subtitle}>Staff, salaries, advances and classes at a glance · {monthLabel(thisMonth, true)}</div>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <Button size="sm" onClick={() => navigate("/payroll")}><Wallet className="h-4 w-4 mr-2" />Open Payroll</Button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Staff & Trainers</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {kpiData.totalStaffTrainers}
-                </p>
-                <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">+3 this month</span>
-                </div>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {failed.length > 0 && (
+        <div className={`${styles.card} ${styles.filters}`} style={{ color: "var(--bad-ink)" }}>
+          <AlertTriangle size={16} />Couldn't load {failed.join(", ")}. The rest of the page is up to date.
+        </div>
+      )}
 
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Trainings & Classes</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {kpiData.activeTrainingsClasses}
-                </p>
-                <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-sm text-green-600">+2 new classes</span>
-                </div>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <GraduationCap className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className={loading ? styles.loadingVeil : undefined} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div className={styles.kpis}>
+          <Kpi icon={Users} tone="blue" label="Staff & trainers" value={fmtInt(dash?.kpiData.totalStaffTrainers)}
+            hint={hiresThisMonth ? `${hiresThisMonth}${hiresCapped ? "+" : ""} joined this month` : "active employees"} onClick={() => navigate("/staffs-trainers")} />
+          <Kpi icon={Wallet} tone="violet" label={`Payroll · ${monthLabel(lastMonth)}`} value={lm?.net != null ? money(lm.net) : "—"}
+            delta={lm?.net != null && lm2?.net != null ? <Delta pct={pctChange(lm.net, lm2.net)} upIsGood={false} /> : undefined}
+            hint={lm ? `${lm.employees} employee${lm.employees === 1 ? "" : "s"} · net pay` : "no salaries recorded"} onClick={() => navigate("/payroll-reports")} />
+          <Kpi icon={AlertTriangle} tone={unpaid && unpaid.length ? "red" : "green"} label={`Unpaid · ${monthLabel(lastMonth)}`}
+            value={unpaid ? fmtInt(unpaid.length) : "—"} hint={unpaid ? (unpaid.length ? money(unpaidTotal) + " to pay" : "everyone paid") : "unavailable"}
+            onClick={() => navigate("/salary-payments")} />
+          <Kpi icon={HandCoins} tone="orange" label="Advances owed" value={report ? money(report.advances.outstanding) : "—"}
+            hint={report ? `${report.advances.openCount} open advance${report.advances.openCount === 1 ? "" : "s"}` : undefined} onClick={() => navigate("/salary-advances")} />
+          <Kpi icon={GraduationCap} tone="teal" label="Upcoming classes" value={fmtInt(dash?.kpiData.activeTrainingsClasses)} hint="scheduled from today" onClick={() => navigate("/trainings-classes")} />
+          <Kpi icon={CalendarClock} tone="amber" label="Bookings · 7 days" value={fmtInt(dash?.kpiData.upcomingBookings)} hint="seats booked" />
+        </div>
 
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Upcoming Bookings</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {kpiData.upcomingBookings}
-                </p>
-                <div className="flex items-center mt-2">
-                  <Clock className="h-4 w-4 text-orange-500 mr-1" />
-                  <span className="text-sm text-orange-600">Next 7 days</span>
+        <div className={styles.row2}>
+          <Panel title="Payroll by salary month" icon={TrendingUp} scope="Last 6 months"
+            sub="Gross pay by part (bars) and net paid (line) — the same figures as Payroll Reports">
+            {payrollByMonth.every(m => !m.net && !m.basic) ? (
+              <Empty icon={Wallet} title="No salaries recorded yet" text="Run payroll or record salary payments and the trend appears here." />
+            ) : (
+              <>
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <ComposedChart data={payrollByMonth} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="label" tick={axisTick(palette)} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick(palette)} tickLine={false} axisLine={false} width={64} tickFormatter={v => compact(Number(v))} />
+                      <Tooltip content={<ChartTip fmt={(v: number) => money(v)} />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                      <Bar isAnimationActive={false} dataKey="basic" name="Basic" stackId="g" fill={palette.s1} maxBarSize={44} />
+                      <Bar isAnimationActive={false} dataKey="allowances" name="Allowances" stackId="g" fill={palette.s2} maxBarSize={44} />
+                      <Bar isAnimationActive={false} dataKey="overtime" name="Overtime" stackId="g" fill={palette.s3} maxBarSize={44} />
+                      <Bar isAnimationActive={false} dataKey="commission" name="Commission" stackId="g" fill={palette.s4} maxBarSize={44} radius={[4, 4, 0, 0]} />
+                      <Line isAnimationActive={false} dataKey="net" name="Net pay" stroke="var(--foreground)" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <Calendar className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <Legend items={[
+                  { label: "Basic", color: palette.s1 }, { label: "Allowances", color: palette.s2 },
+                  { label: "Overtime", color: palette.s3 }, { label: "Commission", color: palette.s4 },
+                  { label: "Net pay", color: "var(--foreground)", line: true },
+                ]} />
+              </>
+            )}
+          </Panel>
 
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Monthly Payroll</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  <CurrencyValue amount={kpiData.monthlyPayroll} />
-                </p>
-                <div className="flex items-center mt-2">
-                  <TrendingUp className="h-4 w-4 text-purple-500 mr-1" />
-                  <span className="text-sm text-purple-600">+7.2% vs last month</span>
-                </div>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <DollarSign className="h-6 w-6 text-purple-600" />
-              </div>
+          <Panel title="Staff by department" icon={Users} sub={`${fmtInt(dash?.kpiData.totalStaffTrainers)} employees · ${money(totalBasic)} monthly basic`}>
+            <BarRows rows={deptRows} fmt={n => `${n} staff`} empty="Add departments to employees to see the split." />
+            <div className={styles.facts} style={{ marginTop: "auto", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
+              <div className={styles.fact}><span className={styles.factLabel}>Monthly basic</span><span className={styles.factValue}>{money(report?.staff.monthlyBase ?? totalBasic)}</span></div>
+              <div className={styles.fact}><span className={styles.factLabel}>Average basic</span><span className={styles.factValue}>{report?.staff.active ? money(report.staff.monthlyBase / report.staff.active) : "—"}</span></div>
+              <div className={styles.fact}><span className={styles.factLabel}>Advance recoveries / month</span><span className={styles.factValue}>{money(installmentsDue)}</span></div>
+              <div className={styles.fact}><span className={styles.factLabel}>Joined in last 6 months</span><span className={styles.factValue}>{fmtInt(report?.staff.joinedInRange)}</span></div>
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
 
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending Salary Payments</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {kpiData.pendingSalaryPayments}
-                </p>
-                <div className="flex items-center mt-2">
-                  <AlertCircle className="h-4 w-4 text-red-500 mr-1" />
-                  <span className="text-sm text-red-600">Due by month-end</span>
-                </div>
+        <Panel title="Classes & bookings" icon={CalendarDays} scope="Last 6 months" sub="Sessions held and seats booked per month">
+          {classTrend.every(t => !t.classes && !t.bookings) ? (
+            <Empty icon={CalendarDays} title="No classes yet" text="Sessions created in Trainings & Classes show here." />
+          ) : (
+            <>
+              <div className={styles.chartMd}>
+                <ResponsiveContainer>
+                  <BarChart data={classTrend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={4}>
+                    <CartesianGrid vertical={false} stroke={palette.grid} />
+                    <XAxis dataKey="label" tick={axisTick(palette)} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                    <YAxis tick={axisTick(palette)} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                    <Tooltip content={<ChartTip />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                    <Bar isAnimationActive={false} dataKey="classes" name="Classes" fill={palette.s3} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar isAnimationActive={false} dataKey="bookings" name="Bookings" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <CreditCard className="h-6 w-6 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <Legend items={[{ label: "Classes", color: palette.s3 }, { label: "Bookings", color: palette.s1 }]} />
+            </>
+          )}
+        </Panel>
 
-        <Card className="bg-white border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Salary Advances Outstanding</p>
-                <p className="text-2xl font-bold text-cyan-600">
-                  <CurrencyValue amount={kpiData.salaryAdvancesOutstanding} />
-                </p>
-                <div className="flex items-center mt-2">
-                  <Wallet className="h-4 w-4 text-cyan-500 mr-1" />
-                  <span className="text-sm text-cyan-600">3 employees</span>
-                </div>
+        <SectionTabs tabs={tabs} value={tab} onChange={setTab} label="Payroll details" />
+
+        {tab === "unpaid" && (
+          <Panel title={`Not yet paid for ${monthLabel(lastMonth, true)}`} icon={Wallet}
+            sub="Active employees without a salary payment for last month, from Salary Payments"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/salary-payments")}>Pay salaries</Button>}>
+            {!unpaid ? <Empty title="Salary payments unavailable" /> : unpaid.length === 0 ? (
+              <Empty icon={Wallet} title={`Everyone has been paid for ${monthLabel(lastMonth, true)}`} />
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Employee</th><th>Department</th><th>Status</th><th className={styles.num}>Net to pay</th></tr></thead>
+                  <tbody>
+                    {unpaid.map(e => (
+                      <tr key={e.employeeId}>
+                        <td style={{ fontWeight: 600 }}>{e.name}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{e.employeeId}{e.designation ? ` · ${e.designation}` : ""}</div></td>
+                        <td className={styles.muted}>{e.department || "—"}</td>
+                        <td><Status kind={e.paymentStatus === "On Hold" ? "info" : "warning"}>{e.paymentStatus}{e.payrollRunStatus ? ` · payroll ${e.payrollRunStatus.toLowerCase()}` : ""}</Status></td>
+                        <td className={styles.num} style={{ fontWeight: 700 }}>{money(Number(e.netSalary) || 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr><td colSpan={3}>Total</td><td className={styles.num}>{money(unpaidTotal)}</td></tr></tfoot>
+                </table>
               </div>
-              <div className="p-3 bg-cyan-100 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-cyan-600" />
+            )}
+          </Panel>
+        )}
+
+        {tab === "advances" && (
+          <Panel title="Salary advances being repaid" icon={HandCoins} sub="Open advances and what's left to recover"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/salary-advances")}>Advances & Deductions</Button>}>
+            {!report || report.advances.open.length === 0 ? (
+              <Empty icon={HandCoins} title="No open advances" />
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Employee</th><th>Issued</th><th className={styles.num}>Approved</th><th className={styles.num}>Recovered</th><th className={styles.num}>Installment</th><th className={styles.num}>Balance</th></tr></thead>
+                  <tbody>
+                    {report.advances.open.map(a => (
+                      <tr key={a.id}>
+                        <td style={{ fontWeight: 600 }}>{a.name}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>ADV-{a.id}{a.type ? ` · ${a.type}` : ""}</div></td>
+                        <td>{fmtDate(a.issuedOn)}</td>
+                        <td className={styles.num}>{money(a.approved)}</td>
+                        <td className={styles.num}>
+                          <span className={styles.miniTrack}><span className={styles.miniFill} style={{ display: "block", width: `${a.approved ? Math.min(100, a.recovered / a.approved * 100) : 0}%`, ["--fill" as any]: palette.s3 }} /></span>
+                          {money(a.recovered)}
+                        </td>
+                        <td className={styles.num}>{money(a.installment)}</td>
+                        <td className={styles.num} style={{ fontWeight: 700 }}>{money(a.balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr><td colSpan={5}>Outstanding</td><td className={styles.num}>{money(report.advances.outstanding)}</td></tr></tfoot>
+                </table>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+          </Panel>
+        )}
+
+        {tab === "hires" && (
+          <Panel title="Recent hires" icon={UserPlus} sub="Latest joiners by joining date"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/staffs-trainers")}>Staffs & Trainers</Button>}>
+            {!dash || dash.recentHires.length === 0 ? <Empty icon={UserPlus} title="No employees yet" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Employee</th><th>Department</th><th>Joined</th><th className={styles.num}>Basic salary</th></tr></thead>
+                  <tbody>
+                    {dash.recentHires.map(h => (
+                      <tr key={h.id}>
+                        <td style={{ fontWeight: 600 }}>{h.name}<div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400, textTransform: "capitalize" }}>{h.position || "—"}</div></td>
+                        <td className={styles.muted}>{h.department || "—"}</td>
+                        <td>{fmtDate(h.hireDate)}{h.hireDate?.slice(0, 7) === thisMonth && <span style={{ marginLeft: 6 }}><Status kind="good">New</Status></span>}</td>
+                        <td className={styles.num}>{h.salary != null ? money(Number(h.salary)) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        )}
+
+        {tab === "classes" && (
+          <Panel title="Best-attended classes" icon={GraduationCap} sub="Ranked by seats booked (cancelled and waitlisted excluded)"
+            action={<Button variant="outline" size="sm" onClick={() => navigate("/trainings-classes")}>Trainings & Classes</Button>}>
+            {!dash || dash.topPerformingClasses.length === 0 ? <Empty icon={GraduationCap} title="No classes yet" /> : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Class</th><th>Trainer</th><th style={{ width: "30%" }}>Seats booked</th><th className={styles.num}>Booking revenue</th></tr></thead>
+                  <tbody>
+                    {dash.topPerformingClasses.map(c => {
+                      const fill = c.capacity ? Math.min(100, (c.bookings / c.capacity) * 100) : 0;
+                      return (
+                        <tr key={c.id}>
+                          <td style={{ fontWeight: 600 }}>{c.className}</td>
+                          <td className={styles.muted}>{c.instructor}</td>
+                          <td>
+                            <span className={styles.miniTrack}><span className={styles.miniFill} style={{ display: "block", width: `${fill}%`, ["--fill" as any]: palette.s1 }} /></span>
+                            {c.bookings}{c.capacity ? ` / ${c.capacity}` : ""}
+                          </td>
+                          <td className={styles.num}>{money(Number(c.revenue) || 0)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+        )}
       </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Classes, Bookings & Payroll Trends */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-blue-600" />
-                  <span>Classes, Bookings & Payroll Trends</span>
-                </CardTitle>
-                <CardDescription>Monthly performance over the last 6 months</CardDescription>
-              </div>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={classBookingTrends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value, name) => {
-                    if (name === 'payroll') return [`${currencyPrefix}${value.toLocaleString()}`, 'Payroll'];
-                    return [value, name === 'classes' ? 'Active Classes' : 'Bookings'];
-                  }} 
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="classes" 
-                  stroke="#10b981" 
-                  strokeWidth={3}
-                  name="Active Classes"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="bookings" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  name="Bookings"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="payroll" 
-                  stroke="#8b5cf6" 
-                  strokeWidth={3}
-                  name={`Payroll (${currencySymbol})`}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Staff Distribution by Department */}
-        <Card className="bg-white border-0 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-green-600" />
-                  <span>Staff Distribution by Department</span>
-                </CardTitle>
-                <CardDescription>Current headcount across departments</CardDescription>
-              </div>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View Details
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={staffByDepartment}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({department, count}) => `${department}: ${count}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {staffByDepartment.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Payroll Distribution Chart */}
-      <Card className="bg-white border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5 text-purple-600" />
-                <span>Monthly Payroll Distribution</span>
-              </CardTitle>
-              <CardDescription>Salary distribution across departments for {getCurrentPeriod()}</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              <Eye className="h-4 w-4 mr-2" />
-              View Details
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={payrollDistribution}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="category" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`${currencyPrefix}${value.toLocaleString()}`, 'Payroll']} />
-              <Bar dataKey="amount" fill="#8b5cf6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Bottom Section - Tables */}
-      <Tabs defaultValue="hires" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="hires">Recent Hires</TabsTrigger>
-          <TabsTrigger value="payments">Upcoming Payments</TabsTrigger>
-          <TabsTrigger value="advances">Salary Advances</TabsTrigger>
-          <TabsTrigger value="classes">Top Classes</TabsTrigger>
-        </TabsList>
-
-        {/* Recent Hires */}
-        <TabsContent value="hires" className="space-y-4">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <UserPlus className="h-5 w-5 text-blue-600" />
-                    <span>Recent Hires</span>
-                  </CardTitle>
-                  <CardDescription>New employees joined in the last 30 days</CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Employee
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee Name</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Hire Date</TableHead>
-                    <TableHead>Salary</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentHires.map((employee) => (
-                    <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.name}</TableCell>
-                      <TableCell>{employee.position}</TableCell>
-                      <TableCell>{employee.department}</TableCell>
-                      <TableCell>
-                        {new Date(employee.hireDate).toLocaleDateString('en-GB')}
-                      </TableCell>
-                      <TableCell><CurrencyValue amount={employee.salary} /></TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(employee.status)}>
-                          {employee.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Upcoming Payments */}
-        <TabsContent value="payments" className="space-y-4">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <CreditCard className="h-5 w-5 text-red-600" />
-                    <span>Upcoming Salary Payments</span>
-                  </CardTitle>
-                  <CardDescription>Salary payments due in the next 7 days</CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Process Payments
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {upcomingPayments.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell className="font-medium">{payment.employee}</TableCell>
-                      <TableCell>{payment.position}</TableCell>
-                      <TableCell><CurrencyValue amount={payment.amount} /></TableCell>
-                      <TableCell>
-                        {new Date(payment.dueDate).toLocaleDateString('en-GB')}
-                      </TableCell>
-                      <TableCell>{payment.type}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(payment.status)}>
-                          {payment.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Salary Advances */}
-        <TabsContent value="advances" className="space-y-4">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <TrendingUp className="h-5 w-5 text-cyan-600" />
-                    <span>Active Salary Advances</span>
-                  </CardTitle>
-                  <CardDescription>Outstanding salary advances and repayment tracking</CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Advance
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Advance Amount</TableHead>
-                    <TableHead>Remaining Balance</TableHead>
-                    <TableHead>Monthly Deduction</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salaryAdvances.map((advance) => (
-                    <TableRow key={advance.id}>
-                      <TableCell className="font-medium">{advance.employee}</TableCell>
-                      <TableCell>{advance.position}</TableCell>
-                      <TableCell><CurrencyValue amount={advance.advanceAmount} /></TableCell>
-                      <TableCell className="text-red-600 font-semibold">
-                        <CurrencyValue amount={advance.remainingBalance} />
-                      </TableCell>
-                      <TableCell><CurrencyValue amount={advance.monthlyDeduction} /></TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(advance.status)}>
-                          {advance.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Top Performing Classes */}
-        <TabsContent value="classes" className="space-y-4">
-          <Card className="bg-white border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Award className="h-5 w-5 text-green-600" />
-                    <span>Top Performing Classes</span>
-                  </CardTitle>
-                  <CardDescription>Most popular classes and instructor performance</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Class Name</TableHead>
-                    <TableHead>Instructor</TableHead>
-                    <TableHead>Bookings</TableHead>
-                    <TableHead>Capacity</TableHead>
-                    <TableHead>Revenue</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topPerformingClasses.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
-                        No class bookings recorded yet
-                      </TableCell>
-                    </TableRow>
-                  ) : topPerformingClasses.map((classData) => (
-                    <TableRow key={classData.id}>
-                      <TableCell className="font-medium">{classData.className}</TableCell>
-                      <TableCell>{classData.instructor}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span>{classData.bookings}</span>
-                          <Progress
-                            value={classData.capacity > 0 ? (classData.bookings / classData.capacity) * 100 : 0}
-                            className="w-16 h-2"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>{classData.capacity}</TableCell>
-                      <TableCell><CurrencyValue amount={classData.revenue} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
-

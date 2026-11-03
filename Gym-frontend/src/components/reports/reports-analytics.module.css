@@ -1,0 +1,93 @@
+/* Reports & Analytics (Community > Reports). Shares the Analytics Dashboard look
+   (components/analytics/community-analytics.module.css); only the pieces that page
+   doesn't have live here. Tailwind is a frozen snapshot, so layout stays in CSS. */
+
+.tabsBar {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabsBar::-webkit-scrollbar { display: none; }
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 0 auto;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.625rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.tab:hover { color: var(--foreground); background: var(--muted); }
+.tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tab[data-active="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+/* KPI grids — 5 headline tiles, 4 per-tab tiles */
+.kpis5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.875rem; }
+.kpis4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.875rem; }
+.kpiActive { box-shadow: 0 0 0 2px var(--primary), 0 4px 6px -1px rgb(0 0 0 / 0.08) !important; }
+
+.tabBody { display: flex; flex-direction: column; gap: 1rem; animation: rp-in 220ms ease-out; }
+@keyframes rp-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Donut + legend side by side */
+.donut { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1.25rem; align-items: center; }
+.donutChart { width: 100%; height: 220px; position: relative; }
+.donutCenter {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none;
+}
+.donutTotal { font-size: 1.125rem; font-weight: 700; line-height: 1.2; }
+.donutLabel { font-size: var(--text-xs); color: var(--muted-foreground); }
+
+.legendRows { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.legendRow {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 0.625rem; align-items: center;
+  font-size: var(--text-sm);
+}
+.legendName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legendAmt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.legendPct { font-size: var(--text-xs); color: var(--muted-foreground); font-variant-numeric: tabular-nums; min-width: 2.5rem; text-align: right; }
+
+/* Big-number facts (membership metrics) */
+.bigFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.bigFact { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.875rem 1rem; border-radius: 0.75rem; background: var(--muted); }
+.bigFactValue { font-size: 1.5rem; font-weight: 700; color: var(--tone, var(--foreground)); line-height: 1.2; }
+
+/* Labelled meters (operational metrics) */
+.meters { display: flex; flex-direction: column; gap: 1.125rem; }
+.meterHead { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; margin-bottom: 0.4rem; font-size: var(--text-sm); }
+.meterValue { font-weight: 600; font-variant-numeric: tabular-nums; }
+.meterHint { font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 0.3rem; }
+
+.panelActions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.updated { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+@media (max-width: 1280px) {
+  .kpis5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1024px) {
+  .kpis4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .kpis5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .donut { grid-template-columns: minmax(0, 1fr); }
+  .bigFacts { grid-template-columns: minmax(0, 1fr); }
+  .tab { flex: 0 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabBody { animation: none; }
+}

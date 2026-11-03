@@ -211,7 +211,7 @@ export function CreditModal({
                 borderRadius: 10,
                 border: "1px solid light-dark(#e5e7eb, var(--border))",
                 padding: 14,
-                backgroundColor: "light-dark(#f9fafb, var(--muted-bg))",
+                backgroundColor: "light-dark(var(--gb-bg), var(--muted-bg))",
                 display: "flex",
                 justifyContent: "space-between",
               }}

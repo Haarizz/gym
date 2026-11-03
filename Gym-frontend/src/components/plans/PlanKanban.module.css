@@ -108,7 +108,7 @@
 .metaText + .metaText::before, .typePill + .metaText::before { content: "·"; margin-right: 0.5rem; color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
 .typePill {
   display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.6875rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 999px;
-  color: #0f766e; background: color-mix(in srgb, #14b8a6 13%, transparent);
+  color: var(--gb-primary-deep); background: color-mix(in srgb, #14b8a6 13%, transparent);
 }
 .typePill svg { width: 0.7rem; height: 0.7rem; }
 .typePill[data-type="couple"] { color: #be185d; background: color-mix(in srgb, #ec4899 12%, transparent); }

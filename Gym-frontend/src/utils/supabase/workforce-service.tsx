@@ -254,10 +254,16 @@ export interface PayrollLine {
     ot_rate: number;
     ot_multiplier: number;
     commission: Record<string, number>;
-    advances: Array<{ advance_id: number; advance_type: string; installment_no: number; installments: number; amount: number; due_month: string }>;
-    deductions: Array<{ deduction_id: number; type: string; code: string | null; amount: number; reason: string | null; installment_no: number; installments: number }>;
+    /** amount = withheld this month; due = the full installment when only part fitted in the pay */
+    advances: Array<{ advance_id: number; advance_type: string; installment_no: number; installments: number; amount: number; due?: number; due_month: string }>;
+    /** a deduction that didn't fit in the pay has amount 0, deferred = true, due = its amount */
+    deductions: Array<{ deduction_id: number; type: string; code: string | null; amount: number; due?: number; deferred?: boolean; reason: string | null; installment_no: number; installments: number }>;
     attendance: AttendanceSummary;
-    net_floored_by?: number;
+    /** joined during the month: basic and allowances are prorated */
+    joined_on?: string;
+    monthly_basic?: number;
+    employed_share?: number;
+    net_floored_by?: number; // older runs only
   } | null;
 }
 

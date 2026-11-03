@@ -6,23 +6,14 @@
 // lands in this state. Class/PT bookings paid the same way in the app wait here
 // too (BookingPaymentService) — the seat is held until reception decides — and so do
 // add-ons bought in the app (AddonPaymentService), which stay inactive until then.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { membersService, type Member } from '../utils/supabase/members-service';
 import { bookingService, type BookingApi } from '../utils/supabase/booking-service';
 import { addonsService, type MemberAddon } from '../utils/supabase/addons-service';
 import { useCurrency } from '../utils/currency';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -33,37 +24,77 @@ import {
 } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import {
-  ClipboardCheck,
+  CalendarCheck,
   CheckCircle,
-  XCircle,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
   Clock,
-  Wallet,
-  CalendarCheck,
+  CreditCard,
+  History,
+  Hourglass,
   PackagePlus,
+  RefreshCw,
+  UserCheck,
+  Wallet,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { styles, Kpi, Panel, SectionTabs, Status, fmtInt, fmtDate } from '../components/overview/overview-kit';
+import q from '../components/approvals/approvals.module.css';
 
 const PAGE_SIZE = 20;
+/** Requests older than this are flagged so reception clears them first. */
+const LATE_HOURS = 24;
 
 type ActionType = 'approve' | 'reject';
+type Tab = 'members' | 'bookings' | 'addons';
 
 type ActionTarget =
   | { kind: 'member'; type: ActionType; member: Member }
   | { kind: 'booking'; type: ActionType; booking: BookingApi }
   | { kind: 'addon'; type: ActionType; addon: MemberAddon };
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+/** One queue card, whatever the request type. */
+interface Request {
+  key: string;
+  name: string;
+  sub?: string;
+  photo?: string;
+  what: string;
+  whatSub?: string;
+  method?: string | null;
+  since?: string | null;
+  /** Date-only values (a member's join date) have no meaningful time. */
+  sinceIsDate?: boolean;
+  total: number;
+  received: number;
+  walletPart?: number;
+  discount?: string | null;
+  onApprove: () => void;
+  onReject: () => void;
 }
 
+const initials = (name?: string | null) =>
+  (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?';
+
+function ageOf(value?: string | null): { hours: number; text: string } | null {
+  if (!value) return null;
+  const t = new Date(value).getTime();
+  if (Number.isNaN(t)) return null;
+  const hours = Math.max(0, (Date.now() - t) / 36e5);
+  const text = hours < 1 ? 'just now' : hours < 24 ? `${Math.floor(hours)}h ago` : `${Math.floor(hours / 24)}d ago`;
+  return { hours, text };
+}
+
+const timeOf = (value?: string | null) => {
+  const d = value ? new Date(value) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+};
+
 export function Approvals() {
+  const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
+  const money = useCallback((n: number) => formatCurrency(n), [formatCurrency]);
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,6 +108,9 @@ export function Approvals() {
 
   const [addonApprovals, setAddonApprovals] = useState<MemberAddon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
+
+  const [tab, setTab] = useState<Tab>('members');
+  const tabChosen = useRef(false);
 
   const [actionDialog, setActionDialog] = useState<ActionTarget | null>(null);
   const [reason, setReason] = useState('');
@@ -129,6 +163,21 @@ export function Approvals() {
   useEffect(() => {
     loadAddons();
   }, [loadAddons]);
+
+  const anyLoading = loading || loadingBookings || loadingAddons;
+
+  // Open on the first queue that has something in it, until the user picks a tab.
+  useEffect(() => {
+    if (anyLoading || tabChosen.current) return;
+    if (totalItems > 0) setTab('members');
+    else if (bookingApprovals.length > 0) setTab('bookings');
+    else if (addonApprovals.length > 0) setTab('addons');
+  }, [anyLoading, totalItems, bookingApprovals.length, addonApprovals.length]);
+
+  const chooseTab = (t: Tab) => {
+    tabChosen.current = true;
+    setTab(t);
+  };
 
   const refreshAll = () => {
     loadMembers();
@@ -203,6 +252,73 @@ export function Approvals() {
     }
   };
 
+  // ── Queue cards ──
+  const memberRequests: Request[] = useMemo(() => members.map((m) => {
+    const total = Number(m.membership_fee ?? 0);
+    const owed = Number(m.outstanding_balance ?? 0);
+    return {
+      key: `m-${m.id}`,
+      name: m.name,
+      sub: m.member_id || m.phone || m.email,
+      photo: m.photo_url,
+      what: m.membership_plan || m.membership_type || 'Membership',
+      whatSub: m.phone || m.email,
+      method: m.payment_method_used,
+      since: m.join_date,
+      sinceIsDate: true,
+      total,
+      received: Math.max(0, total - owed),
+      onApprove: () => openAction('approve', m),
+      onReject: () => openAction('reject', m),
+    };
+  }), [members]);
+
+  const bookingRequests: Request[] = useMemo(() => bookingApprovals.map((b) => ({
+    key: `b-${b.id}`,
+    name: b.memberName || b.guestName || '—',
+    sub: b.guest ? 'Guest' : undefined,
+    what: b.sessionName || 'Session',
+    whatSub: [b.date ? fmtDate(b.date) : '', b.startTime ? b.startTime.slice(0, 5) : '', b.trainerName || ''].filter(Boolean).join(' · '),
+    method: b.paymentMethod,
+    since: b.createdAt,
+    total: Number(b.price ?? 0),
+    received: Number(b.paidAmount ?? 0),
+    walletPart: Number(b.walletAmount ?? 0),
+    discount: b.discountLabel,
+    onApprove: () => openBookingAction('approve', b),
+    onReject: () => openBookingAction('reject', b),
+  })), [bookingApprovals]);
+
+  const addonRequests: Request[] = useMemo(() => addonApprovals.map((a) => ({
+    key: `a-${a.id}`,
+    name: a.member_name || '—',
+    sub: a.member_id,
+    what: a.addon_name || 'Add-on',
+    whatSub: [a.category, a.transaction_id].filter(Boolean).join(' · '),
+    method: a.payment_mode,
+    since: a.purchase_date || a.created_at,
+    total: Number(a.amount ?? 0),
+    received: Number(a.paid_amount ?? 0),
+    walletPart: Number(a.wallet_amount ?? 0),
+    discount: a.discount_label,
+    onApprove: () => openAddonAction('approve', a),
+    onReject: () => openAddonAction('reject', a),
+  })), [addonApprovals]);
+
+  const all = [...memberRequests, ...bookingRequests, ...addonRequests];
+  const waiting = totalItems + bookingApprovals.length + addonApprovals.length;
+  const received = all.reduce((s, r) => s + r.received, 0);
+  const owed = all.reduce((s, r) => s + Math.max(0, r.total - r.received), 0);
+  const oldest = all.map(r => ageOf(r.since)).filter(Boolean).sort((a, b) => b!.hours - a!.hours)[0];
+  const lateCount = all.filter(r => (ageOf(r.since)?.hours ?? 0) >= LATE_HOURS).length;
+  const partialNote = totalPages > 1 ? ' (this page of memberships)' : '';
+
+  const tabs: { id: Tab; label: string; icon: typeof UserCheck; count?: number }[] = [
+    { id: 'members', label: 'Memberships', icon: UserCheck, count: totalItems },
+    { id: 'bookings', label: 'Bookings', icon: CalendarCheck, count: bookingApprovals.length },
+    { id: 'addons', label: 'Add-ons', icon: PackagePlus, count: addonApprovals.length },
+  ];
+
   const dialogName = !actionDialog ? ''
     : actionDialog.kind === 'member' ? actionDialog.member.name
     : actionDialog.kind === 'addon' ? actionDialog.addon.member_name
@@ -211,352 +327,141 @@ export function Approvals() {
     : actionDialog.kind === 'member' ? actionDialog.member.payment_method_used
     : actionDialog.kind === 'addon' ? actionDialog.addon.payment_mode
     : actionDialog.booking.paymentMethod)?.toLowerCase() || 'payment';
+  const dialogRequest = !actionDialog ? undefined
+    : all.find(r => r.key === (actionDialog.kind === 'member' ? `m-${actionDialog.member.id}`
+      : actionDialog.kind === 'addon' ? `a-${actionDialog.addon.id}` : `b-${actionDialog.booking.id}`));
 
-  const cardShell = 'border-primary/10 shadow-md hover:shadow-lg transition-shadow';
+  const renderQueue = (rows: Request[], busy: boolean, emptyTitle: string, emptyText: string) => {
+    if (busy && rows.length === 0) {
+      return <div className={styles.centered} style={{ minHeight: 160 }}><RefreshCw className="h-5 w-5 animate-spin text-primary" />Loading…</div>;
+    }
+    if (rows.length === 0) {
+      return (
+        <div className={q.caughtUp}>
+          <span className={q.caughtUpIcon}><CheckCircle size={22} /></span>
+          <strong>{emptyTitle}</strong>
+          <span>{emptyText}</span>
+        </div>
+      );
+    }
+    return (
+      <div className={`${q.queue} ${busy ? styles.loadingVeil : ''}`}>
+        {rows.map((r) => {
+          const age = ageOf(r.since);
+          const late = (age?.hours ?? 0) >= LATE_HOURS;
+          const due = Math.max(0, r.total - r.received);
+          return (
+            <div key={r.key} className={q.item} data-late={late}>
+              <span className={q.avatar}>{r.photo ? <img src={r.photo} alt="" /> : initials(r.name)}</span>
+              <div className={q.who}>
+                <span className={q.name}>{r.name}{r.sub && <span className={styles.muted} style={{ fontWeight: 400 }}> · {r.sub}</span>}</span>
+                <span className={q.what}>{r.what}</span>
+                <span className={q.meta}>
+                  {r.whatSub && <span>{r.whatSub}</span>}
+                  <Status kind="info"><Wallet size={11} />{r.method || 'Unknown method'}</Status>
+                  {age && (
+                    <span title={r.sinceIsDate ? fmtDate(r.since) : `${fmtDate(r.since)} ${timeOf(r.since)}`}>
+                      {late ? <Status kind="warning"><Hourglass size={11} />waiting {age.text.replace(' ago', '')}</Status>
+                        : <><Clock size={12} />{r.sinceIsDate ? fmtDate(r.since) : age.text}</>}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className={q.money}>
+                <div className={q.moneyCell}>
+                  <span className={q.moneyLabel}>Amount</span>
+                  <span className={q.moneyValue}>{money(r.total)}</span>
+                  {r.discount && <span className={q.moneySub}>{r.discount}</span>}
+                </div>
+                <div className={q.moneyCell}>
+                  <span className={q.moneyLabel}>Received</span>
+                  <span className={q.moneyValue} data-tone={r.total > 0 && due === 0 ? 'good' : undefined}>{money(r.received)}</span>
+                  {r.walletPart ? <span className={q.moneySub}>incl. {money(r.walletPart)} wallet</span> : null}
+                </div>
+                <div className={q.moneyCell}>
+                  <span className={q.moneyLabel}>On credit</span>
+                  <span className={q.moneyValue} data-tone={due > 0 ? 'bad' : undefined}>{money(due)}</span>
+                </div>
+              </div>
+              <div className={q.actions}>
+                <Button size="sm" variant="outline" className={q.reject} onClick={r.onReject}>
+                  <XCircle className="mr-1.5 h-4 w-4" /> Reject
+                </Button>
+                <Button size="sm" className={q.approve} onClick={r.onApprove}>
+                  <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-start">
+    <div className={styles.root}>
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold">Approvals</h1>
-          <p className="text-muted-foreground mt-2">
-            Review mobile purchases, session bookings, and add-ons paid by Cash, Credit, or Mixed payment
-          </p>
-        </div>
-        <Button variant="outline" onClick={refreshAll}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Awaiting Approval</CardTitle>
-            <div className="bg-yellow-50 p-2 rounded-lg">
-              <Clock className="h-4 w-4 text-yellow-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{totalItems}</div>
-            <p className="text-xs text-muted-foreground">Members waiting on reception</p>
-          </CardContent>
-        </Card>
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Booking Payments</CardTitle>
-            <div className="bg-amber-50 p-2 rounded-lg">
-              <CalendarCheck className="h-4 w-4 text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{bookingApprovals.length}</div>
-            <p className="text-xs text-muted-foreground">Seats held until the payment is confirmed</p>
-          </CardContent>
-        </Card>
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Add-on Payments</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <PackagePlus className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{addonApprovals.length}</div>
-            <p className="text-xs text-muted-foreground">Add-ons inactive until the payment is confirmed</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <h2 className="text-lg font-semibold">Memberships</h2>
-
-      {/* Table */}
-      <Card className={cardShell}>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Member</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Amount Paid</TableHead>
-                <TableHead>Outstanding</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Loading pending approvals...
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading && members.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No payments are waiting on approval.
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading && members.map((member) => {
-                const paidAmount = (member.membership_fee ?? 0) - (member.outstanding_balance ?? 0);
-                return (
-                  <TableRow key={member.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell>
-                      <div className="font-medium">{member.name}</div>
-                      <div className="text-xs text-muted-foreground">{member.phone || member.email}</div>
-                    </TableCell>
-                    <TableCell>{member.membership_plan || member.membership_type || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 gap-1">
-                        <Wallet className="h-3 w-3" />
-                        {member.payment_method_used || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatCurrency(paidAmount)}</TableCell>
-                    <TableCell className={(member.outstanding_balance ?? 0) > 0 ? 'text-red-600 font-medium' : ''}>
-                      {formatCurrency(member.outstanding_balance ?? 0)}
-                    </TableCell>
-                    <TableCell>{formatDateTime(member.join_date)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-700 border-green-200 hover:bg-green-50"
-                        onClick={() => openAction('approve', member)}
-                      >
-                        <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-700 border-red-200 hover:bg-red-50"
-                        onClick={() => openAction('reject', member)}
-                      >
-                        <XCircle className="mr-1.5 h-4 w-4" /> Reject
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-2">
-          <div className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} pending
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-            </Button>
-            <div className="text-sm">Page {currentPage} of {totalPages}</div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+          <h1 className={styles.title}>Approvals</h1>
+          <div className={styles.subtitle}>
+            App purchases paid by Cash, Credit or Mixed payment wait here until reception confirms the money
           </div>
         </div>
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={refreshAll} disabled={anyLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${anyLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/approval-history')}>
+            <History className="mr-2 h-4 w-4" />
+            History
+          </Button>
+        </div>
+      </div>
+
+      <div className={styles.kpis}>
+        <Kpi icon={Hourglass} tone={waiting ? 'amber' : 'green'} label="Waiting now" value={fmtInt(waiting)}
+          hint={waiting ? (oldest ? `oldest ${oldest.text}${lateCount ? ` · ${lateCount} over a day` : ''}` : 'requests to review') : 'all caught up'} />
+        <Kpi icon={UserCheck} tone="blue" label="Memberships" value={fmtInt(totalItems)} hint="app access locked until approved" onClick={() => chooseTab('members')} />
+        <Kpi icon={CalendarCheck} tone="violet" label="Bookings" value={fmtInt(bookingApprovals.length)} hint="seats held until approved" onClick={() => chooseTab('bookings')} />
+        <Kpi icon={PackagePlus} tone="teal" label="Add-ons" value={fmtInt(addonApprovals.length)} hint="inactive until approved" onClick={() => chooseTab('addons')} />
+        <Kpi icon={Wallet} tone="green" label="Received, to confirm" value={money(received)} hint={`cash and payments to verify${partialNote}`} />
+        <Kpi icon={CreditCard} tone={owed > 0 ? 'red' : 'orange'} label="On credit" value={money(owed)} hint={`still to be paid${partialNote}`} />
+      </div>
+
+      <SectionTabs tabs={tabs} value={tab} onChange={chooseTab} label="Approval queues" />
+
+      {tab === 'members' && (
+        <Panel title="Membership purchases" icon={UserCheck} sub="Approving unlocks the member's app access and posts the payment to the books">
+          {renderQueue(memberRequests, loading, 'No memberships waiting', 'New app purchases paid by Cash, Credit or Mixed payment will appear here.')}
+          {totalPages > 1 && (
+            <div className={q.pager}>
+              <span>Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} pending</span>
+              <div className={q.pagerBtns}>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                </Button>
+                <span>Page {currentPage} of {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Panel>
       )}
 
-      {/* Booking payments */}
-      <h2 className="text-lg font-semibold pt-2">Booking Payments</h2>
-      <Card className={cardShell}>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Member</TableHead>
-                <TableHead>Session</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Received</TableHead>
-                <TableHead>Booked</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingBookings && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Loading booking payments...
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loadingBookings && bookingApprovals.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    <CalendarCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No booking payments are waiting on approval.
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loadingBookings && bookingApprovals.map((booking) => {
-                const price = booking.price ?? 0;
-                const received = booking.paidAmount ?? 0;
-                return (
-                  <TableRow key={booking.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell>
-                      <div className="font-medium">{booking.memberName || '—'}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{booking.sessionName || '—'}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {booking.date} {booking.startTime ? `· ${booking.startTime.slice(0, 5)}` : ''}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 gap-1">
-                        <Wallet className="h-3 w-3" />
-                        {booking.paymentMethod || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(price)}
-                      {booking.discountLabel && (
-                        <div className="text-xs text-muted-foreground">{booking.discountLabel}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className={received < price ? 'text-red-600 font-medium' : ''}>
-                      {formatCurrency(received)}
-                      {booking.walletAmount ? (
-                        <div className="text-xs text-muted-foreground">incl. {formatCurrency(booking.walletAmount)} wallet</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{formatDateTime(booking.createdAt)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-700 border-green-200 hover:bg-green-50"
-                        onClick={() => openBookingAction('approve', booking)}
-                      >
-                        <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-700 border-red-200 hover:bg-red-50"
-                        onClick={() => openBookingAction('reject', booking)}
-                      >
-                        <XCircle className="mr-1.5 h-4 w-4" /> Reject
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {tab === 'bookings' && (
+        <Panel title="Class & PT bookings" icon={CalendarCheck} sub="The seat is held until you decide; rejecting releases it and returns any wallet amount">
+          {renderQueue(bookingRequests, loadingBookings, 'No bookings waiting', 'Bookings paid by Cash, Credit or Mixed payment in the app will appear here.')}
+        </Panel>
+      )}
 
-      {/* Add-on payments */}
-      <h2 className="text-lg font-semibold pt-2">Add-on Payments</h2>
-      <Card className={cardShell}>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Member</TableHead>
-                <TableHead>Add-on</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Received</TableHead>
-                <TableHead>Purchased</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loadingAddons && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Loading add-on payments...
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loadingAddons && addonApprovals.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    <PackagePlus className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    No add-on payments are waiting on approval.
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loadingAddons && addonApprovals.map((addon) => {
-                const amount = Number(addon.amount ?? 0);
-                const received = Number(addon.paid_amount ?? 0);
-                return (
-                  <TableRow key={addon.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell>
-                      <div className="font-medium">{addon.member_name || '—'}</div>
-                      <div className="text-xs text-muted-foreground">{addon.member_id}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{addon.addon_name || '—'}</div>
-                      <div className="text-xs text-muted-foreground">{addon.transaction_id}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 gap-1">
-                        <Wallet className="h-3 w-3" />
-                        {addon.payment_mode || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(amount)}
-                      {addon.discount_label && (
-                        <div className="text-xs text-muted-foreground">{addon.discount_label}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className={received < amount ? 'text-red-600 font-medium' : ''}>
-                      {formatCurrency(received)}
-                      {addon.wallet_amount ? (
-                        <div className="text-xs text-muted-foreground">incl. {formatCurrency(Number(addon.wallet_amount))} wallet</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{formatDateTime(addon.purchase_date)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-700 border-green-200 hover:bg-green-50"
-                        onClick={() => openAddonAction('approve', addon)}
-                      >
-                        <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-700 border-red-200 hover:bg-red-50"
-                        onClick={() => openAddonAction('reject', addon)}
-                      >
-                        <XCircle className="mr-1.5 h-4 w-4" /> Reject
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {tab === 'addons' && (
+        <Panel title="Add-on purchases" icon={PackagePlus} sub="The add-on starts from the day you approve it">
+          {renderQueue(addonRequests, loadingAddons, 'No add-ons waiting', 'Add-ons bought in the app with Cash, Credit or Mixed payment will appear here.')}
+        </Panel>
+      )}
 
       {/* Approve / Reject confirmation dialog */}
       <Dialog open={!!actionDialog} onOpenChange={(open) => { if (!open) setActionDialog(null); }}>
@@ -581,18 +486,27 @@ export function Approvals() {
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="action-reason">
-              {actionDialog?.type === 'reject' ? 'Reason (required)' : 'Remarks (optional)'}
-            </Label>
-            <Textarea
-              id="action-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={actionDialog?.type === 'reject' ? 'Why is this payment being rejected?' : 'Add a note for the audit trail...'}
-              rows={3}
-            />
-          </div>
+          {dialogRequest && (
+            <dl className={q.summary}>
+              <div><dt>For</dt><dd>{dialogRequest.what}</dd></div>
+              <div><dt>Paid by</dt><dd>{dialogRequest.method || '—'}</dd></div>
+              <div><dt>Received</dt><dd>{money(dialogRequest.received)}</dd></div>
+              <div><dt>On credit</dt><dd style={{ color: dialogRequest.total > dialogRequest.received ? 'var(--status-critical)' : undefined }}>{money(Math.max(0, dialogRequest.total - dialogRequest.received))}</dd></div>
+            </dl>
+          )}
+          {/* Approvals take no note (the server doesn't store one); a rejection needs its reason. */}
+          {actionDialog?.type === 'reject' && (
+            <div className="space-y-2">
+              <Label htmlFor="action-reason">Reason (required)</Label>
+              <Textarea
+                id="action-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why is this payment being rejected?"
+                rows={3}
+              />
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionDialog(null)} disabled={processing}>
               Cancel
@@ -600,7 +514,7 @@ export function Approvals() {
             <Button
               onClick={confirmAction}
               disabled={processing}
-              className={actionDialog?.type === 'reject' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+              className={actionDialog?.type === 'reject' ? 'bg-red-600 hover:bg-red-700 text-white' : q.approve}
             >
               {processing ? 'Processing...' : `Confirm ${actionDialog?.type === 'approve' ? 'Approval' : 'Rejection'}`}
             </Button>

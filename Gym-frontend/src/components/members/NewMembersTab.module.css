@@ -1,7 +1,7 @@
 /* Members › New Members (Web App Design › Members). Tailwind is a frozen snapshot, so the
    tab lives here on the theme tokens (light + .dark). */
 
-[data-tone="teal"] { --tone: #2B7A78; }
+[data-tone="teal"] { --tone: var(--gb-primary); }
 [data-tone="green"] { --tone: #15803d; }
 [data-tone="amber"] { --tone: #b45309; }
 [data-tone="red"] { --tone: #dc2626; }

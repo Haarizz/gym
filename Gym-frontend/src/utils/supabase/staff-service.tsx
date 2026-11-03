@@ -145,6 +145,25 @@ export interface StaffListPerformance {
   performance_status?: string;
 }
 
+/** GET /staff/me/transactions — only the caller's own records. */
+export interface MyTransactions {
+  linked: boolean;
+  days: number;
+  salary_payments: Array<{ id: number; month: string; year: number; net_salary: number; payment_date: string | null; status: string | null; method: string | null; gross?: number; total_deductions?: number }>;
+  advances: Array<{ id: number; advance_type: string | null; requested_amount: number | null; approved_amount: number | null; balance: number | null; total_deducted: number | null; installment_count: number | null; installment_amount: number | null; status: string | null; request_date: string | null; approved_date: string | null }>;
+  receipts: Array<{ id: number; receipt_no: string | null; member_name: string | null; plan_name: string | null; transaction_type: string | null; amount: number | null; paid_amount: number | null; payment_method: string | null; status: string | null; date: string | null }>;
+  pos_sales: Array<{ id: number; transaction_number: string | null; member_name: string | null; payment_method: string | null; total: number; refunded: number; net: number; date: string | null }>;
+  summary: { salary_paid_ytd: number; advance_balance: number; collected: number; receipt_count: number; pos_net: number; pos_count: number };
+}
+
+/** GET /staff/me/attendance — the caller's shift attendance (same day/summary shape as Staff Attendance). */
+export interface MyAttendance {
+  linked: boolean;
+  month: string;
+  days?: Array<{ date: string; status: string; shift_name: string | null; scheduled: boolean; scheduled_in: string | null; scheduled_out: string | null; actual_in: string | null; actual_out: string | null; worked_minutes: number; late_minutes: number; ot_minutes: number }>;
+  summary?: { scheduled_days: number; present: number; absent: number; paid_leave: number; unpaid_leave: number; late_count: number; actual_hours: number; ot_hours: number; attendance_rate: number | null; upcoming_days: number };
+}
+
 export interface StaffPerformance {
   period: { year: number; month: number; label: string };
   revenue_target: { achieved: number; target: number; percentage: number };
@@ -231,6 +250,21 @@ class StaffService {
     );
     if (response.status === 404 || response.status === 401) return null;
     if (!response.ok) throw new Error(`Failed to fetch my profile: ${response.status}`);
+    return response.json();
+  }
+
+  /** The signed-in person's own salary payments, advances, and receipts / POS sales recorded under their login. */
+  async getMyTransactions(days = 90): Promise<MyTransactions> {
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/staff/me/transactions?days=${days}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load your transactions: ${response.status}`));
+    return response.json();
+  }
+
+  /** The signed-in person's own shift attendance for a month (yyyy-MM); linked=false without a staff record. */
+  async getMyAttendance(month?: string): Promise<MyAttendance> {
+    const q = month ? `?month=${encodeURIComponent(month)}` : "";
+    const response = await authService.makeAuthenticatedRequest(`${backendBaseUrl}/staff/me/attendance${q}`);
+    if (!response.ok) throw new Error(await parseApiError(response, `Failed to load your attendance: ${response.status}`));
     return response.json();
   }
 

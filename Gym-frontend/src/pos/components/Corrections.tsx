@@ -230,10 +230,10 @@ export function CorrectionRequestDialog({ target, open, onOpenChange, onDone }: 
                 <Input autoFocus value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Search member name, ID or phone…" />
                 <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid light-dark(#EEF2F6, var(--border))", borderRadius: 8 }}>
                   <button type="button" className={s.clickRow} onClick={() => setMember("WALK_IN")}
-                    style={{ display: "flex", width: "100%", padding: "8px 12px", background: member === "WALK_IN" ? "light-dark(#E6F2F1, var(--muted-bg))" : undefined }}>Walk-in customer</button>
+                    style={{ display: "flex", width: "100%", padding: "8px 12px", background: member === "WALK_IN" ? "light-dark(var(--gb-primary-tint), var(--muted-bg))" : undefined }}>Walk-in customer</button>
                   {members.map((m) => (
                     <button type="button" key={m.id} className={s.clickRow} onClick={() => setMember(m)}
-                      style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "8px 12px", borderTop: "1px solid light-dark(#F1F5F9, var(--border))", background: member !== "WALK_IN" && member?.id === m.id ? "light-dark(#E6F2F1, var(--muted-bg))" : undefined }}>
+                      style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "8px 12px", borderTop: "1px solid light-dark(#F1F5F9, var(--border))", background: member !== "WALK_IN" && member?.id === m.id ? "light-dark(var(--gb-primary-tint), var(--muted-bg))" : undefined }}>
                       <span className={s.strong}>{m.name}</span><span className={`${s.small} ${s.muted}`}>{m.memberCode || ""} {m.phone || ""}</span>
                     </button>
                   ))}

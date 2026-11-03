@@ -28,7 +28,7 @@ type TabId = "dashboard" | "review" | "history" | "reports";
 const RUN_TONE: Record<string, Tone> = { Draft: "gray", Approved: "blue", "Partially Paid": "amber", Paid: "green", Disbursed: "green" };
 const isPaid = (r: PayrollRun) => r.status === "Paid" || r.status === "Disbursed";
 const awaitingPayment = (r: PayrollRun) => r.status === "Approved" || r.status === "Partially Paid";
-const CHART_COLORS = ["#2B7A78", "#3B82F6", "#8B5CF6", "#F59E0B", "#EC4899", "#10B981", "#EF4444", "#0EA5E9"];
+const CHART_COLORS = ["var(--gb-primary)", "#3B82F6", "#8B5CF6", "#F59E0B", "#EC4899", "#10B981", "#EF4444", "#0EA5E9"];
 
 const sum = (lines: PayrollLine[], key: keyof PayrollLine) => lines.reduce((t, l) => t + Number(l[key] || 0), 0);
 const lineDeductions = (l: PayrollLine) => Number(l.attendance_deduction) + Number(l.advance_repayment) + Number(l.other_deductions);
@@ -376,9 +376,9 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} cursor={{ fill: "rgba(43,122,120,0.06)" }} />
+                  <Tooltip formatter={(v: number) => `${currencyPrefix}${Number(v).toLocaleString()}`} cursor={{ fill: "color-mix(in srgb, var(--gb-primary) 6%, transparent)" }} />
                   <Bar dataKey="gross" name="Gross" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={36} />
-                  <Bar dataKey="net" name="Net" fill="#2B7A78" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="net" name="Net" fill="var(--gb-primary)" radius={[6, 6, 0, 0]} maxBarSize={36} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -706,11 +706,17 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                   <DialogDescription>{[l.employee_code, l.designation, l.department].filter(Boolean).join(" · ")} · {selected.period_label}</DialogDescription>
                 </DialogHeader>
                 <div className={s.dialogBody}>
-                  {b && !b.has_shift && <Note tone="blue">No shift was assigned this month, so attendance isn't tracked: the fixed salary is paid in full.</Note>}
+                  {b && !b.has_shift && !b.joined_on && <Note tone="blue">No shift was assigned this month, so attendance isn't tracked: the fixed salary is paid in full.</Note>}
+                  {b?.joined_on && (
+                    <Note tone="blue">
+                      Joined on {formatDate(b.joined_on)}: basic and allowances are paid for {Math.round(Number(b.employed_share ?? 1) * 1000) / 10}% of the month
+                      {b.has_shift ? " (working days on the shift from the joining date)" : " (calendar days from the joining date)"}.
+                    </Note>
+                  )}
 
                   <div className={s.section}>
                     <div className={s.sectionTitle}>A. Fixed salary</div>
-                    <Line label="Basic salary" value={money(l.basic_salary)} />
+                    <Line label={b?.joined_on ? `Basic salary (prorated from ${money(b.monthly_basic ?? l.basic_salary)})` : "Basic salary"} value={money(l.basic_salary)} />
                     {(b?.allowances ?? []).map(a => <Line key={a.name} label={a.name} value={money(a.amount)} />)}
                     <Line label="Gross fixed earnings" value={money(grossFixed)} total tone="teal" />
                   </div>
@@ -744,7 +750,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
 
                   <div className={s.section} data-tone="red">
                     <div className={s.sectionTitle}>D. Attendance deductions</div>
-                    {b?.rate_days ? <div className={s.cellSub} style={{ marginBottom: 4 }}>Daily rate = basic {money(l.basic_salary)} ÷ {b.rate_days} working days in a full month on this shift</div> : null}
+                    {b?.rate_days ? <div className={s.cellSub} style={{ marginBottom: 4 }}>Daily rate = monthly basic {money(b.monthly_basic ?? l.basic_salary)} ÷ {b.rate_days} working days in a full month on this shift</div> : null}
                     <Line label={`Absence (${l.absent_days} day${Number(l.absent_days) === 1 ? "" : "s"} × ${money(perDay)})`} value={absentDed ? money(absentDed) : "—"} tone="red" />
                     <Line label={`Unpaid leave (${l.unpaid_leave_days} day${Number(l.unpaid_leave_days) === 1 ? "" : "s"} × ${money(perDay)})`} value={unpaidDed ? money(unpaidDed) : "—"} tone="red" />
                     <Line label="Total attendance deductions" value={money(l.attendance_deduction)} total tone="red" />
@@ -753,14 +759,24 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                   <div className={s.section} data-tone="orange">
                     <div className={s.sectionTitle}>D2. Advance repayments</div>
                     {(b?.advances ?? []).length === 0 ? <Line label="No advance installments this month" value="—" /> :
-                      (b?.advances ?? []).map(a => <Line key={a.advance_id} label={`${a.advance_type} ADV-${a.advance_id} · installment ${a.installment_no}/${a.installments}`} value={money(a.amount)} tone="orange" />)}
+                      (b?.advances ?? []).map(a => (
+                        <Line key={a.advance_id}
+                          label={`${a.advance_type} ADV-${a.advance_id} · installment ${a.installment_no}/${a.installments}`
+                            + (a.due != null && Number(a.due) > Number(a.amount)
+                              ? ` (due ${money(a.due)} — ${money(Number(a.due) - Number(a.amount))} left on the advance, pay didn't cover it)` : "")}
+                          value={money(a.amount)} tone="orange" />
+                      ))}
                     {(b?.advances ?? []).length > 0 && <Line label="Total advance repayments" value={money(l.advance_repayment)} total tone="orange" />}
                   </div>
 
                   <div className={s.section} data-tone="violet">
                     <div className={s.sectionTitle}>D3. Other deductions</div>
                     {(b?.deductions ?? []).length === 0 ? <Line label="No other deductions this month" value="—" /> :
-                      (b?.deductions ?? []).map(d => <Line key={d.deduction_id} label={`${d.type}${d.reason ? ` — ${d.reason}` : ""}`} value={money(d.amount)} tone="violet" />)}
+                      (b?.deductions ?? []).map(d => (
+                        <Line key={d.deduction_id}
+                          label={`${d.type}${d.reason ? ` — ${d.reason}` : ""}${d.deferred ? ` (${money(d.due ?? 0)} deferred to next month — pay didn't cover it)` : ""}`}
+                          value={d.deferred ? "—" : money(d.amount)} tone="violet" />
+                      ))}
                     {(b?.deductions ?? []).length > 0 && <Line label="Total other deductions" value={money(l.other_deductions)} total tone="violet" />}
                   </div>
 
@@ -775,6 +791,9 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                     <div className={s.netRow}><span className={s.netLabel}>Net pay</span><span className={s.netValue}>{money(l.net_pay)}</span></div>
                   </div>
                   {b?.net_floored_by ? <Note tone="red">Deductions exceeded earnings by {money(b.net_floored_by)}; net pay is shown as zero.</Note> : null}
+                  {((b?.deductions ?? []).some(d => d.deferred) || (b?.advances ?? []).some(a => a.due != null && Number(a.due) > Number(a.amount))) && (
+                    <Note tone="amber">This month's pay didn't cover every recovery. What wasn't withheld stays due and is taken from a later salary — nothing is written off.</Note>
+                  )}
                   <Note tone="amber">Unapproved overtime and commission are not included. Recalculate a draft after approving them.</Note>
                 </div>
                 <div className={s.dialogFooter}>

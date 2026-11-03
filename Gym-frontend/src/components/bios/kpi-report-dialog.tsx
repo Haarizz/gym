@@ -333,7 +333,7 @@ export function KPIReportDialog({
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyPrefix), '']} />
-                      <Bar dataKey="revenue" fill="#0F766E" />
+                      <Bar dataKey="revenue" fill="var(--gb-primary-deep)" />
                       {revenueData.some((point) => point.target != null) && <Bar dataKey="target" fill="#B91C1C" />}
                     </BarChart>
                   </ResponsiveContainer>
@@ -428,7 +428,7 @@ export function KPIReportDialog({
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip />
-                      <Area type="monotone" dataKey="members" stroke="#0F766E" fill="#0F766E" fillOpacity={0.3} />
+                      <Area type="monotone" dataKey="members" stroke="var(--gb-primary-deep)" fill="var(--gb-primary-deep)" fillOpacity={0.3} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>

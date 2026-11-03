@@ -9,7 +9,7 @@
 
 .card {
   --tone: var(--primary);
-  --tone-bg: #2b7a781a;
+  --tone-bg: color-mix(in srgb, var(--gb-primary) 10.2%, transparent);
   --ring: #6366f1;
   display: flex;
   flex-direction: column;
@@ -39,7 +39,7 @@
   box-shadow: 0 0 0 2px var(--ring), 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
-.primary { --tone: var(--primary); --tone-bg: #2b7a781a; --ring: #6366f1; }
+.primary { --tone: var(--primary); --tone-bg: color-mix(in srgb, var(--gb-primary) 10.2%, transparent); --ring: #6366f1; }
 .green { --tone: #16a34a; --tone-bg: #f0fdf4; --ring: #16a34a; }
 .blue { --tone: #2563eb; --tone-bg: #eff6ff; --ring: #2563eb; }
 .red { --tone: #dc2626; --tone-bg: #fef2f2; --ring: #dc2626; }
