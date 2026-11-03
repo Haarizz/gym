@@ -17,10 +17,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,11 +84,13 @@ class MobileStaffPerformanceServiceTest {
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
-        when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
 
         assertNotNull(response);
+        // No Staff record = no sessions of their own, so no rating (not the gym-wide average).
+        assertEquals(0.0, response.getSummary().getRating());
+        verifyNoInteractions(workoutFeedbackRepository);
         // Staff-only fields are skipped rather than guessed at when there's no linked Staff record.
         assertTrue(response.getLeaderboard().isEmpty());
         assertEquals(BigDecimal.ZERO, response.getRevenueTarget().getTarget());
@@ -115,14 +119,9 @@ class MobileStaffPerformanceServiceTest {
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(24L);
 
-        // Ratings 5,5,5,4,4 average to 4.6, matching the rating asserted below.
-        List<WorkoutFeedback> feedbacks = new ArrayList<>();
-        for (int r : new int[]{5, 5, 5, 4, 4}) {
-            WorkoutFeedback fb = new WorkoutFeedback();
-            fb.setTrainerRating(r);
-            feedbacks.add(fb);
-        }
-        when(workoutFeedbackRepository.findAll()).thenReturn(feedbacks);
+        // This trainer's own sessions average 4.6 (5 ratings); other trainers' feedback isn't counted.
+        when(workoutFeedbackRepository.averageRatingByTrainerIds(List.of(10L)))
+                .thenReturn(Collections.singletonList(new Object[]{10L, 4.6, 5L}));
         when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
@@ -161,6 +160,53 @@ class MobileStaffPerformanceServiceTest {
     }
 
     @Test
+    @DisplayName("Growth compares month-to-date with the same days of last month")
+    void testGrowthIsLikeForLike() {
+        when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime startOfPrevMonth = startOfMonth.minusMonths(1);
+        LocalDateTime endOfPrevPeriod = startOfPrevMonth.plusDays(
+                Math.min(today.getDayOfMonth(), startOfPrevMonth.toLocalDate().lengthOfMonth()));
+
+        // Current month: 1500. Same days last month: 1000. Anything else (trend months): 0.
+        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
+        when(progressCalculator.computeRevenue(any(), any(), eq(startOfMonth), eq(startOfMonth.plusMonths(1))))
+                .thenReturn(new BigDecimal("1500"));
+        when(progressCalculator.computeRevenue(any(), any(), eq(startOfPrevMonth), eq(endOfPrevPeriod)))
+                .thenReturn(new BigDecimal("1000"));
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
+
+        StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
+
+        assertEquals(50, response.getSummary().getGrowthPercentage());
+    }
+
+    @Test
+    @DisplayName("Growth is 0 (nothing to compare) when last month had no activity, not the target forecast")
+    void testGrowthWithoutComparisonIgnoresForecast() {
+        when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
+        StaffTarget target = new StaffTarget();
+        target.setRevenueTarget(new BigDecimal("1000"));
+        target.setForecast(85);
+        LocalDate today = LocalDate.now();
+        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
+                .thenReturn(List.of(target));
+        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
+        lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
+        lenient().when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
+
+        StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
+
+        assertEquals(0, response.getSummary().getGrowthPercentage());
+    }
+
+    @Test
     @DisplayName("Handles zero/empty cases gracefully without division by zero")
     void testZeroTargetGracefulHandling() {
         testStaff.setMonthlyTarget(BigDecimal.ZERO);
@@ -173,7 +219,6 @@ class MobileStaffPerformanceServiceTest {
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
-        when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
         when(staffRepository.findAll(any(Specification.class))).thenReturn(Collections.singletonList(testStaff));
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
@@ -205,7 +250,6 @@ class MobileStaffPerformanceServiceTest {
 
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(10L);
-        when(workoutFeedbackRepository.findAll()).thenReturn(Collections.emptyList());
 
         StaffPerformanceResponseDTO response = performanceService.getStaffPerformance(testPrincipal);
 

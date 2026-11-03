@@ -364,10 +364,12 @@ public class SalaryPaymentService {
         }
         if (b != null) {
             for (com.fasterxml.jackson.databind.JsonNode a : b.path("advances")) {
+                if (new BigDecimal(a.path("amount").asText("0")).signum() <= 0) continue; // nothing withheld this month
                 deductions.add(settleRow("Advance installment " + a.path("installment_no").asText("") + " of " + a.path("installments").asText(""),
                         new BigDecimal(a.path("amount").asText("0")), "advance", a.path("advance_id").asLong()));
             }
             for (com.fasterxml.jackson.databind.JsonNode d : b.path("deductions")) {
+                if (new BigDecimal(d.path("amount").asText("0")).signum() <= 0) continue; // deferred to next month
                 String reason = d.path("reason").asText("");
                 deductions.add(settleRow(d.path("type").asText("Deduction") + (reason.isBlank() || "null".equals(reason) ? "" : " — " + reason),
                         new BigDecimal(d.path("amount").asText("0")), "deduction", d.path("deduction_id").asLong()));
@@ -504,6 +506,21 @@ public class SalaryPaymentService {
                         + payrollLine.getNetPay().toPlainString() + ". Pay that amount, or reopen the payroll to change it.");
             }
         }
+        // One salary per employee per month, whichever way it's paid (payroll line, itemised or
+        // plain manual, single or bulk) — a second payment for the same month is money paid twice.
+        if (req.getEmployeeId() != null && req.getMonth() != null && req.getYear() != null) {
+            final String periodMonth = req.getMonth();
+            final Integer periodYear = req.getYear();
+            boolean alreadyPaid = paymentRepository.findAll().stream()
+                    .anyMatch(p -> req.getEmployeeId().equals(p.getEmployeeId()) && periodMonth.equalsIgnoreCase(p.getMonth())
+                            && periodYear.equals(p.getYear()) && (p.getStatus() == null || "Paid".equalsIgnoreCase(p.getStatus())));
+            if (alreadyPaid) {
+                String who = req.getEmployeeName() != null ? req.getEmployeeName() : req.getEmployeeId();
+                throw new BusinessRuleViolationException(who + " has already been paid for " + periodMonth + " " + periodYear
+                        + ". Record anything extra as an allowance next month, or as an advance.");
+            }
+        }
+
         // Without payroll: settle the items chosen from the month's list (see getEmployees).
         java.time.YearMonth manualPeriod = null;
         Staff manualPayee = null;
@@ -514,14 +531,6 @@ public class SalaryPaymentService {
             manualPayee = staffRepository.findByStaffId(req.getEmployeeId()).orElse(null);
             if (manualPeriod == null) throw new BusinessRuleViolationException("Choose the salary month to pay");
             if (manualPayee == null) throw new BusinessRuleViolationException("Employee not found: " + req.getEmployeeId());
-            final String periodMonth = req.getMonth();
-            final Integer periodYear = req.getYear();
-            boolean alreadyPaid = paymentRepository.findAll().stream()
-                    .anyMatch(p -> req.getEmployeeId().equals(p.getEmployeeId()) && periodMonth.equalsIgnoreCase(p.getMonth())
-                            && periodYear.equals(p.getYear()) && (p.getStatus() == null || "Paid".equalsIgnoreCase(p.getStatus())));
-            if (alreadyPaid) {
-                throw new BusinessRuleViolationException(manualPayee.getName() + " has already been paid for " + periodMonth + " " + periodYear);
-            }
             SalaryPaymentEmployee rec = employeeRepository.findByEmployeeId(req.getEmployeeId()).orElse(null);
             BigDecimal basic = staffBasic(manualPayee, rec);
             Map<String, Map<String, Object>> available = new java.util.LinkedHashMap<>();
@@ -543,7 +552,13 @@ public class SalaryPaymentService {
                 throw new BusinessRuleViolationException("Other allowance and other deduction can't be negative");
             }
             BigDecimal net = basic.add(total(chosen, true)).add(extraAllowance)
-                    .subtract(total(chosen, false)).subtract(extraDeduction).max(BigDecimal.ZERO);
+                    .subtract(total(chosen, false)).subtract(extraDeduction);
+            if (net.signum() < 0) {
+                // Settling would record more advance / deduction recovered than the salary can cover.
+                throw new BusinessRuleViolationException("The deductions ticked for " + manualPayee.getName() + " come to "
+                        + net.negate().toPlainString() + " more than the pay. Untick an advance installment or deduction "
+                        + "so it's taken next month instead.");
+            }
             if (req.getNetSalary() == null) {
                 req.setNetSalary(net);
             } else if (req.getNetSalary().subtract(net).abs().compareTo(new BigDecimal("0.01")) > 0) {
@@ -552,6 +567,17 @@ public class SalaryPaymentService {
             }
             manualChosen = chosen;
             settlement = manualSettlement(basic, chosen, extraAllowance, extraDeduction, net);
+        }
+
+        // The split tenders must add up to the salary paid, or the cash / bank postings are wrong.
+        if (req.getSplitPayments() != null && !req.getSplitPayments().isEmpty() && req.getNetSalary() != null) {
+            BigDecimal splitTotal = req.getSplitPayments().stream()
+                    .map(SplitPaymentDTO::getAmount).filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (splitTotal.subtract(req.getNetSalary()).abs().compareTo(new BigDecimal("0.01")) > 0) {
+                throw new BusinessRuleViolationException("The payment split adds up to " + money(splitTotal).toPlainString()
+                        + " but the salary is " + money(req.getNetSalary()).toPlainString() + ".");
+            }
         }
 
         SalaryPaymentEmployee employee = employeeRepository.findByEmployeeId(req.getEmployeeId())

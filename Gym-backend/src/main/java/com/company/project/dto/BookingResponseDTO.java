@@ -28,6 +28,11 @@ public class BookingResponseDTO {
     private String guestPhone;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
+    @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
+    private LocalDateTime checkedInAt;
+
+    public LocalDateTime getCheckedInAt() { return checkedInAt; }
+    public void setCheckedInAt(LocalDateTime checkedInAt) { this.checkedInAt = checkedInAt; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

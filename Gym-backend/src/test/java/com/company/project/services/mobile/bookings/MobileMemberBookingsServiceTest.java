@@ -75,7 +75,7 @@ public class MobileMemberBookingsServiceTest {
         when(memberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
         when(bookingRepository.findUpcomingBookings(eq(10L), any(LocalDate.class), any(LocalTime.class)))
                 .thenReturn(Collections.singletonList(booking));
-        when(bookingRepository.countBySessionIdAndStatusNot(100L, "cancelled")).thenReturn(5L);
+        when(bookingRepository.countBySessionIdAndStatusNotIn(100L, com.company.project.services.BookingService.NO_SEAT_STATUSES)).thenReturn(5L);
 
         List<MemberBookingDTO> upcoming = mobileMemberBookingsService.getUpcomingBookings(principal);
 
@@ -103,7 +103,7 @@ public class MobileMemberBookingsServiceTest {
         
         when(bookingService.createBooking(any(), eq(true))).thenReturn(bookingResponseDTO);
         when(bookingRepository.findByIdAndMemberId(500L, 10L)).thenReturn(Optional.of(booking));
-        when(bookingRepository.countBySessionIdAndStatusNot(100L, "cancelled")).thenReturn(10L);
+        when(bookingRepository.countBySessionIdAndStatusNotIn(100L, com.company.project.services.BookingService.NO_SEAT_STATUSES)).thenReturn(10L);
 
         CreateMemberBookingRequestDTO req = new CreateMemberBookingRequestDTO();
         req.setClassId(100L);

@@ -367,7 +367,7 @@ public class StaffProgressCalculator {
                 units.put("pos_items", items);
             }
         }
-        if (wholeGym || staff.getId() != null) {
+        if (wholeGym || (staff != null && staff.getId() != null)) {
             java.time.LocalDate from = start.toLocalDate();
             java.time.LocalDate lastDay = end.toLocalDate().minusDays(1);
             java.time.LocalDate today = java.time.LocalDate.now();
@@ -410,11 +410,9 @@ public class StaffProgressCalculator {
                             cb.greaterThanOrEqualTo(root.get("createdAt"), start),
                             cb.lessThan(root.get("createdAt"), end))
             ));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
+            Predicate person = personFilter(root, cb, staff, username, "processedBy");
+            if (person != null) {
+                predicates.add(person);
             }
             if (transactionType != null) {
                 predicates.add(cb.equal(root.get("transactionType"), transactionType));
@@ -435,11 +433,9 @@ public class StaffProgressCalculator {
                             cb.greaterThanOrEqualTo(root.get("updatedAt"), start),
                             cb.lessThan(root.get("updatedAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
+            Predicate person = personFilter(root, cb, staff, username, "assignedStaff");
+            if (person != null) {
+                predicates.add(person);
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -457,11 +453,9 @@ public class StaffProgressCalculator {
                             cb.greaterThanOrEqualTo(root.get("createdAt"), start),
                             cb.lessThan(root.get("createdAt"), end))
             ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
+            Predicate person = personFilter(root, cb, staff, username, "processedBy");
+            if (person != null) {
+                predicates.add(person);
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -472,7 +466,7 @@ public class StaffProgressCalculator {
 
     /**
      * Share (0–100) of the staff member's leads — assigned to them or created by them — that
-     * are converted. A null staff counts every lead, matching accounts with no Staff record.
+     * are converted. An account with no Staff record counts the leads its login created.
      */
     public int computeLeadConversionRate(Staff staff, String username) {
         long totalLeads = leadRepository.count(staffLeadsSpec(staff, username, false));
@@ -487,13 +481,30 @@ public class StaffProgressCalculator {
             if (convertedOnly) {
                 predicates.add(cb.equal(root.get("status"), "converted"));
             }
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
+            Predicate person = personFilter(root, cb, staff, username, "assignedStaff");
+            if (person != null) {
+                predicates.add(person);
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    /**
+     * Whose activity a receipt / lead / follow-up query counts. A staff member matches by name in
+     * {@code staffField} (processedBy / assignedStaff) or by the login that created the row; an
+     * account with no Staff record (Admin, gym owner) — or a staff row without a name — matches
+     * only rows its own login created. No staff and no username means gym-wide (returns null).
+     */
+    public static Predicate personFilter(jakarta.persistence.criteria.Root<?> root,
+                                         jakarta.persistence.criteria.CriteriaBuilder cb,
+                                         Staff staff, String username, String staffField) {
+        boolean hasName = staff != null && staff.getName() != null && !staff.getName().isBlank();
+        if (hasName) {
+            return cb.or(
+                    cb.like(cb.lower(root.get(staffField)), "%" + staff.getName().toLowerCase() + "%"),
+                    cb.equal(root.get("createdBy"), username)
+            );
+        }
+        return username != null && !username.isBlank() ? cb.equal(root.get("createdBy"), username) : null;
     }
 }

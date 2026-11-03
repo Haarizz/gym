@@ -4,6 +4,7 @@ import com.company.project.dto.SalaryAdvanceApprovalRequestDTO;
 import com.company.project.dto.SalaryAdvanceRequestDTO;
 import com.company.project.dto.SalaryAdvanceResponseDTO;
 import com.company.project.entities.SalaryAdvance;
+import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.SalaryAdvanceRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -107,8 +108,17 @@ public class SalaryAdvanceService {
         SalaryAdvance advance = advanceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Advance not found with id: " + id));
 
+        // Deciding again would reset the balance to the full amount, wiping the installments
+        // already recovered (and the employee would be charged for them twice).
+        if (advance.getStatus() != null && !"Pending Approval".equalsIgnoreCase(advance.getStatus())) {
+            throw new BusinessRuleViolationException("This advance has already been decided (status: " + advance.getStatus()
+                    + ") — it can't be approved or rejected again");
+        }
         String decision = req.getApprovalStatus() != null ? req.getApprovalStatus() : "Approved";
         BigDecimal approvedAmount = req.getApprovedAmount() != null ? req.getApprovedAmount() : BigDecimal.ZERO;
+        if ("Approved".equalsIgnoreCase(decision) && approvedAmount.signum() <= 0) {
+            throw new BusinessRuleViolationException("Enter the approved amount (above zero)");
+        }
         Integer installmentCount = req.getInstallmentCount() != null ? req.getInstallmentCount() : 1;
         BigDecimal installmentAmount = installmentCount > 0
                 ? approvedAmount.divide(BigDecimal.valueOf(installmentCount), 2, RoundingMode.HALF_UP)
@@ -153,6 +163,13 @@ public class SalaryAdvanceService {
     public void deleteAdvance(Long id) {
         SalaryAdvance advance = advanceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Advance not found with id: " + id));
+        // An approved advance was paid out (and journalled); deleting it would lose track of money
+        // the employee still owes and of the installments already recovered.
+        if (advance.getStatus() != null && !"Pending Approval".equalsIgnoreCase(advance.getStatus())
+                && !"Rejected".equalsIgnoreCase(advance.getStatus())) {
+            throw new BusinessRuleViolationException("An approved advance can't be deleted — it has been paid out. "
+                    + "Recover or skip its installments instead.");
+        }
         advanceRepository.delete(advance);
     }
 }

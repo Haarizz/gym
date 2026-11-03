@@ -12,6 +12,7 @@ import com.company.project.exceptions.SessionFullException;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.repositories.TrainingSessionRepository;
+import com.company.project.services.mobile.push.SessionMemberNotifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -27,6 +28,11 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class BookingService {
 
+    /** Booked onto a full session's waitlist: holds no seat and has not been charged. */
+    public static final String STATUS_WAITLISTED = "waitlisted";
+    /** Booking statuses that don't take a seat on the session. */
+    public static final List<String> NO_SEAT_STATUSES = List.of("cancelled", STATUS_WAITLISTED);
+
     private final BookingRepository bookingRepository;
     private final TrainingSessionRepository sessionRepository;
     private final MemberRepository memberRepository;
@@ -34,6 +40,7 @@ public class BookingService {
     private final QrCodeService qrCodeService;
     private final RewardRedemptionService rewardRedemptionService;
     private final BookingPaymentService bookingPaymentService;
+    private final SessionMemberNotifier sessionMemberNotifier;
 
     public BookingService(BookingRepository bookingRepository,
                           TrainingSessionRepository sessionRepository,
@@ -41,7 +48,8 @@ public class BookingService {
                           NotificationService notificationService,
                           QrCodeService qrCodeService,
                           RewardRedemptionService rewardRedemptionService,
-                          BookingPaymentService bookingPaymentService) {
+                          BookingPaymentService bookingPaymentService,
+                          SessionMemberNotifier sessionMemberNotifier) {
         this.bookingRepository = bookingRepository;
         this.sessionRepository = sessionRepository;
         this.memberRepository = memberRepository;
@@ -49,6 +57,7 @@ public class BookingService {
         this.qrCodeService = qrCodeService;
         this.rewardRedemptionService = rewardRedemptionService;
         this.bookingPaymentService = bookingPaymentService;
+        this.sessionMemberNotifier = sessionMemberNotifier;
     }
 
     public List<BookingResponseDTO> getBookings(String status,
@@ -130,11 +139,23 @@ public class BookingService {
             throw new BusinessRuleViolationException("This session has been cancelled");
         }
 
-        // Bookings awaiting payment approval hold their seat too (anything not cancelled).
-        int booked = Math.toIntExact(bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled"));
+        if ("completed".equalsIgnoreCase(session.getStatus())) {
+            throw new BusinessRuleViolationException("This session has already finished");
+        }
+
+        // Bookings awaiting payment approval hold their seat too (anything not cancelled or waitlisted).
+        int booked = Math.toIntExact(bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), NO_SEAT_STATUSES));
+        boolean waitlisted = false;
         if (session.getCapacity() != null && booked >= session.getCapacity()) {
-            throw new SessionFullException("This session is full — all " + session.getCapacity()
-                    + " spots have been booked.");
+            // Staff can put someone on the waitlist; they move in when a seat frees up.
+            if (memberSelfService || !Boolean.TRUE.equals(request.getWaitlist())) {
+                throw new SessionFullException("This session is full — all " + session.getCapacity()
+                        + " spots have been booked.");
+            }
+            if (request.getRewardPassId() != null) {
+                throw new BusinessRuleViolationException("A Reward Pass can't hold a waitlist spot — use it once a seat frees up");
+            }
+            waitlisted = true;
         }
 
         Member member = null;
@@ -183,7 +204,8 @@ public class BookingService {
         booking.setGuestName(request.getGuestName());
         booking.setGuestEmail(request.getGuestEmail());
         booking.setGuestPhone(request.getGuestPhone());
-        booking.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : "confirmed");
+        booking.setStatus(waitlisted ? STATUS_WAITLISTED
+                : StringUtils.hasText(request.getStatus()) ? request.getStatus() : "confirmed");
         booking.setPaymentStatus(request.getPaymentStatus());
         booking.setPrice(session.getPrice());
 
@@ -220,8 +242,10 @@ public class BookingService {
                     boolean awaitingApproval = BookingPaymentService.STATUS_PENDING_APPROVAL.equals(booking.getStatus());
                     notificationService.notifyUser(
                             targetId,
-                            awaitingApproval ? "Booking Received" : "Booking Confirmed",
-                            awaitingApproval
+                            waitlisted ? "On the Waitlist" : awaitingApproval ? "Booking Received" : "Booking Confirmed",
+                            waitlisted
+                                    ? "You're on the waitlist for " + sessionName + ". We'll let you know if a spot opens up."
+                                    : awaitingApproval
                                     ? "Your seat for " + sessionName + " is held while the gym confirms your payment."
                                     : "Your booking for " + sessionName + " is confirmed.",
                             "SUCCESS", "MEDIUM", "BOOKINGS",
@@ -260,17 +284,37 @@ public class BookingService {
                 && StringUtils.hasText(request.getStatus()) && !cancelling) {
             throw new BusinessRuleViolationException("Approve or reject this booking's payment first");
         }
+        String previousStatus = booking.getStatus();
+        boolean heldSeat = !NO_SEAT_STATUSES.contains(String.valueOf(previousStatus).toLowerCase());
+        if (StringUtils.hasText(request.getStatus()) && !heldSeat && !cancelling
+                && !request.getStatus().equalsIgnoreCase(previousStatus)) {
+            // Off the waitlist (e.g. staff "Move in"): only when a seat is actually free.
+            TrainingSession session = booking.getSession();
+            long taken = bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), NO_SEAT_STATUSES);
+            if (session.getCapacity() != null && taken >= session.getCapacity()) {
+                throw new SessionFullException("The session is still full — cancel a booking or raise the capacity first");
+            }
+        }
         if (cancelling) {
             // Before the status flips — it decides between voiding and refunding.
             bookingPaymentService.settleCancellation(booking, cancelledBy, refundMethod);
         }
         if (StringUtils.hasText(request.getStatus())) {
             booking.setStatus(request.getStatus());
+            if ("checked-in".equalsIgnoreCase(request.getStatus())) {
+                if (booking.getCheckedInAt() == null) booking.setCheckedInAt(LocalDateTime.now());
+            } else if (!"no-show".equalsIgnoreCase(request.getStatus())) {
+                booking.setCheckedInAt(null);
+            }
         }
         if (request.getPaymentStatus() != null) {
             booking.setPaymentStatus(request.getPaymentStatus());
         }
         bookingRepository.save(booking);
+
+        if (cancelling && heldSeat) {
+            promoteFromWaitlist(booking.getSession());
+        }
 
         if ("cancelled".equalsIgnoreCase(request.getStatus())) {
             String sName = booking.getSession() != null && booking.getSession().getName() != null
@@ -307,15 +351,44 @@ public class BookingService {
 
     @Transactional
     public void deleteBooking(Long id) {
+        TrainingSession[] freedSeat = { null };
         bookingRepository.findById(id).ifPresent(booking -> {
             // Deleting a live booking is a staff cancellation: refund it in full first.
             if (!"cancelled".equalsIgnoreCase(booking.getStatus())) {
                 bookingPaymentService.settleCancellation(booking,
                         BookingPaymentService.CANCELLED_BY_STAFF, BookingPaymentService.REFUND_METHOD_WALLET);
             }
+            if (!NO_SEAT_STATUSES.contains(String.valueOf(booking.getStatus()).toLowerCase())) {
+                freedSeat[0] = booking.getSession();
+            }
             releaseRewardPass(booking);
         });
         bookingRepository.deleteById(id);
+        if (freedSeat[0] != null) {
+            bookingRepository.flush();
+            promoteFromWaitlist(freedSeat[0]);
+        }
+    }
+
+    /**
+     * Seats opened up (a cancellation, a deletion, a bigger capacity): move waitlisted
+     * bookings in, first come first served, and tell each member. Staff bookings aren't
+     * charged here, so a promoted booking is simply confirmed — same as a staff booking.
+     */
+    @Transactional
+    public void promoteFromWaitlist(TrainingSession session) {
+        if (session == null || "cancelled".equalsIgnoreCase(session.getStatus())
+                || "completed".equalsIgnoreCase(session.getStatus())) {
+            return;
+        }
+        long taken = bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), NO_SEAT_STATUSES);
+        for (Booking next : bookingRepository.findBySessionIdAndStatusOrderByIdAsc(session.getId(), STATUS_WAITLISTED)) {
+            if (session.getCapacity() != null && taken >= session.getCapacity()) break;
+            next.setStatus("confirmed");
+            bookingRepository.save(next);
+            taken++;
+            sessionMemberNotifier.notifyPromoted(next.getMember(), session, next.getId());
+        }
     }
 
     /** Bookings whose Cash/Credit/Mixed payment awaits staff approval — web Approvals page. */
@@ -371,6 +444,7 @@ public class BookingService {
         dto.setStartTime(booking.getSession() == null ? null : booking.getSession().getStartTime());
         dto.setType(booking.getSession() == null ? null : booking.getSession().getType());
         dto.setStatus(booking.getStatus());
+        dto.setCheckedInAt(booking.getCheckedInAt());
         dto.setPrice(booking.getPrice());
         dto.setQrCode(booking.getQrCode());
         dto.setGuest(booking.isGuest());

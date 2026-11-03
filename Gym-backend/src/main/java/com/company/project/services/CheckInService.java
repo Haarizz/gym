@@ -97,6 +97,7 @@ public class CheckInService {
         // If this was a booking-based check-in, mark the booking as checked in
         if (booking != null && "confirmed".equals(booking.getStatus())) {
             booking.setStatus("checked-in");
+            booking.setCheckedInAt(attendance.getCheckInTime());
             bookingRepository.save(booking);
         }
 

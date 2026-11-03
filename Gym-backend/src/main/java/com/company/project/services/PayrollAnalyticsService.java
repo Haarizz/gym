@@ -43,18 +43,18 @@ public class PayrollAnalyticsService {
         String sBranchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
 
         // Total Staff
-        Long staffCount = withBranch(entityManager.createQuery("SELECT COUNT(s) FROM Staff s WHERE s.status = 'Active'" + branchFilter, Long.class), branchId)
+        Long staffCount = withBranch(entityManager.createQuery("SELECT COUNT(s) FROM Staff s WHERE (s.status IS NULL OR LOWER(s.status) <> 'inactive')" + branchFilter, Long.class), branchId)
                 .getSingleResult();
         kpi.setTotalStaffTrainers(staffCount != null ? staffCount : 0);
 
         // Active Trainings/Classes (Assume TrainingSession)
-        Long classCount = withBranch(entityManager.createQuery("SELECT COUNT(t) FROM TrainingSession t WHERE t.status = 'active'" + branchFilter, Long.class), branchId)
+        Long classCount = withBranch(entityManager.createQuery("SELECT COUNT(t) FROM TrainingSession t WHERE t.status IN ('active', 'in_progress') AND t.date >= :today" + branchFilter, Long.class).setParameter("today", LocalDate.now()), branchId)
                 .getSingleResult();
         kpi.setActiveTrainingsClasses(classCount != null ? classCount : 0);
 
         // Upcoming Bookings
         LocalDate nextWeek = LocalDate.now().plusDays(7);
-        Long bookingCount = withBranch(entityManager.createQuery("SELECT COUNT(b) FROM Booking b WHERE b.status = 'confirmed' AND b.session.date BETWEEN :today AND :nextWeek" + branchFilter, Long.class)
+        Long bookingCount = withBranch(entityManager.createQuery("SELECT COUNT(b) FROM Booking b WHERE b.status NOT IN ('cancelled', 'waitlisted') AND b.session.date BETWEEN :today AND :nextWeek" + branchFilter, Long.class)
                 .setParameter("today", LocalDate.now())
                 .setParameter("nextWeek", nextWeek), branchId)
                 .getSingleResult();
@@ -74,7 +74,7 @@ public class PayrollAnalyticsService {
         kpi.setPendingSalaryPayments(pendingPayments != null ? pendingPayments : 0);
 
         // Salary Advances Outstanding
-        BigDecimal advances = withBranch(entityManager.createQuery("SELECT SUM(s.balance) FROM SalaryAdvance s WHERE s.status = 'Active'" + sBranchFilter, BigDecimal.class), branchId)
+        BigDecimal advances = withBranch(entityManager.createQuery("SELECT SUM(s.balance) FROM SalaryAdvance s WHERE s.status IN ('Active', 'Approved')" + sBranchFilter, BigDecimal.class), branchId)
                 .getSingleResult();
         kpi.setSalaryAdvancesOutstanding(advances != null ? advances : BigDecimal.ZERO);
 
@@ -102,7 +102,7 @@ public class PayrollAnalyticsService {
         // Confirmed bookings per month (joined through the session date)
         List<Object[]> bookingRows = withBranch(entityManager.createQuery(
                 "SELECT FUNCTION('to_char', b.session.date, 'YYYY-MM'), COUNT(b) FROM Booking b " +
-                        "WHERE b.status = 'confirmed' AND b.session.date BETWEEN :rangeStart AND :rangeEnd "
+                        "WHERE b.status NOT IN ('cancelled', 'waitlisted') AND b.session.date BETWEEN :rangeStart AND :rangeEnd "
                         + (branchId != null ? " AND b.session.branchId = :branchId " : "") +
                         " GROUP BY FUNCTION('to_char', b.session.date, 'YYYY-MM')", Object[].class)
                 .setParameter("rangeStart", rangeStart)
@@ -142,7 +142,7 @@ public class PayrollAnalyticsService {
     private List<PayrollDashboardDTO.PayrollDistribution> buildPayrollDistribution(Long branchId) {
         String branchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
         List<Object[]> results = withBranch(entityManager.createQuery(
-                "SELECT s.department, SUM(s.baseSalary) FROM Staff s WHERE s.status = 'Active' " + branchFilter + " GROUP BY s.department", Object[].class), branchId)
+                "SELECT s.department, SUM(s.baseSalary) FROM Staff s WHERE (s.status IS NULL OR LOWER(s.status) <> 'inactive') " + branchFilter + " GROUP BY s.department", Object[].class), branchId)
                 
                 .getResultList();
 
@@ -163,7 +163,7 @@ public class PayrollAnalyticsService {
     private List<PayrollDashboardDTO.StaffByDepartment> buildStaffByDepartment(Long branchId) {
         String branchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
         List<Object[]> results = withBranch(entityManager.createQuery(
-                "SELECT s.department, COUNT(s) FROM Staff s WHERE s.status = 'Active' " + branchFilter + " GROUP BY s.department", Object[].class), branchId)
+                "SELECT s.department, COUNT(s) FROM Staff s WHERE (s.status IS NULL OR LOWER(s.status) <> 'inactive') " + branchFilter + " GROUP BY s.department", Object[].class), branchId)
                 
                 .getResultList();
 
@@ -184,7 +184,7 @@ public class PayrollAnalyticsService {
     private List<PayrollDashboardDTO.RecentHire> buildRecentHires(Long branchId) {
         String branchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
         List<com.company.project.entities.Staff> staffs = withBranch(entityManager.createQuery(
-                "SELECT s FROM Staff s WHERE s.status = 'Active' " + branchFilter + " ORDER BY s.joinDate DESC", com.company.project.entities.Staff.class), branchId)
+                "SELECT s FROM Staff s WHERE (s.status IS NULL OR LOWER(s.status) <> 'inactive') " + branchFilter + " ORDER BY s.joinDate DESC NULLS LAST, s.id DESC", com.company.project.entities.Staff.class), branchId)
                 
                 .setMaxResults(5)
                 .getResultList();
@@ -226,7 +226,7 @@ public class PayrollAnalyticsService {
     private List<PayrollDashboardDTO.SalaryAdvanceInfo> buildSalaryAdvances(Long branchId) {
         String branchFilter = branchId != null ? " AND s.branchId = :branchId " : "";
         List<com.company.project.entities.SalaryAdvance> advances = withBranch(entityManager.createQuery(
-                "SELECT s FROM SalaryAdvance s WHERE s.status = 'Active' " + branchFilter + " ORDER BY s.requestDate DESC", com.company.project.entities.SalaryAdvance.class), branchId)
+                "SELECT s FROM SalaryAdvance s WHERE s.status IN ('Active', 'Approved') " + branchFilter + " ORDER BY s.requestDate DESC", com.company.project.entities.SalaryAdvance.class), branchId)
                 
                 .setMaxResults(5)
                 .getResultList();
@@ -253,8 +253,8 @@ public class PayrollAnalyticsService {
         // session price × a fabricated booking count.
         List<Object[]> rows = withBranch(entityManager.createQuery(
                 "SELECT t, COUNT(b), COALESCE(SUM(b.price), 0) FROM TrainingSession t " +
-                        "LEFT JOIN Booking b ON b.session = t AND b.status = 'confirmed' " +
-                        "WHERE t.status = 'active' " + branchFilter +
+                        "LEFT JOIN Booking b ON b.session = t AND b.status NOT IN ('cancelled', 'waitlisted') " +
+                        "WHERE t.status <> 'cancelled' " + branchFilter +
                         " GROUP BY t ORDER BY COUNT(b) DESC", Object[].class), branchId)
                 .setMaxResults(3)
                 .getResultList();

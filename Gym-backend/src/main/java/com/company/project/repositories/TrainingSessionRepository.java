@@ -58,7 +58,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     // payment approval.
     String BOOKED_PT = "LOWER(s.type) = 'pt' AND LOWER(s.status) <> 'cancelled' AND s.date BETWEEN :start AND :end " +
             "AND EXISTS (SELECT b.id FROM Booking b WHERE b.session = s " +
-            "AND LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'pending_approval'))";
+            "AND LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'pending_approval', 'waitlisted'))";
 
     @Query("SELECT COUNT(s) FROM TrainingSession s WHERE " + BOOKED_PT)
     long countBookedPtSessionsBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);

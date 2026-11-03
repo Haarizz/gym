@@ -135,7 +135,7 @@ class MobileMemberDashboardServiceTest {
 
         when(bookingRepository.findTodayBookingsByMemberId(eq(50L), eq(LocalDate.now())))
                 .thenReturn(List.of(booking));
-        when(bookingRepository.countBySessionIdAndStatusNot(201L, "cancelled")).thenReturn(17L);
+        when(bookingRepository.countBySessionIdAndStatusNotIn(201L, com.company.project.services.BookingService.NO_SEAT_STATUSES)).thenReturn(17L);
         when(bookingRepository.countActiveBookingsByMemberId(50L)).thenReturn(4L);
 
         // Promotion mock
