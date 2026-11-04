@@ -286,6 +286,7 @@ function buildCreateRequest(
       : undefined,
     status: data.status || 'ACTIVE',
     startDate: startDateStr,
+    joinDate: formatDateStr(data.joinDate) || startDateStr,
     paymentStatus: paymentResult?.paymentStatus || data.paymentStatus || 'PENDING',
     // Bill the receipt at what the payment sheet charged (plan price less its
     // discount) — without it the server saved a 0 invoice for app-created members.
@@ -320,8 +321,10 @@ function buildCreateRequest(
 
 function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
   // Lead linking and the registration invoice only apply when the member is first
-  // registered — an edit must not rewrite the fee they were billed.
+  // registered — an edit must not rewrite the fee they were billed. The edit form
+  // seeds its join date from the start date, so sending it would clobber the real one.
   const {
+    joinDate: _joinDate,
     leadId: _leadId,
     membershipFee: _membershipFee,
     monthlyFee: _monthlyFee,

@@ -346,7 +346,7 @@ public class DashboardService {
     }
 
     public List<DashboardMember> getRecentMembers() {
-        List<Member> members = memberRepository.findTop5ByOrderByJoinDateDesc();
+        List<Member> members = memberRepository.findRecentByJoinDate(org.springframework.data.domain.PageRequest.of(0, 5));
         return members.stream().map(m -> {
             DashboardMember dm = new DashboardMember();
             // Numeric DB id — the dashboard opens /member-history-analytics with it (see searchMembers)

@@ -136,7 +136,12 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + " GROUP BY m.membershipType")
     List<Object[]> countActiveMembersByType(@Param("asOf") LocalDateTime asOf);
 
-    List<Member> findTop5ByOrderByJoinDateDesc();
+    /**
+     * Dashboard "Recent Members". Postgres sorts NULLs first on DESC, which pinned
+     * members with no join date above every real recent join — push them last.
+     */
+    @Query("SELECT m FROM Member m ORDER BY m.joinDate DESC NULLS LAST, m.createdAt DESC NULLS LAST, m.id DESC")
+    List<Member> findRecentByJoinDate(org.springframework.data.domain.Pageable pageable);
 
     /**
      * Members whose membership ends (effective end date, see BIOS_END_DATE) in [from, to) — for the

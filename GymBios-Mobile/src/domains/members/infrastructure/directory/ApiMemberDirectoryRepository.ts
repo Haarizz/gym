@@ -131,7 +131,15 @@ export class ApiMemberDirectoryRepository
   async createMember(request: CreateMemberRequest): Promise<Member> {
     const response = await apiClient.post<MemberResponse>(
       '/members',
-      this.toRequest(request),
+      {
+        ...this.toRequest(request),
+        // MemberRequestDTO binds membership_start_date / join_date — the shared
+        // start_date key is ignored, which left the start date defaulting to
+        // "now" and join_date NULL for every app-registered member. Create
+        // only: an edit doesn't recompute expiry, so it must not move the start.
+        membership_start_date: request.startDate,
+        join_date: request.joinDate || request.startDate,
+      },
     );
 
     return this.toDomain(response.data);

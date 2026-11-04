@@ -24,6 +24,8 @@ export interface CreateMemberRequest {
   membershipPlanId?: number;
   status: string;
   startDate: string;
+  /** yyyy-MM-dd — the member's joining date (sent on create only). */
+  joinDate?: string;
   paymentStatus: string;
   /** Invoice total after any discount — what the new member's receipt is billed at. */
   membershipFee?: number;

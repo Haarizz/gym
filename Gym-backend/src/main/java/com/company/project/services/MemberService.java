@@ -520,6 +520,13 @@ public class MemberService {
         
         applyRequest(request, member);
         if (member.getTotalVisits() == null) member.setTotalVisits(0);
+        // Every new member has joined — a client that omits join_date (older mobile
+        // builds) used to leave it NULL, hiding the member from join-date sorts/filters.
+        if (member.getJoinDate() == null) {
+            member.setJoinDate(member.getMembershipStartDate() != null
+                    ? member.getMembershipStartDate()
+                    : LocalDateTime.now());
+        }
 
         // Determine family head flag
         boolean hasFamily = request.getFamilyMembers() != null && !request.getFamilyMembers().isEmpty();
