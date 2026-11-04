@@ -188,6 +188,8 @@ public class MobileFamilyPurchaseService {
             throw new IllegalArgumentException("Add at least one family member.");
         }
         Member head = memberRepository.findById(headDbId).orElseThrow();
+        // Before anyone is invited or billed (convertToFamilyHead would refuse too).
+        com.company.project.services.MemberSuspension.requireNotSuspended(head, "changing to a family plan");
         validateConnectedEmails(connected, MobileFamilyInvitationService.normalizeEmail(head.getEmail()));
 
         FamilyBill bill = billFamily(request, plan, connected);

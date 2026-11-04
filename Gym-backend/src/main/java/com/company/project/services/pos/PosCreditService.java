@@ -7,6 +7,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.services.FinancialEventService;
+import com.company.project.services.MemberSuspension;
 import com.company.project.services.ReceiptVoucherService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,6 +101,7 @@ public class PosCreditService {
         if (req.memberId() == null) throw new BusinessRuleViolationException("Select the member who is paying.");
         Member m = memberRepo.findById(req.memberId())
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + req.memberId()));
+        MemberSuspension.requireNotSuspended(m, "taking a payment");
         BigDecimal amount = r2(req.amount());
         if (amount.signum() <= 0) throw new BusinessRuleViolationException("Amount must be greater than zero.");
         String method = req.paymentMethod() == null ? "CASH" : req.paymentMethod().trim().toUpperCase(Locale.ROOT);

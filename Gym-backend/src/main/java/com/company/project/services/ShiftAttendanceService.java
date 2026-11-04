@@ -45,8 +45,13 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>Late = clocked in after check-in + grace; counted from the scheduled check-in.</li>
  *   <li>Early departure = left before check-out - tolerance.</li>
+ *   <li>Break = an unpaid allowance (e.g. 1 hr) taken whenever the employee needs it. Time clocked out
+ *       between punches counts toward it; whatever is left is taken off the day's worked time, but only on
+ *       days the employee works at least half the shift (a short day isn't charged a break never taken).</li>
  *   <li>Overtime = time worked after check-out, once it passes the shift's "OT starts after" minutes
  *       (early arrival never counts), capped at the shift's max daily OT; all of a worked day off is overtime.
+ *       It is never more than the time worked beyond the day's scheduled hours, so staying late to make up
+ *       a late arrival or a long break isn't overtime.
  *       Policy "eligible" pays it automatically, "approval" only once approved, "none" never.</li>
  *   <li>Half day = under half the scheduled net hours worked.</li>
  *   <li>Absent = a scheduled day with no clock-in once the grace period has passed.</li>
@@ -131,31 +136,44 @@ public class ShiftAttendanceService {
         return outDate.atTime(shift.getCheckOut());
     }
 
+    /** Unpaid break allowed per day: the shift's break duration, else (shifts saved before V116) its old window's length. */
     public static int breakMinutes(Shift shift) {
+        if (shift.getBreakMinutes() != null) return Math.max(0, shift.getBreakMinutes());
         if (shift.getBreakStart() == null || shift.getBreakEnd() == null) return 0;
         long m = Duration.between(shift.getBreakStart(), shift.getBreakEnd()).toMinutes();
         return (int) (m < 0 ? m + 24 * 60 : m);
     }
 
+    /** Scheduled span per day, check-in to check-out (break included). */
+    public static int spanMinutes(Shift shift) {
+        LocalDate d = LocalDate.of(2000, 1, 3);
+        return (int) Duration.between(d.atTime(shift.getCheckIn()), scheduledOut(shift, d)).toMinutes();
+    }
+
     /** Net scheduled minutes per day (span minus break). */
     public static int netMinutes(Shift shift) {
-        LocalDate d = LocalDate.of(2000, 1, 3);
-        long span = Duration.between(d.atTime(shift.getCheckIn()), scheduledOut(shift, d)).toMinutes();
-        return (int) Math.max(0, span - breakMinutes(shift));
+        return Math.max(0, spanMinutes(shift) - breakMinutes(shift));
     }
 
-    private static LocalDateTime[] breakWindow(Shift shift, LocalDate date) {
-        if (shift.getBreakStart() == null || shift.getBreakEnd() == null) return null;
-        LocalDateTime start = shift.getBreakStart().isBefore(shift.getCheckIn())
-                ? date.plusDays(1).atTime(shift.getBreakStart()) : date.atTime(shift.getBreakStart());
-        LocalDateTime end = start.plusMinutes(breakMinutes(shift));
-        return new LocalDateTime[] { start, end };
-    }
-
-    private static long overlapMinutes(LocalDateTime aStart, LocalDateTime aEnd, LocalDateTime bStart, LocalDateTime bEnd) {
-        LocalDateTime s = aStart.isAfter(bStart) ? aStart : bStart;
-        LocalDateTime e = aEnd.isBefore(bEnd) ? aEnd : bEnd;
-        return e.isAfter(s) ? Duration.between(s, e).toMinutes() : 0;
+    /**
+     * Minutes worked from a day's closed punches (sorted by clock-in). The break is a flexible
+     * allowance: time clocked out between punches counts toward it, and whatever is left is taken
+     * off the worked time — only on days at least half the shift was worked.
+     */
+    static int workedMinutes(List<Punch> punches, Shift shift, boolean scheduled) {
+        int punched = 0, gaps = 0;
+        LocalDateTime lastOut = null;
+        for (Punch p : punches) {
+            if (p.out() == null) continue;
+            if (lastOut != null && p.in().isAfter(lastOut)) gaps += (int) Duration.between(lastOut, p.in()).toMinutes();
+            punched += (int) Math.max(0, Duration.between(p.in(), p.out()).toMinutes());
+            if (lastOut == null || p.out().isAfter(lastOut)) lastOut = p.out();
+        }
+        if (!scheduled || shift == null) return punched;
+        int allowance = breakMinutes(shift);
+        if (allowance <= 0 || punched * 2 < spanMinutes(shift)) return punched;
+        int unpaidLeft = Math.max(0, allowance - gaps);
+        return Math.max(0, punched - unpaidLeft);
     }
 
     // ── Context: everything needed to compute days for a date range ──────────
@@ -251,14 +269,7 @@ public class ShiftAttendanceService {
                 .filter(t -> t != null).max(Comparator.naturalOrder()).orElse(null);
         boolean open = punches.stream().anyMatch(p -> p.out() == null);
 
-        int worked = 0;
-        LocalDateTime[] brk = scheduled ? breakWindow(shift, date) : null;
-        for (Punch p : punches) {
-            if (p.out() == null) continue;
-            long m = Duration.between(p.in(), p.out()).toMinutes();
-            if (brk != null) m -= overlapMinutes(p.in(), p.out(), brk[0], brk[1]);
-            worked += (int) Math.max(0, m);
-        }
+        int worked = workedMinutes(punches, shift, scheduled);
 
         int late = 0, early = 0, ot = 0;
         String policy = shift != null ? shift.getOvertimePolicy() : "none";
@@ -272,7 +283,10 @@ public class ShiftAttendanceService {
             // Staying past the threshold counts all the time after check-out; shorter overruns don't count.
             LocalDateTime otThreshold = schedOut.plusMinutes(nz(shift.getOtAfterMinutes()));
             if (actualOut != null && actualOut.isAfter(otThreshold)) {
-                ot = (int) Duration.between(schedOut, actualOut).toMinutes();
+                // Only time beyond the day's scheduled hours is overtime: staying late to make up a
+                // late arrival or a long break just completes the normal day.
+                int pastOut = (int) Duration.between(schedOut, actualOut).toMinutes();
+                ot = Math.min(pastOut, Math.max(0, worked - scheduledMinutes));
             }
         } else if (!scheduled && shift != null && worked > 0) {
             ot = worked; // the whole of a worked day off

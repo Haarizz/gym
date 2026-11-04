@@ -320,8 +320,13 @@ public class PayrollReportService {
         if (nz(l.getCommission()).signum() > 0) items.add(item("Commission", l.getCommission(), "earning"));
         if (nz(l.getAttendanceDeduction()).signum() > 0) items.add(item("Absence / unpaid leave", l.getAttendanceDeduction(), "deduction"));
         if (b != null) {
-            for (JsonNode a : b.path("advances")) items.add(item("Advance installment", dec(a.path("amount")), "deduction"));
-            for (JsonNode d : b.path("deductions")) items.add(item(d.path("type").asText("Deduction"), dec(d.path("amount")), "deduction"));
+            // zero-amount items were deferred to next month (didn't fit in the pay): nothing was withheld
+            for (JsonNode a : b.path("advances")) {
+                if (dec(a.path("amount")).signum() > 0) items.add(item("Advance installment", dec(a.path("amount")), "deduction"));
+            }
+            for (JsonNode d : b.path("deductions")) {
+                if (dec(d.path("amount")).signum() > 0) items.add(item(d.path("type").asText("Deduction"), dec(d.path("amount")), "deduction"));
+            }
         }
         return items;
     }

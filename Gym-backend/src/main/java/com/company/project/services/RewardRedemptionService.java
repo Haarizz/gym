@@ -87,8 +87,16 @@ public class RewardRedemptionService {
         }
     }
 
+    private void requireMemberNotSuspended(ReferralReward reward, String action) {
+        if (reward.getMemberId() != null) {
+            memberRepository.findByMemberId(reward.getMemberId())
+                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, action));
+        }
+    }
+
     public ReferralReward claim(Long rewardId) {
         ReferralReward reward = findOrThrow(rewardId);
+        requireMemberNotSuspended(reward, "claiming a reward");
         if (reward.getStatus() == RewardStatus.PENDING) {
             throw new BusinessRuleViolationException("Reward is awaiting approval and cannot be claimed yet");
         }
@@ -104,6 +112,7 @@ public class RewardRedemptionService {
 
     public ReferralReward redeem(Long rewardId) {
         ReferralReward reward = findOrThrow(rewardId);
+        requireMemberNotSuspended(reward, "redeeming a reward");
         if (reward.getStatus() != RewardStatus.AVAILABLE && reward.getStatus() != RewardStatus.CLAIMED) {
             throw new BusinessRuleViolationException("Reward cannot be redeemed from status " + reward.getStatus());
         }

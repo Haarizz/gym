@@ -55,8 +55,9 @@ public class MobileStaffPerformanceService {
             throw new EntityNotFoundException("User not authenticated");
         }
 
-        // Accounts without a linked Staff record (e.g. Admin) still get their own
-        // performance computed off activity recorded under their username —
+        // Accounts without a linked Staff record (e.g. Admin, gym owner) still get their own
+        // performance computed off activity recorded under their login (receipts, leads and
+        // follow-ups they created, POS sales they rang up — see StaffProgressCalculator.personFilter),
         // just without staff-only fields like a branch, monthly target, or leaderboard.
         Staff staff = staffRepository.findByUserId(principal.getId()).orElse(null);
 
@@ -118,7 +119,7 @@ public class MobileStaffPerformanceService {
         ConversionTargetDTO conversionTargetDTO = new ConversionTargetDTO(conversionsAchieved, conversionTarget, conversionPercentage);
 
         // 4. Summary KPIs (Rating, Growth, Lead count)
-        double rating = computeStaffRating();
+        double rating = computeStaffRating(staff);
         int growthPercentage = computeGrowthPercentage(staff, principal.getUsername(), today, startOfMonth, conversionsAchieved, revenueAchieved, targetOpt);
         int leadCount = computeStaffLeadCount(staff, principal.getUsername());
         SummaryDTO summaryDTO = new SummaryDTO(rating, growthPercentage, leadCount);
@@ -133,7 +134,7 @@ public class MobileStaffPerformanceService {
 
         // 7. Performance Breakdown
         int conversionRate = progressCalculator.computeLeadConversionRate(staff, principal.getUsername());
-        int followUpCompletion = computeFollowUpCompletion(staff);
+        int followUpCompletion = computeFollowUpCompletion(staff, principal.getUsername());
         int customerSatisfaction = computeCustomerSatisfaction(rating);
         BreakdownDTO breakdown = new BreakdownDTO(conversionRate, followUpCompletion, customerSatisfaction);
 
@@ -161,51 +162,46 @@ public class MobileStaffPerformanceService {
         return progressCalculator.computeConversions(staff, username, start, end);
     }
 
-    private double computeStaffRating() {
-        List<WorkoutFeedback> allFeedbacks = workoutFeedbackRepository.findAll();
-        List<WorkoutFeedback> ratedFeedbacks = allFeedbacks.stream()
-                .filter(f -> f.getTrainerRating() != null || f.getOverallSatisfaction() != null)
-                .collect(Collectors.toList());
-
-        double sum = 0.0;
-        int count = 0;
-        for (WorkoutFeedback fb : ratedFeedbacks) {
-            if (fb.getTrainerRating() != null && fb.getTrainerRating() > 0) {
-                sum += fb.getTrainerRating();
-                count++;
-            } else if (fb.getOverallSatisfaction() != null && fb.getOverallSatisfaction() > 0) {
-                sum += fb.getOverallSatisfaction();
-                count++;
-            }
+    /**
+     * Average rating members gave this trainer's sessions (trainer rating, else overall
+     * satisfaction). Accounts without a Staff record have no sessions, so no rating — this used to
+     * average every feedback in the gym, so each staff member saw the gym's score as their own.
+     */
+    private double computeStaffRating(Staff staff) {
+        if (staff == null || staff.getId() == null) return 0.0;
+        for (Object[] row : workoutFeedbackRepository.averageRatingByTrainerIds(List.of(staff.getId()))) {
+            if (row[1] == null) continue;
+            double avg = ((Number) row[1]).doubleValue();
+            return BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP).doubleValue();
         }
-
-        if (count == 0) return 0.0;
-        double avg = sum / count;
-        return BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP).doubleValue();
+        return 0.0;
     }
 
+    /**
+     * Month-to-date vs the same days of last month (revenue, else conversions). Comparing a month in
+     * progress with the whole of last month always read as a drop early in the month, and the old
+     * fallback returned the target's forecast, which isn't a growth figure at all. 0 = nothing to
+     * compare with.
+     */
     private int computeGrowthPercentage(
             Staff staff, String username, LocalDate today, LocalDateTime startOfMonth,
             int currentConversions, BigDecimal currentRevenue, Optional<StaffTarget> targetOpt) {
 
         LocalDateTime startOfPrevMonth = startOfMonth.minusMonths(1);
-        LocalDateTime endOfPrevMonth = startOfMonth;
+        int daysSoFar = today.getDayOfMonth();
+        int prevMonthDays = startOfPrevMonth.toLocalDate().lengthOfMonth();
+        LocalDateTime endOfPrevPeriod = startOfPrevMonth.plusDays(Math.min(daysSoFar, prevMonthDays));
 
-        BigDecimal prevRevenue = computeStaffRevenue(staff, username, startOfPrevMonth, endOfPrevMonth);
-        int prevConversions = computeStaffConversions(staff, username, startOfPrevMonth, endOfPrevMonth);
-
-        if (prevRevenue.compareTo(BigDecimal.ZERO) > 0 && currentRevenue.compareTo(BigDecimal.ZERO) > 0) {
+        BigDecimal prevRevenue = computeStaffRevenue(staff, username, startOfPrevMonth, endOfPrevPeriod);
+        if (prevRevenue.compareTo(BigDecimal.ZERO) > 0) {
             double diff = currentRevenue.doubleValue() - prevRevenue.doubleValue();
             return (int) Math.round((diff / prevRevenue.doubleValue()) * 100);
         }
 
-        if (prevConversions > 0 && currentConversions > 0) {
+        int prevConversions = computeStaffConversions(staff, username, startOfPrevMonth, endOfPrevPeriod);
+        if (prevConversions > 0) {
             double diff = currentConversions - prevConversions;
             return (int) Math.round((diff / (double) prevConversions) * 100);
-        }
-
-        if (targetOpt.isPresent() && targetOpt.get().getForecast() != null && targetOpt.get().getForecast() > 0) {
-            return targetOpt.get().getForecast();
         }
 
         return 0;
@@ -213,14 +209,8 @@ public class MobileStaffPerformanceService {
 
     private int computeStaffLeadCount(Staff staff, String username) {
         Specification<Lead> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
+            Predicate person = StaffProgressCalculator.personFilter(root, cb, staff, username, "assignedStaff");
+            return person != null ? person : cb.conjunction();
         };
         return (int) leadRepository.count(spec);
     }
@@ -290,10 +280,21 @@ public class MobileStaffPerformanceService {
     }
 
     public int computeFollowUpCompletion(Staff staff) {
+        return computeFollowUpCompletion(staff, null);
+    }
+
+    /**
+     * Share of follow-ups completed. A staff member's are the ones assigned to them by name; an
+     * account with no Staff record (Admin) counts the follow-ups its own login created.
+     */
+    public int computeFollowUpCompletion(Staff staff, String username) {
+        boolean hasName = staff != null && staff.getName() != null && !staff.getName().isBlank();
         Specification<FollowUp> staffFUSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
+            if (hasName) {
                 predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"));
+            } else if (username != null && !username.isBlank()) {
+                predicates.add(cb.equal(root.get("createdBy"), username));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -301,14 +302,9 @@ public class MobileStaffPerformanceService {
         long total = followUpRepository.count(staffFUSpec);
         if (total == 0) return 0;
 
-        Specification<FollowUp> completedSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "completed"));
-            if (staff != null && staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
+        Specification<FollowUp> completedSpec = (root, query, cb) -> cb.and(
+                cb.equal(root.get("status"), "completed"),
+                staffFUSpec.toPredicate(root, query, cb));
 
         long completed = followUpRepository.count(completedSpec);
         return (int) Math.round(((double) completed / total) * 100);
@@ -323,6 +319,15 @@ public class MobileStaffPerformanceService {
     private MotivationDTO generateMotivation(int achieved, int target, int remaining) {
         String status;
         String message;
+
+        // Without a target there's nothing to have achieved (achieved >= 0 always held, so every
+        // account with no target — including ones with no Staff record — was told it hit it).
+        if (target <= 0) {
+            return new MotivationDTO(0,
+                    "No conversion target is set for this month yet. You have " + achieved + " conversion"
+                            + (achieved == 1 ? "" : "s") + " so far — keep it going!",
+                    "NO_TARGET");
+        }
 
         if (achieved >= target) {
             status = "ACHIEVED";

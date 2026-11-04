@@ -18,6 +18,11 @@ const memberHome = {
     statusFrozen: 'FROZEN',
     statusActive: 'ACTIVE',
     statusInactive: 'INACTIVE',
+    expiredSubscription: "Expired Subscription",
+    statusExpired: "EXPIRED",
+    expiredOn: "Expired On",
+    expiredPrompt: "Your membership has ended. Renew it to check in and book again.",
+    renewCta: "Renew membership",
     daysRemaining: 'Days Remaining',
     validUntil: 'Valid Until',
 

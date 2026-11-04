@@ -25,10 +25,39 @@ public class StaffController {
 
     private final StaffService staffService;
     private final StaffOverviewService staffOverviewService;
+    private final com.company.project.services.MyRecordsService myRecords;
 
-    public StaffController(StaffService staffService, StaffOverviewService staffOverviewService) {
+    public StaffController(StaffService staffService, StaffOverviewService staffOverviewService,
+                           com.company.project.services.MyRecordsService myRecords) {
         this.staffService = staffService;
         this.staffOverviewService = staffOverviewService;
+        this.myRecords = myRecords;
+    }
+
+    /**
+     * GET /api/staff/me/transactions?days=90
+     * The caller's own salary payments and advances, plus receipts and POS sales recorded under
+     * their login. Self-service for every role (only GETs; writes on /api/staff stay gated).
+     */
+    @GetMapping("/me/transactions")
+    public ResponseEntity<?> getMyTransactions(@AuthenticationPrincipal UserDetailsImpl principal,
+                                               @RequestParam(defaultValue = "90") int days) {
+        if (principal == null) return ResponseEntity.status(401).body("Not authenticated");
+        return ResponseEntity.ok(myRecords.transactions(principal, days));
+    }
+
+    /** GET /api/staff/me/attendance?month=yyyy-MM — the caller's own shift attendance for the month. */
+    @GetMapping("/me/attendance")
+    public ResponseEntity<?> getMyAttendance(@AuthenticationPrincipal UserDetailsImpl principal,
+                                             @RequestParam(required = false) String month) {
+        if (principal == null) return ResponseEntity.status(401).body("Not authenticated");
+        java.time.YearMonth ym;
+        try {
+            ym = month != null && !month.isBlank() ? java.time.YearMonth.parse(month) : java.time.YearMonth.now();
+        } catch (java.time.format.DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "month must be yyyy-MM"));
+        }
+        return ResponseEntity.ok(myRecords.attendance(principal, ym));
     }
 
     // Deliberately not permission-gated beyond authenticated(): several unrelated pages

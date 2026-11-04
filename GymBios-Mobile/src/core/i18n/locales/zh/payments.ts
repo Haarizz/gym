@@ -29,7 +29,7 @@ const payments = {
     suspendedTitle: "会员资格已暂停",
     suspendedAtGym: "您在{{gym}}的会员资格已被健身房暂停。",
     suspendedGeneric: "您的会员资格已被健身房暂停。",
-    suspendedInfo: "您的 GymBios 账户仍可正常使用：您可以浏览社区并查找健身房。请联系健身房前台恢复会员资格，然后下拉重新检查。",
+    suspendedInfo: "您的会员资格已暂停，并未结束——剩余天数会保留，健身房恢复后继续计算。您的 GymBios 账户仍可正常使用：您可以浏览社区并查找健身房。请联系健身房前台恢复会员资格，然后下拉重新检查。",
     openCommunity: "打开社区",
   },
 

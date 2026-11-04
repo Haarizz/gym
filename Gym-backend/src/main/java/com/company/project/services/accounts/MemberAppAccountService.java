@@ -269,8 +269,10 @@ public class MemberAppAccountService {
     }
 
     // Family dependents without their own email get a placeholder address — never an account email.
+    // Same for "<phone>@temp.local", the previous GymBios's placeholder kept on imported members.
     private static String usableEmail(String email) {
-        if (email == null || email.isBlank() || email.trim().toLowerCase().endsWith("@family.local")) {
+        if (email == null || email.isBlank() || email.trim().toLowerCase().endsWith("@family.local")
+                || email.trim().toLowerCase().endsWith("@temp.local")) {
             return null;
         }
         return email.trim();

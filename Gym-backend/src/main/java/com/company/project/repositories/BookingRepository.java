@@ -14,6 +14,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     java.util.Optional<Booking> findByQrCode(String qrCode);
     long countBySessionIdAndStatusNot(Long sessionId, String status);
+    // Seats taken on a session: pass BookingService.NO_SEAT_STATUSES (cancelled, waitlisted).
+    long countBySessionIdAndStatusNotIn(Long sessionId, java.util.Collection<String> statuses);
+    // The waitlist of a session, first come first served.
+    List<Booking> findBySessionIdAndStatusOrderByIdAsc(Long sessionId, String status);
+    // Everyone on a session (participants list), oldest booking first.
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.member WHERE b.session.id = :sessionId ORDER BY b.id ASC")
+    List<Booking> findBySessionIdWithMember(@Param("sessionId") Long sessionId);
+    // (sessionId, status, count) for the session list's checked-in / waitlisted figures.
+    @Query("select b.session.id, lower(b.status), count(b) from Booking b where b.session.id in :sessionIds group by b.session.id, lower(b.status)")
+    List<Object[]> countByStatusForSessionIds(@Param("sessionIds") List<Long> sessionIds);
     boolean existsBySessionId(Long sessionId);
     long deleteBySessionId(Long sessionId);
     // Bookings on a session that were paid with a Reward Pass (to give passes back before deleting).
@@ -37,10 +47,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // (className, bookedCount) for group classes (PT excluded) in the period
     @Query("SELECT s.name, COUNT(b) FROM Booking b JOIN b.session s " +
            "WHERE s.date BETWEEN :start AND :end AND LOWER(s.status) <> 'cancelled' " +
-           "AND LOWER(s.type) <> 'pt' AND LOWER(b.status) <> 'cancelled' GROUP BY s.name")
+           "AND LOWER(s.type) <> 'pt' AND LOWER(b.status) NOT IN ('cancelled', 'waitlisted') GROUP BY s.name")
     List<Object[]> countClassBookingsByNameBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    @Query("select b.session.id, count(b) from Booking b where b.session.id in :sessionIds and b.status <> 'cancelled' group by b.session.id")
+    @Query("select b.session.id, count(b) from Booking b where b.session.id in :sessionIds and lower(b.status) not in ('cancelled', 'waitlisted') group by b.session.id")
     List<Object[]> countActiveBySessionIds(@Param("sessionIds") List<Long> sessionIds);
 
     /**

@@ -42,7 +42,12 @@ import java.util.Optional;
  * The rates use the whole month even when the shift was assigned (or ended) mid-month: days the
  * assignments don't cover are counted as if the nearest assigned shift applied. Otherwise a shift
  * assigned on the 16th would spread a full month's basic over half a month of days.
+ * Someone who joined during the month gets basic and allowances prorated to the share of the
+ * month employed (working days on their shift pattern, else calendar days).
  * Employees without a shift have no scheduled days, so no attendance deduction or overtime.
+ * Recoveries never exceed the pay: a deduction that doesn't fit is deferred to next month and an
+ * advance installment takes only what's left, so the net never needs flooring and nothing is
+ * recorded as recovered that wasn't withheld.
  * Allowances come from the employee profile (fixed or % of basic), else Salary Payments.
  * Draft -> Approved -> Partially Paid -> Paid: an approved run is paid in Salary Payments, one
  * employee at a time. Paying an employee's line records their advance installments (posting the
@@ -106,7 +111,10 @@ public class PayrollRunService {
         }
         runRepository.flush();
 
-        List<Staff> staff = attendance.workforce();
+        // Someone joining after the month isn't on its payroll.
+        List<Staff> staff = attendance.workforce().stream()
+                .filter(s -> s.getJoinDate() == null || !s.getJoinDate().isAfter(period.atEndOfMonth()))
+                .toList();
         if (staff.isEmpty()) throw new BusinessRuleViolationException("There are no active employees to pay");
 
         Map<Long, List<Map<String, Object>>> days = attendance.daysByStaff(period.atDay(1), period.atEndOfMonth());
@@ -145,21 +153,19 @@ public class PayrollRunService {
     private PayrollRunLine calculate(PayrollRun run, Staff s, List<Map<String, Object>> days, Map<Long, Shift> shifts,
                                      Map<String, BigDecimal> commission, List<Map<String, Object>> advanceItems,
                                      List<Map<String, Object>> deductionItems) {
-        Map<String, Object> sum = ShiftAttendanceService.summarize(days);
+        YearMonth period = YearMonth.of(run.getPeriodYear(), run.getPeriodMonth());
+        // Joined during the month: only days from the joining date count toward attendance, and
+        // basic + allowances are prorated (below). Days before it are neither paid nor "absent".
+        LocalDate joined = s.getJoinDate() != null && s.getJoinDate().isAfter(period.atDay(1))
+                && !s.getJoinDate().isAfter(period.atEndOfMonth()) ? s.getJoinDate() : null;
+        List<Map<String, Object>> employedDays = joined == null ? days
+                : days.stream().filter(d -> !LocalDate.parse((String) d.get("date")).isBefore(joined)).toList();
+        Map<String, Object> sum = ShiftAttendanceService.summarize(employedDays);
         Optional<SalaryPaymentEmployee> payrollRecord = s.getStaffId() != null
                 ? salaryEmployeeRepository.findByEmployeeId(s.getStaffId()) : Optional.empty();
-        BigDecimal basic = s.getBaseSalary() != null && s.getBaseSalary().signum() > 0 ? s.getBaseSalary()
+        BigDecimal monthlyBasic = s.getBaseSalary() != null && s.getBaseSalary().signum() > 0 ? s.getBaseSalary()
                 : payrollRecord.map(SalaryPaymentEmployee::getBaseSalary).orElse(BigDecimal.ZERO);
-        basic = money(basic);
-
-        List<Map<String, Object>> allowanceItems = allowances(s, basic);
-        BigDecimal allowances;
-        if (!allowanceItems.isEmpty()) {
-            allowances = allowanceItems.stream().map(a -> (BigDecimal) a.get("amount")).reduce(BigDecimal.ZERO, BigDecimal::add);
-        } else {
-            allowances = money(payrollRecord.map(SalaryPaymentEmployee::getAllowances).orElse(BigDecimal.ZERO));
-            if (allowances.signum() > 0) allowanceItems = List.of(item("Allowances", allowances));
-        }
+        monthlyBasic = money(monthlyBasic);
 
         double scheduledDays = num(sum.get("scheduled_days"));
         double scheduledHours = num(sum.get("scheduled_hours"));
@@ -167,21 +173,78 @@ public class PayrollRunService {
         double unpaid = num(sum.get("unpaid_leave"));
         double approvedOtHours = num(sum.get("approved_ot_hours"));
         boolean hasShift = scheduledDays > 0;
-        double[] basis = rateBasis(days, shifts);
+        double[] basis = rateBasis(days, shifts, joined);
         double rateDays = basis[0] > 0 ? basis[0] : scheduledDays;
         double rateHours = basis[1] > 0 ? basis[1] : scheduledHours;
 
-        BigDecimal perDay = hasShift && rateDays > 0 ? basic.divide(BigDecimal.valueOf(rateDays), 4, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        // Share of the month employed: working days on the shift pattern, else calendar days.
+        BigDecimal employedShare = BigDecimal.ONE;
+        if (joined != null) {
+            double share = hasShift && basis[0] > 0
+                    ? (basis[0] - basis[2]) / basis[0]
+                    : (period.lengthOfMonth() - (joined.getDayOfMonth() - 1)) / (double) period.lengthOfMonth();
+            employedShare = BigDecimal.valueOf(Math.max(0, Math.min(1, share))).setScale(6, RoundingMode.HALF_UP);
+        }
+        BigDecimal basic = money(monthlyBasic.multiply(employedShare));
+
+        List<Map<String, Object>> allowanceItems = allowances(s, monthlyBasic);
+        BigDecimal allowances;
+        if (!allowanceItems.isEmpty()) {
+            if (joined != null) {
+                final BigDecimal shareF = employedShare;
+                allowanceItems = allowanceItems.stream()
+                        .map(a -> item((String) a.get("name"), money(((BigDecimal) a.get("amount")).multiply(shareF)))).toList();
+            }
+            allowances = allowanceItems.stream().map(a -> (BigDecimal) a.get("amount")).reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else {
+            allowances = money(payrollRecord.map(SalaryPaymentEmployee::getAllowances).orElse(BigDecimal.ZERO).multiply(employedShare));
+            if (allowances.signum() > 0) allowanceItems = List.of(item("Allowances", allowances));
+        }
+
+        // Day and hour rates come from the full monthly basic, whatever share of the month was employed.
+        BigDecimal perDay = hasShift && rateDays > 0 ? monthlyBasic.divide(BigDecimal.valueOf(rateDays), 4, RoundingMode.HALF_UP) : BigDecimal.ZERO;
         BigDecimal attendanceDeduction = money(perDay.multiply(BigDecimal.valueOf(absent + unpaid))).min(basic);
         BigDecimal otRate = hasShift && rateHours > 0
-                ? basic.divide(BigDecimal.valueOf(rateHours), 4, RoundingMode.HALF_UP).multiply(OT_MULTIPLIER)
+                ? monthlyBasic.divide(BigDecimal.valueOf(rateHours), 4, RoundingMode.HALF_UP).multiply(OT_MULTIPLIER)
                 : BigDecimal.ZERO;
         BigDecimal otPay = money(otRate.multiply(BigDecimal.valueOf(approvedOtHours)));
         BigDecimal commissionTotal = money(commission.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal advanceTotal = money(advanceItems.stream().map(a -> (BigDecimal) a.get("amount")).reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal otherTotal = money(deductionItems.stream().map(d -> (BigDecimal) d.get("amount")).reduce(BigDecimal.ZERO, BigDecimal::add));
 
         BigDecimal gross = basic.add(allowances).add(otPay).add(commissionTotal);
+
+        // Recoveries never exceed the pay. Other deductions are taken whole when they fit, else
+        // deferred to next month; advance installments take what's left (the rest stays on the
+        // advance's balance). Each item records what was actually withheld, so settling the line
+        // only ever records recoveries that really came out of this salary.
+        BigDecimal available = gross.subtract(attendanceDeduction).max(BigDecimal.ZERO);
+        List<Map<String, Object>> takenDeductions = new ArrayList<>();
+        BigDecimal otherTotal = BigDecimal.ZERO;
+        for (Map<String, Object> d : deductionItems) {
+            BigDecimal due = money((BigDecimal) d.get("amount"));
+            boolean fits = due.compareTo(available) <= 0;
+            Map<String, Object> copy = new LinkedHashMap<>(d);
+            copy.put("amount", fits ? due : BigDecimal.ZERO.setScale(2));
+            if (!fits) {
+                copy.put("due", due);
+                copy.put("deferred", true);
+            } else {
+                available = available.subtract(due);
+                otherTotal = otherTotal.add(due);
+            }
+            takenDeductions.add(copy);
+        }
+        List<Map<String, Object>> takenAdvances = new ArrayList<>();
+        BigDecimal advanceTotal = BigDecimal.ZERO;
+        for (Map<String, Object> a : advanceItems) {
+            BigDecimal due = money((BigDecimal) a.get("amount"));
+            BigDecimal take = due.min(available);
+            Map<String, Object> copy = new LinkedHashMap<>(a);
+            copy.put("amount", take);
+            if (take.compareTo(due) < 0) copy.put("due", due);
+            available = available.subtract(take);
+            advanceTotal = advanceTotal.add(take);
+            takenAdvances.add(copy);
+        }
         BigDecimal net = gross.subtract(attendanceDeduction).subtract(advanceTotal).subtract(otherTotal).max(BigDecimal.ZERO);
 
         Map<String, Object> breakdown = new LinkedHashMap<>();
@@ -193,11 +256,14 @@ public class PayrollRunService {
         breakdown.put("ot_rate", money(otRate));
         breakdown.put("ot_multiplier", OT_MULTIPLIER);
         breakdown.put("commission", commission);
-        breakdown.put("advances", advanceItems);
-        breakdown.put("deductions", deductionItems);
+        breakdown.put("advances", takenAdvances);
+        breakdown.put("deductions", takenDeductions);
         breakdown.put("attendance", sum);
-        BigDecimal shortfall = gross.subtract(attendanceDeduction).subtract(advanceTotal).subtract(otherTotal);
-        if (shortfall.signum() < 0) breakdown.put("net_floored_by", shortfall.negate());
+        if (joined != null) {
+            breakdown.put("joined_on", joined.toString());
+            breakdown.put("monthly_basic", monthlyBasic);
+            breakdown.put("employed_share", employedShare.setScale(4, RoundingMode.HALF_UP));
+        }
 
         PayrollRunLine l = new PayrollRunLine();
         l.setRunId(run.getId());
@@ -231,19 +297,22 @@ public class PayrollRunService {
     }
 
     /**
-     * {working days, working hours} of the full month on the employee's shift pattern. Days a
-     * shift covers count as scheduled; days no assignment covers ("No Shift") use the nearest
-     * covered day's shift. Roster days off and leave/holiday overrides stay as they are.
+     * {working days, working hours, working days before {@code joined}} of the full month on the
+     * employee's shift pattern. Days a shift covers count as scheduled; days no assignment covers
+     * ("No Shift") use the nearest covered day's shift. Roster days off and leave/holiday
+     * overrides stay as they are.
      */
-    private static double[] rateBasis(List<Map<String, Object>> days, Map<Long, Shift> shifts) {
+    private static double[] rateBasis(List<Map<String, Object>> days, Map<Long, Shift> shifts, LocalDate joined) {
         int n = days.size();
-        double workDays = 0;
+        double workDays = 0, beforeJoining = 0;
         int minutes = 0;
         for (int i = 0; i < n; i++) {
             Map<String, Object> d = days.get(i);
+            boolean preJoin = joined != null && LocalDate.parse((String) d.get("date")).isBefore(joined);
             if (d.get("shift_id") != null) {
                 if (Boolean.TRUE.equals(d.get("scheduled"))) {
                     workDays++;
+                    if (preJoin) beforeJoining++;
                     minutes += ((Number) d.get("scheduled_minutes")).intValue();
                 }
                 continue;
@@ -254,13 +323,14 @@ public class PayrollRunService {
                 if (i + k < n && days.get(i + k).get("shift_id") != null) nearest = shifts.get(((Number) days.get(i + k).get("shift_id")).longValue());
                 else if (i - k >= 0 && days.get(i - k).get("shift_id") != null) nearest = shifts.get(((Number) days.get(i - k).get("shift_id")).longValue());
             }
-            if (nearest == null) return new double[] { 0, 0 };
+            if (nearest == null) return new double[] { 0, 0, 0 };
             if (ShiftAttendanceService.worksOn(nearest, LocalDate.parse((String) d.get("date")))) {
                 workDays++;
+                if (preJoin) beforeJoining++;
                 minutes += ShiftAttendanceService.netMinutes(nearest);
             }
         }
-        return new double[] { workDays, minutes / 60.0 };
+        return new double[] { workDays, minutes / 60.0, beforeJoining };
     }
 
     /** Allowances from the employee profile: [{name, type: fixed|pct, value}] under payroll.allowances. */
@@ -381,10 +451,18 @@ public class PayrollRunService {
                 }
             }
             for (JsonNode d : breakdown.path("deductions")) {
+                // a deferred deduction (didn't fit in this pay) stays due for next month
+                if (new BigDecimal(d.path("amount").asText("0")).signum() <= 0) continue;
                 advancesDeductions.markDeductionApplied(d.path("deduction_id").asLong(), period);
             }
         }
-        if (line.getStaffId() != null) commissions.markPaidByPayroll(period, run.getId(), List.of(line.getStaffId()));
+        // Only the commission this line included is paid — commission approved after the payroll
+        // was calculated stays approved for the next payment.
+        if (line.getStaffId() != null && breakdown != null) {
+            List<String> categories = new ArrayList<>();
+            breakdown.path("commission").fieldNames().forEachRemaining(categories::add);
+            if (!categories.isEmpty()) commissions.markPaidByPayroll(period, run.getId(), List.of(line.getStaffId()), categories);
+        }
         line.setSalaryPaymentId(salaryPaymentId);
         line.setPaidAt(LocalDateTime.now());
         lineRepository.save(line);

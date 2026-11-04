@@ -1,16 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { AspectRatio } from "../components/ui/aspect-ratio";
 import { Slider } from "../components/ui/slider";
 import {
@@ -19,19 +14,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { cn } from "../components/ui/utils";
+import { Line, LineChart, ResponsiveContainer } from "recharts";
+import styles from "../components/analytics/community-analytics.module.css";
+import hub from "../components/community/community-hub.module.css";
 import api from "../api/axiosConfig";
 import { communityService, TrendingTopic, LeaderboardEntry, CommunityEngagementStats } from "../utils/supabase/community-service";
 import { membersService } from "../utils/supabase/members-service";
 import {
+  ArrowDownRight,
+  ArrowUpRight,
   Calendar,
   ChevronRight,
-  Filter,
+  Crown,
+  HelpCircle,
+  Lightbulb,
+  Sparkles,
   Flame,
   Heart,
   Image as ImageIcon,
   Loader2,
-  MapPin,
   Medal,
   MessageCircle,
   MessageSquare,
@@ -252,12 +253,92 @@ const getCropPreviewStyle = (cropPosition: number, cropZoom: number) => ({
 const createUploadedPhotoLabel = (fileName: string) =>
   fileName.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ").trim() || "Workout Upload";
 
+// ── Presentation helpers (module level so they aren't re-created each render) ──
+
+type CommunityTab = "feed" | "events" | "achievements" | "leaderboard";
+
+const TYPE_META: Record<CommunityPost["type"], { label: string; plural: string; icon: typeof Trophy }> = {
+  achievement: { label: "Achievement", plural: "Achievements", icon: Trophy },
+  question: { label: "Question", plural: "Questions", icon: HelpCircle },
+  tip: { label: "Tip", plural: "Tips", icon: Lightbulb },
+};
+
+const AVATAR_COLORS = ["#2a78d6", "#1baf7a", "#eb6834", "#6250d6", "#c2410c", "#0e9fb5", "#b45309", "#be185d"];
+const avatarColor = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+};
+const initialsOf = (name: string) =>
+  (name.includes("@") ? name.split("@")[0] : name)
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "?";
+
+function TypePill({ type }: { type: CommunityPost["type"] }) {
+  const Icon = TYPE_META[type]?.icon ?? Star;
+  return (
+    <span className={hub.typePill} data-ptype={type}>
+      <Icon size={11} />{TYPE_META[type]?.label ?? type}
+    </span>
+  );
+}
+
+function InitialsAvatar({ name, small }: { name: string; small?: boolean }) {
+  return (
+    <span className={`${hub.avatar} ${small ? hub.avatarSm : ""}`} style={{ ["--av" as any]: avatarColor(name) }} aria-hidden>
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+function EmptyState({ icon: Icon, title, text }: { icon: typeof Trophy; title: string; text: string }) {
+  return (
+    <div className={hub.emptyState}>
+      <span className={hub.emptyIcon}><Icon size={24} /></span>
+      <span className={hub.emptyTitle}>{title}</span>
+      <span className={hub.emptyText}>{text}</span>
+    </div>
+  );
+}
+
+function Ranked({ title, sub, icon: Icon, tone, rows, metric }: {
+  title: string; sub: string; icon: typeof Trophy; tone: string; rows: LeaderboardEntry[]; metric: (e: LeaderboardEntry) => string;
+}) {
+  return (
+    <div className={`${styles.card} ${styles.panel}`}>
+      <div className={styles.panelHead}>
+        <div>
+          <h3 className={styles.panelTitle} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span className={`${styles.kpiIcon} ${styles.kpiIconSm}`} data-tone={tone}><Icon size={14} /></span>{title}
+          </h3>
+          <div className={styles.panelSub}>{sub}</div>
+        </div>
+      </div>
+      <div>
+        {rows.slice(0, 5).map((entry, idx) => (
+          <div key={entry.userId} className={hub.boardRow}>
+            <span className={hub.medal} data-rank={idx + 1}>{idx + 1}</span>
+            <InitialsAvatar name={entry.username} small />
+            <span className={hub.personName}>{entry.username}</span>
+            <span className={hub.countPill}>{metric(entry)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Community() {
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [feedFilter, setFeedFilter] = useState<"all" | CommunityPost["type"]>("all");
   const [feedView, setFeedView] = useState<"feed" | "archived">("feed");
+  const [activeTab, setActiveTab] = useState<CommunityTab>("feed");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [postDraft, setPostDraft] = useState<CommunityPostDraft>(createEmptyPostDraft);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -271,8 +352,6 @@ export function Community() {
   // state drives the disabled button / "Posting..." label.
   const isSubmittingPostRef = useRef(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
-  const softButton = "border-0 bg-white text-slate-700 shadow-sm hover:bg-red-50 hover:text-red-600";
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [activePost, setActivePost] = useState<CommunityPost | null>(null);
@@ -491,7 +570,10 @@ export function Community() {
     const distinctTypes = new Set(feedPosts.map((p) => p.type));
     return {
       activeMembers: activeMemberCount,
-      postsToday: feedPosts.length,
+      postsToday: feedPosts.filter((p) => {
+        const d = new Date(p.createdAt);
+        return !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
+      }).length,
       postTypes: distinctTypes.size,
       totalEngagement: engagementStats ? engagementStats.totalLikes + engagementStats.totalComments : 0,
     };
@@ -723,684 +805,575 @@ export function Community() {
     }
   };
 
-  const getPostTypeColor = (type: CommunityPost["type"]) => {
-    switch (type) {
-      case "achievement":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "question":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "tip":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
+  const weeklyEngagement = (engagementStats?.weekly ?? []).map((w) => ({ week: w.weekLabel, value: w.likes + w.comments }));
+  const topicMax = Math.max(1, ...trendingTopics.map((t) => t.postCount));
+  const typeTotal = Math.max(1, (engagementStats?.byType ?? []).reduce((s, t) => s + t.posts, 0));
+  const byScore = [...leaderboard].sort((a, b) => b.engagementScore - a.engagementScore);
+  const byLikes = [...leaderboard].sort((a, b) => b.totalLikes - a.totalLikes);
+  const presentTypes = Array.from(new Set(feedPosts.map((p) => p.type)));
 
-  const getBadgeColor = (badge: MemberAchievement["badge"]) => {
-    switch (badge) {
-      case "strength":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "consistency":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "cardio":
-        return "bg-green-100 text-green-800 border-green-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
+  const tabs: { id: CommunityTab; label: string; icon: typeof Trophy; count?: number }[] = [
+    { id: "feed", label: "Community Feed", icon: MessageSquare, count: feedPosts.length },
+    { id: "events", label: "Events", icon: Calendar },
+    { id: "achievements", label: "Achievements", icon: Trophy, count: achievementPosts.length },
+    { id: "leaderboard", label: "Leaderboard", icon: Medal, count: leaderboard.length || undefined },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
-      <style>{`
-        @keyframes communityFadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .community-panel {
-          animation: communityFadeIn 0.22s ease-out;
-        }
-      `}</style>
-      <Card className="community-panel overflow-hidden border-primary/10 shadow-md">
-        <CardContent className="p-0">
-          <div className="bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.14),_transparent_40%),linear-gradient(135deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,1)_45%,_rgba(254,242,242,0.75)_100%)] p-6">
-            <div className="space-y-4">
-              <Badge variant="outline" className="w-fit border-primary/20 bg-white/80 text-primary">
-                Member community hub
-              </Badge>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Community</h1>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  Connect with fellow gym members and share your fitness journey through posts, events, streaks, and community recognition.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  variant="outline"
-                  className={softButton}
-                  onClick={() =>
-                    toast.success("Events view highlighted.", {
-                      description: "Community events and challenge cards are ready below."
-                    })
-                  }
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Browse Events
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="community-panel grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Active Members</CardTitle>
-            <div className="rounded-lg bg-blue-50 p-2">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{stats.activeMembers}</div>
-            <p className="text-xs text-muted-foreground">Members participating in community interactions</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Posts Today</CardTitle>
-            <div className="rounded-lg bg-emerald-50 p-2">
-              <MessageSquare className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">{stats.postsToday}</div>
-            <p className="text-xs text-muted-foreground">Shared wins, questions, and updates since morning</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Post Types</CardTitle>
-            <div className="rounded-lg bg-orange-50 p-2">
-              <Target className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-700">{stats.postTypes}</div>
-            <p className="text-xs text-muted-foreground">Distinct content categories in the feed</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Total Engagement</CardTitle>
-            <div className="rounded-lg bg-purple-50 p-2">
-              <Heart className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-700">{stats.totalEngagement.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total likes and comments across all posts</p>
-          </CardContent>
-        </Card>
+    <div className={styles.root}>
+      {/* Header */}
+      <div className={hub.hero}>
+        <div>
+          <span className={hub.heroTag}><Sparkles size={12} />Member community hub</span>
+          <h1 className={hub.heroTitle}>Community</h1>
+          <p className={hub.heroText}>
+            Connect with fellow gym members and share your fitness journey through posts, events, streaks, and community recognition.
+          </p>
+        </div>
+        <div className={hub.heroActions}>
+          <button type="button" className={hub.heroBtn} onClick={() => setActiveTab("events")}>
+            <Calendar size={16} />Browse Events
+          </button>
+          <button
+            type="button"
+            className={`${hub.heroBtn} ${hub.heroBtnSolid}`}
+            onClick={() => { setActiveTab("feed"); setFeedView("feed"); setIsCreatePostOpen(true); }}
+          >
+            <Plus size={16} />Create Post
+          </button>
+        </div>
       </div>
 
-      <Card className={`${cardShell} community-panel`}>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[240px] flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="pl-10"
-                placeholder="Search posts, topics, or members..."
-              />
-            </div>
-            <Button variant={feedFilter === "all" ? "default" : "outline"} size="sm" className={feedFilter === "all" ? "" : softButton} onClick={() => setFeedFilter("all")}>
-              All Posts
-            </Button>
-            <Button variant={feedFilter === "achievement" ? "default" : "outline"} size="sm" className={feedFilter === "achievement" ? "" : softButton} onClick={() => setFeedFilter("achievement")}>
-              Achievements
-            </Button>
-            <Button variant={feedFilter === "question" ? "default" : "outline"} size="sm" className={feedFilter === "question" ? "" : softButton} onClick={() => setFeedFilter("question")}>
-              Questions
-            </Button>
-            <Button variant={feedFilter === "tip" ? "default" : "outline"} size="sm" className={feedFilter === "tip" ? "" : softButton} onClick={() => setFeedFilter("tip")}>
-              Tips
-            </Button>
+      {/* KPIs */}
+      <div className={hub.kpis}>
+        <div className={`${styles.card} ${styles.kpi}`}>
+          <div className={styles.kpiTop}>
+            <span className={styles.kpiLabel}>Active Members</span>
+            <span className={styles.kpiIcon} data-tone="blue"><Users size={16} /></span>
           </div>
-        </CardContent>
-      </Card>
+          <div className={styles.kpiValue}>{stats.activeMembers.toLocaleString()}</div>
+          <div className={styles.kpiHint}>Members participating in community interactions</div>
+        </div>
+        <div className={`${styles.card} ${styles.kpi}`}>
+          <div className={styles.kpiTop}>
+            <span className={styles.kpiLabel}>Posts Today</span>
+            <span className={styles.kpiIcon} data-tone="green"><MessageSquare size={16} /></span>
+          </div>
+          <div className={styles.kpiValue}>{stats.postsToday.toLocaleString()}</div>
+          <div className={styles.kpiHint}>Shared wins, questions, and updates since morning</div>
+        </div>
+        <div className={`${styles.card} ${styles.kpi}`}>
+          <div className={styles.kpiTop}>
+            <span className={styles.kpiLabel}>Post Types</span>
+            <span className={styles.kpiIcon} data-tone="orange"><Target size={16} /></span>
+          </div>
+          <div className={styles.kpiValue}>{stats.postTypes}<span className={styles.muted} style={{ fontSize: "1rem", fontWeight: 600 }}> / 3</span></div>
+          <div className={styles.kpiHint}>
+            {presentTypes.length ? presentTypes.map((t) => TYPE_META[t]?.plural ?? t).join(" · ") : "Distinct content categories in the feed"}
+          </div>
+        </div>
+        <div className={`${styles.card} ${styles.kpi}`}>
+          <div className={styles.kpiTop}>
+            <span className={styles.kpiLabel}>Total Engagement</span>
+            <span className={styles.kpiIcon} data-tone="violet"><Heart size={16} /></span>
+          </div>
+          <div className={styles.kpiValue}>{stats.totalEngagement.toLocaleString()}</div>
+          <div className={styles.kpiFoot}>
+            {engagementDelta !== null && (
+              <span className={styles.delta} data-tone={engagementDelta > 0 ? "good" : engagementDelta < 0 ? "bad" : "flat"}>
+                {engagementDelta > 0 ? <ArrowUpRight size={13} /> : engagementDelta < 0 ? <ArrowDownRight size={13} /> : null}
+                {Math.abs(engagementDelta)}% this week
+              </span>
+            )}
+            <span>Total likes and comments across all posts</span>
+          </div>
+        </div>
+      </div>
 
-      <Tabs defaultValue="feed" className="community-panel space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[560px] lg:grid-cols-4">
-          <TabsTrigger value="feed">Community Feed</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="achievements">Achievements</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-        </TabsList>
+      {/* Sections */}
+      <div className={`${styles.card} ${hub.tabsBar}`} role="tablist" aria-label="Community sections">
+        {tabs.map(({ id, label, icon: Icon, count }) => (
+          <button key={id} type="button" role="tab" aria-selected={activeTab === id} data-active={activeTab === id} className={hub.tab} onClick={() => setActiveTab(id)}>
+            <Icon size={15} />{label}
+            {count != null && count > 0 && <span className={hub.tabCount}>{count}</span>}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="feed" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.65fr_1fr]">
-            <Card className={cardShell}>
-              <CardHeader>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle>Community Feed</CardTitle>
-                    <CardDescription>Motivation, questions, coaching moments, and photo updates from active members.</CardDescription>
+      {/* ── Feed ── */}
+      {activeTab === "feed" && (
+        <div className={hub.body} key="feed">
+          <div className={hub.feedGrid}>
+            <div className={hub.feedMain}>
+              {/* Composer */}
+              <div className={`${styles.card} ${hub.composer}`}>
+                <span className={hub.avatar} style={{ ["--av" as any]: "var(--primary)" }} aria-hidden><Plus size={18} /></span>
+                <button
+                  type="button"
+                  className={hub.composerInput}
+                  onClick={() => setIsCreatePostOpen(true)}
+                  disabled={feedView === "archived"}
+                  title={feedView === "archived" ? "Switch to Feed to create a post" : undefined}
+                >
+                  Share a win, ask a question, or post a training tip…
+                </button>
+                <div className={hub.composerChips}>
+                  {(["achievement", "question", "tip"] as const).map((t) => {
+                    const Icon = TYPE_META[t].icon;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        className={hub.composerChip}
+                        data-ptype={t}
+                        disabled={feedView === "archived"}
+                        onClick={() => { setPostDraft((d) => ({ ...d, type: t })); setIsCreatePostOpen(true); }}
+                      >
+                        <Icon size={13} />{TYPE_META[t].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Search + filters + feed/archived */}
+              <div className={`${styles.card} ${hub.toolbar}`}>
+                <div className={hub.search}>
+                  <Search size={16} />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search posts, topics, or members..."
+                    aria-label="Search posts"
+                  />
+                </div>
+                <div className={hub.filterChips} role="group" aria-label="Post type">
+                  {(["all", "achievement", "question", "tip"] as const).map((f) => (
+                    <button key={f} type="button" className={hub.filterChip} data-active={feedFilter === f} aria-pressed={feedFilter === f} onClick={() => setFeedFilter(f)}>
+                      {f === "all" ? "All Posts" : TYPE_META[f].plural}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.seg} role="tablist" aria-label="Feed view">
+                  <button type="button" role="tab" aria-selected={feedView === "feed"} className={styles.segBtn} data-active={feedView === "feed"} onClick={() => setFeedView("feed")}>
+                    Feed
+                  </button>
+                  <button type="button" role="tab" aria-selected={feedView === "archived"} className={styles.segBtn} data-active={feedView === "archived"} onClick={() => setFeedView("archived")}>
+                    <Archive size={12} style={{ display: "inline", marginRight: 4, verticalAlign: -1 }} />Archived
+                  </button>
+                </div>
+              </div>
+
+              {/* Posts */}
+              {isLoadingFeed ? (
+                [0, 1].map((i) => (
+                  <div key={i} className={`${styles.card} ${hub.skeleton}`} aria-hidden>
+                    <div className={hub.skelLine} style={{ width: "35%" }} />
+                    <div className={hub.skelLine} style={{ width: "90%" }} />
+                    <div className={hub.skelLine} style={{ width: "70%" }} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={feedView === "feed" ? "default" : "ghost"}
-                        className="h-9 rounded-2xl px-3"
-                        onClick={() => setFeedView("feed")}
-                      >
-                        Feed
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={feedView === "archived" ? "default" : "ghost"}
-                        className="h-9 rounded-2xl px-3"
-                        onClick={() => setFeedView("archived")}
-                      >
-                        Archived
-                      </Button>
+                ))
+              ) : filteredPosts.length === 0 ? (
+                <div className={styles.card}>
+                  {feedView === "archived" ? (
+                    <EmptyState icon={Archive} title="No archived posts" text="Posts you archive are hidden from everyone and kept here." />
+                  ) : searchTerm.trim() || feedFilter !== "all" ? (
+                    <EmptyState icon={Search} title="No matching posts" text="Try a different search or post type." />
+                  ) : (
+                    <EmptyState icon={MessageSquare} title="No posts yet" text="Create the first community update." />
+                  )}
+                </div>
+              ) : filteredPosts.map((post) => (
+                <article key={post.id} className={`${styles.card} ${hub.post}`} data-archived={post.archived ? "true" : undefined}>
+                  <div className={hub.postHead}>
+                    <InitialsAvatar name={post.authorUsername} />
+                    <div className={hub.postMeta}>
+                      <span className={hub.postAuthor}>{post.authorUsername}</span>
+                      <span className={hub.postSub}>
+                        <span>{safeFormatTime(post.createdAt)}</span>
+                        <span className={hub.dot} />
+                        <TypePill type={post.type} />
+                        {post.topic && <span className={hub.topicChip} title={post.topic}>#{post.topic}</span>}
+                        {post.image && (
+                          <span className={hub.topicChip}><ImageIcon size={11} style={{ marginRight: 3 }} />{post.image.aspectRatio}</span>
+                        )}
+                        {post.archived && <span className={styles.status} data-status="warning"><Archive size={11} />Archived</span>}
+                      </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={softButton}
-                      onClick={() =>
-                        toast.success("Feed filters are ready above.", {
-                          description: "Use search and post-type filters to refine the community feed."
-                        })
-                      }
-                    >
-                      <Filter className="mr-2 h-4 w-4" />
-                      Refine Feed
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-10 rounded-2xl px-3 shadow-sm"
-                      onClick={() => setIsCreatePostOpen(true)}
-                      disabled={feedView === "archived"}
-                      title={feedView === "archived" ? "Switch to Feed to create a post" : undefined}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Post
-                    </Button>
+                    {canDeletePost(post) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className={hub.iconBtn} disabled={isDeletingPostId === post.id} title="Post options" aria-label="Post options">
+                            {isDeletingPostId === post.id ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => toggleArchivePost(post, !(post.archived ?? false))}>
+                            <Archive className="h-4 w-4" />
+                            {(post.archived ?? false) ? "Unarchive post" : "Archive post"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem variant="destructive" onSelect={() => deletePost(post)}>
+                            <Trash2 className="h-4 w-4" />
+                            Delete post
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
+
+                  <p className={hub.postContent}>{post.content}</p>
+
+                  {post.image ? (
+                    <div style={{ width: post.image.aspectRatio === "9:16" ? 200 : post.image.aspectRatio === "1:1" ? 280 : 260, maxWidth: "100%" }}>
+                      <div className={hub.postImage}>
+                        <AspectRatio ratio={getAspectRatioValue(post.image.aspectRatio)}>
+                          <img
+                            src={post.image.src}
+                            alt={post.image.alt}
+                            className="absolute inset-0 h-full w-full object-cover"
+                            style={getCropPreviewStyle(post.image.cropPosition, post.image.cropZoom)}
+                          />
+                        </AspectRatio>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className={hub.postActions}>
+                    <button type="button" className={`${hub.action} ${hub.actionLike}`} data-liked={post.likedByMe ? "true" : undefined} onClick={() => toggleLike(post)} aria-pressed={!!post.likedByMe}>
+                      <Heart size={16} />{post.likes} <span className="sr-only">likes</span>
+                    </button>
+                    <button type="button" className={hub.action} onClick={() => openComments(post)}>
+                      <MessageCircle size={16} />{post.comments} <span className="sr-only">comments</span>
+                    </button>
+                    <button type="button" className={hub.action} onClick={() => toast.success("Share options opened.")}>
+                      <Share2 size={16} />Share
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {/* Sidebar */}
+            <aside className={hub.aside}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <div className={styles.panelHead}>
+                  <div>
+                    <h3 className={styles.panelTitle}>Community Pulse</h3>
+                    <div className={styles.panelSub}>What the member base is talking about right now.</div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoadingFeed ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-muted-foreground">
-                    Loading community posts...
+                <div className={styles.block}>
+                  <div className={styles.factLabel} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <TrendingUp size={14} />Engagement this week
                   </div>
-                ) : filteredPosts.length === 0 ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-muted-foreground">
-                    No posts yet. Create the first community update.
-                  </div>
-                ) : filteredPosts.map((post) => (
-                  <div key={post.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-5">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-11 w-11 shadow-sm">
-                        <AvatarImage src={post.avatar ?? ""} />
-                        <AvatarFallback>
-                          {post.authorUsername
-                            .split(" ")
-                            .map((name) => name[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-slate-900">{post.authorUsername}</span>
-                          <span className="text-sm text-muted-foreground">{safeFormatTime(post.createdAt)}</span>
-                          <Badge className={getPostTypeColor(post.type)}>{post.type}</Badge>
-                          <Badge variant="outline">{post.topic}</Badge>
-                          {post.image ? (
-                            <Badge variant="outline" className="bg-white">
-                              <ImageIcon className="mr-1 h-3 w-3" />
-                              {post.image.aspectRatio}
-                            </Badge>
-                          ) : null}
-                          {canDeletePost(post) ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="ml-auto h-8 w-8 rounded-full text-slate-500 hover:bg-slate-100"
-                                  disabled={isDeletingPostId === post.id}
-                                  title="Post options"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onSelect={() => toggleArchivePost(post, !(post.archived ?? false))}
-                                >
-                                  <Archive className="h-4 w-4" />
-                                  {(post.archived ?? false) ? "Unarchive post" : "Archive post"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={() => deletePost(post)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete post
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
-                        </div>
-                        <p className="text-sm leading-6 text-slate-700">{post.content}</p>
-                        {post.image ? (
-                          <div style={{ width: post.image.aspectRatio === "9:16" ? 80 : 120 }}>
-                            <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
-                              <AspectRatio ratio={getAspectRatioValue(post.image.aspectRatio)} className="bg-slate-100">
-                                <img
-                                  src={post.image.src}
-                                  alt={post.image.alt}
-                                  className="absolute inset-0 h-full w-full object-cover"
-                                  style={getCropPreviewStyle(post.image.cropPosition, post.image.cropZoom)}
-                                />
-                              </AspectRatio>
-                            </div>
-                          </div>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600",
-                              post.likedByMe ? "text-red-600" : null,
-                            )}
-                            onClick={() => toggleLike(post)}
-                          >
-                            <Heart className={cn("mr-1 h-4 w-4", post.likedByMe ? "fill-red-500 text-red-500" : null)} />
-                            {post.likes}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600"
-                            onClick={() => openComments(post)}
-                          >
-                            <MessageCircle className="mr-1 h-4 w-4" />
-                            {post.comments}
-                          </Button>
-                          <Button variant="ghost" size="sm" className="bg-white text-muted-foreground shadow-sm hover:bg-red-50 hover:text-red-600" onClick={() => toast.success("Share options opened.")}>
-                            <Share2 className="mr-1 h-4 w-4" />
-                            Share
-                          </Button>
-                        </div>
+                  <div className={hub.pulseRow}>
+                    <div>
+                      <div className={hub.pulseValue} style={{ color: engagementDelta == null ? undefined : engagementDelta >= 0 ? "var(--good-ink)" : "var(--bad-ink)" }}>
+                        {engagementDelta !== null ? `${engagementDelta >= 0 ? "+" : ""}${engagementDelta}%` : "—"}
+                      </div>
+                      <div className={styles.note}>
+                        {engagementDelta !== null
+                          ? engagementDelta >= 0
+                            ? "More interactions than last week."
+                            : "Fewer interactions than last week."
+                          : "Not enough data yet to compare weeks."}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <div className="space-y-4">
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle>Community Pulse</CardTitle>
-                  <CardDescription>What the member base is talking about right now.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <TrendingUp className="h-4 w-4 text-emerald-600" />
-                      Engagement this week
-                    </div>
-                    <p className="mt-2 text-2xl font-bold">
-                      {engagementDelta !== null ? `${engagementDelta >= 0 ? "+" : ""}${engagementDelta}%` : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {engagementDelta !== null
-                        ? engagementDelta >= 0
-                          ? "More interactions than last week."
-                          : "Fewer interactions than last week."
-                        : "Not enough data yet to compare weeks."}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <Star className="h-4 w-4 text-amber-500" />
-                      Most discussed topic
-                    </div>
-                    <p className="mt-2 text-lg font-semibold">{topTopic ?? "No posts yet"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {topTopic
-                        ? `"${topTopic}" is the most-posted topic in the last 30 days.`
-                        : "Topics will appear once members start posting."}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle>Trending Topics</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {trendingTopics.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No trending topics yet. Start posting to see what's popular.</p>
-                  ) : (
-                    trendingTopics.map((item) => (
-                      <div key={item.topic} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-sm font-medium">{item.topic}</span>
-                        <Badge variant="secondary">{item.postCount} {item.postCount === 1 ? "post" : "posts"}</Badge>
+                    {weeklyEngagement.length > 1 && (
+                      <div className={hub.spark} aria-hidden>
+                        <ResponsiveContainer>
+                          <LineChart data={weeklyEngagement} margin={{ top: 4, right: 2, bottom: 2, left: 2 }}>
+                            <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="events" className="space-y-6">
-          <Card className={cardShell}>
-            <CardHeader>
-              <CardTitle>Community Events</CardTitle>
-              <CardDescription>Events will appear here once the events feature is set up in your gym management system.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
-                <Calendar className="mx-auto h-10 w-10 text-slate-400" />
-                <p className="mt-4 text-sm font-medium text-slate-600">No community events yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">When events are created, they will appear here for members to browse and join.</p>
+                    )}
+                  </div>
+                </div>
+                <div className={styles.block}>
+                  <div className={styles.factLabel} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Star size={14} />Most discussed topic
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "1.0625rem", marginTop: 4 }}>{topTopic ?? "No posts yet"}</div>
+                  <div className={styles.note}>
+                    {topTopic
+                      ? `"${topTopic}" is the most-posted topic in the last 30 days.`
+                      : "Topics will appear once members start posting."}
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="achievements" className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
-            <Card className={cardShell}>
-              <CardHeader>
-                <CardTitle>Recent Achievements</CardTitle>
-                <CardDescription>Achievement posts shared by members in the community feed.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {achievementPosts.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
-                    <Trophy className="mx-auto h-10 w-10 text-slate-400" />
-                    <p className="mt-4 text-sm font-medium text-slate-600">No achievement posts yet</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Achievements will appear here when members share posts of type "achievement".</p>
-                  </div>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <div className={styles.panelHead}>
+                  <h3 className={styles.panelTitle}>Trending Topics</h3>
+                </div>
+                {trendingTopics.length === 0 ? (
+                  <div className={styles.note} style={{ textAlign: "center", padding: "0.75rem 0" }}>No trending topics yet. Start posting to see what's popular.</div>
                 ) : (
-                  achievementPosts.slice(0, 8).map((post) => (
-                    <div key={post.id} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
-                        <Trophy className="h-6 w-6 text-yellow-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{post.authorUsername}</span>
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">achievement</Badge>
-                          {post.topic && <Badge variant="outline">{post.topic}</Badge>}
+                  <div className={hub.topicRows}>
+                    {trendingTopics.map((item, idx) => (
+                      <React.Fragment key={item.topic}>
+                        <div className={hub.topicRow}>
+                          <span className={hub.rank}>{idx + 1}</span>
+                          <button type="button" className={hub.topicName} style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}
+                            title={`Search “${item.topic}”`} onClick={() => setSearchTerm(item.topic)}>
+                            #{item.topic}
+                          </button>
+                          <span className={hub.countPill}>{item.postCount} {item.postCount === 1 ? "post" : "posts"}</span>
+                          <span />
+                          <div className={hub.topicBar}><div className={hub.topicFill} style={{ width: `${(item.postCount / topicMax) * 100}%` }} /></div>
                         </div>
-                        <p className="mt-1 text-sm text-slate-700">{post.content}</p>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {byScore.length > 0 && (
+                <div className={`${styles.card} ${styles.panel}`}>
+                  <div className={styles.panelHead}>
+                    <h3 className={styles.panelTitle}>Top Contributors</h3>
+                    <button type="button" className={styles.linkBtn} onClick={() => setActiveTab("leaderboard")}>
+                      Leaderboard<ChevronRight size={12} style={{ display: "inline", verticalAlign: -2 }} />
+                    </button>
+                  </div>
+                  <div className={hub.people}>
+                    {byScore.slice(0, 3).map((entry, idx) => (
+                      <div key={entry.userId} className={hub.person}>
+                        <span className={hub.medal} data-rank={idx + 1}>{idx + 1}</span>
+                        <InitialsAvatar name={entry.username} small />
+                        <span className={hub.personName}>{entry.username}</span>
+                        <span className={hub.countPill}>{entry.engagementScore.toLocaleString()} pts</span>
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {post.likes}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
+        </div>
+      )}
+
+      {/* ── Events ── */}
+      {activeTab === "events" && (
+        <div className={hub.body} key="events">
+          <div className={`${styles.card} ${styles.panel}`}>
+            <div className={styles.panelHead}>
+              <div>
+                <h3 className={styles.panelTitle}>Community Events</h3>
+                <div className={styles.panelSub}>Events will appear here once the events feature is set up in your gym management system.</div>
+              </div>
+            </div>
+            <EmptyState icon={Calendar} title="No community events yet" text="When events are created, they will appear here for members to browse and join." />
+          </div>
+        </div>
+      )}
+
+      {/* ── Achievements ── */}
+      {activeTab === "achievements" && (
+        <div className={hub.body} key="achievements">
+          <div className={hub.split}>
+            <div className={`${styles.card} ${styles.panel}`}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h3 className={styles.panelTitle}>Recent Achievements</h3>
+                  <div className={styles.panelSub}>Achievement posts shared by members in the community feed.</div>
+                </div>
+              </div>
+              {achievementPosts.length === 0 ? (
+                <EmptyState icon={Trophy} title="No achievement posts yet" text={'Achievements will appear here when members share posts of type "achievement".'} />
+              ) : (
+                <div className={hub.achList}>
+                  {achievementPosts.slice(0, 8).map((post) => (
+                    <div key={post.id} className={hub.ach}>
+                      <span className={hub.trophy}><Trophy size={20} /></span>
+                      <div style={{ minWidth: 0 }}>
+                        <div className={hub.postSub}>
+                          <span className={hub.postAuthor} style={{ color: "var(--foreground)" }}>{post.authorUsername}</span>
+                          <TypePill type="achievement" />
+                          {post.topic && <span className={hub.topicChip}>#{post.topic}</span>}
+                        </div>
+                        <p className={hub.achText}>{post.content}</p>
+                      </div>
+                      <div className={hub.achSide}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Heart size={12} />{post.likes}</span>
                         <span>{safeFormatTime(post.createdAt)}</span>
                       </div>
                     </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <div className="space-y-4">
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle>Achievement Pulse</CardTitle>
-                  <CardDescription>Real achievement activity from community posts.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="rounded-lg bg-slate-50 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <Medal className="h-4 w-4 text-red-500" />
-                      Achievement posts
-                    </div>
-                    <p className="mt-2 text-2xl font-bold">{achievementPosts.length}</p>
-                    <p className="text-xs text-muted-foreground">Total achievement posts shared by members.</p>
+            <div className={hub.aside} style={{ position: "static" }}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <div className={styles.panelHead}>
+                  <div>
+                    <h3 className={styles.panelTitle}>Achievement Pulse</h3>
+                    <div className={styles.panelSub}>Real achievement activity from community posts.</div>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                      <Flame className="h-4 w-4 text-orange-500" />
-                      Achievement engagement
-                    </div>
-                    <p className="mt-2 text-2xl font-bold">
-                      {achievementPosts.reduce((sum, p) => sum + p.likes + p.comments, 0)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Total likes and comments on achievement posts.</p>
+                </div>
+                <div className={hub.statPair}>
+                  <div className={hub.statBox}>
+                    <span className={styles.factLabel} style={{ display: "flex", alignItems: "center", gap: 6 }}><Medal size={14} />Achievement posts</span>
+                    <span className={hub.statBoxValue}>{achievementPosts.length}</span>
+                    <span className={styles.note}>Total achievement posts shared by members.</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className={hub.statBox}>
+                    <span className={styles.factLabel} style={{ display: "flex", alignItems: "center", gap: 6 }}><Flame size={14} />Engagement</span>
+                    <span className={hub.statBoxValue}>{achievementPosts.reduce((sum, p) => sum + p.likes + p.comments, 0)}</span>
+                    <span className={styles.note}>Total likes and comments on achievement posts.</span>
+                  </div>
+                </div>
+              </div>
 
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle>Post Type Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {engagementStats && engagementStats.byType.length > 0 ? (
-                    engagementStats.byType.map((t) => (
-                      <div key={t.type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-sm font-medium capitalize">{t.type}</span>
-                        <Badge variant="secondary">{t.posts} {t.posts === 1 ? "post" : "posts"}</Badge>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <div className={styles.panelHead}>
+                  <h3 className={styles.panelTitle}>Post Type Breakdown</h3>
+                </div>
+                {engagementStats && engagementStats.byType.length > 0 ? (
+                  <div className={styles.barRows}>
+                    {engagementStats.byType.map((t) => (
+                      <div key={t.type} className={styles.barRow}>
+                        <span className={styles.barName} style={{ textTransform: "capitalize" }}>{t.type}</span>
+                        <span className={styles.barVal}>{t.posts} {t.posts === 1 ? "post" : "posts"}</span>
+                        <div className={styles.barTrack}>
+                          <div className={styles.track} data-ptype={t.type}>
+                            <div className={styles.fill} style={{ width: `${(t.posts / typeTotal) * 100}%`, ["--fill" as any]: "var(--tone, var(--primary))" }} />
+                          </div>
+                          <span className={styles.barMeta} style={{ minWidth: "6.5rem" }}>{t.likes} likes · {t.comments} comments</span>
+                        </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No posts yet.</p>
-                  )}
-                </CardContent>
-              </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.note} style={{ textAlign: "center", padding: "0.75rem 0" }}>No posts yet.</div>
+                )}
+              </div>
             </div>
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="leaderboard" className="space-y-6">
+      {/* ── Leaderboard ── */}
+      {activeTab === "leaderboard" && (
+        <div className={hub.body} key="leaderboard">
           {leaderboard.length === 0 ? (
-            <Card className={cardShell}>
-              <CardHeader>
-                <CardTitle>Community Leaderboard</CardTitle>
-                <CardDescription>Top contributors ranked by engagement.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-8 text-center">
-                  <Trophy className="mx-auto h-10 w-10 text-slate-400" />
-                  <p className="mt-4 text-sm font-medium text-slate-600">No leaderboard data yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">The leaderboard will populate once members start posting and engaging.</p>
+            <div className={`${styles.card} ${styles.panel}`}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h3 className={styles.panelTitle}>Community Leaderboard</h3>
+                  <div className={styles.panelSub}>Top contributors ranked by engagement.</div>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {/* Top Posters */}
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Flame className="h-5 w-5 text-orange-500" />
-                    <span>Top Posters</span>
-                  </CardTitle>
-                  <CardDescription>Most active community contributors</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {leaderboard.slice(0, 5).map((entry, idx) => (
-                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
-                          {idx + 1}
-                        </div>
-                        <span className="font-medium">{entry.username}</span>
-                      </div>
-                      <Badge variant="outline">{entry.totalPosts} {entry.totalPosts === 1 ? "post" : "posts"}</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Most Liked */}
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="h-5 w-5 text-red-500" />
-                    <span>Most Liked</span>
-                  </CardTitle>
-                  <CardDescription>Members whose posts get the most love</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {[...leaderboard].sort((a, b) => b.totalLikes - a.totalLikes).slice(0, 5).map((entry, idx) => (
-                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
-                          {idx + 1}
-                        </div>
-                        <span className="font-medium">{entry.username}</span>
-                      </div>
-                      <Badge variant="outline">{entry.totalLikes} {entry.totalLikes === 1 ? "like" : "likes"}</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Engagement Score */}
-              <Card className={cardShell}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-purple-600" />
-                    <span>Engagement Score</span>
-                  </CardTitle>
-                  <CardDescription>Combined likes + comments earned</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {leaderboard.slice(0, 5).map((entry, idx) => (
-                    <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${idx === 0 ? "bg-amber-100 text-amber-800" : idx === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-800"}`}>
-                          {idx + 1}
-                        </div>
-                        <span className="font-medium">{entry.username}</span>
-                      </div>
-                      <Badge variant="outline">{entry.engagementScore.toLocaleString()} pts</Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              </div>
+              <EmptyState icon={Trophy} title="No leaderboard data yet" text="The leaderboard will populate once members start posting and engaging." />
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          ) : (
+            <>
+              <div className={`${styles.card} ${hub.podiumCard}`}>
+                <div className={styles.panelHead} style={{ padding: "1rem 0.25rem 0" }}>
+                  <div>
+                    <h3 className={styles.panelTitle} style={{ display: "flex", alignItems: "center", gap: 8 }}><Crown size={16} />Community Champions</h3>
+                    <div className={styles.panelSub}>Top 3 by engagement score (likes + comments earned)</div>
+                  </div>
+                </div>
+                <div className={hub.podium}>
+                  {[1, 0, 2].map((i) => {
+                    const entry = byScore[i];
+                    if (!entry) return <div key={i} />;
+                    return (
+                      <div key={entry.userId} className={hub.podiumSpot} data-rank={i + 1}>
+                        <InitialsAvatar name={entry.username} />
+                        <span className={hub.podiumName}>{entry.username}</span>
+                        <span className={hub.podiumScore}>{entry.engagementScore.toLocaleString()} pts · {entry.totalPosts} {entry.totalPosts === 1 ? "post" : "posts"}</span>
+                        <div className={hub.podiumBlock}>{i + 1}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
+              <div className={hub.boards}>
+                <Ranked title="Top Posters" sub="Most active community contributors" icon={Flame} tone="orange" rows={leaderboard}
+                  metric={(e) => `${e.totalPosts} ${e.totalPosts === 1 ? "post" : "posts"}`} />
+                <Ranked title="Most Liked" sub="Members whose posts get the most love" icon={Heart} tone="red" rows={byLikes}
+                  metric={(e) => `${e.totalLikes} ${e.totalLikes === 1 ? "like" : "likes"}`} />
+                <Ranked title="Engagement Score" sub="Combined likes + comments earned" icon={Star} tone="violet" rows={leaderboard}
+                  metric={(e) => `${e.engagementScore.toLocaleString()} pts`} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Create post */}
       <Dialog open={isCreatePostOpen} onOpenChange={handleCreatePostOpenChange}>
-        <DialogContent className="overflow-hidden rounded-2xl p-0 sm:max-w-[480px]">
+        <DialogContent className="overflow-hidden rounded-2xl p-0" style={{ maxWidth: "min(520px, calc(100% - 2rem))" }}>
           <div className="flex max-h-[90vh] flex-col bg-white">
-            <DialogHeader className="flex-shrink-0 border-b border-slate-200 px-5 py-3">
+            <DialogHeader className="flex-shrink-0 border-b border-slate-200 px-6 py-3">
               <DialogTitle className="text-base">Create Community Post</DialogTitle>
               <DialogDescription className="text-xs">
                 Share an update and optionally add a workout photo (1:1, 4:5, or 9:16).
               </DialogDescription>
             </DialogHeader>
 
-            <div className="mx-auto grid w-full max-w-[440px] gap-3 overflow-y-auto px-5 py-3">
-              <div className="grid gap-4 sm:grid-cols-[1fr_150px]">
-                <div className="space-y-2">
-                  <Label htmlFor="community-post-topic">Topic</Label>
-                  <Input
-                    id="community-post-topic"
-                    value={postDraft.topic}
-                    onChange={(event) => setPostDraft((currentDraft) => ({ ...currentDraft, topic: event.target.value }))}
-                    placeholder="Workout recap, sprint finisher, recovery win..."
-                  />
+            <div className="grid w-full gap-4 overflow-y-auto px-6 py-4">
+              <div className="space-y-2">
+                <Label>Post Type</Label>
+                <div className={hub.typeSeg} role="radiogroup" aria-label="Post type">
+                  {(["achievement", "question", "tip"] as const).map((t) => {
+                    const Icon = TYPE_META[t].icon;
+                    return (
+                      <button key={t} type="button" role="radio" aria-checked={postDraft.type === t} className={hub.typeBtn} data-ptype={t} data-active={postDraft.type === t}
+                        onClick={() => setPostDraft((d) => ({ ...d, type: t }))}>
+                        <Icon size={14} />{TYPE_META[t].label}
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label>Post Type</Label>
-                  <Select
-                    value={postDraft.type}
-                    onValueChange={(value) =>
-                      setPostDraft((currentDraft) => ({
-                        ...currentDraft,
-                        type: value as CommunityPost["type"],
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select post type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="achievement">Achievement</SelectItem>
-                      <SelectItem value="question">Question</SelectItem>
-                      <SelectItem value="tip">Tip</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="community-post-topic">Topic</Label>
+                <Input
+                  id="community-post-topic"
+                  value={postDraft.topic}
+                  onChange={(event) => setPostDraft((currentDraft) => ({ ...currentDraft, topic: event.target.value }))}
+                  placeholder="Workout recap, sprint finisher, recovery win..."
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="community-post-content">Post Content</Label>
                 <Textarea
                   id="community-post-content"
-                  rows={2}
+                  rows={3}
                   value={postDraft.content}
                   onChange={(event) => setPostDraft((currentDraft) => ({ ...currentDraft, content: event.target.value }))}
                   placeholder="Share your workout progress, ask a question, or post a quick coaching takeaway..."
                 />
               </div>
 
-              <input
-                ref={uploadInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
+              <input ref={uploadInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
 
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <Label>Workout Photo</Label>
-                  </div>
-                  <Badge variant="outline" className={postDraft.uploadedPhoto ? "border-red-200 bg-red-50 text-red-600" : "bg-slate-50"}>
+                  <Label>Workout Photo</Label>
+                  <span className={styles.status} data-status={postDraft.uploadedPhoto ? "good" : "info"}>
                     {postDraft.uploadedPhoto ? "1 photo ready" : "Optional"}
-                  </Badge>
+                  </span>
                 </div>
 
                 {!postDraft.uploadedPhoto ? (
-                  <button
-                    type="button"
-                    onClick={() => uploadInputRef.current?.click()}
-                    className="flex min-h-[56px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 text-center transition-all hover:border-red-200 hover:bg-red-50/40"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="rounded-lg bg-white p-2 shadow-sm">
-                        <ImageIcon className="h-4 w-4 text-red-500" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-semibold text-slate-900">Upload One Workout Photo</p>
-                        <p className="text-xs text-muted-foreground">Choose from your computer or phone</p>
-                      </div>
-                    </div>
+                  <button type="button" onClick={() => uploadInputRef.current?.click()} className={hub.upload}>
+                    <span className={hub.uploadIcon}><ImageIcon size={16} /></span>
+                    <span>
+                      <span className="block text-sm font-semibold">Upload One Workout Photo</span>
+                      <span className="block text-xs text-muted-foreground">Choose from your computer or phone</span>
+                    </span>
                   </button>
                 ) : (
-                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-gray-50 p-3 shadow-sm">
                     <div className="flex items-start gap-3">
                       <div className={`flex-shrink-0 ${getImageFrameWidthClass(postDraft.aspectRatio)}`} style={{ width: "100px" }}>
                         <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
@@ -1416,14 +1389,14 @@ export function Community() {
                       </div>
                       <div className="flex flex-1 flex-col justify-between gap-2">
                         <div>
-                          <p className="text-sm font-medium text-slate-900">{createUploadedPhotoLabel(postDraft.uploadedPhoto.fileName)}</p>
+                          <p className="text-sm font-medium text-foreground">{createUploadedPhotoLabel(postDraft.uploadedPhoto.fileName)}</p>
                           <p className="text-xs text-muted-foreground">Ready for crop adjustment.</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" className={softButton} onClick={() => uploadInputRef.current?.click()}>
+                          <Button variant="outline" size="sm" onClick={() => uploadInputRef.current?.click()}>
                             Change
                           </Button>
-                          <Button variant="outline" size="sm" className={softButton} onClick={handleRemoveUploadedPhoto}>
+                          <Button variant="outline" size="sm" onClick={handleRemoveUploadedPhoto}>
                             Remove
                           </Button>
                         </div>
@@ -1433,9 +1406,7 @@ export function Community() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <Label>Crop Ratio</Label>
-                        <Badge variant="outline" className="bg-white">
-                          {postDraft.aspectRatio}
-                        </Badge>
+                        <span className={hub.topicChip}>{postDraft.aspectRatio}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         {cropRatioOptions.map((option) => (
@@ -1443,10 +1414,11 @@ export function Community() {
                             key={option.value}
                             type="button"
                             onClick={() => setPostDraft((currentDraft) => ({ ...currentDraft, aspectRatio: option.value }))}
-                            className={`rounded-2xl border px-3 py-3 text-center shadow-sm transition-all ${postDraft.aspectRatio === option.value ? "border-red-300 bg-red-50 text-red-600 ring-2 ring-red-100" : "border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50/40"}`}
+                            className={hub.ratioBtn}
+                            data-active={postDraft.aspectRatio === option.value}
                           >
                             <p className="text-sm font-semibold">{option.label}</p>
-                            <p className="text-[11px] text-muted-foreground">{option.helper}</p>
+                            <p className="text-xs text-muted-foreground">{option.helper}</p>
                           </button>
                         ))}
                       </div>
@@ -1484,9 +1456,9 @@ export function Community() {
               </div>
             </div>
 
-            <div className="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="flex-shrink-0 border-t border-slate-200 bg-gray-50 px-6 py-3">
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" className={softButton} onClick={() => handleCreatePostOpenChange(false)} disabled={isSubmittingPost}>
+                <Button variant="outline" onClick={() => handleCreatePostOpenChange(false)} disabled={isSubmittingPost}>
                   Cancel
                 </Button>
                 <Button onClick={handleCreatePost} disabled={isSubmittingPost}>
@@ -1503,6 +1475,7 @@ export function Community() {
         </DialogContent>
       </Dialog>
 
+      {/* Comments */}
       <Dialog
         open={isCommentsOpen}
         onOpenChange={(open) => {
@@ -1515,7 +1488,7 @@ export function Community() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent style={{ maxWidth: "min(560px, calc(100% - 2rem))" }}>
           <DialogHeader>
             <DialogTitle>Comments</DialogTitle>
             <DialogDescription>
@@ -1524,34 +1497,43 @@ export function Community() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="max-h-[320px] space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
+            {activePost && (
+              <div className={styles.block}>
+                <div className={hub.postSub} style={{ marginBottom: 4 }}>
+                  <span className={hub.postAuthor} style={{ color: "var(--foreground)" }}>{activePost.authorUsername}</span>
+                  <TypePill type={activePost.type} />
+                </div>
+                <p className={hub.achText}>{activePost.content}</p>
+              </div>
+            )}
+            <div className="max-h-80 space-y-3 overflow-y-auto">
               {isLoadingComments ? (
                 <p className="text-sm text-muted-foreground">Loading comments...</p>
               ) : comments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No comments yet. Be the first to reply.</p>
               ) : (
                 comments.map((comment) => (
-                  <div key={comment.id} className="rounded-xl bg-white p-3 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-1 flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-slate-900">{comment.authorUsername}</span>
+                  <div key={comment.id} className={hub.comment}>
+                    <InitialsAvatar name={comment.authorUsername} small />
+                    <div className={hub.bubble}>
+                      <div className={hub.bubbleHead}>
+                        <span className="text-sm font-semibold">{comment.authorUsername}</span>
                         <span className="text-xs text-muted-foreground">{safeFormatTime(comment.createdAt)}</span>
                       </div>
-                      {canDeleteComment(comment) ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-600"
-                          onClick={() => deleteComment(comment)}
-                          disabled={isDeletingCommentId === comment.id}
-                          title="Delete comment"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
+                      <p className={hub.bubbleText}>{comment.content}</p>
                     </div>
-                    <p className="mt-2 text-sm text-slate-700">{comment.content}</p>
+                    {canDeleteComment(comment) ? (
+                      <button
+                        type="button"
+                        className={hub.iconBtn}
+                        onClick={() => deleteComment(comment)}
+                        disabled={isDeletingCommentId === comment.id}
+                        title="Delete comment"
+                        aria-label="Delete comment"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    ) : <span />}
                   </div>
                 ))
               )}
@@ -1569,7 +1551,7 @@ export function Community() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" className={softButton} onClick={() => setIsCommentsOpen(false)}>
+              <Button variant="outline" onClick={() => setIsCommentsOpen(false)}>
                 Close
               </Button>
               <Button onClick={submitComment} disabled={!activePost}>

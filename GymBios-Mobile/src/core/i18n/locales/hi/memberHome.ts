@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: 'रुकी हुई',
     statusActive: 'सक्रिय',
     statusInactive: 'निष्क्रिय',
+    expiredSubscription: "समाप्त सदस्यता",
+    statusExpired: "समाप्त",
+    expiredOn: "समाप्ति तिथि",
+    expiredPrompt: "आपकी सदस्यता समाप्त हो गई है। फिर से चेक-इन और बुकिंग के लिए इसे नवीनीकृत करें।",
+    renewCta: "सदस्यता नवीनीकृत करें",
     daysRemaining: 'शेष दिन',
     validUntil: 'तक मान्य',
 

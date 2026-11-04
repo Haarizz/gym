@@ -22,7 +22,9 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -145,6 +147,39 @@ public class NotificationService {
             Notification n = buildBase(title, message, type, priority, module, null, actionUrl, eventKey);
             n.setTargetRole(role);
             n.setCount(batchCount);
+            saveIgnoreDuplicate(n);
+        }
+    }
+
+    /** Cleanup for NotificationScheduler, run once per gym database. */
+    @Transactional
+    public void softDeleteOlderThan(LocalDateTime cutoff) {
+        notificationRepository.softDeleteOlderThan(cutoff);
+    }
+
+    /**
+     * A role's daily summary (e.g. "12 memberships expiring soon"), keyed per day. Unlike
+     * notifyRoleAggregated it sets the count instead of adding to it, so re-running the daily
+     * checks (restart catch-up) doesn't double it; it only re-surfaces as unread if it changed.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void upsertRoleSummary(String role, String title, String message,
+                                  String type, String priority, String module,
+                                  String actionUrl, String eventKey, int count) {
+        Optional<Notification> existing = notificationRepository
+                .findByCompanyIdAndEventKey(DEFAULT_COMPANY_ID, eventKey);
+        if (existing.isPresent()) {
+            Notification n = existing.get();
+            if (n.getCount() == count && Objects.equals(n.getMessage(), message)) return;
+            n.setCount(count);
+            n.setTitle(title);
+            n.setMessage(message);
+            n.setRead(false);
+            notificationRepository.save(n);
+        } else {
+            Notification n = buildBase(title, message, type, priority, module, null, actionUrl, eventKey);
+            n.setTargetRole(role);
+            n.setCount(count);
             saveIgnoreDuplicate(n);
         }
     }

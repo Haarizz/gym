@@ -67,6 +67,8 @@ export interface SalesInvoice {
   posTransactionId?: number;
   /** Value returned through POS sales returns. */
   returnedAmount: number;
+  /** Cost of goods at sale time; returns carry their own cost, so prorate for returned invoices. */
+  totalCogs: number;
   createdBy?: string;
   createdAt: string;
   updatedAt?: string;
@@ -183,6 +185,7 @@ function mapInvoice(r: any): SalesInvoice {
     source: (r.source ?? 'MANUAL') === 'POS' ? 'POS' : 'MANUAL',
     posTransactionId: r.pos_transaction_id ?? r.posTransactionId ?? undefined,
     returnedAmount: num(r.returned_amount ?? r.returnedAmount),
+    totalCogs: num(r.total_cogs ?? r.totalCogs),
     createdBy: r.created_by ?? r.createdBy ?? undefined,
     createdAt: r.created_at ?? r.createdAt ?? '',
     updatedAt: r.updated_at ?? r.updatedAt ?? undefined,

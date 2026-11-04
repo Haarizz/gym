@@ -21,6 +21,27 @@ public class TrainingSessionResponseDTO {
     private BigDecimal price;
     private String status;
     private String description;
+    // Live figures for the Trainings & Classes table
+    private Integer checkedIn;
+    private Integer waitlisted;
+    private Integer reviewCount;
+    private Double averageRating;
+    private String trainerPhotoUrl;
+
+    public Integer getCheckedIn() { return checkedIn; }
+    public void setCheckedIn(Integer checkedIn) { this.checkedIn = checkedIn; }
+
+    public Integer getWaitlisted() { return waitlisted; }
+    public void setWaitlisted(Integer waitlisted) { this.waitlisted = waitlisted; }
+
+    public Integer getReviewCount() { return reviewCount; }
+    public void setReviewCount(Integer reviewCount) { this.reviewCount = reviewCount; }
+
+    public Double getAverageRating() { return averageRating; }
+    public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
+
+    public String getTrainerPhotoUrl() { return trainerPhotoUrl; }
+    public void setTrainerPhotoUrl(String trainerPhotoUrl) { this.trainerPhotoUrl = trainerPhotoUrl; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

@@ -19,7 +19,7 @@
 
 /* Tab bars: tinted track, coloured active pill, smooth state changes. */
 [data-bios-ui] [data-slot="tabs-list"] {
-  background-color: #eef5f4;
+  background-color: var(--gb-primary-tint);
   box-shadow: inset 0 0 0 1px rgb(43 122 120 / 0.08);
   border-radius: 0.875rem;
   padding: 4px;
@@ -33,7 +33,7 @@
 
 [data-bios-ui] [data-slot="tabs-trigger"]:hover:not([data-state="active"]) {
   background-color: rgb(43 122 120 / 0.1);
-  color: #2B7A78;
+  color: var(--gb-primary);
 }
 
 [data-bios-ui] [data-slot="tabs-trigger"]:active {
@@ -41,7 +41,7 @@
 }
 
 [data-bios-ui] [data-slot="tabs-trigger"][data-state="active"] {
-  background: linear-gradient(135deg, #2B7A78 0%, #3a9592 100%);
+  background: linear-gradient(135deg, var(--gb-primary) 0%, var(--gb-primary-soft) 100%);
   color: #fff;
   box-shadow: 0 4px 12px -3px rgb(43 122 120 / 0.55);
 }

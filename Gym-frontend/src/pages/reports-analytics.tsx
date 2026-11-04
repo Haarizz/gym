@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useCurrency, CurrencyGlyph } from "../utils/currency";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { useCurrency } from "../utils/currency";
+import { useBranch } from "../utils/branch-context";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Input } from "../components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Users, Calendar, DollarSign, Download, RefreshCw, BarChart3, FileText, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import {
+  Users, DollarSign, Download, RefreshCw, BarChart3, FileText, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Minus,
+  LayoutDashboard, UserPlus, Wallet, Clock, CalendarDays, ChevronDown, CalendarClock,
+} from 'lucide-react';
 import { toast } from "sonner";
+import styles from "../components/analytics/community-analytics.module.css";
+import rs from "../components/reports/reports-analytics.module.css";
 import { membersService, Member as MemberApi } from "../utils/supabase/members-service";
 import { receiptsService, Receipt } from "../utils/supabase/receipts-service";
 import { attendanceService, AttendanceStats } from "../utils/supabase/attendance-service";
@@ -89,12 +93,14 @@ function pctChange(current: number, previous: number): number | null {
 type PaymentModeBucket = { name: string; amount: number; value: number; color: string };
 type ReportPeriod = { key: string; label: string; start: Date; end: Date; total: number; categories: RevenueBucket[]; methods: PaymentModeBucket[] };
 
+// Categorical chart colours are fixed (not the user's theme) so slices stay distinct in
+// every theme — same validated slots as the Analytics Dashboard.
 const CATEGORY_COLORS: Record<string, string> = {
-  Memberships: "#0F766E",
-  "Personal Training": "#3b82f6",
-  "Group Classes": "#f59e0b",
-  Merchandise: "#8b5cf6",
-  "Other Services": "#64748b",
+  Memberships: "#2a78d6",
+  "Personal Training": "#eb6834",
+  "Group Classes": "#1baf7a",
+  Merchandise: "#6250d6",
+  "Other Services": "#a8a69f",
 };
 
 function categorizeReceipt(r: Receipt): string {
@@ -153,13 +159,13 @@ const PAYMENT_METHOD_KEY_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_METHOD_COLORS: Record<string, string> = {
-  Cash: "#0F766E",
-  Card: "#34d399",
-  Cheque: "#3b82f6",
-  "Bank Transfer": "#8b5cf6",
-  "Online Payment": "#06b6d4",
-  Credit: "#f59e0b",
-  "Credit Pending": "#f59e0b",
+  Cash: "#2a78d6",
+  Card: "#1baf7a",
+  Cheque: "#eb6834",
+  "Bank Transfer": "#6250d6",
+  "Online Payment": "#0e9fb5",
+  Credit: "#b45309",
+  "Credit Pending": "#c98a00",
 };
 
 function paymentMethodLabel(method?: string): string {
@@ -260,12 +266,162 @@ function getPeriodBuckets(start: Date, end: Date): { key: string; label: string;
   return buckets;
 }
 
+// ── Presentation pieces (shared look with the Analytics Dashboard) ──────────
+
+type IconT = React.ComponentType<{ size?: number; className?: string }>;
+type ReportsTab = "overview" | "membership" | "revenue" | "operations" | "day" | "custom";
+
+const TABS: { id: ReportsTab; label: string; icon: IconT }[] = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "membership", label: "Membership", icon: Users },
+  { id: "revenue", label: "Revenue", icon: Wallet },
+  { id: "operations", label: "Operations", icon: Activity },
+  { id: "day", label: "Day Report", icon: CalendarDays },
+  { id: "custom", label: "Custom Reports", icon: FileText },
+];
+
+const RANGE_CHIPS: { id: RangeKey; label: string }[] = [
+  { id: "7d", label: "7 days" },
+  { id: "30d", label: "30 days" },
+  { id: "90d", label: "90 days" },
+  { id: "ytd", label: "Year to date" },
+  { id: "all", label: "All time" },
+  { id: "custom", label: "Custom" },
+];
+
+type ReportType = "revenue" | "membership" | "attendance" | "summary";
+type ReportFormat = "csv" | "excel" | "pdf";
+const EXPORT_TYPES: [ReportType, string][] = [["summary", "Summary"], ["revenue", "Revenue"], ["membership", "Membership"], ["attendance", "Attendance"]];
+const EXPORT_FORMATS: [ReportFormat, string][] = [["csv", "CSV"], ["excel", "Excel"], ["pdf", "PDF"]];
+
+// Fixed chart colours (validated dataviz slots), light/dark — not the user's theme.
+const LIGHT = { s1: "#2a78d6", s2: "#eb6834", s3: "#1baf7a", grid: "#e9e8e3", axis: "#898781", soft: "#b7d3f6" };
+const DARK = { s1: "#3987e5", s2: "#d95926", s3: "#199e70", grid: "#2c2c2a", axis: "#898781", soft: "#184f95" };
+
+function usePalette() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  useEffect(() => {
+    const obs = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark ? DARK : LIGHT;
+}
+
+/** `invert` marks metrics where a rise is bad news (e.g. cancellations). */
+function Delta({ pct, invert = false }: { pct: number | null; invert?: boolean }) {
+  if (pct == null || Number.isNaN(pct)) return null;
+  if (Math.abs(pct) < 0.05) return <span className={styles.delta} data-tone="flat"><Minus size={12} />0%</span>;
+  const up = pct > 0;
+  const good = invert ? !up : up;
+  return (
+    <span className={styles.delta} data-tone={good ? "good" : "bad"} title={good ? "Better than the previous period" : "Worse than the previous period"}>
+      {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+      {Math.abs(pct).toLocaleString(undefined, { maximumFractionDigits: 1 })}%
+    </span>
+  );
+}
+
+function KpiTile({ icon: Icon, tone, label, value, change, invert, hint, active, onClick, small }: {
+  icon: IconT; tone: string; label: string; value: string; change?: number | null; invert?: boolean;
+  hint?: React.ReactNode; active?: boolean; onClick?: () => void; small?: boolean;
+}) {
+  const body = (
+    <>
+      <div className={styles.kpiTop}>
+        <span className={styles.kpiLabel}>{label}</span>
+        <span className={`${styles.kpiIcon} ${small ? styles.kpiIconSm : ""}`} data-tone={tone}><Icon size={small ? 14 : 16} /></span>
+      </div>
+      <div className={small ? styles.kpiValueSm : styles.kpiValue}>{value}</div>
+      <div className={styles.kpiFoot}>
+        <Delta pct={change ?? null} invert={invert} />
+        {hint && <span>{hint}</span>}
+      </div>
+    </>
+  );
+  const cls = `${styles.card} ${styles.kpi} ${active ? rs.kpiActive : ""}`;
+  return onClick
+    ? <button type="button" className={cls} onClick={onClick} aria-pressed={active}>{body}</button>
+    : <div className={cls}>{body}</div>;
+}
+
+function PanelHead({ title, sub, scope, children }: { title: string; sub?: React.ReactNode; scope?: string; children?: React.ReactNode }) {
+  return (
+    <div className={styles.panelHead}>
+      <div>
+        <h3 className={styles.panelTitle}>{title}{scope && <span className={styles.scope}>{scope}</span>}</h3>
+        {sub && <div className={styles.panelSub}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ChartTip({ active, payload, label, fmt }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className={styles.tooltip}>
+      <div className={styles.tooltipTitle}>{payload[0]?.payload?.tipLabel ?? label}</div>
+      {payload.filter((p: any) => p.value != null).map((p: any) => (
+        <div key={p.dataKey ?? p.name} className={styles.tooltipRow}>
+          <span className={styles.tooltipKey}>
+            <span className={styles.swatch} style={{ ["--sw" as any]: p.payload?.color || p.color || p.stroke || p.fill }} />{p.name}
+          </span>
+          <span className={styles.tooltipVal}>{fmt(p.value, p)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Seg<T extends string>({ value, onChange, options, label }: {
+  value: T; onChange: (v: T) => void; options: [T, string][]; label: string;
+}) {
+  return (
+    <div className={styles.seg} role="tablist" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button key={v} type="button" role="tab" aria-selected={value === v} className={styles.segBtn} data-active={value === v} onClick={() => onChange(v)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BarRows({ rows, fmt, empty }: {
+  rows: { key: string; label: string; value: number; color: string; meta?: React.ReactNode }[]; fmt: (n: number) => string; empty: string;
+}) {
+  if (!rows.length) return <div className={styles.empty}>{empty}</div>;
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  return (
+    <div className={styles.barRows}>
+      {rows.map((r) => (
+        <div key={r.key} className={styles.barRow}>
+          <span className={styles.barName}>{r.label}</span>
+          <span className={styles.barVal}>{fmt(r.value)}</span>
+          <div className={styles.barTrack}>
+            <div className={styles.track}><div className={styles.fill} style={{ width: `${(r.value / max) * 100}%`, ["--fill" as any]: r.color }} /></div>
+            {r.meta != null && <span className={styles.barMeta}>{r.meta}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const shortDate = (d: Date, withYear = false) =>
+  d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}) });
+
 export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
-  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
-  const statCardShell =
-    "bg-white border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none";
-  const panelCardShell = "bg-white border-0 shadow-sm";
-  const tabContentShell = "space-y-6 animate-in fade-in-0 zoom-in-95 duration-200";
+  const { currencyCode, currencyPrefix, formatCurrency } = useCurrency();
+  const { activeBranchName, isAllBranches } = useBranch();
+  const palette = usePalette();
+  const money = useCallback((n: number) => formatCurrency(n, { maximumFractionDigits: 0 }), [formatCurrency]);
+  const compactMoney = useCallback(
+    (n: number) => formatCurrency(n, { notation: "compact", maximumFractionDigits: 1 } as Intl.NumberFormatOptions),
+    [formatCurrency]
+  );
+  const axisTick = { fill: palette.axis, fontSize: 11 };
 
   const [members, setMembers] = useState<MemberApi[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -277,12 +433,10 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const [rangeKey, setRangeKey] = useState<RangeKey>('30d');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [reportsTab, setReportsTab] = useState('overview');
+  const [reportsTab, setReportsTab] = useState<ReportsTab>('overview');
   const [activeKpiCard, setActiveKpiCard] = useState<number | null>(null);
-
-  const [reportType, setReportType] = useState<'revenue' | 'membership' | 'attendance' | 'summary'>('summary');
-  const [reportFormat, setReportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
-  const [reportGenerated, setReportGenerated] = useState(false);
+  const [periodView, setPeriodView] = useState<'chart' | 'table'>('chart');
+  const [periodSplit, setPeriodSplit] = useState<'category' | 'method'>('category');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -415,7 +569,6 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const revenueBreakdownPrev = useMemo(() => buildRevenueBreakdown(receiptsInPrevRange), [receiptsInPrevRange]);
 
   const paymentBreakdown = useMemo(() => buildPaymentModeBreakdown(receiptsInRange), [receiptsInRange]);
-  const paymentBreakdownPrev = useMemo(() => buildPaymentModeBreakdown(receiptsInPrevRange), [receiptsInPrevRange]);
 
   const reportPeriods: ReportPeriod[] = useMemo(() => {
     const buckets = getPeriodBuckets(rangeStart, rangeEnd);
@@ -442,54 +595,38 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
   const trainingRevenue = revenueBreakdown.find((b) => b.name === "Personal Training")?.amount ?? 0;
   const prevTrainingRevenue = revenueBreakdownPrev.find((b) => b.name === "Personal Training")?.amount ?? 0;
 
-  const revenueReportKpis = [
+  const revenueReportKpis: ReportKpi[] = [
     {
       title: "Total Revenue",
       value: `${currencyPrefix}${Math.round(totalRevenuePeriod).toLocaleString()}`,
       change: hasComparison ? pctChange(totalRevenuePeriod, prevTotalRevenue) : null,
       icon: DollarSign,
-      iconShell: "bg-emerald-50",
-      iconColor: "text-emerald-600",
+      tone: "green",
     },
     {
       title: "Avg Per Transaction",
       value: `${currencyPrefix}${Math.round(avgPerTransaction).toLocaleString()}`,
       change: hasComparison ? pctChange(avgPerTransaction, prevAvgPerTransaction) : null,
       icon: TrendingUp,
-      iconShell: "bg-blue-50",
-      iconColor: "text-blue-600",
+      tone: "blue",
     },
     {
       title: "Membership Revenue",
       value: `${currencyPrefix}${Math.round(membershipRevenue).toLocaleString()}`,
       change: hasComparison ? pctChange(membershipRevenue, prevMembershipRevenue) : null,
       icon: Users,
-      iconShell: "bg-purple-50",
-      iconColor: "text-purple-600",
+      tone: "violet",
     },
     {
       title: "Training Revenue",
       value: `${currencyPrefix}${Math.round(trainingRevenue).toLocaleString()}`,
       change: hasComparison ? pctChange(trainingRevenue, prevTrainingRevenue) : null,
       icon: Activity,
-      iconShell: "bg-amber-50",
-      iconColor: "text-amber-600",
+      tone: "amber",
     },
   ];
 
   const revenueTrendRows = useMemo(() => reportPeriods.map((p) => ({ period: p.label, revenue: p.total })), [reportPeriods]);
-
-  const paymentTrendRows = useMemo(
-    () =>
-      reportPeriods.map((p) => {
-        const row: Record<string, string | number> = { period: p.label };
-        paymentBreakdown.forEach((m) => {
-          row[m.name] = p.methods.find((x) => x.name === m.name)?.amount || 0;
-        });
-        return row;
-      }),
-    [reportPeriods, paymentBreakdown]
-  );
 
   const revenueTrend = useMemo(() => {
     const sums: Record<string, number> = {};
@@ -601,9 +738,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         change: null as number | null,
         description: `${activeMembers.toLocaleString()} active of ${totalMembers.toLocaleString()} members`,
         icon: Users,
-        iconShell: "bg-emerald-50",
-        iconColor: "text-emerald-600",
-        valueColor: "text-emerald-700",
+        tone: "green",
         tab: "membership",
       },
       {
@@ -612,9 +747,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         change: arpmChange,
         description: `vs previous period`,
         icon: DollarSign,
-        iconShell: "bg-blue-50",
-        iconColor: "text-blue-600",
-        valueColor: "text-blue-700",
+        tone: "blue",
         tab: "revenue",
       },
       {
@@ -623,9 +756,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         change: newMembersChange,
         description: `vs previous period`,
         icon: TrendingUp,
-        iconShell: "bg-indigo-50",
-        iconColor: "text-indigo-600",
-        valueColor: "text-indigo-700",
+        tone: "teal",
         tab: "membership",
       },
       {
@@ -634,9 +765,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         change: null as number | null,
         description: "Avg across classes",
         icon: Activity,
-        iconShell: "bg-amber-50",
-        iconColor: "text-amber-600",
-        valueColor: "text-amber-700",
+        tone: "amber",
         tab: "operations",
       },
       {
@@ -645,10 +774,8 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         change: todayVsAvg,
         description: `vs 7-day daily avg`,
         icon: BarChart3,
-        iconShell: "bg-slate-50",
+        tone: "gray",
         tab: "operations",
-        iconColor: "text-slate-600",
-        valueColor: "text-slate-700",
       },
     ];
   }, [members, householdMembers, receiptsInRange, receiptsInPrevRange, newMembersInRange, newMembersInPrevRange, classAttendance, attendanceStats, currencyCode, hasComparison]);
@@ -688,39 +815,11 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     title: string;
     value: string;
     change: number | null;
-    icon: React.ComponentType<{ className?: string }>;
-    iconShell: string;
-    iconColor: string;
+    icon: IconT;
+    tone: string;
     invert?: boolean;
     description?: string;
   };
-
-  const renderKpiRow = (kpis: ReportKpi[]) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      {kpis.map((kpi, index) => (
-        <Card key={index} className={statCardShell}>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
-            <div className={`${kpi.iconShell} p-2 rounded-lg`}>
-              <kpi.icon className={`h-4 w-4 ${kpi.iconColor}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpi.value}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              {kpi.change !== null && (
-                <>
-                  {getTrendIcon(kpi.change, kpi.invert)}
-                  <span className={getTrendColor(kpi.change, kpi.invert)}>{Math.abs(kpi.change).toFixed(1)}%</span>
-                </>
-              )}
-              {kpi.description && <span>{kpi.description}</span>}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
 
   const membershipReportKpis: ReportKpi[] = [
     {
@@ -728,16 +827,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       value: membershipMetrics.total.toLocaleString(),
       change: null,
       icon: Users,
-      iconShell: "bg-emerald-50",
-      iconColor: "text-emerald-600",
+      tone: "green",
     },
     {
       title: "Active Members",
       value: membershipMetrics.active.toLocaleString(),
       change: null,
       icon: Activity,
-      iconShell: "bg-blue-50",
-      iconColor: "text-blue-600",
+      tone: "blue",
       description: `${membershipMetrics.retention.toFixed(1)}% retention rate`,
     },
     {
@@ -745,8 +842,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       value: newMembersInRange.length.toLocaleString(),
       change: hasComparison ? pctChange(newMembersInRange.length, newMembersInPrevRange.length) : null,
       icon: TrendingUp,
-      iconShell: "bg-indigo-50",
-      iconColor: "text-indigo-600",
+      tone: "teal",
     },
     {
       title: "Cancellations",
@@ -754,8 +850,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       change: hasComparison ? pctChange(cancelledMembersInRange.length, cancelledMembersInPrevRange.length) : null,
       invert: true,
       icon: ArrowDownRight,
-      iconShell: "bg-red-50",
-      iconColor: "text-red-600",
+      tone: "red",
     },
   ];
 
@@ -765,16 +860,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
       value: classAttendance.length.toLocaleString(),
       change: null,
       icon: BarChart3,
-      iconShell: "bg-emerald-50",
-      iconColor: "text-emerald-600",
+      tone: "green",
     },
     {
       title: "Avg Class Utilization",
       value: `${(classAttendance.length > 0 ? classAttendance.reduce((s, c) => s + (c.percentage || 0), 0) / classAttendance.length : 0).toFixed(0)}%`,
       change: null,
       icon: Activity,
-      iconShell: "bg-amber-50",
-      iconColor: "text-amber-600",
+      tone: "amber",
     },
     {
       title: "Today's Attendance",
@@ -783,16 +876,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
         ? pctChange(attendanceStats?.totalToday ?? 0, (attendanceStats?.totalThisWeek ?? 0) / 7)
         : null,
       icon: TrendingUp,
-      iconShell: "bg-blue-50",
-      iconColor: "text-blue-600",
+      tone: "blue",
     },
     {
       title: "Avg Visit Duration",
       value: membershipMetrics.avgVisitMinutes ? `${membershipMetrics.avgVisitMinutes} min` : "—",
       change: null,
       icon: Users,
-      iconShell: "bg-purple-50",
-      iconColor: "text-purple-600",
+      tone: "violet",
     },
   ];
 
@@ -850,14 +941,14 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     ],
   );
 
-  const csvBuilders: Record<typeof reportType, () => string> = {
+  const csvBuilders: Record<ReportType, () => string> = {
     revenue: buildRevenueCsv,
     membership: buildMembershipCsv,
     attendance: buildAttendanceCsv,
     summary: buildSummaryCsv,
   };
 
-  const runExport = useCallback((type: typeof reportType, format: typeof reportFormat) => {
+  const runExport = useCallback((type: ReportType, format: ReportFormat) => {
     const csv = csvBuilders[type]();
     const filenameBase = `reports_${type}_${rangeLabel}`;
 
@@ -897,20 +988,6 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     w.document.close();
     toast.success("Print dialog opened (Save as PDF)");
   }, [csvBuilders, rangeKey, rangeLabel]);
-
-  const handleExportReport = useCallback(() => {
-    runExport('summary', 'csv');
-  }, [runExport]);
-
-  const handleGenerateReport = useCallback(() => {
-    setReportGenerated(true);
-  }, []);
-
-  const handleScheduleReportClick = useCallback(() => {
-    toast.info("Report scheduling isn't available yet.", {
-      description: "You can generate and download reports on demand for now.",
-    });
-  }, []);
 
   const downloadRevenueReportPdf = useCallback(() => {
     const w = window.open("", "_blank");
@@ -981,482 +1058,552 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     toast.success("Print dialog opened (Save as PDF)");
   }, [currencyCode, revenueReportKpis, paymentBreakdown, reportPeriods, revenueBreakdown, rangeKey]);
 
-  // `invert` flags metrics where a rise is bad news (e.g. cancellations) so the
-  // up/down arrow still colors green-for-good instead of green-for-increase.
-  const getTrendIcon = (change: number | null, invert = false) => {
-    if (change === null) return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
-    const isGood = invert ? change <= 0 : change >= 0;
-    return change >= 0
-      ? <ArrowUpRight className={`h-3.5 w-3.5 ${isGood ? "text-green-600" : "text-red-600"}`} />
-      : <ArrowDownRight className={`h-3.5 w-3.5 ${isGood ? "text-green-600" : "text-red-600"}`} />;
+  const periodText = rangeKey === "all"
+    ? "All recorded activity"
+    : `${shortDate(rangeStart)} – ${shortDate(rangeEnd, true)}`;
+  const compareText = hasComparison ? `vs ${shortDate(prevStart)} – ${shortDate(prevEnd, true)}` : "no comparison period";
+  const rangeScope = RANGE_LABELS[rangeKey];
+
+  const peak = peakHours.reduce<PeakHourPoint | null>((best, p) => (!best || p.usage > best.usage ? p : best), null);
+  const peakTotal = peakHours.reduce((s, p) => s + p.usage, 0);
+  const avgClassUtil = classAttendance.length > 0
+    ? classAttendance.reduce((s, c) => s + (c.percentage || 0), 0) / classAttendance.length
+    : 0;
+  const todayAttendance = attendanceStats?.totalToday ?? 0;
+
+  const openTab = (tab: ReportsTab, kpiIndex: number | null = null) => {
+    setReportsTab(tab);
+    setActiveKpiCard(kpiIndex);
   };
 
-  const getTrendColor = (change: number | null, invert = false) => {
-    if (change === null) return "text-muted-foreground";
-    const isGood = invert ? change <= 0 : change >= 0;
-    return isGood ? "text-green-600" : "text-red-600";
-  };
+  const moneyTip = (v: number) => money(v);
+  const countTip = (v: number) => Number(v).toLocaleString();
+  const pctTip = (v: number) => `${Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+
+  const splitSeries = periodSplit === "category" ? revenueBreakdown : paymentBreakdown;
+  const periodRows = reportPeriods.map((p) => {
+    const row: Record<string, string | number> = { period: p.label, total: p.total };
+    const source = periodSplit === "category" ? p.categories : p.methods;
+    splitSeries.forEach((s) => { row[s.name] = source.find((x) => x.name === s.name)?.amount || 0; });
+    return row;
+  });
 
   if (loading && members.length === 0 && receipts.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+      <div className={styles.root}>
+        <div className={styles.centered}>
+          <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+          <span>Loading reports…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className={styles.root}>
+      {/* Header */}
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-1">Comprehensive business intelligence and performance metrics.</p>
-          {lastRefreshed && (
-            <p className="text-xs text-muted-foreground mt-1">Last refreshed {lastRefreshed.toLocaleTimeString()}</p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
-            <SelectTrigger className="w-[160px] bg-white">
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-              <SelectItem value="ytd">Year to date</SelectItem>
-              <SelectItem value="all">All time</SelectItem>
-              <SelectItem value="custom">Custom range</SelectItem>
-            </SelectContent>
-          </Select>
-          {rangeKey === 'custom' && (
-            <>
-              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-[150px] bg-white" />
-              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px] bg-white" />
-            </>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="shadow-sm hover:shadow-md transition-all"
-            onClick={loadData}
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={handleExportReport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Report
-          </Button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {kpiData.map((kpi, index) => (
-          <Card
-            key={index}
-            className={`${statCardShell} cursor-pointer`}
-            style={activeKpiCard === index ? { boxShadow: '0 0 0 2px #0F766E' } : undefined}
-            title={`Click to view ${kpi.tab} report`}
-            onClick={() => { setReportsTab(kpi.tab); setActiveKpiCard(index); }}
-          >
-            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-medium text-primary">{kpi.title}</CardTitle>
-              <div className={`${kpi.iconShell} p-2 rounded-lg`}>
-                <kpi.icon className={`h-4 w-4 ${kpi.iconColor}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${kpi.valueColor}`}>{kpi.value}</div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                {kpi.change !== undefined && kpi.change !== null && (
-                  <>
-                    {getTrendIcon(kpi.change)}
-                    <span className={getTrendColor(kpi.change)}>{Math.abs(kpi.change).toFixed(1)}%</span>
-                  </>
-                )}
-                <span>{kpi.description}</span>
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Tabs value={reportsTab} onValueChange={(v) => { setReportsTab(v); setActiveKpiCard(null); }} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="membership">Membership</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="operations">Operations</TabsTrigger>
-          <TabsTrigger value="day">Day Report</TabsTrigger>
-          <TabsTrigger value="custom">Custom Reports</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className={tabContentShell}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Membership Growth Trend</CardTitle>
-                <CardDescription>Member acquisition and retention over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={membershipTrends}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="totalMembers" stackId="1" stroke="#8884d8" fill="#8884d8" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Revenue Distribution</CardTitle>
-                <CardDescription>Revenue breakdown by service type ({RANGE_LABELS[rangeKey]})</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {revenueBreakdown.length === 0 ? (
-                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
-                    No receipts in this range.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={revenueBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {revenueBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+          <h1 className={styles.title}>Reports & Analytics</h1>
+          <div className={styles.subtitle}>
+            <span className={styles.branchChip}>{isAllBranches ? "All branches" : activeBranchName || "Current branch"}</span>
+            <span>Comprehensive business intelligence and performance metrics</span>
+            {lastRefreshed && (
+              <span className={rs.updated}><Clock size={12} />Updated {lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            )}
           </div>
+        </div>
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">
+                <Download className="h-4 w-4 mr-2" />Export Report<ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>{rangeScope}</DropdownMenuLabel>
+              <DropdownMenuItem onClick={downloadRevenueReportPdf}>
+                <FileText className="h-4 w-4 mr-2" />Revenue analysis (PDF)
+              </DropdownMenuItem>
+              {EXPORT_TYPES.map(([type, label]) => (
+                <React.Fragment key={type}>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">{label}</DropdownMenuLabel>
+                  {EXPORT_FORMATS.map(([format, fLabel]) => (
+                    <DropdownMenuItem key={format} onClick={() => runExport(type, format)}>
+                      <Download className="h-4 w-4 mr-2" />{label} · {fLabel}
+                    </DropdownMenuItem>
+                  ))}
+                </React.Fragment>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
 
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle>Peak Usage Hours</CardTitle>
-              <CardDescription>Gym utilization throughout the day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {peakHours.length === 0 ? (
-                <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
-                  No attendance data available yet.
+      {/* Period filter — scopes every "in range" figure below */}
+      <div className={`${styles.card} ${styles.filters}`}>
+        <div className={styles.chips} role="group" aria-label="Date range">
+          {RANGE_CHIPS.map((c) => (
+            <button key={c.id} type="button" className={styles.chip} data-active={rangeKey === c.id} aria-pressed={rangeKey === c.id} onClick={() => setRangeKey(c.id)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        {rangeKey === "custom" && (
+          <div className={styles.customRange}>
+            <Input type="date" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} aria-label="From" />
+            <span className={styles.muted}>to</span>
+            <Input type="date" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} aria-label="To" />
+          </div>
+        )}
+        <div className={styles.filterEnd}>
+          <CalendarClock size={14} />
+          <span><b style={{ color: "var(--foreground)" }}>{periodText}</b> {compareText}</span>
+        </div>
+      </div>
+
+      <div className={loading ? styles.loadingVeil : undefined} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        {/* Headline KPIs — click to open the matching report */}
+        <div className={rs.kpis5}>
+          {kpiData.map((kpi, index) => (
+            <KpiTile
+              key={kpi.title}
+              icon={kpi.icon}
+              tone={kpi.tone}
+              label={kpi.title}
+              value={kpi.value}
+              change={kpi.change}
+              hint={kpi.description}
+              active={activeKpiCard === index}
+              onClick={() => openTab(kpi.tab as ReportsTab, index)}
+            />
+          ))}
+        </div>
+
+        {/* Report sections */}
+        <div className={`${styles.card} ${rs.tabsBar}`} role="tablist" aria-label="Report sections">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" role="tab" aria-selected={reportsTab === id} data-active={reportsTab === id} className={rs.tab} onClick={() => openTab(id)}>
+              <Icon size={15} />{label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Overview ── */}
+        {reportsTab === "overview" && (
+          <div className={rs.tabBody} key="overview">
+            <div className={styles.cols2}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Membership Growth Trend" sub="Member acquisition and retention over time" scope="Last 6 months" />
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <AreaChart data={membershipTrends} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="rpMembers" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={palette.s1} stopOpacity={0.28} />
+                          <stop offset="100%" stopColor={palette.s1} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTip fmt={countTip} />} cursor={{ stroke: palette.axis, strokeWidth: 1 }} />
+                      <Area type="monotone" dataKey="totalMembers" name="Total members" stroke={palette.s1} strokeWidth={2} fill="url(#rpMembers)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={peakHours}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="usage" fill="#0F766E" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <div className={styles.legend}>
+                  <span className={styles.legendItem}><span className={styles.swatch} style={{ ["--sw" as any]: palette.s1 }} />Total members</span>
+                </div>
+              </div>
 
-        <TabsContent value="membership" className={tabContentShell}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Member Acquisition vs Churn</CardTitle>
-                <CardDescription>Monthly new members vs cancellations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={membershipTrends}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="newMembers" fill="#82ca9d" name="New Members" />
-                    <Bar dataKey="cancelledMembers" fill="#ff7c7c" name="Cancelled" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Member Demographics</CardTitle>
-                <CardDescription>Age distribution of members</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {memberDemographics.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-8 text-center">
-                    Add member date-of-birth to see demographics.
-                  </div>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Revenue Distribution" sub="Revenue breakdown by service type" scope={rangeScope} />
+                {revenueBreakdown.length === 0 ? (
+                  <div className={styles.empty}>No receipts in this range.</div>
                 ) : (
-                  memberDemographics.map((demo, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-sm font-medium">{demo.ageGroup}</span>
-                        <div className="w-32 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${demo.percentage}%` }}
-                          ></div>
+                  <div className={rs.donut}>
+                    <div className={rs.donutChart}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie data={revenueBreakdown} dataKey="amount" nameKey="name" innerRadius="62%" outerRadius="92%" paddingAngle={2} stroke="none">
+                            {revenueBreakdown.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                          </Pie>
+                          <Tooltip content={<ChartTip fmt={moneyTip} />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className={rs.donutCenter}>
+                        <div>
+                          <div className={rs.donutTotal}>{compactMoney(totalRevenuePeriod)}</div>
+                          <div className={rs.donutLabel}>collected</div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm">{demo.count}</span>
-                        <Badge variant="secondary">{demo.percentage}%</Badge>
-                      </div>
                     </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle>Membership Metrics</CardTitle>
-              <CardDescription>Key membership performance indicators</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{membershipMetrics.retention.toFixed(1)}%</div>
-                  <div className="text-sm text-muted-foreground">Retention Rate</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{membershipMetrics.active.toLocaleString()}</div>
-                  <div className="text-sm text-muted-foreground">Active Members</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-600">
-                    {membershipMetrics.avgMembershipMonths > 0 ? `${membershipMetrics.avgMembershipMonths.toFixed(1)} mo` : "—"}
+                    <div className={rs.legendRows}>
+                      {revenueBreakdown.map((b) => (
+                        <div key={b.name} className={rs.legendRow}>
+                          <span className={styles.swatch} style={{ ["--sw" as any]: b.color }} />
+                          <span className={rs.legendName}>{b.name}</span>
+                          <span className={rs.legendAmt}>{money(b.amount)}</span>
+                          <span className={rs.legendPct}>{b.value}%</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">Avg. Membership Length</div>
-                </div>
+                )}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle>Recent Signups & Cancellations</CardTitle>
-              <CardDescription>Member events within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {membershipEvents.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-8 text-center">
-                  No member events in this range.
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Detail</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {membershipEvents.map((e, i) => (
-                      <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
-                        <TableCell className="font-medium">{e.name}</TableCell>
-                        <TableCell>
-                          <Badge className={e.type === 'Joined' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                            {e.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{(e.date as Date).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-muted-foreground">{e.detail}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="revenue" className={tabContentShell}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Card className={panelCardShell}>
-                <CardHeader>
-                  <CardTitle>Revenue Trends</CardTitle>
-                  <CardDescription>Monthly revenue by category</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={revenueTrend}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="revenue" stroke="#0F766E" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
             </div>
 
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Revenue Summary</CardTitle>
-                <CardDescription>{RANGE_LABELS[rangeKey]}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {revenueBreakdown.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-8 text-center">
-                    No receipts found in this range.
-                  </div>
-                ) : (
-                  revenueBreakdown.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm">{item.name}</span>
-                      <div className="text-right">
-                        <div className="font-medium"><CurrencyGlyph /> {Math.round(item.amount).toLocaleString()}</div>
-                        <div className="text-xs text-muted-foreground">{item.value}%</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className={panelCardShell}>
-            <CardHeader>
-              <CardTitle>Top Performing Plans</CardTitle>
-              <CardDescription>Highest revenue plans/transaction types within {RANGE_LABELS[rangeKey].toLowerCase()}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {topPlans.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-8 text-center">
-                  No transactions in this range.
-                </div>
+            <div className={`${styles.card} ${styles.panel}`}>
+              <PanelHead
+                title="Peak Usage Hours"
+                sub={peak ? <>Gym utilization throughout the day · busiest at <b>{peak.hour}</b> ({peak.usage.toLocaleString()} check-ins{peakTotal > 0 ? `, ${Math.round((peak.usage / peakTotal) * 100)}% of visits` : ""})</> : "Gym utilization throughout the day"}
+                scope="Today"
+              />
+              {peakHours.length === 0 ? (
+                <div className={styles.empty}>No attendance data available yet.</div>
               ) : (
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow>
-                      <TableHead>Plan / Transaction Type</TableHead>
-                      <TableHead>Transactions</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>Avg / Transaction</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topPlans.map((p, i) => (
-                      <TableRow key={i} className="transition-colors hover:bg-slate-50/50">
-                        <TableCell className="font-medium">{p.plan}</TableCell>
-                        <TableCell>{p.count}</TableCell>
-                        <TableCell className="text-green-600 font-medium"><CurrencyGlyph /> {Math.round(p.revenue).toLocaleString()}</TableCell>
-                        <TableCell className="text-muted-foreground"><CurrencyGlyph /> {Math.round(p.revenue / p.count).toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="operations" className={tabContentShell}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Class Attendance</CardTitle>
-                <CardDescription>Latest attendance distribution by class</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {classAttendance.length === 0 ? (
-                  <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">
-                    No class attendance data available yet.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={classAttendance}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="class" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="percentage" fill="#0F766E" />
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <BarChart data={peakHours} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="hour" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+                      <Tooltip content={<ChartTip fmt={countTip} />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                      <Bar dataKey="usage" name="Check-ins" radius={[4, 4, 0, 0]} maxBarSize={36}>
+                        {peakHours.map((p) => <Cell key={p.hour} fill={peak && p.hour === peak.hour ? palette.s1 : palette.soft} />)}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className={panelCardShell}>
-              <CardHeader>
-                <CardTitle>Operational Metrics</CardTitle>
-                <CardDescription>Live stats from attendance and receipts</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">Today Attendance</span>
-                    <span className="text-sm font-medium">{attendanceStats?.totalToday ?? 0}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full"
-                      style={{ width: `${membershipMetrics.total > 0 ? Math.min(100, ((attendanceStats?.totalToday ?? 0) / membershipMetrics.total) * 100) : 0}%` }}
-                    ></div>
-                  </div>
                 </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">Avg Visit Duration</span>
-                    <span className="text-sm font-medium">{membershipMetrics.avgVisitMinutes ? `${membershipMetrics.avgVisitMinutes} min` : "—"}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{ width: `${Math.min(100, (membershipMetrics.avgVisitMinutes / 120) * 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm">Receipts In Range</span>
-                    <span className="text-sm font-medium">{receiptsInRange.length.toLocaleString()}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-purple-600 h-2 rounded-full"
-                      style={{ width: `${receipts.length > 0 ? Math.min(100, (receiptsInRange.length / receipts.length) * 100) : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="day" className={tabContentShell}>
-          <DayReport />
-        </TabsContent>
+        {/* ── Membership ── */}
+        {reportsTab === "membership" && (
+          <div className={rs.tabBody} key="membership">
+            <div className={rs.kpis4}>
+              {membershipReportKpis.map((k) => (
+                <KpiTile key={k.title} small icon={k.icon} tone={k.tone} label={k.title} value={k.value} change={k.change} invert={k.invert} hint={k.description ?? (k.change != null ? "vs previous period" : undefined)} />
+              ))}
+            </div>
 
-        <TabsContent value="custom" className={tabContentShell}>
-          <CustomReports embedded onNavigate={onNavigate} />
-        </TabsContent>
-      </Tabs>
+            <div className={styles.cols2}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Member Acquisition vs Churn" sub="Monthly new members vs cancellations" scope="Last 6 months" />
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <BarChart data={membershipTrends} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={4}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+                      <Tooltip content={<ChartTip fmt={countTip} />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                      <Bar dataKey="newMembers" name="New Members" fill={palette.s3} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                      <Bar dataKey="cancelledMembers" name="Cancelled" fill={palette.s2} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className={styles.legend}>
+                  <span className={styles.legendItem}><span className={styles.swatch} style={{ ["--sw" as any]: palette.s3 }} />New members</span>
+                  <span className={styles.legendItem}><span className={styles.swatch} style={{ ["--sw" as any]: palette.s2 }} />Cancelled</span>
+                </div>
+              </div>
+
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Member Demographics" sub="Age distribution of members" scope="All members" />
+                <BarRows
+                  rows={memberDemographics.map((d) => ({ key: d.ageGroup, label: d.ageGroup, value: d.count, color: palette.s1, meta: `${d.percentage}% of members` }))}
+                  fmt={(n) => n.toLocaleString()}
+                  empty="Add member date-of-birth to see demographics."
+                />
+              </div>
+            </div>
+
+            <div className={`${styles.card} ${styles.panel}`}>
+              <PanelHead title="Membership Metrics" sub="Key membership performance indicators" scope="All members" />
+              <div className={rs.bigFacts}>
+                <div className={rs.bigFact} data-tone="green">
+                  <span className={styles.factLabel}>Retention Rate</span>
+                  <span className={rs.bigFactValue}>{membershipMetrics.retention.toFixed(1)}%</span>
+                </div>
+                <div className={rs.bigFact} data-tone="blue">
+                  <span className={styles.factLabel}>Active Members</span>
+                  <span className={rs.bigFactValue}>{membershipMetrics.active.toLocaleString()}</span>
+                </div>
+                <div className={rs.bigFact} data-tone="violet">
+                  <span className={styles.factLabel}>Avg. Membership Length</span>
+                  <span className={rs.bigFactValue}>
+                    {membershipMetrics.avgMembershipMonths > 0 ? `${membershipMetrics.avgMembershipMonths.toFixed(1)} mo` : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${styles.card} ${styles.panel}`}>
+              <PanelHead title="Recent Signups & Cancellations" sub={`Member events within ${rangeScope.toLowerCase()}`} scope={rangeScope} />
+              {membershipEvents.length === 0 ? (
+                <div className={styles.empty}>No member events in this range.</div>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr><th>Member</th><th>Event</th><th>Date</th><th>Detail</th></tr>
+                    </thead>
+                    <tbody>
+                      {membershipEvents.map((e, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600 }}>{e.name}</td>
+                          <td>
+                            <span className={styles.status} data-status={e.type === "Joined" ? "good" : "critical"}>
+                              {e.type === "Joined" ? <UserPlus size={12} /> : <ArrowDownRight size={12} />}{e.type}
+                            </span>
+                          </td>
+                          <td>{(e.date as Date).toLocaleDateString()}</td>
+                          <td className={styles.muted} style={{ textTransform: "capitalize" }}>{e.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Revenue ── */}
+        {reportsTab === "revenue" && (
+          <div className={rs.tabBody} key="revenue">
+            <div className={rs.kpis4}>
+              {revenueReportKpis.map((k) => (
+                <KpiTile key={k.title} small icon={k.icon} tone={k.tone} label={k.title} value={k.value} change={k.change} hint={k.change != null ? "vs previous period" : rangeScope} />
+              ))}
+            </div>
+
+            <div className={styles.row2}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Revenue Trends" sub="Monthly revenue collected" scope="Last 6 months" />
+                <div className={styles.chart}>
+                  <ResponsiveContainer>
+                    <LineChart data={revenueTrend} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                      <CartesianGrid vertical={false} stroke={palette.grid} />
+                      <XAxis dataKey="month" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                      <YAxis tick={axisTick} tickLine={false} axisLine={false} width={64} tickFormatter={(v) => compactMoney(Number(v))} />
+                      <Tooltip content={<ChartTip fmt={moneyTip} />} cursor={{ stroke: palette.axis, strokeWidth: 1 }} />
+                      <Line type="monotone" dataKey="revenue" name="Revenue" stroke={palette.s1} strokeWidth={2.5} dot={{ r: 3, fill: palette.s1 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Revenue Summary" sub="By service type" scope={rangeScope} />
+                <BarRows
+                  rows={revenueBreakdown.map((b) => ({ key: b.name, label: b.name, value: b.amount, color: b.color, meta: `${b.value}% of total` }))}
+                  fmt={money}
+                  empty="No receipts found in this range."
+                />
+              </div>
+            </div>
+
+            <div className={styles.row2}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Revenue by Period" sub={`Split by ${periodSplit === "category" ? "service type" : "payment method"}`} scope={rangeScope}>
+                  <div className={rs.panelActions}>
+                    <Seg label="Split by" value={periodSplit} onChange={setPeriodSplit} options={[["category", "Service"], ["method", "Payment"]]} />
+                    <Seg label="Revenue by period view" value={periodView} onChange={setPeriodView} options={[["chart", "Chart"], ["table", "Table"]]} />
+                  </div>
+                </PanelHead>
+                {revenueTrendRows.every((r) => !r.revenue) ? (
+                  <div className={styles.empty}>No receipts in this range.</div>
+                ) : periodView === "chart" ? (
+                  <>
+                    <div className={styles.chart}>
+                      <ResponsiveContainer>
+                        <BarChart data={periodRows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                          <CartesianGrid vertical={false} stroke={palette.grid} />
+                          <XAxis dataKey="period" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} />
+                          <YAxis tick={axisTick} tickLine={false} axisLine={false} width={64} tickFormatter={(v) => compactMoney(Number(v))} />
+                          <Tooltip content={<ChartTip fmt={moneyTip} />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                          {splitSeries.map((s, i) => (
+                            <Bar key={s.name} dataKey={s.name} name={s.name} stackId="split" fill={s.color} maxBarSize={44}
+                              radius={i === splitSeries.length - 1 ? [4, 4, 0, 0] : undefined} />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className={styles.legend}>
+                      {splitSeries.map((s) => (
+                        <span key={s.name} className={styles.legendItem}><span className={styles.swatch} style={{ ["--sw" as any]: s.color }} />{s.name}</span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Period</th>
+                          {splitSeries.map((s) => <th key={s.name} className={styles.num}>{s.name}</th>)}
+                          <th className={styles.num}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {periodRows.map((r) => (
+                          <tr key={String(r.period)}>
+                            <td style={{ fontWeight: 600 }}>{r.period}</td>
+                            {splitSeries.map((s) => <td key={s.name} className={`${styles.num} ${!r[s.name] ? styles.muted : ""}`}>{money(Number(r[s.name]) || 0)}</td>)}
+                            <td className={styles.num} style={{ fontWeight: 700 }}>{money(Number(r.total))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          {splitSeries.map((s) => <td key={s.name} className={styles.num}>{money(s.amount)}</td>)}
+                          <td className={styles.num}>{money(periodRows.reduce((sum, r) => sum + Number(r.total), 0))}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Payment Methods" sub="How members paid · pending credit shown separately" scope={rangeScope} />
+                <BarRows
+                  rows={paymentBreakdown.map((m) => ({ key: m.name, label: m.name, value: m.amount, color: m.color, meta: `${m.value}%` }))}
+                  fmt={money}
+                  empty="No payments in this range."
+                />
+              </div>
+            </div>
+
+            <div className={`${styles.card} ${styles.panel}`}>
+              <PanelHead title="Top Performing Plans" sub={`Highest revenue plans/transaction types within ${rangeScope.toLowerCase()}`} scope={rangeScope}>
+                <Button variant="outline" size="sm" onClick={downloadRevenueReportPdf}>
+                  <FileText className="h-4 w-4 mr-2" />Revenue report (PDF)
+                </Button>
+              </PanelHead>
+              {topPlans.length === 0 ? (
+                <div className={styles.empty}>No transactions in this range.</div>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Plan / Transaction Type</th>
+                        <th className={styles.num}>Transactions</th>
+                        <th className={styles.num}>Revenue</th>
+                        <th className={styles.num}>Avg / Transaction</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topPlans.map((p) => (
+                        <tr key={p.plan}>
+                          <td style={{ fontWeight: 600 }}>{p.plan}</td>
+                          <td className={styles.num}>{p.count.toLocaleString()}</td>
+                          <td className={styles.num}>
+                            <span className={styles.miniTrack}>
+                              <span className={styles.miniFill} style={{ display: "block", width: `${(p.revenue / Math.max(1, topPlans[0].revenue)) * 100}%`, ["--fill" as any]: palette.s1 }} />
+                            </span>
+                            <b>{money(p.revenue)}</b>
+                          </td>
+                          <td className={`${styles.num} ${styles.muted}`}>{money(p.revenue / p.count)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Operations ── */}
+        {reportsTab === "operations" && (
+          <div className={rs.tabBody} key="operations">
+            <div className={rs.kpis4}>
+              {attendanceReportKpis.map((k) => (
+                <KpiTile key={k.title} small icon={k.icon} tone={k.tone} label={k.title} value={k.value} change={k.change}
+                  hint={k.title === "Today's Attendance" ? "vs 7-day daily avg" : k.title === "Avg Visit Duration" ? "today's completed visits" : "latest class data"} />
+              ))}
+            </div>
+
+            <div className={styles.cols2}>
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Class Attendance" sub="Latest attendance distribution by class" scope="Classes" />
+                {classAttendance.length === 0 ? (
+                  <div className={styles.empty}>No class attendance data available yet.</div>
+                ) : (
+                  <div className={styles.chart}>
+                    <ResponsiveContainer>
+                      <BarChart data={classAttendance} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid vertical={false} stroke={palette.grid} />
+                        <XAxis dataKey="class" tick={axisTick} tickLine={false} axisLine={{ stroke: palette.grid }} interval="preserveStartEnd" />
+                        <YAxis tick={axisTick} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip content={<ChartTip fmt={pctTip} />} cursor={{ fill: "color-mix(in srgb, var(--muted) 60%, transparent)" }} />
+                        <Bar dataKey="percentage" name="Utilization" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              <div className={`${styles.card} ${styles.panel}`}>
+                <PanelHead title="Operational Metrics" sub="Live stats from attendance and receipts" scope="Live" />
+                <div className={rs.meters}>
+                  <div>
+                    <div className={rs.meterHead}><span>Today Attendance</span><span className={rs.meterValue}>{todayAttendance.toLocaleString()}</span></div>
+                    <div className={styles.track}>
+                      <div className={styles.fill} style={{ width: `${membershipMetrics.total > 0 ? Math.min(100, (todayAttendance / membershipMetrics.total) * 100) : 0}%`, ["--fill" as any]: palette.s3 }} />
+                    </div>
+                    <div className={rs.meterHint}>of {membershipMetrics.total.toLocaleString()} members</div>
+                  </div>
+                  <div>
+                    <div className={rs.meterHead}><span>Avg Visit Duration</span><span className={rs.meterValue}>{membershipMetrics.avgVisitMinutes ? `${membershipMetrics.avgVisitMinutes} min` : "—"}</span></div>
+                    <div className={styles.track}>
+                      <div className={styles.fill} style={{ width: `${Math.min(100, (membershipMetrics.avgVisitMinutes / 120) * 100)}%`, ["--fill" as any]: palette.s1 }} />
+                    </div>
+                    <div className={rs.meterHint}>scale: 2 hours</div>
+                  </div>
+                  <div>
+                    <div className={rs.meterHead}><span>Receipts In Range</span><span className={rs.meterValue}>{receiptsInRange.length.toLocaleString()}</span></div>
+                    <div className={styles.track}>
+                      <div className={styles.fill} style={{ width: `${receipts.length > 0 ? Math.min(100, (receiptsInRange.length / receipts.length) * 100) : 0}%`, ["--fill" as any]: "#6250d6" }} />
+                    </div>
+                    <div className={rs.meterHint}>of {receipts.length.toLocaleString()} receipts loaded · {rangeScope.toLowerCase()}</div>
+                  </div>
+                  <div>
+                    <div className={rs.meterHead}><span>Avg Class Utilization</span><span className={rs.meterValue}>{avgClassUtil.toFixed(0)}%</span></div>
+                    <div className={styles.track}>
+                      <div className={styles.fill} style={{ width: `${Math.min(100, avgClassUtil)}%`, ["--fill" as any]: palette.s2 }} />
+                    </div>
+                    <div className={rs.meterHint}>across {classAttendance.length.toLocaleString()} classes</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Day Report / Custom Reports (own components, unchanged) ── */}
+        {reportsTab === "day" && (
+          <div className={rs.tabBody} key="day">
+            <DayReport />
+          </div>
+        )}
+        {reportsTab === "custom" && (
+          <div className={rs.tabBody} key="custom">
+            <CustomReports embedded onNavigate={onNavigate} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -242,7 +242,7 @@ export function defaultSettings(docType: DocType): DocTemplateSettings {
 export function resolveSettings(docType: DocType, saved?: Record<string, unknown> | null): DocTemplateSettings {
   const s = { ...defaultSettings(docType), ...(saved ?? {}), docType } as DocTemplateSettings;
   // Inter was the old default but was never loaded, so it printed in the system font.
-  if (/^Inter/.test(s.fontFamily ?? '')) s.fontFamily = DOC_FONT;
+  if (/^Inter\b/.test(s.fontFamily ?? '')) s.fontFamily = DOC_FONT;
   return s;
 }
 

@@ -1,7 +1,7 @@
 /* Member 360 > Subscription tab. Tailwind is a frozen snapshot, so everything here is on the
    theme tokens (light + .dark); tones match member-history-analytics.module.css. */
 
-[data-tone="teal"] { --tone: #2B7A78; }
+[data-tone="teal"] { --tone: var(--gb-primary); }
 [data-tone="blue"] { --tone: #2a78d6; }
 [data-tone="green"] { --tone: #15803d; }
 [data-tone="red"] { --tone: #dc2626; }

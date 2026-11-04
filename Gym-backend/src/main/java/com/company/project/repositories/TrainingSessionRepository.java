@@ -24,6 +24,8 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     void clearTrainer(@Param("staffId") Long staffId);
 
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
+
+    List<TrainingSession> findByDateOrderByStartTimeAsc(LocalDate date);
     long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
 
     long countByTrainer_IdAndStatusAndDateBetween(Long trainerId, String status, LocalDate start, LocalDate end);
@@ -58,7 +60,7 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     // payment approval.
     String BOOKED_PT = "LOWER(s.type) = 'pt' AND LOWER(s.status) <> 'cancelled' AND s.date BETWEEN :start AND :end " +
             "AND EXISTS (SELECT b.id FROM Booking b WHERE b.session = s " +
-            "AND LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'pending_approval'))";
+            "AND LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'pending_approval', 'waitlisted'))";
 
     @Query("SELECT COUNT(s) FROM TrainingSession s WHERE " + BOOKED_PT)
     long countBookedPtSessionsBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);

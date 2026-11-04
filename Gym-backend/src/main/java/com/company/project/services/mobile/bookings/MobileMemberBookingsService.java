@@ -253,6 +253,16 @@ public class MobileMemberBookingsService {
      * The member cancels their own booking. Refunded to their wallet when cancelled at
      * least BookingPaymentService.REFUND_CUTOFF before the session; not refunded after.
      */
+    /** The member rates a session they booked (see TrainingSessionService.submitMemberReview). */
+    @Transactional
+    public com.company.project.dto.SessionOverviewDTO.Review reviewBooking(UserDetailsImpl principal, Long bookingId,
+                                                                          Integer rating, String comment) {
+        Member member = requireAuthenticatedMember(principal);
+        Booking booking = bookingRepository.findByIdAndMemberId(bookingId, member.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Booking not found or access denied"));
+        return trainingSessionService.submitMemberReview(member, booking, rating, comment);
+    }
+
     @Transactional
     public MemberBookingDTO cancelBooking(UserDetailsImpl principal, Long bookingId, String refundMethod) {
         Member member = requireAuthenticatedMember(principal);
@@ -321,7 +331,7 @@ public class MobileMemberBookingsService {
             
             dto.setType(session.getType());
 
-            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
+            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), com.company.project.services.BookingService.NO_SEAT_STATUSES);
             dto.setAvailableSpots(session.getCapacity() == null ? null : Math.max(0, session.getCapacity() - bookedCount));
 
             LocalDateTime refundDeadline = BookingPaymentService.refundDeadline(session);

@@ -297,7 +297,7 @@ export function ExecutiveDashboardDialog({
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip formatter={(value: any) => [compactCurrency(value, live.currencyPrefix), '']} />
-                    <Area type="monotone" dataKey="actual" stroke="#0F766E" fill="#0F766E" fillOpacity={0.6} name="Actual" />
+                    <Area type="monotone" dataKey="actual" stroke="var(--gb-primary-deep)" fill="var(--gb-primary-deep)" fillOpacity={0.6} name="Actual" />
                     <Area type="monotone" dataKey="forecast" stroke="#B91C1C" fill="#B91C1C" fillOpacity={0.3} name="Forecast" strokeDasharray="5 5" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -365,7 +365,7 @@ export function ExecutiveDashboardDialog({
                     <XAxis dataKey="indicator" />
                     <YAxis domain={[0, 100]} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#0F766E" />
+                    <Bar dataKey="value" fill="var(--gb-primary-deep)" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

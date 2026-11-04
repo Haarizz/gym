@@ -100,7 +100,7 @@ const weightTrendData = [
 
 // Workout distribution data
 const workoutTypeData = [
-  { name: 'Strength', value: 45, color: '#0F766E' },
+  { name: 'Strength', value: 45, color: 'var(--gb-primary-deep)' },
   { name: 'Cardio', value: 30, color: '#B91C1C' },
   { name: 'Mobility', value: 15, color: '#FFA500' },
   { name: 'Classes', value: 10, color: '#3B82F6' },
@@ -530,7 +530,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                         cx="64"
                         cy="64"
                         r="56"
-                        stroke="#0F766E"
+                        stroke="var(--gb-primary-deep)"
                         strokeWidth="12"
                         fill="none"
                         strokeDasharray={`${2 * Math.PI * 56}`}
@@ -651,7 +651,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                     <XAxis dataKey={dateRange === 'month' ? 'week' : 'month'} />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey={chartMetric} fill="#0F766E" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey={chartMetric} fill="var(--gb-primary-deep)" radius={[8, 8, 0, 0]} />
                   </RechartsBarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -757,7 +757,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                       <XAxis dataKey="day" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="visits" fill="#0F766E" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="visits" fill="var(--gb-primary-deep)" radius={[8, 8, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -933,8 +933,8 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                   <AreaChart data={weightTrendData}>
                     <defs>
                       <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0F766E" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#0F766E" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--gb-primary-deep)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--gb-primary-deep)" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -945,7 +945,7 @@ export function MyStats({ onNavigate }: MyStatsProps = {}) {
                     <Area 
                       type="monotone" 
                       dataKey="weight" 
-                      stroke="#0F766E" 
+                      stroke="var(--gb-primary-deep)" 
                       fill="url(#colorWeight)" 
                       strokeWidth={3}
                       name="Current Weight"

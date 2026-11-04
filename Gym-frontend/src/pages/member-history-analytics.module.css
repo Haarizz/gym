@@ -18,7 +18,7 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.05);
 }
 
-[data-tone="teal"] { --tone: #2B7A78; }
+[data-tone="teal"] { --tone: var(--gb-primary); }
 [data-tone="blue"] { --tone: #2a78d6; }
 [data-tone="green"] { --tone: #15803d; }
 [data-tone="red"] { --tone: #dc2626; }

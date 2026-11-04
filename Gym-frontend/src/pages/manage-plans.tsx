@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { plansService, Plan } from '../utils/supabase/plans-service';
 import { promotionsService, PromotionApi } from '../utils/supabase/promotions-service';
 import { facilitiesService, FacilityApi } from '../utils/supabase/facilities-service';
@@ -17,6 +18,8 @@ import { Switch } from "../components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Facilities } from "./facilities";
+import { MemberAddons, type AddonStats } from "./member-addons";
+import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { 
   Plus, 
@@ -42,7 +45,12 @@ import {
   Percent,
   Building2,
   Snowflake,
-  Crown
+  Crown,
+  Puzzle,
+  CheckCircle,
+  Hourglass,
+  CalendarX,
+  Ban
 } from 'lucide-react';
 import { Checkbox } from "../components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
@@ -118,11 +126,22 @@ export function ManagePlans() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [priceSort, setPriceSort] = useState<"none" | "asc" | "desc">("none");
-  // ?tab=facilities (or navigation state { tab: "facilities" }) opens the Facilities tab directly
+  // ?tab=facilities|addons (or navigation state { tab }) opens that tab directly
+  const location = useLocation();
+  const tabFrom = (tab: unknown) => (tab === "facilities" || tab === "addons" ? tab : null);
   const [activeTab, setActiveTab] = useState(() =>
-    new URLSearchParams(window.location.search).get("tab") === "facilities" ? "facilities" : "plans");
+    tabFrom((location.state as any)?.tab) ?? tabFrom(new URLSearchParams(window.location.search).get("tab")) ?? "plans");
+  useEffect(() => {
+    const tab = tabFrom((location.state as any)?.tab);
+    if (tab) setActiveTab(tab);
+  }, [location.state]);
   // Where the Facilities tab renders its stat cards (the row above the tab bar)
   const [facilitySummaryHost, setFacilitySummaryHost] = useState<HTMLDivElement | null>(null);
+  // Add-ons tab: member add-on purchases (moved here from Members). Mounted on first visit, then kept.
+  const [addonsVisited, setAddonsVisited] = useState(activeTab === "addons");
+  useEffect(() => { if (activeTab === "addons") setAddonsVisited(true); }, [activeTab]);
+  const [addonFilter, setAddonFilter] = useState("all");
+  const [addonStats, setAddonStats] = useState<AddonStats | null>(null);
 
   // Promotions & Campaigns loaded from Member Connect (real data, not mock)
   const [availablePromotions, setAvailablePromotions] = useState<{
@@ -828,8 +847,24 @@ export function ManagePlans() {
     );
   }
 
+  const money = (n: number) => formatCurrency(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const addonStatCards: StatCardDef[] = [
+    {
+      key: "all", label: "Total Add-ons", value: addonStats?.total ?? null, icon: Puzzle, tone: "primary",
+      sub: addonStats ? `${money(addonStats.revenue)} revenue` : "All add-on purchases",
+    },
+    { key: "Active", label: "Active", value: addonStats?.active ?? null, sub: "Currently running", icon: CheckCircle, tone: "green" },
+    { key: "expiring", label: "Expiring in 7 Days", value: addonStats?.expiring ?? null, sub: "Active, ending soon", icon: Hourglass, tone: "amber" },
+    { key: "Expired", label: "Expired", value: addonStats?.expired ?? null, sub: "Past their expiry date", icon: CalendarX, tone: "red" },
+    { key: "Cancelled", label: "Cancelled", value: addonStats?.cancelled ?? null, sub: "Cancelled purchases", icon: Ban, tone: "cyan" },
+  ];
+  const selectAddonCard = (key: string) => {
+    setAddonFilter(addonFilter === key ? "all" : key);
+    setTimeout(() => document.getElementById("addon-transactions")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-sm">
           {error}
@@ -946,6 +981,9 @@ export function ManagePlans() {
             </div>
             </div>
             <div ref={setFacilitySummaryHost} className={planStyles.tabPane} data-state={activeTab === 'facilities' ? 'active' : 'inactive'} />
+            <div className={planStyles.tabPane} data-state={activeTab === 'addons' ? 'active' : 'inactive'}>
+              <MemberStatCards cards={addonStatCards} activeKey={addonFilter} onSelect={selectAddonCard} />
+            </div>
         </div>
 
         <TabsList className="w-full flex">
@@ -954,6 +992,9 @@ export function ManagePlans() {
           </TabsTrigger>
           <TabsTrigger value="facilities" className="flex-1">
             Facilities Management
+          </TabsTrigger>
+          <TabsTrigger value="addons" className="flex-1">
+            Add-ons
           </TabsTrigger>
         </TabsList>
 
@@ -2475,6 +2516,11 @@ export function ManagePlans() {
         </TabsContent>
         <TabsContent value="facilities" forceMount className={`space-y-6 ${planStyles.tabPane}`}>
           <Facilities embedded summaryContainer={facilitySummaryHost} />
+        </TabsContent>
+        <TabsContent value="addons" forceMount className={`space-y-6 ${planStyles.tabPane}`}>
+          {addonsVisited && (
+            <MemberAddons embedded statusFilter={addonFilter} onStatusFilterChange={setAddonFilter} onStats={setAddonStats} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

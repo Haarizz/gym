@@ -1,46 +1,224 @@
 @custom-variant dark (&:is(.dark *));
 
+/* Colour themes (Settings > Theme, src/utils/theme.ts). Every brand colour in the app
+   reads these --gb-* variables; legacy arbitrary classes such as bg-[#2B7A78] keep their
+   original names but resolve through them, so they follow the active theme too. */
+:root, :root[data-gb-theme="blue"] {
+  --gb-primary: #2693fd;
+  --gb-primary-alt: #2693fd;
+  --gb-primary-hover: #2382f6;
+  --gb-primary-deep: #1a65e2;
+  --gb-primary-darker: #1a65e2;
+  --gb-primary-darkest: #1352cf;
+  --gb-primary-light: #c5dffd;
+  --gb-primary-tint: #eaf3ff;
+  --gb-primary-wash: #f5f9ff;
+  --gb-primary-line: #dce7f5;
+  --gb-primary-soft: #4da6fd;
+  --gb-primary-mid: #5aabfd;
+  --gb-primary-pale: #8dc4fe;
+  --gb-primary-paler: #9acbfe;
+  --gb-secondary-dark: #1b2e4a;
+  --gb-text: #172b4d;
+  --gb-bg: #f5f9ff;
+  --gb-muted-fg: #64748b;
+  --gb-border: #dce7f5;
+  --gb-sidebar: #1352cf;
+  --gb-sidebar-accent: #1a65e2;
+  --gb-sidebar-active: #1f71f1;
+}
+
+:root[data-gb-theme="teal"] {
+  --gb-primary: #2b7a78;
+  --gb-primary-alt: #327f74;
+  --gb-primary-hover: #236360;
+  --gb-primary-deep: #0f766e;
+  --gb-primary-darker: #1f5a52;
+  --gb-primary-darkest: #115e59;
+  --gb-primary-light: #dff5f4;
+  --gb-primary-tint: #eef5f4;
+  --gb-primary-wash: #f0f7f7;
+  --gb-primary-line: #e2eeee;
+  --gb-primary-soft: #3a9592;
+  --gb-primary-mid: #4ba3a0;
+  --gb-primary-pale: #76c7c4;
+  --gb-primary-paler: #7fd1ce;
+  --gb-secondary-dark: #1e3a3f;
+  --gb-text: #1e293b;
+  --gb-bg: #f9fafb;
+  --gb-muted-fg: #4b5563;
+  --gb-border: #d1d5db;
+  --gb-sidebar: #2b7a78;
+  --gb-sidebar-accent: #ffffff1a;
+  --gb-sidebar-active: #fff3;
+}
+
+:root[data-gb-theme="indigo"] {
+  --gb-primary: #4f46e5;
+  --gb-primary-alt: #4f46e5;
+  --gb-primary-hover: #4338ca;
+  --gb-primary-deep: #4338ca;
+  --gb-primary-darker: #3730a3;
+  --gb-primary-darkest: #312e81;
+  --gb-primary-light: #e0e7ff;
+  --gb-primary-tint: #f1f0fd;
+  --gb-primary-wash: #f8f8fe;
+  --gb-primary-line: #d0d5ef;
+  --gb-primary-soft: #6962e9;
+  --gb-primary-mid: #7b74ec;
+  --gb-primary-pale: #9e99f1;
+  --gb-primary-paler: #aba6f3;
+  --gb-secondary-dark: #242151;
+  --gb-text: #1e1b4b;
+  --gb-bg: #f3f5fb;
+  --gb-muted-fg: #64748b;
+  --gb-border: #d3d8ef;
+  --gb-sidebar: #312e81;
+  --gb-sidebar-accent: #3730a3;
+  --gb-sidebar-active: #4f46e5;
+}
+
+:root[data-gb-theme="green"] {
+  --gb-primary: #15803d;
+  --gb-primary-alt: #15803d;
+  --gb-primary-hover: #166534;
+  --gb-primary-deep: #166534;
+  --gb-primary-darker: #14532d;
+  --gb-primary-darkest: #14532d;
+  --gb-primary-light: #dcfce7;
+  --gb-primary-tint: #ecf5ef;
+  --gb-primary-wash: #f6faf7;
+  --gb-primary-line: #c9dcdb;
+  --gb-primary-soft: #38935a;
+  --gb-primary-mid: #50a06e;
+  --gb-primary-pale: #7eb994;
+  --gb-primary-paler: #8fc2a2;
+  --gb-secondary-dark: #12321e;
+  --gb-text: #1e293b;
+  --gb-bg: #f1f6f6;
+  --gb-muted-fg: #64748b;
+  --gb-border: #cedede;
+  --gb-sidebar: #14532d;
+  --gb-sidebar-accent: #166534;
+  --gb-sidebar-active: #15803d;
+}
+
+:root[data-gb-theme="orange"] {
+  --gb-primary: #c2410c;
+  --gb-primary-alt: #c2410c;
+  --gb-primary-hover: #9a3412;
+  --gb-primary-deep: #9a3412;
+  --gb-primary-darker: #7c2d12;
+  --gb-primary-darkest: #7c2d12;
+  --gb-primary-light: #ffedd5;
+  --gb-primary-tint: #faf0ec;
+  --gb-primary-wash: #fdf7f5;
+  --gb-primary-line: #ded4d5;
+  --gb-primary-soft: #cb5e30;
+  --gb-primary-mid: #d17149;
+  --gb-primary-pale: #dd9779;
+  --gb-primary-paler: #e2a48a;
+  --gb-secondary-dark: #461f0f;
+  --gb-text: #292524;
+  --gb-bg: #f6f4f5;
+  --gb-muted-fg: #78716c;
+  --gb-border: #dfd7d9;
+  --gb-sidebar: #7c2d12;
+  --gb-sidebar-accent: #9a3412;
+  --gb-sidebar-active: #c2410c;
+}
+
+:root[data-gb-theme="plum"] {
+  --gb-primary: #714b67;
+  --gb-primary-alt: #714b67;
+  --gb-primary-hover: #5e3d55;
+  --gb-primary-deep: #5e3d55;
+  --gb-primary-darker: #4a2f43;
+  --gb-primary-darkest: #3d2637;
+  --gb-primary-light: #f1e4ee;
+  --gb-primary-tint: #f4f1f3;
+  --gb-primary-wash: #f9f8f9;
+  --gb-primary-line: #d4d5e0;
+  --gb-primary-soft: #86667e;
+  --gb-primary-mid: #95788d;
+  --gb-primary-pale: #b19cab;
+  --gb-primary-paler: #bba9b6;
+  --gb-secondary-dark: #2e222b;
+  --gb-text: #2a1f27;
+  --gb-bg: #f4f5f8;
+  --gb-muted-fg: #6b5e68;
+  --gb-border: #d7d8e2;
+  --gb-sidebar: #4a2f43;
+  --gb-sidebar-accent: #5e3d55;
+  --gb-sidebar-active: #714b67;
+}
+
+:root[data-gb-theme="graphite"] {
+  --gb-primary: #334155;
+  --gb-primary-alt: #334155;
+  --gb-primary-hover: #1e293b;
+  --gb-primary-deep: #1e293b;
+  --gb-primary-darker: #0f172a;
+  --gb-primary-darkest: #0f172a;
+  --gb-primary-light: #e2e8f0;
+  --gb-primary-tint: #eff0f1;
+  --gb-primary-wash: #f7f7f8;
+  --gb-primary-line: #cdd4dd;
+  --gb-primary-soft: #525e6f;
+  --gb-primary-mid: #667180;
+  --gb-primary-pale: #8f97a2;
+  --gb-primary-paler: #9da4ad;
+  --gb-secondary-dark: #1b1f25;
+  --gb-text: #0f172a;
+  --gb-bg: #f2f4f7;
+  --gb-muted-fg: #64748b;
+  --gb-border: #d1d7e1;
+  --gb-sidebar: #0f172a;
+  --gb-sidebar-accent: #1e293b;
+  --gb-sidebar-active: #334155;
+}
+
 :root {
   --font-size: 16px;
   /* GymBios Official Brand Colors - Teal Green Theme (per COLOR_THEME_GUIDE.md) */
-  --gymbios-primary: #2B7A78;
+  --gymbios-primary: var(--gb-primary);
   --gymbios-accent: #E63946;
-  --gymbios-primary-hover: #236360;
+  --gymbios-primary-hover: var(--gb-primary-hover);
   --gymbios-accent-hover: #d32f3d;
-  --gymbios-main-bg: #F9FAFB;
-  --gymbios-heading: #1E293B;
-  --gymbios-body: #1E293B;
+  --gymbios-main-bg: var(--gb-bg);
+  --gymbios-heading: var(--gb-text);
+  --gymbios-body: var(--gb-text);
   --gymbios-white: #FFFFFF;
   --gymbios-success: #4CAF50;
   --gymbios-warning: #FFC107;
   --gymbios-error: #E63946;
-  --gymbios-selected-row: rgba(43, 122, 120, 0.1);
+  --gymbios-selected-row: color-mix(in srgb, var(--gb-primary) 10%, transparent);
   
   /* Updated color system for GymBios - Teal Green Primary + Red Accent */
-  --background: #F9FAFB;
-  --foreground: #1E293B;
+  --background: var(--gb-bg);
+  --foreground: var(--gb-text);
   --card: #ffffff;
-  --card-foreground: #1E293B;
+  --card-foreground: var(--gb-text);
   --popover: #ffffff;
-  --popover-foreground: #1E293B;
-  --primary: #2B7A78;
+  --popover-foreground: var(--gb-text);
+  --primary: var(--gb-primary);
   --primary-foreground: #ffffff;
   --secondary: #E2E8F0;
-  --secondary-foreground: #1E293B;
+  --secondary-foreground: var(--gb-text);
   --muted: #f2f4f7;
-  --muted-foreground: #4b5563;
+  --muted-foreground: var(--gb-muted-fg);
   --accent: #E63946;
   --accent-foreground: #ffffff;
   --destructive: #E63946;
   --destructive-foreground: #ffffff;
-  --border: #d1d5db;
+  --border: var(--gb-border);
   --input: transparent;
   --input-background: #ffffff;
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #2B7A78;
-  --chart-1: #2B7A78;
+  --ring: var(--gb-primary);
+  --chart-1: var(--gb-primary);
   --chart-2: #009688;
   --chart-3: #4CAF50;
   --chart-4: #FFC107;
@@ -56,15 +234,15 @@
   --text-4xl: 2.25rem;
   
   /* GymBios Sidebar Design - Teal Green */
-  --sidebar: #2B7A78;
+  --sidebar: var(--gb-sidebar);
   --sidebar-foreground: #ffffff;
   --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #2B7A78;
-  --sidebar-accent: rgba(255, 255, 255, 0.1);
+  --sidebar-primary-foreground: var(--gb-sidebar);
+  --sidebar-accent: var(--gb-sidebar-accent);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: #ffffff;
-  --sidebar-active: rgba(255, 255, 255, 0.2);
+  --sidebar-active: var(--gb-sidebar-active);
 }
 
 .dark {
@@ -75,9 +253,9 @@
   --card-foreground: #ffffff;
   --popover: #262626;
   --popover-foreground: #ffffff;
-  --primary: #2B7A78;
+  --primary: var(--gb-primary);
   --primary-foreground: #ffffff;
-  --secondary: #1e3a3f;
+  --secondary: var(--gb-secondary-dark);
   --secondary-foreground: #ffffff;
   --muted: #404040;
   --muted-foreground: #a1a1a1;
@@ -87,10 +265,10 @@
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.1);
   --input: #404040;
-  --ring: #2B7A78;
+  --ring: var(--gb-primary);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: #2B7A78;
+  --chart-1: var(--gb-primary);
   --chart-2: #009688;
   --chart-3: #4CAF50;
   --chart-4: #FFC107;
@@ -105,11 +283,11 @@
   --text-4xl: 2.25rem;
   
   /* Dark mode sidebar - Teal Green */
-  --sidebar: #2B7A78;
+  --sidebar: var(--gb-sidebar);
   --sidebar-foreground: #ffffff;
   --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #2B7A78;
-  --sidebar-accent: #236360;
+  --sidebar-primary-foreground: var(--gb-sidebar);
+  --sidebar-accent: var(--gb-primary-hover);
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: #ffffff;
@@ -246,7 +424,7 @@ html {
   }
   
   .bg-gradient-light {
-    background: rgba(43, 122, 120, 0.1);
+    background: color-mix(in srgb, var(--gb-primary) 10%, transparent);
   }
   
   .border-gradient {
@@ -265,7 +443,7 @@ html {
   .btn-primary:hover {
     background: var(--gymbios-primary-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(43, 122, 120, 0.3);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--gb-primary) 30%, transparent);
   }
   
   /* Secondary Button Styling */
@@ -277,7 +455,7 @@ html {
   }
   
   .btn-secondary:hover {
-    background: rgba(43, 122, 120, 0.1);
+    background: color-mix(in srgb, var(--gb-primary) 10%, transparent);
     transform: translateY(-1px);
   }
   
@@ -306,7 +484,7 @@ html {
   
   /* Sidebar Active Menu Item with Teal Green Theme */
   .sidebar-item-active {
-    background: rgba(255, 255, 255, 0.2) !important;
+    background: var(--sidebar-active) !important;
     color: var(--gymbios-white) !important;
     backdrop-filter: blur(10px);
     border-radius: 8px;
@@ -360,7 +538,7 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(43, 122, 120, 0.3);
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--gb-primary) 30%, transparent);
     transition: all 0.3s ease-in-out;
     z-index: 1000;
   }
@@ -368,7 +546,7 @@ html {
   .fab:hover {
     transform: scale(1.1);
     background: var(--gymbios-primary-hover);
-    box-shadow: 0 6px 25px rgba(43, 122, 120, 0.4);
+    box-shadow: 0 6px 25px color-mix(in srgb, var(--gb-primary) 40%, transparent);
   }
   
   /* Status Colors */

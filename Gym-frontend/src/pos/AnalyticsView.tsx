@@ -12,7 +12,7 @@ import { exportReportXlsx } from "./print/reportA4";
 import type { Analytics } from "./types";
 import s from "./pos.module.css";
 
-const TEAL = "#0F766E";
+const TEAL = "var(--gb-primary-deep)";
 const shiftDays = (iso: string, d: number) => {
   const x = new Date(`${iso}T00:00:00`);
   x.setDate(x.getDate() + d);

@@ -30,6 +30,48 @@ export function MemberActiveMembershipCard({ memberInfo }: MemberActiveMembershi
   const formattedDate = memberInfo.validUntil ? formatDate(memberInfo.validUntil, 'PP') : '-';
 
   const isFrozen = memberInfo.isFrozen;
+  // The backend sends the effective status, so a membership past its end date is "expired"
+  // even while the stored status still says active.
+  const isExpired = !isFrozen && memberInfo.status?.toLowerCase() === 'expired'
+    && memberInfo.membershipType !== 'No Active Plan';
+
+  if (isExpired) {
+    return (
+      <View style={[styles.card, styles.inactiveCard, styles.expiredCard]}>
+        <View style={styles.topRow}>
+          <View style={styles.infoLeft}>
+            <Text style={[styles.badgeLabel, styles.inactiveTextLight]}>{t('memberHome.expiredSubscription')}</Text>
+            <Text style={[styles.membershipType, styles.inactiveTextDark]} numberOfLines={2}>{memberInfo.membershipType}</Text>
+            <View style={styles.locationRow}>
+              <Feather name="map-pin" size={12} color="#6B7280" />
+              <Text style={[styles.gymName, styles.inactiveTextLight]} numberOfLines={1}>{branchName}</Text>
+            </View>
+          </View>
+          <View style={[styles.statusPill, styles.expiredPill]}>
+            <Text style={[styles.statusText, styles.expiredPillText]}>{t('memberHome.statusExpired')}</Text>
+          </View>
+        </View>
+        <View style={[styles.divider, styles.inactiveDivider]} />
+        <View style={styles.bottomRow}>
+          <View style={styles.infoLeft}>
+            <Text style={[styles.statLabel, styles.inactiveTextLight]}>{t('memberHome.expiredOn')}</Text>
+            <Text style={[styles.statValueDate, styles.expiredDate]}>{formattedDate}</Text>
+          </View>
+        </View>
+        <Text style={styles.inactivePrompt}>{t('memberHome.expiredPrompt')}</Text>
+        <Pressable
+          style={({ pressed }) => [styles.findGymButton, pressed && styles.findGymButtonPressed]}
+          onPress={() => router.push('/(member)/membership' as any)}
+          accessibilityRole="button"
+          hitSlop={6}
+        >
+          <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+          <Text style={styles.findGymText}>{t('memberHome.renewCta')}</Text>
+          <Feather name="arrow-right" size={14} color="#FFFFFF" />
+        </Pressable>
+      </View>
+    );
+  }
 
   if (!isFrozen && (!memberInfo.isActive || memberInfo.membershipType === 'No Active Plan')) {
     return (
@@ -259,6 +301,20 @@ const styles = StyleSheet.create({
   },
   findGymButtonPressed: {
     opacity: 0.85,
+  },
+  // Expired state — same calm card as "inactive", with a red accent and status pill.
+  expiredCard: {
+    borderColor: 'rgba(220,38,38,0.35)',
+  },
+  expiredPill: {
+    backgroundColor: 'rgba(220,38,38,0.10)',
+    borderColor: 'rgba(220,38,38,0.35)',
+  },
+  expiredPillText: {
+    color: '#B91C1C',
+  },
+  expiredDate: {
+    color: '#B91C1C',
   },
   findGymText: {
     fontSize: 13,

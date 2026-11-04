@@ -220,6 +220,7 @@ import {
   AvatarImage,
 } from "./components/ui/avatar";
 import { Toaster } from "./components/ui/sonner";
+import { syncThemeForUser } from "./utils/theme";
 
 /**
  * Pseudo permission for pages only the gym owner (ADMIN / SUPER_ADMIN role) may open,
@@ -280,6 +281,13 @@ const menuItems = [
         permission: "MEMBERSHIP_PLANS_VIEW",
       },
       {
+        title: "Plans & Services Catalog",
+        icon: BookOpen,
+        id: "plans-services-catalog",
+        path: "/plans-services-catalog",
+        permission: "MEMBERSHIP_PLANS_VIEW",
+      },
+      {
         title: "Attendance",
         icon: UserCheck,
         id: "attendance",
@@ -299,6 +307,20 @@ const menuItems = [
         id: "training-streams",
         path: "/training-streams",
         permission: "TRAINING_STREAMS_VIEW",
+      },
+      {
+        title: "Trainings & Classes",
+        icon: GraduationCap,
+        id: "trainings-classes",
+        path: "/trainings-classes",
+        permission: "TRAININGS_CLASSES_VIEW",
+      },
+      {
+        title: "Bookings",
+        icon: Calendar,
+        id: "bookings",
+        path: "/bookings",
+        permission: "BOOKINGS_VIEW",
       },
       {
         title: "Reports",
@@ -644,20 +666,6 @@ const menuItems = [
         permission: "ADMINISTRATION_VIEW",
       },
       {
-        title: "Trainings & Classes",
-        icon: GraduationCap,
-        id: "trainings-classes",
-        path: "/trainings-classes",
-        permission: "TRAININGS_CLASSES_VIEW",
-      },
-      {
-        title: "Bookings",
-        icon: Calendar,
-        id: "bookings",
-        path: "/bookings",
-        permission: "BOOKINGS_VIEW",
-      },
-      {
         title: "Payroll",
         icon: DollarSign,
         id: "payroll",
@@ -768,13 +776,6 @@ const menuItems = [
     permission: "SETTINGS_VIEW",
   },
   {
-    title: "Plans & Services Catalog",
-    icon: BookOpen,
-    id: "plans-services-catalog",
-    path: "/plans-services-catalog",
-    permission: "MEMBERSHIP_PLANS_VIEW",
-  },
-  {
     title: "My Profile",
     icon: UserIcon,
     id: "my-profile",
@@ -859,6 +860,13 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Each user's colour theme (Settings > Theme) follows them on a shared device; the
+  // login screen is always brand teal. Wait for auth so a reload never flashes teal.
+  useEffect(() => {
+    if (isLoading) return;
+    syncThemeForUser(isAuthenticated ? user?.id ?? null : null);
+  }, [isLoading, isAuthenticated, user?.id]);
 
   // User photo for sidebar and header
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
@@ -1153,6 +1161,8 @@ export default function App() {
         "attendance",
         "check-in",
         "training-streams",
+        "trainings-classes",
+        "bookings",
         "reports",
         "analytics",
       ];
@@ -1215,8 +1225,6 @@ export default function App() {
         "shifts-schedules",
         "staff-attendance",
         "roles-permissions",
-        "trainings-classes",
-        "bookings",
         "payroll",
         "salary-payments",
         "salary-advances",
@@ -1366,14 +1374,7 @@ export default function App() {
       <Route path="/targets-overview" element={<TargetsOverview onNavigate={handleNavClick} />} />
       <Route path="/my-targets" element={<MyTargets />} />
       <Route path="/my-performance" element={<MyPerformance onNavigate={handleNavClick} />} />
-      <Route path="/profile-settings" element={
-        <div className="p-6">
-          <h1>Profile Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your personal profile, notification preferences, and account settings.
-          </p>
-        </div>
-      } />
+      <Route path="/profile-settings" element={<MyProfile onNavigate={handleNavClick} initialTab="settings" />} />
       <Route path="/my-profile" element={<MyProfile onNavigate={handleNavClick} />} />
       <Route path="/settings" element={<AppSettings />} />
       <Route path="/trainings-classes" element={<TrainingsClasses onNavigate={handleNavClick} />} />
@@ -1493,7 +1494,7 @@ export default function App() {
       onOpenMobileChange={setMobileNavOpen}
     >
       <div className="flex w-full gb-shell">
-        <Sidebar className="hidden md:flex bg-gradient-primary">
+        <Sidebar className="hidden md:flex bg-sidebar">
           <SidebarHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -1675,7 +1676,7 @@ export default function App() {
                   <Dumbbell className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-bold" style={{ color: '#2B7A78' }}>GymBios</h2>
+                  <h2 className="font-bold" style={{ color: 'var(--gb-primary)' }}>GymBios</h2>
                   {!isPosRoute && !isGymbiosAdmin && activeBranchName && (
                     <p className="gb-app-header-branch">{activeBranchName}</p>
                   )}

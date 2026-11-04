@@ -186,7 +186,7 @@ export function CustomerCreditsPanel() {
                       <TableCell><Badge className={TYPE_COLOR[c.creditType] ?? "bg-slate-100 text-slate-700"}>{c.creditType}</Badge></TableCell>
                       <TableCell className="text-right font-medium whitespace-nowrap">{money(c.amount)}</TableCell>
                       <TableCell className="text-right text-red-600 whitespace-nowrap">{c.used > 0 ? money(c.used) : "—"}</TableCell>
-                      <TableCell className="text-right font-semibold whitespace-nowrap" style={{ color: c.balance > 0 ? "#2B7A78" : undefined }}>{money(c.balance)}</TableCell>
+                      <TableCell className="text-right font-semibold whitespace-nowrap" style={{ color: c.balance > 0 ? "var(--gb-primary)" : undefined }}>{money(c.balance)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">No expiry</TableCell>
                       <TableCell>
                         <Badge className={c.status === "Active" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}>{c.status}</Badge>

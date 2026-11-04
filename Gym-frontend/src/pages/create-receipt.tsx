@@ -900,7 +900,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <Card style={{ backgroundColor: 'light-dark(#F9FAFB, var(--muted-bg))' }}>
+            <Card style={{ backgroundColor: 'light-dark(var(--gb-bg), var(--muted-bg))' }}>
               <CardContent className="pt-6">
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
@@ -992,7 +992,7 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <Card style={{ backgroundColor: 'light-dark(#F9FAFB, var(--muted-bg))', border: 'none' }}>
+            <Card style={{ backgroundColor: 'light-dark(var(--gb-bg), var(--muted-bg))', border: 'none' }}>
               <CardContent className="pt-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">

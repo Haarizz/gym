@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { TimeSelect12h } from "../components/shared/time-select-12h";
+import { TimeSlotSelect12h } from "../components/shared/time-select-12h";
 import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { TrainingSessionsTab } from "../components/trainings/TrainingSessionsTab";
+import { SessionDetailDialog } from "../components/trainings/SessionDetailDialog";
+import ts from "../components/trainings/trainings.module.css";
 import {
   Card,
   CardContent,
@@ -59,7 +64,7 @@ import { trainingService, TrainingSessionApi } from "../utils/supabase/training-
 import { staffService, Staff } from "../utils/supabase/staff-service";
 
 const classTypes = [
-  { id: "class", name: "Group Class", color: "#0F766E", icon: Users },
+  { id: "class", name: "Group Class", color: "var(--gb-primary-deep)", icon: Users },
   { id: "pt", name: "Personal Training", color: "#B91C1C", icon: Dumbbell },
   { id: "facility", name: "Facility Booking", color: "#2563EB", icon: MapPin },
 ];
@@ -103,15 +108,21 @@ interface ClassItem {
 
 export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   const { currencyCode, currencyPrefix } = useCurrency();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
-  const [showClassDialog, setShowClassDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterTrainer, setFilterTrainer] = useState("all");
   const [isStaffView, setIsStaffView] = useState(false);
+  // "sessions" = Training Sessions management table; "classes" = calendar / list
+  const [pageTab, setPageTab] = useState<"sessions" | "classes">("sessions");
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [detail, setDetail] = useState<{ id: string; remind: boolean } | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [trainers, setTrainers] = useState<TrainerProfile[]>([]);
   const [sessions, setSessions] = useState<TrainingSessionApi[]>([]);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
@@ -127,6 +138,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     location: "",
     capacity: "",
     price: "",
+    description: "",
   });
   const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
@@ -149,6 +161,12 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     const endTime = new Date(`1970-01-01T${end}:00`);
     const diff = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
     return diff > 0 ? diff : 0;
+  };
+
+  // "07:30" → "08:30": where the End Time list opens once a start is picked.
+  const plusOneHour = (value?: string) => {
+    const m = /^(\d{2}):(\d{2})/.exec(value || "");
+    return m ? `${String((Number(m[1]) + 1) % 24).padStart(2, "0")}:${m[2]}` : undefined;
   };
 
   const resolveSlotKey = (value?: string) => {
@@ -231,6 +249,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       location: "",
       capacity: "",
       price: "",
+      description: "",
     });
     setEditingClassId(null);
   };
@@ -241,8 +260,18 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   };
 
   const fetchSessions = async () => {
-    const response = await trainingService.getSessions();
-    setSessions(response);
+    try {
+      const response = await trainingService.getSessions();
+      setSessions(response);
+    } finally {
+      setSessionsLoading(false);
+      setRefreshKey((k) => k + 1);
+    }
+  };
+
+  const openSession = (id: string, opts?: { remind?: boolean }) => {
+    setDetail({ id, remind: Boolean(opts?.remind) });
+    setDetailOpen(true);
   };
 
   useEffect(() => {
@@ -255,6 +284,32 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     };
     load();
   }, []);
+
+  // Bookings' "High demand" alert sends { addSessionFrom: <session id> }: open Create Session
+  // pre-filled from that full session, so staff only pick the new date.
+  useEffect(() => {
+    const fromId = (location.state as { addSessionFrom?: string } | null)?.addSessionFrom;
+    if (!fromId || sessionsLoading) return;
+    const source = sessions.find((s) => String(s.id) === String(fromId));
+    resetNewClassForm();
+    if (source) {
+      setNewClassData((prev) => ({
+        ...prev,
+        name: source.name || "",
+        type: source.type || "class",
+        trainerId: source.trainerId ? String(source.trainerId) : "",
+        startTime: formatTime(source.startTime),
+        endTime: formatTime(source.endTime),
+        location: source.location || "",
+        capacity: String(source.capacity ?? ""),
+        price: String(source.price ?? ""),
+        description: source.description || "",
+      }));
+    }
+    setShowAddDialog(true);
+    // Consume the request so a refresh or Back doesn't reopen the form.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [sessionsLoading, location.state]);
 
   // Filter classes based on search and filters
   const filteredClasses = classes.filter((cls) => {
@@ -282,10 +337,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     ? Math.round(classes.reduce((sum, cls) => sum + getEnrollmentPercentage(cls.enrolled, cls.capacity), 0) / classes.length)
     : 0;
 
-  const handleViewClass = (classItem: ClassItem) => {
-    setSelectedClass(classItem);
-    setShowClassDialog(true);
-  };
+  const handleViewClass = (classItem: ClassItem) => openSession(classItem.id);
 
   const handleBookClass = (classItem: ClassItem) => {
     if (onNavigate) {
@@ -332,8 +384,9 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       location: newClassData.location || "Main Studio",
       capacity,
       price,
-      status: "active",
-      description: "",
+      // A new session starts scheduled; editing leaves its status alone (in progress / completed stay put).
+      status: editingClassId ? undefined : "active",
+      description: newClassData.description.trim(),
     };
 
     try {
@@ -367,6 +420,8 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       location: classItem.location,
       capacity: String(classItem.capacity ?? ""),
       price: String(classItem.price ?? ""),
+      // The card shows a placeholder when empty — edit the stored text, not that.
+      description: sessions.find((x) => String(x.id) === classItem.id)?.description || "",
     });
     setShowAddDialog(true);
   };
@@ -382,10 +437,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       await trainingService.deleteSession(classToDelete.id);
       await fetchSessions();
       toast.success("Class deleted");
-      if (selectedClass?.id === classToDelete.id) {
-        setShowClassDialog(false);
-        setSelectedClass(null);
-      }
+      if (detail?.id === classToDelete.id) setDetailOpen(false);
       setShowDeleteDialog(false);
       setClassToDelete(null);
     } catch (error: any) {
@@ -748,198 +800,6 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     );
   };
 
-  const renderClassDetailDialog = () => {
-    if (!selectedClass) return null;
-
-    const typeConfig = getClassTypeConfig(selectedClass.type);
-    const TypeIcon = typeConfig.icon;
-    const enrollmentPercentage = getEnrollmentPercentage(selectedClass.enrolled, selectedClass.capacity);
-    const trainerExperience = selectedClass.trainer.experience || "Trainer";
-    const trainerRating = selectedClass.trainer.rating ?? 4.8;
-    const trainerSpecialties = selectedClass.trainer.specialties?.length
-      ? selectedClass.trainer.specialties.join(", ")
-      : "General Training";
-
-    return (
-      <Dialog open={showClassDialog} onOpenChange={setShowClassDialog}>
-        <DialogContent className="max-w-2xl">
-          {/* Hero Header */}
-          <div 
-            className="relative -m-6 mb-6 p-6 text-white rounded-t-lg"
-            style={{ background: `linear-gradient(135deg, ${typeConfig.color}CC 0%, ${typeConfig.color}99 100%)` }}
-          >
-            <div className="flex items-center space-x-4">
-              <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
-                <TypeIcon className="h-8 w-8 text-white" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold">{selectedClass.name}</h2>
-                <p className="text-white/90 mt-1">
-                  {typeConfig.name} - {selectedClass.duration} minutes
-                </p>
-              </div>
-              <Avatar className="h-16 w-16 border-4 border-white/20">
-                <AvatarImage src={selectedClass.trainer.avatar} />
-                <AvatarFallback className="text-lg bg-white/20 text-white">
-                  {selectedClass.trainer.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {/* Class Details */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">Schedule</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <CalendarDays className="h-4 w-4 text-gray-400" />
-                      <span>{new Date(`${selectedClass.date}T00:00:00`).toLocaleDateString('en-GB', { 
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span>{formatTime12h(selectedClass.startTime)} - {formatTime12h(selectedClass.endTime)}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span>{selectedClass.location}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">Pricing</h3>
-                  <div className="text-xl font-bold text-primary">
-                    {formatPrice(selectedClass.price)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">Trainer</h3>
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={selectedClass.trainer.avatar} />
-                      <AvatarFallback className="bg-gradient-primary text-white">
-                        {selectedClass.trainer.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{selectedClass.trainer.name}</div>
-                      <div className="text-sm text-gray-500">
-                        {trainerExperience} - {trainerRating} rating
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {trainerSpecialties}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-primary mb-2">Availability</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Enrolled</span>
-                      <span>{selectedClass.enrolled}/{selectedClass.capacity}</span>
-                    </div>
-                    <Progress value={enrollmentPercentage} className="h-2" />
-                    <div className="text-xs text-gray-500">
-                      {selectedClass.capacity - selectedClass.enrolled} spots remaining
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <h3 className="font-semibold mb-2" style={{ color: 'var(--primary)' }}>About This Class</h3>
-              <p className="text-gray-600 leading-relaxed">
-                {selectedClass.description}
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex space-x-3 pt-4 border-t">
-              {isStaffView ? (
-                <>
-                  <Button
-                    className="flex-1"
-                    style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%)', color: 'var(--primary-foreground)' }}
-                    onClick={() => {
-                      handleEditClass(selectedClass);
-                      setShowClassDialog(false);
-                    }}
-                  >
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Reschedule
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    style={{ borderColor: 'color-mix(in srgb, var(--danger) 25.1%, transparent)', color: 'var(--danger)' }}
-                    onClick={() => handleDeleteClass(selectedClass)}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                  <Button
-                    variant="outline"
-                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
-                    onClick={() => setShowClassDialog(false)}
-                  >
-                    Close
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    className="flex-1"
-                    style={{ background: 'linear-gradient(135deg, var(--danger) 0%, var(--danger) 100%)', color: 'var(--danger-foreground)' }}
-                    onClick={() => {
-                      handleBookClass(selectedClass);
-                      setShowClassDialog(false);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Book This Class
-                  </Button>
-                  <Button
-                    variant="outline"
-                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
-                    onClick={() => {
-                      toast.info("Share Class", {
-                        description: "Share functionality coming soon!"
-                      });
-                    }}
-                  >
-                    Share
-                  </Button>
-                  <Button
-                    variant="outline"
-                    style={{ borderColor: 'color-mix(in srgb, var(--primary) 25.1%, transparent)', color: 'var(--primary)' }}
-                    onClick={() => setShowClassDialog(false)}
-                  >
-                    Close
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -965,11 +825,31 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
             }}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Class
+            Create Session
           </Button>
         </div>
       </div>
 
+      <div className={ts.pageTabs} role="tablist" aria-label="Trainings & Classes views">
+        <button type="button" role="tab" className={ts.pageTab} data-active={pageTab === "classes"} aria-selected={pageTab === "classes"} onClick={() => setPageTab("classes")}>
+          <CalendarDays /> Classes & Activities
+        </button>
+        <button type="button" role="tab" className={ts.pageTab} data-active={pageTab === "sessions"} aria-selected={pageTab === "sessions"} onClick={() => setPageTab("sessions")}>
+          <CheckCircle2 /> Training Sessions
+        </button>
+      </div>
+
+      {pageTab === "sessions" ? (
+        <TrainingSessionsTab
+          sessions={sessions}
+          loading={sessionsLoading}
+          refreshKey={refreshKey}
+          onChanged={fetchSessions}
+          onCreate={() => { resetNewClassForm(); setShowAddDialog(true); }}
+          onView={openSession}
+        />
+      ) : (
+      <>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className={cardShell}>
@@ -987,14 +867,14 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
 
         <Card className={cardShell}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Active Classes</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Scheduled</CardTitle>
             <div className="bg-green-50 p-2 rounded-lg">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{activeClasses}</div>
-            <p className="text-xs text-muted-foreground">Currently running</p>
+            <p className="text-xs text-muted-foreground">Not started yet</p>
           </CardContent>
         </Card>
 
@@ -1100,9 +980,23 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
       <div key={view} className="animate-in fade-in-0 zoom-in-95 duration-200">
         {view === "calendar" ? renderCalendarView() : renderListView()}
       </div>
+      </>
+      )}
 
-      {/* Class Detail Dialog */}
-      {renderClassDetailDialog()}
+      {/* Session dialog (both tabs) */}
+      <SessionDetailDialog
+        sessionId={detail?.id ?? null}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        startWithReminder={detail?.remind}
+        onChanged={fetchSessions}
+        onEdit={(session) => {
+          const item = classes.find((c) => c.id === String(session.id));
+          if (!item) return;
+          setDetailOpen(false);
+          handleEditClass(item);
+        }}
+      />
 
       {/* Add Class Dialog */}
       <Dialog
@@ -1122,10 +1016,10 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-xl text-foreground">
-              {editingClassId ? "Reschedule Class" : "Add New Class"}
+              {editingClassId ? "Edit Session" : "Create Session"}
             </DialogTitle>
             <DialogDescription>
-              {editingClassId ? "Update the class schedule details" : "Create a new training class or session"}
+              {editingClassId ? "Update the session schedule and details" : "Schedule a group class, PT session or facility slot"}
             </DialogDescription>
           </DialogHeader>
           
@@ -1195,7 +1089,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start-time" className="block mb-2">Start Time</Label>
-                <TimeSelect12h
+                <TimeSlotSelect12h
                   id="start-time"
                   value={newClassData.startTime}
                   onChange={(v) => setNewClassData((prev) => ({ ...prev, startTime: v }))}
@@ -1204,8 +1098,9 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
               
               <div>
                 <Label htmlFor="end-time" className="block mb-2">End Time</Label>
-                <TimeSelect12h
+                <TimeSlotSelect12h
                   id="end-time"
+                  scrollTo={plusOneHour(newClassData.startTime)}
                   value={newClassData.endTime}
                   onChange={(v) => setNewClassData((prev) => ({ ...prev, endTime: v }))}
                 />
@@ -1249,6 +1144,18 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
                 <span className="text-sm font-medium text-gray-500"><CurrencyGlyph /></span>
               </div>
             </div>
+
+            <div>
+              <Label htmlFor="session-description" className="block mb-2">About this session (optional)</Label>
+              <Textarea
+                id="session-description"
+                rows={3}
+                maxLength={1000}
+                placeholder="What members can expect, what to bring…"
+                value={newClassData.description}
+                onChange={(e) => setNewClassData((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
           </div>
           
           <DialogFooter>
@@ -1266,7 +1173,7 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
               className="btn-primary"
               onClick={handleCreateClass}
             >
-              {editingClassId ? "Save Changes" : "Create Class"}
+              {editingClassId ? "Save Changes" : "Create Session"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1323,13 +1230,13 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Action Button for Mobile */}
-      <button
+      {/* Floating Action Button for Mobile (hidden under the session dialog, where it covered Close) */}
+      {!detailOpen && <button
         className="fab md:hidden"
         onClick={() => setShowAddDialog(true)}
       >
         <Plus className="h-6 w-6 text-white" />
-      </button>
+      </button>}
     </div>
   );
 }

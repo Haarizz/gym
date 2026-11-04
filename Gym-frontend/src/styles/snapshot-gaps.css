@@ -13,26 +13,26 @@
   .bg-indigo-600 { background-color: var(--color-indigo-600); }
   .mb-1\.5 { margin-bottom: calc(var(--spacing) * 1.5); }
 
-  .text-\[\#327F74\] { color: #327F74; }
-  .bg-\[\#327F74\] { background-color: #327F74; }
-  .border-\[\#327F74\] { border-color: #327F74; }
-  .ring-\[\#2B7A78\] { --tw-ring-color: #2B7A78; }
+  .text-\[\#327F74\] { color: var(--gb-primary-alt); }
+  .bg-\[\#327F74\] { background-color: var(--gb-primary-alt); }
+  .border-\[\#327F74\] { border-color: var(--gb-primary-alt); }
+  .ring-\[\#2B7A78\] { --tw-ring-color: var(--gb-primary); }
   .ring-\[\#2B7A78\]\/20 { --tw-ring-color: rgb(43 122 120 / 0.2); }
 
   .from-\[\#327F74\] {
-    --tw-gradient-from: #327F74;
+    --tw-gradient-from: var(--gb-primary-alt);
     --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
   }
 
   .to-\[\#2a6a61\] {
-    --tw-gradient-to: #2a6a61;
+    --tw-gradient-to: var(--gb-primary-hover);
     --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
   }
 
   @media (hover: hover) {
-    .hover\:border-\[\#327F74\]:hover { border-color: #327F74; }
-    .hover\:bg-\[\#327F74\]:hover { background-color: #327F74; }
-    .hover\:bg-\[\#236664\]:hover { background-color: #236664; }
+    .hover\:border-\[\#327F74\]:hover { border-color: var(--gb-primary-alt); }
+    .hover\:bg-\[\#327F74\]:hover { background-color: var(--gb-primary-alt); }
+    .hover\:bg-\[\#236664\]:hover { background-color: var(--gb-primary-hover); }
   }
 
   /* BiOS analysis dialogs + BI Engine (components/bios, pages/bios.tsx) */
@@ -66,7 +66,7 @@
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[\#236663\]:hover { background-color: #236663; }
+    .hover\:bg-\[\#236663\]:hover { background-color: var(--gb-primary-hover); }
     .hover\:bg-\[\#d32f3f\]:hover { background-color: #d32f3f; }
   }
 

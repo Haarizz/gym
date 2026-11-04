@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: 'CONGELADA',
     statusActive: 'ACTIVA',
     statusInactive: 'INACTIVA',
+    expiredSubscription: "Suscripción vencida",
+    statusExpired: "VENCIDA",
+    expiredOn: "Venció el",
+    expiredPrompt: "Tu membresía ha vencido. Renuévala para volver a registrar tu entrada y reservar.",
+    renewCta: "Renovar membresía",
     daysRemaining: 'Días restantes',
     validUntil: 'Válida hasta',
 

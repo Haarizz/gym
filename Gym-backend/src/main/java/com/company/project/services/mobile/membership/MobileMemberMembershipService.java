@@ -111,7 +111,8 @@ public class MobileMemberMembershipService {
         // 1. Membership Overview
         MobileMemberMembershipResponseDTO.MembershipInfo membershipInfo = new MobileMemberMembershipResponseDTO.MembershipInfo();
         membershipInfo.setId(member.getId());
-        membershipInfo.setStatus(member.getMembershipStatus());
+        // Effective status: the stored one never turns "expired" when the end date passes.
+        membershipInfo.setStatus(com.company.project.services.MemberEffectiveStatus.of(member));
         membershipInfo.setStartDate(member.getMembershipStartDate());
         // While frozen, the expiry the member will have once the freeze ends.
         LocalDateTime expiryDate = MembershipFreezeService.projectedExpiry(member, LocalDateTime.now());

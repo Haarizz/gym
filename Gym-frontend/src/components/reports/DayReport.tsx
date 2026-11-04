@@ -25,8 +25,8 @@ import {
 import styles from "./DayReport.module.css";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
-const TEAL = "#0F766E";
-const CHART_COLORS = ["#0F766E", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981"];
+const TEAL = "var(--gb-primary-deep)";
+const CHART_COLORS = ["var(--gb-primary-deep)", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981"];
 const VIEW_KEY = "dayReport.view";
 
 type Preset = "today" | "yesterday" | "last7" | "thisWeek" | "thisMonth" | "lastMonth" | "custom";

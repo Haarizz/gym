@@ -72,7 +72,7 @@ const PaymentEntryRow = React.memo(
           transition: "background-color 0.15s",
         }}
         onMouseEnter={(e) => {
-          if (!error) e.currentTarget.style.backgroundColor = "#f9fafb";
+          if (!error) e.currentTarget.style.backgroundColor = "var(--gb-bg)";
         }}
         onMouseLeave={(e) => {
           if (!error) e.currentTarget.style.backgroundColor = "#fff";

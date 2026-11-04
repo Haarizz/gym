@@ -1015,9 +1015,9 @@ export function BIEngineDashboardV2({ formatCurrency, getCurrentPeriod, live }: 
                   <YAxis />
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                   <Legend />
-                  <Area type="monotone" dataKey="upper" fill="#0F766E" fillOpacity={0.1} stroke="none" name="Upper Bound" />
-                  <Area type="monotone" dataKey="lower" fill="#0F766E" fillOpacity={0.1} stroke="none" name="Lower Bound" />
-                  <Line type="monotone" dataKey="predicted" stroke="#0F766E" strokeWidth={3} name="Predicted Revenue" />
+                  <Area type="monotone" dataKey="upper" fill="var(--gb-primary-deep)" fillOpacity={0.1} stroke="none" name="Upper Bound" />
+                  <Area type="monotone" dataKey="lower" fill="var(--gb-primary-deep)" fillOpacity={0.1} stroke="none" name="Lower Bound" />
+                  <Line type="monotone" dataKey="predicted" stroke="var(--gb-primary-deep)" strokeWidth={3} name="Predicted Revenue" />
                 </ComposedChart>
               </ResponsiveContainer>
             </CardContent>

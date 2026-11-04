@@ -123,13 +123,16 @@ public class MobileMemberDashboardService {
         );
 
         // 2. Membership Details
-        boolean isActive = "active".equalsIgnoreCase(member.getMembershipStatus());
+        // Effective status: the stored one never turns "expired" when the end date passes,
+        // so an expired member used to show as active in the app.
+        String status = com.company.project.services.MemberEffectiveStatus.of(member);
+        boolean isActive = "active".equals(status);
         Integer daysRemaining = computeDaysRemaining(member, today, isActive);
 
         MembershipDetailsDTO membership = new MembershipDetailsDTO(
                 member.getMembershipPlan(),
                 member.getMembershipType(),
-                member.getMembershipStatus(),
+                status,
                 isActive,
                 member.getMembershipStartDate(),
                 member.getMembershipEndDate(),
@@ -217,7 +220,7 @@ public class MobileMemberDashboardService {
                 continue;
             }
 
-            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
+            int bookedCount = (int) bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), com.company.project.services.BookingService.NO_SEAT_STATUSES);
             int capacity = session.getCapacity() != null ? session.getCapacity() : 0;
             int availableSpots = Math.max(0, capacity - bookedCount);
 

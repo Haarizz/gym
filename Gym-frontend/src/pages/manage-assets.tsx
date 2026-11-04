@@ -423,7 +423,7 @@ export function ManageAssets() {
 
   return (
     <TooltipProvider>
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         {/* Header Bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

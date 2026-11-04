@@ -119,6 +119,7 @@ public class MemberAddonService {
         Member targetMember = addon.getMemberDbId() != null
                 ? memberRepository.findById(addon.getMemberDbId()).orElse(null)
                 : null;
+        MemberSuspension.requireNotSuspended(targetMember, "selling an add-on");
         boolean billToGuardian = targetMember != null && targetMember.isEffectivelyBilledToHead();
         Member guardian = null;
         if (billToGuardian) {

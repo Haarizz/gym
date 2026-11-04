@@ -8,6 +8,7 @@ import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.services.FinancialEventService;
+import com.company.project.services.MemberSuspension;
 import com.company.project.services.ReceiptVoucherService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -146,7 +147,9 @@ public class PosCheckoutService {
                 ? memberRepo.findById(req.memberId())
                     .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + req.memberId()))
                 : null;
+        MemberSuspension.requireNotSuspended(member, "selling to them");
         Member creditMember = resolveCreditMember(allocations);
+        MemberSuspension.requireNotSuspended(creditMember, "selling to them");
         if (creditMember != null) {
             if (member == null) member = creditMember;
             else if (!member.getId().equals(creditMember.getId())) {

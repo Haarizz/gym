@@ -672,12 +672,39 @@ public class FinancialEventService {
             return;
         }
 
-        List<JvLine> lines = List.of(
-                dr(ACC_SALARY_EXPENSE, "Salary Expense", amount,
-                        "Salary — " + payment.getEmployeeName()
-                        + " | " + payment.getMonth() + "/" + payment.getYear()),
-                cr(ACC_CASH_AT_BANK, "Cash at Bank", amount, "Bank transfer / salary payment")
-        );
+        List<JvLine> lines = new ArrayList<>();
+        lines.add(dr(ACC_SALARY_EXPENSE, "Salary Expense", amount,
+                "Salary — " + payment.getEmployeeName()
+                + " | " + payment.getMonth() + "/" + payment.getYear()));
+        // Credit the account each tender came out of: cash from Cash in Hand, everything else
+        // (bank transfer, cheque, card, online) from the bank. Whatever the split doesn't cover
+        // (old payments without one) is the bank, as before.
+        java.util.Map<String, BigDecimal> byAccount = new java.util.LinkedHashMap<>();
+        BigDecimal covered = BigDecimal.ZERO;
+        try {
+            com.fasterxml.jackson.databind.JsonNode splits = payment.getSplitPaymentsJson() != null
+                    ? new com.fasterxml.jackson.databind.ObjectMapper().readTree(payment.getSplitPaymentsJson()) : null;
+            if (splits != null && splits.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode s : splits) {
+                    BigDecimal part = s.hasNonNull("amount") ? new BigDecimal(s.get("amount").asText("0")) : BigDecimal.ZERO;
+                    if (part.signum() <= 0) continue;
+                    String account = paymentMethodToAccount(s.path("mode").asText(null));
+                    if (ACC_REWARD_LIABILITY.equals(account)) account = ACC_CASH_AT_BANK; // no wallet tender for salaries
+                    byAccount.merge(account, part, BigDecimal::add);
+                    covered = covered.add(part);
+                }
+            }
+        } catch (Exception e) {
+            byAccount.clear();
+            covered = BigDecimal.ZERO;
+        }
+        if (covered.compareTo(amount) != 0) {
+            // split missing or not matching the salary: post it all to the bank, as before
+            byAccount.clear();
+            byAccount.put(ACC_CASH_AT_BANK, amount);
+        }
+        byAccount.forEach((account, part) -> lines.add(cr(account, cashAccountName(account), part,
+                ACC_CASH_IN_HAND.equals(account) ? "Salary paid in cash" : "Bank transfer / salary payment")));
 
         LocalDate date = payment.getPaymentDate() != null ? payment.getPaymentDate() : LocalDate.now();
 

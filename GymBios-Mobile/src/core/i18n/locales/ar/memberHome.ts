@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: 'مجمّد',
     statusActive: 'نشط',
     statusInactive: 'غير نشط',
+    expiredSubscription: "اشتراك منتهي",
+    statusExpired: "منتهي",
+    expiredOn: "انتهى في",
+    expiredPrompt: "انتهت عضويتك. جدّدها لتتمكن من تسجيل الحضور والحجز مجددًا.",
+    renewCta: "تجديد العضوية",
     daysRemaining: 'الأيام المتبقية',
     validUntil: 'صالح حتى',
 

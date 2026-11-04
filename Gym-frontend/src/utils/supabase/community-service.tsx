@@ -45,18 +45,20 @@ class CommunityService {
     });
     if (!res.ok) throw new Error("Failed to fetch community engagement stats");
     const d = await res.json();
+    // The backend serialises DTOs in snake_case (spring.jackson.property-naming-strategy);
+    // accept both spellings like the feed mapping does.
     return {
-      totalPosts: d.totalPosts ?? 0,
-      totalLikes: d.totalLikes ?? 0,
-      totalComments: d.totalComments ?? 0,
-      byType: (d.byType ?? []).map((t: any) => ({
+      totalPosts: d.totalPosts ?? d.total_posts ?? 0,
+      totalLikes: d.totalLikes ?? d.total_likes ?? 0,
+      totalComments: d.totalComments ?? d.total_comments ?? 0,
+      byType: (d.byType ?? d.by_type ?? []).map((t: any) => ({
         type: t.type,
         posts: t.posts ?? 0,
         likes: t.likes ?? 0,
         comments: t.comments ?? 0,
       })),
       weekly: (d.weekly ?? []).map((w: any) => ({
-        weekLabel: w.weekLabel,
+        weekLabel: w.weekLabel ?? w.week_label,
         posts: w.posts ?? 0,
         likes: w.likes ?? 0,
         comments: w.comments ?? 0,
@@ -72,7 +74,7 @@ class CommunityService {
     const data = await res.json();
     return (data ?? []).map((t: any) => ({
       topic: t.topic ?? "",
-      postCount: t.postCount ?? 0,
+      postCount: t.postCount ?? t.post_count ?? 0,
     }));
   }
 
@@ -83,12 +85,12 @@ class CommunityService {
     if (!res.ok) throw new Error("Failed to fetch leaderboard");
     const data = await res.json();
     return (data ?? []).map((e: any) => ({
-      userId: e.userId ?? 0,
+      userId: e.userId ?? e.user_id ?? 0,
       username: e.username ?? "Unknown",
-      totalPosts: e.totalPosts ?? 0,
-      totalLikes: e.totalLikes ?? 0,
-      totalComments: e.totalComments ?? 0,
-      engagementScore: e.engagementScore ?? 0,
+      totalPosts: e.totalPosts ?? e.total_posts ?? 0,
+      totalLikes: e.totalLikes ?? e.total_likes ?? 0,
+      totalComments: e.totalComments ?? e.total_comments ?? 0,
+      engagementScore: e.engagementScore ?? e.engagement_score ?? 0,
     }));
   }
 }

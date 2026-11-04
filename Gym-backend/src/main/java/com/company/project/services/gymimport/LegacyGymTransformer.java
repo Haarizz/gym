@@ -11,6 +11,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,7 +52,7 @@ public final class LegacyGymTransformer {
     /** The old tables this reads; everything else in the export is ignored. */
     public static final Set<String> TABLES = Set.of("members", "membership_plans", "payments", "partial_payments",
             "member_addons", "member_freeze_log", "member_checkins", "daily_visitors", "users",
-            "member_status_logs", "settings");
+            "member_status_logs", "settings", "staff");
 
     public record Options(LocalDate today, int utcOffsetMinutes, long branchId, String photoPrefix,
                           Set<String> availablePhotos) {}
@@ -91,14 +92,20 @@ public final class LegacyGymTransformer {
     // ── Working model ────────────────────────────────────────────────────────
 
     private static final class PlanDef {
-        int id; String name; String planType; int size; int days; BigDecimal price; String description;
+        int id; String name; String planType; int size; int days; BigDecimal price; String description; boolean active;
+    }
+
+    private static final class StaffDef {
+        long id; String employeeNo; String name; String email; String phone; String role; String department;
+        String address; BigDecimal salary; BigDecimal monthlyTarget; LocalDate joinDate; String status;
+        LocalDateTime createdAt;
     }
 
     private static final class Mem {
         long id; Row old; String memberNo; String name; String phone; String gender; LocalDate dob;
         String nationality; String address; String emergency; String plan; LocalDate start; LocalDate end;
         String oldStatus; LocalDate freezeStart; LocalDate freezeEnd; String freezeReason; LocalDate joinDate;
-        LocalDateTime createdAt; LocalDateTime updatedAt; String photoUrl;
+        LocalDateTime createdAt; LocalDateTime updatedAt; String photoUrl; String email;
         final List<String> notes = new ArrayList<>(); int visits;
         List<Rcpt> bills = new ArrayList<>();
         String status; LocalDate finalEnd; BigDecimal outstanding = ZERO; String paymentStatus;
@@ -116,7 +123,7 @@ public final class LegacyGymTransformer {
         BigDecimal discount = ZERO; String discountLabel; String method; List<Leg> breakdown; String status;
         String planName; LocalDateTime validFrom; LocalDateTime validTill; LocalDate from; LocalDate till;
         LocalDateTime dueDate; String processedBy; String remarks; boolean invoice; String membershipType;
-        Rcpt linkedBill; Row oldPp; Long oldId; LocalDate prevCursor; String prevPlan;
+        Rcpt linkedBill; Row oldPp; Long oldId; String oldNo; LocalDate prevCursor; String prevPlan;
         boolean refunded; BigDecimal writtenOff = ZERO; String receiptNo; String invoiceNo; BigDecimal balanceAfter = ZERO;
     }
 
@@ -161,6 +168,14 @@ public final class LegacyGymTransformer {
 
     private static boolean positive(BigDecimal v) {
         return v != null && v.signum() > 0;
+    }
+
+    /** A real address, or null: the old system filled in "<phone>@temp.local" when none was given (used for staff). */
+    static String realEmail(String raw) {
+        if (raw == null) return null;
+        String e = raw.trim();
+        if (e.isEmpty() || !e.contains("@") || e.toLowerCase(Locale.ROOT).endsWith("@temp.local")) return null;
+        return e;
     }
 
     private static String plain(BigDecimal v) {
@@ -274,14 +289,65 @@ public final class LegacyGymTransformer {
 
     private Plan run() {
         Map<Long, String> users = new HashMap<>();
-        for (Row u : d.rows("users")) users.put(u.lng("id"), u.str("username"));
-        java.util.function.Function<Long, String> staffName = id -> id == null ? null : users.get(id);
+        Map<Long, String> userEmails = new HashMap<>();
+        for (Row u : d.rows("users")) {
+            users.put(u.lng("id"), u.str("username"));
+            String email = u.str("email") == null ? null : u.str("email").trim();
+            userEmails.put(u.lng("id"), email == null || email.isEmpty() ? null : email);
+        }
 
-        // Plans: the active catalogue. Names are what members and payment descriptions use.
+        // Staff: the old staff table → employees (no app login; the gym enables it on the Staff
+        // page). Receipts name staff by their old login, but the app credits a staff member's
+        // sales by matching their name in processed_by — so a login that has a staff record is
+        // written as that staff member's name.
+        List<StaffDef> staff = new ArrayList<>();
+        Map<Long, String> staffNameByUser = new HashMap<>();
+        Set<String> staffEmails = new HashSet<>();
+        for (Row s : d.rows("staff")) {
+            StaffDef x = new StaffDef();
+            x.id = staff.size() + 1;
+            x.employeeNo = s.str("employee_id");
+            x.name = (Objects.requireNonNullElse(s.str("first_name"), "") + " "
+                    + Objects.requireNonNullElse(s.str("last_name"), "")).replaceAll("\\s+", " ").trim();
+            Long userId = s.lng("user_id");
+            if (x.name.isEmpty()) x.name = userId != null && users.get(userId) != null ? users.get(userId) : "Staff " + x.id;
+            String email = userId == null ? null : realEmail(userEmails.get(userId));
+            if (email == null || !staffEmails.add(email.toLowerCase(Locale.ROOT))) {
+                // employees.email is required and unique; the staff page lets the gym change it
+                email = "staff" + x.id + "@" + o.photoPrefix().replaceAll("[^A-Za-z0-9-]", "") + ".staff.local";
+                staffEmails.add(email);
+                warn("Staff without an email of their own (placeholder given)", x.name + ": " + email);
+            }
+            x.email = email;
+            Phone phone = normalizePhone(s.str("phone"));
+            x.phone = phone == null ? null : phone.value();
+            x.role = s.text("position");
+            x.department = s.text("department");
+            x.address = s.text("address");
+            x.salary = s.num("salary") == null ? null : money(s.num("salary"));
+            x.monthlyTarget = s.num("monthly_target") == null ? null : money(s.num("monthly_target"));
+            x.joinDate = date(s.str("hire_date"));
+            x.status = "inactive".equalsIgnoreCase(s.str("status")) ? "inactive" : "active";
+            x.createdAt = ts(s.str("created_at"));
+            staff.add(x);
+            if (userId != null) staffNameByUser.put(userId, x.name);
+        }
+        java.util.function.Function<Long, String> staffName = id -> id == null ? null
+                : staffNameByUser.getOrDefault(id, users.get(id));
+
+        // Plans: the whole catalogue, inactive ones imported as Inactive so the plan count
+        // matches the old system. Names are what members and payment descriptions use, and
+        // the app looks plans up by name, so an inactive plan sharing a name with another
+        // plan (Helenz: inactive "1 Day" #22 next to active "1 Day" #23) gets "(inactive #id)".
         Map<String, Integer> planDays = new HashMap<>();
         Map<String, BigDecimal> planPrice = new HashMap<>();
         List<String> planNamesLongestFirst = new ArrayList<>();
         List<PlanDef> plans = new ArrayList<>();
+        Set<String> usedPlanNames = new HashSet<>();
+        for (Row p : d.rows("membership_plans")) {
+            if ("active".equalsIgnoreCase(p.str("status")))
+                usedPlanNames.add(Objects.requireNonNullElse(p.str("name"), "").toLowerCase(Locale.ROOT));
+        }
         for (Row p : d.rows("membership_plans")) {
             String name = Objects.requireNonNullElse(p.str("name"), "");
             BigDecimal dv = p.num("duration_value");
@@ -289,10 +355,14 @@ public final class LegacyGymTransformer {
             planDays.put(name.toLowerCase(Locale.ROOT), days);
             planPrice.put(name.toLowerCase(Locale.ROOT), money(p.num("price")));
             if (!planNamesLongestFirst.contains(name)) planNamesLongestFirst.add(name);
-            if (!"active".equalsIgnoreCase(p.str("status"))) continue;
             PlanDef def = new PlanDef();
             def.id = plans.size() + 1;
+            def.active = "active".equalsIgnoreCase(p.str("status"));
             def.name = name;
+            if (!def.active && !usedPlanNames.add(name.toLowerCase(Locale.ROOT))) {
+                def.name = name + " (inactive #" + p.lng("id") + ")";
+                usedPlanNames.add(def.name.toLowerCase(Locale.ROOT));
+            }
             String n = name.toLowerCase(Locale.ROOT);
             Matcher fam = FAMILY.matcher(n);
             if (n.contains("couple")) { def.planType = "Couple"; def.size = 2; }
@@ -305,7 +375,8 @@ public final class LegacyGymTransformer {
             plans.add(def);
         }
         planNamesLongestFirst.sort(Comparator.comparingInt(String::length).reversed());
-        Set<String> activePlans = plans.stream().map(p -> p.name.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        Set<String> activePlans = plans.stream().filter(p -> p.active)
+                .map(p -> p.name.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
 
         // ── Members
         List<Row> oldMembers = new ArrayList<>(d.rows("members"));
@@ -314,6 +385,7 @@ public final class LegacyGymTransformer {
         Set<String> referencedPhotos = new LinkedHashSet<>();
         List<PhotoCopy> photoCopies = new ArrayList<>();
         long nextId = 1;
+        Set<String> memberEmails = new HashSet<>();
         for (Row m : oldMembers) {
             Mem x = new Mem();
             x.id = nextId++;
@@ -344,6 +416,15 @@ public final class LegacyGymTransformer {
             x.freezeReason = m.text("freeze_reason");
             x.createdAt = ts(m.str("created_at"));
             x.updatedAt = ts(m.str("updated_at"));
+            // The old system kept emails on the login (users). Its "<phone>@temp.local" placeholder (none
+            // given) is kept as the member's email too, as the old app showed it; app logins never use it
+            // (ImportedMemberAccountService / MemberAppAccountService skip @temp.local).
+            String email = m.lng("user_id") == null ? null : userEmails.get(m.lng("user_id"));
+            if (email != null && !memberEmails.add(email.toLowerCase(Locale.ROOT))) {
+                warn("Emails shared by more than one member (kept on the first)", x.memberNo + " " + x.name + ": " + email);
+                email = null;
+            }
+            x.email = email;
             LocalDate joined = date(m.str("joining_date"));
             x.joinDate = joined != null ? joined : localDateOfUtc(x.createdAt);
             String photo = m.text("photo");
@@ -472,6 +553,7 @@ public final class LegacyGymTransformer {
                     r.status = "Paid"; r.planName = a.str("addon_name");
                     r.validFrom = midnight(date(a.str("start_date"))); r.validTill = midnight(date(a.str("end_date")));
                     r.processedBy = processedBy; r.remarks = remarks; r.invoice = true; r.membershipType = "Individual";
+                    r.oldNo = oldPaymentNo(p);
                     receipts.add(r);
                     Addon ad = new Addon();
                     ad.member = m; ad.old = a; ad.receipt = r; ad.amount = amount; ad.method = mon.method();
@@ -495,6 +577,7 @@ public final class LegacyGymTransformer {
                     r.planName = bill != null ? bill.planName : m.plan; r.linkedBill = bill;
                     r.validFrom = bill != null ? bill.validFrom : null; r.validTill = bill != null ? bill.validTill : null;
                     r.processedBy = processedBy; r.remarks = remarks; r.invoice = false; r.membershipType = "Individual";
+                    r.oldNo = oldPaymentNo(p);
                     receipts.add(r);
                     if (bill != null) bill.paidToDate = money(bill.paidToDate.add(cash));
                     continue;
@@ -538,7 +621,7 @@ public final class LegacyGymTransformer {
                 b.breakdown = legs; b.planName = planName; b.from = from; b.till = till;
                 b.validFrom = midnight(from); b.validTill = midnight(till);
                 b.processedBy = processedBy; b.remarks = remarks; b.invoice = true; b.membershipType = "Individual";
-                b.oldPp = pp.get(p.lng("id")); b.oldId = p.lng("id"); b.prevCursor = cursorEnd[0]; b.prevPlan = prevPlan;
+                b.oldPp = pp.get(p.lng("id")); b.oldId = p.lng("id"); b.oldNo = oldPaymentNo(p); b.prevCursor = cursorEnd[0]; b.prevPlan = prevPlan;
                 if ("refunded".equals(p.str("status"))) b.refunded = true;
                 memberBills.add(b);
                 receipts.add(b);
@@ -615,6 +698,8 @@ public final class LegacyGymTransformer {
             r.discountLabel = price.compareTo(paid) > 0 ? "Discount" : null; r.method = payMethod; r.status = "Paid";
             r.planName = a.activity; r.validFrom = checkIn; r.processedBy = staffName.apply(v.lng("staff_id"));
             r.invoice = true; r.remarks = a.notes; r.membershipType = "Walk-In";
+            // The old system printed no number for day passes; their own id keeps them traceable.
+            r.oldNo = v.lng("id") == null ? null : String.format("DP-%08d", v.lng("id"));
             receipts.add(r);
         }
 
@@ -715,11 +800,19 @@ public final class LegacyGymTransformer {
         }
 
         // ── Ids, numbering, balances
+        // Receipts keep the number the old system printed (DMT_05): "<invoice_prefix>-<payment id, 8 digits>"
+        // for member payments, DP-<day pass id> for day passes — as both receipt and invoice number.
+        // Only documents created afterwards get the app's RCPT-/INV-YYYY- numbering, so they can't collide.
         receipts.sort((a, b) -> cmp(a.txnAt, b.txnAt));
         Map<String, Integer> invoiceSeq = new TreeMap<>();
         long rid = 1;
         for (Rcpt r : receipts) {
             r.id = rid++;
+            if (r.oldNo != null) {
+                r.receiptNo = r.oldNo;
+                if (r.invoice) r.invoiceNo = r.oldNo;
+                continue;
+            }
             r.receiptNo = String.format("RCPT-%010d", r.id);
             if (r.invoice) {
                 String y = String.valueOf((r.txnAt != null ? r.txnAt.toLocalDate() : today).getYear());
@@ -779,9 +872,9 @@ public final class LegacyGymTransformer {
             }
         }
 
-        List<TableRows> tables = buildTables(plans, members.values(), receipts, creditNotes, addons, freezes, attendance);
+        List<TableRows> tables = buildTables(plans, staff, members.values(), receipts, creditNotes, addons, freezes, attendance);
         Map<String, Object> gym = suggestedGym();
-        Map<String, Object> report = buildReport(plans, members.values(), receipts, creditNotes, addons, freezes,
+        Map<String, Object> report = buildReport(plans, staff, members.values(), receipts, creditNotes, addons, freezes,
                 attendance, referencedPhotos, photoCopies);
         return new Plan(tables, invoiceSeq, cnSeq, photoCopies, referencedPhotos, gym, report);
     }
@@ -794,7 +887,7 @@ public final class LegacyGymTransformer {
 
     // ── Target rows ──────────────────────────────────────────────────────────
 
-    private List<TableRows> buildTables(List<PlanDef> plans, java.util.Collection<Mem> members, List<Rcpt> receipts,
+    private List<TableRows> buildTables(List<PlanDef> plans, List<StaffDef> staff, java.util.Collection<Mem> members, List<Rcpt> receipts,
                                         List<CreditNote> creditNotes, List<Addon> addons, List<Freeze> freezes,
                                         List<Visit> attendance) {
         LocalDateTime now = LocalDateTime.now().withNano(0);
@@ -805,7 +898,7 @@ public final class LegacyGymTransformer {
         for (PlanDef p : plans) {
             planRows.add(new Object[] { p.name, "Membership", p.planType,
                     com.company.project.entities.MembershipPlan.isGroupPlanType(p.planType) ? "family_head" : "individual", p.size > 1 ? p.size : null, "Daily",
-                    String.valueOf(p.days), p.days + " daily", p.price, ZERO, "Active", p.description, "[]", "Unlimited", 0,
+                    String.valueOf(p.days), p.days + " daily", p.price, ZERO, p.active ? "Active" : "Inactive", p.description, "[]", "Unlimited", 0,
                     "Unlimited", 3, "Payment", 30, 2, ZERO, 10, true, true, true, "[]", "[]", "[]", "[]", branch, now, MARK });
         }
         out.add(new TableRows("membership_plans", List.of("name", "type", "plan_type", "family_billing_mode",
@@ -824,11 +917,27 @@ public final class LegacyGymTransformer {
                             prices.get(prices.size() / 2), 30, "Personal Training", true, branch, now, MARK })));
         }
 
+        List<Object[]> staffRows = new ArrayList<>();
+        List<Object[]> staffBranchRows = new ArrayList<>();
+        for (StaffDef s : staff) {
+            LocalDateTime created = s.createdAt != null ? s.createdAt : now;
+            // Old employee numbers are kept, like member numbers; the app numbers new staff EMP-0000000NNN
+            String staffNo = s.employeeNo != null && !s.employeeNo.isBlank() ? s.employeeNo : String.format("EMP-%010d", s.id);
+            staffRows.add(new Object[] { s.id, staffNo, s.name, s.email, s.phone, s.role,
+                    s.department, s.address, s.salary, s.monthlyTarget, s.joinDate, s.status, false, true, branch,
+                    created, MARK });
+            staffBranchRows.add(new Object[] { s.id, branch, created });
+        }
+        out.add(new TableRows("employees", List.of("id", "staff_id", "name", "email", "phone", "role", "department",
+                "address", "base_salary", "monthly_target", "join_date", "status", "app_access_enabled",
+                "accepts_member_messages", "branch_id", "created_at", "created_by"), staffRows));
+        out.add(new TableRows("staff_branches", List.of("staff_id", "branch_id", "created_at"), staffBranchRows));
+
         List<Object[]> memberRows = new ArrayList<>();
         List<Object[]> noteRows = new ArrayList<>();
         for (Mem m : members) {
             boolean frozen = "frozen".equals(m.status);
-            memberRows.add(new Object[] { m.id, m.memberNo, m.name, m.phone, m.gender, m.dob, m.nationality, m.address,
+            memberRows.add(new Object[] { m.id, m.memberNo, m.name, m.email, m.phone, m.gender, m.dob, m.nationality, m.address,
                     m.emergency, "Individual", m.plan, m.status, midnight(m.joinDate), midnight(m.start),
                     midnight(m.finalEnd), midnight(m.finalEnd), m.fee, m.discount, m.outstanding, m.paymentStatus,
                     m.nextPayment, m.lastPayment, m.lastMethod, frozen ? midnight(m.freezeStart) : null,
@@ -839,7 +948,7 @@ public final class LegacyGymTransformer {
             lines.addAll(m.notes);
             noteRows.add(new Object[] { m.id, String.join("\n", lines), m.createdAt != null ? m.createdAt : now, MARK });
         }
-        out.add(new TableRows("members", List.of("id", "member_id", "name", "phone", "gender", "date_of_birth",
+        out.add(new TableRows("members", List.of("id", "member_id", "name", "email", "phone", "gender", "date_of_birth",
                 "nationality", "address", "emergency_contact", "membership_type", "membership_plan", "membership_status",
                 "join_date", "membership_start_date", "membership_end_date", "expiry_date", "membership_fee",
                 "discount_applied", "outstanding_balance", "payment_status", "next_payment_date", "last_payment_date",
@@ -918,6 +1027,22 @@ public final class LegacyGymTransformer {
     }
 
     /** Gym details from the old settings table, to prefill the onboarding form. */
+    private String invoicePrefix;
+
+    /** The number the old app printed on a payment's receipt: invoice_prefix + "-" + id padded to 8 (INV-00001110). */
+    private String oldPaymentNo(Row payment) {
+        if (payment.lng("id") == null) return null;
+        if (invoicePrefix == null) {
+            invoicePrefix = "INV";
+            for (Row r : d.rows("settings")) {
+                if ("invoice_prefix".equals(r.str("key_name")) && r.str("key_value") != null && !r.str("key_value").isBlank()) {
+                    invoicePrefix = r.str("key_value").trim();
+                }
+            }
+        }
+        return String.format("%s-%08d", invoicePrefix, payment.lng("id"));
+    }
+
     private Map<String, Object> suggestedGym() {
         Map<String, String> s = new HashMap<>();
         for (Row r : d.rows("settings")) {
@@ -934,7 +1059,7 @@ public final class LegacyGymTransformer {
 
     // ── Report ───────────────────────────────────────────────────────────────
 
-    private Map<String, Object> buildReport(List<PlanDef> plans, java.util.Collection<Mem> members, List<Rcpt> receipts,
+    private Map<String, Object> buildReport(List<PlanDef> plans, List<StaffDef> staff, java.util.Collection<Mem> members, List<Rcpt> receipts,
                                             List<CreditNote> creditNotes, List<Addon> addons, List<Freeze> freezes,
                                             List<Visit> attendance, Set<String> referencedPhotos, List<PhotoCopy> photos) {
         // Cash the old system actually took in: credit bills only count the received
@@ -959,9 +1084,12 @@ public final class LegacyGymTransformer {
 
         int oldAddons = d.rows("member_addons").size();
         List<Map<String, Object>> counts = new ArrayList<>();
-        counts.add(count("Plans", d.rows("membership_plans").size(), plans.size(), "membership plans (inactive duplicates skipped)"));
+        counts.add(count("Plans", d.rows("membership_plans").size(), plans.size(),
+                "membership plans, " + plans.stream().filter(p -> !p.active).count() + " inactive"));
+        counts.add(count("Staff", d.rows("staff").size(), staff.size(), "staff (no app login yet — enable it on the Staff page)"));
         counts.add(count("Members", d.rows("members").size(), members.size(),
-                "members, " + members.stream().filter(m -> m.photoUrl != null).count() + " with photos"));
+                "members, " + members.stream().filter(m -> m.photoUrl != null).count() + " with photos, "
+                        + members.stream().filter(m -> m.email != null).count() + " with an email"));
         counts.add(count("Payments", d.rows("payments").size(), receipts.stream().filter(r -> r.member != null).count(),
                 "receipts, " + creditNotes.size() + " refunds as credit notes"));
         counts.add(count("Add-ons", oldAddons, addons.size(),

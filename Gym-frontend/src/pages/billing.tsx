@@ -499,7 +499,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Billing</h1>
@@ -533,7 +533,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       <div className={bs.statGrid}>
         <Card
           className="border-primary/10 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-          style={activeStatCard === 'today' ? { boxShadow: '0 0 0 2px #2B7A78' } : undefined}
+          style={activeStatCard === 'today' ? { boxShadow: '0 0 0 2px var(--gb-primary)' } : undefined}
           onClick={() => {
             const next = activeStatCard === 'today' ? null : 'today';
             setActiveStatCard(next);
@@ -1444,8 +1444,8 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                     <YAxis tickFormatter={(v) => `${currencyPrefix}${(v/1000).toFixed(0)}k`} />
                     <Tooltip formatter={(value: number) => [`${currencyPrefix}${value.toLocaleString()}`, '']} />
                     <Legend />
-                    <Bar dataKey="collected" fill="#0F766E" name="Collected" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="target"    fill="#E0F5F2" name="Target"    radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="collected" fill="var(--gb-primary-deep)" name="Collected" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="target"    fill="var(--gb-primary-light)" name="Target"    radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

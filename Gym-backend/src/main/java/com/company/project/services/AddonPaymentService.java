@@ -92,6 +92,7 @@ public class AddonPaymentService {
      */
     @Transactional
     public MemberAddon purchase(Member member, AddonPlan plan, MobileAddOnPurchaseRequestDTO request) {
+        MemberSuspension.requireNotSuspended(member, "buying an add-on");
         if (!Boolean.TRUE.equals(plan.getIsActive())) {
             throw new BusinessRuleViolationException("This add-on is no longer available.");
         }
@@ -239,6 +240,10 @@ public class AddonPaymentService {
     @Transactional
     public MemberAddon approve(MemberAddon addon, String approvedBy) {
         requirePendingApproval(addon);
+        if (addon.getMemberDbId() != null) {
+            memberRepository.findById(addon.getMemberDbId())
+                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, "approving an add-on payment"));
+        }
         // Its validity starts on approval, so waiting on reception costs no days.
         LocalDateTime now = LocalDateTime.now();
         if (addon.getStartDate() != null && addon.getExpiryDate() != null) {

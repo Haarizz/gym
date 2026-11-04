@@ -30,7 +30,6 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlinePlus,
   HiOutlineSquares2X2,
-  HiOutlineUserCircle,
   HiOutlineUserGroup,
   HiOutlineSparkles,
   HiMiniCheckCircle,
@@ -57,14 +56,7 @@ import {
 } from "../components/ui/select";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
+import { Switch } from "../components/ui/switch";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import { referralService, ReferralResponse } from "../utils/supabase/referral-service";
@@ -82,6 +74,8 @@ import { toLegacyPayment } from "../payments/legacyPaymentBridge";
 import { PAYMENT_TYPES } from "../payments/paymentModel";
 import { downloadReceiptInvoice } from "../utils/receipt-invoice";
 import type { CreditCustomer } from "../payments/modals/CreditModal";
+import t from "../components/plans/plan-tabs.module.css";
+import { MemberAvatar, memberPhoto, memberStatus } from "../components/members/MemberAvatar";
 
 interface MemberAddonsProps {
   onNavigate?: (section: string) => void;
@@ -125,6 +119,21 @@ const isExpiringWithinWeek = (txn: MemberAddon) => {
 const matchesAddonFilter = (txn: MemberAddon, filter: string) =>
   filter === "all" ? true : filter === "expiring" ? isExpiringWithinWeek(txn) : effectiveAddonStatus(txn) === filter;
 
+/** Whole days from today to the expiry date (0 = ends today); null without an expiry date. */
+const addonDaysLeft = (txn: MemberAddon): number | null => {
+  if (!txn.expiry_date) return null;
+  const expiry = new Date(txn.expiry_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((new Date(expiry.getFullYear(), expiry.getMonth(), expiry.getDate()).getTime() - today.getTime()) / 86_400_000));
+};
+
+const formatAddonDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+const ADDON_STATUS_TONE: Record<string, string> = { Active: "green", Expired: "gray", "Pending Approval": "amber", Cancelled: "red" };
+const ADDON_CATEGORY_TONE: Record<string, string> = { Training: "blue", Nutrition: "green", Classes: "purple", Spa: "pink", Facility: "cyan", Other: "gray" };
+
 interface Member {
   id: string;
   name: string;
@@ -138,6 +147,7 @@ interface Member {
   // charges are folded into their family head's account instead of their own.
   billedToHead: boolean;
   familyHeadName?: string;
+  photo: string | null;
 }
 
 function toLocalMember(m: ApiMember): Member {
@@ -152,6 +162,7 @@ function toLocalMember(m: ApiMember): Member {
     phone: m.phone,
     billedToHead: Boolean((m as any).is_minor || (m as any).billed_to_head),
     familyHeadName: (m as any).family_head_name || (m as any).family_head_id || undefined,
+    photo: memberPhoto(m),
   };
 }
 
@@ -748,48 +759,48 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, transactionsLoading]);
 
+  const headerActions = (
+    <>
+      <Button variant="outline" size="sm" onClick={handleOpenManageModal} className="gap-2">
+        <Settings className="h-4 w-4" />
+        Manage Add-on Plans
+      </Button>
+      <Button size="sm" onClick={handleOpenPurchaseModal} className="gap-2">
+        <Plus className="h-4 w-4" />
+        Purchase An Add-On
+      </Button>
+    </>
+  );
+
   return (
     <div className={embedded ? "" : "min-h-screen bg-background"}>
-      <div className={embedded ? "" : "border-b bg-white"}>
+      {!embedded && (
+      <div className="border-b bg-white">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div>
-                  <h1 className="text-2xl font-semibold text-foreground">
-                    Member Add-ons
-                  </h1>
-                  <p className="text-muted-foreground">
-                    View transactions and purchase additional services
-                  </p>
-                </div>
-              </div>
+              <h1 className="text-2xl font-semibold text-foreground">
+                Member Add-ons
+              </h1>
+              <p className="text-muted-foreground">
+                View transactions and purchase additional services
+              </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleOpenManageModal}>
-                <Settings className="mr-2 h-4 w-4" />
-                Manage Add-on Plans
+              {headerActions}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate && onNavigate("members")}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Members
               </Button>
-              <Button onClick={handleOpenPurchaseModal}>
-                <Plus className="mr-2 h-4 w-4" />
-                Purchase An Add-On
-              </Button>
-              {!embedded && (
-                <Button
-                  variant="outline"
-                  onClick={() => onNavigate && onNavigate("members")}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Members
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Inside Members these figures live in the page's stat cards instead. */}
-          {!embedded && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Transactions</CardTitle>
@@ -829,158 +840,135 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
               </CardContent>
             </Card>
           </div>
-          )}
-
         </div>
       </div>
+      )}
 
-      <div className="p-6">
-        <Card id="addon-transactions" className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                Recent Add-on Transactions
-                <Badge variant="secondary" className="ml-1">
-                  {filteredTransactions.length}
-                </Badge>
-              </CardTitle>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search by Transaction ID, Member Name, or Add-on..."
-                  value={transactionSearchQuery}
-                  onChange={(e) => setTransactionSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+      <div className={embedded ? "" : "p-6"}>
+        <div id="addon-transactions" className={t.panel}>
+          <div className={t.panelHead}>
+            <div>
+              <div className={t.titleRow}>
+                <span className={t.title}>Add-on Transactions</span>
+                <span className={t.count}>{filteredTransactions.length}</span>
               </div>
-              <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Filter by Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="expiring">Expiring in 7 days</SelectItem>
-                  <SelectItem value="Expired">Expired</SelectItem>
-                  <SelectItem value="Pending Approval">Pending Approval</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className={t.subtitle}>Extra services sold to members: PT packs, classes, facility access and more</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-10">#</TableHead>
-                    <TableHead>Transaction ID</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Add-on Name</TableHead>
-                    <TableHead>Purchase Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Amount ({currencySymbol})</TableHead>
-                    <TableHead>Payment Mode</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactionsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        Loading transactions...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredTransactions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        No transactions found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredTransactions.map((txn, index) => (
-                      <TableRow
-                        key={txn.id}
-                        className="hover:bg-slate-50/50 transition-colors"
-                      >
-                        <TableCell className="text-muted-foreground text-sm">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{txn.transaction_id}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{txn.member_name}</p>
-                            <p className="text-xs text-muted-foreground">{txn.member_id}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{txn.addon_name}</TableCell>
-                        <TableCell>
-                          {txn.purchase_date
-                            ? new Date(txn.purchase_date).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {txn.expiry_date
-                            ? new Date(txn.expiry_date).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="font-medium">{Number(txn.amount).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{txn.payment_mode}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              effectiveAddonStatus(txn) === "Active"
-                                ? "bg-green-100 text-green-800"
-                                : effectiveAddonStatus(txn) === "Expired"
-                                ? "bg-gray-100 text-gray-800"
-                                : effectiveAddonStatus(txn) === "Pending Approval"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-red-100 text-red-800"
-                            }
-                          >
-                            {effectiveAddonStatus(txn)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline" size="sm"
-                            className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
-                            title="Print Receipt"
-                            disabled={printingAddonId === txn.id}
-                            onClick={() => handlePrintAddonReceipt(txn)}
-                          >
-                            <Printer className="h-4 w-4 text-primary" />
-                          </Button>
-                          {(txn.status === "Active" || txn.status === "Pending Approval") && (
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 ml-2 border-red-200 hover:bg-red-50"
-                              title="Cancel Add-on"
-                              onClick={() => setCancellingAddon(txn)}
-                            >
-                              <Ban className="h-4 w-4 text-red-600" />
-                            </Button>
+            {embedded && <div className={t.headActions}>{headerActions}</div>}
+          </div>
+          <div className={t.toolbar}>
+            <div className={t.search}>
+              <Search />
+              <Input
+                placeholder="Search by transaction ID, member or add-on..."
+                value={transactionSearchQuery}
+                onChange={(e) => setTransactionSearchQuery(e.target.value)}
+              />
+            </div>
+            <Select value={transactionStatusFilter} onValueChange={setTransactionStatusFilter}>
+              <SelectTrigger className={t.statusSelect}>
+                <SelectValue placeholder="Filter by Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="expiring">Expiring in 7 days</SelectItem>
+                <SelectItem value="Expired">Expired</SelectItem>
+                <SelectItem value="Pending Approval">Pending Approval</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className={t.tableWrap}>
+            <table className={t.table}>
+              <thead>
+                <tr>
+                  <th>Transaction</th>
+                  <th>Member</th>
+                  <th>Add-on</th>
+                  <th>Validity</th>
+                  <th className={t.right}>Amount</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th className={t.right}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactionsLoading ? (
+                  <tr><td colSpan={8} className={t.tableMessage}>Loading transactions…</td></tr>
+                ) : filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className={t.tableMessage}>
+                      {transactions.length === 0 ? "No add-ons sold yet. Use Purchase An Add-On to sell the first one." : "No transactions match your search or filter."}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map((txn) => {
+                    const status = effectiveAddonStatus(txn);
+                    const daysLeft = status === "Active" ? addonDaysLeft(txn) : null;
+                    return (
+                      <tr key={txn.id}>
+                        <td>
+                          <p className={t.strong}>{txn.transaction_id}</p>
+                        </td>
+                        <td>
+                          <p className={t.strong}>{txn.member_name}</p>
+                          <p className={t.sub}>{txn.member_id}</p>
+                        </td>
+                        <td className={t.wrapText}>{txn.addon_name}</td>
+                        <td>
+                          <p className={t.period}>
+                            {formatAddonDate(txn.purchase_date)}
+                            <span className={t.periodArrow}>→</span>
+                            {formatAddonDate(txn.expiry_date)}
+                          </p>
+                          {daysLeft !== null && (
+                            <p className={t.sub}>{daysLeft === 0 ? "Ends today" : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}</p>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        </td>
+                        <td className={`${t.right} ${t.amount}`}>{formatCurrency(Number(txn.amount) || 0)}</td>
+                        <td>
+                          <span className={`${t.pill} ${t.pillPlain}`} data-tone="gray">{txn.payment_mode || "—"}</span>
+                        </td>
+                        <td>
+                          <span className={t.pill} data-tone={isExpiringWithinWeek(txn) ? "amber" : ADDON_STATUS_TONE[status] ?? "red"}>
+                            {isExpiringWithinWeek(txn) ? "Expiring soon" : status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className={t.rowActions}>
+                            <button
+                              type="button"
+                              className={t.iconBtn}
+                              title="Print receipt"
+                              aria-label={`Print receipt for ${txn.transaction_id}`}
+                              disabled={printingAddonId === txn.id}
+                              onClick={() => handlePrintAddonReceipt(txn)}
+                            >
+                              <Printer />
+                            </button>
+                            {(txn.status === "Active" || txn.status === "Pending Approval") && (
+                              <button
+                                type="button"
+                                className={`${t.iconBtn} ${t.iconBtnDanger}`}
+                                title="Cancel add-on"
+                                aria-label={`Cancel ${txn.transaction_id}`}
+                                onClick={() => setCancellingAddon(txn)}
+                              >
+                                <Ban />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {/* Purchase Add-on Modal */}
@@ -1031,20 +1019,38 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                 {/* BG_105: results sit in the normal flow (not an absolute dropdown) so they push
                     the selected-member card and Step 2 down instead of overlapping them. */}
                 {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-border bg-white overflow-y-auto" style={{ maxHeight: 280 }}>
-                    {searchSuggestions.map((member) => (
-                      <button
-                        type="button"
-                        key={member.id}
-                        onClick={() => selectMemberFromSuggestions(member)}
-                        className="block w-full text-left px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-border last:border-b-0"
-                      >
-                        <p className="text-sm font-medium">{member.name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {member.member_id || member.id} • {member.phone}
-                        </p>
-                      </button>
-                    ))}
+                  <div className={t.suggestList} role="listbox" aria-label="Matching members">
+                    {searchSuggestions.map((member) => {
+                      const status = memberStatus(member.membership_status);
+                      const plan = member.membership_plan || member.membership_type;
+                      return (
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={false}
+                          key={member.id}
+                          onClick={() => selectMemberFromSuggestions(member)}
+                          className={t.suggest}
+                        >
+                          <MemberAvatar name={member.name} photo={memberPhoto(member)} />
+                          <span className={t.suggestMain}>
+                            <span className={t.suggestName}>{member.name}</span>
+                            <span className={t.suggestMeta}>
+                              {[member.member_id || member.id, member.phone, member.email].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                          <span className={t.suggestSide}>
+                            <span className={t.pill} data-tone={status.tone}>{status.label}</span>
+                            {plan && (
+                              <span className={t.suggestPlan}>
+                                {plan}
+                                {member.membership_end_date && <> · till {formatAddonDate(member.membership_end_date)}</>}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1053,12 +1059,10 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                 <div className="mx-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-blue-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm shrink-0">
-                        <HiOutlineUserCircle size={20} className="text-white block shrink-0" />
-                      </div>
+                      <MemberAvatar name={selectedMember.name} photo={selectedMember.photo} size={44} />
                       <div>
                         <p className="text-sm font-semibold">{selectedMember.name}</p>
-                        <p className="text-[11px] text-muted-foreground">ID: {selectedMember.membershipId}</p>
+                        <p className={t.sub}>{[selectedMember.membershipId, selectedMember.email].filter(Boolean).join(" · ")}</p>
                       </div>
                     </div>
                     <Badge className={selectedMember.status === "Active" ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700"}>
@@ -1070,11 +1074,11 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                   </div>
                   <div className="grid grid-cols-3 gap-px bg-blue-100">
                     <div className="bg-blue-50/60 px-4 py-2.5">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Current Plan</p>
+                      <p className={t.sectionLabel}>Current Plan</p>
                       <p className="text-xs font-semibold">{selectedMember.currentPlan}</p>
                     </div>
                     <div className="bg-blue-50/60 px-4 py-2.5">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Valid Till</p>
+                      <p className={t.sectionLabel}>Valid Till</p>
                       <p className={`text-xs font-semibold ${getDaysUntilExpiry(selectedMember.validTill) < 10 ? "text-red-600" : ""}`}>
                         {selectedMember.validTill.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </p>
@@ -1085,7 +1089,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                       )}
                     </div>
                     <div className="bg-blue-50/60 px-4 py-2.5">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Contact</p>
+                      <p className={t.sectionLabel}>Contact</p>
                       <p className="text-xs font-semibold">{selectedMember.phone}</p>
                     </div>
                   </div>
@@ -1462,51 +1466,52 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
 
       {/* Manage Add-on Plans Modal */}
       <Dialog open={isManageModalOpen} onOpenChange={(open) => { setIsManageModalOpen(open); if (!open) handleCancelPlanForm(); }}>
-        <DialogContent className="w-[96vw] max-w-[900px] sm:max-w-[900px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="pl-6 pr-14 pt-6 pb-5 border-b bg-white/95 backdrop-blur-sm shrink-0">
-            <div className="flex items-center justify-between gap-6">
-              <div className="flex items-center gap-3.5">
-                <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary shadow-sm shrink-0">
-                  <Settings size={21} className="text-white block shrink-0" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold tracking-tight leading-tight">Manage Add-on Plans</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Create, edit, or remove services offered in the catalog</p>
-                </div>
-              </div>
+        <DialogContent className={t.dialog}>
+          <div className={t.dialogHead}>
+            <div className={t.dialogIcon}><Settings /></div>
+            <div>
+              <DialogTitle className={t.dialogTitle}>Manage Add-on Plans</DialogTitle>
+              <DialogDescription className={t.dialogSub}>Create, edit, or remove services offered in the catalog</DialogDescription>
+            </div>
+          </div>
+
+          <div className={t.dialogBody}>
+            <div className={t.listHead}>
+              <p className={t.listSummary}>
+                {addonPlansLoading ? "Loading…" : (
+                  <><strong>{addonPlans.length}</strong> {addonPlans.length === 1 ? "plan" : "plans"} · <strong>{addonPlans.filter((p) => p.isActive).length}</strong> active</>
+                )}
+              </p>
               {!isAddingPlan && (
-                <Button size="sm" className="shrink-0" onClick={handleStartAddPlan}>
-                  <Plus className="mr-1.5 h-4 w-4" />
+                <Button size="sm" className="gap-1.5" onClick={handleStartAddPlan}>
+                  <Plus className="h-4 w-4" />
                   New Plan
                 </Button>
               )}
             </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6 space-y-5">
             {isAddingPlan && (
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">{editingPlan ? "Edit Plan" : "New Plan"}</p>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCancelPlanForm}>
-                    <X className="h-4 w-4" />
-                  </Button>
+              <div className={t.formCard}>
+                <div className={t.formHead}>
+                  <p className={t.formTitle}>{editingPlan ? `Edit "${editingPlan.name}"` : "New add-on plan"}</p>
+                  <button type="button" className={t.iconBtn} title="Close form" aria-label="Close form" onClick={handleCancelPlanForm}>
+                    <X />
+                  </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <Label className="text-xs">Plan Name</Label>
+                <div className={t.formGrid}>
+                  <div className={`${t.field} ${t.formWide}`}>
+                    <Label htmlFor="addon-plan-name" className="text-xs">Plan Name</Label>
                     <Input
+                      id="addon-plan-name"
                       value={planForm.name}
                       onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
                       placeholder="e.g. Personal Training – 15 Sessions"
                     />
                   </div>
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <div className="flex items-center justify-between">
+                  <div className={`${t.field} ${t.formWide}`}>
+                    <div className={t.fieldHead}>
                       <Label htmlFor="addon-plan-description" className="text-xs">Description</Label>
-                      <span
-                        className={`text-xs tabular-nums ${descriptionTooLong ? "text-red-600" : "text-muted-foreground"}`}
-                      >
+                      <span className={t.charCount} data-over={descriptionTooLong}>
                         {planForm.description.length}/{MAX_PLAN_DESCRIPTION_LENGTH}
                       </span>
                     </div>
@@ -1522,12 +1527,12 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                       aria-describedby={descriptionTooLong ? "addon-plan-description-error" : undefined}
                     />
                     {descriptionTooLong && (
-                      <p id="addon-plan-description-error" className="text-xs text-red-600">
+                      <p id="addon-plan-description-error" className={t.fieldError}>
                         Description must be at most {MAX_PLAN_DESCRIPTION_LENGTH} characters
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1.5">
+                  <div className={t.field}>
                     <Label className="text-xs">Category</Label>
                     <Select
                       value={planForm.category}
@@ -1543,18 +1548,20 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Validity (days)</Label>
+                  <div className={t.field}>
+                    <Label htmlFor="addon-plan-validity" className="text-xs">Validity (days)</Label>
                     <Input
+                      id="addon-plan-validity"
                       type="number"
                       min={1}
                       value={planForm.validity}
                       onChange={(e) => setPlanForm({ ...planForm, validity: Number(e.target.value) })}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Price ({currencySymbol})</Label>
+                  <div className={t.field}>
+                    <Label htmlFor="addon-plan-price" className="text-xs">Price ({currencySymbol})</Label>
                     <Input
+                      id="addon-plan-price"
                       type="number"
                       min={0}
                       value={planForm.price}
@@ -1562,7 +1569,7 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
                     />
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-1">
+                <div className={t.formActions}>
                   <Button variant="outline" size="sm" onClick={handleCancelPlanForm}>Cancel</Button>
                   <Button size="sm" onClick={handleSavePlan} disabled={isSavingPlan}>
                     {isSavingPlan ? "Saving…" : editingPlan ? "Save Changes" : "Create Plan"}
@@ -1572,78 +1579,69 @@ export function MemberAddons({ onNavigate, embedded, statusFilter, onStatusFilte
             )}
 
             {addonPlansLoading ? (
-              <div className="text-center py-14 text-sm text-muted-foreground">Loading plans…</div>
+              <div className={t.empty}><p className={t.emptyText}>Loading plans…</p></div>
             ) : addonPlans.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center py-14 rounded-xl border border-dashed">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
-                  <Package className="h-6 w-6 text-primary" />
+              <div className={t.planList}>
+                <div className={t.empty}>
+                  <div className={t.emptyIcon}><Package /></div>
+                  <p className={t.emptyTitle}>No add-on plans yet</p>
+                  <p className={t.emptyText}>Create PT packs, classes or other extras that staff can sell to members.</p>
                 </div>
-                <p className="text-sm font-medium">No add-on plans yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Click "New Plan" above to create your first one.</p>
               </div>
             ) : (
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Validity</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {addonPlans.map((plan) => (
-                      <TableRow key={plan.id}>
-                        <TableCell style={{ ...WRAP_TEXT_STYLE, maxWidth: 320 }}>
-                          <p className="text-sm font-medium">{plan.name}</p>
-                          <p className="text-xs text-muted-foreground line-clamp-2" title={plan.description}>
-                            {plan.description}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[10px]">{plan.category}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">{plan.validity} days</TableCell>
-                        <TableCell className="text-sm font-semibold"><CurrencyGlyph /> {plan.price}</TableCell>
-                        <TableCell>
-                          <button onClick={() => handleTogglePlanActive(plan)}>
-                            <Badge className={plan.isActive ? "bg-green-100 text-green-800 cursor-pointer" : "bg-gray-100 text-gray-600 cursor-pointer"}>
-                              {plan.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 border-primary/20 hover:bg-blue-50"
-                              title="Edit Plan"
-                              onClick={() => handleStartEditPlan(plan)}
-                            >
-                              <Pencil className="h-4 w-4 text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="outline" size="sm"
-                              className="h-8 w-8 p-0 border-primary/20 hover:bg-red-50"
-                              title="Delete Plan"
-                              onClick={() => handleDeletePlan(plan)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className={t.planList}>
+                <div className={`${t.planRow} ${t.planRowHead}`}>
+                  <span>Plan</span>
+                  <span>Category</span>
+                  <span>Validity</span>
+                  <span>Price</span>
+                  <span>Status</span>
+                  <span className={t.right} style={{ textAlign: "right" }}>Actions</span>
+                </div>
+                {addonPlans.map((plan) => (
+                  <div key={plan.id} className={t.planRow} data-inactive={!plan.isActive}>
+                    <div>
+                      <p className={t.planName}>{plan.name}</p>
+                      {plan.description && <p className={t.planDesc} title={plan.description}>{plan.description}</p>}
+                    </div>
+                    <div>
+                      <span className={t.cellLabel}>Category</span>
+                      <span className={`${t.pill} ${t.pillPlain}`} data-tone={ADDON_CATEGORY_TONE[plan.category] ?? "gray"}>{plan.category}</span>
+                    </div>
+                    <div className={t.planCell}>
+                      <span className={t.cellLabel}>Validity</span>
+                      {plan.validity} {plan.validity === 1 ? "day" : "days"}
+                    </div>
+                    <div className={t.planPrice}>
+                      <span className={t.cellLabel}>Price</span>
+                      {formatCurrency(Number(plan.price) || 0)}
+                    </div>
+                    <div>
+                      <span className={t.cellLabel}>Status</span>
+                      <label className={t.planStatus}>
+                        <Switch
+                          checked={plan.isActive}
+                          onCheckedChange={() => handleTogglePlanActive(plan)}
+                          aria-label={plan.isActive ? `Deactivate ${plan.name}` : `Activate ${plan.name}`}
+                        />
+                        {plan.isActive ? "Active" : "Inactive"}
+                      </label>
+                    </div>
+                    <div className={t.planActions}>
+                      <button type="button" className={t.iconBtn} title="Edit plan" aria-label={`Edit ${plan.name}`} onClick={() => handleStartEditPlan(plan)}>
+                        <Pencil />
+                      </button>
+                      <button type="button" className={`${t.iconBtn} ${t.iconBtnDanger}`} title="Delete plan" aria-label={`Delete ${plan.name}`} onClick={() => handleDeletePlan(plan)}>
+                        <Trash2 />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="px-6 py-4 border-t bg-slate-50/60 flex justify-end shrink-0">
+          <div className={t.dialogFoot}>
             <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>Close</Button>
           </div>
         </DialogContent>

@@ -29,9 +29,26 @@
       <!-- Adjusted per route at runtime — see src/utils/responsive-scope.ts. -->
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <meta name="theme-color" content="#2B7A78" />
+      <!-- Colour theme applied before first paint — see src/utils/theme.ts (keep ids/colours in sync).
+           Signed out: brand teal. Signed in: the user's Settings > Theme choice, else Ocean Blue. -->
+      <script>
+        (function () {
+          var COLORS = { blue: '#2693FD', teal: '#2B7A78', indigo: '#4F46E5', green: '#15803D', orange: '#C2410C', plum: '#714B67', graphite: '#334155' };
+          var t = 'teal';
+          try {
+            var user = sessionStorage.getItem('token') && JSON.parse(sessionStorage.getItem('gymbios_user') || 'null');
+            if (user && user.id) {
+              var saved = localStorage.getItem('gymbios_theme:' + user.id);
+              t = COLORS.hasOwnProperty(saved) ? saved : 'blue';
+            }
+          } catch (_) {}
+          document.documentElement.setAttribute('data-gb-theme', t);
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', COLORS[t]);
+        })();
+      </script>
       <title>GymBios</title>
-      <script type="module" crossorigin src="/assets/index-BpEexem9.js"></script>
-      <link rel="stylesheet" crossorigin href="/assets/index-BiWHNGX7.css">
+      <script type="module" crossorigin src="/assets/index-c4-bg4Mq.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-CpuApyCk.css">
     </head>
 
     <body>

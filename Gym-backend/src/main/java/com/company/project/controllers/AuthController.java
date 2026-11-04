@@ -31,9 +31,14 @@ public class AuthController {
         }
     }
 
+    /**
+     * The web app sends X-Client-App: web — members may only sign in through the mobile
+     * app, so a member login from the web is refused (AuthService.login).
+     */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthRequestDTO request,
+                                                 @RequestHeader(value = "X-Client-App", required = false) String clientApp) {
+        return ResponseEntity.ok(authService.login(request, "web".equalsIgnoreCase(clientApp)));
     }
 
     /**

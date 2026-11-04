@@ -94,6 +94,13 @@ public class Booking extends BaseEntity implements BranchAware {
     @Column(name = "reward_id")
     private Long rewardId;
 
+    // When the participant was checked in (booking QR at the door, or staff in Trainings & Classes).
+    @Column(name = "checked_in_at")
+    private java.time.LocalDateTime checkedInAt;
+
+    public java.time.LocalDateTime getCheckedInAt() { return checkedInAt; }
+    public void setCheckedInAt(java.time.LocalDateTime checkedInAt) { this.checkedInAt = checkedInAt; }
+
     public Booking() {}
 
     public Long getId() { return id; }

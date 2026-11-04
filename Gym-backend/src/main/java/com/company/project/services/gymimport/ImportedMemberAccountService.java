@@ -163,7 +163,9 @@ public class ImportedMemberAccountService {
     }
 
     private static String usableEmail(String email) {
-        if (email == null || email.isBlank() || email.trim().toLowerCase(Locale.ROOT).endsWith("@family.local")) {
+        // The old system's "<phone>@temp.local" placeholder stays on the member, never on the login.
+        if (email == null || email.isBlank() || email.trim().toLowerCase(Locale.ROOT).endsWith("@family.local")
+                || email.trim().toLowerCase(Locale.ROOT).endsWith("@temp.local")) {
             return null;
         }
         return email.trim();

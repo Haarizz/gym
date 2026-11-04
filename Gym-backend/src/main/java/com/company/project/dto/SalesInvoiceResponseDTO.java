@@ -50,6 +50,8 @@ public class SalesInvoiceResponseDTO {
     private String source;
     private Long posTransactionId;
     private BigDecimal returnedAmount;
+    /** Cost of the goods on the invoice at sale time (returns carry their own cost). */
+    private BigDecimal totalCogs;
     private String createdBy;
     @JsonSerialize(using = UtcLocalDateTimeSerializer.class)
     private LocalDateTime createdAt;
@@ -96,6 +98,7 @@ public class SalesInvoiceResponseDTO {
         dto.setSource(inv.getSource());
         dto.setPosTransactionId(inv.getPosTransactionId());
         dto.setReturnedAmount(inv.getReturnedAmount());
+        dto.setTotalCogs(inv.getTotalCogs());
         dto.setCreatedBy(inv.getCreatedBy());
         dto.setCreatedAt(inv.getCreatedAt());
         dto.setUpdatedAt(inv.getUpdatedAt());
@@ -206,6 +209,8 @@ public class SalesInvoiceResponseDTO {
     public void setPosTransactionId(Long posTransactionId) { this.posTransactionId = posTransactionId; }
     public BigDecimal getReturnedAmount() { return returnedAmount; }
     public void setReturnedAmount(BigDecimal returnedAmount) { this.returnedAmount = returnedAmount; }
+    public BigDecimal getTotalCogs() { return totalCogs; }
+    public void setTotalCogs(BigDecimal totalCogs) { this.totalCogs = totalCogs; }
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }

@@ -182,6 +182,8 @@ export interface Member {
   joinDate: string;
   status: string;
   avatar?: string;
+  memberId?: string;
+  membershipPlan?: string;
 }
 
 export interface Notification {

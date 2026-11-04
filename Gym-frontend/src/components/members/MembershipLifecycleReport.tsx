@@ -192,6 +192,18 @@ export async function countLifecycleReport(type: LifecycleReportType): Promise<n
   return (await loadReportRows(type, window)).rows.length;
 }
 
+/**
+ * The Renewals Report's split on its default window: same-plan renewals vs upgrades,
+ * downgrades & plan changes — the same split as the Renewals & Upgrades tab (BG_127).
+ */
+export async function countRenewalReport(): Promise<{ renewals: number; changes: number; total: number }> {
+  const result = await loadReportRows("renewals", resolveRange(defaultRangeFor("renewals"), { from: "", to: "" })!);
+  const rows = result.rows as Receipt[];
+  const kinds = result.kind === "receipts" ? result.renewalKinds ?? {} : {};
+  const renewals = rows.filter((r) => matchesKind(kinds[String(r.id)] ?? "Renewal", "renewals")).length;
+  return { renewals, changes: rows.length - renewals, total: rows.length };
+}
+
 function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
   const cell = (v: unknown) => {
     const s = v === null || v === undefined ? "" : String(v);

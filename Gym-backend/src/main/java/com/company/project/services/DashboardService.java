@@ -337,7 +337,7 @@ public class DashboardService {
         List<TrainingSession> recentSessions = trainingSessionRepository.findTop5ByStatusOrderByDateDescStartTimeDesc("active");
         List<ClassAttendance> attList = new ArrayList<>();
         for (TrainingSession session : recentSessions) {
-            long count = bookingRepository.countBySessionIdAndStatusNot(session.getId(), "cancelled");
+            long count = bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), com.company.project.services.BookingService.NO_SEAT_STATUSES);
             int capacity = session.getCapacity() != null ? session.getCapacity() : 20;
             int percentage = capacity > 0 ? (int) (((double) count / capacity) * 100) : 0;
             attList.add(new ClassAttendance(session.getName(), capacity, (int) count, percentage));
@@ -356,9 +356,20 @@ public class DashboardService {
             dm.setPhone(m.getPhone());
             dm.setMembershipType(m.getMembershipType());
             dm.setJoinDate(m.getJoinDate() != null ? m.getJoinDate().toLocalDate().toString() : "");
-            dm.setStatus(m.getMembershipStatus());
+            dm.setStatus(effectiveStatus(m));
+            dm.setMemberId(m.getMemberId());
+            dm.setMembershipPlan(m.getMembershipPlan());
+            dm.setAvatar(m.getPhotoUrl());
             return dm;
         }).collect(Collectors.toList());
+    }
+
+    // Effective status (MemberEffectiveStatus), capitalised for the dashboard badge.
+    private static String effectiveStatus(Member m) {
+        String s = MemberEffectiveStatus.of(m);
+        if (s == null) return null;
+        if (s.equals("pending_approval")) return "Pending Approval";
+        return s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
     }
 
     public List<Map<String, Object>> getNotifications() {
