@@ -637,6 +637,15 @@ public final class LegacyGymTransformer {
             // extension); stretch the latest live bill to it.
             Rcpt last = null;
             for (Rcpt b : memberBills) if (!b.refunded && b.planName != null) last = b;
+            // A broken end date ("0000-00-00") would leave the member with no end date, which
+            // never expires — use the end of their last paid plan instead (or, when the old
+            // system already had them expired and there's no plan to go by, their start date).
+            if (m.end == null && (last != null || "expired".equals(m.oldStatus))) {
+                m.end = last != null ? last.till : m.start;
+                warn("Members with no valid end date in the old data (end date worked out on import)",
+                        m.memberNo + " " + m.name + ": old status " + m.oldStatus + ", end date set to " + m.end
+                                + (last != null ? " (end of their last paid plan)" : " (their start date)"));
+            }
             if (last != null && m.end != null) {
                 last.validTill = midnight(m.end);
                 if (last.from.isAfter(m.end)) last.validFrom = midnight(m.end.minusDays(daysBetween(last.from, last.till)));
