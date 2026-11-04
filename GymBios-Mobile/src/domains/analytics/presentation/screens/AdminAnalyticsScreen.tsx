@@ -1,150 +1,121 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CurrencyValue } from '@/core/providers';
-import { View, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
-import { Text } from '@/shared/components/AppText';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { useAdminAnalytics } from '../../hooks/useAdminAnalytics';
-import { AnalyticsTabs, AnalyticsTab } from '../components/AnalyticsTabs';
-import { AIInsightsCard } from '../components/AIInsightsCard';
-import { MetricCard } from '../components/MetricCard';
-import { MemberChurnChart } from '../components/MemberChurnChart';
-import { RevenueTrendChart } from '../components/RevenueTrendChart';
-import { BranchRankingCard } from '../components/BranchRankingCard';
-import { ClassUtilizationCard } from '../components/ClassUtilizationCard';
-import { TrainerProductivityCard } from '../components/TrainerProductivityCard';
-import { AddOnPerformanceCard } from '../components/AddOnPerformanceCard';
-import { BrandColors, Spacing, Radius } from '@/core/theme';
-import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text } from '@/shared/components/AppText';
+import { formatDate } from '@/core/i18n/format';
+import { BrandColors, Radius, Spacing, TypographyScale } from '@/core/theme';
+import { TAB_BAR_HEIGHT } from '@/shared/layouts/ScreenLayout';
+import {
+  type AnalyticsPeriod,
+  type AnalyticsRange,
+  useBookingsAnalytics,
+  useMembershipAnalytics,
+  usePosAnalytics,
+} from '../../hooks/useAdminAnalytics';
+import { AnalyticsTab, AnalyticsTabs, PeriodSelector } from '../components/AnalyticsTabs';
+import { MembershipTab } from '../components/MembershipTab';
+import { BookingsTab } from '../components/BookingsTab';
+import { PosTab } from '../components/PosTab';
 
 export function AdminAnalyticsScreen() {
   const { t } = useTranslation();
-  const { data: analytics, isLoading, isError } = useAdminAnalytics();
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const insets = useSafeAreaInsets();
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={BrandColors.teal} />
-      </View>
-    );
-  }
-
-  if (isError || !analytics) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>{t('analytics.failedToLoad')}</Text>
-      </View>
-    );
-  }
-
-  const renderOverviewTab = () => (
-    <>
-      <View style={styles.metricsRow}>
-        <MetricCard
-          title={t('analytics.metrics.revenueGrowth')}
-          value={`+${analytics.overview.revenueGrowth}%`}
-          subtitle={t('analytics.metrics.vsLastMonth')}
-          icon="trending-up"
-          iconColor="#16a34a"
-          iconBgColor="#dcfce7"
-        />
-        <MetricCard
-          title={t('analytics.metrics.memberGrowth')}
-          value={`+${analytics.overview.memberGrowth}%`}
-          subtitle={t('analytics.metrics.vsLastMonth')}
-          icon="users"
-          iconColor="#2563eb"
-          iconBgColor="#dbeafe"
-        />
-      </View>
-      <View style={styles.metricsRow}>
-        <MetricCard
-          title={t('analytics.metrics.churnRate')}
-          value={`${analytics.overview.churnRate}%`}
-          subtitle={t('analytics.metrics.improvement', { value: analytics.overview.churnImprovement })}
-          icon="trending-down"
-          iconColor="#ea580c"
-          iconBgColor="#ffedd5"
-          subtitleColor="#16a34a"
-        />
-        <MetricCard
-          title={t('analytics.metrics.avgRevenue')}
-          value={<CurrencyValue amount={analytics.overview.averageRevenuePerMember} compact />}
-          subtitle={t('analytics.metrics.perMember')}
-          icon="dollar-sign"
-          iconColor="#9333ea"
-          iconBgColor="#f3e8ff"
-        />
-      </View>
-      <MemberChurnChart data={analytics.overview.memberVsChurn} />
-    </>
-  );
-
-  const renderRevenueTab = () => (
-    <>
-      <RevenueTrendChart data={analytics.revenue.trend} />
-      <BranchRankingCard data={analytics.revenue.branchRankings} />
-    </>
-  );
-
-  const renderOperationsTab = () => (
-    <>
-      <ClassUtilizationCard data={analytics.operations.classUtilization} />
-      <TrainerProductivityCard data={analytics.operations.trainerProductivity} />
-      <AddOnPerformanceCard data={analytics.operations.addonPerformance} />
-    </>
-  );
+  const [tab, setTab] = useState<AnalyticsTab>('membership');
+  const [period, setPeriod] = useState<AnalyticsPeriod>('month');
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.screen}>
       <Stack.Screen options={{ title: t('analytics.title'), headerShadowVisible: false }} />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[
-          styles.contentContainer,
-          { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 24 }
-        ]}
-      >
-        <AIInsightsCard insights={analytics.aiInsights} />
-        
-        <AnalyticsTabs selected={activeTab} onSelect={setActiveTab} />
-        
-        {activeTab === 'overview' && renderOverviewTab()}
-        {activeTab === 'revenue' && renderRevenueTab()}
-        {activeTab === 'operations' && renderOperationsTab()}
-        
-      </ScrollView>
-    </SafeAreaView>
+      <TabContent
+        key={tab}
+        tab={tab}
+        period={period}
+        header={
+          <>
+            <AnalyticsTabs selected={tab} onSelect={setTab} />
+            <PeriodSelector selected={period} onSelect={setPeriod} />
+          </>
+        }
+        bottomPadding={TAB_BAR_HEIGHT + insets.bottom + Spacing.four}
+      />
+    </View>
+  );
+}
+
+/** Only the open tab's query runs; the others load when first opened and stay cached. */
+function TabContent({
+  tab,
+  period,
+  header,
+  bottomPadding,
+}: {
+  tab: AnalyticsTab;
+  period: AnalyticsPeriod;
+  header: React.ReactNode;
+  bottomPadding: number;
+}) {
+  const membership = useMembershipAnalytics(period, tab === 'membership');
+  const bookings = useBookingsAnalytics(period, tab === 'bookings');
+  const pos = usePosAnalytics(period, tab === 'pos');
+  const query = tab === 'membership' ? membership : tab === 'bookings' ? bookings : pos;
+
+  return (
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      refreshControl={
+        <RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} tintColor={BrandColors.teal} />
+      }
+    >
+      {header}
+      {query.data && <RangeCaption range={query.data.range} />}
+      {query.isLoading ? (
+        <View style={styles.state}>
+          <ActivityIndicator size="large" color={BrandColors.teal} />
+        </View>
+      ) : query.isError || !query.data ? (
+        <ErrorState onRetry={() => query.refetch()} />
+      ) : tab === 'membership' && membership.data ? (
+        <MembershipTab data={membership.data} />
+      ) : tab === 'bookings' && bookings.data ? (
+        <BookingsTab data={bookings.data} />
+      ) : pos.data ? (
+        <PosTab data={pos.data} />
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function RangeCaption({ range }: { range: AnalyticsRange }) {
+  const { t } = useTranslation();
+  if (!range.from || !range.to) return null;
+  return (
+    <Text style={styles.range}>
+      {t('analytics.rangeCaption', { from: formatDate(range.from, 'd MMM yyyy'), to: formatDate(range.to, 'd MMM yyyy') })}
+    </Text>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.state}>
+      <Text style={styles.errorText}>{t('analytics.failedToLoad')}</Text>
+      <Pressable onPress={onRetry} style={styles.retry} accessibilityRole="button">
+        <Text style={styles.retryText}>{t('analytics.retry')}</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BrandColors.screenBackground,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: BrandColors.screenBackground,
-  },
-  errorText: {
-    color: BrandColors.danger,
-    fontSize: 16,
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: Spacing.four,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: Spacing.four,
-    marginBottom: Spacing.four,
-  },
+  screen: { flex: 1, backgroundColor: BrandColors.screenBackground },
+  content: { padding: Spacing.three },
+  range: { fontSize: TypographyScale.small, color: BrandColors.textSecondary, marginBottom: Spacing.md },
+  state: { paddingVertical: Spacing.six, alignItems: 'center', gap: Spacing.three },
+  errorText: { color: BrandColors.danger, fontSize: TypographyScale.body, textAlign: 'center' },
+  retry: { paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, borderRadius: Radius.full, backgroundColor: BrandColors.teal },
+  retryText: { color: BrandColors.white, fontWeight: '600', fontSize: TypographyScale.body },
 });

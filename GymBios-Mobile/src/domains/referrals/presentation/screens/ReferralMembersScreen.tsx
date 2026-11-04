@@ -52,7 +52,7 @@ export function ReferralMembersScreen() {
           memberName: name,
           memberEmail: r.refereeEmail ? `ref-${name.toLowerCase().replace(/\s+/g, '')}@gym.com` : '',
           referralCode: r.referralCode || `REF-${name.substring(0, 3).toUpperCase()}`,
-          referralLink: r.referralLink || `gymbios.app/ref/${r.referralCode || name.substring(0, 3)}`,
+          referralLink: r.referralLink || '',
           totalReferrals: 0,
           successfulReferrals: 0,
           pendingReferrals: 0,

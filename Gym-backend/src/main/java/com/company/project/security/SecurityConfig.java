@@ -107,6 +107,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/public/walk-in/*/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/public/walk-in/*/*/submit").permitAll()
 
+                // Referral link landing page (/ref/{code}). Returns only the gym name and the
+                // referrer's first name for a valid code; rate-limited (PublicReferralController).
+                .requestMatchers(HttpMethod.GET, "/api/public/referrals/*").permitAll()
+
                 // Platform-owner-only endpoints. GYMBIOS_ADMIN is scoped to Gym Management
                 // only (see RoleService.getEffectivePermissionKeys) — it has no business on
                 // any of these operational routes, so it is deliberately absent from all of

@@ -25,6 +25,10 @@ export interface CreateMemberRequest {
   status: string;
   startDate: string;
   paymentStatus: string;
+  /** Invoice total after any discount — what the new member's receipt is billed at. */
+  membershipFee?: number;
+  /** The plan's list price. */
+  monthlyFee?: number;
 
   paymentMethodUsed?: string;
   paymentBreakdown?: PaymentSplit[];

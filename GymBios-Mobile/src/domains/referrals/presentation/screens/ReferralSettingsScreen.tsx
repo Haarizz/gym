@@ -127,14 +127,6 @@ export function ReferralSettingsScreen() {
               onChangeText={(val) => setSettings((p) => ({ ...p, codePrefix: val }))}
             />
 
-            <Typography variant="bodySmall" style={styles.inputLabel}>
-              {t('adminReferrals.linkDomain')}
-            </Typography>
-            <TextInput
-              style={styles.input}
-              value={settings.linkDomain}
-              onChangeText={(val) => setSettings((p) => ({ ...p, linkDomain: val }))}
-            />
           </View>
 
           {/* Reward Settings */}

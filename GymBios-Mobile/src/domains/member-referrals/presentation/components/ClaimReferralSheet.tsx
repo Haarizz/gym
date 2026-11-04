@@ -35,13 +35,15 @@ interface ClaimReferralSheetProps {
   onClose: () => void;
   /** Dismissing after a code was applied — e.g. take the member on to gym discovery. Defaults to onClose. */
   onApplied?: () => void;
+  /** Code to start with, e.g. from a shared referral link. */
+  initialCode?: string | null;
 }
 
 /**
  * Bottom sheet that asks a newly onboarded member for the referral code of whoever
  * invited them. Shown over member home right after profile completion.
  */
-export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferralSheetProps) {
+export function ClaimReferralSheet({ visible, onClose, onApplied, initialCode }: ClaimReferralSheetProps) {
   const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,14 @@ export function ClaimReferralSheet({ visible, onClose, onApplied }: ClaimReferra
     ];
     return () => subscriptions.forEach((s) => s.remove());
   }, [keyboardInset]);
+
+  // Fill in a code that arrived through a referral link, each time the sheet opens with one.
+  useEffect(() => {
+    if (!visible || !initialCode) return;
+    setCode(initialCode.replace(/[^a-zA-Z0-9]/g, '').slice(0, CODE_LENGTH));
+    setError(null);
+    setStep('enter');
+  }, [visible, initialCode]);
 
   useEffect(() => {
     if (visible) {

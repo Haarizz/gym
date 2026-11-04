@@ -306,6 +306,8 @@ const members = {
         "startDate": "Fecha de inicio de membresía",
         "startDatePlaceholder": "Selecciona la fecha de inicio",
         "endsOn": "La membresía termina el",
+        "chooseTypeFirst": "Elige primero un tipo de membresía",
+        "noPlansForType": "No hay planes para este tipo de membresía",
         "saleCreditTitle": "Comisión de venta",
         "saleCreditDescription": "Cuenta para la meta de este colaborador",
         "processedBy": "Procesado por",

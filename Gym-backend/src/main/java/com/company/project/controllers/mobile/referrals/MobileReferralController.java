@@ -11,6 +11,7 @@ import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.mobile.referrals.MobileReferralResolutionService;
 import com.company.project.services.mobile.referrals.MobileReferralService;
 import com.company.project.services.RewardService;
+import com.company.project.services.referrals.ReferralLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,15 +32,18 @@ public class MobileReferralController {
     private final MobileReferralResolutionService resolutionService;
     private final RewardService rewardService;
     private final EntityManagerFactory entityManagerFactory;
+    private final ReferralLinkBuilder referralLinkBuilder;
 
     public MobileReferralController(MobileReferralService referralService,
                                      MobileReferralResolutionService resolutionService,
                                      RewardService rewardService,
-                                     EntityManagerFactory entityManagerFactory) {
+                                     EntityManagerFactory entityManagerFactory,
+                                     ReferralLinkBuilder referralLinkBuilder) {
         this.referralService = referralService;
         this.resolutionService = resolutionService;
         this.rewardService = rewardService;
         this.entityManagerFactory = entityManagerFactory;
+        this.referralLinkBuilder = referralLinkBuilder;
     }
 
     /**
@@ -66,7 +70,7 @@ public class MobileReferralController {
         return ResponseEntity.ok(Map.of(
                 "eligible", true,
                 "referralCode", profile.getReferralCode(),
-                "url", "https://gymbios.app/ref/" + profile.getReferralCode()
+                "url", referralLinkBuilder.link(profile.getReferralCode())
         ));
     }
 

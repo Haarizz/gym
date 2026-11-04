@@ -231,6 +231,12 @@ export class ApiMemberDirectoryRepository
       start_date: request.startDate,
       ...('endDate' in request ? { end_date: request.endDate } : {}),
       payment_status: request.paymentStatus,
+      ...('membershipFee' in request && request.membershipFee != null
+        ? { membership_fee: request.membershipFee }
+        : {}),
+      ...('monthlyFee' in request && request.monthlyFee != null
+        ? { monthly_fee: request.monthlyFee }
+        : {}),
       ...('paymentMethodUsed' in request && request.paymentMethodUsed
         ? {
             payment_method_used: request.paymentMethodUsed,

@@ -19,6 +19,21 @@ import type { MemberStepProps } from './stepTypes';
 // No "Processed By" picker: the server credits the sale to whoever registers the member
 // (Admin for admins, the staff member or trainer themselves otherwise) or, for a converted
 // lead, to the lead's staff.
+const normalizeType = (type?: string) => (type ?? '').toLowerCase().replace(/[^a-z]/g, '');
+
+/**
+ * Plan types (Individual | Couple | Family | Corporate | Walk-In) that suit a member type
+ * (INDIVIDUAL | COUPLE | FAMILY | CORPORATE). Walk-In passes are single-person, so they
+ * sit under Individual.
+ */
+export function planMatchesMembershipType(plan: MembershipPlan, membershipType: string): boolean {
+  const member = normalizeType(membershipType);
+  const planType = normalizeType(plan.planType);
+  if (!member) return false;
+  if (member === 'individual') return planType === 'individual' || planType === 'walkin';
+  return planType === member;
+}
+
 interface MembershipStepProps extends MemberStepProps {
   /** New registrations can't be backdated; existing members keep their history. */
   allowPastDates?: boolean;
@@ -34,6 +49,8 @@ export function MembershipStep({
   const theme = useTheme();
   const { plans, loading, error } = useMembershipPlans();
   const selectedPlan = plans.find((p) => String(p.id) === data.membershipPlanId);
+  const hasType = !!data.membershipType.trim();
+  const typePlans = hasType ? plans.filter((p) => planMatchesMembershipType(p, data.membershipType)) : [];
   const today = startOfDay(new Date());
   const minimumDate = allowPastDates ? undefined : today;
 
@@ -49,6 +66,17 @@ export function MembershipStep({
     // Membership can't start before the member joins — carry the start date forward.
     if (join && (!data.startDate || isBefore(startOfDay(data.startDate), startOfDay(join)))) {
       applyStartDate(join);
+    }
+  };
+
+  const handleTypeChange = (type: string) => {
+    updateField('membershipType', type);
+    // A plan picked for another type no longer applies — make staff choose again.
+    if (selectedPlan && !planMatchesMembershipType(selectedPlan, type)) {
+      updateField('membershipPlanId', '');
+      updateField('membershipFee', '');
+      updateField('monthlyFee', '');
+      updateField('endDate', null);
     }
   };
 
@@ -69,7 +97,7 @@ export function MembershipStep({
       >
         <MemberTypeSelector
           value={data.membershipType}
-          onChange={(v) => updateField('membershipType', v)}
+          onChange={handleTypeChange}
         />
         {errors?.membershipType ? (
           <Typography variant="caption" color="error">
@@ -81,10 +109,13 @@ export function MembershipStep({
       <FormCard icon="credit-card" title={t('members.form.membershipStep.planTitle')}>
         <MembershipPlanSelector
           value={data.membershipPlanId}
-          plans={plans}
+          plans={typePlans}
           loading={loading}
           error={error}
           onChange={handlePlanChange}
+          disabled={!hasType}
+          placeholder={hasType ? undefined : t('members.form.membershipStep.chooseTypeFirst')}
+          emptyMessage={t('members.form.membershipStep.noPlansForType')}
         />
         {errors?.membershipPlanId ? (
           <Typography variant="caption" color="error">

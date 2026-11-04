@@ -15,6 +15,7 @@ import { MemberTodayScheduleCard } from '../components/MemberTodayScheduleCard';
 import { MemberQuickActions } from '../components/MemberQuickActions';
 import { MemberOfferBanner } from '../components/MemberOfferBanner';
 import { ClaimReferralSheet } from '@/domains/member-referrals/presentation/components/ClaimReferralSheet';
+import { usePendingReferralCodeStore } from '@/domains/member-referrals/store/pendingReferralCodeStore';
 
 export function MemberDashboardScreen() {
   const { data, isLoading, refetch, isRefetching, isStale } = useMemberDashboard();
@@ -24,9 +25,13 @@ export function MemberDashboardScreen() {
   // Set by AuthBootstrap right after profile completion: ask for a referral code once.
   const { claimReferral } = useLocalSearchParams<{ claimReferral?: string }>();
   const [isReferralSheetOpen, setIsReferralSheetOpen] = useState(claimReferral === '1');
+  // A code from a shared referral link (see app/+native-intent.tsx) opens the sheet with it filled in.
+  const pendingReferralCode = usePendingReferralCodeStore((s) => s.code);
+  const setPendingReferralCode = usePendingReferralCodeStore((s) => s.setCode);
 
   const closeReferralSheet = () => {
     setIsReferralSheetOpen(false);
+    setPendingReferralCode(null);
     router.setParams({ claimReferral: undefined });
   };
 
@@ -77,7 +82,8 @@ export function MemberDashboardScreen() {
       </ScrollView>
 
       <ClaimReferralSheet
-        visible={isReferralSheetOpen}
+        visible={isReferralSheetOpen || !!pendingReferralCode}
+        initialCode={pendingReferralCode}
         onClose={closeReferralSheet}
         onApplied={() => {
           // A referred member goes straight to gym discovery to pick a plan.

@@ -306,6 +306,8 @@ const members = {
         "startDate": "Mitgliedschafts-Startdatum",
         "startDatePlaceholder": "Startdatum wählen",
         "endsOn": "Mitgliedschaft endet am",
+        "chooseTypeFirst": "Wähle zuerst einen Mitgliedschaftstyp",
+        "noPlansForType": "Keine Tarife für diesen Mitgliedschaftstyp",
         "saleCreditTitle": "Verkaufsgutschrift",
         "saleCreditDescription": "Zählt für das Ziel dieses Mitarbeiters",
         "processedBy": "Bearbeitet von",

@@ -306,6 +306,8 @@ const members = {
         "startDate": "सदस्यता प्रारंभ तिथि",
         "startDatePlaceholder": "प्रारंभ तिथि चुनें",
         "endsOn": "सदस्यता समाप्त होती है",
+        "chooseTypeFirst": "पहले सदस्यता प्रकार चुनें",
+        "noPlansForType": "इस सदस्यता प्रकार के लिए कोई प्लान नहीं",
         "saleCreditTitle": "बिक्री श्रेय",
         "saleCreditDescription": "इस कर्मचारी के लक्ष्य में गिना जाता है",
         "processedBy": "द्वारा संसाधित",

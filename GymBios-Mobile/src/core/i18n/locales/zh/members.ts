@@ -306,6 +306,8 @@ const members = {
         "startDate": "生效起始日",
         "startDatePlaceholder": "选择生效日期",
         "endsOn": "会员到期日为",
+        "chooseTypeFirst": "请先选择会员类型",
+        "noPlansForType": "此会员类型暂无方案",
         "saleCreditTitle": "业绩归属",
         "saleCreditDescription": "计入该员工的销售业绩",
         "processedBy": "经办人",

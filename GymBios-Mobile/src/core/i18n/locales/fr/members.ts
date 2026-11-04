@@ -306,6 +306,8 @@ const members = {
         "startDate": "Date de début d’adhésion",
         "startDatePlaceholder": "Sélectionnez la date de début",
         "endsOn": "L’adhésion prend fin le",
+        "chooseTypeFirst": "Choisissez d'abord un type d'abonnement",
+        "noPlansForType": "Aucune formule pour ce type d'abonnement",
         "saleCreditTitle": "Crédit de vente",
         "saleCreditDescription": "Compte pour l'objectif de ce collaborateur",
         "processedBy": "Traité par",

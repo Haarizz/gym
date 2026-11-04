@@ -306,6 +306,8 @@ const members = {
         startDate: 'Membership start date',
         startDatePlaceholder: 'Select start date',
         endsOn: 'Membership ends on',
+        chooseTypeFirst: 'Choose a membership type first',
+        noPlansForType: 'No plans for this membership type',
         saleCreditTitle: 'Sale credit',
         saleCreditDescription: "Counts toward this staff member's target",
         processedBy: 'Processed by',

@@ -22,6 +22,7 @@ import com.company.project.repositories.ReferralSettingsRepository;
 import com.company.project.repositories.ReferralRewardRepository;
 import com.company.project.repositories.RewardAuditLogRepository;
 import com.company.project.entities.ReferralReward;
+import com.company.project.services.referrals.ReferralLinkBuilder;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -56,6 +57,7 @@ public class ReferralService {
     private final RewardAuditLogRepository auditLogRepository;
     private final JdbcTemplate jdbcTemplate;
     private final BranchSettingsResolver branchSettingsResolver;
+    private final ReferralLinkBuilder referralLinkBuilder;
 
     public ReferralService(ReferralRepository referralRepository,
                            ReferralRewardRuleRepository ruleRepository,
@@ -64,7 +66,8 @@ public class ReferralService {
                            ReferralRewardRepository rewardRepository,
                            RewardAuditLogRepository auditLogRepository,
                            JdbcTemplate jdbcTemplate,
-                           BranchSettingsResolver branchSettingsResolver) {
+                           BranchSettingsResolver branchSettingsResolver,
+                           ReferralLinkBuilder referralLinkBuilder) {
         this.referralRepository = referralRepository;
         this.ruleRepository = ruleRepository;
         this.settingsRepository = settingsRepository;
@@ -73,6 +76,7 @@ public class ReferralService {
         this.auditLogRepository = auditLogRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.branchSettingsResolver = branchSettingsResolver;
+        this.referralLinkBuilder = referralLinkBuilder;
     }
 
     // ── Settings (one row per branch — each branch can run its own referral ────
@@ -543,8 +547,7 @@ public class ReferralService {
         dto.setPhotoVerifiedBy(ref.getPhotoVerifiedBy());
         dto.setPhotoVerifiedAt(ref.getPhotoVerifiedAt());
         dto.setReferralCode(ref.getReferralCode());
-        String linkDomain = loadOrCreateSettings().getLinkDomain();
-        dto.setReferralLink((linkDomain != null && !linkDomain.isBlank() ? linkDomain : "gymbios.app/ref") + "/" + ref.getReferralCode());
+        dto.setReferralLink(referralLinkBuilder.link(ref.getReferralCode()));
         dto.setStatus(ref.getStatus());
         dto.setRewardAmount(ref.getRewardAmount());
         dto.setDate(ref.getDate());

@@ -318,6 +318,8 @@ const members = {
         "startDate": "تاريخ بدء العضوية",
         "startDatePlaceholder": "حدد تاريخ البدء",
         "endsOn": "تنتهي العضوية في",
+        "chooseTypeFirst": "اختر نوع العضوية أولاً",
+        "noPlansForType": "لا توجد خطط لنوع العضوية هذا",
         "saleCreditTitle": "إسناد المبيعات",
         "saleCreditDescription": "يحتسب ضمن هدف هذا الموظف",
         "processedBy": "تمت المعالجة بواسطة",

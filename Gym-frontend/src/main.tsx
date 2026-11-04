@@ -6,6 +6,7 @@ import { BranchProvider } from "./utils/branch-context";
 import { PrivacyPolicyPage, TermsOfServicePage, SupportPage } from "./pages/legal-pages";
 import { PublicLeadFormPage } from "./pages/public-lead-form";
 import { PublicWalkInPage } from "./pages/public-walk-in";
+import { PublicReferralPage } from "./pages/public-referral";
 import { applyResponsiveScope } from "./utils/responsive-scope";
 import "@fontsource-variable/plus-jakarta-sans/wght.css";
 import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
@@ -33,11 +34,15 @@ const leadFormMatch = path.match(/^\/f\/([A-Za-z0-9]+)\/?$/);
 // Walk-in self-registration (/w/{tenantSlug}/{branchId}?s=staffCode), from the QR
 // at the gym or on a staff member's phone — same standalone treatment.
 const walkInMatch = path.match(/^\/w\/([A-Za-z0-9_-]+)\/(\d+)\/?$/);
+// Shared referral links (/ref/{code}) from the mobile app or the web Referrals page.
+const referralMatch = path.match(/^\/ref\/([A-Za-z0-9_-]{1,64})\/?$/);
 
 if (leadFormMatch) {
   root.render(<PublicLeadFormPage formKey={leadFormMatch[1]} />);
 } else if (walkInMatch) {
   root.render(<PublicWalkInPage tenantSlug={walkInMatch[1]} branchId={walkInMatch[2]} />);
+} else if (referralMatch) {
+  root.render(<PublicReferralPage code={referralMatch[1]} />);
 } else if (path === '/privacy-policy') {
   root.render(<PrivacyPolicyPage />);
 } else if (path === '/terms-of-service') {

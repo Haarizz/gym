@@ -258,6 +258,11 @@ function formatDateStr(d: Date | null): string | undefined {
   return format(d, 'yyyy-MM-dd');
 }
 
+function toAmount(value: string): number | undefined {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function buildCreateRequest(
   data: MemberWizardData,
   paymentResult?: PaymentResult,
@@ -282,6 +287,10 @@ function buildCreateRequest(
     status: data.status || 'ACTIVE',
     startDate: startDateStr,
     paymentStatus: paymentResult?.paymentStatus || data.paymentStatus || 'PENDING',
+    // Bill the receipt at what the payment sheet charged (plan price less its
+    // discount) — without it the server saved a 0 invoice for app-created members.
+    membershipFee: paymentResult?.summary.finalAmount ?? toAmount(data.membershipFee),
+    monthlyFee: toAmount(data.monthlyFee),
     paymentMethodUsed: paymentResult?.paymentMethodUsed,
     paymentBreakdown: paymentResult?.paymentBreakdown,
     discountApplied: paymentResult?.discountApplied,
@@ -310,8 +319,14 @@ function buildCreateRequest(
 }
 
 function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
-  // Lead linking only applies when the member is first registered.
-  const { leadId: _leadId, ...base } = buildCreateRequest(data);
+  // Lead linking and the registration invoice only apply when the member is first
+  // registered — an edit must not rewrite the fee they were billed.
+  const {
+    leadId: _leadId,
+    membershipFee: _membershipFee,
+    monthlyFee: _monthlyFee,
+    ...base
+  } = buildCreateRequest(data);
   return {
     ...base,
     endDate: formatDateStr(data.endDate),

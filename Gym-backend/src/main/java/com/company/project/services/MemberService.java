@@ -550,6 +550,17 @@ public class MemberService {
                 ? planRepository.findByName(member.getMembershipPlan()).orElse(null)
                 : null;
 
+        // A client that picks a plan but sends no fee (older mobile builds) must still be
+        // billed for it — otherwise the receipt is a 0 invoice that reads as "Paid" and
+        // the sale counts as nothing toward the staff member's revenue.
+        if (resolvedPlan != null && member.getMembershipFee() == null) {
+            BigDecimal discount = request.getDiscountApplied() != null ? request.getDiscountApplied() : BigDecimal.ZERO;
+            member.setMembershipFee(PlanOfferPricing.effectivePrice(resolvedPlan).subtract(discount).max(BigDecimal.ZERO));
+        }
+        if (resolvedPlan != null && member.getMonthlyFee() == null) {
+            member.setMonthlyFee(resolvedPlan.getPrice());
+        }
+
         // "family_head" billing mode: EVERY family/couple member (adult or minor)
         // folds into ONE invoice on the head — nobody but the head ever carries
         // their own outstandingBalance/receipt. "individual" (default — every

@@ -126,6 +126,10 @@ interface ReferralReward {
 
 const REFERRAL_TABS = ['overview', 'members', 'activity', 'my-rewards', 'reward-queue', 'rewards', 'analytics', 'settings'];
 
+
+// Referral links come from the server as full URLs; older rows may still be bare "domain/ref/CODE".
+const absoluteLink = (link: string) => (/^https?:\/\//.test(link) ? link : `https://${link}`);
+
 export function Referrals() {
   const { currencyCode } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
@@ -139,8 +143,8 @@ export function Referrals() {
   const [selectedMember, setSelectedMember] = useState<string>('');
   const [showAddReferral, setShowAddReferral] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [dateRange, setDateRange] = useState('7d');
+  const [tierFilter, setTierFilter] = useState('all');
+  const [dateRange, setDateRange] = useState('all');
 
   // API state
   const [apiReferrals, setApiReferrals] = useState<ReferralResponse[]>([]);
@@ -294,7 +298,7 @@ export function Referrals() {
     try {
       const [statsData, referralsData, rulesData, rewardStatsData] = await Promise.all([
         referralService.getStats(),
-        referralService.getReferrals({ size: 1000, status: filterStatus !== 'all' ? filterStatus : undefined, search: searchTerm || undefined }),
+        referralService.getReferrals({ size: 1000, search: searchTerm || undefined }),
         referralService.getRules(),
         rewardService.getStats()
       ]);
@@ -313,7 +317,7 @@ export function Referrals() {
       console.error("Error loading members:", e);
       setMembers([]);
     }
-  }, [filterStatus, searchTerm]);
+  }, [searchTerm]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -362,16 +366,35 @@ export function Referrals() {
 
 
 
-  const topReferrers = Object.values(apiReferrals.reduce<Record<string, { id: string; memberName: string; memberEmail: string; referralCode: string; referralLink: string; totalReferrals: number; successfulReferrals: number; pendingReferrals: number; totalRewardsEarned: number; rewardBalance: number; joinDate: string; lastActivity: string; tier: 'Bronze'|'Silver'|'Gold'|'Platinum' }>>((acc, r) => {
-      const key = r.referrerName || 'Unknown';
+  // One entry per referrer. Tier counts all-time successful referrals (thresholds match
+  // the Tier System cards in Settings: Bronze 0-2, Silver 3-5, Gold 6-10, Platinum 11+).
+  type ReferrerSummary = { id: string; memberName: string; memberEmail: string; referralCode: string; referralLink: string; totalReferrals: number; successfulReferrals: number; pendingReferrals: number; totalRewardsEarned: number; rewardBalance: number; joinDate: string; lastActivity: string; tier: 'Bronze'|'Silver'|'Gold'|'Platinum' };
+  const referrers = useMemo(() => Object.values(apiReferrals.reduce<Record<string, ReferrerSummary>>((acc, r) => {
+      // Group by member id when the referral is linked to one, so two members sharing a name stay apart.
+      const key = r.referrerMemberId ? `id:${r.referrerMemberId}` : `name:${r.referrerName || 'Unknown'}`;
       if (!acc[key]) acc[key] = { id: key, memberName: r.referrerName || '', memberEmail: '', referralCode: r.referralCode, referralLink: r.referralLink, totalReferrals: 0, successfulReferrals: 0, pendingReferrals: 0, totalRewardsEarned: 0, rewardBalance: 0, joinDate: r.createdAt, lastActivity: r.createdAt, tier: 'Bronze' };
-      acc[key].totalReferrals++;
-      if (r.status === 'successful') { acc[key].successfulReferrals++; acc[key].totalRewardsEarned += Number(r.rewardAmount || 0); }
-      if (r.status === 'pending') acc[key].pendingReferrals++;
-      const s = acc[key].successfulReferrals;
-      acc[key].tier = s >= 11 ? 'Platinum' : s >= 6 ? 'Gold' : s >= 3 ? 'Silver' : 'Bronze';
+      const entry = acc[key];
+      entry.totalReferrals++;
+      if (r.status === 'successful') { entry.successfulReferrals++; entry.totalRewardsEarned += Number(r.rewardAmount || 0); }
+      if (r.status === 'pending') entry.pendingReferrals++;
+      if (r.createdAt && (!entry.lastActivity || r.createdAt > entry.lastActivity)) entry.lastActivity = r.createdAt;
+      if (r.createdAt && (!entry.joinDate || r.createdAt < entry.joinDate)) entry.joinDate = r.createdAt;
+      const n = entry.successfulReferrals;
+      entry.tier = n >= 11 ? 'Platinum' : n >= 6 ? 'Gold' : n >= 3 ? 'Silver' : 'Bronze';
       return acc;
-    }, {})).sort((a, b) => b.successfulReferrals - a.successfulReferrals).slice(0, 5);
+    }, {})).sort((a, b) => b.successfulReferrals - a.successfulReferrals || b.totalReferrals - a.totalReferrals), [apiReferrals]);
+
+  // Overview leaderboard.
+  const topReferrers = referrers.slice(0, 5);
+
+  // Members tab: every referrer, narrowed by the tier and activity-date filters.
+  const filteredReferrers = useMemo(() => {
+    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : null;
+    const since = days ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
+    return referrers.filter(m =>
+      (tierFilter === 'all' || m.tier.toLowerCase() === tierFilter)
+      && (since == null || (m.lastActivity && new Date(m.lastActivity).getTime() >= since)));
+  }, [referrers, tierFilter, dateRange]);
 
   const handleCopyCode = useCallback((code: string) => {
     navigator.clipboard.writeText(code);
@@ -381,14 +404,14 @@ export function Referrals() {
   }, []);
 
   const handleCopyLink = useCallback((link: string) => {
-    navigator.clipboard.writeText(`https://${link}`);
+    navigator.clipboard.writeText(absoluteLink(link));
     toast.success('Referral link copied!', {
       description: 'The referral link has been copied to your clipboard.',
     });
   }, []);
 
-  const handleShareWhatsApp = useCallback((code: string, memberName: string) => {
-    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! ??`;
+  const handleShareWhatsApp = useCallback((code: string, memberName: string, link?: string) => {
+    const message = `Join our amazing gym with my referral code: ${code}! Get exclusive benefits and let's achieve our fitness goals together! 💪${link ? `\n${absoluteLink(link)}` : ''}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
@@ -399,7 +422,7 @@ export function Referrals() {
 
   const handleShareEmail = useCallback((code: string, link: string, memberName: string) => {
     const subject = 'Join Our Gym - Exclusive Invitation!';
-    const body = `Hi there!\n\nI'd love to invite you to join our amazing gym! Use my referral code "${code}" or click this link: https://${link}\n\nYou'll get exclusive benefits and we can achieve our fitness goals together!\n\nBest regards,\n${memberName}`;
+    const body = `Hi there!\n\nI'd love to invite you to join our amazing gym! Use my referral code "${code}" or click this link: ${absoluteLink(link)}\n\nYou'll get exclusive benefits and we can achieve our fitness goals together!\n\nBest regards,\n${memberName}`;
     const emailUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(emailUrl);
     
@@ -410,7 +433,7 @@ export function Referrals() {
 
   const [qrDialogLink, setQrDialogLink] = useState<string | null>(null);
   const handleGenerateQR = useCallback((link: string) => {
-    setQrDialogLink(link.startsWith('http') ? link : `https://${link}`);
+    setQrDialogLink(absoluteLink(link));
   }, []);
 
   const handleExportCSV = useCallback(() => {
@@ -628,7 +651,7 @@ export function Referrals() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-green-600">{member.successfulReferrals} referrals</p>
+                        <p className="font-semibold text-green-600">{member.successfulReferrals} successful</p>
                         <Badge variant="outline" className={getTierColor(member.tier)}>
                           {getTierIcon(member.tier)}
                           <span className="ml-1">{member.tier}</span>
@@ -743,7 +766,7 @@ export function Referrals() {
                 </div>
                 <div>
                   <Label htmlFor="tier">Filter by Tier</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <Select value={tierFilter} onValueChange={setTierFilter}>
                     <SelectTrigger id="tier" className="w-[140px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -775,8 +798,13 @@ export function Referrals() {
           </Card>
 
           {/* Members List */}
+          {filteredReferrers.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-10">
+              {referrers.length === 0 ? 'No referrers yet.' : 'No referrers match these filters.'}
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {topReferrers.map((member) => (
+            {filteredReferrers.map((member) => (
               <Card key={member.id} className={cardShell}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -858,7 +886,7 @@ export function Referrals() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleShareWhatsApp(member.referralCode, member.memberName)}
+                      onClick={() => handleShareWhatsApp(member.referralCode, member.memberName, member.referralLink)}
                     >
                       <MessageSquare className="h-4 w-4 mr-1" />
                       WhatsApp
@@ -1124,10 +1152,6 @@ export function Referrals() {
                     <Input id="codePrefix" value={settings.codePrefix} onChange={(e) => setSettings(p => ({ ...p, codePrefix: e.target.value }))} className="mt-1" />
                   </div>
 
-                  <div>
-                    <Label htmlFor="linkDomain">Referral Link Domain</Label>
-                    <Input id="linkDomain" value={settings.linkDomain} onChange={(e) => setSettings(p => ({ ...p, linkDomain: e.target.value }))} className="mt-1" />
-                  </div>
                 </div>
 
                 <div className="space-y-4">

@@ -17,6 +17,10 @@ interface MembershipPlanSelectorProps {
   error?: Error | null;
   onChange: (planId: string, plan: MembershipPlan) => void;
   disabled?: boolean;
+  /** Field text shown when nothing is selected (defaults to the search prompt). */
+  placeholder?: string;
+  /** Sheet message when there are no plans to list at all. */
+  emptyMessage?: string;
 }
 
 export function MembershipPlanSelector({
@@ -26,6 +30,8 @@ export function MembershipPlanSelector({
   error = null,
   onChange,
   disabled = false,
+  placeholder,
+  emptyMessage,
 }: MembershipPlanSelectorProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -88,7 +94,7 @@ export function MembershipPlanSelector({
             { color: selectedPlan ? theme.text : theme.textSecondary },
           ]}
         >
-          {selectedPlan ? selectedPlan.name : t('membershipPlans.list.searchPlaceholder')}
+          {selectedPlan ? selectedPlan.name : (placeholder ?? t('membershipPlans.list.searchPlaceholder'))}
         </Typography>
         <Feather name="chevron-down" size={18} color={theme.textSecondary} />
       </Pressable>
@@ -135,7 +141,7 @@ export function MembershipPlanSelector({
 
         {!loading && !error && filteredPlans.length === 0 && (
           <Typography variant="bodySmall" color="textSecondary" style={styles.statusText}>
-            {t('membershipPlans.list.noPlansFound')}
+            {plans.length === 0 && emptyMessage ? emptyMessage : t('membershipPlans.list.noPlansFound')}
           </Typography>
         )}
 
