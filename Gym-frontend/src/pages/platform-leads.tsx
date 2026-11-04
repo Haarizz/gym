@@ -7,10 +7,7 @@
 // creation.
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 import {
   Select,
   SelectContent,
@@ -18,14 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import {
   Sheet,
   SheetContent,
@@ -36,7 +25,6 @@ import {
   Users,
   TrendingUp,
   Target,
-  Search,
   Phone,
   Mail,
   MessageSquare,
@@ -50,17 +38,21 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  PlatformPage, PageHead, KpiRow, Kpi, Panel, Toolbar, Count, SearchField, DataTable, StateRow,
+  Entity, Pill, Chip, IconAction, Section, Facts, p, type PillKind,
+} from '../components/platform/platform-ui';
+import {
   platformLeadService,
   type PlatformLeadResponse,
   type PlatformLeadStatus,
 } from '../utils/supabase/platform-lead-service';
 
-function getStatusColor(status: PlatformLeadStatus) {
+function statusKind(status: PlatformLeadStatus): PillKind {
   switch (status) {
-    case 'NEW': return 'bg-blue-100 text-blue-800';
-    case 'CONTACTED': return 'bg-yellow-100 text-yellow-800';
-    case 'FOLLOW_UP': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'NEW': return 'info';
+    case 'CONTACTED': return 'neutral';
+    case 'FOLLOW_UP': return 'warn';
+    default: return 'neutral';
   }
 }
 
@@ -78,8 +70,6 @@ export function PlatformLeads() {
   const [detail, setDetail] = useState<PlatformLeadResponse | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const navigate = useNavigate();
-
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -114,7 +104,8 @@ export function PlatformLeads() {
     const total = records.length;
     const inFollowUp = records.filter(l => l.leadStatus === 'FOLLOW_UP').length;
     const newCount = records.filter(l => l.leadStatus === 'NEW').length;
-    return { total, inFollowUp, newCount };
+    const contacted = records.filter(l => l.leadStatus === 'CONTACTED').length;
+    return { total, inFollowUp, newCount, contacted };
   }, [records]);
 
   const handleApprove = async (record: PlatformLeadResponse) => {
@@ -145,299 +136,163 @@ export function PlatformLeads() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <style>{`
-        .platform-table-row:hover {
-          background-color: #f1f5f9;
-        }
-      `}</style>
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Leads</h1>
-          <p className="text-muted-foreground">Prospective gyms that requested a demo, tracked from first contact to approval.</p>
-        </div>
-      </div>
+    <PlatformPage>
+      <PageHead
+        icon={Target}
+        title="Leads"
+        subtitle="Prospective gyms that requested a demo, tracked from first contact to approval."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Active Leads</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpis.total}</div>
-            <p className="text-xs text-muted-foreground">Prospective gyms in progress</p>
-          </CardContent>
-        </Card>
+      <KpiRow cols={4}>
+        <Kpi icon={Users} tone="teal" label="Active leads" value={loading ? '—' : kpis.total} hint="Prospective gyms in progress" />
+        <Kpi icon={Target} tone="blue" label="New" value={loading ? '—' : kpis.newCount} hint="Not yet contacted"
+          onClick={() => setStatusFilter(statusFilter === 'NEW' ? 'all' : 'NEW')} title="Show only new leads" />
+        <Kpi icon={Phone} tone="gray" label="Contacted" value={loading ? '—' : kpis.contacted} hint="Reached at least once"
+          onClick={() => setStatusFilter(statusFilter === 'CONTACTED' ? 'all' : 'CONTACTED')} title="Show only contacted leads" />
+        <Kpi icon={CalendarClock} tone="amber" label="In follow-up" value={loading ? '—' : kpis.inFollowUp} hint="Needs a next touchpoint"
+          onClick={() => setStatusFilter(statusFilter === 'FOLLOW_UP' ? 'all' : 'FOLLOW_UP')} title="Show only leads in follow-up" />
+      </KpiRow>
 
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">New</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <Target className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{kpis.newCount}</div>
-            <p className="text-xs text-muted-foreground">Not yet contacted</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">In Follow-up</CardTitle>
-            <div className="bg-orange-50 p-2 rounded-lg">
-              <CalendarClock className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{kpis.inFollowUp}</div>
-            <p className="text-xs text-muted-foreground">Needs a next touchpoint</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className={cardShell}>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-[250px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by business, contact, or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+      <Panel
+        title="Pipeline"
+        icon={Building2}
+        action={
+          <Toolbar>
+            <Count n={filtered.length} />
+            <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="Search business, contact or email…" label="Search leads" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[150px]" aria-label="Status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="NEW">New</SelectItem>
                 <SelectItem value="CONTACTED">Contacted</SelectItem>
                 <SelectItem value="FOLLOW_UP">Follow-up</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className={cardShell}>
-        <CardHeader>
-          <CardTitle>Leads ({filtered.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader className="bg-slate-100">
-              <TableRow>
-                <TableHead>Business</TableHead>
-                <TableHead>Plan Interest</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading && filtered.map((l) => (
-                <TableRow key={l.id} className="platform-table-row transition-colors">
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{l.businessName || 'Untitled business'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{l.planInterest}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm">{l.contactName || '—'}</p>
-                    <p className="text-xs text-muted-foreground">{l.contactEmail || '—'}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(l.leadStatus)}>{l.leadStatus.replace('_', ' ')}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">{formatDate(l.createdAt)}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => setDetail(l)} title="View details">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { handleContacted(l); window.open(`tel:${l.contactPhone}`); }}
-                        title="Call"
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { handleContacted(l); window.open(`mailto:${l.contactEmail}`); }}
-                        title="Email"
-                      >
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Schedule follow-up"
-                        onClick={() => navigate('/platform-follow-up', { state: { prefillLeadId: l.id, prefillLeadName: l.businessName } })}
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" onClick={() => handleApprove(l)} disabled={approvingId === l.id} title="Approve for onboarding">
-                        {approvingId === l.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                        Approve
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!loading && filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {records.length === 0
-                      ? 'No leads yet — they appear here when someone completes the onboarding form on the pricing page.'
-                      : 'No leads match your search.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          </Toolbar>
+        }
+      >
+        <DataTable head={<>
+          <th>Business</th>
+          <th>Plan interest</th>
+          <th>Contact</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th className={p.right}>Actions</th>
+        </>}>
+          {loading ? <StateRow cols={6} loading /> : filtered.map((l) => (
+            <tr key={l.id} data-clickable="true" onClick={() => setDetail(l)}>
+              <td data-label="">
+                <Entity name={l.businessName || 'Untitled business'} seed={String(l.id)}
+                  sub={l.country ? <><MapPin />{l.country}</> : undefined} />
+              </td>
+              <td data-label="Plan interest">{l.planInterest ? <Chip>{l.planInterest}</Chip> : <span className={p.muted}>—</span>}</td>
+              <td data-label="Contact">
+                <div className={p.stack}>
+                  <span>{l.contactName || '—'}</span>
+                  <span className={p.entitySub}><Mail />{l.contactEmail || '—'}</span>
+                </div>
+              </td>
+              <td data-label="Status"><Pill kind={statusKind(l.leadStatus)}>{l.leadStatus.replace('_', ' ').toLowerCase()}</Pill></td>
+              <td data-label="Created" className={p.muted}>{formatDate(l.createdAt)}</td>
+              <td data-label="">
+                <div className={p.rowActions}>
+                  <IconAction icon={Eye} label="View details" onClick={() => setDetail(l)} />
+                  <IconAction icon={Phone} label={l.contactPhone ? `Call ${l.contactPhone}` : 'No phone number'} disabled={!l.contactPhone}
+                    onClick={() => { handleContacted(l); window.open(`tel:${l.contactPhone}`); }} />
+                  <IconAction icon={Mail} label={l.contactEmail ? `Email ${l.contactEmail}` : 'No email'} disabled={!l.contactEmail}
+                    onClick={() => { handleContacted(l); window.open(`mailto:${l.contactEmail}`); }} />
+                  <IconAction icon={MessageSquare} label="Schedule follow-up"
+                    onClick={() => navigate('/platform-follow-up', { state: { prefillLeadId: l.id, prefillLeadName: l.businessName } })} />
+                  <Button size="sm" onClick={(e) => { e.stopPropagation(); handleApprove(l); }} disabled={approvingId === l.id} title="Approve for onboarding">
+                    {approvingId === l.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                    Approve
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {!loading && filtered.length === 0 && (
+            <StateRow cols={6}>
+              {records.length === 0
+                ? 'No leads yet — they appear here when someone completes the onboarding form on the pricing page.'
+                : 'No leads match your search.'}
+            </StateRow>
+          )}
+        </DataTable>
+      </Panel>
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
         <SheetContent className="w-full sm:w-[600px] sm:max-w-none overflow-y-auto">
           {detail && (
             <>
               <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  {detail.businessName || 'Untitled business'}
+                <SheetTitle>
+                  <Entity name={detail.businessName || 'Untitled business'} seed={String(detail.id)}
+                    sub={<Pill kind={statusKind(detail.leadStatus)}>{detail.leadStatus.replace('_', ' ').toLowerCase()}</Pill>} />
                 </SheetTitle>
               </SheetHeader>
-              <div className="space-y-6 mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Contact</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <p><span className="text-muted-foreground">Name:</span> {detail.contactName || '—'}</p>
-                    <p><span className="text-muted-foreground">Email:</span> {detail.contactEmail || '—'}</p>
-                    <p><span className="text-muted-foreground">Phone:</span> {detail.contactPhone || '—'}</p>
-                    <p><span className="text-muted-foreground">WhatsApp:</span> {detail.contactWhatsapp || '—'}</p>
-                  </CardContent>
-                </Card>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginTop: '1.25rem' }}>
+                <Section icon={Users} title="Contact">
+                  <Facts rows={[
+                    ['Name', detail.contactName],
+                    ['Email', detail.contactEmail],
+                    ['Phone', detail.contactPhone],
+                    ['WhatsApp', detail.contactWhatsapp],
+                  ]} />
+                </Section>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Briefcase className="h-4 w-4" /> Business
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <p><span className="text-muted-foreground">Plan interest:</span> {detail.planInterest}</p>
-                    <p><span className="text-muted-foreground">Years in business:</span> {detail.yearsInBusiness || '—'}</p>
-                    <p><span className="text-muted-foreground">Branches:</span> {detail.branches || '—'}</p>
-                    <p><span className="text-muted-foreground">Members:</span> {detail.memberCount || '—'}</p>
-                    <p><span className="text-muted-foreground">Staff:</span> {detail.staffCount || '—'}</p>
-                    {detail.businessTypes.length > 0 && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Business type</p>
-                        <div className="flex flex-wrap gap-1">
-                          {detail.businessTypes.map(t => <Badge key={t} variant="outline">{t}</Badge>)}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <Section icon={Briefcase} title="Business">
+                  <Facts rows={[
+                    ['Plan interest', detail.planInterest],
+                    ['Years in business', detail.yearsInBusiness],
+                    ['Branches', detail.branches],
+                    ['Members', detail.memberCount],
+                    ['Staff', detail.staffCount],
+                    ...(detail.businessTypes.length > 0
+                      ? [['Business type', <div className={p.chips}>{detail.businessTypes.map(t => <Chip key={t}>{t}</Chip>)}</div>] as [string, React.ReactNode]]
+                      : []),
+                  ]} />
+                </Section>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <MapPin className="h-4 w-4" /> Location
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <p><span className="text-muted-foreground">Country:</span> {detail.country || '—'}</p>
-                    <p><span className="text-muted-foreground">State:</span> {detail.state || '—'}</p>
-                    <p><span className="text-muted-foreground">City / area:</span> {detail.cityArea || '—'}</p>
-                    <p><span className="text-muted-foreground">Address:</span> {detail.address || '—'}</p>
-                  </CardContent>
-                </Card>
+                <Section icon={MapPin} title="Location">
+                  <Facts rows={[
+                    ['Country', detail.country],
+                    ['State', detail.state],
+                    ['City / area', detail.cityArea],
+                    ['Address', detail.address],
+                  ]} />
+                </Section>
 
-                {(detail.services.length > 0 || detail.goals.length > 0 || detail.reasonsToSwitch.length > 0) && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Services & goals</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                      {detail.services.length > 0 && (
-                        <div>
-                          <p className="text-muted-foreground mb-1">Services</p>
-                          <div className="flex flex-wrap gap-1">
-                            {detail.services.map(s => <Badge key={s} variant="outline">{s}</Badge>)}
-                          </div>
-                        </div>
-                      )}
-                      {detail.goals.length > 0 && (
-                        <div>
-                          <p className="text-muted-foreground mb-1">Goals</p>
-                          <div className="flex flex-wrap gap-1">
-                            {detail.goals.map(g => <Badge key={g} variant="outline">{g}</Badge>)}
-                          </div>
-                        </div>
-                      )}
-                      {detail.currentSoftware && (
-                        <p><span className="text-muted-foreground">Current software:</span> {detail.currentSoftware}</p>
-                      )}
-                    </CardContent>
-                  </Card>
+                {(detail.services.length > 0 || detail.goals.length > 0 || detail.currentSoftware) && (
+                  <Section icon={TrendingUp} title="Services & goals">
+                    <Facts rows={[
+                      ...(detail.services.length > 0 ? [['Services', <div className={p.chips}>{detail.services.map(x => <Chip key={x}>{x}</Chip>)}</div>] as [string, React.ReactNode]] : []),
+                      ...(detail.goals.length > 0 ? [['Goals', <div className={p.chips}>{detail.goals.map(g => <Chip key={g}>{g}</Chip>)}</div>] as [string, React.ReactNode]] : []),
+                      ...(detail.currentSoftware ? [['Current software', detail.currentSoftware] as [string, React.ReactNode]] : []),
+                    ]} />
+                  </Section>
                 )}
 
                 {detail.notes && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Notes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm bg-muted/50 rounded-md p-3">{detail.notes}</p>
-                    </CardContent>
-                  </Card>
+                  <Section title="Notes">
+                    <p className={p.note} style={{ margin: 0 }}>{detail.notes}</p>
+                  </Section>
                 )}
 
                 {detail.followUps.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Follow-up history</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
+                  <Section icon={CalendarClock} title="Follow-up history">
+                    <div className={p.timeline}>
                       {detail.followUps.map(fu => (
-                        <div key={fu.id} className="text-sm border rounded-lg p-2">
-                          <p className="font-medium capitalize">{fu.type.toLowerCase()} — {formatDate(fu.dueDate)}</p>
-                          <p className="text-muted-foreground">{fu.notes || 'No notes'}</p>
+                        <div key={fu.id} className={p.timelineItem}>
+                          <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>{fu.type.toLowerCase()} · {formatDate(fu.dueDate)}</div>
+                          <div className={p.muted}>{fu.notes || 'No notes'}</div>
                         </div>
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </Section>
                 )}
 
                 <Button className="w-full" onClick={() => handleApprove(detail)} disabled={approvingId === detail.id}>
@@ -449,7 +304,7 @@ export function PlatformLeads() {
           )}
         </SheetContent>
       </Sheet>
-    </div>
+    </PlatformPage>
   );
 }
 

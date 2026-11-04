@@ -9,7 +9,7 @@ import { useSyncExternalStore } from "react";
  * Printed documents (receipts, statements, salary slips) deliberately keep their own
  * fixed colours — they must look the same whoever prints them.
  */
-export type ThemeId = "blue" | "teal" | "indigo" | "green" | "orange" | "plum" | "graphite";
+export type ThemeId = "blue" | "teal" | "indigo" | "green" | "orange" | "plum" | "graphite" | "petrol" | "burgundy" | "mocha";
 
 export interface ThemeOption {
   id: ThemeId;
@@ -31,19 +31,20 @@ export interface ThemeOption {
 
 export const THEMES: ThemeOption[] = [
   {
+    // Id kept as "blue" so everyone who picked the old bright Ocean Blue moves to this one.
     id: "blue",
-    name: "Ocean Blue",
-    description: "Clean, professional ERP blue with a dark blue sidebar.",
+    name: "Navy Blue",
+    description: "Calm, deep corporate blue — easy on the eyes all day.",
     swatches: {
-      sidebar: "#1352CF",
-      sidebarActive: "#1F71F1",
-      primary: "#2693FD",
-      hover: "#2382F6",
-      light: "#C5DFFD",
-      background: "#F5F9FF",
-      border: "#DCE7F5",
-      text: "#172B4D",
-      muted: "#64748B",
+      sidebar: "#0F2A4A",
+      sidebarActive: "#24599A",
+      primary: "#1D4E89",
+      hover: "#173F70",
+      light: "#D6E3F3",
+      background: "#F1F4F8",
+      border: "#D3DCE7",
+      text: "#1A2B42",
+      muted: "#5B6B80",
     },
   },
   {
@@ -142,10 +143,76 @@ export const THEMES: ThemeOption[] = [
       muted: "#64748B",
     },
   },
+  {
+    id: "petrol",
+    name: "Petrol",
+    description: "Deep cyan-blue — cool and calm for data-heavy work.",
+    swatches: {
+      sidebar: "#0B3442",
+      sidebarActive: "#1A6E88",
+      primary: "#155E75",
+      hover: "#114D60",
+      light: "#D3EAF0",
+      background: "#F1F5F6",
+      border: "#D0DDE1",
+      text: "#14272E",
+      muted: "#566B72",
+    },
+  },
+  {
+    id: "burgundy",
+    name: "Burgundy",
+    description: "Rich wine red — a classic finance-suite look.",
+    swatches: {
+      sidebar: "#5C1020",
+      sidebarActive: "#A3253D",
+      primary: "#9F1D35",
+      hover: "#86182D",
+      light: "#F6DCE2",
+      background: "#F7F4F5",
+      border: "#E2D5D8",
+      text: "#2B1B1F",
+      muted: "#6E5A5F",
+    },
+  },
+  {
+    id: "mocha",
+    name: "Mocha",
+    description: "Warm earthy brown — soft, low-glare and relaxed.",
+    swatches: {
+      sidebar: "#3F2817",
+      sidebarActive: "#8A5A35",
+      primary: "#7A4E2D",
+      hover: "#664126",
+      light: "#EFE2D6",
+      background: "#F6F4F1",
+      border: "#DDD4CC",
+      text: "#2A2119",
+      muted: "#6F6359",
+    },
+  },
 ];
 
 /** Signed-in users who haven't picked a theme yet. */
 export const DEFAULT_THEME: ThemeId = "blue";
+/** The platform super admin (GYMBIOS_ADMIN) until they pick one. */
+export const SUPER_ADMIN_THEME: ThemeId = "graphite";
+
+// Same role check as App.tsx's isGymbiosAdmin, read from the session the login wrote.
+function isSuperAdminSession(): boolean {
+  try {
+    const norm = (r: unknown) => String(r ?? "").toLowerCase().replace(/^role_/, "");
+    const roles: unknown[] = JSON.parse(sessionStorage.getItem("roles") || "[]");
+    return roles.some((r) => norm(r) === "gymbios_admin") || norm(sessionStorage.getItem("gymbios_role_name")) === "gymbios_admin";
+  } catch {
+    return false;
+  }
+}
+
+/** A signed-in user's theme before they choose one: Graphite for the super admin, else the default. */
+export function defaultThemeForSession(): ThemeId {
+  return isSuperAdminSession() ? SUPER_ADMIN_THEME : DEFAULT_THEME;
+}
 /** Login and other signed-out screens — the GymBios brand teal. */
 export const LOGIN_THEME: ThemeId = "teal";
 
@@ -200,7 +267,7 @@ export function setTheme(id: ThemeId) {
  */
 export function syncThemeForUser(userId: string | null) {
   currentUserId = userId;
-  applyTheme(userId ? readStorage(userKey(userId)) ?? DEFAULT_THEME : LOGIN_THEME);
+  applyTheme(userId ? readStorage(userKey(userId)) ?? defaultThemeForSession() : LOGIN_THEME);
 }
 
 function subscribe(onChange: () => void) {

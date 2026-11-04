@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ChevronRight, Search, Star } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { ChevronRight, Star, Building2, MessageSquare, Clock, GitBranch } from 'lucide-react';
 import { RatingInline, RatingSummaryCard, ReviewList } from '../components/ratings/rating-parts';
 import { ratingsService, GymRatingDetail, PlatformGymRating } from '../utils/supabase/ratings-service';
+import {
+  PlatformPage, PageHead, KpiRow, Kpi, Panel, Toolbar, Count, SearchField, DataTable, StateRow, Entity, p,
+} from '../components/platform/platform-ui';
 
 const formatDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString() : '—');
 
@@ -22,20 +21,8 @@ export function PlatformRatings() {
   return <PlatformGymList />;
 }
 
-function Header({ title, subtitle, onBack }: { title: string; subtitle: string; onBack?: () => void }) {
-  return (
-    <div className="flex items-start gap-3">
-      {onBack && (
-        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      )}
-      <div>
-        <h1 className="text-3xl font-bold">{title}</h1>
-        <p className="text-muted-foreground">{subtitle}</p>
-      </div>
-    </div>
-  );
+function ErrorPanel({ message }: { message: string }) {
+  return <Panel title="Couldn't load ratings"><p style={{ margin: 0, color: 'var(--destructive)' }}>{message}</p></Panel>;
 }
 
 function PlatformGymList() {
@@ -54,59 +41,56 @@ function PlatformGymList() {
     return (gyms ?? []).filter(g => !q || `${g.gym_name} ${g.tenant_slug}`.toLowerCase().includes(q));
   }, [gyms, search]);
 
+  // Platform-wide figures: the average is weighted by each gym's number of ratings.
+  const stats = useMemo(() => {
+    const list = gyms ?? [];
+    const rated = list.filter(g => (g.rating_count ?? 0) > 0);
+    const total = rated.reduce((s, g) => s + (g.rating_count ?? 0), 0);
+    const avg = total ? rated.reduce((s, g) => s + (g.average_rating ?? 0) * (g.rating_count ?? 0), 0) / total : null;
+    const last = list.map(g => g.last_review_at).filter(Boolean).sort().pop() ?? null;
+    return { gyms: list.length, rated: rated.length, total, avg, last };
+  }, [gyms]);
+  const loading = gyms === null;
+
   return (
-    <div className="p-6 space-y-6">
-      <Header title="Ratings" subtitle="What members rate each gym in the mobile app" />
-      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center">
-            <Star className="w-5 h-5 mr-2 text-primary" />
-            Gym Ratings
-          </CardTitle>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search gyms..."
-              className="pl-10 bg-background/50"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Gym Name</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Last Review</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {gyms === null ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading ratings...</TableCell></TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No gyms found.</TableCell></TableRow>
-              ) : rows.map(g => (
-                <TableRow
-                  key={g.tenant_slug}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/platform-ratings/${encodeURIComponent(g.tenant_slug)}`)}
-                >
-                  <TableCell className="font-medium">{g.gym_name}</TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">{g.tenant_slug}</TableCell>
-                  <TableCell><RatingInline average={g.average_rating} count={g.rating_count} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{formatDate(g.last_review_at)}</TableCell>
-                  <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+    <PlatformPage>
+      <PageHead icon={Star} title="Ratings" subtitle="What members rate each gym in the mobile app." />
+
+      <KpiRow cols={4}>
+        <Kpi icon={Building2} tone="teal" label="Gyms rated" value={loading ? '—' : `${stats.rated} / ${stats.gyms}`} hint="Have at least one rating" />
+        <Kpi icon={Star} tone="amber" label="Platform average" value={loading || stats.avg == null ? '—' : stats.avg.toFixed(1)} hint="Weighted by number of ratings" />
+        <Kpi icon={MessageSquare} tone="blue" label="Ratings" value={loading ? '—' : stats.total.toLocaleString()} hint="Across all gyms" />
+        <Kpi icon={Clock} tone="gray" label="Latest review" value={loading ? '—' : formatDate(stats.last)} hint="Most recent, any gym" />
+      </KpiRow>
+
+      <Panel
+        title="Gym ratings"
+        icon={Star}
+        action={
+          <Toolbar>
+            <Count n={rows.length} />
+            <SearchField value={search} onChange={setSearch} placeholder="Search gyms…" label="Search gyms" />
+          </Toolbar>
+        }
+      >
+        <DataTable head={<>
+          <th>Gym</th>
+          <th>Rating</th>
+          <th>Last review</th>
+          <th className={p.right} aria-label="Open" />
+        </>}>
+          {loading ? <StateRow cols={4} loading /> : rows.map(g => (
+            <tr key={g.tenant_slug} data-clickable="true" onClick={() => navigate(`/platform-ratings/${encodeURIComponent(g.tenant_slug)}`)}>
+              <td data-label=""><Entity name={g.gym_name} seed={g.tenant_slug} sub={<span className={p.mono}>{g.tenant_slug}</span>} /></td>
+              <td data-label="Rating"><RatingInline average={g.average_rating} count={g.rating_count} /></td>
+              <td data-label="Last review" className={p.muted}>{formatDate(g.last_review_at)}</td>
+              <td data-label="" className={p.right}><ChevronRight className="h-4 w-4" style={{ color: 'var(--muted-foreground)', display: 'inline' }} /></td>
+            </tr>
+          ))}
+          {!loading && rows.length === 0 && <StateRow cols={4}>No gyms found.</StateRow>}
+        </DataTable>
+      </Panel>
+    </PlatformPage>
   );
 }
 
@@ -120,54 +104,50 @@ function PlatformGym({ tenantSlug }: { tenantSlug: string }) {
   }, [tenantSlug]);
 
   return (
-    <div className="p-6 space-y-6">
-      <Header
+    <PlatformPage>
+      <PageHead
+        icon={Star}
         title={gym ? gym.gym_name : 'Ratings'}
-        subtitle={gym ? `${tenantSlug} · ratings by branch` : 'Ratings by branch'}
+        subtitle={<><span className={p.mono}>{tenantSlug}</span> · ratings by branch</>}
         onBack={() => navigate('/platform-ratings')}
       />
-      {error ? (
-        <Card><CardContent className="py-8 text-center text-destructive">{error}</CardContent></Card>
-      ) : !gym ? (
-        <p className="text-muted-foreground">Loading ratings...</p>
+      {error ? <ErrorPanel message={error} /> : !gym ? (
+        <Panel title="Loading ratings…"><div className={p.muted}>Loading…</div></Panel>
       ) : (
         <>
-          <Card className="border-primary/10 shadow-md">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="text-4xl font-bold">{gym.average_rating != null ? gym.average_rating.toFixed(1) : '—'}</div>
+          <Panel title="Overall rating" icon={Star}>
+            <div className={p.score}>
+              <span className={p.scoreBig}>{gym.average_rating != null ? gym.average_rating.toFixed(1) : '—'}</span>
               <RatingInline average={gym.average_rating} count={gym.rating_count} />
-            </CardContent>
-          </Card>
-          <Card className="border-primary/10 shadow-md">
-            <CardHeader><CardTitle>Branches</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              {(gym.branches ?? []).length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No branches found.</p>
-              ) : (
-                <div className="divide-y">
-                  {gym.branches!.map(b => (
-                    <button
-                      key={b.branch_id}
-                      className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-slate-50/50 transition-colors"
-                      onClick={() => navigate(`/platform-ratings/${encodeURIComponent(tenantSlug)}/${b.branch_id}`)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{b.branch_name ?? `Branch ${b.branch_id}`}</div>
-                        {b.last_review_at && (
-                          <div className="text-xs text-muted-foreground">Last review {formatDate(b.last_review_at)}</div>
-                        )}
-                      </div>
-                      <RatingInline average={b.average_rating} count={b.rating_count} />
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              <span className={p.muted} style={{ fontSize: '0.8125rem' }}>Last review {formatDate(gym.last_review_at)}</span>
+            </div>
+          </Panel>
+          <Panel title="Branches" icon={GitBranch} action={<Count n={(gym.branches ?? []).length} />}>
+            {(gym.branches ?? []).length === 0 ? (
+              <div className={p.muted} style={{ textAlign: 'center', padding: '1.5rem 0' }}>No branches found.</div>
+            ) : (
+              <div style={{ margin: '0 -1.25rem -1.25rem' }}>
+                {gym.branches!.map(b => (
+                  <button
+                    key={b.branch_id}
+                    type="button"
+                    className={p.listBtn}
+                    onClick={() => navigate(`/platform-ratings/${encodeURIComponent(tenantSlug)}/${b.branch_id}`)}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Entity name={b.branch_name ?? `Branch ${b.branch_id}`} seed={`${tenantSlug}-${b.branch_id}`}
+                        sub={b.last_review_at ? `Last review ${formatDate(b.last_review_at)}` : 'No reviews yet'} />
+                    </div>
+                    <RatingInline average={b.average_rating} count={b.rating_count} />
+                    <ChevronRight className="h-4 w-4" style={{ color: 'var(--muted-foreground)' }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </Panel>
         </>
       )}
-    </div>
+    </PlatformPage>
   );
 }
 
@@ -181,22 +161,21 @@ function PlatformBranch({ tenantSlug, branchId }: { tenantSlug: string; branchId
   }, [tenantSlug, branchId]);
 
   return (
-    <div className="p-6 space-y-6">
-      <Header
+    <PlatformPage>
+      <PageHead
+        icon={Star}
         title={detail?.summary.branch_name ?? 'Branch ratings'}
-        subtitle={`${tenantSlug} · member ratings and reviews`}
+        subtitle={<><span className={p.mono}>{tenantSlug}</span> · member ratings and reviews</>}
         onBack={() => navigate(`/platform-ratings/${encodeURIComponent(tenantSlug)}`)}
       />
-      {error ? (
-        <Card><CardContent className="py-8 text-center text-destructive">{error}</CardContent></Card>
-      ) : !detail ? (
-        <p className="text-muted-foreground">Loading ratings...</p>
+      {error ? <ErrorPanel message={error} /> : !detail ? (
+        <Panel title="Loading ratings…"><div className={p.muted}>Loading…</div></Panel>
       ) : (
         <>
           <RatingSummaryCard summary={detail.summary} />
           <ReviewList reviews={detail.reviews} />
         </>
       )}
-    </div>
+    </PlatformPage>
   );
 }
