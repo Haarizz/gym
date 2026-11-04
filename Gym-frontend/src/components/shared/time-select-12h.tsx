@@ -130,7 +130,24 @@ export function TimeSlotSelect12h({ value, onChange, id, minuteStep = 15, scroll
   const [open, setOpen] = React.useState(false);
   const [active, setActive] = React.useState(0);
   const anchorRef = React.useRef<HTMLDivElement>(null);
-  const listRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+
+  // The list scrolls itself on the mouse wheel: it's portaled outside any open Dialog, whose
+  // scroll lock otherwise swallows wheel events there (the list wouldn't move at all).
+  const removeWheel = React.useRef<(() => void) | null>(null);
+  const setListEl = React.useCallback((el: HTMLDivElement | null) => {
+    removeWheel.current?.();
+    removeWheel.current = null;
+    listRef.current = el;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+      el.scrollTop += e.deltaY * unit;
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    removeWheel.current = () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   // Follow outside changes (edit form loading a session, reset) while not typing.
   React.useEffect(() => {
@@ -243,9 +260,12 @@ export function TimeSlotSelect12h({ value, onChange, id, minuteStep = 15, scroll
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => { if (anchorRef.current?.contains(e.target as Node)) e.preventDefault(); }}
-        style={{ width: 'var(--radix-popover-trigger-width)', minWidth: '9rem', padding: 4, maxHeight: 260, overflowY: 'auto' }}
+        // Pressing anywhere in the list — its scrollbar too — must keep focus in the field;
+        // the field closes the list when it loses focus (it used to close on a scrollbar drag).
+        onMouseDown={(e) => e.preventDefault()}
+        style={{ width: 'var(--radix-popover-trigger-width)', minWidth: '9rem', padding: 4 }}
       >
-        <div ref={listRef} role="listbox">
+        <div ref={setListEl} role="listbox" style={{ maxHeight: 252, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {options.map((s, i) => (
             <button
               key={s}
