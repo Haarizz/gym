@@ -30,16 +30,19 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <meta name="theme-color" content="#2B7A78" />
       <!-- Colour theme applied before first paint — see src/utils/theme.ts (keep ids/colours in sync).
-           Signed out: brand teal. Signed in: the user's Settings > Theme choice, else Ocean Blue. -->
+           Signed out: brand teal. Signed in: the user's Settings > Theme choice, else Navy Blue (Graphite for the super admin). -->
       <script>
         (function () {
-          var COLORS = { blue: '#2693FD', teal: '#2B7A78', indigo: '#4F46E5', green: '#15803D', orange: '#C2410C', plum: '#714B67', graphite: '#334155' };
+          var COLORS = { blue: '#1D4E89', teal: '#2B7A78', indigo: '#4F46E5', green: '#15803D', orange: '#C2410C', plum: '#714B67', graphite: '#334155', petrol: '#155E75', burgundy: '#9F1D35', mocha: '#7A4E2D' };
           var t = 'teal';
           try {
             var user = sessionStorage.getItem('token') && JSON.parse(sessionStorage.getItem('gymbios_user') || 'null');
             if (user && user.id) {
               var saved = localStorage.getItem('gymbios_theme:' + user.id);
-              t = COLORS.hasOwnProperty(saved) ? saved : 'blue';
+              var norm = function (r) { return String(r || '').toLowerCase().replace(/^role_/, ''); };
+              var roles = JSON.parse(sessionStorage.getItem('roles') || '[]');
+              var superAdmin = roles.some(function (r) { return norm(r) === 'gymbios_admin'; }) || norm(sessionStorage.getItem('gymbios_role_name')) === 'gymbios_admin';
+              t = COLORS.hasOwnProperty(saved) ? saved : (superAdmin ? 'graphite' : 'blue');
             }
           } catch (_) {}
           document.documentElement.setAttribute('data-gb-theme', t);
@@ -47,11 +50,11 @@
         })();
       </script>
       <title>GymBios</title>
-      <script type="module" crossorigin src="/assets/index-HBwXb8Zp.js"></script>
-      <link rel="stylesheet" crossorigin href="/assets/index-BFE8vzAa.css">
+      <script type="module" crossorigin src="/assets/index-CqSX_PS2.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-DZmDwJWE.css">
     </head>
 
     <body>
-      <div id="root"></div>
+      <div id="root"></div>
     </body>
   </html>
