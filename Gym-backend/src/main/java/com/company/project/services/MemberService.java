@@ -881,14 +881,69 @@ public class MemberService {
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
     }
 
+    /**
+     * Resumes a suspended membership. A suspension pauses the membership, it doesn't end it:
+     * the days spent suspended are added back to the end date (like an unfreeze), so the
+     * member gets exactly the time they had left. Days the member was also frozen in that
+     * window are left out — the freeze already gives those back when it ends. A membership
+     * that had already run out before it was suspended isn't extended.
+     */
     public MemberResponseDTO resumeMembership(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + id));
+        if (member.isMembershipSuspended() && member.getSuspendedAt() != null) {
+            LocalDate from = member.getSuspendedAt().toLocalDate();
+            LocalDate today = LocalDate.now();
+            LocalDateTime end = member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate();
+            long days = java.time.temporal.ChronoUnit.DAYS.between(from, today) - frozenDaysWithin(member, from, today);
+            if (days > 0 && end != null && !end.toLocalDate().isBefore(from)) {
+                LocalDate oldEnd = end.toLocalDate();
+                if (member.getExpiryDate() != null) member.setExpiryDate(member.getExpiryDate().plusDays(days));
+                if (member.getMembershipEndDate() != null) member.setMembershipEndDate(member.getMembershipEndDate().plusDays(days));
+                if (member.getNextPaymentDate() != null) member.setNextPaymentDate(member.getNextPaymentDate().plusDays(days));
+                if (memberNoteRepository != null) {
+                    var note = new com.company.project.entities.MemberNote(member.getId(), "Membership resumed after " + days + " day"
+                            + (days == 1 ? "" : "s") + " suspended (since " + from + "). End date moved from "
+                            + oldEnd + " to " + oldEnd.plusDays(days) + "."
+                            + (member.getSuspendedReason() != null ? " Suspension reason: " + member.getSuspendedReason() : ""));
+                    memberNoteRepository.save(note);
+                }
+            }
+        }
         member.setMembershipSuspended(false);
         member.setSuspendedReason(null);
         member.setSuspendedBy(null);
         member.setSuspendedAt(null);
         return MemberResponseDTO.fromEntity(memberRepository.save(member));
+    }
+
+    // Optional so the many unit tests that build MemberService by constructor keep working.
+    private com.company.project.repositories.MembershipFreezeRepository membershipFreezeRepository;
+    private com.company.project.repositories.MemberNoteRepository memberNoteRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSuspensionHistory(com.company.project.repositories.MembershipFreezeRepository membershipFreezeRepository,
+                              com.company.project.repositories.MemberNoteRepository memberNoteRepository) {
+        this.membershipFreezeRepository = membershipFreezeRepository;
+        this.memberNoteRepository = memberNoteRepository;
+    }
+
+    /** Days in [from, to) the member was frozen — those are given back by the freeze itself. */
+    private long frozenDaysWithin(Member member, LocalDate from, LocalDate to) {
+        if (membershipFreezeRepository == null) return 0;
+        long total = 0;
+        for (com.company.project.entities.MembershipFreeze f
+                : membershipFreezeRepository.findByMemberDbIdOrderByFreezeStartDesc(member.getId())) {
+            if (f.getFreezeStart() == null) continue;
+            LocalDate fs = f.getFreezeStart().toLocalDate();
+            LocalDate fe = f.getEndedAt() != null ? f.getEndedAt().toLocalDate()
+                    : "frozen".equalsIgnoreCase(member.getMembershipStatus()) ? to
+                    : f.getPlannedEnd() != null ? f.getPlannedEnd().toLocalDate() : fs;
+            LocalDate a = fs.isAfter(from) ? fs : from;
+            LocalDate b = fe.isBefore(to) ? fe : to;
+            if (b.isAfter(a)) total += java.time.temporal.ChronoUnit.DAYS.between(a, b);
+        }
+        return total;
     }
 
     /**

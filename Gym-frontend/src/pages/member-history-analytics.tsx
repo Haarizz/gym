@@ -591,8 +591,11 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     if (!memberId) return;
     setSavingSuspension(true);
     try {
-      await membersService.resumeMembership(String(memberId));
-      toast.success('Membership resumed');
+      const resumed: any = await membersService.resumeMembership(String(memberId));
+      const newEnd = resumed?.membership_end_date || resumed?.expiry_date;
+      toast.success('Membership resumed', {
+        description: newEnd ? `The suspended days were added back — it now ends ${fmtDate(newEnd)}.` : undefined,
+      });
       loadAll();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to resume membership');
@@ -817,7 +820,8 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
             {member.membership_suspended && (
               <p className="text-sm text-amber-700">
-                Payments, renewals, add-ons, bookings, freezes, check-in and the member app are blocked until resumed
+                Membership paused — payments, renewals, add-ons, bookings, freezes, check-in and the member app are
+                blocked until resumed; the days spent suspended are added back on resume
                 {member.suspended_reason ? ` — ${member.suspended_reason}` : ''}
               </p>
             )}
@@ -2156,8 +2160,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               <span>Suspend Membership</span>
             </DialogTitle>
             <DialogDescription>
-              {member.name} won't be able to check in or use this gym's member features in the app
-              (bookings, membership, payments). They can still sign in, use the Community and browse gyms.
+              The membership is paused, not ended: {member.name} can't check in, pay, renew, book or buy
+              add-ons, and the app shows "Suspended" when they sign in. When you resume it, the days spent
+              suspended are added back to the end date.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">

@@ -31,7 +31,7 @@ const payments = {
     suspendedTitle: "Membresía suspendida",
     suspendedAtGym: "El gimnasio ha suspendido tu membresía en {{gym}}.",
     suspendedGeneric: "El gimnasio ha suspendido tu membresía.",
-    suspendedInfo: "Tu cuenta de GymBios sigue funcionando: puedes explorar la Comunidad y buscar gimnasios. Contacta con la recepción del gimnasio para restablecer tu membresía y desliza hacia abajo para comprobarlo de nuevo.",
+    suspendedInfo: "Tu membresía está en pausa, no finalizada: los días que te quedan se conservan y continúan cuando el gimnasio la reanude. Tu cuenta de GymBios sigue funcionando: puedes explorar la Comunidad y buscar gimnasios. Contacta con la recepción del gimnasio para restablecer tu membresía y desliza hacia abajo para comprobarlo de nuevo.",
     openCommunity: "Abrir Comunidad",
   },
 

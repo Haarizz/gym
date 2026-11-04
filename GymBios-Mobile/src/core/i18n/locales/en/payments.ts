@@ -29,7 +29,7 @@ const payments = {
     suspendedTitle: "Membership Suspended",
     suspendedAtGym: "Your membership at {{gym}} has been suspended by the gym.",
     suspendedGeneric: "Your membership has been suspended by the gym.",
-    suspendedInfo: "Your GymBios account still works: you can browse the Community and find gyms. Contact the gym's reception to restore your membership, then pull down to check again.",
+    suspendedInfo: "Your membership is paused, not ended — the days you have left are kept and continue once the gym resumes it. Your GymBios account still works: you can browse the Community and find gyms. Contact the gym's reception to restore your membership, then pull down to check again.",
     openCommunity: "Open Community",
   },
 

@@ -31,7 +31,7 @@ const payments = {
     suspendedTitle: "Mitgliedschaft ausgesetzt",
     suspendedAtGym: "Deine Mitgliedschaft bei {{gym}} wurde vom Studio ausgesetzt.",
     suspendedGeneric: "Deine Mitgliedschaft wurde vom Studio ausgesetzt.",
-    suspendedInfo: "Dein GymBios-Konto funktioniert weiterhin: Du kannst die Community durchsuchen und Studios finden. Wende dich an den Empfang des Studios, um deine Mitgliedschaft wiederherzustellen, und ziehe dann nach unten, um erneut zu prüfen.",
+    suspendedInfo: "Deine Mitgliedschaft ist pausiert, nicht beendet — deine restlichen Tage bleiben erhalten und laufen weiter, sobald das Studio sie fortsetzt. Dein GymBios-Konto funktioniert weiterhin: Du kannst die Community durchsuchen und Studios finden. Wende dich an den Empfang des Studios, um deine Mitgliedschaft wiederherzustellen, und ziehe dann nach unten, um erneut zu prüfen.",
     openCommunity: "Community öffnen",
   },
 
