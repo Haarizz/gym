@@ -2,7 +2,7 @@
 
 Staff and trainers request a salary advance from the mobile app. Approvers review the request in a new **Requests** tab on the web Salary Advances page. In the app, the request section **replaces the Tax tab** on both ledger screens.
 
-Status: implemented 2026-11-02 (migration V115; rejection note stored in its own `rejection_note` column).
+Status: implemented 2026-11-02 (migration V118 — was V115, renumbered after main took V116/V117; rejection note stored in its own `rejection_note` column).
 
 ---
 
@@ -35,7 +35,7 @@ Status: implemented 2026-11-02 (migration V115; rejection note stored in its own
 
 ## 3. Backend (Gym-backend)
 
-### 3.1 Migration — `V115__salary_advance_request_source.sql`
+### 3.1 Migration — `V118__salary_advance_request_source.sql`
 (Use the next free version number at implementation time. Never edit applied migrations.)
 
 ```sql

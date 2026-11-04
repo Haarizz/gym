@@ -5,3 +5,7 @@
 # Customer data — never commit: legacy gym dumps and member/webcam photos
 /members/
 /*.sql
+
+# Runtime logs
+Gym-backend/backend.log
+*.log
