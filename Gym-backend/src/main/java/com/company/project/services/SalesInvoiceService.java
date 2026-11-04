@@ -160,6 +160,7 @@ public class SalesInvoiceService {
      */
     public SalesInvoiceResponseDTO confirmInvoice(Long id, RecordBillPaymentRequestDTO payment) {
         SalesInvoice invoice = findForUpdate(id);
+        requireMemberNotSuspended(invoice, "confirming their invoice");
         if (!"DRAFT".equals(invoice.getStatus())) {
             throw new BusinessRuleViolationException("Only draft invoices can be confirmed. " + invoice.getInvoiceNumber() + " is " + invoice.getStatus() + ".");
         }
@@ -214,6 +215,7 @@ public class SalesInvoiceService {
         if (!"CONFIRMED".equals(invoice.getStatus())) {
             throw new BusinessRuleViolationException("Payments can only be recorded on confirmed invoices. " + invoice.getInvoiceNumber() + " is " + invoice.getStatus() + ".");
         }
+        requireMemberNotSuspended(invoice, "taking a payment");
         BigDecimal amount = req != null ? r2(nz(req.getAmount())) : BigDecimal.ZERO;
         if (amount.signum() <= 0) throw new BusinessRuleViolationException("Payment amount must be greater than 0.");
         BigDecimal balance = balanceOf(invoice);
@@ -291,6 +293,7 @@ public class SalesInvoiceService {
             if (req.getMemberId() == null) throw new BusinessRuleViolationException("Select the member this invoice is for.");
             Member m = memberRepository.findById(req.getMemberId())
                     .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + req.getMemberId()));
+            MemberSuspension.requireNotSuspended(m, "invoicing them");
             invoice.setCustomerType(SalesInvoice.CUSTOMER_MEMBER);
             invoice.setMemberId(m.getId());
             invoice.setCustomerName(firstNonBlank(req.getCustomerName(), m.getName()));
@@ -597,6 +600,13 @@ public class SalesInvoiceService {
     }
 
     // ── Helpers: misc ───────────────────────────────────────────────────────
+
+    private void requireMemberNotSuspended(SalesInvoice invoice, String action) {
+        if (SalesInvoice.CUSTOMER_MEMBER.equalsIgnoreCase(String.valueOf(invoice.getCustomerType())) && invoice.getMemberId() != null) {
+            memberRepository.findById(invoice.getMemberId())
+                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, action));
+        }
+    }
 
     private SalesInvoice find(Long id) {
         return invoiceRepository.findById(id)

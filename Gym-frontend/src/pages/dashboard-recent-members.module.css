@@ -1,0 +1,75 @@
+/* Dashboard › Recent Members table (DMT_03). Styled here because Gym-frontend's
+   Tailwind is a precompiled snapshot — new utility classes wouldn't exist. */
+
+.table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.avatar {
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+}
+
+.memberText {
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.email {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberId {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+.plan {
+  max-width: 10.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muted {
+  color: var(--muted-foreground);
+}
+
+.actionsHead,
+.actions {
+  text-align: right;
+}
+
+.actions button {
+  height: 2rem;
+  width: 2rem;
+  padding: 0;
+}

@@ -85,15 +85,20 @@ class AuthService {
     password: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // X-Client-App: the backend refuses member logins from the web (members use the mobile app only).
       const response = await fetch(`${backendBaseUrl}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Client-App": "web" },
         body: JSON.stringify({ username: email, password }),
       });
 
       if (response.ok) {
         const result = await response.json();
         const roles: string[] = Array.isArray(result.roles) ? result.roles : [];
+        // Same rule on this side, so an older backend can't let a member in either.
+        if (roles.length > 0 && roles.every((r) => String(r).toUpperCase().replace(/^ROLE_/, "") === "MEMBER")) {
+          return { success: false, error: "Members sign in with the GymBios mobile app. The web app is for gym staff only." };
+        }
         const permissions: string[] = Array.isArray(result.permissions) ? result.permissions : [];
         const roleName: string | undefined = result.roleName ?? result.role_name ?? roles[0];
         const staffName: string | undefined = result.staffName ?? result.staff_name;

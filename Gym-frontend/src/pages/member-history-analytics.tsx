@@ -710,7 +710,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   // Reception hasn't confirmed the payment yet — any membership action would
   // overwrite pending_approval and start the clock before approval.
   const isPendingApproval = member.membership_status === 'pending_approval';
-  const pendingApprovalHint = isPendingApproval ? 'Available after approval' : undefined;
+  // A suspended member is blocked from everything (payments, renewals, add-ons, bookings,
+  // freezes, check-in) until resumed — the backend refuses it too (MemberSuspension).
+  const isSuspended = !!member.membership_suspended;
+  const pendingApprovalHint = isPendingApproval
+    ? 'Available after approval'
+    : isSuspended ? 'Suspended — resume the membership first' : undefined;
   // The membership_status column is only ever set explicitly (create/freeze/
   // deactivate) — nothing flips it to "expired" when the expiry date passes,
   // so derive that here from expiry_date rather than trusting the stored value.
@@ -812,7 +817,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             </div>
             {member.membership_suspended && (
               <p className="text-sm text-amber-700">
-                Check-in and app member features are closed
+                Payments, renewals, add-ons, bookings, freezes, check-in and the member app are blocked until resumed
                 {member.suspended_reason ? ` — ${member.suspended_reason}` : ''}
               </p>
             )}
@@ -835,7 +840,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               size="sm"
               className="btn-primary"
               onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })}
-              disabled={isPendingApproval}
+              disabled={isPendingApproval || isSuspended}
             >
               <RefreshCcw className="h-4 w-4 mr-2" />
               Renew / Upgrade
@@ -845,7 +850,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               className="border-[#2B7A78] text-[#2B7A78] hover:bg-[#DFF5F4]"
               onClick={() => setIsFreezeDialogOpen(true)}
-              disabled={isPendingApproval}
+              disabled={isPendingApproval || (isSuspended && !isFrozen)}
             >
               <Snowflake className="h-4 w-4 mr-2" />
               {isFrozen ? 'Unfreeze' : 'Freeze'}
@@ -855,7 +860,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               className="border-primary/20"
               onClick={() => setIsTransferModalOpen(true)}
-              disabled={isPendingApproval}
+              disabled={isPendingApproval || isSuspended}
             >
               <Share2 className="h-4 w-4 mr-2" />
               Transfer

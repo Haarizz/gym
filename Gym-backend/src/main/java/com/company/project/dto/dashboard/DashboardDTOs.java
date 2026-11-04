@@ -134,6 +134,9 @@ public class DashboardDTOs {
         private String membershipType;
         private String joinDate;
         private String status;
+        private String memberId;
+        private String membershipPlan;
+        private String avatar;
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
@@ -149,6 +152,12 @@ public class DashboardDTOs {
         public void setJoinDate(String joinDate) { this.joinDate = joinDate; }
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
+        public String getMemberId() { return memberId; }
+        public void setMemberId(String memberId) { this.memberId = memberId; }
+        public String getMembershipPlan() { return membershipPlan; }
+        public void setMembershipPlan(String membershipPlan) { this.membershipPlan = membershipPlan; }
+        public String getAvatar() { return avatar; }
+        public void setAvatar(String avatar) { this.avatar = avatar; }
     }
 
     // The web dashboard reads these camelCase (global strategy is SNAKE_CASE)

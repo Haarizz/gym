@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -19,7 +20,7 @@ import { MemberAvatar, MemberStatusPill, memberPhoto } from "../components/membe
 import bd from "../components/bookings/BookingDialog.module.css";
 
 interface BookingsProps {
-  onNavigate?: (section: string) => void;
+  onNavigate?: (section: string, params?: Record<string, any>) => void;
 }
 
 interface Member {
@@ -56,6 +57,13 @@ const formatSessionDate = (value?: string) => {
   if (!value) return "";
   const d = new Date(`${value}T00:00:00`);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+};
+
+/** True once a session's start (gym wall-clock date + HH:mm) is now or in the past. */
+const sessionHasStarted = (s: { date: string; startTime: string }) => {
+  if (!s.date) return false;
+  const start = new Date(`${s.date}T${s.startTime || "00:00"}:00`);
+  return !Number.isNaN(start.getTime()) && start.getTime() <= Date.now();
 };
 
 const memberPlanLine = (m: Member) =>
@@ -123,6 +131,7 @@ interface Booking {
 
 export function Bookings({ onNavigate }: BookingsProps) {
   const { currencyCode, formatCurrency } = useCurrency();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -313,18 +322,41 @@ export function Bookings({ onNavigate }: BookingsProps) {
     }
   };
 
-  // Sessions in the booking dialog: own search, soonest first.
+  // Sessions in the booking dialog: upcoming only (started/past ones can't be booked), own search, soonest first.
   const [dialogSessionQuery, setDialogSessionQuery] = useState("");
+  const upcomingSessions = useMemo(
+    () => sessions.filter(cls => !sessionHasStarted(cls)),
+    // showBookingDialog: re-check against the clock each time the dialog opens.
+    [sessions, showBookingDialog]
+  );
   const dialogSessions = useMemo(() => {
     const q = dialogSessionQuery.trim().toLowerCase();
-    return sessions
+    return upcomingSessions
       .filter(cls => selectedBookingType === 'all' || cls.type === selectedBookingType)
       .filter(cls => !q ||
         cls.name.toLowerCase().includes(q) ||
         cls.instructor.toLowerCase().includes(q) ||
         cls.location.toLowerCase().includes(q))
       .sort((x, y) => `${x.date} ${x.startTime}`.localeCompare(`${y.date} ${y.startTime}`));
-  }, [sessions, selectedBookingType, dialogSessionQuery]);
+  }, [upcomingSessions, selectedBookingType, dialogSessionQuery]);
+
+  // High demand: upcoming, not-cancelled sessions with every seat taken — soonest first, top 3.
+  const highDemandSessions = useMemo(
+    () => upcomingSessions
+      .filter(cls => cls.status !== "cancelled" && cls.capacity > 0 && cls.booked >= cls.capacity)
+      .sort((x, y) => `${x.date} ${x.startTime}`.localeCompare(`${y.date} ${y.startTime}`))
+      .slice(0, 3),
+    [upcomingSessions]
+  );
+
+  // Opens Trainings & Classes' Create Session form pre-filled from the full session.
+  const handleAddSessionLike = (cls: ClassSchedule) => {
+    if (onNavigate) {
+      onNavigate("trainings-classes", { addSessionFrom: cls.id });
+    } else {
+      navigate("/trainings-classes", { state: { addSessionFrom: cls.id } });
+    }
+  };
 
   // Filter classes based on booking type
   const filteredClasses = useMemo(() => {
@@ -390,6 +422,11 @@ export function Bookings({ onNavigate }: BookingsProps) {
 
     if (isGuestBooking && (!guestDetails.name || !guestDetails.email || !guestDetails.phone)) {
       toast.error("Please fill in all guest details");
+      return;
+    }
+
+    if (sessionHasStarted(selectedClass)) {
+      toast.error("This session has already started — go back and pick an upcoming session");
       return;
     }
 
@@ -535,7 +572,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -733,7 +770,7 @@ export function Bookings({ onNavigate }: BookingsProps) {
                           onClick={() => setSelectedBookingType(id)}
                         >
                           {Icon && <Icon />} {label}
-                          <span className={bd.segCount}>{id === 'all' ? sessions.length : sessions.filter(s => s.type === id).length}</span>
+                          <span className={bd.segCount}>{id === 'all' ? upcomingSessions.length : upcomingSessions.filter(s => s.type === id).length}</span>
                         </button>
                       ))}
                     </div>
@@ -751,9 +788,13 @@ export function Bookings({ onNavigate }: BookingsProps) {
                     <div className={bd.results}>
                       <div className={bd.empty}>
                         <div className={bd.emptyIcon}><CalendarIcon /></div>
-                        <p className={bd.emptyTitle}>No sessions to show</p>
+                        <p className={bd.emptyTitle}>{sessions.length > 0 && upcomingSessions.length === 0 ? "No upcoming sessions" : "No sessions to show"}</p>
                         <p className={bd.emptyText}>
-                          {sessions.length === 0 ? "Create classes or PT slots in Trainings & Classes first." : "Try another type or search."}
+                          {sessions.length === 0
+                            ? "Create classes or PT slots in Trainings & Classes first."
+                            : upcomingSessions.length === 0
+                              ? "Every session has already started or finished. Schedule new ones in Trainings & Classes."
+                              : "Try another type or search."}
                         </p>
                       </div>
                     </div>
@@ -890,7 +931,9 @@ export function Bookings({ onNavigate }: BookingsProps) {
               <span className={bd.footHint}>
                 {bookingStep === 1 && (isGuestBooking ? "Fill in all three guest fields" : selectedMember ? `Booking for ${selectedMember.name}` : "Select a member to continue")}
                 {bookingStep === 2 && (selectedClass ? `${selectedClass.name} selected` : "Pick a session to continue")}
-                {bookingStep === 3 && "Check the details, then confirm"}
+                {bookingStep === 3 && (selectedClass && sessionHasStarted(selectedClass)
+                  ? "This session has already started — go back and pick an upcoming one"
+                  : "Check the details, then confirm")}
               </span>
               <div className={bd.footActions}>
                 {bookingStep === 1 ? (
@@ -907,12 +950,12 @@ export function Bookings({ onNavigate }: BookingsProps) {
                   </Button>
                 )}
                 {bookingStep === 2 && (
-                  <Button onClick={() => setBookingStep(3)} disabled={!selectedClass}>
+                  <Button onClick={() => setBookingStep(3)} disabled={!selectedClass || sessionHasStarted(selectedClass)}>
                     Next: confirm <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                 )}
                 {bookingStep === 3 && (
-                  <Button onClick={handleCreateBooking}>
+                  <Button onClick={handleCreateBooking} disabled={!!selectedClass && sessionHasStarted(selectedClass)}>
                     <CheckCircle className="h-4 w-4 mr-1.5" /> Confirm Booking
                   </Button>
                 )}
@@ -1305,43 +1348,28 @@ export function Bookings({ onNavigate }: BookingsProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {/* Sample Alerts */}
-                <div className="flex items-center space-x-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-yellow-800">Guest booking confirmation pending</div>
-                    <div className="text-sm text-yellow-600">John Smith's HIIT Bootcamp booking needs WhatsApp confirmation</div>
+                {highDemandSessions.map((cls) => (
+                  <div key={cls.id} className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Eye className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="font-medium text-blue-800">High demand alert</div>
+                      <div className="text-sm text-blue-600">
+                        {cls.name} ({formatSessionDate(cls.date)} · {cls.startTime}) is 100% booked. Consider adding another session.
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                      onClick={() => handleAddSessionLike(cls)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Session
+                    </Button>
                   </div>
-                  <Button size="sm" variant="outline" className="text-yellow-700 border-yellow-300 hover:bg-yellow-100">
-                    <MessageSquare className="h-4 w-4 mr-1" />
-                    Send
-                  </Button>
-                </div>
+                ))}
 
-                <div className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-green-800">QR code sent successfully</div>
-                    <div className="text-sm text-green-600">Ahmed Al-Mahmoud received booking confirmation via WhatsApp</div>
-                  </div>
-                  <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                    2 min ago
-                  </span>
-                </div>
-
-                <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Eye className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="font-medium text-blue-800">High demand alert</div>
-                    <div className="text-sm text-blue-600">Strength Training class is 100% booked. Consider adding another session.</div>
-                  </div>
-                  <Button size="sm" variant="outline" className="text-blue-700 border-blue-300 hover:bg-blue-100">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Session
-                  </Button>
-                </div>
-
-                {bookings.length === 0 && (
+                {highDemandSessions.length === 0 && (
                   <div className="text-center py-4 text-gray-500">
                     <div className="inline-flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -1442,14 +1470,14 @@ export function Bookings({ onNavigate }: BookingsProps) {
                       <Button 
                         size="sm" 
                         className="btn-primary"
-                        disabled={isFull}
+                        disabled={isFull || sessionHasStarted(cls)}
                         onClick={() => {
                           setSelectedClass(cls);
                           setShowBookingDialog(true);
                           setBookingStep(1);
                         }}
                       >
-                        Book Now
+                        {sessionHasStarted(cls) ? "Started" : "Book Now"}
                       </Button>
                     </div>
                   </div>

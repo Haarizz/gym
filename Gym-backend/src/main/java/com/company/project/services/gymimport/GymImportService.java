@@ -85,7 +85,7 @@ public class GymImportService {
             "WRITE_DIRECTORY_ENTRY", "ACTIVATE", "SYNC_DISCOVERY");
     /** The tables the import writes, in dependency order; they must be empty first. */
     private static final List<String> TARGET_TABLES = List.of("members", "member_notes", "receipts", "credit_notes",
-            "member_addons", "membership_freezes", "attendance");
+            "member_addons", "membership_freezes", "attendance", "employees");
 
     private final GymService gymService;
     private final TenantRepository tenantRepository;
@@ -590,6 +590,8 @@ public class GymImportService {
             case "credit_notes" -> "refunds";
             case "member_addons" -> "add-ons";
             case "membership_freezes" -> "freezes";
+            case "employees" -> "staff";
+            case "staff_branches" -> "staff branches";
             default -> table;
         };
     }

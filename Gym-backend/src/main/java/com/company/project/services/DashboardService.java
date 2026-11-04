@@ -356,9 +356,20 @@ public class DashboardService {
             dm.setPhone(m.getPhone());
             dm.setMembershipType(m.getMembershipType());
             dm.setJoinDate(m.getJoinDate() != null ? m.getJoinDate().toLocalDate().toString() : "");
-            dm.setStatus(m.getMembershipStatus());
+            dm.setStatus(effectiveStatus(m));
+            dm.setMemberId(m.getMemberId());
+            dm.setMembershipPlan(m.getMembershipPlan());
+            dm.setAvatar(m.getPhotoUrl());
             return dm;
         }).collect(Collectors.toList());
+    }
+
+    // Effective status (MemberEffectiveStatus), capitalised for the dashboard badge.
+    private static String effectiveStatus(Member m) {
+        String s = MemberEffectiveStatus.of(m);
+        if (s == null) return null;
+        if (s.equals("pending_approval")) return "Pending Approval";
+        return s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
     }
 
     public List<Map<String, Object>> getNotifications() {

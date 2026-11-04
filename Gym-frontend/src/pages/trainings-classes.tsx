@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -107,6 +108,8 @@ interface ClassItem {
 
 export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
   const { currencyCode, currencyPrefix } = useCurrency();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -281,6 +284,32 @@ export function TrainingsClasses({ onNavigate }: TrainingsClassesProps) {
     };
     load();
   }, []);
+
+  // Bookings' "High demand" alert sends { addSessionFrom: <session id> }: open Create Session
+  // pre-filled from that full session, so staff only pick the new date.
+  useEffect(() => {
+    const fromId = (location.state as { addSessionFrom?: string } | null)?.addSessionFrom;
+    if (!fromId || sessionsLoading) return;
+    const source = sessions.find((s) => String(s.id) === String(fromId));
+    resetNewClassForm();
+    if (source) {
+      setNewClassData((prev) => ({
+        ...prev,
+        name: source.name || "",
+        type: source.type || "class",
+        trainerId: source.trainerId ? String(source.trainerId) : "",
+        startTime: formatTime(source.startTime),
+        endTime: formatTime(source.endTime),
+        location: source.location || "",
+        capacity: String(source.capacity ?? ""),
+        price: String(source.price ?? ""),
+        description: source.description || "",
+      }));
+    }
+    setShowAddDialog(true);
+    // Consume the request so a refresh or Back doesn't reopen the form.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [sessionsLoading, location.state]);
 
   // Filter classes based on search and filters
   const filteredClasses = classes.filter((cls) => {

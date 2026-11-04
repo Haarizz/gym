@@ -137,37 +137,57 @@ export function AppSettings() {
     handleCompanyChange("phone", value.replace(/[^0-9+\-\s()]/g, ""));
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Check size limit (5MB = 5 * 1024 * 1024 bytes)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Company logo must be less than 5MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      handleCompanyChange("logoPreview", event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reads an uploaded logo/stamp and only keeps it if the browser can actually decode it
+  // as an image — the file dialog's "All files" filter bypasses accept="image/*", and a
+  // renamed file (report.xlsx → report.png) still reports an image MIME type.
+  const readImageUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: "logoPreview" | "stampPreview",
+    label: string,
+    maxMb: number,
+  ) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Company stamp must be less than 2MB.");
+    if (!file.type.startsWith("image/")) {
+      toast.error(`${label} must be an image file (PNG, JPG, SVG…).`);
+      return;
+    }
+    if (file.size > maxMb * 1024 * 1024) {
+      toast.error(`${label} must be less than ${maxMb}MB.`);
       return;
     }
     const reader = new FileReader();
-    reader.onload = (event) => handleCompanyChange("stampPreview", event.target?.result as string);
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => handleCompanyChange(field, dataUrl);
+      img.onerror = () => toast.error(`${label} could not be read as an image. Please choose a valid image file.`);
+      img.src = dataUrl;
+    };
+    reader.onerror = () => toast.error(`${label} could not be read. Please try another file.`);
     reader.readAsDataURL(file);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) =>
+    readImageUpload(e, "logoPreview", "Company logo", 5);
+
+  const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) =>
+    readImageUpload(e, "stampPreview", "Company stamp", 2);
+
+  // Inline uploads are data URLs; anything that isn't an image one must not be saved.
+  const isInvalidImageValue = (value: string) =>
+    value.startsWith("data:") && !value.startsWith("data:image/");
+
   const handleSaveCompany = async () => {
+    if (isInvalidImageValue(companyDetails.logoPreview)) {
+      toast.error("Company logo is not a valid image. Please upload a PNG, JPG or SVG file.");
+      return;
+    }
+    if (isInvalidImageValue(companyDetails.stampPreview)) {
+      toast.error("Company stamp is not a valid image. Please upload a PNG, JPG or SVG file.");
+      return;
+    }
     setIsCompanySaving(true);
     try {
       const keys = [

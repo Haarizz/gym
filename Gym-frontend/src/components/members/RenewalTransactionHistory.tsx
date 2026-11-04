@@ -119,31 +119,33 @@ export function RenewalSummaryCards({ stats }: { stats: RenewalHistoryStats | nu
       </div>
     );
   }
-  const { total, renewals, upgrades, totalCollected, methods } = stats;
+  // BG_127: same split as Members → Reports → Renewals Report (Renewals / Upgrades & Downgrades / Total);
+  // these cards cover all time, the report a chosen window.
+  const { total, renewals, changes, totalCollected, methods } = stats;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
-            <div className="text-sm text-blue-700">Total Transactions</div>
+            <div className="text-sm text-blue-700">Total Transactions · all time</div>
             <div className="text-2xl font-bold text-blue-900">{total}</div>
           </CardContent>
         </Card>
         <Card className="bg-green-50 border-green-200">
           <CardContent className="p-4">
-            <div className="text-sm text-green-700">Renewals</div>
+            <div className="text-sm text-green-700">Renewals · all time</div>
             <div className="text-2xl font-bold text-green-900">{renewals}</div>
           </CardContent>
         </Card>
         <Card className="bg-purple-50 border-purple-200">
           <CardContent className="p-4">
-            <div className="text-sm text-purple-700">Upgrades</div>
-            <div className="text-2xl font-bold text-purple-900">{upgrades}</div>
+            <div className="text-sm text-purple-700">Upgrades & Downgrades · all time</div>
+            <div className="text-2xl font-bold text-purple-900">{changes}</div>
           </CardContent>
         </Card>
         <Card className="bg-amber-50 border-amber-200">
           <CardContent className="p-4">
-            <div className="text-sm text-amber-700">Total Collected</div>
+            <div className="text-sm text-amber-700">Total Collected · all time</div>
             <div className="text-2xl font-bold text-amber-900"><CurrencyGlyph /> {totalCollected.toLocaleString()}</div>
           </CardContent>
         </Card>

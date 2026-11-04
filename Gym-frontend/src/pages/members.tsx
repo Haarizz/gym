@@ -69,7 +69,7 @@ import { RenewalTransactionHistory, RenewalSummaryCards } from "../components/me
 import { DueForRenewalList } from "../components/members/DueForRenewalList";
 import { MemberAnalyticsDialog } from "../components/members/MemberAnalyticsDialog";
 import { FreezeTransactionHistory } from "../components/members/FreezeTransactionHistory";
-import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
+import { MembershipLifecycleReport, LIFECYCLE_REPORT_TYPES, countLifecycleReport, countRenewalReport, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
 import { MemberStatCards, type StatCardDef } from "../components/members/MemberStatCards";
 import { PhotoZoomViewer } from "../components/members/PhotoZoomViewer";
 import type { DueFilter, DueStats } from "../components/members/DueForRenewalList";
@@ -284,9 +284,13 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
     receiptsService.countReceipts({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) })
       .then(set("membership"))
       .catch(() => {});
-    (["renewals", "joined", "expiring", "expired"] as LifecycleReportType[]).forEach(type => {
+    (["joined", "expiring", "expired"] as LifecycleReportType[]).forEach(type => {
       countLifecycleReport(type).then(set(type)).catch(() => {});
     });
+    // Same-plan renewals and plan changes counted apart, as on the Renewals & Upgrades tab
+    countRenewalReport()
+      .then(({ renewals, changes }) => { set("renewals")(renewals); set("renewalChanges")(changes); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [activeTab]);
 
@@ -1465,8 +1469,14 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
         return {
           cards: [
             { key: "membership", label: "Transactions", value: reportCounts.membership ?? null, sub: "Last 30 days", icon: FileText, tone: "primary" },
-            // Counts every renewal receipt, upgrades/downgrades included — the report splits them
-            { key: "renewals", label: "Renewals & Upgrades", value: reportCounts.renewals ?? null, sub: "Last 30 days", icon: RefreshCw, tone: "green" },
+            // BG_127: same-plan renewals only — the report's "Renewals" box and the Renewals tab's
+            // "Renewals" card count the same way; upgrades & downgrades are shown beside it.
+            {
+              key: "renewals", label: "Renewals", value: reportCounts.renewals ?? null, icon: RefreshCw, tone: "green",
+              sub: reportCounts.renewalChanges != null
+                ? `Last 30 days · ${reportCounts.renewalChanges} upgrades & downgrades`
+                : "Last 30 days",
+            },
             { key: "joined", label: "New Joiners", value: reportCounts.joined ?? null, sub: "Last 30 days", icon: UserRoundPlus, tone: "blue" },
             { key: "expiring", label: "Expiring Soon", value: reportCounts.expiring ?? null, sub: "Next 30 days", icon: Hourglass, tone: "amber" },
             { key: "expired", label: "Expired", value: reportCounts.expired ?? null, sub: "Last 30 days", icon: CalendarX, tone: "red" },
@@ -1514,7 +1524,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   })();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Members</h1>

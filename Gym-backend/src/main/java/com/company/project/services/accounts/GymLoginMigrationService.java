@@ -88,7 +88,9 @@ public class GymLoginMigrationService {
         }
 
         private static boolean usable(String e) {
-            return StringUtils.hasText(e) && !e.trim().toLowerCase().endsWith("@family.local");
+            // @temp.local: the previous GymBios's "<phone>@temp.local" when no email was given (imported gyms)
+            return StringUtils.hasText(e) && !e.trim().toLowerCase().endsWith("@family.local")
+                    && !e.trim().toLowerCase().endsWith("@temp.local");
         }
     }
 

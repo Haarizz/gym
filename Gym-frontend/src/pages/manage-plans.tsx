@@ -864,7 +864,7 @@ export function ManagePlans() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-sm">
           {error}

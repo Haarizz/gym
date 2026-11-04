@@ -568,7 +568,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
   const COLORS = ['var(--gb-primary-deep)', '#B91C1C', '#F4A261', '#2A9D8F', '#E76F51'];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

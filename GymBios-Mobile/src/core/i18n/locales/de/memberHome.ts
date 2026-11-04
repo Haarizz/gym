@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: 'PAUSIERT',
     statusActive: 'AKTIV',
     statusInactive: 'INAKTIV',
+    expiredSubscription: "Abgelaufenes Abo",
+    statusExpired: "ABGELAUFEN",
+    expiredOn: "Abgelaufen am",
+    expiredPrompt: "Deine Mitgliedschaft ist abgelaufen. Verlängere sie, um wieder einzuchecken und zu buchen.",
+    renewCta: "Mitgliedschaft verlängern",
     daysRemaining: 'Verbleibende Tage',
     validUntil: 'Gültig bis',
 

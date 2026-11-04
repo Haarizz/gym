@@ -138,6 +138,15 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
 
     List<Member> findTop5ByOrderByJoinDateDesc();
 
+    /**
+     * Members whose membership ends (effective end date, see BIOS_END_DATE) in [from, to) — for the
+     * daily expiry alerts. Frozen/suspended/pending memberships are paused, so they're left out.
+     */
+    @Query("SELECT m FROM Member m WHERE " + BIOS_END_DATE + " >= :from AND " + BIOS_END_DATE + " < :to"
+            + " AND m.membershipSuspended = false AND (m.membershipStatus IS NULL OR LOWER(m.membershipStatus) NOT IN"
+            + " ('pending_approval', 'frozen', 'suspended')) ORDER BY " + BIOS_END_DATE + ", m.name")
+    List<Member> findMembershipsEndingBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
     long countByJoinDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 
     long countByMembershipStatusAndExpiryDateBetween(String status, LocalDateTime startDate, LocalDateTime endDate);

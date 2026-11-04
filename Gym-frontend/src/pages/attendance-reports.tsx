@@ -606,7 +606,7 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gymbios-main-bg">
+    <div className="min-h-screen bg-gray-50">
 
       {/* ── Billing-style tab animation ─────────────────────────────────── */}
       <style>{`

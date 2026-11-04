@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Separator } from "../components/ui/separator";
 import { Skeleton } from "../components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { resolveBackendImageUrl } from "../utils/resolve-image-url";
+import recentStyles from "./dashboard-recent-members.module.css";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
 import { 
@@ -531,6 +534,18 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   };
 
+  // Recent Members status — the backend already resolves it (past end date → Expired)
+  const getMemberStatusBadgeColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'expired': return 'bg-red-100 text-red-800';
+      case 'frozen': return 'bg-blue-100 text-blue-800';
+      case 'suspended': return 'bg-orange-100 text-orange-800';
+      case 'pending approval': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   // Safe date parsing and formatting helpers
   const safeParseDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
@@ -576,8 +591,17 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   };
 
+  // Joined column: imported members joined in earlier years, so the year is shown
+  const formatJoinedColumn = (dateValue: any): string => {
+    const date = safeParseDate(dateValue);
+    if (!date) return '—';
+    if (isToday(date)) return 'Today';
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'dd MMM yyyy');
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header Section with Global Search */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -1176,44 +1200,64 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <p className="text-sm">No members yet</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              // DMT_03: a real table with headers — Member ID and Status were missing, and a
+              // missing email used to show as an unlabelled "Not added" line.
+              <Table className={recentStyles.table}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Member ID</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead className={recentStyles.actionsHead}>Contact</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {(recentMembers || []).map((member) => {
                   // Add safety check for member object
                   if (!member || !member.id || !member.name) {
                     return null;
                   }
-                  
-                  // Ensure membershipType exists for badge rendering
-                  const membershipType = member.membershipType || 'Basic';
-                  
+                  const email = member.email && !member.email.includes('@family.local') ? member.email : null;
+
                   return (
-                <div
+                <TableRow
                   key={member.id}
-                  className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted cursor-pointer"
+                  className={recentStyles.row}
                   onClick={() => openMemberAnalytics(member.id, member.name)}
+                  title="View member analytics"
                 >
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={member.avatar} />
-                    <AvatarFallback>
-                      {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium truncate">{member.name}</p>
-                      <Badge className={getMembershipBadgeColor(membershipType)}>
-                        {membershipType}
-                      </Badge>
+                  <TableCell>
+                    <div className={recentStyles.memberCell}>
+                      <Avatar className={recentStyles.avatar}>
+                        <AvatarImage src={resolveBackendImageUrl(member.avatar)} />
+                        <AvatarFallback>
+                          {member.name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className={recentStyles.memberText}>
+                        <div className={recentStyles.name}>{member.name}</div>
+                        <div className={recentStyles.sub}>{member.phone || 'No phone'}</div>
+                        {email && <div className={`${recentStyles.sub} ${recentStyles.email}`}>{email}</div>}
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{member.email && !member.email.includes('@family.local') ? member.email : 'Not added'}</p>
-                    <div className="flex items-center space-x-4 mt-1">
-                      <span className="text-xs text-muted-foreground">{member.phone}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Joined {formatJoinDate(member.joinDate)}
-                      </span>
+                  </TableCell>
+                  <TableCell className={recentStyles.memberId}>
+                    {member.memberId || <span className={recentStyles.muted}>—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <div className={recentStyles.plan} title={member.membershipPlan || undefined}>
+                      {member.membershipPlan || <span className={recentStyles.muted}>—</span>}
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                  </TableCell>
+                  <TableCell>
+                    {member.status
+                      ? <Badge className={getMemberStatusBadgeColor(member.status)}>{member.status}</Badge>
+                      : <span className={recentStyles.muted}>—</span>}
+                  </TableCell>
+                  <TableCell>{formatJoinedColumn(member.joinDate)}</TableCell>
+                  <TableCell className={recentStyles.actions} onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -1226,25 +1270,18 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      title={member.email && !member.email.includes('@family.local') ? `Email ${member.email}` : 'No email address'}
-                      disabled={!member.email || member.email.includes('@family.local')}
-                      onClick={() => { window.location.href = `mailto:${member.email}`; }}
+                      title={email ? `Email ${email}` : 'Email: Not added'}
+                      disabled={!email}
+                      onClick={() => { window.location.href = `mailto:${email}`; }}
                     >
                       <Mail className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      title="View member analytics"
-                      onClick={() => openMemberAnalytics(member.id, member.name)}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                  </TableCell>
+                </TableRow>
                   );
                 })}
-              </div>
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>

@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: 'SUSPENDU',
     statusActive: 'ACTIF',
     statusInactive: 'INACTIF',
+    expiredSubscription: "Abonnement expiré",
+    statusExpired: "EXPIRÉ",
+    expiredOn: "Expiré le",
+    expiredPrompt: "Votre abonnement a expiré. Renouvelez-le pour pointer et réserver à nouveau.",
+    renewCta: "Renouveler l'abonnement",
     daysRemaining: 'Jours restants',
     validUntil: 'Valable jusqu’au',
 

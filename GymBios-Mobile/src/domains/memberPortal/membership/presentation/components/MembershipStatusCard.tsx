@@ -59,6 +59,9 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
     );
   }
 
+  // The backend sends the effective status: "expired" once the end date has passed.
+  const isExpired = membership.status?.toLowerCase() === 'expired';
+
   const percentRemaining = Math.max(
     5,
     Math.min(100, Math.round((membership.daysRemaining / (membership.totalDays || 365)) * 100))
@@ -100,9 +103,9 @@ export function MembershipStatusCard({ membership }: MembershipStatusCardProps) 
             />
           )}
         </View>
-        {/* White-glass active pill — matching reference `.active-pill` */}
-        <View style={styles.activeBadge}>
-          <Feather name="check-circle" size={11} color="#FFFFFF" />
+        {/* White-glass active pill — matching reference `.active-pill`; red with an alert icon once expired */}
+        <View style={[styles.activeBadge, isExpired && styles.expiredBadge]}>
+          <Feather name={isExpired ? 'alert-circle' : 'check-circle'} size={11} color="#FFFFFF" />
           <Text style={styles.activeBadgeText}>{tOr(`membership.status.values.${membership.status.toUpperCase()}`, membership.status.toUpperCase())}</Text>
         </View>
       </View>
@@ -216,6 +219,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  expiredBadge: {
+    backgroundColor: 'rgba(220,38,38,0.85)',
   },
   activeBadgeInactive: {
     backgroundColor: 'rgba(0,0,0,0.08)',

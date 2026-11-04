@@ -275,6 +275,7 @@ public class MemberService {
         entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
+        MemberSuspension.requireNotSuspended(member, "approving a payment");
         if ("REJECTED".equals(member.getApprovalStatus())) {
             return approveRejectedPayment(member, approvedBy);
         }
@@ -1147,6 +1148,7 @@ public class MemberService {
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+        MemberSuspension.requireNotSuspended(member, "renewing or upgrading");
         requireApproved(member, "Renewal");
         if (member.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
@@ -1360,6 +1362,7 @@ public class MemberService {
     public MemberResponseDTO renewFamilyMinor(Long minorId, MinorRenewalRequestDTO request) {
         Member minor = memberRepository.findById(minorId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + minorId));
+        MemberSuspension.requireNotSuspended(minor, "renewing");
         if (!minor.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member is not billed to a family head — use the standard renew endpoint.");
         }
@@ -1444,6 +1447,7 @@ public class MemberService {
     public MemberResponseDTO renewFamily(Long headId, FamilyRenewalRequestDTO request) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
+        MemberSuspension.requireNotSuspended(head, "renewing the family");
         if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
             throw new BusinessRuleViolationException("This member is not a family head.");
         }
@@ -1568,6 +1572,7 @@ public class MemberService {
                                                  List<FamilyMemberDTO> familyMembers) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
+        MemberSuspension.requireNotSuspended(head, "changing to a family plan");
         if (head.getFamilyHeadId() != null) {
             throw new BusinessRuleViolationException("Your membership is part of another member's family — "
                     + "ask your family head or the gym to change it.");
@@ -1620,6 +1625,7 @@ public class MemberService {
     public MemberResponseDTO addFamilyMember(Long headId, FamilyMemberDTO fm) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
+        MemberSuspension.requireNotSuspended(head, "adding family members");
         if (head.getBranchId() != null) {
             branchService.assertBranchActive(head.getBranchId());
         }
@@ -1681,6 +1687,7 @@ public class MemberService {
     public MemberResponseDTO freezeMember(Long id, FreezeRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
+        MemberSuspension.requireNotSuspended(member, "freezing");
         requireApproved(member, "Freeze");
         LocalDateTime freezeUntil = parseDateTime(request.getFreezeUntil());
         LocalDateTime freezeStart = request.getFreezeStartDate() != null

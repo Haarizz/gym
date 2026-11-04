@@ -109,7 +109,15 @@ public class AuthService {
         userRoleRepository.save(new UserRole(null, user, userRoleEntity));
     }
 
+    /** Members sign in through the mobile app only — never the web app. */
+    public static final String MEMBER_WEB_LOGIN_MESSAGE =
+            "Members sign in with the GymBios mobile app. The web app is for gym staff only.";
+
     public AuthResponseDTO login(AuthRequestDTO request) {
+        return login(request, false);
+    }
+
+    public AuthResponseDTO login(AuthRequestDTO request, boolean fromWebApp) {
         // Resolve which tenant database this username/email lives in BEFORE
         // authenticating, so UserDetailsServiceImpl.loadUserByUsername (unchanged
         // itself) transparently hits the right database via TenantRoutingDataSource.
@@ -138,6 +146,9 @@ public class AuthService {
             // hasn't been yet is refused rather than half-working.
             if (loginTenantSlug != null && userDetails.isMemberOnly()) {
                 throw new BusinessRuleViolationException(UserDetailsImpl.GYM_LOGIN_MOVED_MESSAGE);
+            }
+            if (fromWebApp && userDetails.isMemberOnly()) {
+                throw new BusinessRuleViolationException(MEMBER_WEB_LOGIN_MESSAGE);
             }
             SecurityContextHolder.getContext().setAuthentication(authentication);
 

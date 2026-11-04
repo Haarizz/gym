@@ -1,6 +1,9 @@
 import { authService } from "./auth-service";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+// Session times are the gym's wall clock; without a branch time zone the server uses this
+// to tell whether a session has already started.
+const CLIENT_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } })();
 
 export interface BookingApi {
   id: string;
@@ -119,7 +122,11 @@ class BookingService {
     };
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/bookings`,
-      { method: "POST", body: JSON.stringify(body) }
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: CLIENT_TZ ? { "X-Client-Timezone": CLIENT_TZ } : undefined,
+      }
     );
     if (!response.ok) {
       // Surface the backend's reason (e.g. "Reward Pass has expired") instead of a bare status.

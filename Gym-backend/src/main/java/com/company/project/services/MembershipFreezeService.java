@@ -220,6 +220,7 @@ public class MembershipFreezeService {
 
     /** A freeze the member requested in the app: checked against the plan's policy and charged. */
     public FreezeResult freezeByMember(Member member, int days, String reason) {
+        MemberSuspension.requireNotSuspended(member, "freezing");
         if (!"active".equalsIgnoreCase(member.getMembershipStatus())) {
             throw new BusinessRuleViolationException("Membership must be active to freeze.");
         }
@@ -264,6 +265,7 @@ public class MembershipFreezeService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + memberId));
         // Checked up front, before closeOpenFreeze touches any freeze records.
+        MemberSuspension.requireNotSuspended(member, "freezing");
         memberService.requireApproved(member, "Freeze");
         if (request.isOverrideLimits() && (actor == null || !actor.canOverrideLimits())) {
             throw new BusinessRuleViolationException("Only a manager can override the plan's freeze limits.");
@@ -330,12 +332,15 @@ public class MembershipFreezeService {
 
     /** MemberService.renewMember, ending any freeze first (see endFreezeForRenewal). */
     public MemberResponseDTO renewEndingFreeze(Long memberId, RenewalRequestDTO request) {
+        // Before endFreezeForRenewal touches the freeze — renewMember would refuse anyway.
+        memberRepository.findById(memberId).ifPresent(m -> MemberSuspension.requireNotSuspended(m, "renewing or upgrading"));
         endFreezeForRenewal(memberId);
         return memberService.renewMember(memberId, request);
     }
 
     /** MemberService.renewFamily, ending the head's freeze first (see endFreezeForRenewal). */
     public MemberResponseDTO renewFamilyEndingFreeze(Long headId, FamilyRenewalRequestDTO request) {
+        memberRepository.findById(headId).ifPresent(m -> MemberSuspension.requireNotSuspended(m, "renewing the family"));
         endFreezeForRenewal(headId);
         return memberService.renewFamily(headId, request);
     }

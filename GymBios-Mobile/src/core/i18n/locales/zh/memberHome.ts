@@ -20,6 +20,11 @@ const memberHome = {
     statusFrozen: '已冻结',
     statusActive: '有效',
     statusInactive: '未激活',
+    expiredSubscription: "已过期的订阅",
+    statusExpired: "已过期",
+    expiredOn: "到期日",
+    expiredPrompt: "您的会员资格已过期。续费后即可再次签到和预约。",
+    renewCta: "续费会员",
     daysRemaining: '剩余天数',
     validUntil: '有效期至',
 

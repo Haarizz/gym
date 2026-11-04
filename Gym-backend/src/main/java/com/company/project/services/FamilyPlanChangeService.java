@@ -99,6 +99,7 @@ public class FamilyPlanChangeService {
     }
 
     public MemberResponseDTO apply(Long headId, FamilyPlanChangeRequestDTO req) {
+        memberRepository.findById(headId).ifPresent(m -> MemberSuspension.requireNotSuspended(m, "changing the family plan"));
         Change c = build(headId, req);
         // Same as every staff renewal (renewEndingFreeze): a renewed plan doesn't start frozen.
         freezeService.endFreezeForRenewal(headId);

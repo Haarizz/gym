@@ -24,6 +24,8 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     void clearTrainer(@Param("staffId") Long staffId);
 
     List<TrainingSession> findTop5ByStatusOrderByDateDescStartTimeDesc(String status);
+
+    List<TrainingSession> findByDateOrderByStartTimeAsc(LocalDate date);
     long countByDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
 
     long countByTrainer_IdAndStatusAndDateBetween(Long trainerId, String status, LocalDate start, LocalDate end);
