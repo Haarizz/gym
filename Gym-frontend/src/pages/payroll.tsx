@@ -34,7 +34,7 @@ const sum = (lines: PayrollLine[], key: keyof PayrollLine) => lines.reduce((t, l
 const lineDeductions = (l: PayrollLine) => Number(l.attendance_deduction) + Number(l.advance_repayment) + Number(l.other_deductions);
 
 
-/** Payroll lines store approved commission per settlement category: "total" (one per month), or the pre-V119 memberships / pos split. */
+/** Payroll lines store approved commission per settlement category: "total" (one per month), or the pre-V121 memberships / pos split. */
 const commissionLabel = (category: string) =>
   category === "pos" ? "POS sales commission" : category === "memberships" ? "Membership commission" : "Commission & bonuses";
 

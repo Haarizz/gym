@@ -140,7 +140,7 @@ public class FollowUp extends BaseEntity implements BranchAware {
     public List<CommunicationRecord> getCommunicationHistory() { return communicationHistory; }
     public void setCommunicationHistory(List<CommunicationRecord> communicationHistory) { this.communicationHistory = communicationHistory; }
 
-    // Assignee as a staff id (V119).
+    // Assignee as a staff id (V121).
     @Column(name = "assigned_staff_id")
     private Long assignedStaffId;
 

@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Fills performance_events from history once per database (plan §8 Phase 1), in the background
  * after startup so a plain restart is all a deploy needs. Marked done in
- * performance_engine_state; a database without the V119 tables yet is skipped and picked up on a
+ * performance_engine_state; a database without the V121 tables yet is skipped and picked up on a
  * later start. Turn off with --performance.backfill.enabled=false.
  */
 @Component

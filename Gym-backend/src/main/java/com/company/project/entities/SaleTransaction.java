@@ -253,7 +253,7 @@ public class SaleTransaction extends BaseEntity implements BranchAware {
     public String getPromotionName() { return promotionName; }
     public void setPromotionName(String promotionName) { this.promotionName = promotionName; }
 
-    // Cashier as a staff id (V119): the staff member signed in at the till.
+    // Cashier as a staff id (V121): the staff member signed in at the till.
     @Column(name = "cashier_staff_id")
     private Long cashierStaffId;
 

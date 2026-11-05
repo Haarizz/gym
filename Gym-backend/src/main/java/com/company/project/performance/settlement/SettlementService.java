@@ -27,7 +27,7 @@ import java.util.*;
  * note) with a snapshot of the breakdown and plan version; reject earns nothing; pay marks it
  * paid (normally done by a disbursed payroll run); reset reopens an undecided-looking month.
  *
- * Months decided before V119 may hold separate memberships / pos rows; actions apply to all of
+ * Months decided before V121 may hold separate memberships / pos rows; actions apply to all of
  * a month's rows together.
  */
 @Service

@@ -6,9 +6,9 @@ import java.time.LocalDateTime;
 import org.hibernate.annotations.Filter;
 
 /**
- * Commission settlement for one staff member and month (performance engine, V119): category
+ * Commission settlement for one staff member and month (performance engine, V121): category
  * "total", the frozen amount, and a JSON snapshot of the breakdown and plan it was approved
- * under. Older months may still hold their pre-V119 "memberships" / "pos" rows; the engine
+ * under. Older months may still hold their pre-V121 "memberships" / "pos" rows; the engine
  * reads those together as one settlement.
  */
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")

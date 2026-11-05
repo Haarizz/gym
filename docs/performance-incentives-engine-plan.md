@@ -75,7 +75,7 @@ A staff member and a trainer are the same `Staff` record. The plan assigned to t
 
 ### 4.1 Staff IDs on source rows
 
-Migration `V119` adds these columns:
+Migration `V121` adds these columns:
 
 | Table | Column | Set at write time | Backfill / fallback |
 |-------|--------|-------------------|---------------------|
@@ -246,7 +246,7 @@ record PeriodResult(Long staffId, YearMonth period,
 | `GET /unassigned`, `PUT /unassigned/{receipt\|sale\|lead}/{id}` | Unassigned sales |
 | `POST /rebuild` | Repair the ledger |
 | `GET /parity?months` | Old calculator vs ledger, per staff member and month |
-| `GET /migration-report` | What `V119` couldn't carry over |
+| `GET /migration-report` | What `V121` couldn't carry over |
 
 **Permissions**: `/me` and `/metrics` are open to anyone signed in. Everything else needs STAFF or PAYROLL; plans also accept SALARY_PAYMENTS for writes.
 
@@ -289,7 +289,7 @@ record PeriodResult(Long staffId, YearMonth period,
 | Recorder: first credit, idempotence, partial refund in an open month, clawback after approval, reassignment, cancelled session | Unit tests (`PerformanceEventRecorderTest`) |
 | Target and plan resolution | Unit tests (`ResolutionTest`) |
 | Mobile ledger and performance services on the engine | Unit tests (rewritten) |
-| `V119` on a copy of a tenant database, seeded with edge cases | Done once, locally |
+| `V121` on a copy of a tenant database, seeded with edge cases | Done once, locally |
 | **Parity check** reviewed on a copy of a real tenant | **To do before release** |
 | **Payroll integration**: approve → payroll run → paid, with a clawback the next month | **To do** |
 | **Mobile snapshots** for a staff member and a trainer | **To do** (the app has no test suite yet) |

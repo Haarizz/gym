@@ -2,6 +2,7 @@ const crm = {
   "crm": {
     "title": "Deals & Offers",
     "subtitle": "Active promotions, discounts & special deals",
+    "discountOff": "OFF",
     "activeOffers": "Active Offers",
     "totalRedemptions": "Total Redemptions",
     "viewAll": "View All",

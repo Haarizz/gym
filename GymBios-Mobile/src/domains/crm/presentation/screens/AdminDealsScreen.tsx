@@ -423,12 +423,13 @@ function StatTile({
 
 /** Coupon-style discount block: "5%" or the currency amount, with "OFF" underneath. */
 function DiscountTicket({ percent, amount }: { percent?: number; amount: number }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.ticket}>
       <Text style={styles.ticketValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
         {percent !== undefined ? `${percent}%` : <CurrencyValue amount={amount} />}
       </Text>
-      <Text style={styles.ticketOff}>OFF</Text>
+      <Text style={styles.ticketOff}>{t('crm.discountOff')}</Text>
     </View>
   );
 }

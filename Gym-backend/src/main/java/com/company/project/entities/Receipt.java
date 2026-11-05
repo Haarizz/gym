@@ -271,7 +271,7 @@ public class Receipt extends BaseEntity implements BranchAware {
     public Long getInvoiceId() { return invoiceId; }
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
 
-    // Staff member credited with this sale (V119). Set at write time from the picked staff member;
+    // Staff member credited with this sale (V121). Set at write time from the picked staff member;
     // rows written before it existed are resolved by the performance ledger.
     @Column(name = "processed_by_staff_id")
     private Long processedByStaffId;

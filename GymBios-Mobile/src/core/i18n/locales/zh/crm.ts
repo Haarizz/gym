@@ -2,6 +2,7 @@ const crm = {
   "crm": {
     "title": "特惠与促销",
     "subtitle": "有效促销活动、折扣与特别优惠",
+    "discountOff": "优惠",
     "activeOffers": "有效优惠",
     "totalRedemptions": "总兑换量",
     "viewAll": "查看全部",

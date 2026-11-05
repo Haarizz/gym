@@ -2,6 +2,7 @@ const crm = {
   "crm": {
     "title": "Angebote & Deals",
     "subtitle": "Aktive Aktionen, Rabatte und Sonderangebote",
+    "discountOff": "RABATT",
     "activeOffers": "Aktive Angebote",
     "totalRedemptions": "Gesamteinlösungen",
     "viewAll": "Alle anzeigen",
