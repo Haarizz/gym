@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: 'Earnings Breakdown',
       commissionStructureTitle: 'Commission Structure',
+      structure: {
+        noPlan: "No incentive plan",
+        perUnit: "{{amount}} per {{unit}}",
+        fromUnits: "from {{count}}",
+        max: "max {{amount}}",
+        bonusLabel: "Reach {{threshold}}% of your {{metric}} target",
+        bonusPercent: "+{{rate}}% of {{metric}}",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "New member admissions",
+          LEAD_CONVERSION: "Lead conversions",
+          POS_SALE: "POS sales",
+          PT_SESSION_DELIVERED: "PT sessions delivered",
+          CLASS_TAUGHT: "Classes taught",
+          CLASS_ATTENDEE: "Class attendees",
+          REVENUE_TOTAL: "revenue",
+        },
+        units: {
+          MEMBER_ADMISSION: "admission",
+          LEAD_CONVERSION: "conversion",
+          POS_SALE: "sale",
+          PT_SESSION_DELIVERED: "session",
+          CLASS_TAUGHT: "class",
+          CLASS_ATTENDEE: "attendee",
+        },
+      },
       monthlyComparisonTitle: 'Monthly Comparison',
     },
 

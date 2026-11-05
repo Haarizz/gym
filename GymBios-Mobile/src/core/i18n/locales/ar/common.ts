@@ -101,6 +101,7 @@ const common = {
 
   validation: {
     fullNameRequired: 'الاسم الكامل مطلوب',
+    genderRequired: 'الجنس مطلوب',
     phoneRequired: 'رقم الهاتف مطلوب',
     emergencyContactRequired: 'اسم جهة اتصال الطوارئ مطلوب',
     emergencyPhoneRequired: 'هاتف الطوارئ مطلوب',

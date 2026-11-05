@@ -3,7 +3,7 @@ import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { useTheme } from '@/core/hooks';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
@@ -24,7 +24,8 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
 
   return (
     <View style={styles.container}>
-      <FormSection
+      <FormCard
+        icon="home"
         title={
           isCouple
             ? t('membershipPlans.form.familyStep.coupleBillingTitle')
@@ -55,10 +56,10 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
             ? t('membershipPlans.misc2.family.coupleAutoHint')
             : t('membershipPlans.misc2.family.familyAutoHint')}
         </Typography>
-      </FormSection>
+      </FormCard>
 
       {!isCouple && (
-        <FormSection title={t('membershipPlans.form.familyStep.familyMembersSection')}>
+        <FormCard icon="user-plus" title={t('membershipPlans.form.familyStep.familyMembersSection')}>
           <Input
             label={t('membershipPlans.form.familyStep.maxFamilyMembersLabel')}
             value={values.maxFamilyMembers}
@@ -83,10 +84,11 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
           <Typography variant="caption" color="textSecondary">
             {t('membershipPlans.form.familyStep.familyLimitsNote')}
           </Typography>
-        </FormSection>
+        </FormCard>
       )}
 
-      <FormSection
+      <FormCard
+        icon="file-text"
         title={
           isCouple
             ? t('membershipPlans.form.familyStep.invoiceSection')
@@ -153,15 +155,15 @@ export function FamilyOptionsStep({ values, onChange }: FamilyOptionsStepProps) 
             </Typography>
           </View>
         )}
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
   modeCard: {
     borderWidth: 1,

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CurrencyValue } from '@/core/providers';
+import { CurrencyValue, useCurrency } from '@/core/providers';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { CommissionStructureItem, EarningsBreakdownItem } from '../../domain/StaffLedgerData';
 
@@ -11,11 +11,39 @@ interface StaffLedgerBreakdownSectionProps {
   commissionStructure: CommissionStructureItem[];
 }
 
+/** A translator for keys built at runtime (metric codes), typed loosely. */
+type Tr = (key: string, options?: Record<string, unknown>) => string;
+
+/** The plan line in the user's language; falls back to the backend's English text. */
+function describe(item: CommissionStructureItem, t: Tr, money: (n: number) => string): { label: string; value: string } {
+  const k = 'ledger.breakdown.structure';
+  if (item.type === 'NONE') return { label: t(`${k}.noPlan`), value: '—' };
+  if (!item.metric) return { label: item.label, value: item.value };
+  const metric = t(`${k}.metrics.${item.metric}`, { defaultValue: item.label });
+  if (item.type === 'TARGET_BONUS' && item.thresholdPct != null && item.rewardValue != null) {
+    return {
+      label: t(`${k}.bonusLabel`, { threshold: item.thresholdPct, metric: metric.toLowerCase() }),
+      value: item.rewardType === 'percent_of_metric_amount'
+        ? t(`${k}.bonusPercent`, { rate: item.rewardValue, metric: metric.toLowerCase() })
+        : t(`${k}.bonusFixed`, { amount: money(item.rewardValue) }),
+    };
+  }
+  if (item.rate == null) return { label: metric, value: item.value };
+  let value = item.basis === 'percent_of_amount'
+    ? `${item.rate}%`
+    : t(`${k}.perUnit`, { amount: money(item.rate), unit: t(`${k}.units.${item.metric}`, { defaultValue: '' }) });
+  if (item.minUnits) value += ` · ${t(`${k}.fromUnits`, { count: item.minUnits })}`;
+  if (item.capAmount) value += ` · ${t(`${k}.max`, { amount: money(item.capAmount) })}`;
+  return { label: metric, value };
+}
+
 export function StaffLedgerBreakdownSection({
   breakdown,
   commissionStructure,
 }: StaffLedgerBreakdownSectionProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
+  const tr: Tr = (key, options) => String((t as unknown as (k: string, o?: Record<string, unknown>) => unknown)(key, options));
 
   return (
     <View style={styles.container}>
@@ -51,12 +79,15 @@ export function StaffLedgerBreakdownSection({
       >
         <Text style={styles.commissionTitle}>{t('ledger.breakdown.commissionStructureTitle')}</Text>
         <View style={styles.commissionList}>
-          {commissionStructure.map((item, idx) => (
-            <View key={idx} style={styles.commissionRow}>
-              <Text style={styles.commissionLabel}>{item.label}</Text>
-              <Text style={styles.commissionAmount}>{item.value}</Text>
-            </View>
-          ))}
+          {commissionStructure.map((item, idx) => {
+            const line = describe(item, tr, formatCurrency);
+            return (
+              <View key={idx} style={styles.commissionRow}>
+                <Text style={styles.commissionLabel}>{line.label}</Text>
+                <Text style={styles.commissionAmount}>{line.value}</Text>
+              </View>
+            );
+          })}
         </View>
       </LinearGradient>
     </View>

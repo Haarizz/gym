@@ -6,7 +6,11 @@ import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.BookingRepository;
 import com.company.project.repositories.ReceiptRepository;
 import com.company.project.repositories.StaffRepository;
-import com.company.project.repositories.StaffTargetRepository;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
+import java.time.YearMonth;
 import com.company.project.repositories.WorkoutFeedbackRepository;
 import com.company.project.security.UserDetailsImpl;
 import jakarta.persistence.EntityManager;
@@ -33,7 +37,7 @@ public class MobileTrainerDashboardService {
 
     private final StaffRepository staffRepository;
     private final ReceiptRepository receiptRepository;
-    private final StaffTargetRepository staffTargetRepository;
+    private final PerformanceEngine performanceEngine;
     private final BookingRepository bookingRepository;
     private final WorkoutFeedbackRepository workoutFeedbackRepository;
 
@@ -43,12 +47,12 @@ public class MobileTrainerDashboardService {
     public MobileTrainerDashboardService(
             StaffRepository staffRepository,
             ReceiptRepository receiptRepository,
-            StaffTargetRepository staffTargetRepository,
+            PerformanceEngine performanceEngine,
             BookingRepository bookingRepository,
             WorkoutFeedbackRepository workoutFeedbackRepository) {
         this.staffRepository = staffRepository;
         this.receiptRepository = receiptRepository;
-        this.staffTargetRepository = staffTargetRepository;
+        this.performanceEngine = performanceEngine;
         this.bookingRepository = bookingRepository;
         this.workoutFeedbackRepository = workoutFeedbackRepository;
     }
@@ -142,7 +146,7 @@ public class MobileTrainerDashboardService {
             ));
             if (staff.getName() != null && !staff.getName().isBlank()) {
                 predicates.add(cbReceipt.or(
-                        cbReceipt.like(cbReceipt.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
+                        cbReceipt.equal(root.get("processedByStaffId"), staff.getId()),
                         cbReceipt.equal(root.get("createdBy"), principal.getUsername())
                 ));
             }
@@ -153,52 +157,11 @@ public class MobileTrainerDashboardService {
                 .map(r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Monthly Target Percentage
-        int monthlyTargetPercentage = 0;
-        Optional<StaffTarget> targetOpt = staffTargetRepository
-                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), today.getYear(), today.getMonthValue())
-                .stream().findFirst();
-        
-        if (targetOpt.isPresent()) {
-            StaffTarget target = targetOpt.get();
-            BigDecimal revenueTarget = target.getRevenueTarget() != null ? target.getRevenueTarget() : BigDecimal.ZERO;
-            BigDecimal revenueAchieved = target.getRevenueAchieved() != null ? target.getRevenueAchieved() : BigDecimal.ZERO;
-            
-            if (revenueTarget.compareTo(BigDecimal.ZERO) > 0) {
-                monthlyTargetPercentage = (int) Math.round((revenueAchieved.doubleValue() / revenueTarget.doubleValue()) * 100);
-            }
-        } else {
-            // Live calculation fallback
-            Specification<Receipt> monthReceiptsSpec = (root, query, cbReceipt) -> {
-                List<Predicate> predicates = new ArrayList<>();
-                predicates.add(cbReceipt.equal(root.get("status"), "Paid"));
-                predicates.add(cbReceipt.or(
-                        cbReceipt.and(cbReceipt.isNotNull(root.get("transactionDate")),
-                                cbReceipt.greaterThanOrEqualTo(root.get("transactionDate"), startOfMonth),
-                                cbReceipt.lessThan(root.get("transactionDate"), startOfNextMonth)),
-                        cbReceipt.and(cbReceipt.isNull(root.get("transactionDate")),
-                                cbReceipt.greaterThanOrEqualTo(root.get("createdAt"), startOfMonth),
-                                cbReceipt.lessThan(root.get("createdAt"), startOfNextMonth))
-                ));
-                if (staff.getName() != null && !staff.getName().isBlank()) {
-                    predicates.add(cbReceipt.or(
-                            cbReceipt.like(cbReceipt.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                            cbReceipt.equal(root.get("createdBy"), principal.getUsername())
-                    ));
-                }
-                return cbReceipt.and(predicates.toArray(new Predicate[0]));
-            };
-            
-            List<Receipt> monthReceipts = receiptRepository.findAll(monthReceiptsSpec);
-            BigDecimal totalMonthRevenue = monthReceipts.stream()
-                    .map(r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            
-            BigDecimal monthlyTarget = staff.getMonthlyTarget();
-            if (monthlyTarget != null && monthlyTarget.compareTo(BigDecimal.ZERO) > 0) {
-                monthlyTargetPercentage = (int) Math.round((totalMonthRevenue.doubleValue() / monthlyTarget.doubleValue()) * 100);
-            }
-        }
+        // Monthly target: revenue goal, else PT sessions goal (performance engine).
+        PeriodResult month = performanceEngine.evaluate(staff.getId(), YearMonth.from(today));
+        Integer pct = month.percent(Metric.REVENUE_TOTAL, Measure.AMOUNT);
+        if (pct == null) pct = month.percent(Metric.PT_SESSION_DELIVERED, Measure.COUNT);
+        int monthlyTargetPercentage = pct != null ? pct : 0;
 
         // Active Members (Gap limitation)
         // Since there is no explicit Staff -> Member assignment in the schema,

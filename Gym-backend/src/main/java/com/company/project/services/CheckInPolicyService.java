@@ -6,6 +6,7 @@ import com.company.project.entities.Member;
 import com.company.project.entities.MembershipPlan;
 import com.company.project.exceptions.BusinessRuleViolationException;
 import com.company.project.repositories.AttendanceRepository;
+import com.company.project.repositories.BranchRepository;
 import com.company.project.repositories.MembershipPlanRepository;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,10 @@ import java.util.Objects;
  *  3. Cooldown — at least the branch's cooldown_minutes (CheckInSettings) between the
  *     last check-out and the next check-in.
  *    Any check-out ends the visit — there is no re-entry into the same visit.
+ *  4. Branch Access Type — a member whose recorded gender doesn't fit a Ladies Only /
+ *     Men Only branch is refused (see {@link BranchAccessPolicy}). A blank gender is let
+ *     through here so members registered before gender was required aren't locked out;
+ *     new registrations can't be blank at a single-gender branch.
  *
  * Walk-ins are not members and are not subject to these rules.
  */
@@ -41,10 +46,13 @@ public class CheckInPolicyService {
     private final AttendanceRepository attendanceRepository;
     private final MembershipPlanRepository membershipPlanRepository;
     private final CheckInSettingsService checkInSettingsService;
+    private final BranchRepository branchRepository;
 
     public CheckInPolicyService(AttendanceRepository attendanceRepository,
                                 MembershipPlanRepository membershipPlanRepository,
-                                CheckInSettingsService checkInSettingsService) {
+                                CheckInSettingsService checkInSettingsService,
+                                BranchRepository branchRepository) {
+        this.branchRepository = branchRepository;
         this.attendanceRepository = attendanceRepository;
         this.membershipPlanRepository = membershipPlanRepository;
         this.checkInSettingsService = checkInSettingsService;
@@ -109,7 +117,7 @@ public class CheckInPolicyService {
 
         String unit = null;
         Integer used = null;
-        String blocked = null;
+        String blocked = accessTypeRefusal(member);
 
         if (limited) {
             unit = normaliseUnit(plan.getAttendanceLimit());
@@ -127,7 +135,7 @@ public class CheckInPolicyService {
                             .toList();
                     used = days.size();
                     // A further visit today doesn't consume another day.
-                    if (used >= limit && !days.contains(now.toLocalDate())) {
+                    if (blocked == null && used >= limit && !days.contains(now.toLocalDate())) {
                         blocked = "You've used all " + limit + " gym days " + periodLabel + ".";
                     }
                 }
@@ -138,13 +146,13 @@ public class CheckInPolicyService {
                             .mapToInt(Integer::intValue)
                             .sum();
                     used = minutes / 60;
-                    if (minutes >= limit * 60) {
+                    if (blocked == null && minutes >= limit * 60) {
                         blocked = "You've used all " + limit + " gym hours " + periodLabel + ".";
                     }
                 }
                 default -> {
                     used = inPeriod.size();
-                    if (used >= limit) {
+                    if (blocked == null && used >= limit) {
                         blocked = "You've used all " + limit + " sessions " + periodLabel + ".";
                     }
                 }
@@ -169,6 +177,13 @@ public class CheckInPolicyService {
                 MAX_CHECK_INS_PER_DAY,
                 nextAllowed,
                 blocked);
+    }
+
+    private String accessTypeRefusal(Member member) {
+        if (member.getGender() == null || member.getGender().isBlank() || member.getBranchId() == null) return null;
+        return branchRepository.findById(member.getBranchId())
+                .map(branch -> BranchAccessPolicy.refusalReason(branch, member.getGender(), true))
+                .orElse(null);
     }
 
     private MembershipPlan resolvePlan(Member member) {

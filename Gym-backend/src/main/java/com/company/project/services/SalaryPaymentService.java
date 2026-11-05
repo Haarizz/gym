@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.performance.settlement.SettlementService;
 import com.company.project.dto.SalaryPaymentEmployeeRequestDTO;
 import com.company.project.dto.SalaryPaymentEmployeeResponseDTO;
 import com.company.project.dto.SalaryPaymentRequestDTO;
@@ -43,7 +44,7 @@ public class SalaryPaymentService {
     private final com.company.project.repositories.PayrollRunRepository payrollRunRepository;
     private final com.company.project.repositories.PayrollRunLineRepository payrollLineRepository;
     private final AdvancesDeductionsService advancesDeductions;
-    private final CommissionEarningService commissions;
+    private final SettlementService commissions;
 
     public SalaryPaymentService(SalaryPaymentEmployeeRepository employeeRepository,
                                 SalaryPaymentRepository paymentRepository,
@@ -57,7 +58,7 @@ public class SalaryPaymentService {
                                 com.company.project.repositories.PayrollRunRepository payrollRunRepository,
                                 com.company.project.repositories.PayrollRunLineRepository payrollLineRepository,
                                 AdvancesDeductionsService advancesDeductions,
-                                CommissionEarningService commissions) {
+                                SettlementService commissions) {
         this.employeeRepository    = employeeRepository;
         this.paymentRepository     = paymentRepository;
         this.staffRepository       = staffRepository;

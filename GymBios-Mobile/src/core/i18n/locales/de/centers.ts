@@ -28,6 +28,8 @@ const centers = {
     priceAbove: 'Über <amount/>',
 
     list: {
+      genderMissing: 'Gib dein Geschlecht in Mein Profil an, um auch Studios nur für Frauen oder nur für Männer zu sehen.',
+      genderMissingAction: 'Hinzufügen',
       searchPlaceholder: 'Nach Name, Ort oder Typ suchen...',
       nearMe: 'In meiner Nähe',
       useMyLocation: 'Meinen Standort verwenden',
@@ -68,6 +70,7 @@ const centers = {
     },
 
     detail: {
+      accessBlockedTitle: 'Beitritt nicht möglich',
       notFound: 'Studio nicht gefunden.',
       noPhoneTitle: 'Keine Telefonnummer',
       noPhone: 'Dieses Studio hat noch keine Telefonnummer angegeben.',

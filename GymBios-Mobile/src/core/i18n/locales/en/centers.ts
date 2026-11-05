@@ -27,6 +27,8 @@ const centers = {
     priceAbove: 'Above <amount/>',
 
     list: {
+      genderMissing: 'Add your gender in My Profile to also see ladies-only and men-only centers.',
+      genderMissingAction: 'Add',
       searchPlaceholder: 'Search by name, area, or type...',
       nearMe: 'Near Me',
       useMyLocation: 'Use My Location',
@@ -67,6 +69,7 @@ const centers = {
     },
 
     detail: {
+      accessBlockedTitle: "Can't join this center",
       notFound: 'Center not found.',
       noPhoneTitle: 'No phone number',
       noPhone: 'This center has not listed a phone number yet.',

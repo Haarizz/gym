@@ -12,6 +12,7 @@ import java.util.List;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "receipts")
 public class Receipt extends BaseEntity implements BranchAware {
 
@@ -262,6 +263,11 @@ public class Receipt extends BaseEntity implements BranchAware {
     public Long getInvoiceId() { return invoiceId; }
     public void setInvoiceId(Long invoiceId) { this.invoiceId = invoiceId; }
 
+    // Staff member credited with this sale (V119). Set at write time from the picked staff member;
+    // rows written before it existed are resolved by the performance ledger.
+    @Column(name = "processed_by_staff_id")
+    private Long processedByStaffId;
+
     @Column(name = "branch_id")
     private Long branchId;
 
@@ -280,4 +286,6 @@ public class Receipt extends BaseEntity implements BranchAware {
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 
+    public Long getProcessedByStaffId() { return processedByStaffId; }
+    public void setProcessedByStaffId(Long processedByStaffId) { this.processedByStaffId = processedByStaffId; }
 }

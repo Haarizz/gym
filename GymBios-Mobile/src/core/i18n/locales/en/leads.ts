@@ -95,6 +95,7 @@ const leads = {
       phone: 'Phone',
       preferredContact: 'Preferred Contact',
       leadScore: 'Lead Score',
+      scoreNotSet: 'Not set',
       leadDetails: 'Lead Details',
       source: 'Source',
       assignedStaff: 'Assigned Staff',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: 'Add New Lead',
+      leadScoreLabel: 'Lead Score (1-100, optional)',
+      leadScorePlaceholder: 'e.g. 50',
+      leadScoreInvalid: 'Lead score must be a whole number from 1 to 100.',
       editLead: 'Edit Lead',
       fillDetails: 'Fill in the details below',
       contactDetails: 'CONTACT DETAILS',

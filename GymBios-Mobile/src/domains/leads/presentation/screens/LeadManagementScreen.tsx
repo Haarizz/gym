@@ -4,23 +4,23 @@ import {
   Linking,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text, TextInput } from '@/shared/components/AppText';
+import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
-import { Button } from '@/shared/components/Button';
 import { Dropdown } from '@/shared/components/Dropdown';
+import { Pagination } from '@/shared/components/Pagination';
+import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import type { Lead, LeadPriority, LeadSource, LeadStatus } from '../../domain/Lead';
+import type { Lead, LeadStatus } from '../../domain/Lead';
 import type { LeadFilters as LeadFiltersType } from '../../domain/LeadFilters';
 import {
   useCreateLead,
@@ -31,6 +31,7 @@ import {
 import { useLeads, useLeadStats } from '../../hooks/useLeads';
 import { LeadDetailsSheet } from '../components/LeadDetailsSheet';
 import { LeadFilters } from '../components/LeadFilters';
+import { LeadFormSheet, type LeadFormValues } from '../components/LeadFormSheet';
 import { LeadList } from '../components/LeadList';
 import { LeadSelectionToolbar } from '../components/LeadSelectionToolbar';
 import { registerLeadAsMember } from '../navigation/registerLeadAsMember';
@@ -43,6 +44,9 @@ interface LeadManagementScreenProps {
   onNavigateToDetail?: (lead: Lead) => void;
   onNavigateToCreate?: () => void;
 }
+
+// RoleTabsLayout already pads the top inset and the list pads past the tab bar.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
 
 const ALL_STATUSES: LeadStatus[] = [
   'new',
@@ -60,30 +64,6 @@ export function LeadManagementScreen({
   const theme = useTheme();
   const { selectedBranchId } = useBranchContext();
 
-  const statusOptions = useMemo(() => [
-    { label: t('leads.statuses.new'), value: 'new' },
-    { label: t('leads.statuses.contacted'), value: 'contacted' },
-    { label: t('leads.statuses.followUp'), value: 'follow-up' },
-    { label: t('leads.statuses.converted'), value: 'converted' },
-    { label: t('leads.statuses.lost'), value: 'lost' },
-  ], [t]);
-
-  const priorityOptions = useMemo(() => [
-    { label: t('leads.priorities.high'), value: 'high' },
-    { label: t('leads.priorities.medium'), value: 'medium' },
-    { label: t('leads.priorities.low'), value: 'low' },
-  ], [t]);
-
-  const sourceOptions = useMemo(() => [
-    { label: t('leads.sources.website'), value: 'website' },
-    { label: t('leads.sources.referral'), value: 'referral' },
-    { label: t('leads.sources.walkIn'), value: 'walk-in' },
-    { label: t('leads.sources.socialMedia'), value: 'social-media' },
-    { label: t('leads.sources.phone'), value: 'phone' },
-    { label: t('leads.sources.campaign'), value: 'campaign' },
-    { label: t('leads.sources.other'), value: 'other' },
-  ], [t]);
-
   const getStatusLabel = useCallback((status: LeadStatus) => {
     switch (status) {
       case 'new': return t('leads.statuses.new');
@@ -97,24 +77,13 @@ export function LeadManagementScreen({
 
   // State
   const [filters, setFilters] = useState<LeadFiltersType>({ page: 1, size: 50 });
-  const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [formSheetVisible, setFormSheetVisible] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [bulkStatusModalVisible, setBulkStatusModalVisible] = useState(false);
   const [bulkAssignModalVisible, setBulkAssignModalVisible] = useState(false);
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-
-  // Form States
-  const [formFirstName, setFormFirstName] = useState('');
-  const [formLastName, setFormLastName] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formStatus, setFormStatus] = useState<LeadStatus>('new');
-  const [formSource, setFormSource] = useState<LeadSource>('website');
-  const [formPriority, setFormPriority] = useState<LeadPriority>('medium');
-  const [formAssignedStaff, setFormAssignedStaff] = useState('');
-  const [formNotes, setFormNotes] = useState('');
 
   const [bulkStaffName, setBulkStaffName] = useState('');
   const router = useRouter();
@@ -221,17 +190,8 @@ export function LeadManagementScreen({
   );
 
   const handleEdit = useCallback((lead: Lead) => {
-    setSelectedLead(lead);
-    setFormFirstName(lead.firstName || '');
-    setFormLastName(lead.lastName || '');
-    setFormEmail(lead.email || '');
-    setFormPhone(lead.phone || '');
-    setFormStatus(lead.status || 'new');
-    setFormSource(lead.source || 'website');
-    setFormPriority(lead.priority || 'medium');
-    setFormAssignedStaff(lead.assignedStaff || '');
-    setFormNotes(lead.notes || '');
-    setEditModalVisible(true);
+    setEditingLead(lead);
+    setFormSheetVisible(true);
   }, []);
 
   const handleDelete = useCallback(
@@ -265,46 +225,20 @@ export function LeadManagementScreen({
     [deleteMutation, isSelected, t, toggleSelection],
   );
 
-  // Modal Submit Handlers
-  const handleCreateSubmit = () => {
-    if (!formFirstName.trim()) {
-      toast.error(t('leads.form.firstNameRequired'), {
-        title: t('leads.form.validationErrorTitle'),
-      });
-      return;
-    }
+  const closeFormSheet = useCallback(() => {
+    setFormSheetVisible(false);
+    setEditingLead(null);
+  }, []);
 
-    createMutation.mutate(
-      {
-        firstName: formFirstName.trim(),
-        lastName: formLastName.trim(),
-        email: formEmail.trim(),
-        phone: formPhone.trim(),
-        status: formStatus,
-        source: formSource,
-        priority: formPriority,
-        assignedStaff: formAssignedStaff.trim() || undefined,
-        notes: formNotes.trim() || undefined,
-      },
-      {
-        onSuccess: () => {
-          setCreateModalVisible(false);
-          resetForm();
-        },
+  const handleFormSubmit = (values: LeadFormValues) => {
+    if (!editingLead) {
+      createMutation.mutate(values, {
+        onSuccess: closeFormSheet,
         onError: err => {
           toast.error(err.message || t('leads.management.createError'), {
             title: t('common.error'),
           });
         },
-      },
-    );
-  };
-
-  const handleEditSubmit = () => {
-    if (!selectedLead) return;
-    if (!formFirstName.trim()) {
-      toast.error(t('leads.form.firstNameRequired'), {
-        title: t('leads.form.validationErrorTitle'),
       });
       return;
     }
@@ -312,36 +246,14 @@ export function LeadManagementScreen({
     // Marking a lead converted only flips its status — like the web, offer to register the
     // member right away so the sale is recorded and credited to the lead's staff.
     const newlyConverted =
-      formStatus === 'converted' && selectedLead.status !== 'converted' && !selectedLead.memberId;
-    const convertedLead: Lead = {
-      ...selectedLead,
-      firstName: formFirstName.trim(),
-      lastName: formLastName.trim(),
-      email: formEmail.trim(),
-      phone: formPhone.trim(),
-      assignedStaff: formAssignedStaff.trim() || undefined,
-    };
+      values.status === 'converted' && editingLead.status !== 'converted' && !editingLead.memberId;
+    const convertedLead: Lead = { ...editingLead, ...values };
 
     updateMutation.mutate(
-      {
-        id: selectedLead.id,
-        request: {
-          firstName: formFirstName.trim(),
-          lastName: formLastName.trim(),
-          email: formEmail.trim(),
-          phone: formPhone.trim(),
-          status: formStatus,
-          source: formSource,
-          priority: formPriority,
-          assignedStaff: formAssignedStaff.trim() || undefined,
-          notes: formNotes.trim() || undefined,
-        },
-      },
+      { id: editingLead.id, request: values },
       {
         onSuccess: () => {
-          setEditModalVisible(false);
-          setSelectedLead(null);
-          resetForm();
+          closeFormSheet();
           if (newlyConverted) {
             Alert.alert(
               t('leads.management.registerPromptTitle'),
@@ -416,7 +328,7 @@ export function LeadManagementScreen({
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = useCallback(() => {
     Alert.alert(
       t('leads.management.bulkDeleteTitle'),
       t('leads.management.bulkDeleteConfirm', { count: selectedCount }),
@@ -438,21 +350,9 @@ export function LeadManagementScreen({
         },
       ],
     );
-  };
+  }, [selectedCount, selectedLeadIds, deleteMutation, clearSelection, t]);
 
-  const resetForm = () => {
-    setFormFirstName('');
-    setFormLastName('');
-    setFormEmail('');
-    setFormPhone('');
-    setFormStatus('new');
-    setFormSource('website');
-    setFormPriority('medium');
-    setFormAssignedStaff('');
-    setFormNotes('');
-  };
-
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     if (selectedBranchId === 'ALL') {
       toast.error(t('leads.management.branchRequired'), {
         title: t('leads.management.branchRequiredTitle'),
@@ -462,102 +362,90 @@ export function LeadManagementScreen({
     if (onNavigateToCreate) {
       onNavigateToCreate();
     } else {
-      resetForm();
-      setCreateModalVisible(true);
+      setEditingLead(null);
+      setFormSheetVisible(true);
     }
-  };
+  }, [selectedBranchId, onNavigateToCreate, t]);
 
-  // Header Component with KPI summary cards & filters
-  const renderHeaderComponent = () => (
-    <View style={styles.headerContainer}>
-      {/* Top Title & Add Lead Button */}
-      <View style={styles.titleRow}>
-        <View>
-          <Text style={[styles.screenTitle, { color: theme.text }]}>
-            {t('leads.management.title')}
-          </Text>
-          <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-            {t('leads.management.subtitle')}
-          </Text>
-        </View>
+  const kpis = useMemo(
+    () => [
+      { key: 'total', label: t('leads.management.totalLeads'), value: statsData?.totalLeads, color: theme.text },
+      { key: 'new', label: t('leads.management.newLeads'), value: statsData?.newLeads, color: '#3b82f6' },
+      { key: 'contacted', label: t('leads.management.contactedLeads'), value: statsData?.contactedLeads, color: '#eab308' },
+      { key: 'converted', label: t('leads.management.convertedLeads'), value: statsData?.convertedLeads, color: '#16a34a' },
+      {
+        key: 'rate',
+        label: t('leads.management.conversionRate'),
+        value: statsData ? `${(statsData.conversionRate ?? 0).toFixed(1)}%` : undefined,
+        color: BrandColors.teal,
+      },
+    ],
+    [statsData, theme.text, t],
+  );
 
-        <Button
-          label={t('leads.management.addLeadBtn')}
-          size="md"
-          onPress={openCreateModal}
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.headerContainer}>
+        <LeadFilters filters={filters} onChangeFilters={setFilters} />
+
+        {/* KPI cards: 3 on the first row, 2 wider ones on the second */}
+        {[kpis.slice(0, 3), kpis.slice(3)].map((row, i) => (
+          <View key={i} style={styles.summaryRow}>
+            {row.map(kpi => (
+              <View
+                key={kpi.key}
+                style={[styles.summaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+              >
+                <Typography variant="caption" color="textSecondary" style={styles.summaryLabel} numberOfLines={1}>
+                  {kpi.label}
+                </Typography>
+                <Typography variant="subtitle" style={[styles.summaryValue, { color: kpi.color }]}>
+                  {kpi.value ?? '—'}
+                </Typography>
+              </View>
+            ))}
+          </View>
+        ))}
+
+        <LeadSelectionToolbar
+          selectedCount={selectedCount}
+          onAssignStaff={() => setBulkAssignModalVisible(true)}
+          onUpdateStatus={() => setBulkStatusModalVisible(true)}
+          onDelete={handleBulkDelete}
+          onClear={clearSelection}
         />
       </View>
+    ),
+    [filters, kpis, theme, selectedCount, handleBulkDelete, clearSelection],
+  );
 
-      {/* KPI Stats Row */}
-      {statsData && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
+  const listFooter = useMemo(
+    () => (
+      <View style={styles.footer}>
+        <Pagination
+          currentPage={filters.page ?? 1}
+          totalPages={leadsData?.pagination?.totalPages ?? 1}
+          onPageChange={page => setFilters(prev => ({ ...prev, page }))}
+        />
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          onPress={openCreateModal}
+          accessibilityRole="button"
         >
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.kpiValue, { color: theme.text }]}>
-              {statsData.totalLeads ?? 0}
-            </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              {t('leads.management.totalLeads')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.kpiValue, { color: '#60a5fa' }]}>
-              {statsData.newLeads ?? 0}
-            </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              {t('leads.management.newLeads')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.kpiValue, { color: '#facc15' }]}>
-              {statsData.contactedLeads ?? 0}
-            </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              {t('leads.management.contactedLeads')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.kpiValue, { color: '#4ade80' }]}>
-              {statsData.convertedLeads ?? 0}
-            </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              {t('leads.management.convertedLeads')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={[styles.kpiValue, { color: BrandColors.teal }]}>
-              {(statsData.conversionRate ?? 0).toFixed(1)}%
-            </Text>
-            <Text style={[styles.kpiLabel, { color: theme.textSecondary }]}>
-              {t('leads.management.conversionRate')}
-            </Text>
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Search & Filter Bar */}
-      <LeadFilters filters={filters} onChangeFilters={setFilters} />
-
-      {/* Bulk Selection Toolbar */}
-      <LeadSelectionToolbar
-        selectedCount={selectedCount}
-        onAssignStaff={() => setBulkAssignModalVisible(true)}
-        onUpdateStatus={() => setBulkStatusModalVisible(true)}
-        onDelete={handleBulkDelete}
-        onClear={clearSelection}
-      />
-    </View>
+          <Feather name="plus" size={18} color={BrandColors.white} />
+          <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
+            {t('leads.form.addNewLead')}
+          </Typography>
+        </Pressable>
+      </View>
+    ),
+    [filters.page, leadsData?.pagination?.totalPages, openCreateModal, t],
   );
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <LeadList
         leads={leads}
         loading={loadingLeads}
@@ -572,7 +460,12 @@ export function LeadManagementScreen({
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        ListHeaderComponent={renderHeaderComponent()}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        emptyActionLabel={filters.search || filters.status || filters.priority || filters.source
+          ? undefined
+          : t('leads.form.addNewLead')}
+        onEmptyAction={openCreateModal}
       />
 
       {/* Lead Detail BottomSheet Component */}
@@ -585,263 +478,15 @@ export function LeadManagementScreen({
         onRegisterMember={handleRegisterMember}
       />
 
-      {/* Create Lead Modal / Sheet */}
-      <Modal
-        visible={createModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setCreateModalVisible(false)}>
-          <Pressable
-            style={[styles.modalSheet, { backgroundColor: theme.background }]}
-            onPress={e => e.stopPropagation()}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {t('leads.form.addNewLead')}
-              </Text>
-              <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
-                <Feather name="x" size={22} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.firstName')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formFirstName}
-                onChangeText={setFormFirstName}
-                placeholder={t('leads.form.firstNamePlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.lastName')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formLastName}
-                onChangeText={setFormLastName}
-                placeholder={t('leads.form.lastNamePlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.emailLabel')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formEmail}
-                onChangeText={setFormEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholder={t('leads.form.emailPlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.phoneLabel')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formPhone}
-                onChangeText={setFormPhone}
-                keyboardType="phone-pad"
-                placeholder={t('leads.form.phonePlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-              />
-
-              <Dropdown
-                label={t('leads.form.status')}
-                value={formStatus}
-                options={statusOptions}
-                onChange={val => setFormStatus(val as LeadStatus)}
-              />
-
-              <Dropdown
-                label={t('leads.form.priority')}
-                value={formPriority}
-                options={priorityOptions}
-                onChange={val => setFormPriority(val as LeadPriority)}
-              />
-
-              <Dropdown
-                label={t('leads.form.source')}
-                value={formSource}
-                options={sourceOptions}
-                onChange={val => setFormSource(val as LeadSource)}
-              />
-
-              <Dropdown
-                label={t('leads.form.assignedStaff')}
-                placeholder={t('leads.management.selectStaffPlaceholder')}
-                value={formAssignedStaff}
-                options={staffOptions}
-                onChange={setFormAssignedStaff}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                {t('leads.form.notes')}
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.multilineInput,
-                  { color: theme.text, borderColor: theme.border },
-                ]}
-                value={formNotes}
-                onChangeText={setFormNotes}
-                multiline
-                numberOfLines={3}
-                placeholder={t('leads.form.notesPlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.clearBtn, { borderColor: theme.border }]}
-                onPress={() => setCreateModalVisible(false)}
-              >
-                <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  {t('leads.form.cancel')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.applyBtn} onPress={handleCreateSubmit}>
-                <Text style={styles.applyBtnText}>{t('leads.form.createLead')}</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Edit Lead Modal / Sheet */}
-      <Modal
-        visible={editModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setEditModalVisible(false)}>
-          <Pressable
-            style={[styles.modalSheet, { backgroundColor: theme.background }]}
-            onPress={e => e.stopPropagation()}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {t('leads.form.editLead')}
-              </Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Feather name="x" size={22} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.firstName')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formFirstName}
-                onChangeText={setFormFirstName}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.lastName')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formLastName}
-                onChangeText={setFormLastName}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.emailLabel')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formEmail}
-                onChangeText={setFormEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text }]}>
-                {t('leads.form.phoneLabel')}
-              </Text>
-              <TextInput
-                style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-                value={formPhone}
-                onChangeText={setFormPhone}
-                keyboardType="phone-pad"
-              />
-
-              <Dropdown
-                label={t('leads.form.status')}
-                value={formStatus}
-                options={statusOptions}
-                onChange={val => setFormStatus(val as LeadStatus)}
-              />
-
-              <Dropdown
-                label={t('leads.form.priority')}
-                value={formPriority}
-                options={priorityOptions}
-                onChange={val => setFormPriority(val as LeadPriority)}
-              />
-
-              <Dropdown
-                label={t('leads.form.source')}
-                value={formSource}
-                options={sourceOptions}
-                onChange={val => setFormSource(val as LeadSource)}
-              />
-
-              <Dropdown
-                label={t('leads.form.assignedStaff')}
-                placeholder={t('leads.management.selectStaffPlaceholder')}
-                value={formAssignedStaff}
-                options={staffOptions}
-                onChange={setFormAssignedStaff}
-              />
-
-              <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                {t('leads.form.notes')}
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.multilineInput,
-                  { color: theme.text, borderColor: theme.border },
-                ]}
-                value={formNotes}
-                onChangeText={setFormNotes}
-                multiline
-                numberOfLines={3}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.clearBtn, { borderColor: theme.border }]}
-                onPress={() => setEditModalVisible(false)}
-              >
-                <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  {t('leads.form.cancel')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.applyBtn} onPress={handleEditSubmit}>
-                <Text style={styles.applyBtnText}>{t('leads.form.saveChanges')}</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Create / Edit Lead Sheet */}
+      <LeadFormSheet
+        visible={formSheetVisible}
+        lead={editingLead}
+        staffOptions={staffOptions}
+        submitting={createMutation.isPending || updateMutation.isPending}
+        onClose={closeFormSheet}
+        onSubmit={handleFormSubmit}
+      />
 
       {/* Bulk Status Update Modal */}
       <Modal
@@ -944,40 +589,45 @@ export function LeadManagementScreen({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
-  titleRow: {
+  summaryRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    padding: Spacing.md,
+  },
+  summaryLabel: {
+    marginBottom: Spacing.one,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  footer: {
+    gap: Spacing.three,
+    paddingTop: Spacing.one,
+  },
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.three,
-  },
-  screenTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  screenSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  statsScroll: {
+    justifyContent: 'center',
     gap: Spacing.two,
-    paddingBottom: Spacing.three,
-  },
-  kpiCard: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.md,
     borderRadius: Radius.md,
-    minWidth: 100,
+    backgroundColor: BrandColors.teal,
   },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: '800',
+  addButtonPressed: {
+    backgroundColor: BrandColors.tealDark,
   },
-  kpiLabel: {
-    fontSize: 11,
-    marginTop: 2,
+  addButtonLabel: {
+    color: BrandColors.white,
   },
   modalOverlay: {
     flex: 1,
@@ -1002,23 +652,6 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     marginBottom: Spacing.three,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: Spacing.two,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 14,
-  },
-  multilineInput: {
-    height: 80,
-    textAlignVertical: 'top',
   },
   modalFooter: {
     flexDirection: 'row',

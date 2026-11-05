@@ -226,6 +226,17 @@ public class BranchService {
     }
 
     /**
+     * Rejects a member whose gender doesn't fit the branch's Access Type
+     * (see {@link BranchAccessPolicy}). {@code forMember} picks the wording:
+     * the member themselves (app) or staff registering them.
+     */
+    public void assertGenderAllowed(Long branchId, String gender, boolean forMember) {
+        if (branchId == null) return;
+        branchRepository.findById(branchId)
+                .ifPresent(branch -> BranchAccessPolicy.enforce(branch, gender, forMember));
+    }
+
+    /**
      * Returns the list of branch IDs the current user can access.
      * Used for filtering in "All Branches" mode for non-admin users.
      */

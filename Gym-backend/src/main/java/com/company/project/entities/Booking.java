@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "bookings")
 public class Booking extends BaseEntity implements BranchAware {
 

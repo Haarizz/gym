@@ -48,6 +48,7 @@ export const discoveryApi = {
       taxPercentage: data.tax_percentage,
       taxInclusive: data.tax_inclusive || false,
       termsAndPolicies: data.terms_and_policies,
+      accessBlockedReason: data.access_blocked_reason ?? null,
       avgRating: data.avg_rating,
       reviewCount: data.review_count ?? 0,
       amenities: data.amenities || [],

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,9 @@ import {
 } from '../components';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { useCurrencyStore } from '@/core/providers';
+
+import { exportMemberStatementCsv } from '../utils/exportMemberStatement';
 
 interface MemberStatementsScreenProps {
   onBack: () => void;
@@ -83,20 +86,37 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
     });
   }, [selectedMember, fromDate, toDate, t]);
 
-  const handleExportCSV = useCallback(() => {
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportCSV = useCallback(async () => {
+    if (exporting) return;
     if (!statement || !statement.lines.length) {
       toast.info(t('billing.msg.noStatementLines'), {
         title: t('common.exportCsv')
       });
       return;
     }
-    toast.info(
-      t('billing.msg.statementExported', { name: statement.memberName ?? t('billing.msg.member') }),
-      {
-        title: t('billing.msg.statementExportTitle')
-      }
-    );
-  }, [statement]);
+    setExporting(true);
+    try {
+      await exportMemberStatementCsv(
+        statement,
+        useCurrencyStore.getState().currencyCode,
+        activeRange?.from,
+        activeRange?.to,
+      );
+      toast.success(
+        t('billing.msg.statementExported', { name: statement.memberName ?? t('billing.msg.member') }),
+        { title: t('billing.msg.statementExportTitle') },
+      );
+    } catch (err) {
+      console.error('[MemberStatements] CSV export failed', err);
+      toast.error(t('billing.msg.statementExportFailed'), {
+        title: t('billing.msg.statementExportTitle'),
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [statement, activeRange, exporting, t]);
 
   const lines = statement?.lines ?? [];
 
@@ -308,8 +328,15 @@ export function MemberStatementsScreen({ onBack }: MemberStatementsScreenProps) 
                 </Typography>
               </View>
 
-              <Pressable onPress={handleExportCSV} style={styles.exportBtn} accessibilityRole="button">
-                <Feather name="download" size={14} color={BrandColors.teal} />
+              <Pressable
+                onPress={handleExportCSV}
+                disabled={exporting}
+                style={[styles.exportBtn, exporting && { opacity: 0.6 }]}
+                accessibilityRole="button"
+              >
+                {exporting
+                  ? <ActivityIndicator size="small" color={BrandColors.teal} />
+                  : <Feather name="download" size={14} color={BrandColors.teal} />}
                 <Typography variant="caption" style={styles.exportBtnText}>
                   {t('billing.statements.exportCsv')}
                 </Typography>

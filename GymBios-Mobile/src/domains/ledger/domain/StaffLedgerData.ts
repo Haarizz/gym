@@ -18,10 +18,24 @@ export interface EarningsBreakdownItem {
   percentage: number;
 }
 
+/**
+ * One line of the staff member's incentive plan (configured on the web). label/value are the
+ * backend's English wording; the structured fields let the app word it in the user's language.
+ */
 export interface CommissionStructureItem {
+  /** Metric code (MEMBER_ADMISSION, POS_SALE, …), TARGET_BONUS, or NONE when there is no plan. */
+  type?: string;
   label: string;
-  /** A rate as configured in the web commission rules, e.g. "10%" or "+2%". */
+  /** A rate as configured on the web, e.g. "10%" or "+2%". */
   value: string;
+  metric?: string;
+  basis?: 'percent_of_amount' | 'fixed_per_unit';
+  rate?: number;
+  minUnits?: number | null;
+  capAmount?: number | null;
+  thresholdPct?: number;
+  rewardType?: 'fixed' | 'percent_of_metric_amount';
+  rewardValue?: number;
 }
 
 export interface RecentEarningTransaction {

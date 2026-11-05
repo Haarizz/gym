@@ -1,6 +1,10 @@
 const membershipPlans = {
   "membershipPlans": {
     "list": {
+      "addBtn": "添加新订阅",
+      "kpiTotal": "总数",
+      "kpiActive": "有效",
+      "kpiOnOffer": "优惠中",
       "title": "会员方案",
       "newSubscriptionBtn": "+ 新增方案",
       "searchPlaceholder": "按名称或类型搜索方案...",
@@ -26,6 +30,15 @@ const membershipPlans = {
       "archived": "已归档"
     },
     "card": {
+      "offer": "优惠",
+      "unlimitedSessions": "不限次数",
+      "unlimitedMembers": "不限人数",
+      "durationDay_other": "{{count}} 天",
+      "durationWeek_other": "{{count}} 周",
+      "durationMonth_other": "{{count}} 个月",
+      "durationYear_other": "{{count}} 年",
+      "sessionsCount_other": "{{count}} 次",
+      "familyMembers_other": "最多 {{count}} 人",
       "price": "价格",
       "duration": "有效期",
       "familySize": "家庭人数",
@@ -42,6 +55,8 @@ const membershipPlans = {
       "discardMsg": "已输入的所有信息都将丢失。",
       "keepEditing": "继续编辑",
       "discard": "放弃",
+      "required": "必填",
+      "save": "保存",
       "stepIndicator": "第 {{current}} / {{total}} 步",
       "cancel": "取消",
       "back": "上一步",

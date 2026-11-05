@@ -140,10 +140,16 @@ public class FollowUp extends BaseEntity implements BranchAware {
     public List<CommunicationRecord> getCommunicationHistory() { return communicationHistory; }
     public void setCommunicationHistory(List<CommunicationRecord> communicationHistory) { this.communicationHistory = communicationHistory; }
 
+    // Assignee as a staff id (V119).
+    @Column(name = "assigned_staff_id")
+    private Long assignedStaffId;
+
     @Column(name = "branch_id")
     private Long branchId;
 
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
 
+    public Long getAssignedStaffId() { return assignedStaffId; }
+    public void setAssignedStaffId(Long assignedStaffId) { this.assignedStaffId = assignedStaffId; }
 }

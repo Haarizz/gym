@@ -1,21 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text, TextInput } from '@/shared/components/AppText';
-import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
-import { Dropdown } from '@/shared/components/Dropdown';
-import type { FollowUp } from '../../domain/FollowUp';
 import { localizeOptions } from '@/core/i18n/format';
+import { Spacing } from '@/core/theme';
+import { Text } from '@/shared/components/AppText';
+import { Button } from '@/shared/components/Button';
+import { Dropdown } from '@/shared/components/Dropdown';
+import { FormSheet } from '@/shared/components/FormSheet';
+import { Input } from '@/shared/components/Input';
+import type { FollowUp } from '../../domain/FollowUp';
 
 interface CompleteFollowUpSheetProps {
   visible: boolean;
@@ -47,175 +42,81 @@ export function CompleteFollowUpSheet({
   const [outcome, setOutcome] = useState('successful');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
+  // Reset each time the sheet opens (during render, not in an effect).
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (visible) {
       setOutcome('successful');
       setNotes('');
     }
-  }, [visible]);
-
-  const handleSubmit = () => {
-    onSubmit(outcome, notes.trim());
-  };
+  }
 
   if (!followUp) return null;
 
   return (
-    <Modal
+    <FormSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      title={t('followUps.completeTitle')}
+      icon="check-circle"
+      closeLabel={t('followUps.cancel')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button
+            variant="outline"
+            label={t('followUps.cancel')}
+            onPress={onClose}
+            disabled={submitting}
+            style={styles.flex}
+          />
+          <Button
+            label={t('followUps.complete')}
+            onPress={() => onSubmit(outcome, notes.trim())}
+            loading={submitting}
+            style={styles.primaryButton}
+          />
+        </>
+      }
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modalSheet, { backgroundColor: theme.background }]}
-          onPress={e => e.stopPropagation()}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {t('followUps.completeTitle')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={theme.text} />
-            </TouchableOpacity>
-          </View>
+      <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
+        {t('followUps.completingFor')}{' '}
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{followUp.leadName}</Text>
+      </Text>
 
-          <ScrollView style={styles.modalBody}>
-            <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
-              {t('followUps.completingFor')}{' '}
-              <Text style={{ color: theme.text, fontWeight: '700' }}>
-                {followUp.leadName}
-              </Text>
-            </Text>
+      <Dropdown
+        label={t('followUps.outcome')}
+        value={outcome}
+        options={localizeOptions(OUTCOME_OPTIONS, { prefix: 'followUps.outcomes' })}
+        onChange={setOutcome}
+      />
 
-            <Dropdown
-              label={t('followUps.outcome')}
-              value={outcome}
-              options={localizeOptions(OUTCOME_OPTIONS, { prefix: 'followUps.outcomes' })}
-              onChange={setOutcome}
-            />
-
-            <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              {t('followUps.completionNotes')}
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                styles.multilineInput,
-                { color: theme.text, borderColor: theme.border },
-              ]}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-              placeholder={t('followUps.outcomeNotesPlaceholder')}
-              placeholderTextColor={theme.textSecondary}
-            />
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: theme.border }]}
-              onPress={onClose}
-              disabled={submitting}
-            >
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                {t('followUps.cancel')}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: '#16a34a' }]}
-              onPress={handleSubmit}
-              disabled={submitting}
-            >
-              <Text style={styles.submitBtnText}>
-                {submitting ? t('followUps.msg.completing') : t('followUps.complete')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      <Input
+        label={t('followUps.completionNotes')}
+        placeholder={t('followUps.outcomeNotesPlaceholder')}
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        numberOfLines={3}
+        style={styles.notes}
+      />
+    </FormSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  flex: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  modalSheet: {
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    paddingBottom: Spacing.four,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.four,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalBody: {
-    padding: Spacing.four,
+  primaryButton: {
+    flex: 2,
   },
   leadSubHeader: {
     fontSize: 14,
     marginBottom: Spacing.three,
   },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: Spacing.one,
-  },
-  input: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    fontSize: 14,
-  },
-  multilineInput: {
-    height: 80,
-    paddingTop: Spacing.two,
+  notes: {
+    minHeight: 80,
     textAlignVertical: 'top',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  submitBtn: {
-    flex: 2,
-    height: 48,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
   },
 });

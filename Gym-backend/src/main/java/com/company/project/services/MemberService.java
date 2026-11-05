@@ -519,6 +519,8 @@ public class MemberService {
         member.setBranchId(branchId);
         
         applyRequest(request, member);
+        // Branch Access Type (Ladies Only / Men Only) — see BranchAccessPolicy.
+        branchService.assertGenderAllowed(branchId, member.getGender(), false);
         if (member.getTotalVisits() == null) member.setTotalVisits(0);
         // Every new member has joined — a client that omits join_date (older mobile
         // builds) used to leave it NULL, hiding the member from join-date sorts/filters.
@@ -1184,7 +1186,13 @@ public class MemberService {
                 && !"pending_approval".equalsIgnoreCase(request.getMembershipStatus())) {
             requireApproved(member, "Changing the membership status");
         }
+        String previousGender = member.getGender();
         applyRequest(request, member);
+        // Only a gender change is checked, so members who joined before the branch's
+        // Access Type was set can still have their other details edited.
+        if (!java.util.Objects.equals(previousGender, member.getGender())) {
+            branchService.assertGenderAllowed(member.getBranchId(), member.getGender(), false);
+        }
         Member saved = memberRepository.save(member);
         // The member's own details also go to their GymBios account (plan §3), so the app
         // shows the gym's correction. Gym-only fields (plan, fees, status…) never do.
@@ -2037,9 +2045,17 @@ public class MemberService {
                         cb.isNotNull(effectiveEndDate),
                         cb.lessThan(effectiveEndDate, startOfToday)
                 );
-                if ("expired".equalsIgnoreCase(status)) {
+                // Suspending sets the membershipSuspended flag and leaves membershipStatus as it
+                // was, and that flag wins over every other status (MemberEffectiveStatus). So
+                // "suspended" matches the flag, and every other status leaves flagged members out.
+                Predicate suspendedFlag = cb.isTrue(root.get("membershipSuspended"));
+                if ("suspended".equalsIgnoreCase(status)) {
+                    predicates.add(cb.or(suspendedFlag, cb.equal(cb.lower(root.get("membershipStatus")), "suspended")));
+                } else if ("expired".equalsIgnoreCase(status)) {
+                    predicates.add(cb.not(suspendedFlag));
                     predicates.add(cb.or(cb.equal(cb.lower(root.get("membershipStatus")), status.toLowerCase()), expiredByDate));
                 } else {
+                    predicates.add(cb.not(suspendedFlag));
                     predicates.add(cb.and(cb.equal(cb.lower(root.get("membershipStatus")), status.toLowerCase()), cb.not(expiredByDate)));
                 }
             }

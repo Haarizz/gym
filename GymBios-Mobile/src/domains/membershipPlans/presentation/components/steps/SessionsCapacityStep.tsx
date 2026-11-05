@@ -2,54 +2,16 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
-import { useTheme } from '@/core/hooks';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
+import { OptionChips, planOptions } from '../OptionChips';
 import { Input } from '@/shared/components/Input';
-import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
-import { tOr } from '@/core/i18n/format';
 
 const CAPACITY_OPTIONS = ['Unlimited', 'Limited'];
 const ATTENDANCE_LIMITS = ['None', 'Per Day', 'Per Week', 'Per Month'];
 const ATTENDANCE_PERIODS = ['Day', 'Week', 'Month'];
 
-interface OptionRowProps {
-  options: string[];
-  selected: string;
-  onSelect: (value: string) => void;
-  getLabel?: (value: string) => string;
-}
 
-function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
-  const theme = useTheme();
-  return (
-    <View style={styles.optionRow}>
-      {options.map((opt) => {
-        const isActive = opt === selected;
-        return (
-          <View
-            key={getLabel ? getLabel(opt) : opt}
-            style={[
-              styles.optionChip,
-              {
-                backgroundColor: isActive ? theme.primary : theme.backgroundElement,
-                borderColor: isActive ? theme.primary : theme.border,
-              },
-            ]}
-            onTouchEnd={() => onSelect(opt)}
-          >
-            <Typography
-              variant="caption"
-              style={[styles.optionText, { color: isActive ? '#ffffff' : theme.textSecondary }]}
-            >
-              {opt}
-            </Typography>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
 
 interface SessionsCapacityStepProps {
   values: PlanWizardData;
@@ -62,7 +24,7 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
 
   return (
     <View style={styles.container}>
-      <FormSection title={t('membershipPlans.form.capacityStep.sessionsSection')}>
+      <FormCard icon="activity" title={t('membershipPlans.form.capacityStep.sessionsSection')}>
         <Input
           label={t('membershipPlans.form.capacityStep.maxSessionsLabel')}
           value={values.maxSessions}
@@ -70,15 +32,12 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
           placeholder={t('membershipPlans.form.capacityStep.maxSessionsPlaceholder')}
           keyboardType="numeric"
         />
-      </FormSection>
+      </FormCard>
 
-      <FormSection title={t('membershipPlans.form.capacityStep.capacitySection')}>
-        <Typography variant="bodySmallBold">
-          {t('membershipPlans.form.capacityStep.capacityTypeLabel')}
-        </Typography>
-        <OptionRow
-          options={CAPACITY_OPTIONS}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+      <FormCard icon="users" title={t('membershipPlans.form.capacityStep.capacitySection')}>
+        <OptionChips
+          label={t('membershipPlans.form.capacityStep.capacityTypeLabel')}
+          options={planOptions(CAPACITY_OPTIONS)}
           selected={values.membershipCapacity || 'Unlimited'}
           onSelect={(v) => onChange('membershipCapacity', v)}
         />
@@ -91,15 +50,12 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
             keyboardType="numeric"
           />
         )}
-      </FormSection>
+      </FormCard>
 
-      <FormSection title={t('membershipPlans.form.capacityStep.attendanceSection')}>
-        <Typography variant="bodySmallBold">
-          {t('membershipPlans.form.capacityStep.attendanceLimitLabel')}
-        </Typography>
-        <OptionRow
-          options={ATTENDANCE_LIMITS}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+      <FormCard icon="calendar" title={t('membershipPlans.form.capacityStep.attendanceSection')}>
+        <OptionChips
+          label={t('membershipPlans.form.capacityStep.attendanceLimitLabel')}
+          options={planOptions(ATTENDANCE_LIMITS)}
           selected={values.attendanceLimit || 'None'}
           onSelect={(v) => onChange('attendanceLimit', v)}
         />
@@ -112,40 +68,22 @@ export function SessionsCapacityStep({ values, errors, onChange }: SessionsCapac
               placeholder={t('membershipPlans.form.capacityStep.attendanceValuePlaceholder')}
               keyboardType="numeric"
             />
-            <Typography variant="bodySmallBold">
-              {t('membershipPlans.form.capacityStep.attendancePeriodLabel')}
-            </Typography>
-            <OptionRow
-              options={ATTENDANCE_PERIODS}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
-              selected={values.attendancePeriod || 'Day'}
-              onSelect={(v) => onChange('attendancePeriod', v)}
-            />
+            <OptionChips
+          label={t('membershipPlans.form.capacityStep.attendancePeriodLabel')}
+          options={planOptions(ATTENDANCE_PERIODS)}
+          selected={values.attendancePeriod || 'Day'}
+          onSelect={(v) => onChange('attendancePeriod', v)}
+        />
           </>
         )}
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  optionChip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  optionText: {
-    fontWeight: '600',
-    fontSize: 12,
+    gap: Spacing.md,
   },
 });

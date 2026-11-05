@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "جميع الأولويات",
       "allStaff": "جميع الموظفين"
     },
+    "form": {
+      "addTitle": "متابعة جديدة",
+      "editTitle": "تعديل المتابعة",
+      "subtitle": "خطط لنقطة التواصل التالية مع العميل المحتمل",
+      "create": "إنشاء متابعة",
+      "addButton": "إضافة متابعة جديدة",
+      "whoSection": "مَن",
+      "detailsSection": "التفاصيل",
+      "scheduleSection": "الجدولة",
+      "notesSection": "ملاحظات",
+      "minutes": "{{count}} د"
+    },
     "msg": {
       "selectMemberOrLead": "يرجى اختيار عضو أو عميل محتمل.",
       "subjectRequired": "موضوع المتابعة مطلوب.",

@@ -8,6 +8,7 @@ import java.time.LocalTime;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "training_sessions")
 public class TrainingSession extends BaseEntity implements BranchAware {
 

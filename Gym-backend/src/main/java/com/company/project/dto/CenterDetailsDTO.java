@@ -14,6 +14,8 @@ public class CenterDetailsDTO {
     private String phone;
     private String operatingHours;
     private String accessType;
+    /** Why the signed-in member can't join this branch (Access Type), or null. */
+    private String accessBlockedReason;
     private String about;
     private Integer establishedYear;
     private String coverImageUrl;
@@ -60,6 +62,8 @@ public class CenterDetailsDTO {
 
     public String getAccessType() { return accessType; }
     public void setAccessType(String accessType) { this.accessType = accessType; }
+    public String getAccessBlockedReason() { return accessBlockedReason; }
+    public void setAccessBlockedReason(String accessBlockedReason) { this.accessBlockedReason = accessBlockedReason; }
 
     public String getAbout() { return about; }
     public void setAbout(String about) { this.about = about; }

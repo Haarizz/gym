@@ -321,6 +321,13 @@ export function useMembershipPlanWizard({
     setStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
+  const goToStep = useCallback(
+    (target: number) => {
+      setStep(Math.min(Math.max(target, 1), totalSteps));
+    },
+    [totalSteps],
+  );
+
   const submit = useCallback(async () => {
     try {
       const request = buildRequest(data);
@@ -346,6 +353,7 @@ export function useMembershipPlanWizard({
     updateField,
     next,
     previous,
+    goToStep,
     submit,
   };
 }

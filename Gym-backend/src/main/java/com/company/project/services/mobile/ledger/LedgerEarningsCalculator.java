@@ -1,67 +1,77 @@
 package com.company.project.services.mobile.ledger;
 
 import com.company.project.entities.*;
-import com.company.project.repositories.ReceiptRepository;
+import com.company.project.performance.PerformanceClock;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.events.PerformanceEvent;
+import com.company.project.performance.events.PerformanceEventRepository;
+import com.company.project.performance.events.SourceLabels;
+import com.company.project.performance.incentives.IncentiveCalculator;
+import com.company.project.performance.incentives.IncentivePlan;
+import com.company.project.performance.metric.Metric;
+import com.company.project.performance.settlement.SettlementView;
 import com.company.project.repositories.SalaryPaymentEmployeeRepository;
 import com.company.project.repositories.SalaryPaymentRepository;
-import com.company.project.repositories.StaffTargetRepository;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
-import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.*;
 
 /**
- * Earnings figures shared by the mobile Staff and Trainer ledgers, derived only from records the
- * web app also shows: staff/payroll salary settings, salary payments recorded in web payroll, and
- * commission computed by {@link StaffProgressCalculator} exactly as the web Targets pages do.
- * Nothing is estimated — missing data is reported as zero.
+ * Earnings figures shared by the mobile Staff and Trainer ledgers, from the same records the web
+ * shows: staff/payroll salary settings, salary payments recorded in web payroll, and commission
+ * from the {@link PerformanceEngine} — the frozen amount for decided months, so the phone always
+ * shows what payroll pays. Missing data is reported as zero.
  */
 @Component
 @Transactional(readOnly = true)
 public class LedgerEarningsCalculator {
 
-    private static final int RECENT_RECEIPTS_LIMIT = 10;
+    private static final int RECENT_ACTIVITY_LIMIT = 15;
     private static final int RECENT_PAYMENTS_LIMIT = 6;
 
     /** One line in a ledger's recent earnings list. */
     public record LedgerEntry(String id, String type, String title, String member, LocalDate date,
                               BigDecimal amount, boolean paid) {}
 
-    private final StaffTargetRepository staffTargetRepository;
     private final SalaryPaymentRepository salaryPaymentRepository;
     private final SalaryPaymentEmployeeRepository salaryPaymentEmployeeRepository;
-    private final ReceiptRepository receiptRepository;
-    private final StaffProgressCalculator progressCalculator;
+    private final PerformanceEngine engine;
+    private final PerformanceEventRepository events;
+    private final SourceLabels sourceLabels;
+    private final PerformanceClock clock;
 
     public LedgerEarningsCalculator(
-            StaffTargetRepository staffTargetRepository,
             SalaryPaymentRepository salaryPaymentRepository,
             SalaryPaymentEmployeeRepository salaryPaymentEmployeeRepository,
-            ReceiptRepository receiptRepository,
-            StaffProgressCalculator progressCalculator) {
-        this.staffTargetRepository = staffTargetRepository;
+            PerformanceEngine engine,
+            PerformanceEventRepository events,
+            SourceLabels sourceLabels,
+            PerformanceClock clock) {
         this.salaryPaymentRepository = salaryPaymentRepository;
         this.salaryPaymentEmployeeRepository = salaryPaymentEmployeeRepository;
-        this.receiptRepository = receiptRepository;
-        this.progressCalculator = progressCalculator;
+        this.engine = engine;
+        this.events = events;
+        this.sourceLabels = sourceLabels;
+        this.clock = clock;
     }
 
-    /** Same identity the web Targets pages use to attribute receipts and leads. */
+    /** The login used to attribute activity to an account. */
     public String usernameFor(Staff staff, UserDetailsImpl principal) {
         if (staff.getAppUsername() != null) return staff.getAppUsername();
         return principal.getUsername() != null ? principal.getUsername() : "";
+    }
+
+    public YearMonth currentMonth() {
+        return clock.currentMonth(null);
     }
 
     public Optional<SalaryPaymentEmployee> findPayrollEmployee(Staff staff) {
@@ -131,21 +141,15 @@ public class LedgerEarningsCalculator {
         return "paid".equalsIgnoreCase(p.getStatus());
     }
 
-    /**
-     * Commission for a month exactly as the web Targets pages report it: the live figure from
-     * paid sales, floored at whatever was stored on that month's target.
-     */
-    public BigDecimal commissionFor(Staff staff, String username, YearMonth period) {
-        LocalDateTime start = period.atDay(1).atStartOfDay();
-        LocalDateTime end = period.plusMonths(1).atDay(1).atStartOfDay();
-        BigDecimal live = progressCalculator.computeCommission(staff, username, start, end);
-        BigDecimal stored = staffTargetRepository
-                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), period.getYear(), period.getMonthValue())
-                .stream().findFirst()
-                .map(StaffTarget::getCommissionEarned)
-                .map(LedgerEarningsCalculator::nz)
-                .orElse(BigDecimal.ZERO);
-        return live.max(stored);
+    /** The month's figures from the engine (frozen once decided). */
+    public PeriodResult periodFor(Staff staff, YearMonth period) {
+        return engine.evaluate(staff.getId(), period);
+    }
+
+    /** Commission for a month: the approved/paid amount once decided, the live estimate before. */
+    public BigDecimal commissionFor(Staff staff, YearMonth period) {
+        PeriodResult r = periodFor(staff, period);
+        return r != null ? r.commission() : BigDecimal.ZERO;
     }
 
     /**
@@ -164,11 +168,12 @@ public class LedgerEarningsCalculator {
         return BigDecimal.ZERO;
     }
 
-    /** Commission earned from January through {@code current}, month by month as the web reports it. */
-    public BigDecimal ytdCommission(Staff staff, String username, YearMonth current) {
+    /** Commission from January through {@code current}. */
+    public BigDecimal ytdCommission(Staff staff, YearMonth current) {
         BigDecimal total = BigDecimal.ZERO;
-        for (int m = 1; m <= current.getMonthValue(); m++) {
-            total = total.add(commissionFor(staff, username, YearMonth.of(current.getYear(), m)));
+        for (Map<Long, PeriodResult> month : engine.evaluate(List.of(staff.getId()), YearMonth.of(current.getYear(), 1), current).values()) {
+            PeriodResult r = month.get(staff.getId());
+            if (r != null) total = total.add(r.commission());
         }
         return total;
     }
@@ -183,11 +188,11 @@ public class LedgerEarningsCalculator {
     }
 
     /**
-     * Recorded salary payments plus commission on the staff member's most recent paid sales at
-     * their role's rates, newest first. Commission counts as paid once payroll has been run for
-     * the month of the sale.
+     * Recorded salary payments plus the person's recently credited activity (each sale, session or
+     * conversion from the performance ledger) with what it earns at their plan's rates, newest
+     * first. Activity counts as paid once its month's commission has been paid.
      */
-    public List<LedgerEntry> recentEntries(Staff staff, String username, List<SalaryPayment> payments) {
+    public List<LedgerEntry> recentEntries(Staff staff, List<SalaryPayment> payments) {
         List<LedgerEntry> list = new ArrayList<>();
 
         for (SalaryPayment p : payments.subList(0, Math.min(RECENT_PAYMENTS_LIMIT, payments.size()))) {
@@ -208,68 +213,36 @@ public class LedgerEarningsCalculator {
             ));
         }
 
-        Specification<Receipt> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        Optional<CommissionRule> rule = progressCalculator.findCommissionRule(staff);
-        BigDecimal admissionRate = progressCalculator.admissionCommissionRate(rule);
-        BigDecimal baseRate = progressCalculator.baseCommissionRate(rule);
-
-        List<Receipt> receipts = receiptRepository
-                .findAll(spec, PageRequest.of(0, RECENT_RECEIPTS_LIMIT, Sort.by(Sort.Direction.DESC, "createdAt")))
-                .getContent();
-        for (Receipt r : receipts) {
-            BigDecimal revenue = r.getPaidAmount() != null ? r.getPaidAmount() : nz(r.getAmount());
-            boolean admission = "New".equals(r.getTransactionType());
-            BigDecimal commission = progressCalculator.commissionOn(revenue, admission ? admissionRate : baseRate);
-            if (commission.compareTo(BigDecimal.ZERO) <= 0) continue;
-
-            LocalDate date = r.getTransactionDate() != null ? r.getTransactionDate().toLocalDate()
-                    : (r.getCreatedAt() != null ? r.getCreatedAt().toLocalDate() : null);
-            boolean paid = date != null && findPaymentFor(payments, YearMonth.from(date))
-                    .map(LedgerEarningsCalculator::isPaid)
-                    .orElse(false);
-
+        YearMonth current = currentMonth();
+        PerformanceClock.Window window = new PerformanceClock.Window(
+                clock.window(current.minusMonths(2), null).start(), clock.window(current, null).end()).upToNow();
+        List<PerformanceEvent> activity = events.findForStaff(staff.getId(), window.start(), window.end(),
+                PageRequest.of(0, RECENT_ACTIVITY_LIMIT));
+        Map<String, Map<Long, SourceLabels.Label>> labels = sourceLabels.describe(activity);
+        Map<YearMonth, IncentivePlan> plans = new HashMap<>();
+        Map<YearMonth, Boolean> paidMonths = new HashMap<>();
+        for (PerformanceEvent e : activity) {
+            YearMonth month = clock.monthOf(e.getOccurredAt(), e.getBranchId());
+            IncentivePlan plan = plans.computeIfAbsent(month, m -> engine.planFor(staff.getId(), m));
+            BigDecimal earned = IncentiveCalculator.perActivity(plan, e.getMetric(), e.getQuantity(), e.getAmount());
+            boolean paid = paidMonths.computeIfAbsent(month, m -> {
+                PeriodResult r = periodFor(staff, m);
+                return r != null && SettlementView.PAID.equals(r.settlement().status());
+            });
+            SourceLabels.Label label = labels.getOrDefault(e.getSourceType(), Map.of()).get(e.getSourceId());
+            Metric metric = Metric.parse(e.getMetric()).orElse(null);
+            String what = metric != null ? metric.label() : e.getMetric();
+            String title = (e.getRevision() > 0 ? "Correction - " : "Commission - ") + what
+                    + (label != null && label.title() != null ? " (" + label.title() + ")" : "");
             list.add(new LedgerEntry(
-                    "rec-" + r.getId(),
+                    "event-" + e.getId(),
                     "COMMISSION",
-                    "Commission - " + (r.getPlanName() != null ? r.getPlanName() : (admission ? "New Admission" : "Sale")),
-                    r.getMemberName() != null ? r.getMemberName() : "Member",
-                    date,
-                    commission,
+                    title,
+                    label != null && label.person() != null ? label.person() : what,
+                    e.getOccurredAt().toLocalDate(),
+                    earned,
                     paid
             ));
-        }
-
-        // POS sales this staff member rang up, at their role's POS rates.
-        if (progressCalculator.hasPosRates(rule) && username != null && !username.isBlank()) {
-            LocalDateTime now = LocalDateTime.now();
-            List<SaleTransaction> sales = progressCalculator.posSales(username, now.minusMonths(3), now.plusDays(1));
-            for (SaleTransaction sale : sales.subList(0, Math.min(RECENT_RECEIPTS_LIMIT, sales.size()))) {
-                BigDecimal commission = progressCalculator.posCommissionOn(sale, rule);
-                if (commission.compareTo(BigDecimal.ZERO) <= 0) continue;
-                LocalDate date = sale.getCreatedAt() != null ? sale.getCreatedAt().toLocalDate() : null;
-                boolean paid = date != null && findPaymentFor(payments, YearMonth.from(date))
-                        .map(LedgerEarningsCalculator::isPaid)
-                        .orElse(false);
-                list.add(new LedgerEntry(
-                        "pos-" + sale.getId(),
-                        "COMMISSION",
-                        "Commission - POS sale " + (sale.getTransactionNumber() != null ? sale.getTransactionNumber() : ""),
-                        sale.getMemberName() != null ? sale.getMemberName() : "Walk-in customer",
-                        date,
-                        commission,
-                        paid
-                ));
-            }
         }
 
         list.sort(Comparator.comparing(LedgerEntry::date, Comparator.nullsLast(Comparator.reverseOrder())));

@@ -101,6 +101,7 @@ const common = {
 
   validation: {
     fullNameRequired: 'पूरा नाम आवश्यक है',
+    genderRequired: 'लिंग आवश्यक है',
     phoneRequired: 'फ़ोन नंबर आवश्यक है',
     emergencyContactRequired: 'आपातकालीन संपर्क का नाम आवश्यक है',
     emergencyPhoneRequired: 'आपातकालीन फ़ोन आवश्यक है',

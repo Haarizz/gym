@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, RefreshControl } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { BrandColors } from '@/core/theme';
-import { ReferralHeader } from '../components/ReferralHeader';
+import { BrandColors, Spacing } from '@/core/theme';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { ReferralStatsSummary } from '../components/ReferralStatsSummary';
 import { ReferralHubMenu } from '../components/ReferralHubMenu';
 import { referralKeys } from '../../hooks/referralKeys';
@@ -11,6 +11,7 @@ import { rewardKeys } from '@/domains/rewards';
 export function ReferralsHubScreen() {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const bottomInset = useTabBarBottomInset() + Spacing.four;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -25,7 +26,8 @@ export function ReferralsHubScreen() {
     <View style={styles.screen}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -49,8 +51,5 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
-  },
-  content: {
-    paddingBottom: 40,
   },
 });

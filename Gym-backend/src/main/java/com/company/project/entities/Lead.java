@@ -10,6 +10,7 @@ import java.util.List;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "leads")
 public class Lead extends BaseEntity implements BranchAware {
 
@@ -174,10 +175,16 @@ public class Lead extends BaseEntity implements BranchAware {
     public Long getLeadFormId() { return leadFormId; }
     public void setLeadFormId(Long leadFormId) { this.leadFormId = leadFormId; }
 
+    // Assignee as a staff id (V119); follows assignedStaff when that names exactly one employee.
+    @Column(name = "assigned_staff_id")
+    private Long assignedStaffId;
+
     @Column(name = "branch_id")
     private Long branchId;
 
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
 
+    public Long getAssignedStaffId() { return assignedStaffId; }
+    public void setAssignedStaffId(Long assignedStaffId) { this.assignedStaffId = assignedStaffId; }
 }

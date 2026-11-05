@@ -107,8 +107,31 @@ public class MobileDiscoveryController {
         this.memberStaffService = memberStaffService;
     }
 
+    /**
+     * The signed-in GymBios account's profile gender, read from the global DB before any
+     * tenant switch. Empty when the caller isn't a GymBios account (staff sign-in, or
+     * not signed in) — those callers aren't filtered by Branch Access Type.
+     */
+    private java.util.Optional<String> callerGender() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof UserDetailsImpl user)
+                || !user.isGlobal()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(globalUserService.findUserProfileRequiresNew(user.getId())
+                    .map(UserProfile::getGender)
+                    .orElse(""));
+        } catch (Exception e) {
+            return java.util.Optional.empty();
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<CenterSummaryDTO>> getCenters() {
+        // Branch Access Type: a member only sees centers they're allowed to join
+        // (BranchAccessPolicy) — e.g. a male account never sees Ladies Only branches.
+        java.util.Optional<String> gender = callerGender();
         List<CenterSummaryDTO> centers = globalDiscoveryRepository.findAll().stream()
                 .filter(c -> "ACTIVE".equals(c.getStatus()))
                 .map(c -> {
@@ -184,6 +207,8 @@ public class MobileDiscoveryController {
 
                     return dto;
                 })
+                .filter(dto -> gender.isEmpty()
+                        || com.company.project.services.BranchAccessPolicy.isAllowed(dto.getAccessType(), gender.get()))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(centers);
     }
@@ -196,6 +221,7 @@ public class MobileDiscoveryController {
         GlobalBranchDiscovery summary = globalDiscoveryRepository
                 .findByTenantSlugAndBranchId(tenantSlug, branchId)
                 .orElseThrow(() -> new RuntimeException("Center not found"));
+        java.util.Optional<String> gender = callerGender();
 
         try {
             TenantContextHolder.setCurrentTenant(tenantSlug);
@@ -213,6 +239,10 @@ public class MobileDiscoveryController {
             dto.setLng(branch.getLng());
             dto.setCenterType(branch.getCenterType());
             dto.setAccessType(branch.getAccessType());
+            // Reached through a deep or shared link even when the list hides it — the app
+            // shows this instead of letting the member pick a plan.
+            gender.ifPresent(g -> dto.setAccessBlockedReason(
+                    com.company.project.services.BranchAccessPolicy.refusalReason(branch, g, true)));
             dto.setOperatingHours(branch.getOperatingHours());
             dto.setPhone(branch.getPhone());
             dto.setAbout(branch.getDescription());
@@ -340,6 +370,9 @@ public class MobileDiscoveryController {
             // Verify branch
             Branch branch = branchRepository.findById(branchId)
                     .orElseThrow(() -> new RuntimeException("Branch not found in tenant DB"));
+
+            // Branch Access Type — refused before any card leg is verified or charged.
+            com.company.project.services.BranchAccessPolicy.enforce(branch, profile.getGender(), true);
 
             // Get plan (will throw if not found/active)
             MembershipPlanResponseDTO plan = planService.getPlanById(request.getPlanId());

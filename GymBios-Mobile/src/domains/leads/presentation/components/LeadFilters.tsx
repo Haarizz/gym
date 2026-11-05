@@ -277,7 +277,6 @@ export function LeadFilters({ filters, onChangeFilters }: LeadFiltersProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.three,
     gap: Spacing.two,
   },
   searchRow: {

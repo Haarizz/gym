@@ -1,11 +1,17 @@
 package com.company.project.services.mobile.ledger;
 
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PerformanceTestData;
+import com.company.project.performance.events.PerformanceEventRepository;
+import com.company.project.performance.events.SourceLabels;
+import java.util.HashMap;
+import java.util.Map;
+
 import com.company.project.dto.mobile.ledger.trainer.TrainerLedgerResponseDTO;
 import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,19 +47,21 @@ class MobileTrainerLedgerServiceTest {
 
 
     @Mock
-    private StaffTargetRepository staffTargetRepository;
-
-    @Mock
     private SalaryPaymentRepository salaryPaymentRepository;
 
     @Mock
     private SalaryPaymentEmployeeRepository salaryPaymentEmployeeRepository;
 
     @Mock
-    private ReceiptRepository receiptRepository;
+    private PerformanceEngine engine;
 
     @Mock
-    private StaffProgressCalculator progressCalculator;
+    private PerformanceEventRepository events;
+
+    @Mock
+    private SourceLabels sourceLabels;
+
+    private final Map<YearMonth, String> commission = new HashMap<>();
 
     private MobileTrainerLedgerService ledgerService;
 
@@ -64,8 +72,8 @@ class MobileTrainerLedgerServiceTest {
     @BeforeEach
     void setUp() {
         LedgerEarningsCalculator earnings = new LedgerEarningsCalculator(
-                staffTargetRepository, salaryPaymentRepository, salaryPaymentEmployeeRepository,
-                receiptRepository, progressCalculator);
+                salaryPaymentRepository, salaryPaymentEmployeeRepository, engine, events, sourceLabels,
+                PerformanceTestData.utcClock());
         ledgerService = new MobileTrainerLedgerService(staffRepository, earnings);
 
         testPrincipal = new UserDetailsImpl(200L, "trainer", "trainer@gymbios.com", "password", Collections.emptyList(), true);
@@ -82,18 +90,14 @@ class MobileTrainerLedgerServiceTest {
         current = YearMonth.now();
 
         when(staffRepository.findByUserId(200L)).thenReturn(Optional.of(trainer));
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(anyLong(), anyInt(), anyInt()))
-                .thenReturn(Collections.emptyList());
         when(salaryPaymentEmployeeRepository.findByEmployeeId(anyString())).thenReturn(Optional.empty());
         when(salaryPaymentRepository.findAll()).thenReturn(Collections.emptyList());
-        when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
-
-        when(progressCalculator.computeCommission(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
-        when(progressCalculator.findCommissionRule(any())).thenReturn(Optional.empty());
-        when(progressCalculator.baseCommissionRate(any())).thenCallRealMethod();
-        when(progressCalculator.admissionCommissionRate(any())).thenCallRealMethod();
-        when(progressCalculator.commissionOn(any(), any())).thenCallRealMethod();
+        when(events.findForStaff(anyLong(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(sourceLabels.describe(any())).thenReturn(Map.of());
+        when(engine.evaluate(eq(20L), any(YearMonth.class))).thenAnswer(inv -> {
+            YearMonth m = inv.getArgument(1);
+            return PerformanceTestData.result(20L, m).commission(commission.getOrDefault(m, "0")).build();
+        });
     }
 
     @Test
@@ -129,8 +133,7 @@ class MobileTrainerLedgerServiceTest {
         SalaryPayment thisMonth = payment(1L, current, "15000");
         SalaryPayment lastMonth = payment(2L, current.minusMonths(1), "19000");
         when(salaryPaymentRepository.findAll()).thenReturn(List.of(lastMonth, thisMonth));
-        when(progressCalculator.computeCommission(eq(trainer), eq("trainer"), eq(current.atDay(1).atStartOfDay()), any()))
-                .thenReturn(new BigDecimal("1000"));
+        commission.put(current, "1000");
 
         TrainerLedgerResponseDTO response = ledgerService.getTrainerLedger(testPrincipal);
 

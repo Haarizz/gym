@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "सभी प्राथमिकताएँ",
       "allStaff": "सभी स्टाफ"
     },
+    "form": {
+      "addTitle": "नया फ़ॉलो-अप",
+      "editTitle": "फ़ॉलो-अप संपादित करें",
+      "subtitle": "लीड के साथ अगले संपर्क की योजना बनाएं",
+      "create": "फ़ॉलो-अप बनाएं",
+      "addButton": "नया फ़ॉलो-अप जोड़ें",
+      "whoSection": "किसके साथ",
+      "detailsSection": "विवरण",
+      "scheduleSection": "शेड्यूल",
+      "notesSection": "नोट्स",
+      "minutes": "{{count}} मिनट"
+    },
     "msg": {
       "selectMemberOrLead": "कृपया कोई सदस्य या लीड चुनें।",
       "subjectRequired": "फॉलो-अप का विषय आवश्यक है।",

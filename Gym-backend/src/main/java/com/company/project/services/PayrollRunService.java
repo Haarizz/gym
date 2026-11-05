@@ -1,5 +1,6 @@
 package com.company.project.services;
 
+import com.company.project.performance.settlement.SettlementService;
 import com.company.project.entities.PayrollRun;
 import com.company.project.entities.PayrollRunLine;
 import com.company.project.entities.SalaryPayment;
@@ -62,7 +63,7 @@ public class PayrollRunService {
     private final PayrollRunRepository runRepository;
     private final PayrollRunLineRepository lineRepository;
     private final ShiftAttendanceService attendance;
-    private final CommissionEarningService commissions;
+    private final SettlementService commissions;
     private final AdvancesDeductionsService advancesDeductions;
     private final SalaryPaymentEmployeeRepository salaryEmployeeRepository;
     private final ShiftRepository shiftRepository;
@@ -70,7 +71,7 @@ public class PayrollRunService {
     private final ObjectMapper objectMapper;
 
     public PayrollRunService(PayrollRunRepository runRepository, PayrollRunLineRepository lineRepository,
-                             ShiftAttendanceService attendance, CommissionEarningService commissions,
+                             ShiftAttendanceService attendance, SettlementService commissions,
                              AdvancesDeductionsService advancesDeductions,
                              SalaryPaymentEmployeeRepository salaryEmployeeRepository, ShiftRepository shiftRepository,
                              SalaryPaymentRepository salaryPaymentRepository, ObjectMapper objectMapper) {

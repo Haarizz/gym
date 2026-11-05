@@ -59,6 +59,7 @@ const common = {
 
   validation: {
     fullNameRequired: 'முழுப் பெயர் தேவை',
+    genderRequired: 'பாலினம் தேவை',
     phoneRequired: 'தொலைபேசி எண் தேவை',
     emergencyContactRequired: 'அவசரத் தொடர்பு நபரின் பெயர் தேவை',
     emergencyPhoneRequired: 'அவசரத் தொலைபேசி எண் தேவை',

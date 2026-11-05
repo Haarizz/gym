@@ -37,6 +37,7 @@ import {
   type GymMembership,
 } from '@/domains/gymSwitcher/gymMembershipsApi';
 import { openMembershipAt } from '@/domains/gymSwitcher/openMembership';
+import { useMobileProfile } from '@/domains/profile/hooks/useMobileProfile';
 
 export function MemberCentersScreen({
   initialDeepLink,
@@ -57,6 +58,10 @@ export function MemberCentersScreen({
   const isLocationOn = coords != null;
   // Gyms the member already belongs to show "Manage" instead of "Subscribe".
   const { data: myGyms } = useMyGymMemberships();
+  // Without a gender on the profile, Ladies Only / Men Only centers are left out of
+  // the list by the backend (branch Access Type) — prompt the member to add one.
+  const { profile } = useMobileProfile();
+  const isGenderMissing = profile != null && !profile.gender?.trim();
 
   const goToDetail = (center: CenterSummary, tab: 'overview' | 'plans' = 'overview') => {
     // Location only lives on this screen, so hand the already-computed distance to
@@ -264,6 +269,18 @@ export function MemberCentersScreen({
           </Pressable>
         </View>
       </View>
+
+      {isGenderMissing && (
+        <Pressable
+          style={({ pressed }) => [styles.genderBanner, pressed && styles.pressed]}
+          onPress={() => router.push('/(member)/profile' as any)}
+          accessibilityRole="button"
+        >
+          <Feather name="info" size={15} color={BrandColors.tealDark} />
+          <Text style={styles.genderBannerText}>{t('centers.list.genderMissing')}</Text>
+          <Text style={styles.genderBannerAction}>{t('centers.list.genderMissingAction')}</Text>
+        </Pressable>
+      )}
 
       {/* Active filter chips */}
       {activeFilterCount > 0 && (
@@ -476,6 +493,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: BrandColors.trainerAmber,
+  },
+  genderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginHorizontal: Spacing.three,
+    marginBottom: Spacing.two,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: Glass.fillStrong,
+    borderWidth: 1,
+    borderColor: heroTint(BrandColors.teal, 0.35),
+  },
+  genderBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: BrandColors.textPrimary,
+  },
+  genderBannerAction: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: BrandColors.teal,
   },
   activeFiltersBar: {
     paddingBottom: Spacing.two,

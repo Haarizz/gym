@@ -245,6 +245,7 @@ public class MemberAddonService {
                 receipt.setValidTill(saved.getExpiryDate());
                 receipt.setMembershipType(targetMember.getMembershipType());
                 receipt.setProcessedBy(receiptService.resolveProcessedByName(request.getProcessedByStaffId()));
+                receipt.setProcessedByStaffId(receiptService.resolveProcessedByStaffId(request.getProcessedByStaffId()));
                 createdReceipt = receiptService.createReceipt(receipt);
             }
         }

@@ -28,6 +28,8 @@ const centers = {
     priceAbove: 'Plus de <amount/>',
 
     list: {
+      genderMissing: 'Ajoutez votre genre dans Mon profil pour voir aussi les centres réservés aux femmes et aux hommes.',
+      genderMissingAction: 'Ajouter',
       searchPlaceholder: 'Rechercher par nom, quartier ou type...',
       nearMe: 'Près de moi',
       useMyLocation: 'Utiliser ma position',
@@ -68,6 +70,7 @@ const centers = {
     },
 
     detail: {
+      accessBlockedTitle: 'Impossible de rejoindre ce centre',
       notFound: 'Centre introuvable.',
       noPhoneTitle: 'Aucun numéro',
       noPhone: 'Ce centre n’a pas encore indiqué de numéro de téléphone.',

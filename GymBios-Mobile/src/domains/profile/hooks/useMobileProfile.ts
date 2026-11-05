@@ -31,6 +31,9 @@ export function useMobileProfile() {
       queryClient.invalidateQueries({ queryKey: ['mobileProfile'] });
       // MyProfileScreen's contact details come from profileKeys.current().
       queryClient.invalidateQueries({ queryKey: profileKeys.current() });
+      // The centers list and detail pages are filtered by the profile's gender
+      // (branch Access Type), so refetch them after an edit.
+      queryClient.invalidateQueries({ queryKey: ['discovery'] });
       // Update session to reflect profileCompleted = true
       if (session) {
         const updatedSession = Session.create({

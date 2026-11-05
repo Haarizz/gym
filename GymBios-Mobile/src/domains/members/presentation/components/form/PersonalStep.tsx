@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
-import { Radius, Spacing } from '@/core/theme';
+import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
@@ -66,6 +66,11 @@ export function PersonalStep({ data, updateField, errors }: MemberStepProps) {
               );
             })}
           </View>
+          {!!errors?.gender && (
+            <Typography variant="caption" style={styles.genderError}>
+              {errors.gender}
+            </Typography>
+          )}
         </View>
 
         <DatePicker
@@ -148,6 +153,10 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  genderError: {
+    marginTop: Spacing.one,
+    color: BrandColors.danger,
   },
   multiline: {
     minHeight: 72,

@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: 'कमाई विवरण',
       commissionStructureTitle: 'कमीशन संरचना',
+      structure: {
+        noPlan: "कोई प्रोत्साहन योजना नहीं",
+        perUnit: "प्रति {{unit}} {{amount}}",
+        fromUnits: "{{count}} से",
+        max: "अधिकतम {{amount}}",
+        bonusLabel: "{{metric}} लक्ष्य का {{threshold}}% पूरा करें",
+        bonusPercent: "{{metric}} का +{{rate}}%",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "नए सदस्य प्रवेश",
+          LEAD_CONVERSION: "लीड रूपांतरण",
+          POS_SALE: "POS बिक्री",
+          PT_SESSION_DELIVERED: "दिए गए PT सत्र",
+          CLASS_TAUGHT: "ली गई कक्षाएँ",
+          CLASS_ATTENDEE: "कक्षा उपस्थित",
+          REVENUE_TOTAL: "राजस्व",
+        },
+        units: {
+          MEMBER_ADMISSION: "प्रवेश",
+          LEAD_CONVERSION: "रूपांतरण",
+          POS_SALE: "बिक्री",
+          PT_SESSION_DELIVERED: "सत्र",
+          CLASS_TAUGHT: "कक्षा",
+          CLASS_ATTENDEE: "उपस्थित",
+        },
+      },
       monthlyComparisonTitle: 'मासिक तुलना',
     },
 

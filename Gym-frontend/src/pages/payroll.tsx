@@ -33,6 +33,11 @@ const CHART_COLORS = ["var(--gb-primary)", "#3B82F6", "#8B5CF6", "#F59E0B", "#EC
 const sum = (lines: PayrollLine[], key: keyof PayrollLine) => lines.reduce((t, l) => t + Number(l[key] || 0), 0);
 const lineDeductions = (l: PayrollLine) => Number(l.attendance_deduction) + Number(l.advance_repayment) + Number(l.other_deductions);
 
+
+/** Payroll lines store approved commission per settlement category: "total" (one per month), or the pre-V119 memberships / pos split. */
+const commissionLabel = (category: string) =>
+  category === "pos" ? "POS sales commission" : category === "memberships" ? "Membership commission" : "Commission & bonuses";
+
 export function Payroll({ onNavigate }: PayrollProps) {
   const { activeBranchId } = useBranch();
   const { currencyCode, currencyPrefix } = useCurrency();
@@ -246,7 +251,7 @@ footer{margin-top:24px;color:#64748b;font-size:10px}</style></head><body>
 <div class="meta"><div>Scheduled days<b>${l.scheduled_days}</b></div><div>Present<b>${l.present_days}</b></div><div>Absent<b>${l.absent_days}</b></div><div>Unpaid leave<b>${l.unpaid_leave_days}</b></div></div>
 ${block("A. Fixed salary", row("Basic salary", money(l.basic_salary)) + (b?.allowances ?? []).map(a => row(a.name, money(a.amount))).join("") + row("Gross fixed", money(Number(l.basic_salary) + Number(l.allowances)), true))}
 ${block("B. Working hours", row("Scheduled hours", hoursLabel(l.scheduled_hours)) + row("Actual hours", hoursLabel(l.actual_hours)) + row("Regular hours", hoursLabel(l.regular_hours)) + row("Approved overtime", hoursLabel(l.approved_ot_hours)))}
-${block("C. Variable earnings", row("Overtime earnings", money(l.ot_pay)) + Object.entries(b?.commission ?? {}).map(([k, v]) => row(k === "pos" ? "POS commission" : "Membership commission", money(v))).join("") + row("Total variable", money(Number(l.ot_pay) + Number(l.commission)), true))}
+${block("C. Variable earnings", row("Overtime earnings", money(l.ot_pay)) + Object.entries(b?.commission ?? {}).map(([k, v]) => row(commissionLabel(k), money(v))).join("") + row("Total variable", money(Number(l.ot_pay) + Number(l.commission)), true))}
 ${block("D. Deductions", row("Absence / unpaid leave", money(l.attendance_deduction)) + (b?.advances ?? []).map(a => row(`Advance installment ${a.installment_no}/${a.installments}`, money(a.amount))).join("") + (b?.deductions ?? []).map(d => row(d.type, money(d.amount))).join("") + row("Total deductions", money(lineDeductions(l)), true))}
 ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductions", "− " + money(lineDeductions(l))))}
 <div class="net"><span>Net pay</span><span>${esc(money(l.net_pay))}</span></div>
@@ -668,7 +673,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                 "Scheduled days and hours from each employee's shift and roster",
                 "Absences, unpaid leave, late arrivals and actual hours from Staff Attendance",
                 "Approved overtime only, paid at 1.25× the hourly rate",
-                "Approved commission (memberships and POS) from Target & Commission",
+                "Approved commission from Targets & Incentives",
                 "Advance installments and active deductions due this month",
               ].map(t => <div key={t} className={s.line}><span className={s.row} style={{ gap: "0.4rem" }}><CheckCircle size={14} color="var(--primary)" />{t}</span></div>)}
             </div>
@@ -742,7 +747,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                     <div className={s.sectionTitle}>C. Variable earnings</div>
                     <Line label={`Overtime (${hoursLabel(l.approved_ot_hours)} × ${money(b?.ot_rate)})`} value={money(l.ot_pay)} tone="green" />
                     {Object.entries(b?.commission ?? {}).map(([k, v]) => (
-                      <Line key={k} label={k === "pos" ? "POS sales commission" : "Membership commission"} value={money(v)} tone="green" />
+                      <Line key={k} label={commissionLabel(k)} value={money(v)} tone="green" />
                     ))}
                     {!Object.keys(b?.commission ?? {}).length && <Line label="Commission" value="— (none approved)" />}
                     <Line label="Total variable earnings" value={money(variable)} total tone="green" />

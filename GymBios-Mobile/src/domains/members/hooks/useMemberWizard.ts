@@ -100,9 +100,12 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+?[0-9\s\-()]{7,20}$/;
 const MIN_PASSWORD_LENGTH = 6;
 
-function validatePersonal(data: MemberWizardData): StepErrors {
+function validatePersonal(data: MemberWizardData, mode: WizardMode): StepErrors {
   const errors: StepErrors = {};
   if (data.name.trim().length < 2) errors.name = i18n.t('shared.formErrors.memberName');
+  // Required for new members — a branch's Access Type (Ladies Only / Men Only) is
+  // checked against it. Editing stays lenient for members saved before this.
+  if (mode === 'create' && !data.gender) errors.gender = i18n.t('validation.genderRequired');
 
   const phone = data.phone.trim();
   if (!phone) errors.phone = i18n.t('shared.formErrors.phoneRequired');

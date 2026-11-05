@@ -109,40 +109,36 @@ export function ReferralHubMenu({ onSelectItem }: ReferralHubMenuProps) {
 
   return (
     <View style={styles.container}>
-      <Typography variant="subtitle" style={styles.sectionTitle}>
+      <Typography variant="caption" style={styles.sectionTitle}>
         {t('adminReferrals.menuTitle')}
       </Typography>
 
-      <View style={styles.list}>
-        {REFERRAL_MENU_ITEMS.map((item) => (
-          <Pressable
-            key={item.id}
-            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() => handlePress(item)}
-            accessibilityRole="button"
-            accessibilityLabel={t(`adminReferrals.hub.${item.id}.title`, { defaultValue: item.title })}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: item.iconBg }]}>
-              <Feather name={item.icon} size={22} color={item.iconColor} />
-            </View>
-
-            <View style={styles.contentContainer}>
-              <Typography variant="subtitle" style={styles.itemTitle}>
-                {t(`adminReferrals.hub.${item.id}.title`, { defaultValue: item.title })}
+      <View style={styles.grid}>
+        {REFERRAL_MENU_ITEMS.map((item) => {
+          const title = t(`adminReferrals.hub.${item.id}.title`, { defaultValue: item.title });
+          return (
+            <Pressable
+              key={item.id}
+              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+              onPress={() => handlePress(item)}
+              accessibilityRole="button"
+              accessibilityLabel={title}
+            >
+              <View style={styles.tileTop}>
+                <View style={[styles.iconContainer, { backgroundColor: item.iconBg }]}>
+                  <Feather name={item.icon} size={18} color={item.iconColor} />
+                </View>
+                <Feather name="chevron-right" size={16} color={BrandColors.textSecondary} />
+              </View>
+              <Typography variant="bodySmallBold" style={styles.itemTitle} numberOfLines={1}>
+                {title}
               </Typography>
-              <Typography variant="bodySmall" color="textSecondary" style={styles.itemDescription}>
+              <Typography variant="caption" color="textSecondary" style={styles.itemDescription} numberOfLines={2}>
                 {t(`adminReferrals.hub.${item.id}.description`, { defaultValue: item.description })}
               </Typography>
-            </View>
-
-            <View style={styles.navButton}>
-              <Typography variant="bodySmall" style={styles.navButtonText}>
-                {t('adminReferrals.open')}
-              </Typography>
-              <Feather name="arrow-right" size={14} color={BrandColors.teal} />
-            </View>
-          </Pressable>
-        ))}
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -152,69 +148,57 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.three,
     marginTop: Spacing.four,
-    marginBottom: Spacing.six,
+    gap: Spacing.two + 2,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    color: BrandColors.textPrimary,
-    marginBottom: Spacing.two,
+    color: BrandColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: Spacing.one,
   },
-  list: {
-    gap: Spacing.two,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: Spacing.two + 2,
+  },
+  tile: {
+    width: '48.5%',
+    backgroundColor: '#ffffff',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.one,
     shadowColor: '#000',
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.04)',
+    elevation: 1,
   },
-  cardPressed: {
-    backgroundColor: '#f8fafc',
-    opacity: 0.9,
+  tilePressed: {
+    opacity: 0.75,
+  },
+  tileTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.one,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.three,
-  },
-  contentContainer: {
-    flex: 1,
-    marginRight: Spacing.two,
   },
   itemTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
     color: BrandColors.textPrimary,
-    marginBottom: 2,
   },
   itemDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#eef7f6',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-  },
-  navButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.teal,
+    fontSize: 11,
+    lineHeight: 15,
+    minHeight: 30,
   },
 });

@@ -95,6 +95,7 @@ const leads = {
       phone: '联系电话',
       preferredContact: '首选联系方式',
       leadScore: '意向分',
+      scoreNotSet: '未设置',
       leadDetails: '客户详情',
       source: '来源渠道',
       assignedStaff: '跟进员工',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: '添加新潜在客户',
+      leadScoreLabel: '意向分（1-100，可选）',
+      leadScorePlaceholder: '例如 50',
+      leadScoreInvalid: '意向分必须是 1 到 100 之间的整数。',
       editLead: '编辑潜在客户',
       fillDetails: '填写以下信息',
       contactDetails: '联系方式',

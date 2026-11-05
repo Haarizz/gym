@@ -278,7 +278,17 @@ export function CenterDetailScreen() {
   // Every purchase path goes through here. A gym the member already belongs to isn't
   // bought again: they manage that membership instead. Joining a gym while holding a
   // membership elsewhere asks first, since it adds a separate membership.
+  // Branch Access Type (Ladies Only / Men Only) doesn't match the member's gender —
+  // reachable through a deep or shared link even though the list hides it. The
+  // backend refuses the purchase too; this just explains it before checkout.
+  const warnIfAccessBlocked = () => {
+    if (!details?.accessBlockedReason) return false;
+    toast.warning(details.accessBlockedReason, { title: t('centers.detail.accessBlockedTitle') });
+    return true;
+  };
+
   const handleSelectPlan = async (plan: CenterPlan) => {
+    if (warnIfAccessBlocked()) return;
     const gyms = await getMyGymMemberships();
     if (membershipAtGym(gyms, tenantSlug)) {
       setShowAlreadyMember(true);
@@ -360,6 +370,7 @@ export function CenterDetailScreen() {
   // With a single plan there's nothing to choose, so go straight to checkout;
   // otherwise show the plans to pick from.
   const handleBuyMembership = () => {
+    if (warnIfAccessBlocked()) return;
     if (plans && plans.length === 1) {
       void handleSelectPlan(plans[0]);
       return;

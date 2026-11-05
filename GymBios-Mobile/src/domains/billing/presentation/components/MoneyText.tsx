@@ -1,4 +1,5 @@
 import React from 'react';
+import type { StyleProp, TextStyle } from 'react-native';
 
 import { CurrencyValue } from '@/core/providers';
 import { Typography } from '@/shared/components/Typography';
@@ -11,6 +12,9 @@ interface MoneyTextProps {
   color?: string;
   /** Show a +/- prefix based on sign. */
   signed?: boolean;
+  /** Extra text style (e.g. font size). */
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
 }
 
 /**
@@ -22,9 +26,11 @@ export function MoneyText({
   variant = 'bodySmallBold',
   color,
   signed = false,
+  style,
+  numberOfLines,
 }: MoneyTextProps) {
   return (
-    <Typography variant={variant} style={color ? { color } : undefined}>
+    <Typography variant={variant} style={[style, color ? { color } : null]} numberOfLines={numberOfLines}>
       <CurrencyValue
         amount={signed ? amount : Math.abs(amount)}
         signed={signed}

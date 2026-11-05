@@ -62,7 +62,8 @@ export function LeadCard({
   }, [lead.nextFollowUp, t]);
 
   const priorityStyle = getPriorityBadgeStyle(lead.priority);
-  const score = lead.leadScore ?? 50;
+  // Lead score is set manually by staff (1-100); it is never auto-calculated.
+  const score = lead.leadScore;
 
   return (
     <Pressable
@@ -151,6 +152,7 @@ export function LeadCard({
           </View>
         )}
 
+        {score != null && (
         <View style={[styles.scoreContainer, { backgroundColor: theme.muted }]}>
           <Text style={[styles.scoreText, { color: theme.textSecondary }]}>
             {t('leads.card.score', { score })}
@@ -164,6 +166,7 @@ export function LeadCard({
             />
           </View>
         </View>
+        )}
       </View>
 
       {/* Divider */}

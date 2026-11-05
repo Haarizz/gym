@@ -21,7 +21,8 @@ export const personalInfoSchema = z.object({
   fullName: z.string().min(1, required('validation.fullNameRequired')),
   phone: z.string().min(1, required('validation.phoneRequired')),
   dateOfBirth: optionalWith(validateDateOfBirth),
-  gender: z.string().optional(),
+  // Required: a branch's Access Type (Ladies Only / Men Only) is matched against it.
+  gender: z.string().min(1, required('validation.genderRequired')),
   nationality: z.string().optional(),
   address: z.string().optional(),
 });

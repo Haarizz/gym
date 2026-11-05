@@ -3,14 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
-import { useTheme } from '@/core/hooks';
 import { CurrencyValue, useCurrency } from '@/core/providers';
 import { DatePicker } from '@/shared/components/DatePicker';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
+import { OptionChips, planOptions } from '../OptionChips';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import { offerError, type PlanWizardData } from '../../hooks/useMembershipPlanWizard';
-import { tOr } from '@/core/i18n/format';
 
 const DURATION_TYPES = ['Day', 'Week', 'Month', 'Year'];
 
@@ -41,46 +40,7 @@ function offerPreview(values: PlanWizardData): { discount: number; pays: number 
   return { discount, pays: Math.round((price - discount) * 100) / 100 };
 }
 
-interface OptionRowProps {
-  options: string[];
-  selected: string;
-  onSelect: (value: string) => void;
-  getLabel?: (value: string) => string;
-}
 
-function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
-  const theme = useTheme();
-  return (
-    <View style={styles.optionRow}>
-      {options.map((opt) => {
-        const isActive = opt === selected;
-        return (
-          <View
-            key={getLabel ? getLabel(opt) : opt}
-            style={[
-              styles.optionChip,
-              {
-                backgroundColor: isActive ? theme.primary : theme.backgroundElement,
-                borderColor: isActive ? theme.primary : theme.border,
-              },
-            ]}
-            onTouchEnd={() => onSelect(opt)}
-          >
-            <Typography
-              variant="caption"
-              style={[
-                styles.optionText,
-                { color: isActive ? '#ffffff' : theme.textSecondary },
-              ]}
-            >
-              {opt}
-            </Typography>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
 
 interface DurationPricingStepProps {
   values: PlanWizardData;
@@ -100,14 +60,12 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
 
   return (
     <View style={styles.container}>
-      <FormSection title={t('membershipPlans.form.pricingStep.durationSection')}>
-        <Typography variant="bodySmallBold">
-          {t('membershipPlans.form.pricingStep.durationTypeLabel')}
-        </Typography>
-        <OptionRow
-          options={DURATION_TYPES}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+      <FormCard icon="clock" title={t('membershipPlans.form.pricingStep.durationSection')}>
+        <OptionChips
+          label={t('membershipPlans.form.pricingStep.durationTypeLabel')}
+          options={planOptions(DURATION_TYPES)}
           selected={values.durationType}
+          error={errors.durationType}
           onSelect={(v) => onChange('durationType', v)}
         />
         <Input
@@ -118,9 +76,9 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
           keyboardType="numeric"
           error={errors.durationValue}
         />
-      </FormSection>
+      </FormCard>
 
-      <FormSection title={t('membershipPlans.form.pricingStep.pricingSection')}>
+      <FormCard icon="credit-card" title={t('membershipPlans.form.pricingStep.pricingSection')}>
         <Input
           label={t('membershipPlans.form.pricingStep.priceLabel')}
           value={values.price}
@@ -129,24 +87,16 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
           keyboardType="decimal-pad"
           error={errors.price}
         />
-      </FormSection>
+      </FormCard>
 
-      <FormSection title={t('membershipPlans.form.pricingStep.offerSection')}>
+      <FormCard icon="tag" title={t('membershipPlans.form.pricingStep.offerSection')}>
         <Typography variant="caption" color="textSecondary">
           {t('membershipPlans.form.pricingStep.offerDescription')}
         </Typography>
-        <OptionRow
-          options={offerTypeOptions.map((o) => o.label)}
-          selected={
-            offerTypeOptions.find((o) => o.value === values.offerType)?.label ??
-            t('membershipPlans.form.pricingStep.noOffer')
-          }
-          onSelect={(label) =>
-            onChange(
-              'offerType',
-              offerTypeOptions.find((o) => o.label === label)?.value ?? 'none',
-            )
-          }
+        <OptionChips
+          options={offerTypeOptions}
+          selected={values.offerType}
+          onSelect={(v) => onChange('offerType', v as PlanWizardData['offerType'])}
         />
         {values.offerType !== 'none' && (
           <>
@@ -205,15 +155,15 @@ export function DurationPricingStep({ values, errors, onChange }: DurationPricin
             })()}
           </>
         )}
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
   dateRow: {
     flexDirection: 'row',
@@ -221,20 +171,5 @@ const styles = StyleSheet.create({
   },
   dateCol: {
     flex: 1,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  optionChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  optionText: {
-    fontWeight: '600',
-    fontSize: 12,
   },
 });

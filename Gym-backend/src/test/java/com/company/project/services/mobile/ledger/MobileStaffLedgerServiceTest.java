@@ -6,7 +6,15 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PerformanceTestData;
+import com.company.project.performance.events.PerformanceEvent;
+import com.company.project.performance.events.PerformanceEventRepository;
+import com.company.project.performance.events.SourceLabels;
+import com.company.project.performance.incentives.IncentivePlan;
+import com.company.project.performance.incentives.IncentivePlanBonus;
+import com.company.project.performance.incentives.IncentivePlanLine;
+import com.company.project.performance.settlement.SettlementView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,22 +50,24 @@ class MobileStaffLedgerServiceTest {
     private StaffRepository staffRepository;
 
     @Mock
-    private StaffTargetRepository staffTargetRepository;
-
-    @Mock
     private SalaryPaymentRepository salaryPaymentRepository;
 
     @Mock
     private SalaryPaymentEmployeeRepository salaryPaymentEmployeeRepository;
 
     @Mock
-    private ReceiptRepository receiptRepository;
+    private PerformanceEngine engine;
 
     @Mock
-    private StaffProgressCalculator progressCalculator;
+    private PerformanceEventRepository events;
+
+    @Mock
+    private SourceLabels sourceLabels;
 
     private MobileStaffLedgerService ledgerService;
 
+    private final Map<YearMonth, String> commission = new HashMap<>();
+    private final Map<YearMonth, String> status = new HashMap<>();
     private UserDetailsImpl testPrincipal;
     private Staff testStaff;
     private YearMonth current;
@@ -66,9 +76,9 @@ class MobileStaffLedgerServiceTest {
     @BeforeEach
     void setUp() {
         LedgerEarningsCalculator earnings = new LedgerEarningsCalculator(
-                staffTargetRepository, salaryPaymentRepository, salaryPaymentEmployeeRepository,
-                receiptRepository, progressCalculator);
-        ledgerService = new MobileStaffLedgerService(staffRepository, progressCalculator, earnings);
+                salaryPaymentRepository, salaryPaymentEmployeeRepository, engine, events, sourceLabels,
+                PerformanceTestData.utcClock());
+        ledgerService = new MobileStaffLedgerService(staffRepository, engine, earnings);
 
         testPrincipal = new UserDetailsImpl(100L, "staffuser", "staff@gymbios.com", "password", Collections.emptyList(), true);
 
@@ -83,32 +93,48 @@ class MobileStaffLedgerServiceTest {
         testStaff.setUserId(100L);
         testStaff.setAppUsername("staffuser");
 
-        current = YearMonth.now();
+        current = YearMonth.now(java.time.ZoneOffset.UTC);
         previous = current.minusMonths(1);
 
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(anyLong(), anyInt(), anyInt()))
-                .thenReturn(Collections.emptyList());
         when(salaryPaymentEmployeeRepository.findByEmployeeId(anyString())).thenReturn(Optional.empty());
         when(salaryPaymentRepository.findAll()).thenReturn(Collections.emptyList());
-        when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(Collections.emptyList()));
-
-        // No sales and no commission rule unless a test says otherwise; rate helpers behave for real.
-        when(progressCalculator.computeCommission(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
-        when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(0);
-        when(progressCalculator.findCommissionRule(any())).thenReturn(Optional.empty());
-        when(progressCalculator.baseCommissionRate(any())).thenCallRealMethod();
-        when(progressCalculator.admissionCommissionRate(any())).thenCallRealMethod();
-        when(progressCalculator.commissionOn(any(), any())).thenCallRealMethod();
-    }
-
-    private static LocalDateTime monthStart(YearMonth ym) {
-        return ym.atDay(1).atStartOfDay();
+        when(events.findForStaff(anyLong(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(sourceLabels.describe(any())).thenReturn(Map.of());
+        when(engine.planFor(anyLong(), any())).thenReturn(null);
+        when(engine.evaluate(eq(10L), any(YearMonth.class))).thenAnswer(inv -> {
+            YearMonth m = inv.getArgument(1);
+            return PerformanceTestData.result(10L, m)
+                    .commission(commission.getOrDefault(m, "0"))
+                    .status(status.getOrDefault(m, SettlementView.ESTIMATED))
+                    .build();
+        });
     }
 
     private static String monthName(YearMonth ym) {
         return ym.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+    }
+
+    private static IncentivePlan plan() {
+        IncentivePlan plan = new IncentivePlan();
+        plan.setId(3L);
+        plan.setName("Trainer commission");
+        IncentivePlanLine admission = new IncentivePlanLine();
+        admission.setMetric("MEMBER_ADMISSION");
+        admission.setBasis(IncentivePlanLine.PERCENT_OF_AMOUNT);
+        admission.setRate(new BigDecimal("15"));
+        IncentivePlanLine pt = new IncentivePlanLine();
+        pt.setMetric("PT_SESSION_DELIVERED");
+        pt.setBasis(IncentivePlanLine.FIXED_PER_UNIT);
+        pt.setRate(new BigDecimal("150"));
+        IncentivePlanBonus bonus = new IncentivePlanBonus();
+        bonus.setMetric("REVENUE_TOTAL");
+        bonus.setThresholdPct(new BigDecimal("100"));
+        bonus.setRewardType(IncentivePlanBonus.PERCENT_OF_METRIC_AMOUNT);
+        bonus.setRewardValue(new BigDecimal("2"));
+        plan.getLines().addAll(List.of(admission, pt));
+        plan.getBonuses().add(bonus);
+        return plan;
     }
 
     @Test
@@ -126,8 +152,8 @@ class MobileStaffLedgerServiceTest {
     }
 
     @Test
-    @DisplayName("A staff member who joined this month has no last-month earnings, commission or invented entries")
-    void testFreshStaffShowsNoInventedData() {
+    @DisplayName("No incentive plan: no commission and no implicit 5% rate")
+    void testNoPlanEarnsNothing() {
         testStaff.setJoinDate(LocalDate.now());
 
         StaffLedgerResponseDTO response = ledgerService.getStaffLedger(testPrincipal);
@@ -138,21 +164,14 @@ class MobileStaffLedgerServiceTest {
         assertNull(response.getSummary().getGrowthPercentage());
         assertEquals("—", response.getQuickStats().getGrowth());
 
-        assertEquals("Allowances", response.getBreakdown().get(2).getCategory());
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getBreakdown().get(1).getAmount()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(response.getBreakdown().get(2).getAmount()));
-
-        // Same 5% default the web Targets pages use when the role has no rule.
-        assertEquals(2, response.getCommissionStructure().size());
-        assertEquals("5%", response.getCommissionStructure().get(0).getAmount());
-        assertEquals("5%", response.getCommissionStructure().get(1).getAmount());
-
+        assertEquals(1, response.getCommissionStructure().size());
+        assertEquals("NONE", response.getCommissionStructure().get(0).getType());
         assertTrue(response.getRecentEarnings().isEmpty());
     }
 
     @Test
-    @DisplayName("Uses recorded payroll, the web commission calculation and the role's commission rule")
-    void testLedgerFromRealRecords() {
+    @DisplayName("Commission comes from the engine, the structure from the plan, activity from the ledger")
+    void testLedgerFromEngine() {
         testStaff.setJoinDate(LocalDate.now().minusYears(1));
 
         SalaryPaymentEmployee payroll = new SalaryPaymentEmployee();
@@ -169,58 +188,45 @@ class MobileStaffLedgerServiceTest {
         prevPayment.setStatus("Paid");
         when(salaryPaymentRepository.findAll()).thenReturn(List.of(prevPayment));
 
-        // Live commission 1200 this month, but the stored target says 1500 — web shows the larger.
-        when(progressCalculator.computeCommission(eq(testStaff), eq("staffuser"), eq(monthStart(current)), any()))
-                .thenReturn(new BigDecimal("1200"));
-        StaffTarget target = new StaffTarget();
-        target.setCommissionEarned(new BigDecimal("1500"));
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, current.getYear(), current.getMonthValue()))
-                .thenReturn(List.of(target));
-        when(progressCalculator.computeCommission(eq(testStaff), eq("staffuser"), eq(monthStart(previous)), any()))
-                .thenReturn(new BigDecimal("800"));
-        when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(3);
+        commission.put(current, "1500");
+        commission.put(previous, "800"); // frozen (approved) amount for last month
+        status.put(previous, SettlementView.APPROVED);
+        when(engine.planFor(eq(10L), any())).thenReturn(plan());
 
-        CommissionRule rule = new CommissionRule();
-        rule.setRole("Trainer");
-        rule.setBaseCommission(new BigDecimal("10.00"));
-        rule.setAdmissionCommission(new BigDecimal("15.00"));
-        rule.setTargetBonusesJson("[{\"threshold\":100,\"bonus\":2.0}]");
-        when(progressCalculator.findCommissionRule(testStaff)).thenReturn(Optional.of(rule));
-
-        Receipt sale = new Receipt();
+        PerformanceEvent sale = new PerformanceEvent();
         sale.setId(55L);
-        sale.setStatus("Paid");
-        sale.setTransactionType("New");
-        sale.setPaidAmount(new BigDecimal("10000"));
-        sale.setMemberName("Asha");
-        sale.setPlanName("Gold");
-        sale.setTransactionDate(LocalDateTime.now());
-        when(receiptRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(sale)));
+        sale.setMetric("MEMBER_ADMISSION");
+        sale.setQuantity(1);
+        sale.setAmount(new BigDecimal("10000"));
+        sale.setSourceType("receipt");
+        sale.setSourceId(9L);
+        sale.setOccurredAt(LocalDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(5));
+        when(events.findForStaff(eq(10L), any(), any(), any())).thenReturn(List.of(sale));
+        when(sourceLabels.describe(any())).thenReturn(Map.of("receipt", Map.of(9L, new SourceLabels.Label("Gold", "Asha"))));
 
         StaffLedgerResponseDTO response = ledgerService.getStaffLedger(testPrincipal);
 
         // 18000 base + 1500 commission + 500 allowances
         assertEquals(0, new BigDecimal("1500").compareTo(response.getSummary().getCommission()));
         assertEquals(0, new BigDecimal("20000").compareTo(response.getSummary().getThisMonth()));
-        // 20000 recorded salary + 800 commission
+        // 20000 recorded salary + 800 approved commission
         assertEquals(0, new BigDecimal("20800").compareTo(response.getSummary().getLastMonth()));
         assertEquals(-4, response.getSummary().getGrowthPercentage());
-        assertEquals("-4%", response.getQuickStats().getGrowth());
 
+        assertEquals("MEMBER_ADMISSION", response.getCommissionStructure().get(0).getType());
         assertEquals("15%", response.getCommissionStructure().get(0).getAmount());
-        assertEquals("10%", response.getCommissionStructure().get(1).getAmount());
-        assertEquals("Reach 100% of target", response.getCommissionStructure().get(2).getLabel());
+        assertEquals("150 per session", response.getCommissionStructure().get(1).getAmount());
+        assertEquals("TARGET_BONUS", response.getCommissionStructure().get(2).getType());
         assertEquals("+2%", response.getCommissionStructure().get(2).getAmount());
 
         assertEquals(2, response.getRecentEarnings().size());
-        RecentEarningDTO commission = response.getRecentEarnings().stream()
+        RecentEarningDTO earned = response.getRecentEarnings().stream()
                 .filter(e -> "COMMISSION".equals(e.getType())).findFirst().orElseThrow();
-        assertEquals(0, new BigDecimal("1500").compareTo(commission.getAmount())); // 15% admission rate
-        assertEquals("pending", commission.getStatus());
+        assertEquals(0, new BigDecimal("1500").compareTo(earned.getAmount())); // 15% of 10000
+        assertEquals("pending", earned.getStatus());
+        assertTrue(earned.getTitle().contains("Gold"));
         RecentEarningDTO salary = response.getRecentEarnings().stream()
                 .filter(e -> "SALARY".equals(e.getType())).findFirst().orElseThrow();
-        assertEquals(0, new BigDecimal("20000").compareTo(salary.getAmount()));
         assertEquals("paid", salary.getStatus());
     }
 

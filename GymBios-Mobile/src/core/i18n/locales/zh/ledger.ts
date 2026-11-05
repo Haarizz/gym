@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: '收入明细',
       commissionStructureTitle: '提成规则',
+      structure: {
+        noPlan: "暂无激励方案",
+        perUnit: "每{{unit}} {{amount}}",
+        fromUnits: "满 {{count}} 起",
+        max: "上限 {{amount}}",
+        bonusLabel: "达成{{metric}}目标的 {{threshold}}%",
+        bonusPercent: "+{{metric}}的 {{rate}}%",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "新会员入会",
+          LEAD_CONVERSION: "潜客转化",
+          POS_SALE: "POS 销售",
+          PT_SESSION_DELIVERED: "完成的私教课",
+          CLASS_TAUGHT: "授课次数",
+          CLASS_ATTENDEE: "课程签到人数",
+          REVENUE_TOTAL: "营收",
+        },
+        units: {
+          MEMBER_ADMISSION: "位新会员",
+          LEAD_CONVERSION: "次转化",
+          POS_SALE: "笔销售",
+          PT_SESSION_DELIVERED: "节课",
+          CLASS_TAUGHT: "节课",
+          CLASS_ATTENDEE: "位学员",
+        },
+      },
       monthlyComparisonTitle: '月度对比',
     },
 

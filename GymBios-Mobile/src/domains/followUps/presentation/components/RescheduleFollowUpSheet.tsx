@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { format } from 'date-fns';
+import { useState } from 'react';
+import { StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/shared/components/AppText';
-import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
-import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { Spacing } from '@/core/theme';
+import { Text } from '@/shared/components/AppText';
+import { Button } from '@/shared/components/Button';
 import { DatePicker } from '@/shared/components/DatePicker';
+import { FormSheet } from '@/shared/components/FormSheet';
 import type { FollowUp } from '../../domain/FollowUp';
-
-import { toast } from '@/shared/components/Toasts/toastStore';
 
 interface RescheduleFollowUpSheetProps {
   visible: boolean;
@@ -29,151 +29,84 @@ export function RescheduleFollowUpSheet({
   const { t } = useTranslation();
   const theme = useTheme();
   const [dueDate, setDueDate] = useState<Date | null>(new Date());
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (visible && followUp) {
+  // Reset each time the sheet opens for a follow-up (during render, not in an effect).
+  const openKey = visible && followUp ? String(followUp.id) : null;
+  const [lastOpenKey, setLastOpenKey] = useState(openKey);
+  if (openKey !== lastOpenKey) {
+    setLastOpenKey(openKey);
+    if (openKey && followUp) {
       setDueDate(followUp.dueDate ? new Date(followUp.dueDate) : new Date());
+      setError('');
     }
-  }, [visible, followUp]);
+  }
 
   const handleSubmit = () => {
     if (!dueDate) {
-      toast.error(t('followUps.msg.newDueDateRequired'), {
-        title: t('common.validationError')
-      });
+      setError(t('followUps.msg.newDueDateRequired'));
       return;
     }
-    // Format to ISO date string (YYYY-MM-DD)
-    const formattedDate = dueDate.toISOString().split('T')[0];
-    onSubmit(formattedDate);
+    // Local calendar date — toISOString() would shift it back a day in timezones ahead of UTC.
+    onSubmit(format(dueDate, 'yyyy-MM-dd'));
   };
 
   if (!followUp) return null;
 
   return (
-    <Modal
+    <FormSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      title={t('followUps.rescheduleTitle')}
+      icon="calendar"
+      closeLabel={t('followUps.cancel')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button
+            variant="outline"
+            label={t('followUps.cancel')}
+            onPress={onClose}
+            disabled={submitting}
+            style={styles.flex}
+          />
+          <Button
+            label={t('followUps.reschedule')}
+            onPress={handleSubmit}
+            loading={submitting}
+            style={styles.primaryButton}
+          />
+        </>
+      }
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modalSheet, { backgroundColor: theme.background }]}
-          onPress={e => e.stopPropagation()}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {t('followUps.rescheduleTitle')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={theme.text} />
-            </TouchableOpacity>
-          </View>
+      <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
+        {t('followUps.reschedulingFor')}{' '}
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{followUp.leadName}</Text>
+      </Text>
 
-          <ScrollView style={styles.modalBody}>
-            <Text style={[styles.leadSubHeader, { color: theme.textSecondary }]}>
-              {t('followUps.reschedulingFor')}{' '}
-              <Text style={{ color: theme.text, fontWeight: '700' }}>
-                {followUp.leadName}
-              </Text>
-            </Text>
-
-            <DatePicker
-              label={t('followUps.newDueDate')}
-              required
-              minimumDate={new Date()}
-              value={dueDate}
-              onChange={val => setDueDate(val)}
-            />
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: theme.border }]}
-              onPress={onClose}
-              disabled={submitting}
-            >
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                {t('followUps.cancel')}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: BrandColors.teal }]}
-              onPress={handleSubmit}
-              disabled={submitting}
-            >
-              <Text style={styles.submitBtnText}>
-                {submitting ? t('followUps.msg.rescheduling') : t('followUps.reschedule')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      <DatePicker
+        label={t('followUps.newDueDate')}
+        required
+        minimumDate={new Date()}
+        value={dueDate}
+        onChange={val => {
+          setDueDate(val);
+          setError('');
+        }}
+        error={error}
+      />
+    </FormSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  flex: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  modalSheet: {
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    paddingBottom: Spacing.four,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.four,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalBody: {
-    padding: Spacing.four,
+  primaryButton: {
+    flex: 2,
   },
   leadSubHeader: {
     fontSize: 14,
     marginBottom: Spacing.three,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  submitBtn: {
-    flex: 2,
-    height: 48,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
   },
 });

@@ -28,6 +28,8 @@ const centers = {
     priceAbove: '高于 <amount/>',
 
     list: {
+      genderMissing: '在“我的资料”中填写性别，即可同时查看女士专属和男士专属中心。',
+      genderMissingAction: '添加',
       searchPlaceholder: '按名称、区域或类型搜索...',
       nearMe: '我附近',
       useMyLocation: '使用我的位置',
@@ -68,6 +70,7 @@ const centers = {
     },
 
     detail: {
+      accessBlockedTitle: '无法加入此中心',
       notFound: '未找到该场馆。',
       noPhoneTitle: '无电话号码',
       noPhone: '该场馆尚未提供电话号码。',

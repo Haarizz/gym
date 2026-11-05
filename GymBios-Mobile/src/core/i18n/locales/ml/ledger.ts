@@ -1,5 +1,34 @@
 const ledger = {
   ledger: {
+    breakdown: {
+      structure: {
+        noPlan: "ഇൻസെന്റീവ് പ്ലാൻ ഇല്ല",
+        perUnit: "ഓരോ {{unit}}-നും {{amount}}",
+        fromUnits: "{{count}} മുതൽ",
+        max: "പരമാവധി {{amount}}",
+        bonusLabel: "{{metric}} ലക്ഷ്യത്തിന്റെ {{threshold}}% നേടുക",
+        bonusPercent: "{{metric}}-ന്റെ +{{rate}}%",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "പുതിയ അംഗത്വങ്ങൾ",
+          LEAD_CONVERSION: "ലീഡ് കൺവേർഷനുകൾ",
+          POS_SALE: "POS വിൽപ്പന",
+          PT_SESSION_DELIVERED: "നടത്തിയ PT സെഷനുകൾ",
+          CLASS_TAUGHT: "എടുത്ത ക്ലാസുകൾ",
+          CLASS_ATTENDEE: "ക്ലാസ് പങ്കാളികൾ",
+          REVENUE_TOTAL: "വരുമാനം",
+        },
+        units: {
+          MEMBER_ADMISSION: "അംഗത്വം",
+          LEAD_CONVERSION: "കൺവേർഷൻ",
+          POS_SALE: "വിൽപ്പന",
+          PT_SESSION_DELIVERED: "സെഷൻ",
+          CLASS_TAUGHT: "ക്ലാസ്",
+          CLASS_ATTENDEE: "പങ്കാളി",
+        },
+      },
+    },
+
     tabs: {
       advances: "അഡ്വാൻസുകൾ",
     },

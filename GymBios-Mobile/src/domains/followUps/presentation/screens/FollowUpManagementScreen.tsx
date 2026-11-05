@@ -1,19 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
-import { Button } from '@/shared/components/Button';
+import { Pagination } from '@/shared/components/Pagination';
+import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
 import type { FollowUp } from '../../domain/FollowUp';
 import type { FollowUpFilters as FollowUpFiltersType } from '../../domain/FollowUpFilters';
@@ -35,6 +28,9 @@ import { FollowUpList } from '../components/FollowUpList';
 import { RescheduleFollowUpSheet } from '../components/RescheduleFollowUpSheet';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+
+// RoleTabsLayout already pads the top inset and the list pads past the tab bar.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
 
 export function FollowUpManagementScreen() {
   const { t } = useTranslation();
@@ -93,7 +89,7 @@ export function FollowUpManagementScreen() {
         title: t('common.error')
       });
     });
-  }, []);
+  }, [t]);
 
   const handleEmail = useCallback((followUp: FollowUp) => {
     if (!followUp.leadEmail) {
@@ -107,7 +103,7 @@ export function FollowUpManagementScreen() {
         title: t('common.error')
       });
     });
-  }, []);
+  }, [t]);
 
   const handleView = useCallback((followUp: FollowUp) => {
     setDetailFollowUpId(followUp.id);
@@ -142,7 +138,7 @@ export function FollowUpManagementScreen() {
         ],
       );
     },
-    [deleteMutation],
+    [deleteMutation, t],
   );
 
   const handleCancelAction = useCallback(
@@ -168,7 +164,7 @@ export function FollowUpManagementScreen() {
         ],
       );
     },
-    [cancelMutation],
+    [cancelMutation, t],
   );
 
   const handleCompleteAction = useCallback((followUp: FollowUp) => {
@@ -261,137 +257,95 @@ export function FollowUpManagementScreen() {
     );
   };
 
-  // Header Component with 8 KPI Summary Cards & Filter Bar
-  const renderHeaderComponent = () => (
-    <View style={styles.headerContainer}>
-      {/* Title & Action Button */}
-      <View style={styles.titleRow}>
-        <View style={styles.titleTextContainer}>
-          <Text style={[styles.screenTitle, { color: theme.text }]}>
-            {t('followUps.title')}
-          </Text>
-          <Text style={[styles.screenSubtitle, { color: theme.textSecondary }]}>
-            {t('followUps.subtitle')}
-          </Text>
-        </View>
+  const openCreateSheet = useCallback(() => {
+    setEditingFollowUp(null);
+    setAddSheetVisible(true);
+  }, []);
 
-        <Button
-          label={t('followUps.addFollowUp')}
-          size="md"
-          onPress={() => {
-            setEditingFollowUp(null);
-            setAddSheetVisible(true);
-          }}
-        />
+  // Six KPI tiles in two rows of three (cancelled count is reachable via the status filter).
+  const kpiRows = useMemo(() => {
+    const kpis = [
+      { key: 'total', label: t('followUps.total'), value: statsData?.totalFollowUps, color: theme.text },
+      { key: 'pending', label: t('followUps.pending'), value: statsData?.pendingFollowUps, color: '#2563eb' },
+      { key: 'overdue', label: t('followUps.overdue'), value: statsData?.overdueFollowUps, color: '#dc2626' },
+      {
+        key: 'completed',
+        label: t('followUps.completed'),
+        value: statsData?.completedFollowUps,
+        color: '#16a34a',
+      },
+      {
+        key: 'rescheduled',
+        label: t('followUps.rescheduled'),
+        value: statsData?.rescheduledFollowUps,
+        color: '#d97706',
+      },
+      {
+        key: 'rate',
+        label: t('followUps.successRate'),
+        value: statsData ? `${(statsData.completionRate ?? 0).toFixed(1)}%` : undefined,
+        color: BrandColors.teal,
+      },
+    ];
+    return [kpis.slice(0, 3), kpis.slice(3)];
+  }, [statsData, theme.text, t]);
+
+  // Must be an element, not a component: a component whose identity changes on
+  // every keystroke is remounted by FlatList, which drops focus from the search input.
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.headerContainer}>
+        <FollowUpFilters filters={filters} onChangeFilters={setFilters} />
+
+        {kpiRows.map((row, i) => (
+          <View key={i} style={styles.summaryRow}>
+            {row.map(kpi => (
+              <View
+                key={kpi.key}
+                style={[styles.summaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+              >
+                <Typography variant="caption" color="textSecondary" style={styles.summaryLabel} numberOfLines={1}>
+                  {kpi.label}
+                </Typography>
+                <Typography variant="subtitle" style={[styles.summaryValue, { color: kpi.color }]}>
+                  {kpi.value ?? '—'}
+                </Typography>
+              </View>
+            ))}
+          </View>
+        ))}
       </View>
-
-      {/* KPI Stats Scroll */}
-      {statsData && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
-        >
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: BrandColors.teal }]}>{t('followUps.total')}</Text>
-              <Feather name="users" size={14} color={BrandColors.teal} />
-            </View>
-            <Text style={[styles.kpiValue, { color: theme.text }]}>
-              {statsData.totalFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.allFollowUps')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#2563eb' }]}>{t('followUps.pending')}</Text>
-              <Feather name="clock" size={14} color="#2563eb" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#2563eb' }]}>
-              {statsData.pendingFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.awaitingAction')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#dc2626' }]}>{t('followUps.overdue')}</Text>
-              <Feather name="alert-triangle" size={14} color="#dc2626" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#dc2626' }]}>
-              {statsData.overdueFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.pastDueDate')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#ea580c' }]}>{t('followUps.completed')}</Text>
-              <Feather name="check-circle" size={14} color="#ea580c" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#ea580c' }]}>
-              {statsData.completedFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.finishedTasks')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#d97706' }]}>{t('followUps.rescheduled')}</Text>
-              <Feather name="calendar" size={14} color="#d97706" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#d97706' }]}>
-              {statsData.rescheduledFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.movedDates')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#6b7280' }]}>{t('followUps.cancelled')}</Text>
-              <Feather name="x-circle" size={14} color="#6b7280" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#6b7280' }]}>
-              {statsData.cancelledFollowUps ?? 0}
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.cancelledTasks')}
-            </Text>
-          </View>
-
-          <View style={[styles.kpiCard, { backgroundColor: theme.backgroundElement }]}>
-            <View style={styles.kpiHeader}>
-              <Text style={[styles.kpiTitle, { color: '#16a34a' }]}>{t('followUps.successRate')}</Text>
-              <Feather name="trending-up" size={14} color="#16a34a" />
-            </View>
-            <Text style={[styles.kpiValue, { color: '#16a34a' }]}>
-              {(statsData.completionRate ?? 0).toFixed(1)}%
-            </Text>
-            <Text style={[styles.kpiSubtitle, { color: theme.textSecondary }]}>
-              {t('followUps.completionRate')}
-            </Text>
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Search & Filters */}
-      <FollowUpFilters filters={filters} onChangeFilters={setFilters} />
-    </View>
+    ),
+    [filters, kpiRows, theme],
   );
 
+  const listFooter = useMemo(
+    () => (
+      <View style={styles.footer}>
+        <Pagination
+          currentPage={filters.page ?? 1}
+          totalPages={followUpsData?.pagination?.totalPages ?? 1}
+          onPageChange={page => setFilters(prev => ({ ...prev, page }))}
+        />
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          onPress={openCreateSheet}
+          accessibilityRole="button"
+        >
+          <Feather name="plus" size={18} color={BrandColors.white} />
+          <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
+            {t('followUps.form.addButton')}
+          </Typography>
+        </Pressable>
+      </View>
+    ),
+    [filters.page, followUpsData?.pagination?.totalPages, openCreateSheet, t],
+  );
+
+  const hasActiveFilters = !!(filters.search || filters.status || filters.type || filters.priority || filters.assignedStaff);
+
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <FollowUpList
         followUps={followUps}
         loading={loadingFollowUps}
@@ -406,7 +360,10 @@ export function FollowUpManagementScreen() {
         onCancel={handleCancelAction}
         onCall={handleCall}
         onEmail={handleEmail}
-        ListHeaderComponent={renderHeaderComponent()}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        emptyActionLabel={hasActiveFilters ? undefined : t('followUps.form.addButton')}
+        onEmptyAction={openCreateSheet}
       />
 
       {/* Detail BottomSheet */}
@@ -462,51 +419,44 @@ export function FollowUpManagementScreen() {
 
 const styles = StyleSheet.create({
   headerContainer: {
-    marginBottom: Spacing.two,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
   },
-  titleRow: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: Spacing.two,
+    gap: Spacing.md,
   },
-  titleTextContainer: {
+  summaryCard: {
     flex: 1,
-    paddingRight: Spacing.two,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    padding: Spacing.md,
   },
-  screenTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+  summaryLabel: {
+    marginBottom: Spacing.one,
   },
-  screenSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '600',
   },
-  statsScroll: {
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
+  footer: {
+    gap: Spacing.three,
+    paddingTop: Spacing.one,
   },
-  kpiCard: {
-    width: 130,
-    padding: Spacing.three,
-    borderRadius: Radius.lg,
-  },
-  kpiHeader: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: BrandColors.teal,
   },
-  kpiTitle: {
-    fontSize: 12,
-    fontWeight: '700',
+  addButtonPressed: {
+    backgroundColor: BrandColors.tealDark,
   },
-  kpiValue: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  kpiSubtitle: {
-    fontSize: 10,
-    marginTop: 2,
+  addButtonLabel: {
+    color: BrandColors.white,
   },
 });

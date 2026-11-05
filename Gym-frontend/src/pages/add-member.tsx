@@ -1011,6 +1011,20 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       return;
     }
 
+    // Gender is mandatory for new members — a branch's Access Type (Ladies Only /
+    // Men Only, Branch Settings) is checked against it. Edit mode stays lenient so
+    // members saved before this can still be updated.
+    if (!isEditMode && !formData.gender) {
+      toast.error('Please select a gender', {
+        description: 'Gender is required — it decides which branches the member can join.',
+        duration: 4000
+      });
+      const el = document.getElementById('gender');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.focus({ preventScroll: true });
+      return;
+    }
+
     // Emergency contact is mandatory for new members (BG_71). Edit mode is left
     // lenient so legacy members saved without one can still be updated.
     if (!isEditMode) {
@@ -1992,9 +2006,9 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="gender" className="mb-1.5 block">Gender</Label>
+                <Label htmlFor="gender" className="mb-1.5 block">Gender {!isEditMode && <span className="text-red-500">*</span>}</Label>
                 <Select value={formData.gender || undefined} onValueChange={(v) => setFormData({...formData, gender: v, genderOther: v !== 'other' ? '' : formData.genderOther})}>
-                  <SelectTrigger id="gender"><SelectValue placeholder="Select Gender (Optional)" /></SelectTrigger>
+                  <SelectTrigger id="gender"><SelectValue placeholder="Select Gender" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>

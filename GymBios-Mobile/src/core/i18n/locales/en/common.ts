@@ -100,6 +100,7 @@ const common = {
 
   validation: {
     fullNameRequired: 'Full name is required',
+    genderRequired: 'Gender is required',
     phoneRequired: 'Phone number is required',
     emergencyContactRequired: 'Emergency contact name is required',
     emergencyPhoneRequired: 'Emergency phone is required',
