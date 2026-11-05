@@ -22,7 +22,7 @@ import java.util.TimeZone;
 // explicit too, in config.PrimaryDataSourceConfig — see that class for why).
 // Every existing entity already lives flat under this package, so this is a
 // no-op for existing behavior — it only excludes the new controlplane subtree.
-@EntityScan("com.company.project.entities")
+@EntityScan({"com.company.project.entities", "com.company.project.performance"})
 public class GymApplication {
 
 	public static void main(String[] args) {

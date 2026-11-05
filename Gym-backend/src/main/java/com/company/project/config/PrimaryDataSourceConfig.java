@@ -35,7 +35,7 @@ import java.util.Map;
  */
 @Configuration
 @EnableJpaRepositories(
-        basePackages = "com.company.project.repositories",
+        basePackages = {"com.company.project.repositories", "com.company.project.performance"},
         entityManagerFactoryRef = "entityManagerFactory",
         transactionManagerRef = "transactionManager"
 )
@@ -172,7 +172,7 @@ public class PrimaryDataSourceConfig {
 
         return builder
                 .dataSource(dataSource)
-                .packages("com.company.project.entities")
+                .packages("com.company.project.entities", "com.company.project.performance")
                 .persistenceUnit("default")
                 .properties(jpaProperties)
                 .build();
