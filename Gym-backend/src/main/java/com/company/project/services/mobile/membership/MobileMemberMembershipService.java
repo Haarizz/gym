@@ -15,6 +15,7 @@ import com.company.project.repositories.MembershipPlanRepository;
 import com.company.project.repositories.TrainingStreamRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.CheckInPolicyService;
+import com.company.project.services.FreezeAddonPolicy;
 import com.company.project.services.MembershipFreezeService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -179,6 +180,9 @@ public class MobileMemberMembershipService {
 
         boolean isFrozen = "frozen".equalsIgnoreCase(member.getMembershipStatus());
         freezeInfo.setIsFrozen(isFrozen);
+        FreezeAddonPolicy.Rule addonRule = freezeService.addonRule(member);
+        freezeInfo.setPausesAddons(addonRule.pausesAddons());
+        freezeInfo.setPausesFacilities(addonRule.pausesFacilities());
         if (isFrozen) {
             if (member.getFreezeStartDate() != null) {
                 freezeInfo.setStartDate(member.getFreezeStartDate().toString());

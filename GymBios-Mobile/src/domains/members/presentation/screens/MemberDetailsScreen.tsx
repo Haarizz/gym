@@ -33,6 +33,8 @@ import type { Member } from '../../domain/Member';
 import type { AddFamilyMemberRequest } from '../../application/family/MemberFamilyRepository';
 import type { FreezeRequest } from '../../application/freeze/MemberFreezeRepository';
 import { toRenewalPayment } from '../utils/renewalPayment';
+import { SellAddonBottomSheet } from '../components/extras/SellAddonBottomSheet';
+import { extrasApi, type RegistrationExtra } from '../components/extras/extrasApi';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
 
@@ -87,6 +89,43 @@ export function MemberDetailsScreen({
   useEffect(() => {
     loadMember(memberId).catch(() => { });
   }, [memberId, loadMember]);
+
+  // Sell an add-on / facility access to this member: pick it, then pay in the shared sheet.
+  const [sellVisible, setSellVisible] = useState(false);
+  const [sellItem, setSellItem] = useState<RegistrationExtra | null>(null);
+  const [sellPaymentVisible, setSellPaymentVisible] = useState(false);
+  const [selling, setSelling] = useState(false);
+
+  const handleSellContinue = useCallback((item: RegistrationExtra) => {
+    setSellItem(item);
+    setSellVisible(false);
+    // Let the picker sheet close before the payment sheet mounts (same as renewals).
+    setTimeout(() => setSellPaymentVisible(true), 350);
+  }, []);
+
+  const handleSellPayment = useCallback(
+    async (result: PaymentResult) => {
+      if (!selectedMember || !sellItem) return;
+      const payment = toRenewalPayment(result);
+      try {
+        setSelling(true);
+        await extrasApi.sellToMember(
+          { id: selectedMember.id, memberId: selectedMember.memberId, name: selectedMember.name },
+          sellItem,
+          { paymentMode: payment.paymentMethod, paidAmount: payment.amountReceived, paymentBreakdown: payment.paymentBreakdown },
+        );
+        setSellPaymentVisible(false);
+        toast.success(t('members.extras.sold', { name: sellItem.name, member: selectedMember.name }));
+        setSellItem(null);
+        loadMember(selectedMember.id).catch(() => {});
+      } catch {
+        // apiClient already toasts the server's reason (e.g. a frozen or suspended membership).
+      } finally {
+        setSelling(false);
+      }
+    },
+    [selectedMember, sellItem, loadMember, t],
+  );
 
 
   const handleDelete = useCallback(() => {
@@ -255,6 +294,7 @@ export function MemberDetailsScreen({
           onRenew={() => setRenewVisible(true)}
           onFreeze={() => setFreezeVisible(true)}
           onDelete={handleDelete}
+          onAddon={() => setSellVisible(true)}
         />
 
         <MembershipSection member={selectedMember} />
@@ -330,6 +370,27 @@ export function MemberDetailsScreen({
         visible={linkVisible}
         onClose={() => setLinkVisible(false)}
         onSubmit={handleRequestLink}
+      />
+
+      <SellAddonBottomSheet
+        visible={sellVisible}
+        memberName={selectedMember.name}
+        onClose={() => setSellVisible(false)}
+        onContinue={handleSellContinue}
+      />
+
+      <PaymentBottomSheet
+        visible={sellPaymentVisible}
+        amount={sellItem?.price ?? 0}
+        title={sellItem?.name ?? t('members.extras.sellTitle')}
+        subtitle={t('members.memberSubtitle', { name: selectedMember.name })}
+        allowDiscount={false}
+        payer="staff"
+        isProcessing={selling}
+        onClose={() => {
+          if (!selling) setSellPaymentVisible(false);
+        }}
+        onComplete={handleSellPayment}
       />
 
       <SuspendMembershipBottomSheet

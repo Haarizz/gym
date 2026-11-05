@@ -139,6 +139,8 @@ export class ApiMemberDirectoryRepository
         // only: an edit doesn't recompute expiry, so it must not move the start.
         membership_start_date: request.startDate,
         join_date: request.joinDate || request.startDate,
+        // Priced by the backend from the catalogue; they go on the membership's receipt.
+        ...(request.addons && request.addons.length > 0 ? { addons: request.addons } : {}),
       },
     );
 

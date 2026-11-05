@@ -156,6 +156,33 @@ public class FinancialEventService {
      * is computed as the remainder (amount - net) rather than independently
      * rounded, so the two lines always sum back to the original amount.
      */
+    // Optional so the unit tests that build this service by constructor keep working.
+    private com.company.project.repositories.ReceiptRepository receiptRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setReceiptRepository(com.company.project.repositories.ReceiptRepository receiptRepository) {
+        this.receiptRepository = receiptRepository;
+    }
+
+    /**
+     * Share (0..1) of a receipt's money that belongs to add-ons sold on it: its own add-on
+     * lines, or — for a settlement — those of the bill it pays. Cancelled lines don't count.
+     */
+    BigDecimal addonShareOf(Receipt receipt) {
+        Receipt bill = receipt;
+        if ((receipt.getAddonItems() == null || receipt.getAddonItems().isEmpty())
+                && receipt.getLinkedBillId() != null && receiptRepository != null) {
+            bill = receiptRepository.findById(receipt.getLinkedBillId()).orElse(null);
+        }
+        if (bill == null || bill.getAddonItems() == null || bill.getAddonItems().isEmpty()) return BigDecimal.ZERO;
+        BigDecimal addons = bill.getAddonItems().stream()
+                .filter(com.company.project.dto.ReceiptAddonItemDTO::isActiveLine)
+                .map(i -> safe(i.getAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = safe(bill.getAmount());
+        if (addons.signum() <= 0 || total.signum() <= 0) return BigDecimal.ZERO;
+        return addons.divide(total, 6, java.math.RoundingMode.HALF_UP).min(BigDecimal.ONE);
+    }
+
     private BigDecimal[] splitVatInclusive(BigDecimal grossAmount) {
         BigDecimal rate = getStandardVatRate();
         if (rate.compareTo(BigDecimal.ZERO) <= 0) {
@@ -203,17 +230,29 @@ public class FinancialEventService {
             lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", amount, "Invoice payment"));
         } else {
             BigDecimal[] split = splitVatInclusive(amount);
+            // A registration receipt can carry add-ons / facility access too (and a settlement
+            // pays into such a bill): their share of the money is add-on revenue, never
+            // membership or deferred revenue.
+            BigDecimal addonNet = split[0].multiply(addonShareOf(receipt)).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal membershipNet = split[0].subtract(addonNet);
             defer = deferredRevenueScheduleService.qualifiesForDeferral(receipt);
             if (defer) {
-                deferredNet = split[0];
-                lines.add(cr(ACC_DEFERRED_REVENUE, "Deferred Revenue", split[0],
-                        "Membership payment held as deferred revenue"));
+                deferredNet = membershipNet;
+                if (membershipNet.signum() > 0) {
+                    lines.add(cr(ACC_DEFERRED_REVENUE, "Deferred Revenue", membershipNet,
+                            "Membership payment held as deferred revenue"));
+                }
             } else if (ReceiptService.TXN_CLASS_BOOKING.equals(receipt.getTransactionType())) {
                 lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0], "Class booking revenue"));
+                addonNet = BigDecimal.ZERO;
             } else if (ReceiptService.TXN_ADDON.equals(receipt.getTransactionType())) {
                 lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", split[0], "Add-on revenue"));
-            } else {
-                lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", split[0], "Revenue recognition"));
+                addonNet = BigDecimal.ZERO;
+            } else if (membershipNet.signum() > 0) {
+                lines.add(cr(ACC_MEMBERSHIP_REVENUE, "Membership Revenue", membershipNet, "Revenue recognition"));
+            }
+            if (addonNet.signum() > 0) {
+                lines.add(cr(ACC_SERVICE_REVENUE, "Service / Add-on Revenue", addonNet, "Add-ons sold with the membership"));
             }
             if (split[1].compareTo(BigDecimal.ZERO) > 0) {
                 lines.add(cr(ACC_TAX_PAYABLE, "Tax / GST Payable", split[1], "VAT on membership payment"));
@@ -230,7 +269,7 @@ public class FinancialEventService {
 
         registerSource("Receipt", receipt.getId(), "BILLING", jv.getId());
 
-        if (defer) {
+        if (defer && deferredNet.signum() > 0) {
             deferredRevenueScheduleService.createSchedule(receipt, deferredNet, jv.getId());
         }
     }

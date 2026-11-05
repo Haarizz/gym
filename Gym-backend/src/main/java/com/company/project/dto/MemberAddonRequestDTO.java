@@ -37,8 +37,16 @@ public class MemberAddonRequestDTO {
     private BigDecimal walletAmountApplied;
     // Which staff member actually handled this sale — see MemberRequestDTO.processedByStaffId.
     private Long processedByStaffId;
+    // What it's sold from (optional): an add-on plan, or a facility for facility access.
+    private Long addonPlanId;
+    private Long facilityId;
 
     public MemberAddonRequestDTO() {}
+
+    public Long getAddonPlanId() { return addonPlanId; }
+    public void setAddonPlanId(Long addonPlanId) { this.addonPlanId = addonPlanId; }
+    public Long getFacilityId() { return facilityId; }
+    public void setFacilityId(Long facilityId) { this.facilityId = facilityId; }
 
     // ── Getters & Setters ────────────────────────────────────────────────────
 

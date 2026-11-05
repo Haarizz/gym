@@ -16,6 +16,9 @@ import { performanceKeys } from '@/domains/performance/hooks/useStaffPerformance
 import { dashboardKeys } from '@/domains/dashboard/hooks/useStaffDashboard';
 import { validateDateOfBirth } from '@/domains/profile/domain/dateOfBirthRules';
 import i18n from '@/core/i18n/i18n';
+import {
+  extrasRequest, extrasTotal, type RegistrationExtra,
+} from '@/domains/members/presentation/components/extras/extrasApi';
 
 /** Contact details carried over when a converted lead is registered as a member. */
 export interface MemberPrefill {
@@ -62,6 +65,10 @@ export interface MemberWizardData {
 
   // Source lead (create from a converted lead only)
   leadId: number | null;
+
+  // Add-ons / facility access sold with a new membership (create only, same receipt).
+  allowExtras: boolean;
+  extras: RegistrationExtra[];
 
   // Step 3: Medical
   bloodGroup: string;
@@ -232,6 +239,8 @@ function mapMemberToWizardData(member?: Member, prefill?: MemberPrefill): Member
     discount: '',
 
     leadId: prefill?.leadId ?? null,
+    allowExtras: !member,
+    extras: [],
 
     bloodGroup: member?.bloodGroup ?? '',
     height: member?.height ?? '',
@@ -290,7 +299,11 @@ function buildCreateRequest(
     paymentStatus: paymentResult?.paymentStatus || data.paymentStatus || 'PENDING',
     // Bill the receipt at what the payment sheet charged (plan price less its
     // discount) — without it the server saved a 0 invoice for app-created members.
-    membershipFee: paymentResult?.summary.finalAmount ?? toAmount(data.membershipFee),
+    // The sheet charged membership + add-ons; the membership fee is its own share.
+    membershipFee: paymentResult
+      ? Math.max(0, Math.round((paymentResult.summary.finalAmount - extrasTotal(data.extras)) * 100) / 100)
+      : toAmount(data.membershipFee),
+    addons: data.extras.length > 0 ? extrasRequest(data.extras) : undefined,
     monthlyFee: toAmount(data.monthlyFee),
     paymentMethodUsed: paymentResult?.paymentMethodUsed,
     paymentBreakdown: paymentResult?.paymentBreakdown,
@@ -328,6 +341,7 @@ function buildUpdateRequest(data: MemberWizardData): UpdateMemberRequest {
     leadId: _leadId,
     membershipFee: _membershipFee,
     monthlyFee: _monthlyFee,
+    addons: _addons,
     ...base
   } = buildCreateRequest(data);
   return {

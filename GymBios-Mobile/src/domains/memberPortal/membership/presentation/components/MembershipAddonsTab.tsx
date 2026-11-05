@@ -19,9 +19,11 @@ export interface MembershipAddonsTabProps {
   isError: boolean;
   page: number;
   setPage: (page: number) => void;
+  /** A frozen membership pauses its add-ons and facility access too (they resume with the days added). */
+  membershipFrozen?: boolean;
 }
 
-export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }: MembershipAddonsTabProps) {
+export function MembershipAddonsTab({ data, isLoading, isError, page, setPage, membershipFrozen = false }: MembershipAddonsTabProps) {
   const { t } = useTranslation();
   const [selectedAddOn, setSelectedAddOn] = useState<AddOn | null>(null);
   // Set once the member has reviewed the price (code, wallet) and goes on to pay.
@@ -139,14 +141,16 @@ export function MembershipAddonsTab({ data, isLoading, isError, page, setPage }:
                 <Text style={styles.activePrice}>
                   {activeAddOn.status === ADDON_PENDING_APPROVAL
                     ? t('membership.addons.pendingApproval')
-                    : activeAddOn.status}
+                    : activeAddOn.paused ? t('members.extras.paused') : activeAddOn.status}
                 </Text>
               </View>
             </View>
           ))
         )}
         <Text style={styles.activeSubtext}>
-          {t('membership.addons.activeSubtext')}
+          {active.some((a) => a.paused) ? t('members.extras.pausedHint')
+            : membershipFrozen && active.length > 0 ? t('members.extras.runningHint')
+            : t('membership.addons.activeSubtext')}
         </Text>
       </View>
 

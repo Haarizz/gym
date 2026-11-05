@@ -285,6 +285,7 @@ export function MemberMembershipScreen() {
           isError={isAddonsError} 
           page={addonsPage} 
           setPage={setAddonsPage} 
+          membershipFrozen={membership?.isFrozen ?? false}
         />
       )}
         </>

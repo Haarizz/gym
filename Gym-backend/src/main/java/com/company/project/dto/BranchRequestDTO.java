@@ -20,7 +20,14 @@ public class BranchRequestDTO {
     private List<String> acceptedPaymentMethods;
     private Boolean bnplEnabled;
     private Boolean walkInSelfRegistration;
+    private Boolean freezePausesAddons;
+    private Boolean freezePausesFacilities;
     private String bnplProvider;
+
+    public Boolean getFreezePausesAddons() { return freezePausesAddons; }
+    public void setFreezePausesAddons(Boolean freezePausesAddons) { this.freezePausesAddons = freezePausesAddons; }
+    public Boolean getFreezePausesFacilities() { return freezePausesFacilities; }
+    public void setFreezePausesFacilities(Boolean freezePausesFacilities) { this.freezePausesFacilities = freezePausesFacilities; }
     private BigDecimal taxPercentage;
     private Boolean taxInclusive;
     private String termsAndPolicies;

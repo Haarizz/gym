@@ -92,7 +92,7 @@ public class AddonPaymentService {
      */
     @Transactional
     public MemberAddon purchase(Member member, AddonPlan plan, MobileAddOnPurchaseRequestDTO request) {
-        MemberSuspension.requireNotSuspended(member, "buying an add-on");
+        MemberSuspension.requireUsable(member, "buying an add-on");
         if (!Boolean.TRUE.equals(plan.getIsActive())) {
             throw new BusinessRuleViolationException("This add-on is no longer available.");
         }
@@ -242,7 +242,7 @@ public class AddonPaymentService {
         requirePendingApproval(addon);
         if (addon.getMemberDbId() != null) {
             memberRepository.findById(addon.getMemberDbId())
-                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, "approving an add-on payment"));
+                    .ifPresent(m -> MemberSuspension.requireUsable(m, "approving an add-on payment"));
         }
         // Its validity starts on approval, so waiting on reception costs no days.
         LocalDateTime now = LocalDateTime.now();
@@ -293,6 +293,13 @@ public class AddonPaymentService {
         if (STATUS_CANCELLED.equalsIgnoreCase(addon.getStatus()) || STATUS_REJECTED.equalsIgnoreCase(addon.getStatus())) {
             throw new BusinessRuleViolationException("This add-on is already " + addon.getStatus().toLowerCase());
         }
+        Receipt receipt = receiptOf(addon);
+        // Sold with the membership at registration: it's one line of the membership's receipt,
+        // so only that line is cancelled — never the receipt (or the membership) itself.
+        if (isBundled(receipt)) {
+            settleBundledCancellation(addon, receipt);
+            return;
+        }
         if (STATUS_PENDING_APPROVAL.equalsIgnoreCase(addon.getStatus())) {
             // Staff never confirmed the money arrived, so there's nothing to refund — undo the charge.
             voidPendingPayment(addon, cancelledBy, "Add-on cancelled before the payment was approved");
@@ -300,7 +307,6 @@ public class AddonPaymentService {
         }
         if (addon.getRefundedAt() != null) return;
 
-        Receipt receipt = receiptOf(addon);
         Member payer = receipt != null && receipt.getMemberDbId() != null
                 ? memberRepository.findById(receipt.getMemberDbId()).orElse(null)
                 : ownerOf(addon);
@@ -325,6 +331,53 @@ public class AddonPaymentService {
         addon.setRefundedAt(LocalDateTime.now());
         notifyMember(addon, "Add-on Cancelled",
                 addonName(addon) + " was cancelled and " + paid + " was refunded to your wallet.",
+                "INFO", "ADDON_REFUNDED_" + addon.getId());
+    }
+
+    /** An add-on sold as a line of a membership (registration) receipt, not on its own receipt. */
+    static boolean isBundled(Receipt receipt) {
+        return receipt != null && !ReceiptService.TXN_ADDON.equals(receipt.getTransactionType())
+                && receipt.getAddonItems() != null && !receipt.getAddonItems().isEmpty();
+    }
+
+    /**
+     * Cancels one add-on line of a combined registration receipt. Payments on that receipt are
+     * shared across its lines in proportion, so the line's paid share goes back to the payer's
+     * wallet and its unpaid share is no longer owed; the receipt's total and amount paid drop by
+     * the line, so what's still due on it keeps matching the member's balance.
+     */
+    private void settleBundledCancellation(MemberAddon addon, Receipt receipt) {
+        if (addon.getRefundedAt() != null) return;
+        com.company.project.dto.ReceiptAddonItemDTO line = receipt.getAddonItems().stream()
+                .filter(i -> addon.getId() != null && addon.getId().equals(i.getMemberAddonId()))
+                .findFirst().orElse(null);
+        if (line != null && !line.isActiveLine()) return;
+        BigDecimal lineAmount = money(line != null ? line.getAmount() : addon.getAmount());
+        BigDecimal total = money(receipt.getAmount());
+        BigDecimal paidToDate = money(receipt.getTotalPaidToDate() != null ? receipt.getTotalPaidToDate() : receipt.getPaidAmount());
+        boolean approved = !STATUS_PENDING_APPROVAL.equalsIgnoreCase(addon.getStatus());
+        BigDecimal paidShare = !approved || total.signum() <= 0 ? BigDecimal.ZERO
+                : lineAmount.multiply(paidToDate.min(total)).divide(total, 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal unpaidShare = lineAmount.subtract(paidShare).max(BigDecimal.ZERO);
+
+        Member payer = receipt.getMemberDbId() != null ? memberRepository.findById(receipt.getMemberDbId()).orElse(null) : ownerOf(addon);
+        if (unpaidShare.signum() > 0) writeOffOutstanding(payer, unpaidShare);
+
+        if (line != null) line.setCancelled(true);
+        receipt.setAddonItems(new java.util.ArrayList<>(receipt.getAddonItems()));
+        receipt.setAmount(total.subtract(lineAmount).max(BigDecimal.ZERO));
+        receipt.setTotalPaidToDate(paidToDate.subtract(paidShare).max(BigDecimal.ZERO));
+        if (receipt.getTotalPaidToDate().compareTo(receipt.getAmount()) >= 0) receipt.setStatus("Paid");
+        receiptRepository.save(receipt);
+
+        if (paidShare.signum() <= 0 || payer == null || payer.getMemberId() == null) return;
+        walletService.credit(payer.getMemberId(), paidShare, "ADDON_REFUND", addon.getId(),
+                "Refund for cancelled add-on " + addon.getTransactionId() + " — " + addonName(addon));
+        financialEventService.onAddonRefundedToWallet(addon, payer.getName(), paidShare);
+        addon.setRefundedAmount(paidShare);
+        addon.setRefundedAt(LocalDateTime.now());
+        notifyMember(addon, "Add-on Cancelled",
+                addonName(addon) + " was cancelled and " + paidShare + " was refunded to your wallet.",
                 "INFO", "ADDON_REFUNDED_" + addon.getId());
     }
 

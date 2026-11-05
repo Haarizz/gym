@@ -24,6 +24,9 @@ export interface BranchDTO {
   tax_inclusive?: boolean;
   terms_and_policies?: string;
   walk_in_self_registration?: boolean;
+  /** Membership freeze: do add-ons / facility access pause with it (default yes). */
+  freeze_pauses_addons?: boolean;
+  freeze_pauses_facilities?: boolean;
 }
 
 export interface BranchRequestDTO {
@@ -48,6 +51,9 @@ export interface BranchRequestDTO {
   tax_inclusive?: boolean;
   terms_and_policies?: string;
   walk_in_self_registration?: boolean;
+  /** Membership freeze: do add-ons / facility access pause with it (default yes). */
+  freeze_pauses_addons?: boolean;
+  freeze_pauses_facilities?: boolean;
 }
 
 export interface BranchImageDTO {

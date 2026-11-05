@@ -35,6 +35,15 @@ export function exceedsFreezeLimits(allowance: FreezeAllowance | null, days: num
   return !!allowance && (!allowance.canFreeze || days > allowance.remainingDays);
 }
 
+/** One line on what the freeze does to add-ons and facility access, from the branch's rule. */
+export function freezeAddonRuleText(pausesAddons: boolean, pausesFacilities: boolean): string {
+  if (pausesAddons && pausesFacilities) return 'Add-ons and facility access pause with the membership and get the frozen days back.';
+  if (!pausesAddons && !pausesFacilities) return 'Add-ons and facility access keep running during the freeze and end on their usual dates.';
+  return pausesAddons
+    ? 'Add-ons pause with the membership; facility access keeps running and ends on its usual date.'
+    : 'Facility access pauses with the membership; add-ons keep running and end on their usual dates.';
+}
+
 /** Whether staff can submit this freeze: within the limits, or a manager overriding them. */
 export function canSubmitStaffFreeze(allowance: FreezeAllowance | null, days: number, overrideLimits: boolean): boolean {
   return !exceedsFreezeLimits(allowance, days) || (overrideLimits && !!allowance?.canOverrideLimits);
@@ -139,6 +148,14 @@ export function StaffFreezeOptions({
             ? <>This plan unfreezes automatically — the membership reactivates on {endDate ? format(addDays(endDate, 1), 'dd MMM yyyy') : 'the day after the end date'}.</>
             : <>This plan doesn't unfreeze automatically — unfreeze the membership when the member is back.</>}
           {' '}Change this in Manage Plans.
+        </span>
+      </div>
+
+      <div className="flex items-start gap-2 rounded-lg p-3 text-xs text-gray-600" style={{ border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
+        <Info className="h-4 w-4 shrink-0" style={{ color: 'var(--primary)' }} />
+        <span>
+          {freezeAddonRuleText(allowance.pausesAddons !== false, allowance.pausesFacilities !== false)}
+          {' '}Change this in Branch Settings.
         </span>
       </div>
     </div>

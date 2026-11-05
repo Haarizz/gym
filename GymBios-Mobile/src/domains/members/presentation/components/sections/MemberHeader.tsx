@@ -17,24 +17,34 @@ interface MemberHeaderProps {
   onRenew: () => void;
   onFreeze: () => void;
   onDelete: () => void;
+  /** Sell an add-on / facility access (omitted where selling isn't offered). */
+  onAddon?: () => void;
 }
 
-export function MemberHeader({ member, onEdit, onRenew, onFreeze, onDelete }: MemberHeaderProps) {
+export function MemberHeader({ member, onEdit, onRenew, onFreeze, onDelete, onAddon }: MemberHeaderProps) {
   const { t } = useTranslation();
   const theme = useTheme();
 
-  const actions = [
+  // A suspended or frozen membership is locked until resumed / unfrozen — the backend refuses
+  // renewals, add-on sales and payments for it (MemberSuspension.requireUsable). Unfreeze stays.
+  const suspended = !!member.membershipSuspended;
+  const frozen = !!member.isFrozen;
+  const locked = suspended || frozen;
+
+  const actions: { key: string; label: string; icon: any; color: string; onPress: () => void; disabled?: boolean }[] = [
     { key: 'edit', label: t('members.header.edit'), icon: 'edit-2', color: theme.text, onPress: onEdit },
-    { key: 'renew', label: t('members.header.renew'), icon: 'refresh-cw', color: theme.text, onPress: onRenew },
+    { key: 'renew', label: t('members.header.renew'), icon: 'refresh-cw', color: theme.text, onPress: onRenew, disabled: locked },
+    ...(onAddon ? [{ key: 'addon', label: t('members.header.addon'), icon: 'package', color: theme.text, onPress: onAddon, disabled: locked }] : []),
     {
       key: 'freeze',
-      label: member.isFrozen ? t('members.header.unfreeze') : t('members.header.freeze'),
-      icon: member.isFrozen ? 'sun' : 'pause-circle',
+      label: frozen ? t('members.header.unfreeze') : t('members.header.freeze'),
+      icon: frozen ? 'sun' : 'pause-circle',
       color: theme.text,
       onPress: onFreeze,
+      disabled: suspended,
     },
     { key: 'delete', label: t('members.header.delete'), icon: 'trash-2', color: BrandColors.danger, onPress: onDelete },
-  ] as const;
+  ];
 
   return (
     <DetailCard>
@@ -61,14 +71,26 @@ export function MemberHeader({ member, onEdit, onRenew, onFreeze, onDelete }: Me
         </View>
       </View>
 
+      {locked && (
+        <View style={[styles.lockBanner, { backgroundColor: suspended ? 'rgba(212,24,61,0.08)' : 'rgba(29,78,216,0.08)' }]}>
+          <Feather name={suspended ? 'slash' : 'pause-circle'} size={14} color={suspended ? BrandColors.danger : '#1d4ed8'} />
+          <Typography variant="caption" style={{ flex: 1, color: suspended ? BrandColors.danger : '#1d4ed8' }}>
+            {suspended ? t('members.extras.lockedSuspended') : t('members.extras.lockedFrozen')}
+            {suspended && member.suspendedReason ? ` (${member.suspendedReason})` : ''}
+          </Typography>
+        </View>
+      )}
+
       <View style={[styles.actionsRow, { borderTopColor: theme.border }]}>
         {actions.map((action) => (
           <Pressable
             key={action.key}
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.action, pressed && styles.pressed, action.disabled && styles.disabled]}
             onPress={action.onPress}
+            disabled={action.disabled}
             accessibilityRole="button"
             accessibilityLabel={action.label}
+            accessibilityState={{ disabled: !!action.disabled }}
           >
             <View style={[styles.actionIcon, { backgroundColor: theme.backgroundSelected }]}>
               <Feather name={action.icon} size={16} color={action.color} />
@@ -120,5 +142,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  disabled: {
+    opacity: 0.35,
+  },
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    marginTop: Spacing.md,
+    padding: Spacing.two,
+    borderRadius: Radius.md,
   },
 });

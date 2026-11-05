@@ -42,6 +42,9 @@ public class MemberAddonResponseDTO {
     private BigDecimal discountAmount;
     private String discountLabel;
 
+    private Long addonPlanId;
+    private Long facilityId;
+
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static MemberAddonResponseDTO fromEntity(MemberAddon a) {
@@ -66,6 +69,8 @@ public class MemberAddonResponseDTO {
         dto.updatedAt       = a.getUpdatedAt() != null ? a.getUpdatedAt().format(ISO) + "Z" : null;
         dto.walletAmount    = a.getWalletAmount();
         dto.refundedAmount  = a.getRefundedAmount();
+        dto.addonPlanId     = a.getAddonPlanId();
+        dto.facilityId      = a.getFacilityId();
         return dto;
     }
 
@@ -94,6 +99,8 @@ public class MemberAddonResponseDTO {
 
     public BigDecimal getWalletAmount() { return walletAmount; }
     public BigDecimal getRefundedAmount() { return refundedAmount; }
+    public Long getAddonPlanId() { return addonPlanId; }
+    public Long getFacilityId() { return facilityId; }
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public BigDecimal getPaidAmount() { return paidAmount; }
     @JsonInclude(JsonInclude.Include.NON_NULL)

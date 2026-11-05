@@ -55,7 +55,7 @@ public class WalletService {
         Member member = memberRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
         // Spending only — credits (refunds back to the wallet) stay allowed.
-        MemberSuspension.requireNotSuspended(member, "paying from their wallet");
+        MemberSuspension.requireUsable(member, "paying from their wallet");
 
         BigDecimal current = member.getWalletBalance() != null ? member.getWalletBalance() : BigDecimal.ZERO;
         if (current.compareTo(amount) < 0) {

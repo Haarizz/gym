@@ -147,9 +147,9 @@ public class PosCheckoutService {
                 ? memberRepo.findById(req.memberId())
                     .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + req.memberId()))
                 : null;
-        MemberSuspension.requireNotSuspended(member, "selling to them");
+        MemberSuspension.requireUsable(member, "selling to them");
         Member creditMember = resolveCreditMember(allocations);
-        MemberSuspension.requireNotSuspended(creditMember, "selling to them");
+        MemberSuspension.requireUsable(creditMember, "selling to them");
         if (creditMember != null) {
             if (member == null) member = creditMember;
             else if (!member.getId().equals(creditMember.getId())) {
