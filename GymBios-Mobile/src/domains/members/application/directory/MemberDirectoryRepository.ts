@@ -11,6 +11,8 @@ export interface MemberFilters {
 }
 
 export interface CreateMemberRequest {
+  /** Add-ons / facility access sold with the membership (MemberRequestDTO.addons, snake_case items). */
+  addons?: Record<string, unknown>[];
   name: string;
   email: string;
   phone: string;

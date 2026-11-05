@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, CheckCircle2, XCircle, Search, Dumbbell, Trash2 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
+import { Plus, Edit2, CheckCircle2, XCircle, Dumbbell, Trash2, Building2, GitBranch, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Badge } from "../components/ui/badge";
+import {
+  PlatformPage, PageHead, KpiRow, Kpi, Panel, Toolbar, Count, SearchField, DataTable, StateRow,
+  Entity, Pill, IconAction, p, type PillKind,
+} from '../components/platform/platform-ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -199,128 +200,107 @@ export function GymManagement() {
            g.slug.toLowerCase().includes(q);
   });
 
-  if (loading) return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
+  // Backend serializes as snake_case (is_default/branch_count/owner_username) — GymDTO's
+  // camelCase typing doesn't match the real wire shape, so both keys are checked.
+  const isDefaultGym = (gym: GymDTO) => !!((gym as any).isDefault ?? (gym as any).is_default);
+  const branchCountOf = (gym: GymDTO): number => Number((gym as any).branchCount ?? (gym as any).branch_count ?? 0);
+  const ownerOf = (gym: GymDTO): string | null => (gym as any).ownerUsername ?? (gym as any).owner_username ?? null;
+
+  const statusPill = (status: string) => {
+    const kind: PillKind = status === 'ACTIVE' ? 'good'
+      : status === 'PROVISIONING' ? 'info'
+      : status === 'PROVISION_FAILED' || status === 'SUSPENDED' ? 'bad' : 'neutral';
+    const label = status === 'PROVISION_FAILED' ? 'Setup failed' : status === 'PROVISIONING' ? 'Setting up' : status.toLowerCase();
+    return <Pill kind={kind}>{label}</Pill>;
+  };
+
+  const activeCount = gyms.filter(g => g.status === 'ACTIVE').length;
+  const totalBranches = gyms.reduce((sum, g) => sum + branchCountOf(g), 0);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Gym Management</h1>
-          <p className="text-muted-foreground">Manage gym clients onboarded to the platform</p>
-        </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Gym
-        </Button>
-      </div>
+    <PlatformPage>
+      <PageHead
+        icon={Dumbbell}
+        title="Gym Management"
+        subtitle="Gym clients onboarded to the platform — their status, owner login and branches."
+        actions={
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Gym
+          </Button>
+        }
+      />
 
-      <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center">
-              <Dumbbell className="w-5 h-5 mr-2 text-primary" />
-              Gym Clients
-            </CardTitle>
-          </div>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search gyms..."
-              className="pl-10 bg-background/50"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Gym Name</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Branches</TableHead>
-                <TableHead>Owner Login</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGyms.map((gym) => (
-                <TableRow key={gym.id} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                        {gym.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <span className="font-medium">{gym.name}</span>
-                      {/* Backend serializes as snake_case (is_default/branch_count/owner_username) — GymDTO's
-                          camelCase typing doesn't match the real wire shape, so both keys are checked. */}
-                      {((gym as any).isDefault ?? (gym as any).is_default) && <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 ml-2">Default</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground font-mono">{gym.slug}</TableCell>
-                  <TableCell className="text-muted-foreground">{gym.address || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{(gym as any).branchCount ?? (gym as any).branch_count ?? 0}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono">
-                    {((gym as any).ownerUsername ?? (gym as any).owner_username)
-                      ? ((gym as any).ownerUsername ?? (gym as any).owner_username)
-                      : <span className="italic text-xs">Not issued</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={gym.status === 'ACTIVE' ? "default" : "destructive"} className={gym.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20" : ""}>
-                      {gym.status === 'ACTIVE' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
-                      {gym.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      {/* BG_60: a TENANT-sourced row can now appear while still PROVISIONING/
-                          PROVISION_FAILED (see GymService.toResponseDTO placeholder) — its
-                          dedicated database doesn't exist yet, so Edit/status-toggle (which
-                          write to that database) are disabled until it's actually provisioned. */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEditModal(gym)}
-                        disabled={isProvisioningPlaceholder(gym)}
-                        aria-label="Edit gym"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Switch
-                        checked={gym.status === 'ACTIVE'}
-                        onCheckedChange={() => toggleStatus(gym)}
-                        disabled={isProvisioningPlaceholder(gym)}
-                        aria-label="Toggle Status"
-                      />
-                      {gym.source === 'TENANT' && !((gym as any).isDefault ?? (gym as any).is_default) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteGym(gym)}
-                          aria-label="Delete gym"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredGyms.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No gyms found matching your search.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <KpiRow cols={4}>
+        <Kpi icon={Building2} tone="teal" label="Gyms" value={loading ? '—' : gyms.length} hint="On the platform" />
+        <Kpi icon={CheckCircle2} tone="green" label="Active" value={loading ? '—' : activeCount} hint="Open to staff and members" />
+        <Kpi icon={XCircle} tone="gray" label="Not active" value={loading ? '—' : gyms.length - activeCount} hint="Inactive, suspended or setting up" />
+        <Kpi icon={GitBranch} tone="blue" label="Branches" value={loading ? '—' : totalBranches} hint="Across all gyms" />
+      </KpiRow>
+
+      <Panel
+        title="Gym clients"
+        icon={Dumbbell}
+        action={
+          <Toolbar>
+            <Count n={filteredGyms.length} />
+            <SearchField value={searchQuery} onChange={setSearchQuery} placeholder="Search by name or slug…" label="Search gyms" />
+          </Toolbar>
+        }
+      >
+        <DataTable head={<>
+          <th>Gym</th>
+          <th>Slug</th>
+          <th className={p.num}>Branches</th>
+          <th>Owner login</th>
+          <th>Status</th>
+          <th className={p.right}>Actions</th>
+        </>}>
+          {loading ? <StateRow cols={6} loading /> : filteredGyms.map((gym) => (
+            <tr key={gym.id}>
+              <td data-label="">
+                <Entity
+                  name={gym.name}
+                  seed={gym.slug}
+                  badge={isDefaultGym(gym) ? <Pill kind="brand">Default</Pill> : undefined}
+                  sub={gym.address ? <><MapPin />{gym.address}</> : <span>No address</span>}
+                />
+              </td>
+              <td data-label="Slug"><span className={`${p.chip} ${p.mono}`}>{gym.slug}</span></td>
+              <td data-label="Branches" className={p.num}>{branchCountOf(gym)}</td>
+              <td data-label="Owner login">
+                {ownerOf(gym)
+                  ? <span className={p.mono}>{ownerOf(gym)}</span>
+                  : <span className={p.muted} style={{ fontStyle: 'italic', fontSize: '0.75rem' }}>Not issued</span>}
+              </td>
+              <td data-label="Status">{statusPill(gym.status)}</td>
+              <td data-label="">
+                {/* BG_60: a TENANT-sourced row can now appear while still PROVISIONING/
+                    PROVISION_FAILED (see GymService.toResponseDTO placeholder) — its
+                    dedicated database doesn't exist yet, so Edit/status-toggle (which
+                    write to that database) are disabled until it's actually provisioned. */}
+                <div className={p.rowActions}>
+                  <IconAction icon={Edit2} label="Edit gym" onClick={() => openEditModal(gym)} disabled={isProvisioningPlaceholder(gym)} />
+                  <span title={gym.status === 'ACTIVE' ? 'Deactivate gym' : 'Activate gym'} style={{ display: 'inline-flex', padding: '0 0.25rem' }}>
+                    <Switch
+                      checked={gym.status === 'ACTIVE'}
+                      onCheckedChange={() => toggleStatus(gym)}
+                      disabled={isProvisioningPlaceholder(gym)}
+                      aria-label="Toggle Status"
+                    />
+                  </span>
+                  {gym.source === 'TENANT' && !isDefaultGym(gym) && (
+                    <IconAction icon={Trash2} label="Delete gym permanently" danger onClick={() => handleDeleteGym(gym)} />
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+          {!loading && filteredGyms.length === 0 && (
+            <StateRow cols={6}>{gyms.length === 0 ? 'No gyms yet — add one with Add Gym.' : 'No gyms match your search.'}</StateRow>
+          )}
+        </DataTable>
+      </Panel>
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -487,6 +467,6 @@ export function GymManagement() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </PlatformPage>
   );
 }

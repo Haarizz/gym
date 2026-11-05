@@ -119,7 +119,7 @@ public class MemberAddonService {
         Member targetMember = addon.getMemberDbId() != null
                 ? memberRepository.findById(addon.getMemberDbId()).orElse(null)
                 : null;
-        MemberSuspension.requireNotSuspended(targetMember, "selling an add-on");
+        MemberSuspension.requireUsable(targetMember, "selling an add-on");
         boolean billToGuardian = targetMember != null && targetMember.isEffectivelyBilledToHead();
         Member guardian = null;
         if (billToGuardian) {
@@ -340,6 +340,8 @@ public class MemberAddonService {
         if (r.getExpiryDate()       != null) a.setExpiryDate(parseDateTime(r.getExpiryDate()));
         if (r.getNotes()            != null) a.setNotes(r.getNotes());
         if (r.getPaymentBreakdown() != null) a.setPaymentBreakdown(r.getPaymentBreakdown());
+        if (r.getAddonPlanId()      != null) a.setAddonPlanId(r.getAddonPlanId());
+        if (r.getFacilityId()       != null) a.setFacilityId(r.getFacilityId());
     }
 
     private Specification<MemberAddon> buildSpec(String search, String status) {

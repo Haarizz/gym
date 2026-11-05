@@ -14,6 +14,7 @@ import { useMembershipPlans, type MembershipPlan } from '@/domains/membershipPla
 import { computeEndDate } from '@/domains/members/hooks/useMemberWizard';
 
 import { FormCard } from './FormCard';
+import { ExtrasList, ExtrasPicker } from '../extras/ExtrasPicker';
 import type { MemberStepProps } from './stepTypes';
 
 // No "Processed By" picker: the server credits the sale to whoever registers the member
@@ -160,6 +161,14 @@ export function MembershipStep({
           </View>
         ) : null}
       </FormCard>
+
+      {/* New registrations only: add-ons and facility access sold with the membership, on its receipt. */}
+      {data.allowExtras && (
+        <FormCard icon="package" title={t('members.extras.title')} description={t('members.extras.subtitle')}>
+          <ExtrasPicker chosen={data.extras} onPick={(extra) => updateField('extras', [...data.extras, extra])} />
+          <ExtrasList extras={data.extras} onRemove={(key) => updateField('extras', data.extras.filter((e) => e.key !== key))} />
+        </FormCard>
+      )}
 
     </View>
   );

@@ -143,6 +143,7 @@ export const membershipApi = {
         category: item.category,
         expiryDate: item.expiryDate || item.expiry_date,
         status: item.status,
+        paused: item.paused === true,
       })) || [],
     };
   },

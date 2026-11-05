@@ -12,6 +12,9 @@ export interface MemberAddon {
   addon_name: string;
   addon_description?: string;
   category: string;
+  /** Set on facility access sold from a facility (category "Facility"). */
+  facility_id?: number | null;
+  addon_plan_id?: number | null;
   amount: number;
   payment_mode: string;
   start_date: string;

@@ -90,7 +90,7 @@ public class RewardRedemptionService {
     private void requireMemberNotSuspended(ReferralReward reward, String action) {
         if (reward.getMemberId() != null) {
             memberRepository.findByMemberId(reward.getMemberId())
-                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, action));
+                    .ifPresent(m -> MemberSuspension.requireUsable(m, action));
         }
     }
 

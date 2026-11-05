@@ -96,7 +96,7 @@ import type { ReferralResponse } from '../utils/supabase/referral-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
 import s from './member-history-analytics.module.css';
-import { StaffFreezeOptions, canSubmitStaffFreeze, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
+import { StaffFreezeOptions, canSubmitStaffFreeze, freezeAddonRuleText, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
 import { SubscriptionTimeline } from '../components/members/SubscriptionTimeline';
 
 interface MemberHistoryAnalyticsProps {
@@ -716,9 +716,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   // A suspended member is blocked from everything (payments, renewals, add-ons, bookings,
   // freezes, check-in) until resumed — the backend refuses it too (MemberSuspension).
   const isSuspended = !!member.membership_suspended;
+  // A frozen membership is locked the same way until it's unfrozen (MemberSuspension.requireUsable);
+  // only Unfreeze stays available.
   const pendingApprovalHint = isPendingApproval
     ? 'Available after approval'
-    : isSuspended ? 'Suspended — resume the membership first' : undefined;
+    : isSuspended ? 'Suspended — resume the membership first'
+    : isFrozen ? 'Frozen — unfreeze the membership first' : undefined;
   // The membership_status column is only ever set explicitly (create/freeze/
   // deactivate) — nothing flips it to "expired" when the expiry date passes,
   // so derive that here from expiry_date rather than trusting the stored value.
@@ -844,7 +847,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               size="sm"
               className="btn-primary"
               onClick={() => onNavigate?.('members', { tab: 'renewals', memberId: memberId })}
-              disabled={isPendingApproval || isSuspended}
+              disabled={isPendingApproval || isSuspended || isFrozen}
             >
               <RefreshCcw className="h-4 w-4 mr-2" />
               Renew / Upgrade
@@ -864,7 +867,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
               variant="outline"
               className="border-primary/20"
               onClick={() => setIsTransferModalOpen(true)}
-              disabled={isPendingApproval || isSuspended}
+              disabled={isPendingApproval || isSuspended || isFrozen}
             >
               <Share2 className="h-4 w-4 mr-2" />
               Transfer
@@ -911,7 +914,22 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
             <div className={s.addons}>
               {addons.length === 0
                 ? <span className={s.addonNone}>No add-ons</span>
-                : addons.map(a => <span key={a.id} className={s.addon}>{a.addon_name}</span>)}
+                : addons.map(a => {
+                    // A freeze pauses add-ons and/or facility access with the membership (the branch's
+                    // rule when it started); on unfreeze their end dates move out by the frozen days.
+                    const since = isFrozen && member.freeze_start_date ? new Date(member.freeze_start_date) : new Date();
+                    const running = !/cancel|reject|refund/i.test(String(a.status || ''))
+                      && (!a.expiry_date || new Date(a.expiry_date) >= since);
+                    const isFacility = a.facility_id != null || /^facility$/i.test(String(a.category || ''));
+                    const pauses = isFacility ? member.freeze_pauses_facilities !== false : member.freeze_pauses_addons !== false;
+                    const paused = isFrozen && running && pauses;
+                    return (
+                      <span key={a.id} className={s.addon} data-paused={paused || undefined}
+                        title={paused ? 'Paused while the membership is frozen — resumes with the frozen days added' : undefined}>
+                        {a.addon_name}{paused ? ' · paused' : ''}
+                      </span>
+                    );
+                  })}
             </div>
           </div>
           <div className={s.term} data-tone={termTone}>
@@ -1037,7 +1055,9 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <span className={s.actionLabel}>View receipts</span>
                 <ChevronRight className={s.chev} />
               </button>
-              <button type="button" className={s.action} onClick={() => onNavigate?.('manage-plans', { tab: 'addons', purchaseAddonFor: memberId })}>
+              <button type="button" className={s.action} disabled={isFrozen || isSuspended}
+                title={isFrozen || isSuspended ? pendingApprovalHint : undefined}
+                onClick={() => onNavigate?.('manage-plans', { tab: 'addons', purchaseAddonFor: memberId })}>
                 <span className={s.actionIcon} data-tone="blue"><ShoppingCart /></span>
                 <span className={s.actionLabel}>Purchase add-on</span>
                 <ChevronRight className={s.chev} />
@@ -2305,6 +2325,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                 <CardContent className="p-4 text-sm text-blue-900">
                   <p>This membership is currently frozen{member.freeze_reason ? `: ${member.freeze_reason}` : '.'}</p>
                   {member.freeze_end_date && <p className="mt-1">Last frozen day: {fmtDate(new Date(new Date(member.freeze_end_date).getTime() - 1).toISOString())}</p>}
+                  <p className="mt-1">{freezeAddonRuleText(member.freeze_pauses_addons !== false, member.freeze_pauses_facilities !== false)}</p>
                 </CardContent>
               </Card>
             </div>

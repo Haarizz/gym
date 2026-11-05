@@ -42,6 +42,7 @@ public class ReceiptResponseDTO {
     private String bankAccountCode;
     private String bankAccountName;
     private List<MinorChargeDTO> minorCharges;
+    private List<com.company.project.dto.ReceiptAddonItemDTO> addonItems;
     private java.math.BigDecimal totalPaidToDate;
     private java.math.BigDecimal balanceAfter;
     private String linkedBillId;
@@ -87,6 +88,7 @@ public class ReceiptResponseDTO {
         dto.bankAccountCode = r.getBankAccountCode();
         dto.bankAccountName = r.getBankAccountName();
         dto.minorCharges    = r.getMinorCharges();
+        dto.addonItems      = r.getAddonItems();
         dto.totalPaidToDate = r.getTotalPaidToDate();
         dto.balanceAfter    = r.getBalanceAfter();
         dto.linkedBillId    = r.getLinkedBillId() != null ? String.valueOf(r.getLinkedBillId()) : null;
@@ -126,6 +128,7 @@ public class ReceiptResponseDTO {
     public String getBankAccountCode() { return bankAccountCode; }
     public String getBankAccountName() { return bankAccountName; }
     public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
+    public List<com.company.project.dto.ReceiptAddonItemDTO> getAddonItems() { return addonItems; }
     public java.math.BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
     public java.math.BigDecimal getBalanceAfter() { return balanceAfter; }
     public String getLinkedBillId() { return linkedBillId; }

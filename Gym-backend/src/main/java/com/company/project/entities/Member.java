@@ -107,6 +107,20 @@ public class Member extends BaseEntity implements BranchAware {
     @Column(name = "freeze_reason")
     private String freezeReason;
 
+    // The branch's freeze rule as it was when this freeze started (FreezeAddonPolicy):
+    // whether add-ons / facility access pause with the membership. Null when not frozen.
+    @Column(name = "freeze_pauses_addons")
+    private Boolean freezePausesAddons;
+
+    @Column(name = "freeze_pauses_facilities")
+    private Boolean freezePausesFacilities;
+
+    public Boolean getFreezePausesAddons() { return freezePausesAddons; }
+    public void setFreezePausesAddons(Boolean freezePausesAddons) { this.freezePausesAddons = freezePausesAddons; }
+
+    public Boolean getFreezePausesFacilities() { return freezePausesFacilities; }
+    public void setFreezePausesFacilities(Boolean freezePausesFacilities) { this.freezePausesFacilities = freezePausesFacilities; }
+
     // Additional profile fields
     @Column(name = "gender")
     private String gender;

@@ -4,28 +4,28 @@
    reads these --gb-* variables; legacy arbitrary classes such as bg-[#2B7A78] keep their
    original names but resolve through them, so they follow the active theme too. */
 :root, :root[data-gb-theme="blue"] {
-  --gb-primary: #2693fd;
-  --gb-primary-alt: #2693fd;
-  --gb-primary-hover: #2382f6;
-  --gb-primary-deep: #1a65e2;
-  --gb-primary-darker: #1a65e2;
-  --gb-primary-darkest: #1352cf;
-  --gb-primary-light: #c5dffd;
-  --gb-primary-tint: #eaf3ff;
-  --gb-primary-wash: #f5f9ff;
-  --gb-primary-line: #dce7f5;
-  --gb-primary-soft: #4da6fd;
-  --gb-primary-mid: #5aabfd;
-  --gb-primary-pale: #8dc4fe;
-  --gb-primary-paler: #9acbfe;
-  --gb-secondary-dark: #1b2e4a;
-  --gb-text: #172b4d;
-  --gb-bg: #f5f9ff;
-  --gb-muted-fg: #64748b;
-  --gb-border: #dce7f5;
-  --gb-sidebar: #1352cf;
-  --gb-sidebar-accent: #1a65e2;
-  --gb-sidebar-active: #1f71f1;
+  --gb-primary: #1d4e89;
+  --gb-primary-alt: #1d4e89;
+  --gb-primary-hover: #173f70;
+  --gb-primary-deep: #163b6a;
+  --gb-primary-darker: #12325a;
+  --gb-primary-darkest: #0e2747;
+  --gb-primary-light: #d6e3f3;
+  --gb-primary-tint: #edf1f6;
+  --gb-primary-wash: #f6f8fa;
+  --gb-primary-line: #d5dee9;
+  --gb-primary-soft: #3f699b;
+  --gb-primary-mid: #567aa7;
+  --gb-primary-pale: #839ebe;
+  --gb-primary-paler: #8ea7c4;
+  --gb-secondary-dark: #16263d;
+  --gb-text: #1a2b42;
+  --gb-bg: #f1f4f8;
+  --gb-muted-fg: #5b6b80;
+  --gb-border: #d3dce7;
+  --gb-sidebar: #0f2a4a;
+  --gb-sidebar-accent: #173a63;
+  --gb-sidebar-active: #24599a;
 }
 
 :root[data-gb-theme="teal"] {
@@ -176,6 +176,81 @@
   --gb-sidebar: #0f172a;
   --gb-sidebar-accent: #1e293b;
   --gb-sidebar-active: #334155;
+}
+
+:root[data-gb-theme="petrol"] {
+  --gb-primary: #155e75;
+  --gb-primary-alt: #155e75;
+  --gb-primary-hover: #114d60;
+  --gb-primary-deep: #114d60;
+  --gb-primary-darker: #0e4152;
+  --gb-primary-darkest: #0b3442;
+  --gb-primary-light: #d3eaf0;
+  --gb-primary-tint: #ecf2f4;
+  --gb-primary-wash: #f6f9f9;
+  --gb-primary-line: #d2e0e4;
+  --gb-primary-soft: #38768a;
+  --gb-primary-mid: #508698;
+  --gb-primary-pale: #7ea6b3;
+  --gb-primary-paler: #8aafba;
+  --gb-secondary-dark: #132a31;
+  --gb-text: #14272e;
+  --gb-bg: #f1f5f6;
+  --gb-muted-fg: #566b72;
+  --gb-border: #d0dde1;
+  --gb-sidebar: #0b3442;
+  --gb-sidebar-accent: #0f4555;
+  --gb-sidebar-active: #1a6e88;
+}
+
+:root[data-gb-theme="burgundy"] {
+  --gb-primary: #9f1d35;
+  --gb-primary-alt: #9f1d35;
+  --gb-primary-hover: #86182d;
+  --gb-primary-deep: #86182d;
+  --gb-primary-darker: #6f1426;
+  --gb-primary-darkest: #5c1020;
+  --gb-primary-light: #f6dce2;
+  --gb-primary-tint: #f7edef;
+  --gb-primary-wash: #fbf6f7;
+  --gb-primary-line: #e9d6da;
+  --gb-primary-soft: #ad3f53;
+  --gb-primary-mid: #b75668;
+  --gb-primary-pale: #ca8390;
+  --gb-primary-paler: #cf8e9a;
+  --gb-secondary-dark: #33161c;
+  --gb-text: #2b1b1f;
+  --gb-bg: #f7f4f5;
+  --gb-muted-fg: #6e5a5f;
+  --gb-border: #e2d5d8;
+  --gb-sidebar: #5c1020;
+  --gb-sidebar-accent: #731529;
+  --gb-sidebar-active: #a3253d;
+}
+
+:root[data-gb-theme="mocha"] {
+  --gb-primary: #7a4e2d;
+  --gb-primary-alt: #7a4e2d;
+  --gb-primary-hover: #664126;
+  --gb-primary-deep: #664126;
+  --gb-primary-darker: #54351f;
+  --gb-primary-darkest: #3f2817;
+  --gb-primary-light: #efe2d6;
+  --gb-primary-tint: #f4f1ee;
+  --gb-primary-wash: #faf8f7;
+  --gb-primary-line: #e4dad1;
+  --gb-primary-soft: #8e694d;
+  --gb-primary-mid: #9b7a62;
+  --gb-primary-pale: #b69e8c;
+  --gb-primary-paler: #bda796;
+  --gb-secondary-dark: #2c2118;
+  --gb-text: #2a2119;
+  --gb-bg: #f6f4f1;
+  --gb-muted-fg: #6f6359;
+  --gb-border: #ddd4cc;
+  --gb-sidebar: #3f2817;
+  --gb-sidebar-accent: #53351f;
+  --gb-sidebar-active: #8a5a35;
 }
 
 :root {

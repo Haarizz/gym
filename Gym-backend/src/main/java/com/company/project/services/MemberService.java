@@ -275,7 +275,7 @@ public class MemberService {
         entityManager.unwrap(org.hibernate.Session.class).disableFilter("branchFilter");
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + memberId));
-        MemberSuspension.requireNotSuspended(member, "approving a payment");
+        MemberSuspension.requireUsable(member, "approving a payment");
         if ("REJECTED".equals(member.getApprovalStatus())) {
             return approveRejectedPayment(member, approvedBy);
         }
@@ -692,7 +692,14 @@ public class MemberService {
             member.setLastPaymentDate(LocalDateTime.now());
         }
 
+        // Add-ons / facility access sold with the membership — priced from the catalogue
+        // (never the client) and validated before anything is saved.
+        List<RegistrationAddonService.Line> addonLines = registrationAddonService != null
+                ? registrationAddonService.price(request.getAddons()) : List.of();
+        BigDecimal addonTotal = RegistrationAddonService.total(addonLines);
+
         // Recalculate outstanding balance: fee - paid amount
+        boolean outstandingFromClient = member.getOutstandingBalance() != null;
         if (member.getOutstandingBalance() == null && member.getMembershipFee() != null) {
             String ps = member.getPaymentStatus();
             if ("paid".equalsIgnoreCase(ps)) {
@@ -700,6 +707,13 @@ public class MemberService {
             } else {
                 member.setOutstandingBalance(member.getMembershipFee());
             }
+        }
+
+        // A client that sends its own outstanding balance already counted the add-ons in it
+        // (it collects one payment for the whole receipt); otherwise an unpaid registration
+        // owes them too.
+        if (!outstandingFromClient && addonTotal.signum() > 0 && !"paid".equalsIgnoreCase(member.getPaymentStatus())) {
+            member.setOutstandingBalance(orZero(member.getOutstandingBalance()).add(addonTotal));
         }
 
         // Fold minors' UNPAID fees on top of the head's own outstanding balance — a
@@ -737,7 +751,7 @@ public class MemberService {
         // derived from (combinedFee - outstandingBalance), which now correctly nets out
         // to the head's own paid amount plus any minors' fees paid at registration.
         BigDecimal ownFee = saved.getMembershipFee() != null ? saved.getMembershipFee() : BigDecimal.ZERO;
-        BigDecimal combinedFee = ownFee.add(minorFeeTotal);
+        BigDecimal combinedFee = ownFee.add(minorFeeTotal).add(addonTotal);
         // Under family_head mode there's no independent per-dependent payment to
         // check — every member is "paid" together, exactly when the head's own
         // combined invoice ended up fully covered.
@@ -769,6 +783,16 @@ public class MemberService {
                 : (codeDiscount.signum() > 0 ? "Discount" : null);
         receipt = receiptService.recordDiscount(receipt, orZero(request.getOfferDiscount()).add(codeDiscount),
                 discountLabel(request.getOfferDiscount(), request.getOfferLabel(), codeLabel));
+
+        // The add-ons are lines on this same receipt; created before it's posted so the
+        // ledger splits their share into add-on revenue.
+        if (!addonLines.isEmpty()) {
+            List<com.company.project.dto.ReceiptAddonItemDTO> addonItems = registrationAddonService.create(saved, addonLines,
+                    saved.getMembershipStartDate(), saved.getPaymentMethodUsed(),
+                    "PENDING".equals(saved.getApprovalStatus()) ? AddonPaymentService.STATUS_PENDING_APPROVAL : "Active");
+            receipt = receiptService.attachAddonItems(receipt, addonItems);
+            registrationAddonService.linkReceipt(addonItems, receipt.getId());
+        }
 
         // A mobile self-service purchase paid by Cash/Credit/Mixed is awaiting
         // reception approval (see MobileDiscoveryController) — mirror the member's
@@ -940,6 +964,47 @@ public class MemberService {
     // Optional so the many unit tests that build MemberService by constructor keep working.
     private com.company.project.repositories.MembershipFreezeRepository membershipFreezeRepository;
     private com.company.project.repositories.MemberNoteRepository memberNoteRepository;
+
+    private RegistrationAddonService registrationAddonService;
+    private com.company.project.repositories.MemberAddonRepository memberAddonRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setMemberAddonRepository(com.company.project.repositories.MemberAddonRepository memberAddonRepository) {
+        this.memberAddonRepository = memberAddonRepository;
+    }
+
+    private FreezeAddonPolicy freezeAddonPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFreezeAddonPolicy(FreezeAddonPolicy freezeAddonPolicy) {
+        this.freezeAddonPolicy = freezeAddonPolicy;
+    }
+
+    private FreezeAddonPolicy.Rule freezeRule(Member member) {
+        return freezeAddonPolicy != null ? freezeAddonPolicy.forMember(member) : FreezeAddonPolicy.Rule.PAUSE_ALL;
+    }
+
+    /**
+     * The add-ons / facility access this freeze paused (the branch's rule, recorded on the
+     * member at freeze time — FreezeAddonPolicy) get the frozen days added to their end date,
+     * if they were still running when the freeze began. The rest kept running and are left alone,
+     * as are cancelled / rejected / refunded ones.
+     */
+    private void extendAddonsForFreeze(Member member, LocalDateTime frozenSince, long days, FreezeAddonPolicy.Rule rule) {
+        if (memberAddonRepository == null || days <= 0 || member == null || member.getId() == null) return;
+        if (!rule.pausesAddons() && !rule.pausesFacilities()) return;
+        for (com.company.project.entities.MemberAddon a : memberAddonRepository.findByMemberDbIdOrderByPurchaseDateAsc(member.getId())) {
+            if (a.getExpiryDate() == null || !rule.pauses(a)) continue;
+            if (!FreezeAddonPolicy.isRunning(a, frozenSince)) continue;   // already over before the freeze
+            a.setExpiryDate(a.getExpiryDate().plusDays(days));
+            memberAddonRepository.save(a);
+        }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRegistrationAddonService(RegistrationAddonService registrationAddonService) {
+        this.registrationAddonService = registrationAddonService;
+    }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setSuspensionHistory(com.company.project.repositories.MembershipFreezeRepository membershipFreezeRepository,
@@ -1229,7 +1294,7 @@ public class MemberService {
     public MemberResponseDTO renewMember(Long id, RenewalRequestDTO request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
-        MemberSuspension.requireNotSuspended(member, "renewing or upgrading");
+        MemberSuspension.requireUsable(member, "renewing or upgrading");
         requireApproved(member, "Renewal");
         if (member.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member's charges are billed to their family head — "
@@ -1443,7 +1508,7 @@ public class MemberService {
     public MemberResponseDTO renewFamilyMinor(Long minorId, MinorRenewalRequestDTO request) {
         Member minor = memberRepository.findById(minorId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + minorId));
-        MemberSuspension.requireNotSuspended(minor, "renewing");
+        MemberSuspension.requireUsable(minor, "renewing");
         if (!minor.isEffectivelyBilledToHead()) {
             throw new BusinessRuleViolationException("This member is not billed to a family head — use the standard renew endpoint.");
         }
@@ -1528,7 +1593,7 @@ public class MemberService {
     public MemberResponseDTO renewFamily(Long headId, FamilyRenewalRequestDTO request) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
-        MemberSuspension.requireNotSuspended(head, "renewing the family");
+        MemberSuspension.requireUsable(head, "renewing the family");
         if (!Boolean.TRUE.equals(head.getIsFamilyHead())) {
             throw new BusinessRuleViolationException("This member is not a family head.");
         }
@@ -1653,7 +1718,7 @@ public class MemberService {
                                                  List<FamilyMemberDTO> familyMembers) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
-        MemberSuspension.requireNotSuspended(head, "changing to a family plan");
+        MemberSuspension.requireUsable(head, "changing to a family plan");
         if (head.getFamilyHeadId() != null) {
             throw new BusinessRuleViolationException("Your membership is part of another member's family — "
                     + "ask your family head or the gym to change it.");
@@ -1706,7 +1771,7 @@ public class MemberService {
     public MemberResponseDTO addFamilyMember(Long headId, FamilyMemberDTO fm) {
         Member head = memberRepository.findById(headId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + headId));
-        MemberSuspension.requireNotSuspended(head, "adding family members");
+        MemberSuspension.requireUsable(head, "adding family members");
         if (head.getBranchId() != null) {
             branchService.assertBranchActive(head.getBranchId());
         }
@@ -1780,6 +1845,7 @@ public class MemberService {
         member.setFreezeStartDate(freezeStart);
         member.setFreezeEndDate(freezeUntil);
         if (request.getReason() != null) member.setFreezeReason(request.getReason());
+        if (freezeAddonPolicy != null) freezeAddonPolicy.recordOnFreeze(member);
         Member saved = memberRepository.save(member);
         cascadeFreezeStateToBilledToHeadDependents(saved, "frozen", freezeStart, freezeUntil, request.getReason(), 0);
 
@@ -1843,6 +1909,8 @@ public class MemberService {
                 .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + id));
 
         long daysFrozen = 0;
+        LocalDateTime frozenSince = member.getFreezeStartDate();
+        FreezeAddonPolicy.Rule addonRule = freezeRule(member);
         if ("frozen".equalsIgnoreCase(member.getMembershipStatus()) && member.getFreezeStartDate() != null) {
             daysFrozen = java.time.temporal.ChronoUnit.DAYS.between(member.getFreezeStartDate(), frozenUntil);
             if (daysFrozen > 0) {
@@ -1862,7 +1930,10 @@ public class MemberService {
         member.setFreezeStartDate(null);
         member.setFreezeEndDate(null);
         member.setFreezeReason(null);
+        FreezeAddonPolicy.clearOnUnfreeze(member);
         Member saved = memberRepository.save(member);
+        // Add-ons / facility access the branch pauses with the membership get the days back too.
+        extendAddonsForFreeze(saved, frozenSince, daysFrozen, addonRule);
         cascadeFreezeStateToBilledToHeadDependents(saved, "active", null, null, null, daysFrozen);
 
         // eventKey includes "now" so a member unfrozen more than once over their membership
@@ -1912,8 +1983,10 @@ public class MemberService {
                 dep.setFreezeStartDate(freezeStart);
                 dep.setFreezeEndDate(freezeUntil);
                 if (reason != null) dep.setFreezeReason(reason);
+                if (freezeAddonPolicy != null) freezeAddonPolicy.recordOnFreeze(dep);
             } else {
                 if (daysFrozen > 0) {
+                    extendAddonsForFreeze(dep, dep.getFreezeStartDate(), daysFrozen, freezeRule(dep));
                     if (dep.getExpiryDate() != null) {
                         dep.setExpiryDate(dep.getExpiryDate().plusDays(daysFrozen));
                     }
@@ -1927,6 +2000,7 @@ public class MemberService {
                 dep.setFreezeStartDate(null);
                 dep.setFreezeEndDate(null);
                 dep.setFreezeReason(null);
+                FreezeAddonPolicy.clearOnUnfreeze(dep);
             }
             memberRepository.save(dep);
         }

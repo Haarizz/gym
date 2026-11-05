@@ -5,6 +5,7 @@ import {
   Loader2, RotateCcw, Smartphone, Upload, XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageHead } from '../components/platform/platform-ui';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -225,15 +226,11 @@ export function GymImport() {
 
   return (
     <div className={styles.root}>
-      <header className={styles.head}>
-        <div>
-          <h1 className={styles.title}>Import Gym</h1>
-          <p className={styles.subtitle}>
-            Bring a gym over from the previous GymBios: its members and photos, plans, payments, refunds,
-            add-ons, freezes, day passes and visits. The gym is created with its own owner login.
-          </p>
-        </div>
-      </header>
+      <PageHead
+        icon={Database}
+        title="Import Gym"
+        subtitle="Bring a gym over from the previous GymBios: its members and photos, plans, payments, refunds, add-ons, freezes, day passes and visits. The gym is created with its own owner login."
+      />
 
       <ol className={styles.steps}>
         {['Upload', 'Review', 'Onboard', 'Done'].map((s, i) => (

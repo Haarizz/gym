@@ -167,7 +167,7 @@ public class BookingService {
         if (!isGuest) {
             member = memberRepository.findById(request.getMemberId())
                     .orElseThrow(() -> new RuntimeException("Member not found"));
-            MemberSuspension.requireNotSuspended(member, "booking a session");
+            MemberSuspension.requireUsable(member, "booking a session");
         } else {
             if (!StringUtils.hasText(request.getGuestName())
                     || !StringUtils.hasText(request.getGuestEmail())
@@ -391,8 +391,9 @@ public class BookingService {
         long taken = bookingRepository.countBySessionIdAndStatusNotIn(session.getId(), NO_SEAT_STATUSES);
         for (Booking next : bookingRepository.findBySessionIdAndStatusOrderByIdAsc(session.getId(), STATUS_WAITLISTED)) {
             if (session.getCapacity() != null && taken >= session.getCapacity()) break;
-            // A suspended member keeps their waitlist place but isn't given the seat.
-            if (next.getMember() != null && next.getMember().isMembershipSuspended()) continue;
+            // A suspended or frozen member keeps their waitlist place but isn't given the seat.
+            if (next.getMember() != null
+                    && (next.getMember().isMembershipSuspended() || MemberSuspension.isFrozen(next.getMember()))) continue;
             next.setStatus("confirmed");
             bookingRepository.save(next);
             taken++;
@@ -421,7 +422,7 @@ public class BookingService {
     public BookingResponseDTO approvePayment(Long id, String approvedBy) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new com.company.project.exceptions.EntityNotFoundException("Booking not found"));
-        MemberSuspension.requireNotSuspended(booking.getMember(), "approving a booking payment");
+        MemberSuspension.requireUsable(booking.getMember(), "approving a booking payment");
         bookingPaymentService.approve(booking, approvedBy);
         return toResponse(bookingRepository.save(booking));
     }

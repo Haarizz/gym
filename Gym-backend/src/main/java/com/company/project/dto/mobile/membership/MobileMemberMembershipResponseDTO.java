@@ -354,6 +354,15 @@ public class MobileMemberMembershipResponseDTO {
         private Boolean autoUnfreeze;
         private String unavailableReason;     // PLAN_DOES_NOT_ALLOW | NO_DAYS_LEFT | NO_FREEZES_LEFT
         private String unavailableMessage;
+        // The branch rule (or, while frozen, this freeze's): do add-ons / facility access pause with it?
+        private Boolean pausesAddons;
+        private Boolean pausesFacilities;
+
+        public Boolean getPausesAddons() { return pausesAddons; }
+        public void setPausesAddons(Boolean pausesAddons) { this.pausesAddons = pausesAddons; }
+
+        public Boolean getPausesFacilities() { return pausesFacilities; }
+        public void setPausesFacilities(Boolean pausesFacilities) { this.pausesFacilities = pausesFacilities; }
 
         public Integer getMaxDays() { return maxDays; }
         public void setMaxDays(Integer maxDays) { this.maxDays = maxDays; }

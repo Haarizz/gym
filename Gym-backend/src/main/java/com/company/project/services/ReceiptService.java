@@ -490,9 +490,11 @@ public class ReceiptService {
     // ── Write ───────────────────────────────────────────────────────────────
 
     public ReceiptResponseDTO createReceipt(Receipt receipt) {
-        if (receipt.getMemberDbId() != null) {
+        // The freeze's own charge is raised as the freeze ends (member still frozen, possibly
+        // suspended too, e.g. the automatic unfreeze) — it must never be refused.
+        if (receipt.getMemberDbId() != null && !MembershipFreezeService.FREEZE_CHARGE_TYPE.equals(receipt.getTransactionType())) {
             memberRepository.findById(receipt.getMemberDbId())
-                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, "taking a payment"));
+                    .ifPresent(m -> MemberSuspension.requireUsable(m, "taking a payment"));
         }
         Receipt saved = receiptRepository.save(receipt);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
@@ -529,7 +531,7 @@ public class ReceiptService {
                                         List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                         String bankAccountCode, String bankAccountName,
                                         LocalDateTime dueDate) {
-        MemberSuspension.requireNotSuspended(member, "booking a session");
+        MemberSuspension.requireUsable(member, "booking a session");
         BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
         BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(total) : BigDecimal.ZERO;
 
@@ -583,7 +585,7 @@ public class ReceiptService {
                                       List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                       String bankAccountCode, String bankAccountName,
                                       LocalDateTime dueDate) {
-        MemberSuspension.requireNotSuspended(member, "selling an add-on");
+        MemberSuspension.requireUsable(member, "selling an add-on");
         BigDecimal total = amount != null ? amount : BigDecimal.ZERO;
         BigDecimal paid = paidAmount != null ? paidAmount.max(BigDecimal.ZERO).min(total) : BigDecimal.ZERO;
 
@@ -703,7 +705,7 @@ public class ReceiptService {
     public Receipt approveReceipt(Receipt receipt, String approvedBy) {
         if (receipt.getMemberDbId() != null) {
             memberRepository.findById(receipt.getMemberDbId())
-                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, "approving a payment"));
+                    .ifPresent(m -> MemberSuspension.requireUsable(m, "approving a payment"));
         }
         receipt.setApprovalStatus("APPROVED");
         receipt.setApprovedBy(approvedBy);
@@ -735,6 +737,12 @@ public class ReceiptService {
      * Records the discount already taken off a bill's amount and what it was, so payment
      * history shows a discounted (or free) bill as such. No-op when there was none.
      */
+    /** The add-on / facility-access lines of a combined registration receipt (before it's posted). */
+    public Receipt attachAddonItems(Receipt receipt, List<com.company.project.dto.ReceiptAddonItemDTO> items) {
+        receipt.setAddonItems(items == null || items.isEmpty() ? null : new java.util.ArrayList<>(items));
+        return receiptRepository.save(receipt);
+    }
+
     public Receipt recordDiscount(Receipt receipt, BigDecimal discount, String label) {
         if (receipt == null || discount == null || discount.signum() <= 0) return receipt;
         receipt.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
@@ -792,7 +800,7 @@ public class ReceiptService {
                                           BigDecimal amountOverride,
                                           List<com.company.project.dto.MinorChargeDTO> minorCharges,
                                           Long processedByStaffId) {
-        MemberSuspension.requireNotSuspended(member, "taking a payment");
+        MemberSuspension.requireUsable(member, "taking a payment");
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(member.getId());
@@ -925,8 +933,8 @@ public class ReceiptService {
                                             List<com.company.project.dto.PaymentSplitDTO> paymentBreakdown,
                                             String bankAccountCode, String bankAccountName,
                                             Long processedByStaffId) {
-        MemberSuspension.requireNotSuspended(guardian, "taking a payment");
-        MemberSuspension.requireNotSuspended(minor, "taking a payment");
+        MemberSuspension.requireUsable(guardian, "taking a payment");
+        MemberSuspension.requireUsable(minor, "taking a payment");
         Receipt r = new Receipt();
         r.setTransactionDate(LocalDateTime.now());
         r.setMemberDbId(guardian.getId());
@@ -973,7 +981,7 @@ public class ReceiptService {
     public ReceiptResponseDTO settlePayment(SettlePaymentRequestDTO req) {
         Member member = memberRepository.findById(req.getMemberDbId())
                 .orElseThrow(() -> new EntityNotFoundException("Member not found: " + req.getMemberDbId()));
-        MemberSuspension.requireNotSuspended(member, "taking a payment");
+        MemberSuspension.requireUsable(member, "taking a payment");
 
         BigDecimal totalPaid = BigDecimal.ZERO;
         Long soleBillId = null;

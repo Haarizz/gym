@@ -332,6 +332,8 @@ public class BranchService {
         }
         if (request.getBnplEnabled() != null) branch.setBnplEnabled(request.getBnplEnabled());
         if (request.getWalkInSelfRegistration() != null) branch.setWalkInSelfRegistration(request.getWalkInSelfRegistration());
+        if (request.getFreezePausesAddons() != null) branch.setFreezePausesAddons(request.getFreezePausesAddons());
+        if (request.getFreezePausesFacilities() != null) branch.setFreezePausesFacilities(request.getFreezePausesFacilities());
         if (request.getBnplProvider() != null) branch.setBnplProvider(request.getBnplProvider());
         if (request.getTaxPercentage() != null) branch.setTaxPercentage(request.getTaxPercentage());
         if (request.getTaxInclusive() != null) branch.setTaxInclusive(request.getTaxInclusive());
@@ -368,6 +370,8 @@ public class BranchService {
         }
         dto.setBnplEnabled(branch.isBnplEnabled());
         dto.setWalkInSelfRegistration(branch.isWalkInSelfRegistration());
+        dto.setFreezePausesAddons(branch.isFreezePausesAddons());
+        dto.setFreezePausesFacilities(branch.isFreezePausesFacilities());
         dto.setBnplProvider(branch.getBnplProvider());
         dto.setTaxPercentage(branch.getTaxPercentage());
         dto.setTaxInclusive(branch.isTaxInclusive());

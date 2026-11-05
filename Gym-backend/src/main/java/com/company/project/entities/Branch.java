@@ -78,6 +78,20 @@ public class Branch extends BaseEntity {
     @Column(name = "walk_in_self_registration", columnDefinition = "boolean not null default false")
     private boolean walkInSelfRegistration = false;
 
+    // What a membership freeze does to a member's add-ons and to their facility access:
+    // pause with it (end dates move out by the frozen days on unfreeze) or keep running.
+    @Column(name = "freeze_pauses_addons", columnDefinition = "boolean not null default true")
+    private boolean freezePausesAddons = true;
+
+    @Column(name = "freeze_pauses_facilities", columnDefinition = "boolean not null default true")
+    private boolean freezePausesFacilities = true;
+
+    public boolean isFreezePausesAddons() { return freezePausesAddons; }
+    public void setFreezePausesAddons(boolean freezePausesAddons) { this.freezePausesAddons = freezePausesAddons; }
+
+    public boolean isFreezePausesFacilities() { return freezePausesFacilities; }
+    public void setFreezePausesFacilities(boolean freezePausesFacilities) { this.freezePausesFacilities = freezePausesFacilities; }
+
     // ACTIVE / INACTIVE
     @Column(nullable = false)
     private String status = "ACTIVE";

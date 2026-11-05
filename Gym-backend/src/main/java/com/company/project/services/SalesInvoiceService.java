@@ -293,7 +293,7 @@ public class SalesInvoiceService {
             if (req.getMemberId() == null) throw new BusinessRuleViolationException("Select the member this invoice is for.");
             Member m = memberRepository.findById(req.getMemberId())
                     .orElseThrow(() -> new EntityNotFoundException("Member not found with id: " + req.getMemberId()));
-            MemberSuspension.requireNotSuspended(m, "invoicing them");
+            MemberSuspension.requireUsable(m, "invoicing them");
             invoice.setCustomerType(SalesInvoice.CUSTOMER_MEMBER);
             invoice.setMemberId(m.getId());
             invoice.setCustomerName(firstNonBlank(req.getCustomerName(), m.getName()));
@@ -604,7 +604,7 @@ public class SalesInvoiceService {
     private void requireMemberNotSuspended(SalesInvoice invoice, String action) {
         if (SalesInvoice.CUSTOMER_MEMBER.equalsIgnoreCase(String.valueOf(invoice.getCustomerType())) && invoice.getMemberId() != null) {
             memberRepository.findById(invoice.getMemberId())
-                    .ifPresent(m -> MemberSuspension.requireNotSuspended(m, action));
+                    .ifPresent(m -> MemberSuspension.requireUsable(m, action));
         }
     }
 

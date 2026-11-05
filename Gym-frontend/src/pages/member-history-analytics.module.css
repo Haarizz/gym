@@ -98,6 +98,7 @@
   font-size: 0.6875rem; font-weight: 500; border-radius: 999px; padding: 0.1rem 0.5rem;
   color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
 }
+.addon[data-paused] { color: #1d4ed8; border-color: color-mix(in srgb, #1d4ed8 35%, transparent); background: color-mix(in srgb, #1d4ed8 7%, transparent); }
 .addonNone { font-size: var(--text-xs); color: var(--muted-foreground); }
 
 .term { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }

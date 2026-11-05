@@ -5,19 +5,9 @@
 // backend endpoint (the same one Gym Management's "Add Gym" form uses), pre-filled
 // from the lead's captured info, with Super Admin setting the owner credentials.
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -32,8 +22,6 @@ import {
   ClipboardCheck,
   CheckCircle,
   XCircle,
-  Search,
-  Building2,
   Mail,
   Phone,
   Calendar,
@@ -41,8 +29,12 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  PlatformPage, PageHead, KpiRow, Kpi, Panel, Toolbar, Count, SearchField, DataTable, StateRow, Entity, Chip, p,
+} from '../components/platform/platform-ui';
 import { platformLeadService, type PlatformLeadResponse } from '../utils/supabase/platform-lead-service';
 import { gymApi } from '../utils/supabase/gym-service';
 
@@ -91,8 +83,6 @@ export function PendingApproval() {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectTarget, setRejectTarget] = useState<PlatformLeadResponse | null>(null);
   const [rejecting, setRejecting] = useState(false);
-
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -256,140 +246,75 @@ export function PendingApproval() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <style>{`
-        .platform-table-row:hover {
-          background-color: #f1f5f9;
+    <PlatformPage>
+      <PageHead
+        icon={ClipboardCheck}
+        title="Pending Approval"
+        subtitle="Leads approved for onboarding — finish creating the gym and issue the owner's login."
+      />
+
+      <KpiRow cols={2}>
+        <Kpi icon={Clock} tone="amber" label="Awaiting final approval" value={loading ? '—' : records.length} hint="Ready to become a gym" />
+        <Kpi icon={CheckCircle} tone="green" label="Approved (all time)" value={loading ? '—' : approvedCount} hint="Gyms created from this pipeline" />
+      </KpiRow>
+
+      <Panel
+        title="Ready for onboarding"
+        icon={ClipboardCheck}
+        action={
+          <Toolbar>
+            <Count n={filtered.length} />
+            <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="Search business, contact or email…" label="Search requests" />
+          </Toolbar>
         }
-      `}</style>
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Pending Approval</h1>
-          <p className="text-muted-foreground">Leads approved for onboarding — finish creating the gym and issue owner credentials.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Awaiting Final Approval</CardTitle>
-            <div className="bg-orange-50 p-2 rounded-lg">
-              <Clock className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{records.length}</div>
-            <p className="text-xs text-muted-foreground">Ready to become a gym</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Approved (all time)</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{approvedCount}</div>
-            <p className="text-xs text-muted-foreground">Gyms created from this pipeline</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className={cardShell}>
-        <CardContent className="p-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by business, contact, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className={cardShell}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-primary" />
-            <span>Ready for Onboarding ({filtered.length})</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader className="bg-slate-100">
-              <TableRow>
-                <TableHead>Business</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Branches</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading && filtered.map((r) => (
-                <TableRow key={r.id} className="platform-table-row transition-colors">
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{r.businessName || 'Untitled business'}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{r.country}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{r.planInterest}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <p className="text-sm">{r.contactName || '—'}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Mail className="h-3 w-3" /> {r.contactEmail || '—'}
-                    </p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> {r.contactPhone || '—'}
-                    </p>
-                  </TableCell>
-                  <TableCell>{r.branches || '—'}</TableCell>
-                  <TableCell>
-                    <div className="text-sm flex items-center gap-1 text-muted-foreground">
-                      <Calendar className="h-3 w-3" /> {formatDateTime(r.createdAt)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" onClick={() => openApprove(r)}>
-                        <CheckCircle className="h-4 w-4 mr-1" /> Approve & Create Gym
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReject(r)}>
-                        <XCircle className="h-4 w-4 mr-1" /> Reject
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!loading && filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {records.length === 0
-                      ? 'Nothing pending — approve a lead from Leads or Follow Up to see it here.'
-                      : 'No requests match your search.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      >
+        <DataTable head={<>
+          <th>Business</th>
+          <th>Plan</th>
+          <th>Contact</th>
+          <th className={p.num}>Branches</th>
+          <th>Requested</th>
+          <th className={p.right}>Actions</th>
+        </>}>
+          {loading ? <StateRow cols={6} loading /> : filtered.map((r) => (
+            <tr key={r.id}>
+              <td data-label="">
+                <Entity name={r.businessName || 'Untitled business'} seed={String(r.id)}
+                  sub={r.country ? <><MapPin />{r.country}</> : undefined} />
+              </td>
+              <td data-label="Plan">{r.planInterest ? <Chip>{r.planInterest}</Chip> : <span className={p.muted}>—</span>}</td>
+              <td data-label="Contact">
+                <div className={p.stack}>
+                  <span>{r.contactName || '—'}</span>
+                  <span className={p.entitySub}><Mail />{r.contactEmail || '—'}</span>
+                  <span className={p.entitySub}><Phone />{r.contactPhone || '—'}</span>
+                </div>
+              </td>
+              <td data-label="Branches" className={p.num}>{r.branches || '—'}</td>
+              <td data-label="Requested">
+                <span className={p.entitySub} style={{ marginTop: 0 }}><Calendar />{formatDateTime(r.createdAt)}</span>
+              </td>
+              <td data-label="">
+                <div className={p.rowActions}>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReject(r)}>
+                    <XCircle className="h-4 w-4 mr-1" /> Reject
+                  </Button>
+                  <Button size="sm" onClick={() => openApprove(r)}>
+                    <CheckCircle className="h-4 w-4 mr-1" /> Approve & create gym
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {!loading && filtered.length === 0 && (
+            <StateRow cols={6}>
+              {records.length === 0
+                ? 'Nothing pending — approve a lead from Leads or Follow Up to see it here.'
+                : 'No requests match your search.'}
+            </StateRow>
+          )}
+        </DataTable>
+      </Panel>
 
       {/* Approve & create gym dialog — reuses Gym Management's real create-gym API */}
       <Dialog open={!!approveTarget} onOpenChange={(open) => !open && setApproveTarget(null)}>
@@ -533,7 +458,7 @@ export function PendingApproval() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PlatformPage>
   );
 }
 

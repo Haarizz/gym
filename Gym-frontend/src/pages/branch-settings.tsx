@@ -14,6 +14,7 @@ import {
   CalendarDays,
   CreditCard,
   QrCode,
+  Snowflake,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -60,6 +61,8 @@ interface DiscoveryFormState {
   tax_percentage: string;
   tax_inclusive: boolean;
   walk_in_self_registration: boolean;
+  freeze_pauses_addons: boolean;
+  freeze_pauses_facilities: boolean;
 }
 
 function toFormState(branch: BranchDTO): DiscoveryFormState {
@@ -77,6 +80,8 @@ function toFormState(branch: BranchDTO): DiscoveryFormState {
     tax_percentage: branch.tax_percentage != null ? String(branch.tax_percentage) : "",
     tax_inclusive: branch.tax_inclusive || false,
     walk_in_self_registration: branch.walk_in_self_registration || false,
+    freeze_pauses_addons: branch.freeze_pauses_addons !== false,
+    freeze_pauses_facilities: branch.freeze_pauses_facilities !== false,
   };
 }
 
@@ -183,6 +188,8 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
         tax_percentage: form.tax_percentage ? Number(form.tax_percentage) : undefined,
         tax_inclusive: form.tax_inclusive,
         walk_in_self_registration: form.walk_in_self_registration,
+        freeze_pauses_addons: form.freeze_pauses_addons,
+        freeze_pauses_facilities: form.freeze_pauses_facilities,
       });
       toast.success("Branch settings saved");
       setIsDirty(false);
@@ -611,6 +618,47 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
                 subtitle="Scan to register as a walk-in visitor"
               />
             )}
+          </CardContent>
+        </Card>
+
+        {/* What a membership freeze does to the member's add-ons and facility access. */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Snowflake className="h-5 w-5 text-primary" />
+              <CardTitle>Membership Freeze</CardTitle>
+            </div>
+            <CardDescription>
+              Choose what freezing a membership at this branch does to the member's add-ons and facility access.
+              Paused ones stand still with the membership and get the frozen days added when it is unfrozen;
+              the others keep running and end on their usual date.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            {([
+              ["freeze_pauses_addons", "Pause add-ons with the membership",
+                "Personal training, nutrition and other add-on plans."],
+              ["freeze_pauses_facilities", "Pause facility access with the membership",
+                "Pool, court, sauna and other facility access sold to the member."],
+            ] as const).map(([key, title, hint]) => (
+              <label key={key} htmlFor={key} className="border rounded-lg px-4 py-3 flex items-start gap-3 cursor-pointer transition-colors hover:bg-gray-50">
+                <Checkbox
+                  id={key}
+                  checked={form[key]}
+                  onCheckedChange={(v) => updateForm({ [key]: v === true })}
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-gray-700 block">{title}</span>
+                  <span className="text-muted-foreground">
+                    {hint} {form[key] ? "Paused while frozen." : "Keeps running while frozen."}
+                  </span>
+                </span>
+              </label>
+            ))}
+            <p className="text-xs text-muted-foreground md:col-span-2">
+              A change applies to freezes started after you save — members already frozen keep the rule they were frozen under.
+              A frozen member still can't buy, book or check in until unfrozen.
+            </p>
           </CardContent>
         </Card>
 

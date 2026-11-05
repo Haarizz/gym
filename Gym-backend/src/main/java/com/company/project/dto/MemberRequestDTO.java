@@ -236,6 +236,10 @@ public class MemberRequestDTO {
     public void setRelationshipToHead(String relationshipToHead) { this.relationshipToHead = relationshipToHead; }
 
     public List<FamilyMemberDTO> getFamilyMembers() { return familyMembers; }
+    // Add-ons / facility access sold with the membership at registration (one combined receipt).
+    private List<com.company.project.dto.RegistrationAddonDTO> addons;
+    public List<com.company.project.dto.RegistrationAddonDTO> getAddons() { return addons; }
+    public void setAddons(List<com.company.project.dto.RegistrationAddonDTO> addons) { this.addons = addons; }
     public void setFamilyMembers(List<FamilyMemberDTO> familyMembers) { this.familyMembers = familyMembers; }
 
     public String getAppUsername() { return appUsername; }

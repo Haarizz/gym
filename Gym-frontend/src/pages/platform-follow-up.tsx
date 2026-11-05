@@ -4,8 +4,6 @@
 // directly from here, moving it to Pending Approval.
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -17,14 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -41,10 +31,12 @@ import {
   Phone,
   Mail,
   Users,
-  Building2,
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  PlatformPage, PageHead, KpiRow, Kpi, Panel, Toolbar, Count, SearchField, DataTable, StateRow, Entity, Pill, p, type PillKind,
+} from '../components/platform/platform-ui';
 import {
   platformLeadService,
   type PlatformLeadResponse,
@@ -76,12 +68,12 @@ function deriveStatus(status: string, dueDate: string): DerivedStatus {
   return 'PENDING';
 }
 
-function getStatusColor(status: DerivedStatus) {
+function statusKind(status: DerivedStatus): PillKind {
   switch (status) {
-    case 'PENDING': return 'bg-yellow-100 text-yellow-800';
-    case 'COMPLETED': return 'bg-green-100 text-green-800';
-    case 'OVERDUE': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'PENDING': return 'warn';
+    case 'COMPLETED': return 'good';
+    case 'OVERDUE': return 'bad';
+    default: return 'neutral';
   }
 }
 
@@ -100,6 +92,7 @@ export function PlatformFollowUp() {
   const [leads, setLeads] = useState<PlatformLeadResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(!!prefill?.prefillLeadId);
   const [saving, setSaving] = useState(false);
   const [completingId, setCompletingId] = useState<number | null>(null);
@@ -110,8 +103,6 @@ export function PlatformFollowUp() {
     dueDate: '',
     notes: '',
   });
-
-  const cardShell = "border-primary/10 shadow-md hover:shadow-lg transition-shadow";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -149,9 +140,10 @@ export function PlatformFollowUp() {
   }, [leads]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return followUpRows;
-    return followUpRows.filter(f => f.status === statusFilter);
-  }, [followUpRows, statusFilter]);
+    const q = search.trim().toLowerCase();
+    return followUpRows.filter(f =>
+      (statusFilter === 'all' || f.status === statusFilter) && (!q || f.leadName.toLowerCase().includes(q)));
+  }, [followUpRows, statusFilter, search]);
 
   const kpis = useMemo(() => ({
     overdue: followUpRows.filter(f => f.status === 'OVERDUE').length,
@@ -222,158 +214,93 @@ export function PlatformFollowUp() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <style>{`
-        .platform-table-row:hover {
-          background-color: #f1f5f9;
+    <PlatformPage>
+      <PageHead
+        icon={CalendarClock}
+        title="Follow Up"
+        subtitle="Scheduled touchpoints with prospective gyms — calls, emails and meetings."
+        actions={
+          <Button onClick={() => setAddOpen(true)} disabled={leads.length === 0}>
+            <Plus className="mr-2 h-4 w-4" />
+            Schedule Follow-up
+          </Button>
         }
-      `}</style>
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Follow Up</h1>
-          <p className="text-muted-foreground">Scheduled touchpoints with prospective gyms.</p>
-        </div>
-        <Button onClick={() => setAddOpen(true)} disabled={leads.length === 0}>
-          <Plus className="mr-2 h-4 w-4" />
-          Schedule Follow-up
-        </Button>
-      </div>
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Overdue</CardTitle>
-            <div className="bg-red-50 p-2 rounded-lg">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{kpis.overdue}</div>
-            <p className="text-xs text-muted-foreground">Past their due date</p>
-          </CardContent>
-        </Card>
+      <KpiRow cols={3}>
+        <Kpi icon={AlertCircle} tone="red" label="Overdue" value={loading ? '—' : kpis.overdue} hint="Past their due date"
+          onClick={() => setStatusFilter(statusFilter === 'OVERDUE' ? 'all' : 'OVERDUE')} title="Show only overdue follow-ups" />
+        <Kpi icon={CalendarClock} tone="amber" label="Pending" value={loading ? '—' : kpis.pending} hint="Scheduled, not yet due"
+          onClick={() => setStatusFilter(statusFilter === 'PENDING' ? 'all' : 'PENDING')} title="Show only pending follow-ups" />
+        <Kpi icon={CheckCircle} tone="green" label="Completed" value={loading ? '—' : kpis.completed} hint="Wrapped up"
+          onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? 'all' : 'COMPLETED')} title="Show only completed follow-ups" />
+      </KpiRow>
 
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Pending</CardTitle>
-            <div className="bg-yellow-50 p-2 rounded-lg">
-              <CalendarClock className="h-4 w-4 text-yellow-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{kpis.pending}</div>
-            <p className="text-xs text-muted-foreground">Scheduled, not yet due</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cardShell}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Completed</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{kpis.completed}</div>
-            <p className="text-xs text-muted-foreground">Wrapped up</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className={cardShell}>
-        <CardContent className="p-4">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="OVERDUE">Overdue</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      <Card className={cardShell}>
-        <CardHeader>
-          <CardTitle>Follow-ups ({filtered.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader className="bg-slate-100">
-              <TableRow>
-                <TableHead>Lead</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              )}
-              {!loading && filtered.map((f) => (
-                <TableRow key={f.id} className="platform-table-row transition-colors">
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{f.leadName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 capitalize">
-                      {typeIcon(f.type)}
-                      {f.type.toLowerCase()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-sm ${f.status === 'OVERDUE' ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                      {formatDate(f.dueDate)}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground line-clamp-2">{f.notes || '—'}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(f.status)}>{f.status.toLowerCase()}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {f.status !== 'COMPLETED' && (
-                        <Button size="sm" variant="outline" onClick={() => handleComplete(f)} disabled={completingId === f.id}>
-                          {completingId === f.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                          Mark done
-                        </Button>
-                      )}
-                      <Button size="sm" onClick={() => handleApprove(f.leadId, f.leadName)} disabled={approvingId === f.leadId}>
-                        {approvingId === f.leadId ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                        Approve
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!loading && filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {followUpRows.length === 0
-                      ? 'No follow-ups scheduled yet.'
-                      : 'No follow-ups match this filter.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Panel
+        title="Follow-ups"
+        icon={CalendarClock}
+        action={
+          <Toolbar>
+            <Count n={filtered.length} />
+            <SearchField value={search} onChange={setSearch} placeholder="Search by lead…" label="Search follow-ups" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]" aria-label="Status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="OVERDUE">Overdue</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </Toolbar>
+        }
+      >
+        <DataTable head={<>
+          <th>Lead</th>
+          <th>Type</th>
+          <th>Due</th>
+          <th>Notes</th>
+          <th>Status</th>
+          <th className={p.right}>Actions</th>
+        </>}>
+          {loading ? <StateRow cols={6} loading /> : filtered.map((f) => (
+            <tr key={f.id}>
+              <td data-label=""><Entity name={f.leadName} seed={String(f.leadId)} /></td>
+              <td data-label="Type">
+                <span className={p.chip} style={{ textTransform: 'capitalize' }}>{typeIcon(f.type)}{f.type.toLowerCase()}</span>
+              </td>
+              <td data-label="Due">
+                <span style={f.status === 'OVERDUE' ? { color: '#dc2626', fontWeight: 600 } : undefined} className={f.status === 'OVERDUE' ? undefined : p.muted}>
+                  {formatDate(f.dueDate)}
+                </span>
+              </td>
+              <td data-label="Notes"><span className={`${p.muted} ${p.clamp}`}>{f.notes || '—'}</span></td>
+              <td data-label="Status"><Pill kind={statusKind(f.status)}>{f.status.toLowerCase()}</Pill></td>
+              <td data-label="">
+                <div className={p.rowActions}>
+                  {f.status !== 'COMPLETED' && (
+                    <Button size="sm" variant="outline" onClick={() => handleComplete(f)} disabled={completingId === f.id}>
+                      {completingId === f.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                      Mark done
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => handleApprove(f.leadId, f.leadName)} disabled={approvingId === f.leadId}>
+                    {approvingId === f.leadId ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                    Approve
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {!loading && filtered.length === 0 && (
+            <StateRow cols={6}>
+              {followUpRows.length === 0 ? 'No follow-ups scheduled yet.' : 'No follow-ups match this filter.'}
+            </StateRow>
+          )}
+        </DataTable>
+      </Panel>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
@@ -445,7 +372,7 @@ export function PlatformFollowUp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PlatformPage>
   );
 }
 

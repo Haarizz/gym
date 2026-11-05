@@ -28,7 +28,14 @@ public class BranchResponseDTO {
     private List<String> acceptedPaymentMethods;
     private boolean bnplEnabled;
     private boolean walkInSelfRegistration;
+    private boolean freezePausesAddons = true;
+    private boolean freezePausesFacilities = true;
     private String bnplProvider;
+
+    public boolean isFreezePausesAddons() { return freezePausesAddons; }
+    public void setFreezePausesAddons(boolean freezePausesAddons) { this.freezePausesAddons = freezePausesAddons; }
+    public boolean isFreezePausesFacilities() { return freezePausesFacilities; }
+    public void setFreezePausesFacilities(boolean freezePausesFacilities) { this.freezePausesFacilities = freezePausesFacilities; }
     private BigDecimal taxPercentage;
     private boolean taxInclusive;
     private String termsAndPolicies;

@@ -41,6 +41,9 @@ public class MemberResponseDTO {
     private String freezeStartDate;
     private String freezeEndDate;
     private String freezeReason;
+    // While frozen: whether this freeze pauses the member's add-ons / facility access.
+    private Boolean freezePausesAddons;
+    private Boolean freezePausesFacilities;
     private String createdAt;
     private String updatedAt;
 
@@ -127,6 +130,10 @@ public class MemberResponseDTO {
         dto.freezeStartDate      = m.getFreezeStartDate()      != null ? m.getFreezeStartDate().format(ISO) + "Z"      : null;
         dto.freezeEndDate        = m.getFreezeEndDate()        != null ? m.getFreezeEndDate().format(ISO) + "Z"        : null;
         dto.freezeReason         = m.getFreezeReason();
+        if ("frozen".equalsIgnoreCase(m.getMembershipStatus())) {
+            dto.freezePausesAddons     = !Boolean.FALSE.equals(m.getFreezePausesAddons());
+            dto.freezePausesFacilities = !Boolean.FALSE.equals(m.getFreezePausesFacilities());
+        }
         dto.createdAt            = m.getCreatedAt()            != null ? m.getCreatedAt().format(ISO) + "Z"            : null;
         dto.updatedAt            = m.getUpdatedAt()            != null ? m.getUpdatedAt().format(ISO) + "Z"            : null;
         dto.gender              = m.getGender();
@@ -196,6 +203,8 @@ public class MemberResponseDTO {
     public String getFreezeStartDate() { return freezeStartDate; }
     public String getFreezeEndDate() { return freezeEndDate; }
     public String getFreezeReason() { return freezeReason; }
+    public Boolean getFreezePausesAddons() { return freezePausesAddons; }
+    public Boolean getFreezePausesFacilities() { return freezePausesFacilities; }
     public String getCreatedAt() { return createdAt; }
     public String getUpdatedAt() { return updatedAt; }
     public String getGender() { return gender; }

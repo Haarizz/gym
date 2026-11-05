@@ -31,6 +31,9 @@ export interface FreezeAllowance {
   unavailableMessage: string | null;
   /** Whether the signed-in staff member may go past the plan's limits (ADMIN/MANAGER). */
   canOverrideLimits: boolean;
+  /** The member's branch rule: do add-ons / facility access pause with the freeze. */
+  pausesAddons?: boolean;
+  pausesFacilities?: boolean;
 }
 
 export interface MemberFreezeRepository {
