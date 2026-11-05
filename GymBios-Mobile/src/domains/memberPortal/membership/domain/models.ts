@@ -62,6 +62,9 @@ export interface FreezeInfo {
   charge_per_extra_day: number;
   currency_symbol: string | null;
   auto_unfreeze: boolean;
+  /** Branch rule (or the running freeze's): do add-ons / facility access pause with it. */
+  pauses_addons?: boolean;
+  pauses_facilities?: boolean;
   unavailable_reason: FreezeUnavailableReason | null;
   unavailable_message: string | null;
 }
@@ -141,6 +144,8 @@ export interface ActiveAddOn {
   category: string;
   expiryDate: string;
   status: string;
+  /** Standing still while the membership is frozen (the branch pauses this kind); resumes with the days added. */
+  paused?: boolean;
 }
 
 /** Backend status of an add-on bought with Cash/Credit/Mixed until reception approves it. */

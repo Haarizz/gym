@@ -13,6 +13,7 @@ import { AppBottomSheet } from '@/shared/components/AppBottomSheet';
 
 const MAX_2DP = { maximumFractionDigits: 2 };
 import type { FreezeInfo } from '../../domain/models';
+import { freezeRuleKey } from '@/domains/members/presentation/components/extras/extrasApi';
 
 interface FreezeMembershipModalProps {
   visible: boolean;
@@ -152,6 +153,7 @@ export function FreezeMembershipModal({
         <Text style={styles.policyText}>
           {t(freeze.auto_unfreeze ? 'membership.freezeModal.autoUnfreeze' : 'membership.freezeModal.manualUnfreeze')}
         </Text>
+        <Text style={styles.policyText}>{t(freezeRuleKey(freeze.pauses_addons, freeze.pauses_facilities))}</Text>
       </View>
 
       <Text style={styles.sectionLabel}>{t('membership.freezeModal.selectDuration')}</Text>

@@ -524,6 +524,29 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
 // vatRatePercent defaults to the standard UAE rate but should be the actual
 // configured rate (see getVatRate()) so the printed breakdown always matches
 // what FinancialEventService posted to the ledger for this same payment.
+// A registration receipt can also carry the add-ons / facility access sold with the membership
+// (addon_items): the membership line is what's left after them, each add-on its own line.
+// Lines cancelled later are left off — the receipt total already dropped by them.
+function receiptItems(receipt: Receipt, totalAmt: number): ReceiptPrintItem[] {
+  const extras = ((receipt as any).addon_items ?? []).filter((i: any) => !i.cancelled);
+  const extrasTotal = extras.reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
+  const items: ReceiptPrintItem[] = [{
+    description: receipt.plan_name ?? receipt.transaction_type,
+    subtitle: `Transaction Type: ${receipt.transaction_type}`,
+    type: receipt.transaction_type,
+    amount: Math.round((totalAmt - extrasTotal) * 100) / 100,
+  }];
+  for (const i of extras) {
+    items.push({
+      description: i.name,
+      subtitle: i.valid_from ? `Valid ${i.valid_from} → ${i.valid_till ?? '-'}` : (i.category || 'Add-on'),
+      type: i.category === 'Facility' ? 'Facility Access' : 'Add-on',
+      amount: Number(i.amount || 0),
+    });
+  }
+  return items;
+}
+
 function toPrintData(receipt: Receipt, currencyCode: string, vatRatePercent: number): ReceiptPrintData {
   const totalAmt   = Number(receipt.amount);
   const paidAmt    = Number(receipt.paid_amount ?? totalAmt);
@@ -550,12 +573,7 @@ function toPrintData(receipt: Receipt, currencyCode: string, vatRatePercent: num
       memberId: receipt.member_id,
       phone: receipt.member_phone,
     },
-    items: [{
-      description: receipt.plan_name ?? receipt.transaction_type,
-      subtitle: `Transaction Type: ${receipt.transaction_type}`,
-      type: receipt.transaction_type,
-      amount: totalAmt,
-    }],
+    items: receiptItems(receipt, totalAmt),
     currencyCode,
     subtotalExclVat,
     vatRatePercent,

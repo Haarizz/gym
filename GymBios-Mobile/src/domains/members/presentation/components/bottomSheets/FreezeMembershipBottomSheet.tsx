@@ -14,6 +14,7 @@ import { Typography } from '@/shared/components/Typography';
 import type { Member } from '../../../domain/Member';
 import type { FreezeAllowance, FreezeRequest } from '../../../application/freeze/MemberFreezeRepository';
 import { formatMemberDate, startOfToday, toIsoDate } from '../../utils/memberDisplay';
+import { freezeRuleKey } from '../extras/extrasApi';
 
 interface FreezeMembershipBottomSheetProps {
   visible: boolean;
@@ -259,7 +260,8 @@ export function FreezeMembershipBottomSheet({
               <Typography variant="bodySmall" color="textSecondary">
                 {allowance.autoUnfreeze
                   ? t('members.freezeSheet.autoUnfreezeNote')
-                  : t('members.freezeSheet.manualUnfreezeNote')}
+                  : t('members.freezeSheet.manualUnfreezeNote')}{' '}
+                {t(freezeRuleKey(allowance.pausesAddons, allowance.pausesFacilities))}
               </Typography>
             ) : null}
 

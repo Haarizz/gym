@@ -326,7 +326,9 @@ class MembershipFreezeServiceTest {
     }
 
     @Test
-    void renewingWhileFrozenEndsTheFreezeBeforeRenewing() {
+    void renewingWhileFrozenIsRefusedAndLeavesTheFreeze() {
+        // A frozen membership is locked until it's unfrozen (MemberSuspension.requireUsable):
+        // renewing no longer ends the freeze on its own — staff unfreeze first.
         member.setMembershipStatus("frozen");
         MembershipFreeze open = new MembershipFreeze();
         open.setFreezeStart(LocalDateTime.now().minusDays(3));
@@ -334,12 +336,25 @@ class MembershipFreezeServiceTest {
                 .thenReturn(Optional.of(open));
         RenewalRequestDTO request = new RenewalRequestDTO();
 
+        BusinessRuleViolationException e = assertThrows(BusinessRuleViolationException.class,
+                () -> service.renewEndingFreeze(7L, request));
+
+        assertTrue(e.getMessage().contains("frozen"), e.getMessage());
+        verify(memberService, never()).unfreezeMember(anyLong(), any(LocalDateTime.class));
+        verify(memberService, never()).renewMember(anyLong(), any());
+        assertNull(open.getEndedAt());
+    }
+
+    @Test
+    void renewingAfterUnfreezingStillWorks() {
+        member.setMembershipStatus("active");
+        when(freezeRepository.findFirstByMemberDbIdAndEndedAtIsNullOrderByFreezeStartDesc(7L))
+                .thenReturn(Optional.empty());
+        RenewalRequestDTO request = new RenewalRequestDTO();
+
         service.renewEndingFreeze(7L, request);
 
-        var order = inOrder(memberService);
-        order.verify(memberService).unfreezeMember(eq(7L), any(LocalDateTime.class));
-        order.verify(memberService).renewMember(7L, request);
-        assertNotNull(open.getEndedAt());
+        verify(memberService).renewMember(7L, request);
     }
 
     @Test

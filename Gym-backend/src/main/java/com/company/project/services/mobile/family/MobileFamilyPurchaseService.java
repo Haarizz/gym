@@ -189,7 +189,7 @@ public class MobileFamilyPurchaseService {
         }
         Member head = memberRepository.findById(headDbId).orElseThrow();
         // Before anyone is invited or billed (convertToFamilyHead would refuse too).
-        com.company.project.services.MemberSuspension.requireNotSuspended(head, "changing to a family plan");
+        com.company.project.services.MemberSuspension.requireUsable(head, "changing to a family plan");
         validateConnectedEmails(connected, MobileFamilyInvitationService.normalizeEmail(head.getEmail()));
 
         FamilyBill bill = billFamily(request, plan, connected);

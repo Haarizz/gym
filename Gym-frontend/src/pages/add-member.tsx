@@ -20,6 +20,7 @@ import { Slider } from "../components/ui/slider";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { MemberAppAccountCard, AccountEmailNote } from "../components/members/MemberAppAccountCard";
+import { RegistrationExtras, extrasTotal, extrasRequest, type RegistrationExtra } from "../components/members/RegistrationExtras";
 import { toast } from "sonner";
 import { usePaymentManager } from '../payments/usePaymentManager';
 import { PaymentAllocationPanel } from '../payments/PaymentAllocationPanel';
@@ -185,6 +186,8 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
   const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
   const { isAllBranches } = useBranch();
   const isEditMode = Boolean(routeMemberId);
+  // Add-ons / facility access sold with a new membership (registration only).
+  const [extras, setExtras] = useState<RegistrationExtra[]>([]);
 
   // A lead converted on the Leads page hands its contact info off here via router state
   // instead of the member being fabricated with no plan/payment info.
@@ -1172,7 +1175,12 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     return Math.round(Math.max(0, basePrice - discountAmount) * 100) / 100;
   };
 
-  const paymentManager = usePaymentManager({ invoiceTotal: getFinalPrice() });
+  // What this registration's payment collects: the membership plus any add-ons / facility
+  // access sold with it (one combined receipt). The membership fee itself stays getFinalPrice().
+  const getInvoiceTotal = () =>
+    Math.round((getFinalPrice() + (isEditMode ? 0 : extrasTotal(extras))) * 100) / 100;
+
+  const paymentManager = usePaymentManager({ invoiceTotal: getInvoiceTotal() });
 
   // Handle discount selection and calculation
   const handleDiscountChange = (discountId: string) => {
@@ -1423,7 +1431,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
     const membershipDetails = getMembershipDetails();
     const finalPrice = getFinalPrice();
     const hasPayment = paymentManager.paymentLines.length > 0;
-    const payload = buildPaymentPayload(paymentManager.paymentLines, finalPrice);
+    const payload = buildPaymentPayload(paymentManager.paymentLines, getInvoiceTotal());
     const outstandingBalance = payload.creditBalance;
     // In edit mode with no new payment entered (e.g. only updating profile/access
     // credentials), leave outstanding balance and payment status untouched rather
@@ -1616,7 +1624,11 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
       if (isEditMode && internalId) {
         await membersService.updateMember(internalId, updatePayload);
       } else {
-        createdMember = await membersService.createMember({ ...memberPayload, total_visits: 0 } as any);
+        createdMember = await membersService.createMember({
+          ...memberPayload,
+          total_visits: 0,
+          ...(extras.length > 0 ? { addons: extrasRequest(extras) } : {}),
+        } as any);
       }
 
       // Record promotion redemption (increment usage count and track revenue)
@@ -2537,6 +2549,28 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               </CardContent>
             </Card>
 
+            {/* Add-ons & Facilities — sold with the membership, on its receipt */}
+            {!isEditMode && (
+              <Card className="border-primary/10 shadow-sm">
+                <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center justify-center w-8 h-8 bg-cyan-600 rounded-lg shrink-0">
+                      <FaPlus size={14} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <CardTitle className="text-base">Add-ons &amp; Facilities (Optional)</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Add personal training, lockers, pool or other facility access — charged with the membership on the same receipt.
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-4 sm:px-6 pb-5">
+                  <RegistrationExtras value={extras} onChange={setExtras} />
+                </CardContent>
+              </Card>
+            )}
+
             {/* Health Information Section */}
             <Card className="border-primary/10 shadow-sm">
               <CardHeader className="pb-3">
@@ -3219,6 +3253,28 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
                     </div>
                   </div>
                 )}
+
+                {/* Add-ons & facility access sold with the membership — same receipt, one payment */}
+                {!isEditMode && extras.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200 text-sm">
+                    <div className="flex items-center justify-between text-blue-800">
+                      <span>Membership</span>
+                      <span className="font-semibold">{currencyPrefix}{getFinalPrice().toFixed(2)}</span>
+                    </div>
+                    {extras.map(e => (
+                      <div key={e.key} className="flex items-center justify-between text-blue-800 mt-1">
+                        <span>+ {e.name}</span>
+                        <span className="font-semibold">{currencyPrefix}{e.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200">
+                      <span className="font-semibold text-blue-900">Total to pay:</span>
+                      <span className="text-2xl font-bold text-blue-900">
+                        <span className="text-sm">{currencySymbol}</span> {getInvoiceTotal().toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </DialogHeader>
@@ -3449,7 +3505,7 @@ export function AddMember({ onNavigate }: AddMemberProps = {}) {
               <h3 className="font-semibold text-lg">Payment</h3>
               <PaymentAllocationPanel
                 manager={paymentManager}
-                invoiceTotal={getFinalPrice()}
+                invoiceTotal={getInvoiceTotal()}
                 bankAccounts={bankAccounts}
                 customers={[{
                   code: isEditMode ? (formData.memberId || 'this-member') : 'this-member',

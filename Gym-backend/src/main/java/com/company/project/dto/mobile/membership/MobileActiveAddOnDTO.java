@@ -23,4 +23,9 @@ public class MobileActiveAddOnDTO {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    // Frozen membership and this branch pauses this kind of add-on: its end date moves out on unfreeze.
+    private boolean paused;
+    public boolean isPaused() { return paused; }
+    public void setPaused(boolean paused) { this.paused = paused; }
 }

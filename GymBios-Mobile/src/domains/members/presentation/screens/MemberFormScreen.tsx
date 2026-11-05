@@ -19,6 +19,7 @@ import { BrandColors, MaxContentWidth, Radius, Spacing } from '@/core/theme';
 import { Button } from '@/shared/components/Button';
 import { Typography } from '@/shared/components/Typography';
 import { PaymentBottomSheet, type PaymentResult } from '@/shared/payment';
+import { extrasTotal } from '../components/extras/extrasApi';
 import type { Member } from '../../domain/Member';
 import { useMemberWizard, type MemberPrefill } from '../../hooks/useMemberWizard';
 
@@ -381,7 +382,8 @@ export function MemberFormScreen({
 
       <PaymentBottomSheet
         visible={showPaymentSheet}
-        amount={parseFloat(data.membershipFee || '0')}
+        // Membership plus any add-ons / facility access sold with it — one receipt, one payment.
+        amount={Math.round(((parseFloat(data.membershipFee || '0') || 0) + extrasTotal(data.extras)) * 100) / 100}
         title={data.membershipType ? translateValue('membershipType', data.membershipType) : t('members.registrationTitle')}
         subtitle={data.name ? `Member: ${data.name}` : undefined}
         payer="staff"

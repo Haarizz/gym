@@ -83,7 +83,19 @@ public class MemberAddon extends BaseEntity {
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
 
+    // What it was sold from (V119): an add-on plan, or a facility (facility access).
+    @Column(name = "addon_plan_id")
+    private Long addonPlanId;
+
+    @Column(name = "facility_id")
+    private Long facilityId;
+
     public MemberAddon() {}
+
+    public Long getAddonPlanId() { return addonPlanId; }
+    public void setAddonPlanId(Long addonPlanId) { this.addonPlanId = addonPlanId; }
+    public Long getFacilityId() { return facilityId; }
+    public void setFacilityId(Long facilityId) { this.facilityId = facilityId; }
 
     // ── Getters & Setters ────────────────────────────────────────────────────
 

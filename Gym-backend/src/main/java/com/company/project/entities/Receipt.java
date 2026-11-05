@@ -121,6 +121,12 @@ public class Receipt extends BaseEntity implements BranchAware {
     @Convert(converter = MinorChargeBreakdownConverter.class)
     private List<MinorChargeDTO> minorCharges;
 
+    // Add-ons / facility access sold on this (membership) receipt at registration — the
+    // ledger splits their share into add-on revenue. Empty for every other receipt.
+    @Column(name = "addon_items", columnDefinition = "TEXT")
+    @Convert(converter = com.company.project.converters.ReceiptAddonItemsConverter.class)
+    private List<com.company.project.dto.ReceiptAddonItemDTO> addonItems;
+
     // Cumulative amount paid toward THIS bill across its whole lifecycle (this
     // receipt's own paidAmount plus every later settlement applied against it).
     // A live rollup — unlike paidAmount/paymentMethod/paymentBreakdown (which stay
@@ -249,6 +255,8 @@ public class Receipt extends BaseEntity implements BranchAware {
 
     public List<MinorChargeDTO> getMinorCharges() { return minorCharges; }
     public void setMinorCharges(List<MinorChargeDTO> minorCharges) { this.minorCharges = minorCharges; }
+    public List<com.company.project.dto.ReceiptAddonItemDTO> getAddonItems() { return addonItems; }
+    public void setAddonItems(List<com.company.project.dto.ReceiptAddonItemDTO> addonItems) { this.addonItems = addonItems; }
 
     public BigDecimal getTotalPaidToDate() { return totalPaidToDate; }
     public void setTotalPaidToDate(BigDecimal totalPaidToDate) { this.totalPaidToDate = totalPaidToDate; }

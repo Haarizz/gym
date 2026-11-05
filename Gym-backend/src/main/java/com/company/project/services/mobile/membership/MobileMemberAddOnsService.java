@@ -15,6 +15,7 @@ import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.MemberRepository;
 import com.company.project.security.UserDetailsImpl;
 import com.company.project.services.AddonPaymentService;
+import com.company.project.services.FreezeAddonPolicy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -86,7 +87,12 @@ public class MobileMemberAddOnsService {
             List<MemberAddon> activeAddons = memberAddonRepository.findAll(activeSpec);
 
             activeDtos = activeAddons.stream()
-                    .map(MobileMemberAddOnsService::toActiveDTO)
+                    .map(ma -> {
+                        MobileActiveAddOnDTO dto = toActiveDTO(ma);
+                        // Standing still while the membership is frozen (when the branch pauses this kind).
+                        dto.setPaused(FreezeAddonPolicy.isPaused(member, ma));
+                        return dto;
+                    })
                     .collect(Collectors.toList());
         }
 

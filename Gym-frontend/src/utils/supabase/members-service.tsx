@@ -37,6 +37,9 @@ export interface Member {
   freeze_start_date?: string;
   freeze_end_date?: string;
   freeze_reason?: string;
+  /** While frozen: does this freeze pause the member's add-ons / facility access (branch rule at freeze time). */
+  freeze_pauses_addons?: boolean;
+  freeze_pauses_facilities?: boolean;
   outstanding_balance?: number;
   /** Unpaid balance on confirmed Sales Invoices (products sold on account) — separate from outstanding_balance. */
   sales_invoice_due?: number;
@@ -633,6 +636,9 @@ export interface FreezeAllowance {
   unavailableMessage: string | null;
   /** Whether the signed-in staff member may go past the plan's limits (ADMIN/MANAGER). */
   canOverrideLimits?: boolean;
+  /** The member's branch rule: do add-ons / facility access pause with the freeze (Branch Settings). */
+  pausesAddons?: boolean;
+  pausesFacilities?: boolean;
 }
 
 export interface FreezeHistoryEntry {

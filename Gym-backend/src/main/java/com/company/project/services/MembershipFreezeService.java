@@ -172,7 +172,24 @@ public class MembershipFreezeService {
         m.put("canFreeze", a.canFreeze());
         m.put("unavailableMessage", a.unavailableReason() == null ? null : unavailableMessage(a.unavailableReason(), a));
         m.put("canOverrideLimits", actor != null && actor.canOverrideLimits());
+        FreezeAddonPolicy.Rule rule = addonRule(member);
+        m.put("pausesAddons", rule.pausesAddons());
+        m.put("pausesFacilities", rule.pausesFacilities());
         return m;
+    }
+
+    private FreezeAddonPolicy freezeAddonPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFreezeAddonPolicy(FreezeAddonPolicy freezeAddonPolicy) {
+        this.freezeAddonPolicy = freezeAddonPolicy;
+    }
+
+    /** While frozen, the rule this freeze runs under; otherwise what a freeze would do now at the member's branch. */
+    public FreezeAddonPolicy.Rule addonRule(Member member) {
+        if (freezeAddonPolicy == null) return FreezeAddonPolicy.Rule.PAUSE_ALL;
+        return MemberSuspension.isFrozen(member) ? freezeAddonPolicy.forMember(member)
+                : freezeAddonPolicy.forBranch(member.getBranchId());
     }
 
     /** Every freeze recorded for a member, newest first (web Freeze History). */
@@ -333,14 +350,14 @@ public class MembershipFreezeService {
     /** MemberService.renewMember, ending any freeze first (see endFreezeForRenewal). */
     public MemberResponseDTO renewEndingFreeze(Long memberId, RenewalRequestDTO request) {
         // Before endFreezeForRenewal touches the freeze — renewMember would refuse anyway.
-        memberRepository.findById(memberId).ifPresent(m -> MemberSuspension.requireNotSuspended(m, "renewing or upgrading"));
+        memberRepository.findById(memberId).ifPresent(m -> MemberSuspension.requireUsable(m, "renewing or upgrading"));
         endFreezeForRenewal(memberId);
         return memberService.renewMember(memberId, request);
     }
 
     /** MemberService.renewFamily, ending the head's freeze first (see endFreezeForRenewal). */
     public MemberResponseDTO renewFamilyEndingFreeze(Long headId, FamilyRenewalRequestDTO request) {
-        memberRepository.findById(headId).ifPresent(m -> MemberSuspension.requireNotSuspended(m, "renewing the family"));
+        memberRepository.findById(headId).ifPresent(m -> MemberSuspension.requireUsable(m, "renewing the family"));
         endFreezeForRenewal(headId);
         return memberService.renewFamily(headId, request);
     }
