@@ -63,7 +63,9 @@ import {
   type RevenueSummary
 } from "../../utils/supabase/dashboard-service";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
-import { RevenueComparisonTab, RevenueInsightTiles, RevenueReportsTab, formatRange } from "./RevenueReports";
+import { RevenueInsightTiles, RevenueReportsTab, formatRange } from "./RevenueReports";
+import { ComparisonHub } from "./RevenueOperations";
+import { ReportActions, type ReportDocument, type ReportSection, chartFromRows, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../report-export";
 import reportStyles from "./RevenueReports.module.css";
 
 type FilterType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
@@ -548,6 +550,78 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
   const showExpenseLine = data?.granularity !== 'hourly' && toNumber(data?.expenses?.total) > 0;
   const expenseRows = data?.expenses?.breakdown ?? [];
 
+  // Export / print: the active revenue tab, from the same summary the tab renders.
+  const STREAM_TABS: Record<string, { stream: RevenueStreamKey; title: string; breakdown: string }> = {
+    membership: { stream: 'membership', title: 'Membership Revenue', breakdown: 'Transaction breakdown' },
+    'personal-training': { stream: 'services', title: 'PT & Services Revenue', breakdown: 'Service breakdown' },
+    merchandise: { stream: 'merchandise', title: 'Merchandise Revenue', breakdown: 'Category breakdown' },
+    cafe: { stream: 'cafe', title: 'Cafe & F&B Revenue', breakdown: 'Category breakdown' },
+    equipment: { stream: 'equipment', title: 'Equipment Revenue', breakdown: 'Category breakdown' },
+  };
+  const tabHasOwnExport = activeTab === 'comparison' || activeTab === 'reports' || activeTab === 'facilities';
+  const buildRevenueReport = (): ReportDocument => {
+    if (!data) throw new Error('Revenue data is still loading');
+    const n = toNumber;
+    const base = {
+      period: { from: data.from, to: data.to, label: rangeLabel },
+      filters: [{ label: 'Compared with', value: `${data.comparison?.label ?? 'Previous period'} (${formatRange(data.previousFrom, data.previousTo)})` }],
+    };
+    const trendHint = (t: number | undefined) => (t == null ? {} : { hint: `${t > 0 ? '+' : ''}${Math.round(t * 10) / 10}% ${compareText}`, tone: (t > 0 ? 'good' : t < 0 ? 'bad' : 'neutral') as 'good' | 'bad' | 'neutral' });
+    const headline = kpiSection([
+      { label: 'Total collection', value: n(total?.total), format: 'money', ...trendHint(total ? n(total.trend) : undefined) },
+      { label: 'Total expenses', value: n(data.expenses?.total), format: 'money', ...trendHint(n(data.expenses.trend)), tone: n(data.expenses.trend) > 0 ? 'bad' : 'good' },
+      { label: 'Net revenue', value: n(data.netRevenue?.total), format: 'money', ...trendHint(n(data.netRevenue.trend)) },
+      { label: 'Active members', value: n(data.activeMembers?.count), format: 'integer', hint: `${n(data.activeMembers.newInPeriod)} joined in this period` },
+    ], 'Headline');
+    const breakdownTable = (title: string, rows: { name: string; count: number; amount: number }[], countLabel = 'Transactions') =>
+      tableSection(title, [col('name', 'Name'), countCol('count', countLabel), moneyCol('amount', 'Amount')], rows.map(r => ({ name: r.name, count: n(r.count), amount: n(r.amount) })), { totals: true });
+    const stream = STREAM_TABS[activeTab];
+    if (stream) {
+      const s = data.streams?.[stream.stream];
+      const sections: ReportSection[] = [headline];
+      if (s && n(s.total) > 0) {
+        sections.push(
+          kpiSection([
+            { label: stream.title, value: n(s.total), format: 'money' },
+            { label: 'Cash', value: n(s.cash), format: 'money' },
+            { label: 'Card', value: n(s.card), format: 'money' },
+            { label: 'Online / other', value: n(s.other), format: 'money' },
+            { label: 'Transactions', value: n(s.count), format: 'integer' },
+          ], stream.title),
+          chartFromRows(stream.title + ' by type', 'hbar', s.breakdown, 'name', [{ key: 'amount', name: 'Amount', color: '#2a78d6' }], { valueFormat: 'money' }),
+          breakdownTable(stream.breakdown, s.breakdown),
+        );
+      }
+      return { ...base, title: stream.title, sections };
+    }
+    if (activeTab === 'expenses') {
+      return {
+        ...base, title: 'Expenses Report', fileName: 'Revenue Expenses',
+        sections: [
+          headline,
+          chartFromRows('Expense categories', 'hbar', expenseRows, 'name', [{ key: 'amount', name: 'Amount', color: '#eb6834' }], { valueFormat: 'money' }),
+          breakdownTable('Expense categories (approved and paid)', expenseRows, 'Items'),
+        ],
+      };
+    }
+    return {
+      ...base, title: 'Revenue Report · Total Collection', fileName: 'Revenue Report',
+      sections: [
+        headline,
+        pieSection('Payment method split', cashVsCardData.map(d => ({ label: d.name, value: d.value })), { valueFormat: 'money' }),
+        chartFromRows(TREND_TITLES[data.granularity ?? 'daily'], 'line', trendData, 'label', [
+          { key: 'revenue', name: 'Revenue', color: '#2a78d6' },
+          ...(showComparisonLine ? [{ key: (p: typeof trendData[number]) => p.previous ?? 0, name: comparisonName, color: '#8a8780' }] : []),
+          ...(showExpenseLine ? [{ key: (p: typeof trendData[number]) => p.expenses ?? 0, name: 'Expenses', color: '#eb6834' }] : []),
+        ], { valueFormat: 'money' }),
+        tableSection('Revenue trend', [col('label', 'Period'), moneyCol('revenue', 'Revenue'), moneyCol('previous', comparisonName), moneyCol('expenses', 'Expenses')], trendData, { totals: true }),
+        breakdownTable('Payment methods', data.paymentMethods ?? []),
+        tableSection('Revenue by stream', [col('name', 'Stream'), moneyCol('total', 'Total'), moneyCol('cash', 'Cash'), moneyCol('card', 'Card'), moneyCol('other', 'Online / other'), countCol('count', 'Transactions')],
+          Object.values(STREAM_TABS).map(t => { const s = data.streams?.[t.stream]; return { name: t.title.replace(' Revenue', ''), total: n(s?.total), cash: n(s?.cash), card: n(s?.card), other: n(s?.other), count: n(s?.count) }; }), { totals: true }),
+      ],
+    };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Filters */}
@@ -562,6 +636,7 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
           <div className="flex items-center gap-2">
             {isLoading && data && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Badge variant="outline" className="text-sm">{rangeLabel}</Badge>
+            {!tabHasOwnExport && <ReportActions report={buildRevenueReport} disabled={!data || isLoading} menuLabel={`Revenue · ${rangeLabel}`} compact />}
           </div>
         </div>
 
@@ -627,7 +702,9 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
           </div>
           {data && (
             <span className={reportStyles.compareRange}>
-              Comparing with {formatRange(data.previousFrom, data.previousTo)}
+              {data.toDate
+                ? `Up to today: ${formatRange(data.from, data.to)} vs ${formatRange(data.previousFrom, data.previousTo)}`
+                : `Comparing with ${formatRange(data.previousFrom, data.previousTo)}`}
             </span>
           )}
         </div>
@@ -808,9 +885,16 @@ export function RevenueDashboard({ refreshKey = 0 }: RevenueDashboardProps) {
 
             {/* Period-vs-period comparison */}
             <TabsContent value="comparison" className="space-y-4">
-              {data?.insights && data?.comparison
-                ? <RevenueComparisonTab data={data} />
-                : <EmptyState title="Comparison" message="Comparison data isn't available from the server yet." />}
+              {/* Revenue plus freezes, targets, CRM, POS, attendance, bookings and members */}
+              <ComparisonHub
+                summary={data}
+                from={fromKey}
+                to={toKey}
+                granularity={granularity}
+                compare={compareMode}
+                refreshKey={refreshKey + reloadKey}
+                currencyCode={currencyCode}
+              />
             </TabsContent>
 
             {/* Detailed reports: top plans/products/members, staff, day & hour patterns */}

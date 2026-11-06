@@ -86,6 +86,7 @@ import {
   Building
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, col, tableSection } from "../components/report-export";
 import { format } from "date-fns";
 
 interface Lead {
@@ -509,18 +510,21 @@ export function Leads() {
     }
   }, [navigate]);
 
-  const handleExportCSV = useCallback(() => {
-    const csv = ['First Name,Last Name,Email,Phone,Status,Source,Priority,Assigned Staff,Created', ...filteredLeads.map(l =>
-      `${l.firstName},${l.lastName},${l.email},${l.phone},${l.status},${l.source},${l.priority},${l.assignedStaff || ''},${l.createdDate.toISOString()}`
-    )].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'leads.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Leads exported');
+  // Export / print: the leads list as filtered on screen
+  const buildLeadsReport = useCallback((): ReportDocument => {
+    const counts = new Map<string, number>();
+    filteredLeads.forEach(l => counts.set(String(l.status), (counts.get(String(l.status)) || 0) + 1));
+    return {
+      title: 'Leads Report', orientation: 'landscape',
+      period: { to: new Date(), label: 'Current list' },
+      sections: [
+        { kind: 'kpis', items: [{ label: 'Leads', value: filteredLeads.length, format: 'integer' }, ...[...counts.entries()].map(([s, n]) => ({ label: s, value: n, format: 'integer' as const }))] },
+        tableSection('Leads', [
+          col('first', 'First name'), col('last', 'Last name'), col('email', 'Email'), col('phone', 'Phone'), col('status', 'Status'),
+          col('source', 'Source'), col('priority', 'Priority'), col('staff', 'Assigned staff'), col('created', 'Created', 'date'),
+        ], filteredLeads.map(l => ({ first: l.firstName, last: l.lastName, email: l.email, phone: l.phone, status: l.status, source: l.source, priority: l.priority, staff: l.assignedStaff || '', created: l.createdDate })), { emptyText: 'No leads match the filters.' }),
+      ],
+    };
   }, [filteredLeads]);
 
   return (
@@ -532,10 +536,7 @@ export function Leads() {
           <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <ReportActions report={buildLeadsReport} size="default" menuLabel="Leads" />
           <Button variant="outline" onClick={() => setShowLeadForms(true)}>
             <ExternalLink className="mr-2 h-4 w-4" />
             Lead Forms

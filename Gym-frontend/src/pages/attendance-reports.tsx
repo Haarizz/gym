@@ -66,7 +66,9 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { authService } from "../utils/supabase/auth-service";
 import { attendanceService } from "../utils/supabase/attendance-service";
-import { withPrintFont } from "../utils/print-font";
+import {
+  ReportActions, useReportExporter, type ReportDocument, chartFromRows, col, countCol, kpiSection, pieSection, tableSection,
+} from "../components/report-export";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
@@ -177,250 +179,43 @@ function fmtDuration(mins: number): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-function buildPrintHTML(
-  report: ReportData,
-  trainers: TrainerRow[],
-  startStr: string,
-  endStr: string
-): string {
-  const summary = report.summary;
-  const dateLabel = `${startStr} to ${endStr}`;
-
-  const dailyRows = report.dailySummary
-    .map(
-      (r) =>
-        `<tr>
-          <td>${r.date}</td>
-          <td>${r.visits}</td>
-          <td>${r.avgDuration > 0 ? r.avgDuration + " min" : "—"}</td>
-        </tr>`
-    )
-    .join("");
-
-  const activityRows = report.activityBreakdown
-    .map(
-      (a) =>
-        `<tr><td>${a.type}</td><td>${a.count}</td><td>${a.percentage}%</td></tr>`
-    )
-    .join("");
-
-  const trainerRows = trainers
-    .map(
-      (t) =>
-        `<tr>
-          <td>${t.name}</td>
-          <td>${t.role}</td>
-          <td>${t.sessions}</td>
-          <td>${fmtDuration(t.totalMinutes)}</td>
-          <td>${fmtDuration(t.avgSessionMinutes)}</td>
-        </tr>`
-    )
-    .join("");
-
-  const memberTopRows = report.topConsistentMembers
-    .map(
-      (m) =>
-        `<tr><td>${m.name}</td><td>${m.visits}</td><td>${m.attendanceRate}%</td></tr>`
-    )
-    .join("");
-
-  const memberIrregRows = report.irregularMembers
-    .map(
-      (m) =>
-        `<tr><td>${m.name}</td><td>${m.visits}</td><td>${m.attendanceRate}%</td></tr>`
-    )
-    .join("");
-
-  const insightItems = report.insights
-    .map(
-      (i) =>
-        `<div class="insight ${i.type}"><strong>${i.title}</strong><p>${i.message}</p></div>`
-    )
-    .join("");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>Attendance Report – ${dateLabel}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Plus Jakarta Sans Variable','Segoe UI',Arial,sans-serif;color:#1a1a1a;background:#fff;padding:40px;font-size:13px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
-  .brand h1{font-size:26px;font-weight:800;color:#0047AB}
-  .brand p{color:#666;font-size:12px;margin-top:2px}
-  .report-meta{text-align:right;font-size:12px;color:#555;line-height:1.8}
-  .report-meta .title{font-size:18px;font-weight:700;color:#0047AB;margin-bottom:6px}
-  hr{border:none;border-top:2px solid #0047AB;margin:20px 0}
-  hr.thin{border-top:1px solid #e5e7eb;margin:16px 0}
-  h2{font-size:14px;font-weight:700;color:#0047AB;margin:20px 0 10px;text-transform:uppercase;letter-spacing:.5px}
-  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}
-  .kpi{background:#f0f4ff;border-radius:8px;padding:14px;text-align:center}
-  .kpi .val{font-size:22px;font-weight:800;color:#0047AB}
-  .kpi .lbl{font-size:11px;color:#666;margin-top:3px}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  th{background:#f0f4ff;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#0047AB;padding:8px 10px;text-align:left;border-bottom:2px solid #0047AB}
-  td{padding:8px 10px;border-bottom:1px solid #f0f0f0;font-size:12px}
-  tr:hover td{background:#fafbff}
-  .insight{padding:10px 14px;border-radius:6px;margin-bottom:10px;border-left:4px solid #ccc}
-  .insight.success{background:#f0fdf4;border-left-color:#16a34a}
-  .insight.warning{background:#fffbeb;border-left-color:#d97706}
-  .insight.info{background:#eff6ff;border-left-color:#2563eb}
-  .insight strong{font-size:13px;display:block;margin-bottom:4px}
-  .insight p{font-size:12px;color:#555}
-  .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#888;line-height:1.8}
-  @media print{body{padding:20px}.no-print{display:none}}
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="brand">
-      <h1>GymBios</h1>
-      <p>Wellness Services Operating System</p>
-    </div>
-    <div class="report-meta">
-      <div class="title">Attendance Report</div>
-      <div>Period: ${dateLabel}</div>
-      <div>Generated: ${new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-    </div>
-  </div>
-  <hr/>
-
-  <div class="kpi-grid">
-    <div class="kpi"><div class="val">${summary.totalVisits.toLocaleString()}</div><div class="lbl">Total Check-ins</div></div>
-    <div class="kpi"><div class="val">${summary.avgDailyVisits}</div><div class="lbl">Avg Daily Visits</div></div>
-    <div class="kpi"><div class="val">${summary.attendanceRate}%</div><div class="lbl">Attendance Rate</div></div>
-    <div class="kpi"><div class="val">${summary.totalActiveMembers.toLocaleString()}</div><div class="lbl">Active Members</div></div>
-  </div>
-  <p style="font-size:12px;color:#555;margin-bottom:8px">Peak hour: <strong>${summary.peakHour}</strong> &nbsp;|&nbsp; Period: <strong>${summary.daysInRange} days</strong></p>
-  <hr class="thin"/>
-
-  <h2>Daily Summary</h2>
-  <table>
-    <thead><tr><th>Date</th><th>Check-ins</th><th>Avg Duration</th></tr></thead>
-    <tbody>${dailyRows || "<tr><td colspan='3' style='text-align:center;color:#999'>No data</td></tr>"}</tbody>
-  </table>
-
-  ${activityRows ? `
-  <h2>Activity Breakdown</h2>
-  <table>
-    <thead><tr><th>Activity Type</th><th>Count</th><th>Share</th></tr></thead>
-    <tbody>${activityRows}</tbody>
-  </table>` : ""}
-
-  ${trainerRows ? `
-  <h2>Trainer / Staff Attendance</h2>
-  <table>
-    <thead><tr><th>Name</th><th>Role</th><th>Sessions</th><th>Total Hours</th><th>Avg Session</th></tr></thead>
-    <tbody>${trainerRows}</tbody>
-  </table>` : ""}
-
-  ${memberTopRows ? `
-  <h2>Top 5 Most Consistent Members</h2>
-  <table>
-    <thead><tr><th>Member</th><th>Visits</th><th>Attendance Rate</th></tr></thead>
-    <tbody>${memberTopRows}</tbody>
-  </table>` : ""}
-
-  ${memberIrregRows ? `
-  <h2>Top 5 Irregular Members</h2>
-  <table>
-    <thead><tr><th>Member</th><th>Visits</th><th>Attendance Rate</th></tr></thead>
-    <tbody>${memberIrregRows}</tbody>
-  </table>` : ""}
-
-  <h2>Insights &amp; Recommendations</h2>
-  ${insightItems || "<p style='color:#999;font-size:12px'>No insights available</p>"}
-
-  <div class="footer">
-    <strong>GymBios – Wellness Services Operating System</strong><br/>
-    Dubai, United Arab Emirates &nbsp;|&nbsp; support@gymbios.ae &nbsp;|&nbsp; www.gymbios.ae
-  </div>
-
-  <script>window.onload = function(){ (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){ window.print(); }); }</script>
-</body>
-</html>`;
-}
-
-function buildExcelCSV(report: ReportData, trainers: TrainerRow[], startStr: string, endStr: string): string {
-  const sections: string[] = [];
-
-  sections.push(`ATTENDANCE REPORT`);
-  sections.push(`Period,${startStr} to ${endStr}`);
-  sections.push(`Generated,${new Date().toLocaleString()}`);
-  sections.push(``);
-
-  sections.push(`SUMMARY`);
-  sections.push(`Total Check-ins,${report.summary.totalVisits}`);
-  sections.push(`Avg Daily Visits,${report.summary.avgDailyVisits}`);
-  sections.push(`Attendance Rate,${report.summary.attendanceRate}%`);
-  sections.push(`Active Members,${report.summary.totalActiveMembers}`);
-  sections.push(`Peak Hour,"${report.summary.peakHour}"`);
-  sections.push(`Days in Range,${report.summary.daysInRange}`);
-  sections.push(``);
-
-  sections.push(`DAILY SUMMARY`);
-  sections.push(`Date,Check-ins,Avg Duration (min)`);
-  report.dailySummary.forEach((r) =>
-    sections.push(`${r.date},${r.visits},${r.avgDuration}`)
-  );
-  sections.push(``);
-
-  if (report.activityBreakdown.length > 0) {
-    sections.push(`ACTIVITY BREAKDOWN`);
-    sections.push(`Activity Type,Count,Share (%)`);
-    report.activityBreakdown.forEach((a) =>
-      sections.push(`"${a.type}",${a.count},${a.percentage}`)
-    );
-    sections.push(``);
-  }
-
-  if (trainers.length > 0) {
-    sections.push(`TRAINER / STAFF ATTENDANCE`);
-    sections.push(`Name,Role,Department,Sessions,Total Minutes,Avg Session (min)`);
-    trainers.forEach((t) =>
-      sections.push(`"${t.name}","${t.role}","${t.department}",${t.sessions},${t.totalMinutes},${t.avgSessionMinutes}`)
-    );
-    sections.push(``);
-  }
-
-  if (report.topConsistentMembers.length > 0) {
-    sections.push(`TOP 5 CONSISTENT MEMBERS`);
-    sections.push(`Member,Visits,Attendance Rate (%)`);
-    report.topConsistentMembers.forEach((m) =>
-      sections.push(`"${m.name}",${m.visits},${m.attendanceRate}`)
-    );
-    sections.push(``);
-  }
-
-  if (report.irregularMembers.length > 0) {
-    sections.push(`TOP 5 IRREGULAR MEMBERS`);
-    sections.push(`Member,Visits,Attendance Rate (%)`);
-    report.irregularMembers.forEach((m) =>
-      sections.push(`"${m.name}",${m.visits},${m.attendanceRate}`)
-    );
-    sections.push(``);
-  }
-
-  if (report.peakHours.length > 0) {
-    sections.push(`PEAK HOURS (visits per hour per day)`);
-    sections.push(`Hour,Mon,Tue,Wed,Thu,Fri,Sat,Sun`);
-    report.peakHours.forEach((h) =>
-      sections.push(`${h.hour},${h.Mon},${h.Tue},${h.Wed},${h.Thu},${h.Fri},${h.Sat},${h.Sun}`)
-    );
-    sections.push(``);
-  }
-
-  if (report.facilityBreakdown.filter((f) => f.count > 0).length > 0) {
-    sections.push(`FACILITY UTILIZATION`);
-    sections.push(`Area,Visits,Share (%)`);
-    report.facilityBreakdown
-      .filter((f) => f.count > 0)
-      .forEach((f) => sections.push(`"${f.name}",${f.count},${f.value}`));
-    sections.push(``);
-  }
-
-  return sections.join("\n");
+/** The full attendance report (every tab) for export / print. */
+function buildAttendanceReport(report: ReportData, trainers: TrainerRow[], startStr: string, endStr: string, trainerFilter: string): ReportDocument {
+  const s = report.summary;
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+  return {
+    title: "Attendance Report",
+    period: { from: startStr, to: endStr },
+    filters: [{ label: "Trainer", value: trainerFilter }],
+    sections: [
+      kpiSection([
+        { label: "Total visits", value: s.totalVisits, format: "integer" },
+        { label: "Avg daily visits", value: s.avgDailyVisits, format: "number" },
+        { label: "Attendance rate", value: s.attendanceRate, format: "percent" },
+        { label: "Peak hour", value: s.peakHour || "—" },
+        { label: "Active members", value: s.totalActiveMembers, format: "integer" },
+        { label: "Days in range", value: s.daysInRange, format: "integer" },
+      ], "Summary"),
+      chartFromRows("Daily visits", "bar", report.dailySummary, "date", [{ key: "visits", name: "Visits", color: "#2a78d6" }], { valueFormat: "integer" }),
+      tableSection("Daily summary", [col("fullDate", "Date", "date"), countCol("visits", "Visits"), col("avgDuration", "Avg duration", "duration", { total: "avg" })],
+        report.dailySummary.map((r) => ({ fullDate: r.fullDate || r.date, visits: r.visits, avgDuration: r.avgDuration > 0 ? r.avgDuration : null })), { totals: true }),
+      ...(report.monthlyTrend.length ? [
+        chartFromRows("Monthly trend", "line", report.monthlyTrend, "month", [{ key: "visits", name: "Visits", color: "#2a78d6" }], { valueFormat: "integer" }),
+      ] : []),
+      pieSection("Activity breakdown", report.activityBreakdown.map((a) => ({ label: a.type, value: a.count })), { valueFormat: "integer" }),
+      tableSection("Activity breakdown", [col("type", "Activity"), countCol("count", "Visits"), col("percentage", "Share", "percent", { total: "sum" })], report.activityBreakdown, { totals: true }),
+      tableSection("Peak hours by weekday", [col("label", "Hour"), ...days.map((d) => countCol(d, d))],
+        report.peakHours.map((p) => ({ label: p.label || p.hour, ...Object.fromEntries(days.map((d) => [d, p[d]])) })), { totals: true }),
+      pieSection("Facility usage", report.facilityBreakdown.filter((f) => f.count > 0).map((f) => ({ label: f.name, value: f.count })), { valueFormat: "integer" }),
+      tableSection("Facility usage", [col("name", "Facility"), countCol("count", "Visits"), col("value", "Share", "percent", { total: "sum" })],
+        report.facilityBreakdown.filter((f) => f.count > 0), { totals: true }),
+      tableSection("Most consistent members", [col("name", "Member"), countCol("visits", "Visits"), col("attendanceRate", "Attendance rate", "percent")], report.topConsistentMembers),
+      tableSection("Irregular members", [col("name", "Member"), countCol("visits", "Visits"), col("attendanceRate", "Attendance rate", "percent")], report.irregularMembers),
+      tableSection("Trainer sessions", [col("name", "Trainer"), col("role", "Role"), col("department", "Department"), countCol("sessions", "Sessions"),
+        col("totalMinutes", "Total time", "duration", { total: "sum" }), col("avgSessionMinutes", "Avg session", "duration")], trainers, { totals: true }),
+      ...(report.insights.length ? [tableSection("Insights", [col("title", "Insight"), col("message", "Detail", "text", { wrap: true })], report.insights)] : []),
+    ],
+  };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -549,37 +344,16 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
     return trainers.filter((t) => String(t.id) === selectedTrainer);
   }, [trainers, selectedTrainer]);
 
-  // ── Export PDF ────────────────────────────────────────────────────────────
-  const handleExportPDF = () => {
-    if (!report) { toast.error("No data to export"); return; }
-    const html = buildPrintHTML(report, trainers, startStr, endStr);
-    const win = window.open("", "_blank", "width=900,height=950");
-    if (win) {
-      win.document.write(withPrintFont(html));
-      win.document.close();
-      toast.success("PDF report opened — use browser Print (Ctrl+P) to save as PDF");
-    } else {
-      toast.error("Pop-up blocked", { description: "Allow pop-ups for this site and try again." });
-    }
+  // ── Export / print (shared engine) ───────────────────────────────────────
+  const exporter = useReportExporter();
+  const buildReport = () => {
+    if (!report) throw new Error("No data to export yet");
+    const trainerName = selectedTrainer === "all" ? "All trainers" : trainers.find((t) => String(t.id) === selectedTrainer)?.name ?? "All trainers";
+    return buildAttendanceReport(report, filteredTrainers, startStr, endStr, trainerName);
   };
-
-  // ── Export Excel (multi-section CSV) ─────────────────────────────────────
-  const handleExportExcel = () => {
-    if (!report) { toast.error("No data to export"); return; }
-    const csv = buildExcelCSV(report, trainers, startStr, endStr);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `attendance-report-${startStr}-to-${endStr}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Excel/CSV exported", {
-      description: `attendance-report-${startStr}-to-${endStr}.csv`,
-    });
-  };
-
-  // ── Download (same as Excel but announced differently) ────────────────────
+  const handleExportPDF = () => exporter.run("pdf", buildReport);
+  const handleExportExcel = () => exporter.run("xlsx", buildReport);
+  const handlePrint = () => exporter.run("print", buildReport);
   const handleDownloadReport = () => handleExportExcel();
 
   // ── View Detailed Report (modal) ──────────────────────────────────────────
@@ -702,24 +476,9 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                 {loading ? "Loading…" : "Refresh"}
               </Button>
 
-              <Button
-                onClick={handleExportPDF}
-                variant="outline"
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white"
-                disabled={!report}
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Export PDF
-              </Button>
-
-              <Button
-                onClick={handleExportExcel}
-                className="bg-white hover:bg-white/90 text-primary"
-                disabled={!report}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export Excel
-              </Button>
+              <div className="rounded-lg bg-white p-0.5">
+                <ReportActions report={buildReport} disabled={!report || loading} size="default" menuLabel="Attendance report" />
+              </div>
             </div>
           </div>
         </div>
@@ -1479,18 +1238,18 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                     variant="outline"
                     className="border-primary/30"
                     onClick={handleExportPDF}
-                    disabled={!report}
+                    disabled={!report || !!exporter.busy}
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    Export PDF
+                    {exporter.busy === "pdf" ? "Exporting…" : "Export PDF"}
                   </Button>
                   <Button
                     className="btn-primary"
                     onClick={handleDownloadReport}
-                    disabled={!report}
+                    disabled={!report || !!exporter.busy}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Download Report
+                    {exporter.busy === "xlsx" ? "Exporting…" : "Download Excel"}
                   </Button>
                 </div>
               </div>
@@ -1630,11 +1389,15 @@ export function AttendanceReports({ onNavigate }: AttendanceReportsProps) {
                 <Button variant="outline" onClick={() => setDetailOpen(false)}>
                   Close
                 </Button>
-                <Button variant="outline" onClick={handleExportPDF}>
+                <Button variant="outline" onClick={handlePrint} disabled={!!exporter.busy}>
                   <Printer className="h-4 w-4 mr-2" />
-                  Print / PDF
+                  Print
                 </Button>
-                <Button className="btn-primary" onClick={handleExportExcel}>
+                <Button variant="outline" onClick={handleExportPDF} disabled={!!exporter.busy}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button className="btn-primary" onClick={handleExportExcel} disabled={!!exporter.busy}>
                   <Download className="h-4 w-4 mr-2" />
                   Download Excel
                 </Button>

@@ -4,12 +4,13 @@ import {
   RefreshCw, Search, UserRound, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ReportActions } from "../components/report-export";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { PageHeader } from "../components/workforce/ui";
 import {
-  PeriodFilter, PersonCell, ReportTable, exportCsv, exportXlsx, fmtNum, fmtPct, pi as styles, presetRange, printReport,
+  PeriodFilter, PersonCell, ReportTable, fmtNum, fmtPct, pi as styles, presetRange, toReportDocument,
   type Col, type MonthRange, type Preset,
 } from "../components/workforce/payroll-insights";
 import { useCurrency } from "../utils/currency";
@@ -305,12 +306,18 @@ export function PayrollReports({ onNavigate }: Props) {
     columns: current.columns, rows: sortedForExport(current.rows, current.columns, current.sort),
     currencyCode, moneyText,
   });
-  const doExport = (kind: "xlsx" | "csv" | "print") => {
-    if (!current.rows.length) return toast.error("Nothing to export for these filters");
-    if (kind === "xlsx") { exportXlsx(spec()); toast.success("Exported to Excel"); }
-    else if (kind === "csv") { exportCsv(spec()); toast.success("Exported CSV"); }
-    else printReport(spec());
-  };
+  const monthEnd = (ym: string) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m, 0); };
+  const buildReport = () => toReportDocument({
+    ...spec(),
+    reportTitle: meta.name,
+    period: report === "advances" ? { to: new Date(), label: "Open balances today" } : { from: `${range.from}-01`, to: monthEnd(range.to), label: periodText },
+    filters: [
+      { label: "Department", value: department !== "all" ? department : "All" },
+      ...(report !== "payments" && report !== "advances" ? [{ label: "Status", value: status !== "all" ? (status === "final" ? "Approved & paid" : status) : "All" }] : []),
+      { label: "Search", value: search.trim() || undefined },
+    ],
+    summary,
+  });
 
   // Summary strip: what the current report adds up to.
   const summary: [string, string][] = (() => {
@@ -452,9 +459,7 @@ export function PayrollReports({ onNavigate }: Props) {
               <Search size={14} />
               <Input placeholder="Search employee or ID…" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search" />
             </div>
-            <Button variant="outline" size="sm" onClick={() => doExport("print")} disabled={!data}><Printer className="h-4 w-4 mr-1" />Print</Button>
-            <Button variant="outline" size="sm" onClick={() => doExport("csv")} disabled={!data}><Download className="h-4 w-4 mr-1" />CSV</Button>
-            <Button size="sm" onClick={() => doExport("xlsx")} disabled={!data}><FileSpreadsheet className="h-4 w-4 mr-1" />Excel</Button>
+            <ReportActions report={buildReport} disabled={!data} menuLabel={meta.name} />
           </div>
         </div>
 

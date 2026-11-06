@@ -113,7 +113,7 @@ export function ManagePlans() {
   const changeViewMode = (mode: PlanViewMode) => setViewMode(mode);
   const [savingStatusIds, setSavingStatusIds] = useState<Set<number>>(new Set());
   // Members on each plan (by plan name, lower case) for the kanban cards.
-  const [memberCounts, setMemberCounts] = useState<Record<string, { active: number; total: number }> | null>(null);
+  const [memberCounts, setMemberCounts] = useState<Record<string, { active: number; total: number; used?: number }> | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -261,15 +261,14 @@ export function ManagePlans() {
     loadPlans();
   }, [activeBranchId]);
 
-  // Counts only matter on the board; a failure just hides them.
+  // Members per plan, for the board and the list's Members column; a failure just hides them.
   useEffect(() => {
-    if (viewMode !== "kanban") return;
     let cancelled = false;
     plansService.getMemberCounts()
       .then(c => { if (!cancelled) setMemberCounts(c); })
       .catch(() => { if (!cancelled) setMemberCounts(null); });
     return () => { cancelled = true; };
-  }, [viewMode, activeBranchId]);
+  }, [activeBranchId]);
 
   useEffect(() => {
     const loadPromotions = async () => {
@@ -1097,6 +1096,7 @@ export function ManagePlans() {
                 <TableHead>Duration</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead title="Members who have ever been on this plan, and how many are active today">Members</TableHead>
                 <TableHead>Assigned Trainers</TableHead>
                 <TableHead>Training Streams</TableHead>
                 <TableHead>Facilities</TableHead>
@@ -1108,7 +1108,7 @@ export function ManagePlans() {
             <TableBody>
               {filteredPlans.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center">
+                  <TableCell colSpan={11} className="h-32 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Search className="h-8 w-8 mb-2 opacity-20" />
                       <p>No results found. Try a different search term.</p>
@@ -1146,6 +1146,23 @@ export function ManagePlans() {
                         </div>
                       ) : (
                         <div className="font-medium"><CurrencyGlyph /> {plan.price}</div>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      if (!memberCounts) return <span className="text-sm text-muted-foreground">—</span>;
+                      const c = memberCounts[(plan.name ?? "").trim().toLowerCase()];
+                      const used = c?.used ?? c?.total ?? 0;
+                      const active = c?.active ?? 0;
+                      return (
+                        <div title={`${used} member${used === 1 ? "" : "s"} have used this plan · ${c?.total ?? 0} on it now · ${active} active today`}>
+                          <div className="flex items-center font-medium">
+                            <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                            {used.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{active.toLocaleString()} active now</div>
+                        </div>
                       );
                     })()}
                   </TableCell>

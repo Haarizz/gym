@@ -14,7 +14,7 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .item:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 8%, transparent); }
-.item[data-late="true"] { border-left: 3px solid var(--status-warning); }
+.item[data-late="true"] { border-left: 3px solid var(--status-warning, #c98a00); }
 
 .avatar {
   width: 2.5rem; height: 2.5rem; border-radius: 999px; display: grid; place-items: center;
@@ -33,15 +33,15 @@
 .moneyCell { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .moneyLabel { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
 .moneyValue { font-size: var(--text-sm); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.moneyValue[data-tone="bad"] { color: var(--status-critical); }
-.moneyValue[data-tone="good"] { color: var(--status-good); }
+.moneyValue[data-tone="bad"] { color: var(--status-critical, #d03b3b); }
+.moneyValue[data-tone="good"] { color: var(--status-good, #0ca30c); }
 .moneySub { font-size: var(--text-xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
-.approve { background: var(--status-good) !important; color: #fff !important; border-color: transparent !important; }
+.approve { background: var(--status-good, #0ca30c) !important; color: #fff !important; border-color: transparent !important; }
 .approve:hover { filter: brightness(0.95); }
-.reject { color: var(--status-critical) !important; border-color: color-mix(in srgb, var(--status-critical) 35%, transparent) !important; }
-.reject:hover { background: color-mix(in srgb, var(--status-critical) 8%, transparent) !important; }
+.reject { color: var(--status-critical, #d03b3b) !important; border-color: color-mix(in srgb, var(--status-critical, #d03b3b) 35%, transparent) !important; }
+.reject:hover { background: color-mix(in srgb, var(--status-critical, #d03b3b) 8%, transparent) !important; }
 
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted-foreground); padding-top: 0.25rem; }
 .pagerBtns { display: flex; align-items: center; gap: 0.5rem; }
@@ -51,7 +51,7 @@
 .summary dd { margin: 0; font-weight: 600; }
 
 .caughtUp { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2.5rem 1rem; text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); }
-.caughtUpIcon { width: 3rem; height: 3rem; border-radius: 999px; display: grid; place-items: center; color: var(--status-good); background: color-mix(in srgb, var(--status-good) 12%, transparent); }
+.caughtUpIcon { width: 3rem; height: 3rem; border-radius: 999px; display: grid; place-items: center; color: var(--status-good, #0ca30c); background: color-mix(in srgb, var(--status-good, #0ca30c) 12%, transparent); }
 .caughtUp strong { color: var(--foreground); font-size: var(--text-base); }
 
 @media (max-width: 1100px) {
@@ -64,3 +64,5 @@
   .money { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary { grid-template-columns: minmax(0, 1fr); }
 }
+.rejectSolid { background: #dc2626 !important; color: #fff !important; border-color: transparent !important; }
+.rejectSolid:hover:not(:disabled) { background: #b91c1c !important; }

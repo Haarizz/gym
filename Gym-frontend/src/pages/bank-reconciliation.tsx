@@ -52,6 +52,7 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 interface BankTransaction {
   id: string;
@@ -493,8 +494,39 @@ export function BankReconciliation() {
     await loadReconciliations();
   };
 
-  const handleExport = (format: string) => {
-    toast.success(`Exporting reconciliation as ${format.toUpperCase()}`);
+  // Export / print: the reconciliation summary, the statement lines as filtered, and every statement on file
+  const buildReconciliationReport = (): ReportDocument => {
+    const rec = currentReconciliation;
+    const lines = filteredAndSortedTransactions;
+    return {
+      title: "Bank Reconciliation Report", orientation: "landscape",
+      period: rec ? { to: rec.statementDate, label: `Statement of ${formatDate(rec.statementDate)}` } : { label: "All statements" },
+      filters: [
+        { label: "Bank account", value: selectedAccountName !== ALL_ACCOUNTS ? selectedAccountName : "All accounts" },
+        { label: "Status", value: statusFilter !== "all" ? statusFilter : "All" },
+        { label: "Date filter", value: dateFilter !== "all" ? dateFilter : "All dates" },
+        { label: "Search", value: searchQuery || undefined },
+      ],
+      sections: [
+        ...(rec ? [kpiSection([
+          { label: "Opening balance", value: rec.openingBalance, format: "money" },
+          { label: "Statement closing", value: rec.closingBalance, format: "money" },
+          { label: "Ledger (system) balance", value: rec.systemBalance, format: "money" },
+          { label: "Difference", value: rec.difference, format: "money", tone: Math.abs(rec.difference) < 0.01 ? "good" : "bad" },
+          { label: "Unmatched lines", value: rec.unmatchedCount, format: "integer" },
+          { label: "Status", value: rec.status },
+        ], `${rec.bankAccountName} · ${formatDate(rec.statementDate)}`)] : []),
+        tableSection("Statement lines", [
+          col("date", "Date", "date"), col("description", "Description", "text", { wrap: true }), col("reference", "Reference"), col("type", "Type"),
+          moneyCol("bankAmount", "Bank amount"), moneyCol("ledgerAmount", "Ledger amount"), col("status", "Status"), col("ledgerReference", "Matched voucher"), col("matchedBy", "Matched by"),
+        ], lines.map(t => ({ ...t, ledgerReference: t.ledgerReference ?? "", matchedBy: t.matchedBy ?? "" })), { totals: true, emptyText: "No statement lines match the filters." }),
+        tableSection("Reconciliations", [
+          col("bankAccountName", "Bank account"), col("statementDate", "Statement date", "date"), moneyCol("openingBalance", "Opening", { total: undefined }),
+          moneyCol("closingBalance", "Closing", { total: undefined }), moneyCol("systemBalance", "Ledger", { total: undefined }), moneyCol("difference", "Difference", { total: undefined }),
+          col("unmatchedCount", "Unmatched", "integer"), col("status", "Status"),
+        ], allReconciliations.filter(r => selectedAccountName === ALL_ACCOUNTS || r.bankAccountName === selectedAccountName)),
+      ],
+    };
   };
 
   const handleFinalizeReconciliation = async () => {
@@ -809,22 +841,7 @@ export function BankReconciliation() {
                 Auto-Match
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="border-gymbios-primary text-gymbios-primary hover:bg-gymbios-primary hover:text-white">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => handleExport("csv")}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Export as CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                    <FileText className="h-4 w-4 mr-2" /> Export as PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ReportActions report={buildReconciliationReport} size="default" disabled={loadingData} menuLabel="Bank reconciliation" />
 
               <Button className="btn-primary" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />

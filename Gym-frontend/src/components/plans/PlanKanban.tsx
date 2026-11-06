@@ -26,7 +26,7 @@ export function PlanViewToggle({ value, onChange }: { value: PlanViewMode; onCha
 type Section = "description" | "streams" | "facilities" | "marketing";
 type SortKey = "default" | "name" | "price-asc" | "price-desc" | "members";
 type Density = "compact" | "detailed";
-export type PlanMemberCounts = Record<string, { active: number; total: number }>;
+export type PlanMemberCounts = Record<string, { active: number; total: number; used?: number }>;
 
 interface PlanKanbanProps {
   plans: Plan[];

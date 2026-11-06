@@ -102,6 +102,7 @@ import {
   ChevronsUpDown
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, col, tableSection } from "../components/report-export";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays } from "date-fns";
 import { cn } from "../components/ui/utils";
 import { Automations } from "./automations";
@@ -538,18 +539,20 @@ export function FollowUps() {
     setShowEditDialog(true);
   }, []);
 
-  const handleExportCSV = useCallback(() => {
-    const csv = ['Lead,Subject,Type,Status,Priority,Assigned Staff,Due Date', ...filteredFollowUps.map(f =>
-      `${f.leadName},${f.subject},${f.type},${f.status},${f.priority},${f.assignedStaff || ''},${f.dueDate.toISOString()}`
-    )].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'follow-ups.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Follow-ups exported');
+  // Export / print: the follow-ups list as filtered on screen
+  const buildFollowUpsReport = useCallback((): ReportDocument => {
+    const counts = new Map<string, number>();
+    filteredFollowUps.forEach(f => counts.set(String(f.status), (counts.get(String(f.status)) || 0) + 1));
+    return {
+      title: 'Follow-ups Report',
+      period: { to: new Date(), label: 'Current list' },
+      sections: [
+        { kind: 'kpis', items: [{ label: 'Follow-ups', value: filteredFollowUps.length, format: 'integer' }, ...[...counts.entries()].map(([s, n]) => ({ label: s, value: n, format: 'integer' as const }))] },
+        tableSection('Follow-ups', [
+          col('lead', 'Lead'), col('subject', 'Subject'), col('type', 'Type'), col('status', 'Status'), col('priority', 'Priority'), col('staff', 'Assigned staff'), col('due', 'Due date', 'datetime'),
+        ], filteredFollowUps.map(f => ({ lead: f.leadName, subject: f.subject, type: f.type, status: f.status, priority: f.priority, staff: f.assignedStaff || '', due: f.dueDate })), { emptyText: 'No follow-ups match the filters.' }),
+      ],
+    };
   }, [filteredFollowUps]);
 
   return (
@@ -561,10 +564,7 @@ export function FollowUps() {
           <p className="text-muted-foreground">Comprehensive member management and operations.</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <ReportActions report={buildFollowUpsReport} size="default" menuLabel="Follow-ups" />
           <Button onClick={() => setShowAddFollowUp(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Follow-up

@@ -229,7 +229,8 @@ export function NewMembersTab({ planNames, onOpenMember, initialPreset }: {
               </thead>
               <tbody>
                 {rows.map(m => {
-                  const joined = m.join_date ? new Date(m.join_date) : null;
+                  const joinedRaw = m.join_date || m.membership_start_date || m.created_at;
+                  const joined = joinedRaw ? new Date(joinedRaw) : null;
                   const hasTime = joined && (joined.getHours() !== 0 || joined.getMinutes() !== 0);
                   const end = (m as any).membership_end_date || (m as any).expiry_date;
                   const st = statusOf(m);

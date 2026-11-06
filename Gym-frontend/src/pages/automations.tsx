@@ -127,6 +127,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, col, countCol, kpiSection, tableSection } from "../components/report-export";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays, addHours, addMinutes } from "date-fns";
 import { cn } from "../components/ui/utils";
 
@@ -711,30 +712,23 @@ export function Automations() {
     }
   }, [workflowBuilder, selectedWorkflow, fetchWorkflows]);
 
-  const handleExport = useCallback(() => {
-    const rows = [
-      ['Name', 'Status', 'Trigger', 'Action', 'Frequency', 'Total Runs', 'Members Engaged', 'Last Run'],
-      ...filteredWorkflows.map(w => [
-        `"${w.name}"`,
-        w.status,
-        w.trigger.type,
-        w.action.type,
-        w.frequency,
-        w.totalRuns,
-        w.membersEngaged,
-        w.lastRun ? w.lastRun.toISOString() : '-',
-      ])
-    ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'automations.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Exported automations.csv');
-  }, [filteredWorkflows]);
+  const buildAutomationsReport = useCallback((): ReportDocument => ({
+    title: 'Automations Report',
+    period: { to: new Date(), label: 'Current list' },
+    sections: [
+      kpiSection([
+        { label: 'Workflows', value: filteredWorkflows.length, format: 'integer' },
+        { label: 'Active', value: filteredWorkflows.filter(w => String(w.status).toLowerCase() === 'active').length, format: 'integer' },
+        { label: 'Total runs', value: filteredWorkflows.reduce((s, w) => s + Number(w.totalRuns || 0), 0), format: 'integer' },
+        { label: 'Members engaged', value: filteredWorkflows.reduce((s, w) => s + Number(w.membersEngaged || 0), 0), format: 'integer' },
+      ]),
+      tableSection('Workflows', [
+        col('name', 'Name'), col('status', 'Status'), col('trigger', 'Trigger'), col('action', 'Action'), col('frequency', 'Frequency'),
+        countCol('totalRuns', 'Total runs'), countCol('membersEngaged', 'Members engaged'), col('lastRun', 'Last run', 'datetime'),
+      ], filteredWorkflows.map(w => ({ name: w.name, status: w.status, trigger: w.trigger.type, action: w.action.type, frequency: w.frequency, totalRuns: w.totalRuns, membersEngaged: w.membersEngaged, lastRun: w.lastRun ?? '—' })), { totals: true }),
+    ],
+  }), [filteredWorkflows]);
+
 
   const renderWorkflowBuilderStep = () => {
     switch (currentStep) {
@@ -1092,10 +1086,7 @@ export function Automations() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <ReportActions report={buildAutomationsReport} size="default" menuLabel="Automations" />
           <Button onClick={handleCreateWorkflow} disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
             Create Automation

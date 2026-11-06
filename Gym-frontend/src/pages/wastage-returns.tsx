@@ -32,6 +32,7 @@ import {
 import { productsService, Product } from "../utils/supabase/products-service";
 import { PosReturnsList } from "../components/wastage/PosReturnsList";
 import { printWhenFontReady, withPrintFont } from "../utils/print-font";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -478,21 +479,23 @@ export function WastageReturns() {
     toast.info("Duplicated — save as a new voucher");
   }
 
-  function exportCsv() {
-    const rows = [
-      ['Voucher #', 'Date', 'Type', 'Reason', 'Location', 'Items', 'Total Value', 'Status', 'Recorded By'],
-      ...vouchers.map(v => [
-        v.voucherNumber, v.date, v.type, v.reason, v.location,
-        v.totalItems, v.totalValue, v.status, v.recordedBy ?? '',
-      ]),
-    ];
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'wastage-returns.csv'; a.click();
-    URL.revokeObjectURL(url);
+  function buildReport(): ReportDocument {
+    return {
+      title: 'Wastage & Returns Report', fileName: 'Wastage and Returns Report',
+      period: { to: new Date(), label: 'All vouchers' },
+      sections: [
+        kpiSection([
+          { label: 'Vouchers', value: vouchers.length, format: 'integer' },
+          { label: 'Items', value: vouchers.reduce((s, v) => s + Number(v.totalItems || 0), 0), format: 'number' },
+          { label: 'Total value', value: vouchers.reduce((s, v) => s + Number(v.totalValue || 0), 0), format: 'money' },
+        ]),
+        tableFromMatrix('Vouchers', ['Voucher #', 'Date', 'Type', 'Reason', 'Location', 'Items', 'Total Value', 'Status', 'Recorded By'],
+          vouchers.map(v => [v.voucherNumber, v.date, v.type, v.reason, v.location, v.totalItems, v.totalValue, v.status, v.recordedBy ?? '']),
+          { totals: true, money: [6], noMoney: [5] }),
+      ],
+    };
   }
+
 
   // ── render ─────────────────────────────────────────────────────────────────
 
@@ -508,9 +511,7 @@ export function WastageReturns() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-9" onClick={exportCsv}>
-            <Download className="mr-2 h-4 w-4" /> Export
-          </Button>
+          <ReportActions report={buildReport} disabled={vouchers.length === 0} menuLabel="Wastage & returns" />
           <Button size="sm" className="h-9" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" /> New Voucher
           </Button>

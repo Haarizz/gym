@@ -159,6 +159,8 @@ public class DayReportSections {
             m.put("category", x.getCategory());
             m.put("amount", nz(x.getTotalAmount()));
             m.put("status", x.getStatus());
+            // Approvals page approves via approvalStatus only — the Summary needs both to decide "spent"
+            m.put("approvalStatus", x.getApprovalStatus());
             m.put("paymentStatus", x.getPaymentStatus());
             m.put("notes", x.getNotes());
             rows.add(m);

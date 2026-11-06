@@ -19,6 +19,10 @@ public class FreezeRequestDTO {
     private String reason;
     private boolean overrideLimits; // a manager going past the plan's freeze limits
     private boolean waiveCharge;    // don't bill the days beyond the free allowance
+    private Boolean autoUnfreeze;   // staff's choice for this freeze; null follows the plan
+
+    public Boolean getAutoUnfreeze() { return autoUnfreeze; }
+    public void setAutoUnfreeze(Boolean autoUnfreeze) { this.autoUnfreeze = autoUnfreeze; }
 
     public String getFreezeUntil() { return freezeUntil; }
     public void setFreezeUntil(String freezeUntil) { this.freezeUntil = freezeUntil; }

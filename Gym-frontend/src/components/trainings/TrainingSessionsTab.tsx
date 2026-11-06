@@ -13,9 +13,10 @@ import { resolveBackendImageUrl } from "../../utils/resolve-image-url";
 import { trainingService, type SessionStatus, type TrainingSessionApi } from "../../utils/supabase/training-service";
 import { bookingService } from "../../utils/supabase/booking-service";
 import {
-  SESSION_TYPES, downloadRoster, formatSessionDate, hhmm, isoDay, sessionDuration, sessionStatus, sessionType,
+  SESSION_TYPES, buildRosterReport, formatSessionDate, hhmm, isoDay, sessionDuration, sessionStatus, sessionType,
 } from "./session-utils";
 import s from "./trainings.module.css";
+import { useReportExporter } from "../report-export";
 
 interface TrainingSessionsTabProps {
   sessions: TrainingSessionApi[];
@@ -137,17 +138,16 @@ export function TrainingSessionsTab({ sessions, loading, refreshKey, onChanged, 
     }
   };
 
+  // Downloads the roster as a formatted Excel sheet (open the session for PDF / print)
+  const rosterExporter = useReportExporter();
   const exportRoster = async (session: TrainingSessionApi) => {
     setBusy(session.id);
     try {
-      const overview = await trainingService.getOverview(session.id);
-      if (!overview.participants.length) {
-        toast.info("No participants to export yet");
-        return;
-      }
-      downloadRoster(overview.session, overview.participants);
-    } catch (e: any) {
-      toast.error(e?.message || "Couldn't export the roster");
+      await rosterExporter.run("xlsx", async () => {
+        const overview = await trainingService.getOverview(session.id);
+        if (!overview.participants.length) throw new Error("No participants to export yet");
+        return buildRosterReport(overview.session, overview.participants);
+      });
     } finally {
       setBusy(null);
     }

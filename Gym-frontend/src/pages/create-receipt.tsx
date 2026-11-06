@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 import { getCompanyDetails } from "../utils/company-details";
-import { getVatRate, splitVatInclusive } from "../utils/tax";
+import { getVatRate, splitVatInclusive, vatRateFor } from "../utils/tax";
 import { buildFullReceiptHtml, buildPaymentReceiptHtml, type ReceiptPrintData } from "../utils/receipt-invoice";
 import { printHtml } from "../utils/print-html";
 import { getReceiptColors } from "../utils/receipt-colors";
@@ -306,7 +306,8 @@ export function CreateReceipt({ onNavigate, layout = "page" }: CreateReceiptProp
     if (printInFlightRef.current) return;
     printInFlightRef.current = true;
 
-    const [company, vatRatePercent] = await Promise.all([getCompanyDetails(), getVatRate()]);
+    const [company, configuredVat] = await Promise.all([getCompanyDetails(), getVatRate()]);
+    const vatRatePercent = vatRateFor(company, configuredVat); // no TRN → no VAT
 
     const totalPaid   = calculateTotalPayment();
     const { net: subtotalExclVat, vat: vatAmount } = splitVatInclusive(totalPaid, vatRatePercent);

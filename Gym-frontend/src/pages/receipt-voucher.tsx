@@ -28,6 +28,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "../components/ui/sheet";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import {
   Search,
   Filter,
@@ -579,9 +580,39 @@ export function ReceiptVoucher() {
     setShowBulkActions(false);
   };
 
-  const exportReceipts = (format: string) => {
-    console.log(`Exporting receipts as ${format}`);
-    alert(`Receipt vouchers will be exported as ${format.toUpperCase()}`);
+  // Export / print: every voucher in the current filtered list (the table pages it client-side)
+  const buildVouchersReport = (): ReportDocument => {
+    const list = filteredReceipts;
+    // Same grouping as the "Income sources" panel: by source category, completed receipts only
+    const bySource = new Map<string, number>(
+      incomeSourcesConfig
+        .map(src => [src.name, list.filter(r => r.sourceCategory === src.id && r.status === 'completed').reduce((s, r) => s + Number(r.amount || 0), 0)] as [string, number])
+        .filter(([, v]) => v > 0),
+    );
+    return {
+      title: 'Receipt Vouchers Register', fileName: 'Receipt Vouchers', orientation: 'landscape',
+      period: { label: dateRange === 'all' ? 'All dates' : dateRange },
+      filters: [
+        { label: 'Search', value: searchTerm || undefined },
+        { label: 'Source', value: sourceFilter !== 'all' ? sourceFilter : 'All' },
+        { label: 'Status', value: statusFilter !== 'all' ? statusFilter : 'All' },
+        { label: 'Payment mode', value: paymentModeFilter !== 'all' ? paymentModeFilter : 'All' },
+      ],
+      sections: [
+        kpiSection([
+          { label: "Today's receipts", value: todayTotal, format: 'money', hint: `${completedToday} completed today` },
+          { label: 'This month', value: thisMonthTotal, format: 'money' },
+          { label: 'Pending', value: pendingAmount, format: 'money' },
+          { label: 'Vouchers listed', value: list.length, format: 'integer' },
+          { label: 'Amount listed', value: list.reduce((s, r) => s + Number(r.amount || 0), 0), format: 'money' },
+        ]),
+        pieSection('Completed receipts by source', [...bySource.entries()].map(([label, value]) => ({ label, value })), { valueFormat: 'money' }),
+        tableSection('Receipt vouchers', [
+          col('id', 'Voucher no'), col('date', 'Date', 'date'), col('source', 'Source'), col('member', 'Received from'), col('memberId', 'Member ID'),
+          moneyCol('amount', 'Amount'), col('paymentMode', 'Payment mode'), col('reference', 'Reference'), col('branch', 'Branch'), col('status', 'Status'),
+        ], list.map(r => ({ ...r, reference: r.reference ?? '', branch: r.branch ?? '' })), { totals: true, emptyText: 'No receipt vouchers match the filters.' }),
+      ],
+    };
   };
 
   const openReceiptDetails = (receipt: any) => {
@@ -661,14 +692,7 @@ export function ReceiptVoucher() {
               </DropdownMenu>
             )}
             
-            <Button variant="outline" size="sm" onClick={() => exportReceipts('excel')}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => exportReceipts('pdf')}>
-              <Printer className="h-4 w-4 mr-2" />
-              Export PDF
-            </Button>
+            <ReportActions report={buildVouchersReport} disabled={loading} menuLabel="Receipt vouchers" />
             <Button size="sm" onClick={() => setShowAddReceipt(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Receipt

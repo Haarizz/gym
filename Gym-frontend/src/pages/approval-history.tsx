@@ -40,6 +40,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import q from '../components/approvals/approvals.module.css';
 
 const PAGE_SIZE = 20;
 
@@ -354,7 +355,7 @@ export function ApprovalHistory() {
             <AlertDialogAction
               disabled={approveBusy}
               onClick={(e) => { e.preventDefault(); confirmApprove(); }}
-              className="bg-green-600 hover:bg-green-700"
+              className={q.approve}
             >
               {approveBusy ? 'Approving…' : 'Approve'}
             </AlertDialogAction>

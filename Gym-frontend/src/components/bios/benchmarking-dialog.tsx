@@ -45,6 +45,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { type BiosLiveData, NoData } from './bios-live';
+import { BiosReportActions } from "./bios-report";
 
 interface BenchmarkingDialogProps {
   open: boolean;
@@ -426,14 +427,7 @@ export function BenchmarkingDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onExportReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button className="bg-[#E63946] hover:bg-[#d32f3f]" onClick={() => window.print()}>
-            <FileText className="h-4 w-4 mr-2" />
-            Generate PDF
-          </Button>
+          <BiosReportActions live={live} kind="benchmarking" />
         </div>
       </DialogContent>
     </Dialog>

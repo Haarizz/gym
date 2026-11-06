@@ -20,7 +20,8 @@ import java.util.Optional;
  *       overrides the branch default. With no branch rate configured the product's rate applies,
  *       as before.</li>
  * </ul>
- * A branch that never set the switch keeps charging tax as before (counts as registered).
+ * A branch with no TRN isn't VAT registered either (it can't charge VAT), whatever the switch says.
+ * A branch that has a TRN but never set the switch keeps charging tax as before (counts as registered).
  */
 @Service
 @Transactional(readOnly = true)
@@ -44,12 +45,16 @@ public class TaxPolicyService {
 
     /** The active branch's tax defaults (registered with no rates when no branch is selected). */
     public TaxDefaults current() {
-        Long branchId = branchResolver.resolveForRead();
+        return forBranch(branchResolver.resolveForRead());
+    }
+
+    /** A given branch's tax defaults (registered with no rates when there is no branch). */
+    public TaxDefaults forBranch(Long branchId) {
         if (branchId == null) return new TaxDefaults(true, null, null, null, null);
         String trn = value(KEY_TRN, branchId).orElse(null);
-        boolean registered = value(KEY_VAT_REGISTERED, branchId)
+        boolean registered = trn != null && value(KEY_VAT_REGISTERED, branchId)
                 .map(v -> v.equalsIgnoreCase("true"))
-                // Never set: keep charging tax as before — only switching it off stops tax.
+                // Never set: keep charging tax as before — only switching it off (or no TRN) stops tax.
                 .orElse(true);
         BigDecimal vat = rate(KEY_VAT_RATE, branchId);
         BigDecimal sales = rate(KEY_SALES_RATE, branchId);
@@ -74,6 +79,11 @@ public class TaxPolicyService {
 
     public boolean vatRegistered() {
         return current().vatRegistered();
+    }
+
+    /** Whether this branch charges VAT; null = the active (or default) branch. */
+    public boolean vatRegistered(Long branchId) {
+        return (branchId != null ? forBranch(branchId) : current()).vatRegistered();
     }
 
     static BigDecimal resolve(TaxDefaults d, Product product, boolean sales) {

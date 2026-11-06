@@ -74,7 +74,7 @@ import { format } from "date-fns";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
 import { expensesService, type Expense, type ExpenseCreateRequest, type ExpenseStats } from "../utils/supabase/expenses-service";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { ledgersService, type CostCenter } from "../utils/supabase/ledgers-service";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
@@ -238,34 +238,42 @@ export function Expenses() {
 
   // Exports every expense matching the active filters, not just the current page —
   // re-fetches with a high limit rather than exporting only what's on screen.
-  const handleExport = async () => {
-    try {
-      const result = await expensesService.getExpenses({
-        search: searchTerm || undefined,
-        status: selectedStatus !== "all" ? selectedStatus : undefined,
-        category: selectedCategory !== "all" ? selectedCategory : undefined,
-        location: selectedLocation !== "all" ? selectedLocation : undefined,
-        page: 1,
-        limit: Math.max(totalExpenseCount, 1),
-      });
-      const rows = (selectedTaxRate === "all"
-        ? result.expenses
-        : result.expenses.filter((e) => e.taxRate.toString() === selectedTaxRate)
-      ).map((e) => [e.date, e.vendorName, e.category, e.location, e.amount, e.taxRate, e.taxAmount, e.totalAmount, e.status]);
-
-      if (rows.length === 0) {
-        toast.error("No expenses to export");
-        return;
-      }
-      exportAsCsv(
-        `expenses_${format(new Date(), "yyyy-MM-dd")}.csv`,
-        ["Date", "Vendor", "Category", "Location", "Amount", "Tax Rate %", "Tax Amount", "Total", "Status"],
-        rows
-      );
-      toast.success("Export started");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to export expenses");
-    }
+  const buildExpensesReport = async (): Promise<ReportDocument> => {
+    const result = await expensesService.getExpenses({
+      search: searchTerm || undefined,
+      status: selectedStatus !== "all" ? selectedStatus : undefined,
+      category: selectedCategory !== "all" ? selectedCategory : undefined,
+      location: selectedLocation !== "all" ? selectedLocation : undefined,
+      page: 1,
+      limit: Math.max(totalExpenseCount, 1),
+    });
+    const list = selectedTaxRate === "all" ? result.expenses : result.expenses.filter((e) => e.taxRate.toString() === selectedTaxRate);
+    const byCat = new Map<string, number>();
+    list.forEach((e) => byCat.set(e.category || "Uncategorised", (byCat.get(e.category || "Uncategorised") || 0) + Number(e.totalAmount || 0)));
+    return {
+      title: "Expenses Report", orientation: "landscape",
+      period: { label: "All dates" },
+      filters: [
+        { label: "Search", value: searchTerm || undefined },
+        { label: "Status", value: selectedStatus !== "all" ? selectedStatus : "All" },
+        { label: "Category", value: selectedCategory !== "all" ? selectedCategory : "All" },
+        { label: "Location", value: selectedLocation !== "all" ? selectedLocation : "All" },
+        { label: "Tax rate", value: selectedTaxRate !== "all" ? `${selectedTaxRate}%` : "All" },
+      ],
+      sections: [
+        kpiSection([
+          { label: "Expenses", value: list.length, format: "integer" },
+          { label: "Amount (before tax)", value: list.reduce((s, e) => s + Number(e.amount || 0), 0), format: "money" },
+          { label: "Tax", value: list.reduce((s, e) => s + Number(e.taxAmount || 0), 0), format: "money" },
+          { label: "Total", value: list.reduce((s, e) => s + Number(e.totalAmount || 0), 0), format: "money" },
+        ]),
+        pieSection("Expenses by category", [...byCat.entries()].map(([label, value]) => ({ label, value })), { valueFormat: "money" }),
+        tableSection("Expenses", [
+          col("date", "Date", "date"), col("vendorName", "Vendor"), col("category", "Category"), col("location", "Location"),
+          moneyCol("amount", "Amount"), col("taxRate", "Tax rate", "percent"), moneyCol("taxAmount", "Tax"), moneyCol("totalAmount", "Total"), col("status", "Status"),
+        ], list, { totals: true, emptyText: "No expenses match the filters." }),
+      ],
+    };
   };
 
   const resetForm = () => {
@@ -534,10 +542,7 @@ export function Expenses() {
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <ReportActions report={buildExpensesReport} menuLabel="Expenses" />
           <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-primary hover:bg-primary/90 shadow-sm hover:shadow-md transition-all">

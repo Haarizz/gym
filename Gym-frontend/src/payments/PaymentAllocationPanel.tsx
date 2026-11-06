@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Banknote, CreditCard, Landmark, Users, Pencil, Wallet, X as XIcon } from "lucide-react";
 import { CurrencyValue } from "../utils/currency";
-import { Progress } from "../components/ui/progress";
 import type { AccountHead } from "../utils/supabase/account-heads-service";
 import { PAYMENT_TYPES, PaymentLine, PaymentType, lineLabel } from "./paymentModel";
 import type { PaymentManager } from "./usePaymentManager";
@@ -249,9 +248,17 @@ export function PaymentAllocationPanel({
   const progressPct = invoiceTotal > 0 ? Math.min(100, (allocated / invoiceTotal) * 100) : 100;
   const creditTotal = manager.totalByType(PAYMENT_TYPES.CREDIT);
 
-  const statusColor = overAllocated ? "#dc2626" : fullyAllocated ? "#15803d" : "#b45309";
-  const statusBg = overAllocated ? "#fef2f2" : fullyAllocated ? "#f0fdf4" : "#fffbeb";
-  const statusBorder = overAllocated ? "#fecaca" : fullyAllocated ? "#bbf7d0" : "#fde68a";
+  // Light / dark pairs — the card's text inherits, so the background must follow the theme.
+  const statusColor = overAllocated
+    ? "light-dark(#dc2626, oklch(75% 0.15 22))"
+    : fullyAllocated ? "light-dark(#15803d, oklch(80% 0.15 150))" : "light-dark(#b45309, oklch(82% 0.13 75))";
+  const statusBg = overAllocated
+    ? "light-dark(#fef2f2, oklch(26% 0.05 22))"
+    : fullyAllocated ? "light-dark(#f0fdf4, oklch(26% 0.04 155))" : "light-dark(#fffbeb, oklch(27% 0.04 90))";
+  const statusBorder = overAllocated
+    ? "light-dark(#fecaca, oklch(40% 0.09 22))"
+    : fullyAllocated ? "light-dark(#bbf7d0, oklch(40% 0.07 155))" : "light-dark(#fde68a, oklch(42% 0.08 90))";
+  const tileBorder = "light-dark(#e5e7eb, var(--border))";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -269,18 +276,21 @@ export function PaymentAllocationPanel({
                 alignItems: "center",
                 gap: 8,
                 borderRadius: 10,
-                border: "2px solid light-dark(#e5e7eb, var(--border))",
+                border: `2px solid ${tileBorder}`,
                 backgroundColor: "light-dark(#fff, var(--card))",
+                color: "var(--foreground)",
                 padding: 14,
                 cursor: "pointer",
-                transition: "box-shadow 0.15s, border-color 0.15s",
+                transition: "box-shadow 0.15s, border-color 0.15s, background-color 0.15s",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = tile.accent;
+                e.currentTarget.style.backgroundColor = `color-mix(in srgb, ${tile.accent} 8%, var(--card))`;
                 e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.08)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.borderColor = tileBorder;
+                e.currentTarget.style.backgroundColor = "light-dark(#fff, var(--card))";
                 e.currentTarget.style.boxShadow = "none";
               }}
             >
@@ -332,11 +342,16 @@ export function PaymentAllocationPanel({
           </div>
         </div>
 
-        <Progress
-          value={progressPct}
-          style={{ height: 8 }}
-          className={overAllocated ? "[&>div]:bg-red-600" : fullyAllocated ? "[&>div]:bg-green-600" : undefined}
-        />
+        {/* Plain bar: the snapshot Tailwind has no [&>div]:bg-* variants, so <Progress> stayed primary. */}
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progressPct)}
+          style={{ height: 8, borderRadius: 999, overflow: "hidden", backgroundColor: `color-mix(in srgb, ${statusColor} 18%, transparent)` }}
+        >
+          <div style={{ height: "100%", width: `${progressPct}%`, borderRadius: 999, backgroundColor: statusColor, transition: "width 0.2s" }} />
+        </div>
 
         <div style={{ borderTop: "1px solid light-dark(rgba(0,0,0,0.08), var(--border))", paddingTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>

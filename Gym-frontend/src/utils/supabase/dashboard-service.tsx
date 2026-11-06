@@ -115,6 +115,19 @@ export const dashboardService = {
     return apiCall(`/dashboard/revenue-summary?${params.toString()}`) as Promise<ApiResponse<RevenueSummary>>;
   },
 
+  // Revenue Dashboard › Comparison: freezes, CRM, POS, attendance, bookings, members
+  async getRevenueOperations(from: string, to: string, granularity?: RevenueGranularity, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
+    if (granularity) params.set('granularity', granularity);
+    return apiCall(`/dashboard/revenue-operations?${params.toString()}`) as Promise<ApiResponse<OperationsComparison>>;
+  },
+
+  // Revenue Dashboard › Comparison › Targets (heavier: live achieved per target)
+  async getRevenueTargets(from: string, to: string, compare: RevenueCompareMode = 'previous') {
+    const params = new URLSearchParams({ from, to, compare });
+    return apiCall(`/dashboard/revenue-targets?${params.toString()}`) as Promise<ApiResponse<TargetsComparison>>;
+  },
+
   // Update KPI data
   async updateKPI(period: string, kpiData: any) {
     return apiCall('/dashboard/update-kpi', {
@@ -261,7 +274,11 @@ export type RevenueStreamKey = 'membership' | 'services' | 'merchandise' | 'cafe
 
 export interface RevenueSummary {
   from: string;
+  /** Last day measured: the requested end, or today when the range runs past it */
   to: string;
+  requestedTo?: string;
+  /** The range runs past today, so both periods are measured up to the same point */
+  toDate?: boolean;
   previousFrom: string;
   previousTo: string;
   granularity: RevenueGranularity;
@@ -330,6 +347,96 @@ export interface RevenueInsights {
   staff: RevenueCompareRow[];
   weekdays: RevenueCompareRow[];
   hours: { hour: number; name: string; amount: number; count: number }[];
+}
+
+// ── Revenue Dashboard › Comparison (operations + targets) ──
+
+export type OpsArea = 'freeze' | 'crm' | 'pos' | 'attendance' | 'bookings' | 'members';
+export type OpsFormat = 'count' | 'money' | 'percent' | 'days' | 'hours' | 'minutes' | 'decimal';
+
+export interface OpsMetric {
+  area: OpsArea;
+  key: string;
+  label: string;
+  /** null = not measurable (a rate or average with nothing to measure) */
+  current: number | null;
+  previous: number | null;
+  format: OpsFormat;
+  goodWhenUp: boolean;
+}
+
+/** A row with both periods: counts, and amounts when the report is money-ranked. */
+export interface OpsRow {
+  name: string;
+  current: number;
+  previous: number;
+  amount?: number;
+  previousAmount?: number;
+  /** Lead reports only */
+  converted?: number;
+  previousConverted?: number;
+  hour?: number;
+}
+
+export type OpsTrendKey = 'checkIns' | 'bookings' | 'leads' | 'conversions' | 'freezes' | 'posSales' | 'posNet' | 'joins';
+
+/** One bucket: each key, plus `${key}Prev` from the comparison window (aligned by index). */
+export type OpsTrendPoint = { label: string } & Record<OpsTrendKey, number> & Record<`${OpsTrendKey}Prev`, number | null>;
+
+export interface OperationsComparison {
+  from: string;
+  /** Last day measured: the requested end, or today when the range runs past it */
+  to: string;
+  requestedTo: string;
+  /** The range runs past today, so both periods are measured up to the same point */
+  toDate: boolean;
+  previousFrom: string;
+  previousTo: string;
+  compare: RevenueCompareMode;
+  label: string;
+  granularity: RevenueGranularity;
+  metrics: OpsMetric[];
+  freeze: { frozenNow: number; activeMembers: number; byReason: OpsRow[]; bySource: OpsRow[]; byPlan: OpsRow[]; byLength: OpsRow[] };
+  crm: { byStatus: OpsRow[]; bySource: OpsRow[]; byStaff: OpsRow[]; enquiryCategories: OpsRow[] };
+  pos: { byCashier: OpsRow[]; byTerminal: OpsRow[]; byCustomer: OpsRow[]; byWeekday: OpsRow[] };
+  attendance: { byWeekday: OpsRow[]; byHour: OpsRow[]; byMethod: OpsRow[] };
+  bookings: { byStatus: OpsRow[]; byType: OpsRow[]; topSessions: OpsRow[]; byTrainer: OpsRow[]; byWeekday: OpsRow[] };
+  members: { byReceiptType: OpsRow[] };
+  trend: OpsTrendPoint[];
+}
+
+export interface TargetTotals {
+  hasTarget: boolean;
+  target: number;
+  achieved: number;
+  membershipTarget: number;
+  membershipAchieved: number;
+  posTarget: number;
+  posAchieved: number;
+  ptTarget: number;
+  ptAchieved: number;
+  /** History rows only */
+  month?: string;
+}
+
+export interface StaffTargetCompareRow {
+  name: string;
+  role?: string | null;
+  target: number;
+  achieved: number;
+  previousTarget: number;
+  previousAchieved: number;
+}
+
+export interface TargetsComparison {
+  months: string[];
+  previousMonths: string[];
+  /** The comparison window falls in the same month(s), so its targets are the same rows */
+  sameMonths: boolean;
+  institution: TargetTotals;
+  previousInstitution: TargetTotals;
+  staff: StaffTargetCompareRow[];
+  history: TargetTotals[];
 }
 
 export interface ApiResponse<T> {

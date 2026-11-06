@@ -3,6 +3,7 @@ package com.company.project.controllers;
 import com.company.project.dto.dashboard.DashboardDTOs.GenericResponse;
 import com.company.project.services.DashboardService;
 import com.company.project.services.RevenueDashboardService;
+import com.company.project.services.RevenueOperationsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +17,13 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
     private final RevenueDashboardService revenueDashboardService;
+    private final RevenueOperationsService revenueOperationsService;
 
-    public DashboardController(DashboardService dashboardService, RevenueDashboardService revenueDashboardService) {
+    public DashboardController(DashboardService dashboardService, RevenueDashboardService revenueDashboardService,
+                               RevenueOperationsService revenueOperationsService) {
         this.dashboardService = dashboardService;
         this.revenueDashboardService = revenueDashboardService;
+        this.revenueOperationsService = revenueOperationsService;
     }
 
     // period: today | week (last 7 days) | month | lastMonth
@@ -94,6 +98,27 @@ public class DashboardController {
             @RequestParam(required = false) String granularity,
             @RequestParam(required = false) String compare) {
         return ResponseEntity.ok(new GenericResponse<>(true, revenueDashboardService.getSummary(from, to, granularity, compare)));
+    }
+
+    // Revenue Dashboard › Comparison: freezes, CRM, POS, attendance, bookings and member movement for
+    // [from, to] vs the same comparison window as /revenue-summary, with an aligned trend
+    @GetMapping("/revenue-operations")
+    public ResponseEntity<GenericResponse<?>> getRevenueOperations(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String granularity,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, revenueOperationsService.getOperations(from, to, granularity, compare)));
+    }
+
+    // Revenue Dashboard › Comparison › Targets: institution + staff targets vs achieved for the months
+    // the range (and its comparison window) touch, plus 12 months of institution target history
+    @GetMapping("/revenue-targets")
+    public ResponseEntity<GenericResponse<?>> getRevenueTargets(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String compare) {
+        return ResponseEntity.ok(new GenericResponse<>(true, revenueOperationsService.getTargets(from, to, compare)));
     }
 
     @GetMapping("/member-churn")

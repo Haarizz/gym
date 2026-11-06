@@ -4,12 +4,12 @@ import { useBranch } from "../utils/branch-context";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
+  ReportActions, type ReportDocument, kpiFromDisplay, kpiSection, tableSection, col, moneyCol, countCol, chartFromRows, pieSection,
+} from "../components/report-export";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import {
-  Users, DollarSign, Download, RefreshCw, BarChart3, FileText, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Minus,
-  LayoutDashboard, UserPlus, Wallet, Clock, CalendarDays, ChevronDown, CalendarClock,
+  Users, DollarSign, RefreshCw, BarChart3, FileText, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Minus,
+  LayoutDashboard, UserPlus, Wallet, Clock, CalendarDays, CalendarClock,
 } from 'lucide-react';
 import { toast } from "sonner";
 import styles from "../components/analytics/community-analytics.module.css";
@@ -20,7 +20,6 @@ import { attendanceService, AttendanceStats } from "../utils/supabase/attendance
 import { dashboardService, ClassAttendance as DashboardClassAttendance } from "../utils/supabase/dashboard-service";
 import { CustomReports } from "./custom-reports";
 import { DayReport } from "../components/reports/DayReport";
-import { withPrintFont } from "../utils/print-font";
 
 interface ReportsAnalyticsProps {
   onNavigate?: (section: string) => void;
@@ -289,10 +288,6 @@ const RANGE_CHIPS: { id: RangeKey; label: string }[] = [
   { id: "custom", label: "Custom" },
 ];
 
-type ReportType = "revenue" | "membership" | "attendance" | "summary";
-type ReportFormat = "csv" | "excel" | "pdf";
-const EXPORT_TYPES: [ReportType, string][] = [["summary", "Summary"], ["revenue", "Revenue"], ["membership", "Membership"], ["attendance", "Attendance"]];
-const EXPORT_FORMATS: [ReportFormat, string][] = [["csv", "CSV"], ["excel", "Excel"], ["pdf", "PDF"]];
 
 // Fixed chart colours (validated dataviz slots), light/dark — not the user's theme.
 const LIGHT = { s1: "#2a78d6", s2: "#eb6834", s3: "#1baf7a", grid: "#e9e8e3", axis: "#898781", soft: "#b7d3f6" };
@@ -887,176 +882,6 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     },
   ];
 
-  const rangeLabel = useMemo(() => {
-    if (rangeKey === 'custom') {
-      return `${customFrom || rangeStart.toISOString().split('T')[0]}_to_${customTo || rangeEnd.toISOString().split('T')[0]}`;
-    }
-    return RANGE_LABELS[rangeKey].toLowerCase().replaceAll(' ', '_');
-  }, [rangeKey, customFrom, customTo, rangeStart, rangeEnd]);
-
-  // Export helpers
-  const downloadBlob = (filename: string, blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const toCsvCell = (value: unknown) => {
-    const s = value == null ? "" : String(value);
-    return `"${s.replaceAll('"', '""')}"`;
-  };
-
-  const buildCsv = (header: string[], rows: (string | number)[][]) =>
-    [header.map(toCsvCell).join(","), ...rows.map((row) => row.map(toCsvCell).join(","))].join("\n");
-
-  const buildRevenueCsv = () => buildCsv(
-    ["Category", `Amount (${currencyCode})`, "Share %"],
-    revenueBreakdown.map((b) => [b.name, Math.round(b.amount), b.value]),
-  );
-
-  const buildMembershipCsv = () => buildCsv(
-    ["Event", "Member", "Date", "Detail"],
-    membershipEvents.map((e) => [e.type, e.name, (e.date as Date).toISOString().split('T')[0], e.detail || '']),
-  );
-
-  const buildAttendanceCsv = () => buildCsv(
-    ["Class", "Utilization %"],
-    classAttendance.map((c: any) => [c.class ?? c.name ?? 'Unknown', c.percentage ?? 0]),
-  );
-
-  const buildSummaryCsv = () => buildCsv(
-    ["Metric", "Value"],
-    [
-      ["Range", RANGE_LABELS[rangeKey]],
-      ...kpiData.map((k) => [k.title, k.value]),
-      ["Top Plan", topPlans[0]?.plan ?? "—"],
-      ["Total Receipts In Range", receiptsInRange.length],
-      ["New Members In Range", newMembersInRange.length],
-      ["Cancelled Members In Range", cancelledMembersInRange.length],
-    ],
-  );
-
-  const csvBuilders: Record<ReportType, () => string> = {
-    revenue: buildRevenueCsv,
-    membership: buildMembershipCsv,
-    attendance: buildAttendanceCsv,
-    summary: buildSummaryCsv,
-  };
-
-  const runExport = useCallback((type: ReportType, format: ReportFormat) => {
-    const csv = csvBuilders[type]();
-    const filenameBase = `reports_${type}_${rangeLabel}`;
-
-    if (format === 'csv') {
-      downloadBlob(`${filenameBase}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      toast.success("CSV downloaded");
-      return;
-    }
-
-    if (format === 'excel') {
-      const lines = csv.split("\n").map((l) => l.split(",").map((c) => c.replace(/^"|"$/g, '').replaceAll('""', '"')));
-      const html = `<html><head><meta charset="utf-8" /></head><body><table border="1" cellspacing="0" cellpadding="4">${lines
-        .map((cells, i) => `<tr>${cells.map((c) => `<${i === 0 ? 'th' : 'td'}>${c}</${i === 0 ? 'th' : 'td'}>`).join('')}</tr>`)
-        .join('')}</table></body></html>`;
-      downloadBlob(`${filenameBase}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
-      toast.success("Excel downloaded");
-      return;
-    }
-
-    // pdf: print-friendly popup
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast.error("Popup blocked. Please allow popups to export PDF.");
-      return;
-    }
-    const lines = csv.split("\n").map((l) => l.split(",").map((c) => c.replace(/^"|"$/g, '').replaceAll('""', '"')));
-    w.document.write(withPrintFont(`
-      <html><head><meta charset="utf-8" /><title>Report</title>
-      <style>body{font-family:'Plus Jakarta Sans Variable',ui-sans-serif,system-ui;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}</style>
-      </head><body>
-      <h1 style="margin:0 0 6px;font-size:18px;">${type.charAt(0).toUpperCase() + type.slice(1)} Report</h1>
-      <div style="color:#6b7280;font-size:12px;margin-bottom:16px;">Range: ${RANGE_LABELS[rangeKey]}</div>
-      <table>${lines.map((cells, i) => `<tr>${cells.map((c) => `<${i === 0 ? 'th' : 'td'}>${c}</${i === 0 ? 'th' : 'td'}>`).join('')}</tr>`).join('')}</table>
-      <script>window.onload = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print());</script>
-      </body></html>
-    `));
-    w.document.close();
-    toast.success("Print dialog opened (Save as PDF)");
-  }, [csvBuilders, rangeKey, rangeLabel]);
-
-  const downloadRevenueReportPdf = useCallback(() => {
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast.error("Popup blocked. Please allow popups to export PDF.");
-      return;
-    }
-    const money = (n: number) => `${currencyCode} ${Math.round(n).toLocaleString()}`;
-
-    const kpiRows = revenueReportKpis.map((k) => [k.title, k.value]);
-
-    const paymentTableRows = paymentBreakdown
-      .map((m) => `<tr><td>${m.name}</td><td>${money(m.amount)}</td><td>${m.value}%</td></tr>`)
-      .join("");
-
-    const periodTableHeader = [...paymentBreakdown.map((m) => m.name), "Total"];
-    const periodTableRows = reportPeriods
-      .map((p) => {
-        const cells = paymentBreakdown
-          .map((m) => `<td>${money(p.methods.find((x) => x.name === m.name)?.amount || 0)}</td>`)
-          .join("");
-        return `<tr><td>${p.label}</td>${cells}<td><strong>${money(p.total)}</strong></td></tr>`;
-      })
-      .join("");
-
-    const categoryTableRows = revenueBreakdown
-      .map((c) => `<tr><td>${c.name}</td><td>${money(c.amount)}</td><td>${c.value}%</td></tr>`)
-      .join("");
-
-    const detailedTableHeader = [...revenueBreakdown.map((c) => c.name), "Total"];
-    const detailedTableRows = reportPeriods
-      .map((p) => {
-        const cells = revenueBreakdown
-          .map((c) => `<td>${money(p.categories.find((x) => x.name === c.name)?.amount || 0)}</td>`)
-          .join("");
-        return `<tr><td>${p.label}</td>${cells}<td><strong>${money(p.total)}</strong></td></tr>`;
-      })
-      .join("");
-
-    w.document.write(withPrintFont(`
-      <html><head><meta charset="utf-8" /><title>Revenue Analysis Report</title>
-      <style>
-        body{font-family:'Plus Jakarta Sans Variable',ui-sans-serif,system-ui;padding:24px;color:#1f2937}
-        h1{margin:0 0 4px;font-size:20px}
-        h2{margin:24px 0 8px;font-size:15px}
-        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
-        th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}
-        th{background:#f9fafb}
-        .meta{color:#6b7280;font-size:12px;margin-bottom:16px}
-      </style>
-      </head><body>
-      <h1>Revenue Analysis Report</h1>
-      <div class="meta">Range: ${RANGE_LABELS[rangeKey]}</div>
-      <h2>Summary</h2>
-      <table>${kpiRows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
-      <h2>Payment Mode Performance</h2>
-      <table><tr><th>Method</th><th>Amount</th><th>Share</th></tr>${paymentTableRows}</table>
-      <h2>Period-wise Payment Mode Breakdown</h2>
-      <table><tr><th>Period</th>${periodTableHeader.map((h) => `<th>${h}</th>`).join("")}</tr>${periodTableRows}</table>
-      <h2>Revenue by Category</h2>
-      <table><tr><th>Category</th><th>Amount</th><th>Share</th></tr>${categoryTableRows}</table>
-      <h2>Detailed Revenue Breakdown</h2>
-      <table><tr><th>Period</th>${detailedTableHeader.map((h) => `<th>${h}</th>`).join("")}</tr>${detailedTableRows}</table>
-      <script>window.onload = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print());</script>
-      </body></html>
-    `));
-    w.document.close();
-    toast.success("Print dialog opened (Save as PDF)");
-  }, [currencyCode, revenueReportKpis, paymentBreakdown, reportPeriods, revenueBreakdown, rangeKey]);
 
   const periodText = rangeKey === "all"
     ? "All recorded activity"
@@ -1088,6 +913,99 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
     return row;
   });
 
+  // Export / print: the active tab, built from exactly the figures on screen.
+  const buildReport = (): ReportDocument => {
+    const period = rangeKey === "all"
+      ? { label: RANGE_LABELS[rangeKey] }
+      : { from: rangeStart, to: rangeEnd, label: RANGE_LABELS[rangeKey] };
+    const filters = [{ label: "Compared with", value: hasComparison ? `${shortDate(prevStart, true)} – ${shortDate(prevEnd, true)}` : "No comparison" }];
+    const tile = (k: { title: string; value: string; change: number | null; description?: string; invert?: boolean }) =>
+      kpiFromDisplay(k.title, k.value, k.change, k.description, k.invert);
+    const shareTable = (title: string, label: string, rows: { name: string; amount: number; value: number }[]) =>
+      tableSection(title, [col("name", label), moneyCol("amount", "Amount"), col("share", "Share", "percent", { total: "sum" })],
+        rows.map((b) => ({ name: b.name, amount: b.amount, share: b.value })), { totals: true });
+    const periodTable = (title: string, split: "category" | "method") => {
+      const series = split === "category" ? revenueBreakdown : paymentBreakdown;
+      return tableSection(title, [col("period", "Period"), ...series.map((s) => moneyCol(s.name, s.name)), moneyCol("total", "Total")],
+        reportPeriods.map((p) => {
+          const src = split === "category" ? p.categories : p.methods;
+          const row: Record<string, string | number> = { period: p.label, total: p.total };
+          series.forEach((s) => { row[s.name] = src.find((x) => x.name === s.name)?.amount || 0; });
+          return row;
+        }), { totals: true });
+    };
+
+    if (reportsTab === "membership") {
+      return {
+        title: "Membership Report", period, filters,
+        sections: [
+          kpiSection(membershipReportKpis.map(tile), "Key metrics"),
+          chartFromRows("Member Acquisition vs Churn (last 6 months)", "bar", membershipTrends, "month", [
+            { key: "newMembers", name: "New members", color: LIGHT.s3 }, { key: "cancelledMembers", name: "Cancelled", color: LIGHT.s2 },
+          ], { valueFormat: "integer" }),
+          tableSection("Monthly membership trend", [col("month", "Month"), countCol("newMembers", "New members"), countCol("cancelledMembers", "Cancelled"), col("totalMembers", "Total members", "integer")], membershipTrends, { totals: true }),
+          { kind: "keyValue", title: "Membership metrics (all members)", items: [
+            { label: "Retention rate", value: membershipMetrics.retention, format: "percent" },
+            { label: "Active members", value: membershipMetrics.active, format: "integer" },
+            { label: "Avg. membership length (months)", value: membershipMetrics.avgMembershipMonths > 0 ? membershipMetrics.avgMembershipMonths : "—", format: "number" },
+          ] },
+          tableSection("Member demographics (age)", [col("ageGroup", "Age group"), countCol("count", "Members"), col("percentage", "Share", "percent")], memberDemographics,
+            { totals: true, emptyText: "Add member date-of-birth to see demographics." }),
+          tableSection(`Recent signups & cancellations`, [col("name", "Member"), col("type", "Event"), col("date", "Date", "date"), col("detail", "Detail")],
+            membershipEvents.map((e) => ({ name: e.name, type: e.type, date: e.date as Date, detail: e.detail })), { emptyText: "No member events in this range." }),
+        ],
+      };
+    }
+    if (reportsTab === "revenue") {
+      return {
+        title: "Revenue Report", period, filters,
+        sections: [
+          kpiSection(revenueReportKpis.map(tile), "Key metrics"),
+          chartFromRows("Revenue trend (last 6 months)", "line", revenueTrend, "month", [{ key: "revenue", name: "Revenue", color: LIGHT.s1 }], { valueFormat: "money" }),
+          pieSection("Revenue by service type", revenueBreakdown.map((b) => ({ label: b.name, value: b.amount, color: b.color })), { valueFormat: "money" }),
+          shareTable("Revenue summary by service type", "Service type", revenueBreakdown),
+          chartFromRows("Revenue by period · service type", "stacked-bar", reportPeriods, "label",
+            revenueBreakdown.map((s) => ({ key: (p: ReportPeriod) => p.categories.find((x) => x.name === s.name)?.amount || 0, name: s.name, color: s.color })), { valueFormat: "money" }),
+          periodTable("Revenue by period · service type", "category"),
+          periodTable("Revenue by period · payment method", "method"),
+          shareTable("Payment methods", "Payment method", paymentBreakdown),
+          tableSection("Top performing plans", [col("plan", "Plan / transaction type"), countCol("count", "Transactions"), moneyCol("revenue", "Revenue"), col("avg", "Avg / transaction", "money")],
+            topPlans.map((p) => ({ plan: p.plan, count: p.count, revenue: p.revenue, avg: p.count ? p.revenue / p.count : 0 })), { totals: true }),
+        ],
+      };
+    }
+    if (reportsTab === "operations") {
+      return {
+        title: "Operations Report", period, filters,
+        sections: [
+          kpiSection(attendanceReportKpis.map(tile), "Key metrics"),
+          chartFromRows("Class attendance (utilisation)", "bar", classAttendance, "class", [{ key: "percentage", name: "Utilisation", color: LIGHT.s1 }], { valueFormat: "percent" }),
+          tableSection("Class attendance", [col("class", "Class"), col("attended", "Attended", "integer", { total: "sum" }), col("capacity", "Capacity", "integer", { total: "sum" }), col("percentage", "Utilisation", "percent", { total: "avg" })],
+            classAttendance.map((c) => ({ class: c.class, attended: c.attended, capacity: c.capacity, percentage: c.percentage })), { totals: true, emptyText: "No class attendance data available yet." }),
+          { kind: "keyValue", title: "Operational metrics", items: [
+            { label: "Today's attendance", value: todayAttendance, format: "integer" },
+            { label: "Avg visit duration (today)", value: membershipMetrics.avgVisitMinutes || "—", format: "duration" },
+            { label: `Receipts in range (${rangeScope})`, value: receiptsInRange.length, format: "integer" },
+            { label: "Avg class utilisation", value: avgClassUtil, format: "percent" },
+          ] },
+          chartFromRows("Peak usage hours (today)", "bar", peakHours, "hour", [{ key: "usage", name: "Check-ins", color: LIGHT.s1 }], { valueFormat: "integer" }),
+        ],
+      };
+    }
+    return {
+      title: "Reports & Analytics Overview", fileName: "Analytics Overview", period, filters,
+      sections: [
+        kpiSection(kpiData.map(tile), "Key metrics"),
+        chartFromRows("Membership growth (last 6 months)", "area", membershipTrends, "month", [{ key: "totalMembers", name: "Total members", color: LIGHT.s1 }], { valueFormat: "integer" }),
+        pieSection("Revenue distribution", revenueBreakdown.map((b) => ({ label: b.name, value: b.amount, color: b.color })), { valueFormat: "money" }),
+        shareTable("Revenue distribution by service type", "Service type", revenueBreakdown),
+        chartFromRows("Peak usage hours (today)", "bar", peakHours, "hour", [{ key: "usage", name: "Check-ins", color: LIGHT.s1 }], { valueFormat: "integer" }),
+        tableSection("Peak usage hours (today)", [col("hour", "Hour"), countCol("usage", "Check-ins")], peakHours, { totals: true, emptyText: "No attendance data available yet." }),
+      ],
+    };
+  };
+  const tabHasOwnExport = reportsTab === "day" || reportsTab === "custom";
+
   if (loading && members.length === 0 && receipts.length === 0) {
     return (
       <div className={styles.root}>
@@ -1117,30 +1035,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm">
-                <Download className="h-4 w-4 mr-2" />Export Report<ChevronDown className="h-4 w-4 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>{rangeScope}</DropdownMenuLabel>
-              <DropdownMenuItem onClick={downloadRevenueReportPdf}>
-                <FileText className="h-4 w-4 mr-2" />Revenue analysis (PDF)
-              </DropdownMenuItem>
-              {EXPORT_TYPES.map(([type, label]) => (
-                <React.Fragment key={type}>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">{label}</DropdownMenuLabel>
-                  {EXPORT_FORMATS.map(([format, fLabel]) => (
-                    <DropdownMenuItem key={format} onClick={() => runExport(type, format)}>
-                      <Download className="h-4 w-4 mr-2" />{label} · {fLabel}
-                    </DropdownMenuItem>
-                  ))}
-                </React.Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!tabHasOwnExport && <ReportActions report={buildReport} disabled={loading} menuLabel={`${TABS.find((t) => t.id === reportsTab)?.label ?? "Report"} · ${rangeScope}`} />}
         </div>
       </div>
 
@@ -1486,9 +1381,7 @@ export function ReportsAnalytics({ onNavigate }: ReportsAnalyticsProps = {}) {
 
             <div className={`${styles.card} ${styles.panel}`}>
               <PanelHead title="Top Performing Plans" sub={`Highest revenue plans/transaction types within ${rangeScope.toLowerCase()}`} scope={rangeScope}>
-                <Button variant="outline" size="sm" onClick={downloadRevenueReportPdf}>
-                  <FileText className="h-4 w-4 mr-2" />Revenue report (PDF)
-                </Button>
+
               </PanelHead>
               {topPlans.length === 0 ? (
                 <div className={styles.empty}>No transactions in this range.</div>

@@ -16,6 +16,7 @@ import {
   styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Seg, Status, Delta, fmtInt, fmtDate,
   Period, periodRange, PERIOD_OPTIONS,
 } from "../components/overview/overview-kit";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 
 type Tab = "activity" | "dues" | "bills" | "recon";
 
@@ -85,6 +86,65 @@ export function Financials() {
     { id: "recon", label: "Reconciliations", icon: Scale, count: openRecons.length },
   ];
 
+  // Export / print: every panel and tab of the overview, from the same /overview payload
+  const buildReport = (): ReportDocument => {
+    if (!data || !k) throw new Error("The financial overview is still loading");
+    const accountTable = (title: string, rows: typeof data.revenueByAccount) => tableSection(title, [
+      col("code", "Code"), col("name", "Account"), moneyCol("current", "This period"), moneyCol("previous", "Comparison"),
+      col("changePct", "Change", "percent"), col("share", "Share", "percent", { total: "sum" }),
+    ], rows.filter(a => a.current > 0 || a.previous > 0), { totals: true });
+    const aging = (title: string, rows: typeof data.receivablesAging, unit: string) =>
+      tableSection(title, [col("label", "Age"), moneyCol("amount", "Amount"), countCol("count", unit)], rows, { totals: true });
+    return {
+      title: "Financial Overview",
+      period: { from: range.from, to: range.to, label: range.label },
+      filters: [{ label: "Compared with", value: `${fmtDate(range.compareFrom)} – ${fmtDate(range.compareTo)}` }],
+      sections: [
+        kpiSection([
+          { label: "Revenue", value: k.revenue.current, format: "money", ...changeHint(k.revenue.changePct) },
+          { label: "Expenses", value: k.expenses.current, format: "money", ...changeHint(k.expenses.changePct) },
+          { label: k.netProfit.current < 0 ? "Net loss" : "Net profit", value: k.netProfit.current, format: "money", ...changeHint(k.netProfit.changePct) },
+          { label: "Profit margin", value: k.profitMargin.current, format: "percent" },
+          { label: "Collected", value: k.collections.current, format: "money", ...changeHint(k.collections.changePct) },
+          { label: "Cash & bank", value: k.cashBalance, format: "money" },
+          { label: "Members owe", value: k.receivables.amount, format: "money", hint: `${fmtInt(k.receivables.members)} members · ${money(k.receivables.overdue).replace(/\u20C3\s?/g, "AED ")} overdue` },
+          { label: "Unpaid bills", value: k.payables.amount, format: "money", hint: `${fmtInt(k.payables.bills)} bills` },
+        ], "Key figures"),
+        chartFromRows("Income vs expenses (last 6 months)", "bar", monthly, "tipLabel", [
+          { key: "revenue", name: "Revenue", color: "#2a78d6" }, { key: "expenses", name: "Expenses", color: "#eb6834" }, { key: "profit", name: "Profit", color: "#1baf7a" },
+        ], { valueFormat: "money" }),
+        tableSection("Monthly income and expenses", [col("label", "Month"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), col("margin", "Margin", "percent")],
+          data.monthly.slice(-6), { totals: true }),
+        accountTable("Where the money came from · revenue by account", data.revenueByAccount),
+        accountTable("Where the money went · expenses by account", data.expenseByAccount),
+        pieSection("How members paid", data.collectionsByMethod.filter(m => m.amount > 0).map(m => ({ label: m.method, value: m.amount })), { valueFormat: "money" }),
+        tableSection("Collections by payment method", [col("method", "Method"), moneyCol("amount", "Amount"), countCol("count", "Payments"), col("share", "Share", "percent", { total: "sum" }), moneyCol("previous", "Comparison")],
+          data.collectionsByMethod.filter(m => m.amount > 0 || m.previous > 0), { totals: true }),
+        { kind: "keyValue", title: `Balance sheet snapshot (as of ${fmtDate(range.to)})`, items: [
+          { label: "Cash & bank", value: k.cashBalance, format: "money" },
+          { label: "Cash in (period)", value: k.cashIn.current, format: "money" },
+          { label: "Cash out (period)", value: k.cashOut.current, format: "money" },
+          { label: "Receivable (ledger)", value: k.receivables.ledger, format: "money" },
+          { label: "Payable (ledger)", value: k.payables.ledger, format: "money" },
+          { label: "Tax payable", value: k.taxPayable, format: "money" },
+          { label: "Unearned membership revenue", value: k.deferredRevenue, format: "money" },
+        ] },
+        ...(data.branches.length > 1 ? [tableSection("By branch", [col("name", "Branch"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), col("margin", "Margin", "percent"), col("revenueShare", "Revenue share", "percent")], data.branches, { totals: true })] : []),
+        tableSection("Income & expense entries", [col("date", "Date", "date"), col("voucherNo", "Voucher"), col("entry", "Entry", "text", { wrap: true }), col("accounts", "Accounts"), col("kind", "Type"), col("amount", "Amount", "money")],
+          data.activity.map(a => {
+            const income = a.kind === "income" || a.kind === "expense_reversal";
+            return { date: a.date, voucherNo: a.voucherNo ?? "", entry: a.narration || a.reference || "—", accounts: a.accounts, kind: a.kind.replace("_", " "), amount: income ? Math.abs(a.amount) : -Math.abs(a.amount) };
+          }), { emptyText: "No postings in this period." }),
+        aging("Member dues by age", data.receivablesAging, "Receipts"),
+        tableSection("Largest member balances", [col("name", "Member"), moneyCol("amount", "Amount"), col("oldestDue", "Oldest due", "date"), col("daysOverdue", "Days overdue", "integer")], data.topDebtors, { totals: true, emptyText: "Nothing outstanding." }),
+        aging("Unpaid supplier bills by age", data.payablesAging, "Bills"),
+        tableSection("Supplier bills due next", [col("vendor", "Supplier"), col("bill", "Bill"), moneyCol("amount", "Amount"), col("dueDate", "Due date", "date"), col("daysOverdue", "Days overdue", "integer")], data.upcomingPayables, { totals: true, emptyText: "No bills waiting to be paid." }),
+        tableSection("Open bank reconciliations", [col("account", "Account"), col("bank", "Bank"), col("lastReconciled", "Last reconciled", "date"), moneyCol("difference", "Difference"), col("status", "Status")], openRecons, { emptyText: "All bank accounts are reconciled." }),
+        ...(data.insights.length ? [tableSection("Worth a look", [col("title", "Insight"), col("detail", "Detail", "text", { wrap: true })], data.insights)] : []),
+      ],
+    };
+  };
+
   if (loading && !data) {
     return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading financials…</div></div>;
   }
@@ -101,6 +161,7 @@ export function Financials() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
+          <ReportActions report={buildReport} disabled={!data || loading} menuLabel={`Financials · ${range.label}`} />
           <Button size="sm" onClick={() => navigate("/financial-analytics")}><BarChart3 className="h-4 w-4 mr-2" />Full analytics</Button>
         </div>
       </div>

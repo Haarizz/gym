@@ -3,9 +3,8 @@ import { Line, LineChart, ResponsiveContainer } from "recharts";
 import {
   AlertTriangle, ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, CheckCircle2, ChevronRight, Info, Minus, XCircle,
 } from "lucide-react";
-import { buildXlsx, downloadBlob, type XlsxCell } from "../../utils/xlsx-export";
-import { exportAsCsv } from "../../utils/export-utils";
-import { printHtml } from "../../utils/print-html";
+
+import { kpiFromDisplay, type ReportColumn, type ReportDocument, type ReportRow, type ValueFormat } from "../report-export";
 import { addMonths, monthsBetween, ym } from "../../utils/supabase/payroll-report-service";
 import styles from "./payroll-insights.module.css";
 
@@ -465,66 +464,45 @@ export interface ExportSpec<T> {
 const exportCols = <T,>(cols: Col<T>[]) => cols.filter(c => !c.screenOnly);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-function rawCell<T>(c: Col<T>, r: T): XlsxCell {
-  const v = c.value(r);
-  if (v == null) return "";
-  return isNumeric(c.kind) ? round2(Number(v)) : String(v);
-}
 
-function totalsRow<T>(cols: Col<T>[], rows: T[], label: string): XlsxCell[] | null {
-  if (!cols.some(c => c.total)) return null;
-  return cols.map((c, i) => {
-    if (i === 0) return label;
-    const t = columnTotal(c, rows);
-    return t == null ? "" : typeof t === "number" ? round2(t) : t;
+
+/**
+ * A payroll report spec as a report-export document (PDF / Excel / print through the shared engine).
+ * Column kinds map to typed columns; the totals row uses each column's own total rule (sums, or a
+ * custom figure such as an average) so exports add up exactly like the on-screen footer.
+ */
+export function toReportDocument<T>(s: ExportSpec<T> & {
+  reportTitle: string;
+  period?: ReportDocument["period"];
+  filters?: ReportDocument["filters"];
+  /** The on-screen summary strip: [label, display value]. */
+  summary?: [string, string][];
+}): ReportDocument {
+  const cols = exportCols(s.columns);
+  const fmt = (k?: ColKind): ValueFormat => (k === "money" ? "money" : k === "number" || k === "hours" ? "number" : k === "percent" ? "percent" : "text");
+  const columns: ReportColumn[] = cols.map(c => ({ key: c.key, header: c.kind === "hours" ? `${c.label} (h)` : c.label, format: fmt(c.kind) }));
+  const rows: ReportRow[] = s.rows.map(r => {
+    const row: ReportRow = {};
+    cols.forEach(c => { const v = c.value(r); row[c.key] = v == null ? null : isNumeric(c.kind) ? round2(Number(v)) : String(v); });
+    return row;
   });
-}
-
-export function exportXlsx<T>(s: ExportSpec<T>) {
-  const cols = exportCols(s.columns);
-  const header = cols.map(c => c.kind === "money" ? `${c.label} (${s.currencyCode})` : c.label);
-  const body = s.rows.map(r => cols.map(c => rawCell(c, r)));
-  const total = totalsRow(cols, s.rows, s.totalLabel ?? "Total");
-  const rows: XlsxCell[][] = [[s.title], [s.subtitle], [], header, ...body, ...(total ? [total] : [])];
-  const blob = buildXlsx(s.title, rows, {
-    boldRows: [0, 3, ...(total ? [rows.length - 1] : [])],
-    moneyColumns: cols.map((c, i) => (c.kind === "money" ? i : -1)).filter(i => i >= 0),
-    columnWidths: cols.map(c => (c.kind === "text" || !c.kind ? 24 : 15)),
-  });
-  downloadBlob(blob, `${s.filename}.xlsx`);
-}
-
-export function exportCsv<T>(s: ExportSpec<T>) {
-  const cols = exportCols(s.columns);
-  const header = cols.map(c => c.kind === "money" ? `${c.label} (${s.currencyCode})` : c.label);
-  const body: unknown[][] = s.rows.map(r => cols.map(c => rawCell(c, r)));
-  const total = totalsRow(cols, s.rows, s.totalLabel ?? "Total");
-  exportAsCsv(`${s.filename}.csv`, header, total ? [...body, total] : body);
-}
-
-const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-
-export function printReport<T>(s: ExportSpec<T>, extraHtml = "") {
-  const cols = exportCols(s.columns);
-  const cell = (c: Col<T>, v: unknown) => (isNumeric(c.kind) ? formatCell(c.kind, v, s.moneyText) : esc(v ?? "—"));
-  const total = cols.some(c => c.total)
-    ? `<tfoot><tr>${cols.map((c, i) => {
+  if (rows.length && cols.some(c => c.total)) {
+    const total: ReportRow = { _kind: "total" };
+    cols.forEach((c, i) => {
       const t = columnTotal(c, s.rows);
-      return `<td class="${isNumeric(c.kind) ? "n" : ""}">${i === 0 ? esc(s.totalLabel ?? "Total") : t == null ? "" : typeof t === "number" ? cell(c, t) : esc(t)}</td>`;
-    }).join("")}</tr></tfoot>`
-    : "";
-  const landscape = cols.length > 7;
-  printHtml(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(s.title)}</title><style>
-    @page{size:A4 ${landscape ? "landscape" : "portrait"};margin:12mm}
-    body{color:#0b0b0b;font-size:10.5px;margin:0}
-    h1{font-size:17px;margin:0}.sub{color:#52514e;margin:3px 0 14px}
-    table{width:100%;border-collapse:collapse}th,td{padding:5px 6px;border-bottom:1px solid #e1e0d9;text-align:left;vertical-align:top}
-    th{color:#52514e;font-weight:600;background:#f4f3ef}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-    tfoot td{font-weight:700;border-top:2px solid #0b0b0b;border-bottom:0}
-    h2{font-size:13px;margin:18px 0 6px}</style></head><body>
-    <h1>${esc(s.title)}</h1><div class="sub">${esc(s.subtitle)}</div>
-    ${extraHtml}
-    <table><thead><tr>${cols.map(c => `<th class="${isNumeric(c.kind) ? "n" : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>
-    <tbody>${s.rows.map(r => `<tr>${cols.map(c => `<td class="${isNumeric(c.kind) ? "n" : ""}">${cell(c, c.value(r))}</td>`).join("")}</tr>`).join("")}</tbody>
-    ${total}</table></body></html>`);
+      total[c.key] = i === 0 ? s.totalLabel ?? "Total" : t == null ? null : typeof t === "number" ? round2(t) : t;
+    });
+    rows.push(total);
+  }
+  return {
+    title: s.reportTitle,
+    fileName: s.reportTitle,
+    orientation: cols.length > 7 ? "landscape" : "auto",
+    period: s.period,
+    filters: s.filters,
+    sections: [
+      ...(s.summary?.length ? [{ kind: "kpis" as const, items: s.summary.map(([label, value]) => kpiFromDisplay(label, value)) }] : []),
+      { kind: "table", title: s.reportTitle, columns, rows, emptyText: "Nothing to report for these filters." },
+    ],
+  };
 }

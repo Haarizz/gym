@@ -80,6 +80,7 @@ import {
   Info
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, chartFromRows, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { format, addDays, subDays, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { cn } from "../components/ui/utils";
 import { membersService, Member as ApiMember } from '../utils/supabase/members-service';
@@ -351,64 +352,34 @@ export function MemberConnectAnalytics() {
     };
   }, [members, statusCounts, acquisitionTrend, avgVisits, leadStats]);
 
-  // Real CSV export of whatever real data is currently loaded (mirrors leads.tsx's Blob pattern).
-  const handleExportCSV = useCallback(() => {
-    const lines: string[] = [];
-    lines.push('Member Connect Analytics Export');
-    lines.push(`Generated,${format(new Date(), 'yyyy-MM-dd HH:mm')}`);
-    lines.push('');
-
-    lines.push('KPI,Value');
-    lines.push(`Total Members,${analytics.totalMembers}`);
-    lines.push(`New Members This Month,${analytics.newMembersThisMonth}`);
-    lines.push(`Retention Rate,${analytics.retentionRate.toFixed(1)}%`);
-    lines.push(`Churn Rate,${analytics.churnRate.toFixed(1)}%`);
-    lines.push(`Avg Visits per Member,${analytics.avgVisits.toFixed(1)}`);
-    if (leadStats) lines.push(`Lead Conversion Rate,${leadStats.conversionRate.toFixed(1)}%`);
-    if (referralStats) lines.push(`Referral Conversion Rate,${referralStats.conversionRate.toFixed(1)}%`);
-    lines.push('');
-
-    lines.push('Membership Distribution');
-    lines.push('Plan Type,Members,Percentage');
-    membershipDistribution.forEach(d => lines.push(`${d.name},${d.value},${d.percentage}%`));
-    lines.push('');
-
-    lines.push('Recent New Members');
-    lines.push('Name,Email,Plan,Fee,Join Date,Status');
-    recentMembers.forEach(m => {
-      const fee = m.membership_fee ?? m.monthly_fee ?? 0;
-      lines.push(`${m.name},${m.email},${m.membership_plan || m.membership_type || ''},${fee},${format(new Date(m.join_date), 'yyyy-MM-dd')},${m.membership_status}`);
-    });
-    lines.push('');
-
-    lines.push('Retention by Signup Cohort');
-    lines.push('Cohort,New Members,Currently Active,Retention %');
-    retentionCohorts.forEach(c => lines.push(`${c.cohort},${c.newMembers},${c.active},${c.retentionPct.toFixed(1)}%`));
-    lines.push('');
-
-    lines.push('Lead Funnel');
-    lines.push('Stage,Count');
-    funnelData.forEach(f => lines.push(`${f.name},${f.value}`));
-    lines.push('');
-
-    if (campaignCards.length) {
-      lines.push('Campaigns / Promotions');
-      lines.push('Name,Type,Status,Usage,Conversion Rate,Redemption Rate,Total Revenue,Total Savings');
-      campaignCards.forEach(c => lines.push(
-        `${c.name},${c.type},${c.status},${c.usageCount}${c.usageLimit ? '/' + c.usageLimit : ''},${c.conversionRate}%,${c.redemptionRate}%,${c.totalRevenue},${c.totalSavings}`
-      ));
-    }
-
-    const csv = lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `member-connect-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Analytics exported as CSV');
-  }, [analytics, leadStats, referralStats, membershipDistribution, recentMembers, retentionCohorts, funnelData, campaignCards]);
+  // Export / print of every panel's loaded data
+  const buildReport = useCallback((): ReportDocument => ({
+    title: 'Member Connect Analytics',
+    period: { to: new Date(), label: 'As of today' },
+    sections: [
+      kpiSection([
+        { label: 'Total members', value: analytics.totalMembers, format: 'integer' },
+        { label: 'New this month', value: analytics.newMembersThisMonth, format: 'integer' },
+        { label: 'Retention rate', value: analytics.retentionRate, format: 'percent' },
+        { label: 'Churn rate', value: analytics.churnRate, format: 'percent' },
+        { label: 'Avg visits per member', value: analytics.avgVisits, format: 'number' },
+        leadStats ? { label: 'Lead conversion', value: leadStats.conversionRate, format: 'percent' } : null,
+        referralStats ? { label: 'Referral conversion', value: referralStats.conversionRate, format: 'percent' } : null,
+      ], 'Key metrics'),
+      pieSection('Membership distribution', membershipDistribution.map(d => ({ label: d.name, value: d.value })), { valueFormat: 'integer', seriesName: 'Members' }),
+      tableSection('Membership distribution', [col('name', 'Plan type'), countCol('value', 'Members'), col('percentage', 'Share', 'percent', { total: 'sum' })], membershipDistribution, { totals: true }),
+      chartFromRows('Retention by signup cohort', 'bar', retentionCohorts, 'cohort', [{ key: 'retentionPct', name: 'Retention', color: '#1baf7a' }], { valueFormat: 'percent' }),
+      tableSection('Retention by signup cohort', [col('cohort', 'Cohort'), countCol('newMembers', 'New members'), countCol('active', 'Currently active'), col('retentionPct', 'Retention', 'percent')], retentionCohorts, { totals: true }),
+      chartFromRows('Lead funnel', 'hbar', funnelData, 'name', [{ key: 'value', name: 'Leads', color: '#6250d6' }], { valueFormat: 'integer' }),
+      tableSection('Lead funnel', [col('name', 'Stage'), countCol('value', 'Count')], funnelData),
+      tableSection('Recent new members', [col('name', 'Name'), col('email', 'Email'), col('plan', 'Plan'), moneyCol('fee', 'Fee'), col('join', 'Join date', 'date'), col('status', 'Status')],
+        recentMembers.map(m => ({ name: m.name, email: m.email, plan: m.membership_plan || m.membership_type || '', fee: m.membership_fee ?? m.monthly_fee ?? 0, join: m.join_date, status: m.membership_status })), { totals: true }),
+      ...(campaignCards.length ? [tableSection('Campaigns / promotions', [
+        col('name', 'Name'), col('type', 'Type'), col('status', 'Status'), col('usage', 'Usage'), col('conversionRate', 'Conversion', 'percent'),
+        col('redemptionRate', 'Redemption', 'percent'), moneyCol('totalRevenue', 'Revenue'), moneyCol('totalSavings', 'Savings'),
+      ], campaignCards.map(c => ({ ...c, usage: `${c.usageCount}${c.usageLimit ? '/' + c.usageLimit : ''}` })), { totals: true })] : []),
+    ],
+  }), [analytics, leadStats, referralStats, membershipDistribution, recentMembers, retentionCohorts, funnelData, campaignCards]);
 
   // Get trend indicator
   const getTrendIcon = (value: number, reverse = false) => {
@@ -453,10 +424,7 @@ export function MemberConnectAnalytics() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
+          <ReportActions report={buildReport} size="default" />
           <Button onClick={handleRefresh} disabled={isRefreshing}>
             <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
             Refresh

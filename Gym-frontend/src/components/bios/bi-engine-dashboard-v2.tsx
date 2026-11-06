@@ -84,6 +84,7 @@ import {
   Phone
 } from 'lucide-react';
 import { type BiosLiveData, formatSignedPercent, clampPercent, useBiosInsights, InsightsStatus, NoData, changePercent } from './bios-live';
+import { BiosReportActions } from "./bios-report";
 import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface BIEngineDashboardV2Props {
@@ -310,14 +311,7 @@ export function BIEngineDashboardV2({ formatCurrency, getCurrentPeriod, live }: 
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </Button>
-          <Button variant="outline" size="sm" onClick={live.onExportData}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Report
-          </Button>
+          <BiosReportActions live={live} kind="bi-engine" readDialog={false} />
         </div>
       </div>
 

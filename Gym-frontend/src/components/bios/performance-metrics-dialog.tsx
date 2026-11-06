@@ -45,7 +45,9 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
-import { type BiosLiveData, formatSignedPercent, clampPercent, useBiosInsights, InsightsStatus, NoData, BiosScheduleTable, downloadCsv, shareOf } from './bios-live';
+import { type BiosLiveData, formatSignedPercent, clampPercent, useBiosInsights, InsightsStatus, NoData, BiosScheduleTable, shareOf } from './bios-live';
+import { BiosReportActions } from "./bios-report";
+import { type ReportSection, chartFromRows, col, countCol, moneyCol, tableSection } from "../report-export";
 import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface PerformanceMetricsDialogProps {
@@ -155,9 +157,12 @@ export function PerformanceMetricsDialog({
   const avgOccupancy = occupancyDays.length > 0 ? Math.round(average(occupancyDays)) : null;
   const avgRevenue = average(historicalPerformance.map((d) => d.revenue));
   const busiestDay = [...historicalPerformance].sort((a, b) => b.checkIns - a.checkIns)[0] ?? null;
-  const exportHistory = () => downloadCsv('bios-daily-performance.csv',
-    ['Date', 'Check-ins', 'Class occupancy %', `Revenue (${live.currencyCode})`],
-    (operations?.daily ?? []).map((d) => [d.date, d.check_ins, d.capacity > 0 ? Math.round((d.bookings / d.capacity) * 100) : '', d.revenue]));
+  const historySections = (): ReportSection[] => [
+    chartFromRows("Daily check-ins", "bar", operations?.daily ?? [], "date", [{ key: "check_ins", name: "Check-ins", color: "#2a78d6" }], { valueFormat: "integer" }),
+    tableSection(`Last ${historyDays || 14} days performance`, [
+      col("date", "Date", "date"), countCol("check_ins", "Check-ins"), col("occupancy", "Class occupancy", "percent"), moneyCol("revenue", "Revenue"),
+    ], (operations?.daily ?? []).map((d) => ({ date: d.date, check_ins: d.check_ins, occupancy: d.capacity > 0 ? Math.round((d.bookings / d.capacity) * 100) : null, revenue: d.revenue })), { totals: true }),
+  ];
 
   // Hourly Performance (Today) — check-ins per hour from today's attendance.
   const hourlyPerformance = [...live.peakHours]
@@ -473,10 +478,7 @@ export function PerformanceMetricsDialog({
                 <h3 className="font-semibold">Last {historyDays || 14} Days Performance</h3>
                 <p className="text-sm text-muted-foreground">Check-ins, class occupancy and money taken per day</p>
               </div>
-              <Button size="sm" variant="outline" onClick={exportHistory} disabled={!operations}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <BiosReportActions live={live} kind="performance" readDialog={false} extra={historySections} compact />
             </div>
             <InsightsStatus loading={operationsLoading} error={operationsError} />
 
@@ -790,14 +792,7 @@ export function PerformanceMetricsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onExportReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button className="bg-[#E63946] hover:bg-[#d32f3f]" onClick={() => window.print()}>
-            <FileText className="h-4 w-4 mr-2" />
-            Print
-          </Button>
+          <BiosReportActions live={live} kind="performance" extra={historySections} />
         </div>
       </DialogContent>
     </Dialog>

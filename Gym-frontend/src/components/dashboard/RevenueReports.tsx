@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { CurrencyGlyph } from "../../utils/currency";
 import type { RevenueCompareRow, RevenueSummary } from "../../utils/supabase/dashboard-service";
 import styles from "./RevenueReports.module.css";
+import { ReportActions, type ReportDocument, type ReportSection, chartFromRows, col, countCol, kpiSection, moneyCol, tableSection } from "../report-export";
 
 const CURRENT_COLOR = "var(--gb-primary-deep)";
 const COMPARE_COLOR = "#94A3B8";
@@ -335,10 +336,7 @@ export function RevenueReportsTab({ data, currencyCode }: { data: RevenueSummary
         <p>
           Detailed revenue report for <strong>{formatRange(data.from, data.to)}</strong>, compared with {c.label.toLowerCase()} ({formatRange(data.previousFrom, data.previousTo)}).
         </p>
-        <Button size="sm" variant="outline" onClick={() => exportRevenueReport(data, currencyCode)}>
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <ReportActions report={() => buildRevenueDetailReport(data)} menuLabel="Detailed revenue report" compact />
       </div>
 
       <div className={styles.highlights}>
@@ -402,64 +400,67 @@ export function RevenueReportsTab({ data, currencyCode }: { data: RevenueSummary
 
 // ── CSV export ──────────────────────────────────────────────────────────────
 
-export function exportRevenueReport(data: RevenueSummary, currencyCode: string) {
+/** The Detailed Reports tab (both periods, every breakdown) as an export / print document. */
+export function buildRevenueDetailReport(data: RevenueSummary): ReportDocument {
   const i = data.insights;
   const c = data.comparison;
-  const cell = (v: unknown) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const money = (v: unknown) => num(v).toFixed(2);
-  const change = (cur: number, prev: number) => {
-    const p = pctChange(cur, prev);
-    return p === null ? "New" : `${p.toFixed(1)}%`;
-  };
-  const lines: unknown[][] = [
-    ["Revenue Report"],
-    ["Period", formatRange(data.from, data.to)],
-    [c.label, formatRange(data.previousFrom, data.previousTo)],
-    ["Currency", currencyCode],
-    [],
-    ["Summary", "This period", c.label, "Change"],
-    ["Total Collection", money(data.totalCollection.total), money(c.totalCollection.total), change(num(data.totalCollection.total), num(c.totalCollection.total))],
-    ["Cash", money(data.totalCollection.cash), money(c.totalCollection.cash), change(num(data.totalCollection.cash), num(c.totalCollection.cash))],
-    ["Card", money(data.totalCollection.card), money(c.totalCollection.card), change(num(data.totalCollection.card), num(c.totalCollection.card))],
-    ["Online / Other", money(data.totalCollection.other), money(c.totalCollection.other), change(num(data.totalCollection.other), num(c.totalCollection.other))],
-    ["Expenses", money(data.expenses.total), money(c.expenses.total), change(num(data.expenses.total), num(c.expenses.total))],
-    ["Net Revenue", money(data.netRevenue.total), money(c.netRevenue.total), change(num(data.netRevenue.total), num(c.netRevenue.total))],
-    ["Transactions", i.transactions, c.transactions, change(num(i.transactions), num(c.transactions))],
-    ["Avg. Transaction", money(i.avgTransaction), money(c.avgTransaction), change(num(i.avgTransaction), num(c.avgTransaction))],
-    ["Paying Members", i.payingMembers, c.payingMembers, change(num(i.payingMembers), num(c.payingMembers))],
-    ["Discounts Given", money(i.discounts.total), money(c.discounts), change(num(i.discounts.total), num(c.discounts))],
-    ["Outstanding Dues (as of today)", money(i.outstanding.total)],
-  ];
-  const section = (title: string, rows: RevenueCompareRow[]) => {
-    lines.push([], [title], ["Name", "This period", "Transactions", c.label, `${c.label} transactions`, "Change", "Share %"]);
+  const ch = (cur: number, prev: number) => { const p = pctChange(cur, prev); return p === null ? "New" : Math.round(p * 10) / 10; };
+  const row = (metric: string, cur: unknown, prev: unknown) => ({ metric, cur: num(cur), prev: num(prev), change: ch(num(cur), num(prev)) });
+  const compareTable = (title: string, rows: RevenueCompareRow[], countLabel = "Transactions"): ReportSection => {
     const total = rows.reduce((s, r) => s + num(r.amount), 0);
-    rows.forEach((r) => lines.push([
-      r.name, money(r.amount), r.count, money(r.previousAmount), r.previousCount,
-      change(num(r.amount), num(r.previousAmount)), total > 0 ? ((num(r.amount) / total) * 100).toFixed(1) : "0.0",
-    ]));
+    return tableSection(title, [
+      col("name", "Name"), moneyCol("amount", "This period"), countCol("count", countLabel), moneyCol("previousAmount", c.label), countCol("previousCount", `${c.label} ${countLabel.toLowerCase()}`),
+      col("change", "Change", "percent"), col("share", "Share", "percent", { total: "sum" }),
+    ], rows.map((r) => ({
+      name: r.name, amount: num(r.amount), count: num(r.count), previousAmount: num(r.previousAmount), previousCount: num(r.previousCount),
+      change: ch(num(r.amount), num(r.previousAmount)), share: total > 0 ? Math.round((num(r.amount) / total) * 1000) / 10 : 0,
+    })), { totals: true, emptyText: "Nothing recorded in this period." });
   };
-  section("Revenue Streams", i.streams);
-  section("Payment Methods", i.paymentMethods);
-  section("Membership Transaction Types", i.transactionTypes);
-  section("Expense Categories", i.expenseCategories);
-  section("Top Plans", i.topPlans);
-  section("Top POS Products", i.topProducts);
-  section("Top Paying Members", i.topMembers);
-  section("Collection by Staff", i.staff);
-  section("Revenue by Day of Week", i.weekdays);
-  lines.push([], ["Revenue by Hour"], ["Hour", "Revenue", "Transactions"]);
-  i.hours.forEach((h) => lines.push([h.name, money(h.amount), h.count]));
-  lines.push([], ["Trend"], ["Bucket", "Revenue", "Expenses", `${c.label} revenue`]);
-  data.trend.forEach((p, idx) => lines.push([p.label, money(p.revenue), p.expenses === null ? "" : money(p.expenses), money(c.trend[idx]?.revenue)]));
-
-  const csv = lines.map((l) => l.map(cell).join(",")).join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `revenue-report-${data.from}-to-${data.to}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  return {
+    title: "Detailed Revenue Report",
+    period: { from: data.from, to: data.to },
+    filters: [{ label: "Compared with", value: `${c.label} (${formatRange(data.previousFrom, data.previousTo)})` }],
+    orientation: "landscape",
+    sections: [
+      kpiSection([
+        { label: "Total collection", value: num(data.totalCollection.total), format: "money" },
+        { label: "Net revenue", value: num(data.netRevenue.total), format: "money" },
+        { label: "Transactions", value: num(i.transactions), format: "integer" },
+        { label: "Avg. transaction", value: num(i.avgTransaction), format: "money" },
+        { label: "Paying members", value: num(i.payingMembers), format: "integer" },
+        { label: "Outstanding dues (today)", value: num(i.outstanding.total), format: "money" },
+      ], "Headline"),
+      tableSection("Summary · amounts", [col("metric", "Metric"), moneyCol("cur", "This period", { total: undefined }), moneyCol("prev", c.label, { total: undefined }), col("change", "Change", "percent")], [
+        row("Total collection", data.totalCollection.total, c.totalCollection.total),
+        row("Cash", data.totalCollection.cash, c.totalCollection.cash),
+        row("Card", data.totalCollection.card, c.totalCollection.card),
+        row("Online / other", data.totalCollection.other, c.totalCollection.other),
+        row("Expenses", data.expenses.total, c.expenses.total),
+        row("Net revenue", data.netRevenue.total, c.netRevenue.total),
+        row("Avg. transaction", i.avgTransaction, c.avgTransaction),
+        row("Discounts given", i.discounts.total, c.discounts),
+      ]),
+      tableSection("Summary · counts", [col("metric", "Metric"), col("cur", "This period", "integer"), col("prev", c.label, "integer"), col("change", "Change", "percent")], [
+        row("Transactions", i.transactions, c.transactions),
+        row("Paying members", i.payingMembers, c.payingMembers),
+      ]),
+      chartFromRows("Revenue trend", "line", data.trend.map((p, idx) => ({ ...p, prev: num(c.trend[idx]?.revenue) })), "label", [
+        { key: (p: { revenue: number }) => num(p.revenue), name: "Revenue", color: "#2a78d6" },
+        { key: "prev", name: c.label, color: "#8a8780" },
+      ], { valueFormat: "money" }),
+      compareTable("Revenue streams", i.streams),
+      compareTable("Payment methods", i.paymentMethods),
+      compareTable("Membership transaction types", i.transactionTypes),
+      compareTable("Expense categories", i.expenseCategories, "Items"),
+      compareTable("Top plans", i.topPlans),
+      compareTable("Top POS products", i.topProducts, "Lines"),
+      compareTable("Top paying members", i.topMembers),
+      compareTable("Collection by staff", i.staff),
+      compareTable("Revenue by day of week", i.weekdays),
+      chartFromRows("Revenue by hour", "bar", i.hours, "name", [{ key: (h: { amount: number }) => num(h.amount), name: "Revenue", color: "#2a78d6" }], { valueFormat: "money" }),
+      tableSection("Revenue by hour", [col("name", "Hour"), moneyCol("amount", "Revenue"), countCol("count", "Transactions")], i.hours.map((h) => ({ name: h.name, amount: num(h.amount), count: num(h.count) })), { totals: true }),
+      tableSection("Trend", [col("label", "Period"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("prev", `${c.label} revenue`)],
+        data.trend.map((p, idx) => ({ label: p.label, revenue: num(p.revenue), expenses: p.expenses === null ? null : num(p.expenses), prev: num(c.trend[idx]?.revenue) })), { totals: true }),
+    ],
+  };
 }

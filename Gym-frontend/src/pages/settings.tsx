@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { financialSettingsService } from "../utils/supabase/financial-settings-service";
-import { invalidateCompanyDetailsCache } from "../utils/company-details";
+import { invalidateCompanyDetailsCache, LOCAL_NAME_FONT_STACK, ARABIC_SCRIPT } from "../utils/company-details";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
   Settings as SettingsIcon, Coins, Check, Building, MapPin, Mail, Phone, UploadCloud, Building2, Image as ImageIcon, Hash, MapPinned, Stamp,
-  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent, FileText,
+  AlertTriangle, LayoutDashboard, Receipt, CreditCard, BarChart3, Percent, FileText, Languages,
 } from "lucide-react";
 import { useCurrency, CURRENCIES, CurrencyCode, CurrencyGlyph } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
@@ -76,6 +76,7 @@ export function AppSettings() {
 
   const [companyDetails, setCompanyDetails] = useState({
     name: "",
+    nameLocal: "",
     address: "",
     email: "",
     phone: "",
@@ -85,6 +86,8 @@ export function AppSettings() {
   });
   // Id of the saved company_stamp row, so removing the stamp can delete it (settings can't hold blank values).
   const [stampSettingId, setStampSettingId] = useState<number | null>(null);
+  // Same for the local-language name: clearing the field deletes its row.
+  const [localNameSettingId, setLocalNameSettingId] = useState<number | null>(null);
   const [isCompanyLoading, setIsCompanyLoading] = useState(true);
   const [isCompanySaving, setIsCompanySaving] = useState(false);
 
@@ -94,6 +97,7 @@ export function AppSettings() {
         const settings = await financialSettingsService.getSettings("COMPANY");
         const details = {
           name: "",
+          nameLocal: "",
           address: "",
           email: "",
           phone: "",
@@ -102,8 +106,10 @@ export function AppSettings() {
           trn: ""
         };
         let stampId: number | null = null;
+        let localNameId: number | null = null;
         settings.forEach(s => {
           if (s.settingKey === "company_name") details.name = s.settingValue;
+          if (s.settingKey === "company_name_local") { details.nameLocal = s.settingValue; localNameId = s.id; }
           if (s.settingKey === "company_address") details.address = s.settingValue;
           if (s.settingKey === "company_email") details.email = s.settingValue;
           if (s.settingKey === "company_phone") details.phone = s.settingValue;
@@ -113,6 +119,7 @@ export function AppSettings() {
         });
         setCompanyDetails(details);
         setStampSettingId(stampId);
+        setLocalNameSettingId(localNameId);
       } catch (err) {
         console.error("Failed to load company details", err);
       } finally {
@@ -188,10 +195,15 @@ export function AppSettings() {
       toast.error("Company stamp is not a valid image. Please upload a PNG, JPG or SVG file.");
       return;
     }
+    if (companyDetails.nameLocal.trim().length > 150) {
+      toast.error("Company name (local language) must be 150 characters or fewer.");
+      return;
+    }
     setIsCompanySaving(true);
     try {
       const keys = [
         { key: "company_name", val: companyDetails.name },
+        { key: "company_name_local", val: companyDetails.nameLocal.trim() },
         { key: "company_address", val: companyDetails.address },
         { key: "company_email", val: companyDetails.email },
         { key: "company_phone", val: companyDetails.phone },
@@ -204,13 +216,17 @@ export function AppSettings() {
           settingKey: k.key,
           settingValue: k.val,
           category: "COMPANY",
-          description: `Company ${k.key.split('_')[1]}`
+          description: k.key === "company_name_local" ? "Company name (local language)" : `Company ${k.key.split('_')[1]}`
         })
       ));
       // A removed stamp can't be saved as blank — delete its row instead.
       if (!companyDetails.stampPreview && stampSettingId != null) {
         await financialSettingsService.deleteSetting(stampSettingId);
         setStampSettingId(null);
+      }
+      if (!companyDetails.nameLocal.trim() && localNameSettingId != null) {
+        await financialSettingsService.deleteSetting(localNameSettingId);
+        setLocalNameSettingId(null);
       }
 
       invalidateCompanyDetailsCache();
@@ -409,6 +425,25 @@ export function AppSettings() {
                         value={companyDetails.name}
                         onChange={(e) => handleCompanyChange("name", e.target.value)}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="companyNameLocal" className="flex items-center gap-2">
+                        <Languages className="h-4 w-4 text-gray-500" />
+                        Company Name (Local Language)
+                      </Label>
+                      {/* dir="auto": Arabic is typed and shown right-to-left, other scripts left-to-right */}
+                      <Input
+                        id="companyNameLocal"
+                        dir="auto"
+                        lang={ARABIC_SCRIPT.test(companyDetails.nameLocal) ? "ar" : undefined}
+                        maxLength={150}
+                        placeholder="e.g. اسم الشركة"
+                        value={companyDetails.nameLocal}
+                        onChange={(e) => handleCompanyChange("nameLocal", e.target.value)}
+                        style={{ fontFamily: LOCAL_NAME_FONT_STACK, fontSize: 15, unicodeBidi: "plaintext" }}
+                      />
+                      <p className="text-xs text-gray-500">Optional. Printed under the company name on invoices, receipts and statements.</p>
                     </div>
 
                     <div className="space-y-2">

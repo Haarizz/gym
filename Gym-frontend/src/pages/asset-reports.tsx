@@ -266,8 +266,8 @@ export function AssetReports() {
             variant="outline"
             size="sm"
             onClick={() =>
-              toast.success("Export package prepared.", {
-                description: "Mock ZIP bundle contains the currently visible report runs."
+              toast.info("Nothing to export yet", {
+                description: "This page shows sample report runs, not your gym's data. Use Export on the report pages for real files."
               })
             }
           >

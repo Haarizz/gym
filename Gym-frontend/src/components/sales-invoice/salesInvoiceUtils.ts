@@ -1,6 +1,7 @@
 import { salesInvoiceService, type SalesInvoice } from '../../utils/supabase/sales-invoice-service';
 import styles from '../purchase/PurchaseInvoice.module.css';
 import { methodLabel, round2, todayIso } from '../purchase/purchaseInvoiceUtils';
+import { type ReportDocument, kpiSection, tableFromMatrix } from '../report-export';
 
 // ── Loading ──────────────────────────────────────────────────────────────────
 // The list endpoint is paginated; pull every page so KPIs, balances and history are complete.
@@ -200,24 +201,24 @@ export function buildTimeline(inv: SalesInvoice): TimelineEvent[] {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
-export function exportInvoicesCsv(invoices: SalesInvoice[], currencyCode: string) {
-  const head = ['S.No', 'Invoice No', 'Date', 'Due Date', 'Customer', 'Customer Type', 'Phone', 'Reference', 'Salesperson',
-    'Pay Mode', 'Status', 'Items', `Net Amount (${currencyCode})`, `Paid (${currencyCode})`, `Balance (${currencyCode})`];
-  const esc = (v: unknown) => {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/** Sales invoices register for export / print — the list as filtered on screen. */
+export function buildInvoicesReport(invoices: SalesInvoice[]): ReportDocument {
+  return {
+    title: 'Sales Invoices Register', fileName: 'Sales Invoices', orientation: 'landscape',
+    period: { to: new Date(), label: 'Current list' },
+    sections: [
+      kpiSection([
+        { label: 'Invoices', value: invoices.length, format: 'integer' },
+        { label: 'Net amount', value: invoices.reduce((s, i) => s + Number(i.totalAmount || 0), 0), format: 'money' },
+        { label: 'Paid', value: invoices.reduce((s, i) => s + Number(i.amountPaid || 0), 0), format: 'money' },
+        { label: 'Balance', value: invoices.reduce((s, i) => s + balanceOf(i), 0), format: 'money' },
+      ]),
+      tableFromMatrix('Sales invoices',
+        ['S.No', 'Invoice No', 'Date', 'Due Date', 'Customer', 'Customer Type', 'Phone', 'Reference', 'Salesperson', 'Pay Mode', 'Status', 'Items', 'Net Amount', 'Paid', 'Balance'],
+        invoices.map((inv, i) => [i + 1, inv.invoiceNumber, inv.invoiceDate, inv.dueDate ?? '', inv.customerName, customerTypeMeta(inv).label,
+          inv.customerPhone ?? '', inv.reference ?? '', inv.salesperson ?? '', inv.amountPaid > 0 ? paymentSummaryLabel(inv) : '',
+          statusMeta(displayStatus(inv)).label, inv.items.length, inv.totalAmount, inv.amountPaid, balanceOf(inv)]),
+        { totals: true, money: [12, 13, 14], noMoney: [0, 11] }),
+    ],
   };
-  const rows = invoices.map((inv, i) => [
-    i + 1, inv.invoiceNumber, inv.invoiceDate, inv.dueDate ?? '', inv.customerName, customerTypeMeta(inv).label,
-    inv.customerPhone ?? '', inv.reference ?? '', inv.salesperson ?? '', inv.amountPaid > 0 ? paymentSummaryLabel(inv) : '',
-    statusMeta(displayStatus(inv)).label, inv.items.length, inv.totalAmount.toFixed(2), inv.amountPaid.toFixed(2), balanceOf(inv).toFixed(2),
-  ]);
-  const csv = [head, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Sales_Invoices_${todayIso()}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

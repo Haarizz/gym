@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, chartFromRows, kpiSection, tableFromMatrix } from "../components/report-export";
 import { staffService, StaffTarget, CommissionRule } from "../utils/supabase/staff-service";
 import { rolesService } from "../utils/supabase/roles-service";
 import {
@@ -355,9 +355,29 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
     }
   };
 
-  const exportPerformance = () => exportAsCsv(`staff-performance-${range.from}${range.to !== range.from ? `_${range.to}` : ""}.csv`,
-    ["Employee", "Role", "Department", "Revenue Target", "Actual Revenue", "Achievement %", "Units Target", "Units Achieved", "Commission", "Approved Commission"],
-    perStaff.map(x => [x.row.name, x.row.role, x.row.department, x.revT, x.revA, x.ach, x.uT, x.uA, x.comm, x.approved]));
+  const buildPerformanceReport = (): ReportDocument => {
+    const revT = perStaff.reduce((s, x) => s + Number(x.revT || 0), 0);
+    const revA = perStaff.reduce((s, x) => s + Number(x.revA || 0), 0);
+    return {
+      title: "Staff Performance vs Targets", fileName: "Staff Performance", orientation: "landscape",
+      period: { from: range.from, to: range.to },
+      sections: [
+        kpiSection([
+          { label: "Revenue target", value: revT, format: "money" },
+          { label: "Actual revenue", value: revA, format: "money" },
+          { label: "Achievement", value: revT ? (revA / revT) * 100 : "—", format: "percent" },
+          { label: "Commission", value: perStaff.reduce((s, x) => s + Number(x.comm || 0), 0), format: "money" },
+        ]),
+        chartFromRows("Target vs actual revenue", "bar", perStaff.map(x => ({ name: x.row.name, t: Number(x.revT || 0), a: Number(x.revA || 0) })), "name", [
+          { key: "t", name: "Target", color: "#b7d3f6" }, { key: "a", name: "Actual", color: "#2a78d6" },
+        ], { valueFormat: "money" }),
+        tableFromMatrix("Staff performance",
+          ["Employee", "Role", "Department", "Revenue Target", "Actual Revenue", "Achievement %", "Units Target", "Units Achieved", "Commission", "Approved Commission"],
+          perStaff.map(x => [x.row.name, x.row.role, x.row.department, Number(x.revT || 0), Number(x.revA || 0), `${Math.round(Number(x.ach || 0) * 10) / 10}%`, x.uT, x.uA, Number(x.comm || 0), Number(x.approved || 0)]),
+          { totals: true, money: [3, 4, 8, 9], noMoney: [6, 7] }),
+      ],
+    };
+  };
 
   const anchorOptions = useMemo(() => Array.from({ length: 18 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -455,7 +475,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
           </div>
 
           <Panel title="Staff performance" description={`${periodText} · click a row for the category breakdown`}
-            actions={<Button variant="outline" size="sm" onClick={exportPerformance}><Download className="h-4 w-4 mr-1" />Export</Button>} flush>
+            actions={<ReportActions report={buildPerformanceReport} menuLabel="Staff performance" compact />} flush>
             <div className={s.tableWrap}>
               <table className={s.table}>
                 <thead>

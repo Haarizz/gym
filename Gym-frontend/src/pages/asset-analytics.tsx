@@ -196,8 +196,8 @@ export function AssetAnalytics() {
             variant="outline"
             size="sm"
             onClick={() =>
-              toast.success("Analytics export queued.", {
-                description: "The current mock dashboard snapshot is being packaged."
+              toast.info("Nothing to export yet", {
+                description: "This dashboard shows sample figures, not your gym's data, so there is no real file to export."
               })
             }
           >

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import { useCurrency, CurrencyGlyph } from "../utils/currency";
 import { paymentVoucherService, type PaymentVoucher as PVApiType, type PaymentVoucherCreateRequest } from "../utils/supabase/payment-voucher-service";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { purchaseService, type Supplier } from "../utils/supabase/purchase-service";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -354,44 +354,47 @@ export function PaymentVoucher() {
   // re-fetches with a high limit rather than exporting only what's on screen.
   // "PDF" is browser print (matches financial-reports.tsx's convention) since there's
   // no backend PDF generator.
-  const handleExport = async (exportFormat: "csv" | "pdf" = "csv") => {
-    if (exportFormat === "pdf") {
-      window.print();
-      return;
-    }
-    try {
-      const supplierType = selectedCategory === "supplier" ? "Supplier" : undefined;
-      const category = selectedCategory === "supplier" ? undefined : selectedCategory;
-      const result = await paymentVoucherService.getPaymentVouchers({
-        search: searchQuery || undefined,
-        status: selectedStatus !== "all" ? selectedStatus : undefined,
-        supplierType,
-        category: category !== "all" ? category : undefined,
-        from: selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined,
-        to: selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined,
-        sortField,
-        sortDirection,
-        page: 1,
-        limit: Math.max(totalVoucherCount, 1),
-      });
-      const rows = (selectedPaymentMethod === "all"
-        ? result.vouchers
-        : result.vouchers.filter(v => v.paymentMethod.toLowerCase().replace(/ /g, "-") === selectedPaymentMethod)
-      ).map(v => [v.voucherNo, v.supplierName, v.supplierType, v.billNo ?? "", v.paymentDate, v.amount, v.paymentMethod, v.status]);
-
-      if (rows.length === 0) {
-        toast.error("No payment vouchers to export");
-        return;
-      }
-      exportAsCsv(
-        `payment-vouchers_${format(new Date(), "yyyy-MM-dd")}.csv`,
-        ["Voucher No", "Supplier", "Type", "Bill No", "Payment Date", "Amount", "Payment Method", "Status"],
-        rows
-      );
-      toast.success("Export started");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to export payment vouchers");
-    }
+  const buildVouchersReport = async (): Promise<ReportDocument> => {
+    const supplierType = selectedCategory === "supplier" ? "Supplier" : undefined;
+    const category = selectedCategory === "supplier" ? undefined : selectedCategory;
+    const result = await paymentVoucherService.getPaymentVouchers({
+      search: searchQuery || undefined,
+      status: selectedStatus !== "all" ? selectedStatus : undefined,
+      supplierType,
+      category: category !== "all" ? category : undefined,
+      from: selectedDateRange.from ? format(selectedDateRange.from, "yyyy-MM-dd") : undefined,
+      to: selectedDateRange.to ? format(selectedDateRange.to, "yyyy-MM-dd") : undefined,
+      sortField,
+      sortDirection,
+      page: 1,
+      limit: Math.max(totalVoucherCount, 1),
+    });
+    const list = selectedPaymentMethod === "all"
+      ? result.vouchers
+      : result.vouchers.filter(v => v.paymentMethod.toLowerCase().replace(/ /g, "-") === selectedPaymentMethod);
+    const byMethod = new Map<string, number>();
+    list.forEach(v => byMethod.set(v.paymentMethod || "Other", (byMethod.get(v.paymentMethod || "Other") || 0) + Number(v.amount || 0)));
+    return {
+      title: "Payment Vouchers Register", fileName: "Payment Vouchers",
+      period: selectedDateRange.from || selectedDateRange.to ? { from: selectedDateRange.from, to: selectedDateRange.to } : { label: "All dates" },
+      filters: [
+        { label: "Search", value: searchQuery || undefined },
+        { label: "Status", value: selectedStatus !== "all" ? selectedStatus : "All" },
+        { label: "Category", value: selectedCategory !== "all" ? selectedCategory : "All" },
+        { label: "Payment method", value: selectedPaymentMethod !== "all" ? selectedPaymentMethod : "All" },
+      ],
+      sections: [
+        kpiSection([
+          { label: "Vouchers", value: list.length, format: "integer" },
+          { label: "Total paid", value: list.reduce((s, v) => s + Number(v.amount || 0), 0), format: "money" },
+        ]),
+        pieSection("By payment method", [...byMethod.entries()].map(([label, value]) => ({ label, value })), { valueFormat: "money" }),
+        tableSection("Payment vouchers", [
+          col("voucherNo", "Voucher no"), col("supplierName", "Payee"), col("supplierType", "Type"), col("billNo", "Bill no"),
+          col("paymentDate", "Payment date", "date"), moneyCol("amount", "Amount"), col("paymentMethod", "Method"), col("status", "Status"),
+        ], list.map(v => ({ ...v, billNo: v.billNo ?? "" })), { totals: true, emptyText: "No payment vouchers match the filters." }),
+      ],
+    };
   };
 
   const openCreate = () => {
@@ -899,24 +902,7 @@ export function PaymentVoucher() {
                 Filter
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="btn-secondary shadow-sm hover:shadow-md transition-all">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleExport("csv")}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export as CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export as PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ReportActions report={buildVouchersReport} menuLabel="Payment vouchers" />
 
               <Button size="sm" className="btn-primary shadow-sm hover:shadow-md transition-all" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-2" />

@@ -96,8 +96,10 @@ import type { ReferralResponse } from '../utils/supabase/referral-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
 import { downloadReceiptInvoice } from '../utils/receipt-invoice';
 import s from './member-history-analytics.module.css';
-import { StaffFreezeOptions, canSubmitStaffFreeze, freezeAddonRuleText, staffFreezeDays, useFreezeAllowance } from '../components/members/StaffFreezeOptions';
+import { MemberFreezeDialog } from "../components/members/MemberFreezeDialog";
 import { SubscriptionTimeline } from '../components/members/SubscriptionTimeline';
+import { ReportActions } from '../components/report-export';
+import { buildMemberStatementReport } from '../utils/member-statement-print';
 
 interface MemberHistoryAnalyticsProps {
   onNavigate?: (section: string, params?: Record<string, any>) => void;
@@ -248,15 +250,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     effectiveDate: new Date().toISOString().split('T')[0], reason: '', confirmDeactivation: false,
   });
   const [savingDeactivate, setSavingDeactivate] = useState(false);
-
-  const [freezeStartDate, setFreezeStartDate] = useState<Date | undefined>(undefined);
-  const [freezeEndDate, setFreezeEndDate] = useState<Date | undefined>(undefined);
-  const [freezeReason, setFreezeReason] = useState('');
-  const [savingFreeze, setSavingFreeze] = useState(false);
-  const [waiveFreezeCharge, setWaiveFreezeCharge] = useState(false);
-  const [overrideFreezeLimits, setOverrideFreezeLimits] = useState(false);
-  // Reloaded each time the freeze dialog opens — the allowance changes with every freeze.
-  const { allowance: freezeAllowance } = useFreezeAllowance(isFreezeDialogOpen ? memberId : null);
 
   // ── Load everything for this member ─────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -480,72 +473,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
   };
 
-  const handleFreeze = async () => {
-    if (!member || !memberId) return;
-    if (!freezeEndDate) { toast.error('Please select a freeze end date'); return; }
-
-    if (freezeStartDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const fStart = new Date(freezeStartDate);
-      fStart.setHours(0, 0, 0, 0);
-
-      const mStartStr = member.membership_start_date || member.join_date;
-      if (mStartStr) {
-        const mStart = new Date(mStartStr);
-        mStart.setHours(0, 0, 0, 0);
-        if (fStart < mStart) {
-          toast.error('Freeze start date cannot be before the membership start date');
-          return;
-        }
-      }
-
-      if (fStart < today) {
-        toast.error('Freeze start date cannot be in the past');
-        return;
-      }
-    }
-    setSavingFreeze(true);
-    try {
-      const freezeUntil = format(freezeEndDate, 'yyyy-MM-dd') + 'T00:00:00Z';
-      const freezeStart = freezeStartDate ? format(freezeStartDate, 'yyyy-MM-dd') + 'T00:00:00Z' : undefined;
-      await membersService.freezeMember(String(memberId), {
-        freezeUntil,
-        freezeStartDate: freezeStart,
-        reason: freezeReason || undefined,
-        overrideLimits: overrideFreezeLimits || undefined,
-        waiveCharge: waiveFreezeCharge || undefined,
-      });
-      toast.success('Membership frozen successfully');
-      setIsFreezeDialogOpen(false);
-      setFreezeStartDate(undefined);
-      setFreezeEndDate(undefined);
-      setFreezeReason('');
-      setWaiveFreezeCharge(false);
-      setOverrideFreezeLimits(false);
-      loadAll();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to freeze membership');
-    } finally {
-      setSavingFreeze(false);
-    }
-  };
-
-  const handleUnfreeze = async () => {
-    if (!memberId) return;
-    setSavingFreeze(true);
-    try {
-      await membersService.unfreezeMember(String(memberId));
-      toast.success('Membership unfrozen successfully');
-      setIsFreezeDialogOpen(false);
-      loadAll();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to unfreeze membership');
-    } finally {
-      setSavingFreeze(false);
-    }
-  };
-
   const handleTransfer = async () => {
     if (!memberId) return;
     if (!transferForm.fullName || !transferForm.mobileNumber || !transferForm.confirmTransfer) return;
@@ -707,8 +634,6 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   }
 
   const isFrozen = member.membership_status === 'frozen';
-  const canSubmitFreeze = canSubmitStaffFreeze(
-    freezeAllowance, staffFreezeDays(freezeStartDate ?? new Date(), freezeEndDate), overrideFreezeLimits);
   const isActive = member.membership_status === 'active';
   // Reception hasn't confirmed the payment yet — any membership action would
   // overwrite pending_approval and start the clock before approval.
@@ -1134,6 +1059,12 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
 
                 {/* Tab 2: Financial & Payment History */}
                 <TabsContent value="financial" className="space-y-6 mt-0">
+                  {statement && (
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <span className="text-sm text-muted-foreground">Statement of account · all transactions</span>
+                      <ReportActions report={() => buildMemberStatementReport(statement)} menuLabel="Statement of account" compact />
+                    </div>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -2304,125 +2235,15 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
         </DialogContent>
       </Dialog>
 
-      {/* Freeze / Unfreeze Modal */}
-      <Dialog open={isFreezeDialogOpen} onOpenChange={setIsFreezeDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Snowflake className="h-5 w-5 text-primary" />
-              <span>{isFrozen ? 'Unfreeze Membership' : 'Freeze Membership'}</span>
-            </DialogTitle>
-            <DialogDescription>
-              {isFrozen
-                ? 'Reactivate this membership immediately.'
-                : 'Temporarily pause this membership until a chosen date.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          {isFrozen ? (
-            <div className="py-4 space-y-4">
-              <Card className="overflow-hidden border-blue-200 bg-blue-50">
-                <CardContent className="p-4 text-sm text-blue-900">
-                  <p>This membership is currently frozen{member.freeze_reason ? `: ${member.freeze_reason}` : '.'}</p>
-                  {member.freeze_end_date && <p className="mt-1">Last frozen day: {fmtDate(new Date(new Date(member.freeze_end_date).getTime() - 1).toISOString())}</p>}
-                  <p className="mt-1">{freezeAddonRuleText(member.freeze_pauses_addons !== false, member.freeze_pauses_facilities !== false)}</p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Freeze Start Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left">
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {freezeStartDate ? format(freezeStartDate, 'dd MMM yyyy') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={freezeStartDate}
-                        onSelect={setFreezeStartDate}
-                        disabled={(date) => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          const mStartStr = member.membership_start_date || member.join_date;
-                          const mStart = mStartStr ? new Date(mStartStr) : null;
-                          if (mStart) mStart.setHours(0, 0, 0, 0);
-                          return date < today || (mStart != null && date < mStart);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Freeze End Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left">
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {freezeEndDate ? format(freezeEndDate, 'dd MMM yyyy') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent mode="single" selected={freezeEndDate} onSelect={setFreezeEndDate} disabled={(date) => date < new Date()} />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              <StaffFreezeOptions
-                allowance={freezeAllowance}
-                startDate={freezeStartDate ?? new Date()}
-                endDate={freezeEndDate}
-                waiveCharge={waiveFreezeCharge}
-                onWaiveChargeChange={setWaiveFreezeCharge}
-                overrideLimits={overrideFreezeLimits}
-                onOverrideLimitsChange={setOverrideFreezeLimits}
-              />
-
-              <div className="space-y-2">
-                <Label>Reason (Optional)</Label>
-                <Textarea
-                  placeholder="Add reason or notes for this freeze..."
-                  rows={3}
-                  value={freezeReason}
-                  onChange={(e) => setFreezeReason(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsFreezeDialogOpen(false)}>
-              Cancel
-            </Button>
-            {isFrozen ? (
-              <Button
-                className="bg-[#2B7A78] hover:bg-[#236664] text-white"
-                disabled={savingFreeze}
-                onClick={handleUnfreeze}
-              >
-                {savingFreeze ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
-                Unfreeze Membership
-              </Button>
-            ) : (
-              <Button
-                className="bg-[#E63946] hover:bg-[#d12935] text-white"
-                disabled={!freezeEndDate || !canSubmitFreeze || savingFreeze}
-                onClick={handleFreeze}
-              >
-                {savingFreeze ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Snowflake className="h-4 w-4 mr-2" />}
-                Freeze Membership
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MemberFreezeDialog
+        open={isFreezeDialogOpen}
+        onOpenChange={setIsFreezeDialogOpen}
+        member={member}
+        memberDbId={memberId ?? member.id}
+        statusLabel={String(displayStatus || "")}
+        statusTone={statusTone}
+        onChanged={loadAll}
+      />
       </div>
     </div>
   );

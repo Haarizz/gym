@@ -72,6 +72,7 @@ import {
 import { cn } from "../components/ui/utils";
 import { format } from "date-fns";
 import { unitLabel } from "../utils/target-units";
+import { ReportActions, type ReportDocument, chartFromRows, kpiSection, tableFromMatrix } from "../components/report-export";
 
 type UnitTarget = { service: string; target_units: number; achieved_units: number };
 
@@ -197,30 +198,29 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
   // Trend data is not available week-by-week from the API; use empty array
   const trendData: Array<{date: string; target: number; actual: number; forecast: number}> = [];
 
-  const exportToCsv = () => {
-    const header = ["Staff", "Role", "Department", "Target", "Achieved", "Progress %", "Commission", "Forecast %"];
-    const rows = filteredStaffData.map(t => [
-      t.staff_name || "",
-      t.staff_role || "",
-      t.staff_department || "",
-      t.revenue_target || 0,
-      t.revenue_achieved || 0,
-      t.percentage || 0,
-      t.commission_earned || 0,
-      t.forecast || 0,
-    ]);
-    const csv = [header, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `staff-targets-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const buildTargetsReport = (): ReportDocument => {
+    const target = filteredStaffData.reduce((s, t) => s + Number(t.revenue_target || 0), 0);
+    const achieved = filteredStaffData.reduce((s, t) => s + Number(t.revenue_achieved || 0), 0);
+    return {
+      title: "Staff Targets Overview", fileName: "Staff Targets",
+      period: { label: format(new Date(), "MMMM yyyy") },
+      sections: [
+        kpiSection([
+          { label: "Staff", value: filteredStaffData.length, format: "integer" },
+          { label: "Revenue target", value: target, format: "money" },
+          { label: "Achieved", value: achieved, format: "money" },
+          { label: "Progress", value: target ? (achieved / target) * 100 : "—", format: "percent" },
+          { label: "Commission earned", value: filteredStaffData.reduce((s, t) => s + Number(t.commission_earned || 0), 0), format: "money" },
+        ]),
+        chartFromRows("Target vs achieved", "bar", filteredStaffData.map(t => ({ name: t.staff_name || "", t: Number(t.revenue_target || 0), a: Number(t.revenue_achieved || 0) })), "name", [
+          { key: "t", name: "Target", color: "#b7d3f6" }, { key: "a", name: "Achieved", color: "#2a78d6" },
+        ], { valueFormat: "money" }),
+        tableFromMatrix("Staff targets", ["Staff", "Role", "Department", "Target", "Achieved", "Progress %", "Commission", "Forecast %"],
+          filteredStaffData.map(t => [t.staff_name || "", t.staff_role || "", t.staff_department || "", Number(t.revenue_target || 0), Number(t.revenue_achieved || 0),
+            `${Number(t.percentage || 0)}%`, Number(t.commission_earned || 0), `${Number(t.forecast || 0)}%`]),
+          { totals: true, money: [3, 4, 6] }),
+      ],
+    };
   };
 
   const toggleRowExpansion = (staffId: string) => {
@@ -370,10 +370,7 @@ export function TargetsOverview({ onNavigate }: TargetsOverviewProps) {
               Refresh
             </Button>
 
-            <Button variant="outline" size="sm" onClick={exportToCsv} disabled={filteredStaffData.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <ReportActions report={buildTargetsReport} disabled={filteredStaffData.length === 0} menuLabel="Staff targets" />
 
             <Button variant="outline" onClick={() => onNavigate("staffs-trainers")}>
               <ArrowLeft className="h-4 w-4 mr-2" />

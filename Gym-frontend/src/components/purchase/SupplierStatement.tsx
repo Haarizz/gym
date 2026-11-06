@@ -10,7 +10,7 @@ import { SearchableSelect } from '../shared/SearchableSelect';
 import styles from './PurchaseInvoice.module.css';
 import { cx } from './purchaseUi';
 import { displayDate, money, todayIso } from './purchaseInvoiceUtils';
-import { printWhenFontReady, withPrintFont } from "../../utils/print-font";
+import { ReportActions, type ReportDocument, type ReportRow } from "../report-export";
 
 type Preset = 'THIS_MONTH' | 'LAST_3_MONTHS' | 'THIS_YEAR' | 'ALL';
 
@@ -68,71 +68,48 @@ export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers:
     [supplier?.name, from, to],
   );
 
-  const exportCsv = () => {
-    if (!statement) return;
-    const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const rows: (string | number)[][] = [
-      ['Supplier', statement.supplierName], ['Period', `${from} to ${to}`], [],
-      ['Date', 'Type', 'Document No', 'Description', 'Reference', `Debit - Payment (${currencyCode})`, `Credit - Invoice (${currencyCode})`, `Balance (${currencyCode})`],
-      [from, 'Opening', '', 'Opening balance', '', '', '', balanceText(statement.openingBalance)],
-      ...statement.entries.map(e => [e.date, e.type === 'INVOICE' ? 'Invoice' : 'Payment', e.documentNo, e.description, e.reference,
-        e.debit ? e.debit.toFixed(2) : '', e.credit ? e.credit.toFixed(2) : '', balanceText(e.runningBalance)]),
-      ['', '', '', 'Closing totals', '', statement.totalDebit.toFixed(2), statement.totalCredit.toFixed(2), balanceText(statement.closingBalance)],
-    ];
-    const url = URL.createObjectURL(new Blob(['﻿' + rows.map(r => r.map(esc).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileBase}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  const print = () => {
-    if (!statement) return;
-    const win = window.open('', '_blank');
-    if (!win) { toast.error('Allow pop-ups for this site to print the statement'); return; }
+  // Supplier statement of account for export / print (Cr = we owe the supplier, Dr = they owe us)
+  const buildStatementReport = (): ReportDocument => {
+    if (!statement) throw new Error('Generate the statement first');
+    const side = (v: number) => (Math.abs(v) < 0.005 ? '' : v >= 0 ? 'Cr' : 'Dr');
     const s = supplier;
-    const addr = [s?.address, s?.city, s?.country].filter(Boolean).join(', ');
-    const rows = statement.entries.map(e => `
-      <tr><td>${html(displayDate(e.date))}</td><td>${e.type === 'INVOICE' ? 'Invoice' : 'Payment'}</td><td>${html(e.documentNo)}</td>
-      <td>${html(e.description)}</td><td>${html(e.reference || '—')}</td>
-      <td class="r">${e.debit ? money(e.debit) : '—'}</td><td class="r">${e.credit ? money(e.credit) : '—'}</td>
-      <td class="r"><b>${balanceText(e.runningBalance)}</b></td></tr>`).join('');
-    win.document.write(withPrintFont(`<!doctype html><html><head><title>${html(fileBase)}</title><style>
-      *{box-sizing:border-box} body{font-family:'Plus Jakarta Sans Variable',Arial,sans-serif;color:#1e293b;margin:0;padding:32px;font-size:12px}
-      .top{display:flex;justify-content:space-between;border-bottom:3px solid #2b7a78;padding-bottom:14px;margin-bottom:18px}
-      h1{margin:0;font-size:20px;color:#2b7a78;letter-spacing:.05em} .m{color:#64748b}
-      .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
-      .tile{border:1px solid #e2e8f0;border-radius:8px;padding:10px} .tile span{display:block;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-      .tile b{font-size:14px}
-      table{width:100%;border-collapse:collapse} th{background:#f1f5f9;text-align:left;font-size:10px;text-transform:uppercase;color:#475569}
-      th,td{padding:7px 9px;border-bottom:1px solid #e2e8f0} .r{text-align:right} tfoot td{font-weight:700;background:#f8fafc}
-      .note{margin-top:28px;text-align:center;color:#94a3b8;font-size:10px} @media print{body{padding:14px}}
-    </style></head><body>
-      <div class="top"><div><h1>STATEMENT OF ACCOUNT</h1><div style="font-size:15px;font-weight:700;margin-top:4px">${html(statement.supplierName)}</div>
-        ${s?.contactPerson ? `<div class="m">${html(s.contactPerson)}</div>` : ''}${addr ? `<div class="m">${html(addr)}</div>` : ''}
-        ${s?.phone ? `<div class="m">${html(s.phone)}</div>` : ''}${s?.email ? `<div class="m">${html(s.email)}</div>` : ''}
-        ${s?.taxId ? `<div class="m">TRN: ${html(s.taxId)}</div>` : ''}</div>
-        <div style="text-align:right"><div class="m">Statement period</div><b>${html(displayDate(from))} – ${html(displayDate(to))}</b>
-        <div class="m" style="margin-top:6px">Generated on</div><b>${html(displayDate(todayIso()))}</b>
-        <div class="m" style="margin-top:6px">Currency</div><b>${html(currencyCode)}</b></div></div>
-      <div class="tiles">
-        <div class="tile"><span>Opening balance</span><b>${balanceText(statement.openingBalance)}</b></div>
-        <div class="tile"><span>Total purchases</span><b>${money(statement.totalCredit)}</b></div>
-        <div class="tile"><span>Total payments</span><b>${money(statement.totalDebit)}</b></div>
-        <div class="tile"><span>Closing balance</span><b>${balanceText(statement.closingBalance)}</b></div>
-      </div>
-      <table><thead><tr><th>Date</th><th>Type</th><th>Document No</th><th>Description</th><th>Reference</th>
-        <th class="r">Debit (Payment)</th><th class="r">Credit (Invoice)</th><th class="r">Balance</th></tr></thead>
-        <tbody><tr><td>${html(displayDate(from))}</td><td>Opening</td><td></td><td>Opening balance</td><td></td><td></td><td></td>
-        <td class="r"><b>${balanceText(statement.openingBalance)}</b></td></tr>${rows}</tbody>
-        <tfoot><tr><td colspan="5" class="r">Closing totals</td><td class="r">${money(statement.totalDebit)}</td>
-        <td class="r">${money(statement.totalCredit)}</td><td class="r">${balanceText(statement.closingBalance)}</td></tr></tfoot></table>
-      <div class="note">Cr = amount payable to the supplier · Dr = advance paid to the supplier. This is a computer-generated statement and does not require a signature.</div>
-    </body></html>`));
-    win.document.close();
-    win.focus();
-    printWhenFontReady(win);
+    const rows: ReportRow[] = [
+      { _kind: 'subtotal', date: from, type: 'Opening', doc: '', description: 'Opening balance', reference: '', debit: null, credit: null, balance: Math.abs(statement.openingBalance), side: side(statement.openingBalance) },
+      ...statement.entries.map((e): ReportRow => ({
+        date: e.date, type: e.type === 'INVOICE' ? 'Invoice' : 'Payment', doc: e.documentNo, description: e.description, reference: e.reference || '',
+        debit: e.debit || null, credit: e.credit || null, balance: Math.abs(e.runningBalance), side: side(e.runningBalance),
+      })),
+      { _kind: 'total', date: null, type: '', doc: '', description: 'Closing totals', reference: '', debit: statement.totalDebit, credit: statement.totalCredit, balance: Math.abs(statement.closingBalance), side: side(statement.closingBalance) },
+    ];
+    return {
+      title: 'Supplier Statement of Account',
+      fileName: `Supplier Statement ${statement.supplierName}`,
+      orientation: 'landscape',
+      period: { from, to },
+      sections: [
+        { kind: 'keyValue', title: 'Supplier', columns: 3, items: [
+          { label: 'Supplier', value: statement.supplierName },
+          { label: 'Address', value: [s?.address, s?.city, s?.country].filter(Boolean).join(', ') || '—' },
+          { label: 'TRN', value: (s as any)?.taxId || '—' },
+        ] },
+        { kind: 'kpis', items: [
+          { label: 'Opening balance', value: Math.abs(statement.openingBalance), format: 'money', hint: balanceHint(statement.openingBalance) },
+          { label: 'Payments (debit)', value: statement.totalDebit, format: 'money' },
+          { label: 'Invoices (credit)', value: statement.totalCredit, format: 'money' },
+          { label: 'Closing balance', value: Math.abs(statement.closingBalance), format: 'money', hint: balanceHint(statement.closingBalance), tone: statement.closingBalance > 0.005 ? 'bad' : 'good' },
+        ] },
+        {
+          kind: 'table', title: 'Transactions', sheetName: 'Statement',
+          columns: [
+            { key: 'date', header: 'Date', format: 'date' }, { key: 'type', header: 'Type' }, { key: 'doc', header: 'Document No' },
+            { key: 'description', header: 'Description', wrap: true }, { key: 'reference', header: 'Reference' },
+            { key: 'debit', header: 'Debit (payment)', format: 'money' }, { key: 'credit', header: 'Credit (invoice)', format: 'money' },
+            { key: 'balance', header: 'Balance', format: 'money' }, { key: 'side', header: 'Cr/Dr' },
+          ],
+          rows,
+        },
+      ],
+    };
   };
 
   const presets: { key: Preset; label: string }[] = [
@@ -183,8 +160,7 @@ export function SupplierStatement({ suppliers, initialSupplierId }: { suppliers:
             <Button onClick={generate} disabled={loading || !supplierId}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Generate Statement
             </Button>
-            <Button variant="outline" onClick={print} disabled={!statement || loading}><Printer className="h-4 w-4" /> Print</Button>
-            <Button variant="outline" onClick={exportCsv} disabled={!statement || loading}><Download className="h-4 w-4" /> Export Excel</Button>
+            <ReportActions report={buildStatementReport} size="default" disabled={!statement || loading} menuLabel="Supplier statement" />
           </div>
         </div>
       </div>

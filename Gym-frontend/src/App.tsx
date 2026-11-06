@@ -948,7 +948,12 @@ export default function App() {
   const visibleMenuItems = useMemo(
     () => filterMenuByPermission(menuItems, canUse).filter(
       (item) => isGymbiosAdmin ? gymbiosAdminMenuIds.includes(item.id) : true
-    ),
+    ).map((item: any) => (
+      // The gym owner gets everyone's targets there (Staff Targets board); other roles their own.
+      isGymOwner && item.id === "my-profile" && item.subItems
+        ? { ...item, subItems: item.subItems.map((sub: any) => sub.id === "my-targets" ? { ...sub, title: "Staff Targets" } : sub) }
+        : item
+    )),
     [permissions, isGymbiosAdmin, isGymOwner], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const globalSearchPages = useMemo<GlobalSearchPage[]>(() => {

@@ -151,6 +151,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, col, kpiSection, tableSection } from "../components/report-export";
 import { format, addDays, isAfter, isBefore, isToday, isTomorrow, isYesterday, addWeeks, subDays, addHours, addMinutes, startOfDay, endOfDay } from "date-fns";
 import { cn } from "../components/ui/utils";
 import api from "../api/axiosConfig";
@@ -640,45 +641,34 @@ export function PostWorkoutCheckin() {
     return { totalFeedbackDelta, avgSatisfactionDelta, flaggedDelta };
   }, [feedbackResponses]);
 
-  // Export the currently filtered feedback list as CSV
-  const handleExportData = useCallback(() => {
-    if (filteredFeedback.length === 0) {
-      toast.error('No feedback data to export');
-      return;
-    }
-    const header = 'Member,Workout Type,Class,Trainer,Submitted At,Overall Satisfaction,Workout Intensity,Trainer Rating,Equipment Quality,Facility Rating,Recommend Workout,Difficulty Level,Pace Rating,Energy After Workout,Likely To Return,Would Recommend Trainer,Flagged For Review,Follow Up Required,Comments,Suggestions';
-    const escape = (value: string) => `"${(value || '').replace(/"/g, '""')}"`;
-    const rows = filteredFeedback.map(f => [
-      escape(f.memberName),
-      f.workoutType,
-      f.className || '',
-      f.trainerName || '',
-      f.submittedAt.toISOString(),
-      f.overallSatisfaction,
-      f.workoutIntensity,
-      f.trainerRating ?? '',
-      f.equipmentQuality,
-      f.facilityRating,
-      f.recommendWorkout,
-      f.difficultyLevel,
-      f.paceRating,
-      f.energyAfterWorkout,
-      f.likelyToReturn,
-      f.wouldRecommendTrainer || '',
-      f.flaggedForReview ? 'Yes' : 'No',
-      f.followUpRequired ? 'Yes' : 'No',
-      escape(f.comments),
-      escape(f.suggestions)
-    ].join(','));
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `workout-feedback-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Feedback data exported');
+  // Export / print: the feedback list as filtered on screen
+  const buildFeedbackReport = useCallback((): ReportDocument => {
+    const avg = (pick: (f: (typeof filteredFeedback)[number]) => number | null | undefined) => {
+      const vals = filteredFeedback.map(pick).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+    };
+    return {
+      title: 'Post-Workout Feedback Report', fileName: 'Workout Feedback', orientation: 'landscape',
+      period: { to: new Date(), label: 'Current list' },
+      sections: [
+        kpiSection([
+          { label: 'Feedback entries', value: filteredFeedback.length, format: 'integer' },
+          { label: 'Avg satisfaction', value: avg(f => Number(f.overallSatisfaction)) ?? '—', format: 'number' },
+          { label: 'Avg trainer rating', value: avg(f => (f.trainerRating == null ? null : Number(f.trainerRating))) ?? '—', format: 'number' },
+          { label: 'Flagged for review', value: filteredFeedback.filter(f => f.flaggedForReview).length, format: 'integer' },
+          { label: 'Follow-up required', value: filteredFeedback.filter(f => f.followUpRequired).length, format: 'integer' },
+        ]),
+        tableSection('Feedback', [
+          col('memberName', 'Member'), col('workoutType', 'Workout'), col('className', 'Class'), col('trainerName', 'Trainer'), col('submittedAt', 'Submitted', 'datetime'),
+          col('overallSatisfaction', 'Satisfaction', 'number'), col('workoutIntensity', 'Intensity'), col('trainerRating', 'Trainer rating', 'number'),
+          col('equipmentQuality', 'Equipment', 'number'), col('facilityRating', 'Facility', 'number'), col('likelyToReturn', 'Likely to return'),
+          col('flagged', 'Flagged'), col('followUp', 'Follow-up'), col('comments', 'Comments', 'text', { wrap: true }), col('suggestions', 'Suggestions', 'text', { wrap: true }),
+        ], filteredFeedback.map(f => ({
+          ...f, className: f.className || '', trainerName: f.trainerName || '', trainerRating: f.trainerRating ?? '',
+          flagged: f.flaggedForReview ? 'Yes' : 'No', followUp: f.followUpRequired ? 'Yes' : 'No',
+        })), { emptyText: 'No feedback matches the filters.' }),
+      ],
+    };
   }, [filteredFeedback]);
 
   return (
@@ -696,10 +686,7 @@ export function PostWorkoutCheckin() {
             <Search className="mr-2 h-4 w-4" />
             Member Lookup
           </Button>
-          <Button variant="outline" onClick={handleExportData}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Data
-          </Button>
+          <ReportActions report={buildFeedbackReport} size="default" menuLabel="Workout feedback" />
           <Button onClick={() => setActiveTab('check-in')}>
             <Plus className="mr-2 h-4 w-4" />
             New Check-in

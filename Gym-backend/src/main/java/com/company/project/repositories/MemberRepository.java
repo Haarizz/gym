@@ -191,6 +191,23 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
             + "FROM Member m WHERE m.membershipPlan IS NOT NULL GROUP BY m.membershipPlan")
     List<Object[]> countMembersByPlan(@Param("asOf") LocalDateTime asOf);
 
+    /**
+     * Rows of [lower(trim(planName)), distinct members] who have ever used each plan: bought or
+     * renewed onto it (New/Renewal receipts, not cancelled), or are on it now. Native, so the
+     * branch is passed in (null = all branches) — the same scope the branchFilter gives JPQL.
+     */
+    @Query(value = "SELECT u.k, COUNT(DISTINCT u.mid) FROM ("
+            + " SELECT LOWER(TRIM(r.plan_name)) AS k, r.member_db_id AS mid FROM receipts r"
+            + "  WHERE r.transaction_type IN ('New', 'Renewal') AND r.member_db_id IS NOT NULL"
+            + "  AND r.plan_name IS NOT NULL AND COALESCE(r.status, '') <> 'Cancelled'"
+            + "  AND (CAST(:branchId AS BIGINT) IS NULL OR r.branch_id = CAST(:branchId AS BIGINT))"
+            + " UNION"
+            + " SELECT LOWER(TRIM(m.membership_plan)), m.id FROM members m"
+            + "  WHERE m.membership_plan IS NOT NULL"
+            + "  AND (CAST(:branchId AS BIGINT) IS NULL OR m.branch_id = CAST(:branchId AS BIGINT))"
+            + ") u WHERE u.k <> '' GROUP BY u.k", nativeQuery = true)
+    List<Object[]> countMembersEverOnPlan(@Param("branchId") Long branchId);
+
     /** Effectively active at :asOf among members who had joined by then — for month-end snapshots. */
     @Query("SELECT COUNT(m) FROM Member m WHERE " + BIOS_EFFECTIVELY_ACTIVE + " AND " + BIOS_JOIN_DATE + " < :asOf")
     long countEffectivelyActiveJoinedBefore(@Param("asOf") LocalDateTime asOf);

@@ -22,6 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../report-export";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -300,29 +301,31 @@ export function RenewalTransactionHistory({
     ? shownRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
     : shownRows.slice(0, PAGE_PREVIEW);
 
-  const exportCsv = () => {
-    if (rows.length === 0) {
-      toast.error("No renewal transactions to export");
-      return;
-    }
-    const cell = (v: unknown) => {
-      const s = v === null || v === undefined ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // Export / print: every row of the current filter (all pages, not only the preview)
+  const buildReport = (): ReportDocument => {
+    const list = shownRows;
+    return {
+      title: "Renewal & Upgrade Transaction History",
+      fileName: "Renewals and Upgrades History",
+      orientation: "landscape",
+      filters: [{ label: "Showing", value: filter ? (filter === "renewals" ? "Renewals" : "Upgrades, downgrades & plan changes") : "All renewals and upgrades" }],
+      sections: [
+        kpiSection([
+          { label: "Transactions", value: list.length, format: "integer" },
+          { label: "Renewals", value: list.filter((r) => r.kind === "Renewal").length, format: "integer" },
+          { label: "Upgrades", value: list.filter((r) => r.kind === "Upgrade").length, format: "integer" },
+          { label: "Downgrades / changes", value: list.filter((r) => r.kind === "Downgrade" || r.kind === "Plan Change").length, format: "integer" },
+          { label: "Amount", value: list.reduce((s, r) => s + num(r.receipt.amount), 0), format: "money" },
+          { label: "Paid", value: list.reduce((s, r) => s + num(r.receipt.paid_amount), 0), format: "money" },
+        ]),
+        tableFromMatrix("Transactions",
+          ["Receipt No", "Member", "Member ID", "Type", "Previous Plan", "New Plan", "Amount", "Paid", "Payment Method", "Date", "New Expiry", "Processed By", "Status"],
+          list.map(({ receipt: r, kind, previousPlan, newPlan }) => [
+            r.receipt_no, r.member_name, r.member_id, kind, previousPlan ?? "", newPlan,
+            num(r.amount), num(r.paid_amount), r.payment_method, r.transaction_date ? String(r.transaction_date).slice(0, 10) : "", r.valid_till ? String(r.valid_till).slice(0, 10) : "", r.processed_by ?? "", r.status,
+          ]), { totals: true, money: [6, 7] }),
+      ],
     };
-    const header = ["Receipt No", "Member", "Member ID", "Type", "Previous Plan", "New Plan",
-      `Amount (${currencyCode})`, `Paid (${currencyCode})`, "Payment Method", "Date", "New Expiry", "Processed By", "Status"];
-    const lines = rows.map(({ receipt: r, kind, previousPlan, newPlan }) => [
-      r.receipt_no, r.member_name, r.member_id, kind, previousPlan ?? "", newPlan,
-      num(r.amount), num(r.paid_amount), r.payment_method, r.transaction_date, r.valid_till ?? "", r.processed_by ?? "", r.status,
-    ]);
-    const csv = [header, ...lines].map((l) => l.map(cell).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `renewal-upgrade-history-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${rows.length} transactions`);
   };
 
   const kindBadge = (kind: RenewalKind) => {
@@ -368,10 +371,7 @@ export function RenewalTransactionHistory({
             <Button variant="outline" size="sm" onClick={load} disabled={loading} title="Refresh">
               <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             </Button>
-            <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || rows.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <ReportActions report={buildReport} disabled={loading || rows.length === 0} menuLabel="Renewal & upgrade history" compact />
             {shownRows.length > PAGE_PREVIEW && (
               <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
                 {showAll ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}

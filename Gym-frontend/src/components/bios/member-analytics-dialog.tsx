@@ -48,6 +48,7 @@ import {
   TrendingUpDown
 } from 'lucide-react';
 import { type BiosLiveData, formatSignedPercent, useBiosInsights, InsightsStatus, NoData, shareOf } from './bios-live';
+import { BiosReportActions } from "./bios-report";
 import { biosInsightsService } from '../../utils/supabase/bios-insights-service';
 
 interface MemberAnalyticsDialogProps {
@@ -1043,14 +1044,7 @@ export function MemberAnalyticsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onExportData}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button className="bg-[#E63946] hover:bg-[#d32f3f]" onClick={() => window.print()}>
-            <FileText className="h-4 w-4 mr-2" />
-            Generate PDF
-          </Button>
+          <BiosReportActions live={live} kind="member" />
         </div>
       </DialogContent>
     </Dialog>

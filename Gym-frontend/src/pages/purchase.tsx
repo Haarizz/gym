@@ -31,11 +31,12 @@ import { PurchaseInvoiceEditor, PurchaseInvoiceEditorHandle } from '../component
 import styles from '../components/purchase/PurchaseInvoice.module.css';
 import { IconBtn, ModuleHeader, NativeSelect, StatCard, SupplierFormDialog, cx } from '../components/purchase/purchaseUi';
 import {
-  STATUS_FILTERS, DisplayStatus, balanceOf, billActions, displayDate, displayStatus, exportBillsCsv, paymentSummaryLabel,
+  STATUS_FILTERS, DisplayStatus, balanceOf, billActions, displayDate, displayStatus, buildBillsReport, paymentSummaryLabel,
   fetchAllBills, fetchAllOrders, priorityMeta, statusMeta, todayIso,
 } from '../components/purchase/purchaseInvoiceUtils';
 import { buildBillDocument, printPurchaseDocument } from '../components/print-templates/purchasePrint';
 import type { BarcodePrintRequest } from './barcode-print';
+import { ReportActions } from '../components/report-export';
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 const PAGE_SIZE = 20;
@@ -482,10 +483,7 @@ export function Purchase() {
             )}
             {view === 'list' && (
               <>
-                <Button variant="outline" size="sm" disabled={filtered.length === 0}
-                  onClick={() => exportBillsCsv(filtered, currencyCode, warehouseName)}>
-                  <Download className="h-4 w-4" /> Export
-                </Button>
+                <ReportActions report={() => buildBillsReport(filtered, warehouseName)} disabled={filtered.length === 0} menuLabel="Purchase invoices" />
                 <Button variant="outline" size="sm" onClick={() => navigate('/suppliers')}><Users className="h-4 w-4" /> Suppliers</Button>
               </>
             )}

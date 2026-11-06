@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { isGymAdminRole } from "../utils/permissions";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
@@ -11,6 +12,7 @@ import {
   styles, usePalette, axisTick, Kpi, Panel, ChartTip, BarRows, Empty, Seg, Delta, fmtInt,
 } from "../components/overview/overview-kit";
 import mp from "../components/performance/my-performance.module.css";
+import { ReportActions, type ReportDocument, chartFromRows, col, countCol, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 interface MyPerformanceProps {
   onNavigate?: (section: string) => void;
@@ -53,6 +55,7 @@ function Goal({ name, achieved, target, fmt, pace, fill }: { name: string; achie
  * My Performance — the signed-in user's own figures for this month (GET /mobile/staff/performance).
  * Revenue and conversions are what was recorded under this person; accounts without a Staff record
  * (Admin, owner) are measured by their login and have no targets or leaderboard.
+ * The gym owner (ADMIN) never has targets — they set them for staff in Staff Targets.
  */
 export function MyPerformance(_props: MyPerformanceProps) {
   const navigate = useNavigate();
@@ -68,6 +71,7 @@ export function MyPerformance(_props: MyPerformanceProps) {
   const [hasStaffRecord, setHasStaffRecord] = useState<boolean | null>(null);
   const [myTargets, setMyTargets] = useState<StaffTarget[]>([]);
   const [metric, setMetric] = useState<"revenue" | "conversions">("revenue");
+  const isOwner = isGymAdminRole();
 
   const loadPerformance = useCallback(async () => {
     setLoading(true);
@@ -89,7 +93,7 @@ export function MyPerformance(_props: MyPerformanceProps) {
       try {
         const profile = await staffService.getMyProfile();
         if (!cancelled) setHasStaffRecord(!!profile);
-        if (!profile) return;
+        if (!profile || isGymAdminRole()) return; // owners have no targets
         const targets = await staffService.getTargets(undefined, undefined, undefined, Number(profile.id));
         if (!cancelled) setMyTargets(targets);
       } catch (error) {
@@ -136,6 +140,31 @@ export function MyPerformance(_props: MyPerformanceProps) {
   const topRevenue = Math.max(1, ...(p?.leaderboard ?? []).map(e => e.revenue));
   const me = p?.leaderboard.find(e => e.current_user);
 
+  const buildReport = (): ReportDocument => {
+    if (!p) throw new Error("No performance data yet");
+    return {
+      title: "My Performance",
+      period: { from: new Date(p.period.year, p.period.month - 1, 1), to: new Date(p.period.year, p.period.month, 0), label: p.period.label },
+      sections: [
+        kpiSection([
+          { label: "Revenue", value: revenue, format: "money", hint: revenueTarget ? `target ${Math.round((revenue / revenueTarget) * 100)}% reached` : "no target" },
+          { label: "Revenue target", value: revenueTarget || "—", format: "money" },
+          { label: "Conversions", value: conversions, format: "integer", hint: conversionTarget ? `of ${conversionTarget} target` : undefined },
+          { label: "Lead conversion", value: p.breakdown.conversion_rate, format: "percent" },
+          { label: "Follow-ups completed", value: p.breakdown.follow_up_completion, format: "percent" },
+          ...(rating > 0 ? [{ label: "Member rating", value: rating, format: "number" as const, hint: "out of 5" }] : []),
+          ...(me ? [{ label: "Leaderboard rank", value: me.rank, format: "integer" as const }] : []),
+        ], "This month"),
+        chartFromRows("Monthly trend", "bar", trend, "tipLabel", [{ key: "revenue", name: "Revenue", color: "#2a78d6" }], { valueFormat: "money" }),
+        tableSection("Monthly trend", [col("tipLabel", "Month"), moneyCol("revenue", "Revenue"), countCol("conversions", "Conversions")], trend, { totals: true }),
+        ...(pastTargets.length ? [tableSection("Past targets", [col("period", "Month"), moneyCol("revenue_target", "Revenue target", { total: undefined })],
+          pastTargets.map(t => ({ period: `${t.month ?? ""}/${t.year}`, revenue_target: t.revenue_target })))] : []),
+        ...(p.leaderboard.length ? [tableSection("Leaderboard", [col("rank", "Rank", "integer"), col("staff_name", "Staff"), countCol("conversion_count", "Conversions"), moneyCol("revenue", "Revenue")],
+          p.leaderboard.map(e => ({ ...e, staff_name: e.current_user ? `${e.staff_name} (you)` : e.staff_name })))] : []),
+      ],
+    };
+  };
+
   if (loading && !p) {
     return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading your performance…</div></div>;
   }
@@ -153,9 +182,10 @@ export function MyPerformance(_props: MyPerformanceProps) {
           <Button variant="outline" size="sm" onClick={loadPerformance} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          {hasStaffRecord && (
+          <ReportActions report={buildReport} disabled={!p} menuLabel="My performance" />
+          {(hasStaffRecord || isOwner) && (
             <Button size="sm" onClick={() => navigate("/my-targets")}>
-              <Target className="h-4 w-4 mr-2" />My Targets
+              <Target className="h-4 w-4 mr-2" />{isOwner ? "Staff Targets" : "My Targets"}
             </Button>
           )}
         </div>
@@ -173,13 +203,31 @@ export function MyPerformance(_props: MyPerformanceProps) {
             <div className={`${styles.card} ${styles.filters}`} style={{ alignItems: "flex-start", flexWrap: "nowrap", fontSize: "var(--text-sm)", color: "var(--muted-foreground)" }}>
               <Info size={16} style={{ flexShrink: 0, marginTop: 2, color: "var(--primary)" }} />
               <span>
-                Your account isn't linked to a staff record, so these figures are the receipts, leads, follow-ups and POS sales recorded
-                under your login. Targets and the branch leaderboard appear once the account is linked to a staff member in Staffs &amp; Trainers.
+                {isOwner
+                  ? "These figures are the receipts, leads, follow-ups and POS sales recorded under your login. As the gym owner you don't have targets — you set them for your staff in Staff Targets."
+                  : <>Your account isn't linked to a staff record, so these figures are the receipts, leads, follow-ups and POS sales recorded
+                    under your login. Targets and the branch leaderboard appear once the account is linked to a staff member in Staffs &amp; Trainers.</>}
               </span>
             </div>
           )}
 
-          {/* Where you stand this month */}
+          {/* Where you stand this month — the owner has no targets, so theirs is just the month so far */}
+          {isOwner ? (
+          <div className={`${styles.card} ${mp.hero}`} data-status="ON_TRACK">
+            <Ring pct={pace} label={`${pace}%`} sub="of month" />
+            <div className={mp.heroText}>
+              <span className={mp.heroTag}>Gym owner</span>
+              <span className={mp.heroTitle}>{money(revenue)} recorded under your login in {p.period.label}</span>
+              <span className={mp.heroMsg}>Owners don't have targets. You set monthly targets for your staff and track their progress in Staff Targets.</span>
+            </div>
+            <div className={mp.goals}>
+              <Button size="sm" variant="outline" style={{ alignSelf: "flex-start" }} onClick={() => navigate("/my-targets")}>
+                <Target className="h-4 w-4 mr-2" />Open Staff Targets
+              </Button>
+              <span className={mp.goalNote}>Day {now.getDate()} of {daysInMonth} — {pace}% of the month gone.</span>
+            </div>
+          </div>
+          ) : (
           <div className={`${styles.card} ${mp.hero}`} data-status={status}>
             {revenueTarget > 0
               ? <Ring pct={p.revenue_target.percentage} label={`${p.revenue_target.percentage}%`} sub="of target" />
@@ -208,13 +256,14 @@ export function MyPerformance(_props: MyPerformanceProps) {
               )}
             </div>
           </div>
+          )}
 
           <div className={styles.kpis}>
             <Kpi icon={TrendingUp} tone="blue" label="Revenue" value={money(revenue)}
               delta={p.summary.growth_percentage ? <Delta pct={p.summary.growth_percentage} /> : undefined}
               hint={p.summary.growth_percentage ? "vs same days last month" : lastMonth ? `last month ${money(lastMonth.revenue)}` : undefined} />
             <Kpi icon={UserPlus} tone="green" label="Conversions" value={fmtInt(conversions)}
-              hint={conversionTarget > 0 ? `target ${fmtInt(conversionTarget)}` : lastMonth ? `last month ${fmtInt(lastMonth.conversions)}` : "new members signed up"} />
+              hint={!isOwner && conversionTarget > 0 ? `target ${fmtInt(conversionTarget)}` : lastMonth ? `last month ${fmtInt(lastMonth.conversions)}` : "new members signed up"} />
             <Kpi icon={Users} tone="violet" label="Leads assigned" value={fmtInt(p.summary.lead_count)} hint="all leads in your name"
               onClick={() => navigate("/leads")} />
             <Kpi icon={Target} tone="teal" label="Lead conversion" value={`${p.breakdown.conversion_rate}%`} hint="of your leads became members" />
@@ -260,7 +309,7 @@ export function MyPerformance(_props: MyPerformanceProps) {
 
             <Panel title="How well you follow through" icon={Heart} sub="All-time rates for leads and follow-ups in your name">
               <BarRows rows={qualityRows} fmt={n => `${n}%`} empty="Nothing to measure yet." />
-              {pastTargets.length > 0 && (
+              {!isOwner && pastTargets.length > 0 && (
                 <div style={{ marginTop: "auto", paddingTop: "1rem", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                   <span className={styles.factLabel}>Earlier targets</span>
                   {pastTargets.map(t => (

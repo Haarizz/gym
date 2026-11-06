@@ -459,6 +459,8 @@ class MembersService {
     reason?: string;
     overrideLimits?: boolean;
     waiveCharge?: boolean;
+    /** Staff's choice for this freeze; omitted follows the plan's auto-unfreeze setting. */
+    autoUnfreeze?: boolean;
   }): Promise<Member> {
     const response = await authService.makeAuthenticatedRequest(
       `${backendBaseUrl}/members/${id}/freeze`,

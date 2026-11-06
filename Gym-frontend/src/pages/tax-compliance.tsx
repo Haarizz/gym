@@ -24,6 +24,7 @@ import {
   ChevronRight, Bell, Percent, Truck, BadgeCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from '../components/report-export';
 
 const taxTypeColors: Record<string, string> = {
   STANDARD: "bg-blue-100 text-blue-800",
@@ -96,18 +97,7 @@ function money(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Downloads rows as a CSV file (opens in Excel). */
-function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const csv = rows
-    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\r\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+
 
 function daysUntil(dateStr: string): number {
   const d = new Date(dateStr);
@@ -231,37 +221,48 @@ export function TaxCompliance() {
   const salesRateLabel = taxDefaults?.vatRegistered && taxDefaults.salesRate != null ? ` (${formatRate(taxDefaults.salesRate)})` : '';
   const purchaseRateLabel = taxDefaults?.vatRegistered && taxDefaults.purchaseRate != null ? ` (${formatRate(taxDefaults.purchaseRate)})` : '';
 
-  const exportCorporateTax = () => {
+  const buildCorporateTaxReport = (): ReportDocument => {
     const s = annualTaxSummary;
-    if (!s) return;
-    downloadCsv(`corporate-tax-${s.periodFrom}-to-${s.periodTo}.csv`, [
-      ['Corporate Tax Summary', `${s.periodFrom} to ${s.periodTo}`],
-      ['Currency', currencyCode],
-      ['Total Revenue', s.totalRevenue.toFixed(2)],
-      ['Deductions', s.deductions.toFixed(2)],
-      ['Taxable Profit', s.taxableProfit.toFixed(2)],
-      ['0% threshold', s.corporateTaxZeroRateThreshold.toFixed(2)],
-      ['Tax rate above threshold (%)', (s.corporateTaxRate * 100).toFixed(2)],
-      ['Corporate Tax Payable', s.corporateTaxPayable.toFixed(2)],
-    ]);
+    if (!s) throw new Error('The corporate tax summary is still loading');
+    return {
+      title: 'Corporate Tax Summary', fileName: 'Corporate Tax',
+      period: { from: s.periodFrom, to: s.periodTo },
+      sections: [
+        kpiSection([
+          { label: 'Taxable profit', value: s.taxableProfit, format: 'money' },
+          { label: 'Corporate tax payable', value: s.corporateTaxPayable, format: 'money' },
+        ]),
+        { kind: 'keyValue', title: 'Computation', items: [
+          { label: 'Total revenue', value: s.totalRevenue, format: 'money' },
+          { label: 'Deductions', value: s.deductions, format: 'money' },
+          { label: 'Taxable profit', value: s.taxableProfit, format: 'money' },
+          { label: '0% threshold', value: s.corporateTaxZeroRateThreshold, format: 'money' },
+          { label: 'Tax rate above threshold', value: s.corporateTaxRate * 100, format: 'percent' },
+          { label: 'Corporate tax payable', value: s.corporateTaxPayable, format: 'money' },
+        ] },
+      ],
+    };
   };
 
-  const exportVatReturn = () => {
+  const buildVatReturnReport = (): ReportDocument => {
     const s = quarterlyTaxSummary;
-    if (!s) return;
-    downloadCsv(`vat-return-${s.periodFrom}-to-${s.periodTo}.csv`, [
-      ['VAT Return', `${s.periodFrom} to ${s.periodTo}`],
-      ['Currency', currencyCode],
-      ['VAT registered', vatRegistered ? 'Yes' : 'No'],
-      ['TRN', taxDefaults?.trn ?? ''],
-      ['Default VAT rate (sales)', formatRate(taxDefaults?.salesRate)],
-      ['Purchase tax rate', formatRate(taxDefaults?.purchaseRate)],
-      ['Output VAT', s.outputVat.toFixed(2)],
-      ['Input VAT', s.inputVat.toFixed(2)],
-      ['Net VAT Payable', s.netVatPayable.toFixed(2)],
-      ...(s.taxByCode.length ? [[], ['Tax Code', 'Name', 'Type', 'Output', 'Input']] : []),
-      ...s.taxByCode.map(t => [t.taxCode, t.name, t.taxType, t.outputAmount.toFixed(2), t.inputAmount.toFixed(2)]),
-    ]);
+    if (!s) throw new Error('The VAT summary is still loading');
+    return {
+      title: 'VAT Return', period: { from: s.periodFrom, to: s.periodTo },
+      filters: [{ label: 'VAT registered', value: vatRegistered ? 'Yes' : 'No' }],
+      sections: [
+        kpiSection([
+          { label: 'Output VAT', value: s.outputVat, format: 'money' },
+          { label: 'Input VAT', value: s.inputVat, format: 'money' },
+          { label: 'Net VAT payable', value: s.netVatPayable, format: 'money', tone: s.netVatPayable > 0 ? 'bad' : 'good' },
+        ]),
+        { kind: 'keyValue', title: 'Rates', items: [
+          { label: 'Default VAT rate (sales)', value: formatRate(taxDefaults?.salesRate) },
+          { label: 'Purchase tax rate', value: formatRate(taxDefaults?.purchaseRate) },
+        ] },
+        tableSection('Tax by code', [col('taxCode', 'Tax code'), col('name', 'Name'), col('taxType', 'Type'), moneyCol('outputAmount', 'Output'), moneyCol('inputAmount', 'Input')], s.taxByCode, { totals: true, emptyText: 'No taxed transactions in this period.' }),
+      ],
+    };
   };
 
   const configuredRatesCard = (
@@ -814,10 +815,7 @@ export function TaxCompliance() {
                     ? 'Output VAT is collected on membership, add-on, POS and invoice sales; Input VAT is reclaimed on expenses and supplier bills. Rates are set in Settings › Tax Configuration.'
                     : 'This branch is not VAT registered (Settings › Tax Configuration), so its sales and purchases carry no VAT.'}
                 </p>
-                <Button className="w-full bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"
-                  onClick={exportVatReturn} disabled={taxSummaryLoading || !quarterlyTaxSummary}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />Download CSV
-                </Button>
+                <ReportActions report={buildVatReturnReport} disabled={taxSummaryLoading || !quarterlyTaxSummary} menuLabel="VAT return" className="w-full justify-center" />
               </CardContent>
             </Card>
 
@@ -843,10 +841,7 @@ export function TaxCompliance() {
                     UAE Corporate Tax: 0% on the first <CurrencyGlyph /> {annualTaxSummary.corporateTaxZeroRateThreshold.toLocaleString()} of taxable profit, {formatRate(annualTaxSummary.corporateTaxRate * 100)} above it.
                   </p>
                 )}
-                <Button className="w-full bg-white shadow-sm hover:shadow-md border-0" variant="ghost" size="sm"
-                  onClick={exportCorporateTax} disabled={taxSummaryLoading || !annualTaxSummary}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />Download CSV
-                </Button>
+                <ReportActions report={buildCorporateTaxReport} disabled={taxSummaryLoading || !annualTaxSummary} menuLabel="Corporate tax" className="w-full justify-center" />
               </CardContent>
             </Card>
           </div>

@@ -24,12 +24,18 @@ public class StaffTargetService {
     private final StaffTargetRepository targetRepository;
     private final StaffRepository staffRepository;
     private final StaffProgressCalculator progressCalculator;
+    private final com.company.project.repositories.UserRepository userRepository;
+
+    /** The gym owner's roles: they set targets for staff and never have one themselves. */
+    private static final java.util.Set<String> OWNER_ROLES = java.util.Set.of("ADMIN", "SUPER_ADMIN");
 
     public StaffTargetService(StaffTargetRepository targetRepository, StaffRepository staffRepository,
-                               StaffProgressCalculator progressCalculator) {
+                               StaffProgressCalculator progressCalculator,
+                               com.company.project.repositories.UserRepository userRepository) {
         this.targetRepository = targetRepository;
         this.staffRepository = staffRepository;
         this.progressCalculator = progressCalculator;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -177,7 +183,23 @@ public class StaffTargetService {
         if (req.getStaffDbId() != null) {
             Staff staff = staffRepository.findById(req.getStaffDbId())
                     .orElseThrow(() -> new RuntimeException("Staff not found: " + req.getStaffDbId()));
+            if (isLinkedToOwner(staff)) {
+                throw new com.company.project.exceptions.BusinessRuleViolationException(
+                        staff.getName() + " signs in as the gym owner (Admin). Owners set targets for staff and don't have targets themselves.");
+            }
             target.setStaff(staff);
         }
+    }
+
+    /** Whether this staff record's login is an owner account (ADMIN / SUPER_ADMIN). */
+    private boolean isLinkedToOwner(Staff staff) {
+        if (staff.getUserId() == null) return false;
+        return userRepository.findById(staff.getUserId())
+                .map(u -> u.getUserRoles().stream()
+                        .map(ur -> ur.getRole() != null ? ur.getRole().getRoleName() : null)
+                        .filter(java.util.Objects::nonNull)
+                        .map(r -> r.toUpperCase(java.util.Locale.ROOT).replace("ROLE_", ""))
+                        .anyMatch(OWNER_ROLES::contains))
+                .orElse(false);
     }
 }

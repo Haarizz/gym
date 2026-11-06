@@ -183,8 +183,28 @@ public class FinancialEventService {
         return addons.divide(total, 6, java.math.RoundingMode.HALF_UP).min(BigDecimal.ONE);
     }
 
+    private TaxPolicyService taxPolicyService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setTaxPolicyService(TaxPolicyService taxPolicyService) {
+        this.taxPolicyService = taxPolicyService;
+    }
+
+    /**
+     * VAT on member payments: none for a branch that isn't VAT registered (no TRN, or the switch in
+     * Settings › Tax Configuration off) — the printed receipt shows no VAT for it either (tax.ts vatRateFor).
+     */
+    private BigDecimal vatRateFor(Long branchId) {
+        if (taxPolicyService != null && !taxPolicyService.vatRegistered(branchId)) return BigDecimal.ZERO;
+        return getStandardVatRate();
+    }
+
     private BigDecimal[] splitVatInclusive(BigDecimal grossAmount) {
-        BigDecimal rate = getStandardVatRate();
+        return splitVatInclusive(grossAmount, null);
+    }
+
+    private BigDecimal[] splitVatInclusive(BigDecimal grossAmount, Long branchId) {
+        BigDecimal rate = vatRateFor(branchId);
         if (rate.compareTo(BigDecimal.ZERO) <= 0) {
             return new BigDecimal[] { grossAmount, BigDecimal.ZERO };
         }
@@ -229,7 +249,7 @@ public class FinancialEventService {
             // issued (onInvoiceIssued) — this only settles the receivable.
             lines.add(cr(ACC_RECEIVABLE, "Accounts Receivable", amount, "Invoice payment"));
         } else {
-            BigDecimal[] split = splitVatInclusive(amount);
+            BigDecimal[] split = splitVatInclusive(amount, receipt.getBranchId());
             // A registration receipt can carry add-ons / facility access too (and a settlement
             // pays into such a bill): their share of the money is add-on revenue, never
             // membership or deferred revenue.

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { statusColors, categoryIcons } from "./manage-assets";
 import { assetsService, Asset, AssetEvent } from "../utils/supabase/assets-service";
 import { CurrencyValue } from "../utils/currency";
+import { ReportActions, type ReportDocument, col, tableSection } from "../components/report-export";
 import {
   History,
   CalendarDays,
@@ -97,14 +98,28 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-const exportAssetHistory = (asset: any, events: AssetEvent[], format: "pdf" | "excel") => {
-  console.log(`Exporting ${asset.name} history as ${format.toUpperCase()}`, events);
-  if (format === "pdf") {
-    alert(`PDF report for ${asset.name} will be downloaded shortly.`);
-  } else {
-    alert(`Excel report for ${asset.name} will be downloaded shortly.`);
-  }
-};
+/** One asset's lifecycle as a report-export document (PDF / Excel / print). */
+const buildAssetHistoryReport = (asset: any, events: AssetEvent[]): ReportDocument => ({
+  title: "Asset History & Lifecycle",
+  fileName: `Asset History ${asset.code || asset.name}`,
+  period: { to: new Date(), label: "Full history" },
+  sections: [
+    { kind: "keyValue", title: "Asset", columns: 3, items: [
+      { label: "Asset", value: asset.name },
+      { label: "Code", value: asset.code || "—" },
+      { label: "Category", value: asset.category || "—" },
+      { label: "Status", value: asset.status || "—" },
+      { label: "Purchase date", value: asset.purchaseDate || "—", format: "date" },
+      { label: "Purchase price", value: asset.purchasePrice ?? "—", format: "money" },
+      { label: "Current value", value: asset.currentValue ?? "—", format: "money" },
+      ...(asset.utilizationRate != null ? [{ label: "Utilization", value: asset.utilizationRate, format: "percent" as const }] : []),
+    ] },
+    tableSection("Lifecycle events", [
+      col("date", "Date", "date"), col("type", "Type"), col("title", "Event"), col("description", "Description", "text", { wrap: true }),
+      col("location", "Location"), col("status", "Status"), col("amount", "Amount", "money", { total: "sum" }),
+    ], events.map(e => ({ ...e, description: e.description ?? "", location: e.location ?? "", status: e.status ?? "" })), { totals: true, emptyText: "No events recorded for this asset." }),
+  ],
+});
 
 export function AssetHistoryPage() {
   const navigate = useNavigate();
@@ -253,14 +268,7 @@ export function AssetHistoryPage() {
 
           {selectedHistoryAsset && (
             <div className="flex items-center gap-2 md:justify-end">
-              <Button variant="outline" size="sm" onClick={() => exportAssetHistory(selectedHistoryAsset, events, "pdf")}>
-                <Printer className="h-4 w-4 mr-2" />
-                Export PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportAssetHistory(selectedHistoryAsset, events, "excel")}>
-                <FileBarChart className="h-4 w-4 mr-2" />
-                Export Excel
-              </Button>
+              <ReportActions report={() => buildAssetHistoryReport(selectedHistoryAsset, events)} menuLabel={selectedHistoryAsset.name} />
             </div>
           )}
         </div>

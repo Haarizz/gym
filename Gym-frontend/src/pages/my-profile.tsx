@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isGymAdminRole } from "../utils/permissions";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -23,6 +24,7 @@ import { ThemeSettings } from "../components/settings/ThemeSettings";
 import styles from "../components/analytics/community-analytics.module.css";
 import rs from "../components/reports/reports-analytics.module.css";
 import pf from "../components/profile/my-profile.module.css";
+import { ReportActions, type ReportDocument, tableFromMatrix } from "../components/report-export";
 
 interface MyProfileProps {
   onNavigate?: (section: string) => void;
@@ -159,7 +161,11 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
   // Active tab lives in the URL (?tab=performance) so tabs can be linked to and survive a refresh.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as ProfileTab | null;
-  const activeTab: ProfileTab = tabParam && TABS.some(t => t.id === tabParam) ? tabParam : initialTab;
+  // The gym owner (ADMIN) has no targets — they set them for staff — so no Targets tab for them.
+  const isOwner = isGymAdminRole();
+  const tabs = isOwner ? TABS.filter(t => t.id !== "targets") : TABS;
+  const activeTab: ProfileTab = tabParam && tabs.some(t => t.id === tabParam) ? tabParam
+    : initialTab === "targets" && isOwner ? "personal" : initialTab;
   const openTab = (tab: ProfileTab) => setSearchParams(tab === initialTab ? {} : { tab }, { replace: true });
 
   // ── Profile ──
@@ -221,7 +227,7 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
   const [myTargets, setMyTargets] = useState<StaffTarget[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
   useEffect(() => {
-    if (!staffProfile?.id) { setMyTargets([]); return; }
+    if (!staffProfile?.id || isGymAdminRole()) { setMyTargets([]); return; }
     let cancelled = false;
     setLoadingTargets(true);
     staffService.getTargets(undefined, undefined, undefined, Number(staffProfile.id))
@@ -373,32 +379,33 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
     window.location.href = "/";
   };
 
-  const exportTransactions = () => {
-    if (!tx) return;
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const buildTransactionsReport = (): ReportDocument => {
+    if (!tx) throw new Error("Your transactions are still loading");
+    const titles = { salary: "My Salary Payments", advances: "My Salary Advances", receipts: "Receipts I Processed", pos: "My POS Sales" } as const;
     let header: string[] = [];
     let rows: unknown[][] = [];
+    let money: number[] = [];
     if (txView === "salary") {
       header = ["Month", "Year", "Net salary", "Gross", "Deductions", "Paid on", "Method", "Status"];
-      rows = tx.salary_payments.map(p => [p.month, p.year, p.net_salary, p.gross ?? "", p.total_deductions ?? "", p.payment_date ?? "", p.method ?? "", p.status ?? ""]);
+      rows = tx.salary_payments.map(p => [p.month, String(p.year), p.net_salary, p.gross ?? "", p.total_deductions ?? "", p.payment_date ?? "", p.method ?? "", p.status ?? ""]);
+      money = [2, 3, 4];
     } else if (txView === "advances") {
       header = ["Advance", "Type", "Requested", "Approved", "Recovered", "Balance", "Installments", "Status", "Requested on"];
       rows = tx.advances.map(a => [`ADV-${a.id}`, a.advance_type ?? "", a.requested_amount ?? "", a.approved_amount ?? "", a.total_deducted ?? "", a.balance ?? "", a.installment_count ?? "", a.status ?? "", a.request_date ?? ""]);
+      money = [2, 3, 4, 5];
     } else if (txView === "receipts") {
       header = ["Receipt", "Date", "Member", "Plan / item", "Type", "Paid", "Billed", "Method", "Status"];
       rows = tx.receipts.map(r => [r.receipt_no ?? r.id, r.date ?? "", r.member_name ?? "", r.plan_name ?? "", r.transaction_type ?? "", r.paid_amount ?? "", r.amount ?? "", r.payment_method ?? "", r.status ?? ""]);
+      money = [5, 6];
     } else {
       header = ["Sale", "Date", "Customer", "Method", "Total", "Refunded", "Net"];
       rows = tx.pos_sales.map(s => [s.transaction_number ?? s.id, s.date ?? "", s.member_name ?? "", s.payment_method ?? "", s.total, s.refunded, s.net]);
+      money = [4, 5, 6];
     }
-    if (!rows.length) { toast.info("Nothing to export in this list."); return; }
-    const csv = [header, ...rows].map(r => r.map(esc).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `my-${txView}-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return {
+      title: titles[txView], fileName: titles[txView], period: { label: "All my records" },
+      sections: [tableFromMatrix(titles[txView], header, rows, { totals: true, money, noMoney: txView === "advances" ? [6] : [] })],
+    };
   };
 
   const strength = passwordStrength(newPassword);
@@ -464,10 +471,17 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
             <div className={pf.heroStatValue}>{perfState === "ready" && conv ? conv.achieved : "—"}</div>
             <div className={pf.heroStatLabel}>Conversions</div>
           </div>
-          <div className={pf.heroStat}>
-            <div className={pf.heroStatValue}>{staffProfile ? `${targetsSummary.completed}/${targetsSummary.total}` : "—"}</div>
-            <div className={pf.heroStatLabel}>Targets met</div>
-          </div>
+          {isOwner ? (
+            <div className={pf.heroStat}>
+              <div className={pf.heroStatValue}>{perfState === "ready" && performance ? performance.summary.lead_count : "—"}</div>
+              <div className={pf.heroStatLabel}>Leads</div>
+            </div>
+          ) : (
+            <div className={pf.heroStat}>
+              <div className={pf.heroStatValue}>{staffProfile ? `${targetsSummary.completed}/${targetsSummary.total}` : "—"}</div>
+              <div className={pf.heroStatLabel}>Targets met</div>
+            </div>
+          )}
           <div className={pf.heroStat}>
             <div className={pf.heroStatValue}>{attendanceRate != null ? `${attendanceRate}%` : "—"}</div>
             <div className={pf.heroStatLabel}>{attendance?.linked ? "Attendance this month" : "Attendance"}</div>
@@ -477,7 +491,7 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
 
       {/* Tabs */}
       <div className={`${styles.card} ${rs.tabsBar}`} role="tablist" aria-label="Profile sections">
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {tabs.map(({ id, label, icon: Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={activeTab === id} data-active={activeTab === id} className={rs.tab} onClick={() => openTab(id)}>
             <Icon size={15} />{label}
           </button>
@@ -618,7 +632,7 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
                   delta={<Delta pct={performance.summary.growth_percentage} />}
                   hint={performance.revenue_target.target > 0 ? `${performance.revenue_target.percentage}% of ${money(performance.revenue_target.target)}` : "vs last month"} />
                 <Tile icon={UserCheck} tone="blue" label="Conversions" value={String(performance.conversion_target.achieved)}
-                  hint={performance.conversion_target.target > 0 ? `${performance.conversion_target.percentage}% of ${performance.conversion_target.target}` : "no target set"} />
+                  hint={performance.conversion_target.target > 0 ? `${performance.conversion_target.percentage}% of ${performance.conversion_target.target}` : isOwner ? "this month" : "no target set"} />
                 <Tile icon={Users} tone="violet" label="Leads" value={String(performance.summary.lead_count)} hint={`${performance.breakdown.conversion_rate}% converted`} />
                 <Tile icon={Trophy} tone="amber" label="Member rating" value={performance.summary.rating > 0 ? `${performance.summary.rating} / 5` : "—"}
                   hint={performance.summary.rating > 0 ? "from workout feedback" : "no ratings yet"} />
@@ -654,7 +668,7 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
                       <Meter value={value} color={color} />
                     </div>
                   ))}
-                  {performance.motivation?.message && (
+                  {!isOwner && performance.motivation?.message && (
                     <div className={pf.notice} style={{ ["--tone" as any]: performance.motivation.status === "AT_RISK" ? "#d03b3b" : performance.motivation.status === "ACHIEVED" ? "#0ca30c" : "var(--primary)" }}>
                       <Target size={16} /><span>{performance.motivation.message}</span>
                     </div>
@@ -761,7 +775,7 @@ export function MyProfile({ onNavigate, initialTab = "personal" }: MyProfileProp
               <Button variant="outline" size="sm" onClick={() => loadTransactions(txDays)} disabled={txState === "loading"}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${txState === "loading" ? "animate-spin" : ""}`} />Refresh
               </Button>
-              <Button variant="outline" size="sm" onClick={exportTransactions} disabled={!tx}><Download className="h-4 w-4 mr-2" />Export CSV</Button>
+              <ReportActions report={buildTransactionsReport} disabled={!tx} menuLabel="My transactions" />
             </div>
           </div>
 

@@ -35,6 +35,19 @@ export function hasPermission(permissionKey: string): boolean {
   return permissionsCache.includes(permissionKey);
 }
 
+/**
+ * True for the gym owner's roles (ADMIN / SUPER_ADMIN), read from the login's stored roles —
+ * the same check App.tsx uses for GYM_OWNER_ONLY pages. GYMBIOS_ADMIN (platform) is not one.
+ */
+export function isGymAdminRole(): boolean {
+  const norm = (r: string | null | undefined) => (r ?? "").toLowerCase().replace("role_", "");
+  let roles: string[] = [];
+  try { roles = JSON.parse(sessionStorage.getItem("roles") || "[]") as string[]; } catch { roles = []; }
+  const all = [...roles.map(norm), norm(sessionStorage.getItem("gymbios_role_name"))];
+  if (all.includes("gymbios_admin")) return false;
+  return all.includes("admin") || all.includes("super_admin");
+}
+
 /** True if the user has at least one of the given permission keys. */
 export function hasAnyPermission(permissionKeys: string[]): boolean {
   return permissionKeys.some((key) => permissionsCache.includes(key));
