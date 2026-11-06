@@ -127,6 +127,40 @@ public class MobileDiscoveryController {
         }
     }
 
+    /**
+     * Runs {@code work} against one gym's tenant DB on an EntityManager of its own.
+     *
+     * Under OSIV the request's EntityManager keeps the first connection it opens. Anything
+     * read before the tenant switch — e.g. {@link #callerGender()}, whose REQUIRES_NEW
+     * transaction joins that EntityManager because no transaction is active yet — pins it
+     * to the global DB, and every later "tenant" read would silently hit the global DB
+     * ("Branch not found in tenant DB"). Its first-level cache also mixes ids across
+     * tenants. So the request's EntityManager is set aside, a fresh one serves the
+     * tenant, and the original is put back afterwards.
+     */
+    private <T> T inTenant(String tenantSlug, Long branchId, java.util.function.Supplier<T> work) {
+        EntityManagerHolder requestEmHolder = TransactionSynchronizationManager.hasResource(entityManagerFactory)
+                ? (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory)
+                : null;
+        try {
+            TenantContextHolder.setCurrentTenant(tenantSlug);
+            BranchContextHolder.setActiveBranchId(branchId);
+            TransactionSynchronizationManager.bindResource(entityManagerFactory,
+                    new EntityManagerHolder(entityManagerFactory.createEntityManager()));
+            return work.get();
+        } finally {
+            if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
+                EntityManagerHolder tenantEmHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
+                EntityManagerFactoryUtils.closeEntityManager(tenantEmHolder.getEntityManager());
+            }
+            if (requestEmHolder != null) {
+                TransactionSynchronizationManager.bindResource(entityManagerFactory, requestEmHolder);
+            }
+            BranchContextHolder.clear();
+            TenantContextHolder.clear();
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<CenterSummaryDTO>> getCenters() {
         // Branch Access Type: a member only sees centers they're allowed to join
@@ -143,67 +177,49 @@ public class MobileDiscoveryController {
                     dto.setLat(c.getLat());
                     dto.setLng(c.getLng());
 
-                    // Each center lives in a different tenant DB. Under OSIV the request's
-                    // EntityManager holds the first tenant connection it opens (and its
-                    // first-level cache — branch ids collide across tenants), so every
-                    // later center would silently be read from the first gym's DB. Give
-                    // each tenant its own EntityManager instead.
-                    EntityManagerHolder requestEmHolder = TransactionSynchronizationManager.hasResource(entityManagerFactory)
-                            ? (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory)
-                            : null;
-                    try {
-                        TenantContextHolder.setCurrentTenant(c.getTenantSlug());
-                        BranchContextHolder.setActiveBranchId(c.getBranchId());
-                        TransactionSynchronizationManager.bindResource(entityManagerFactory,
-                                new EntityManagerHolder(entityManagerFactory.createEntityManager()));
-
-                        // Same source of truth as getCenterDetails — the tenant's Branch row
-                        // (edited in Branch Settings), with the discovery copy as fallback.
-                        Branch branch = branchRepository.findById(c.getBranchId()).orElse(null);
-                        if (branch != null) {
-                            if (branch.getAddress() != null && !branch.getAddress().isBlank()) dto.setAddress(branch.getAddress());
-                            if (branch.getLat() != null) dto.setLat(branch.getLat());
-                            if (branch.getLng() != null) dto.setLng(branch.getLng());
-                            dto.setCenterType(branch.getCenterType());
-                            dto.setAccessType(branch.getAccessType());
-                            if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
-                                dto.setAcceptedPaymentMethods(java.util.Arrays.stream(branch.getAcceptedPaymentMethods().split(","))
-                                        .map(String::trim)
-                                        .filter(s -> !s.isEmpty())
-                                        .collect(Collectors.toList()));
+                    // Each center lives in a different tenant DB — each gets its own
+                    // EntityManager (see inTenant).
+                    inTenant(c.getTenantSlug(), c.getBranchId(), () -> {
+                        try {
+                            // Same source of truth as getCenterDetails — the tenant's Branch row
+                            // (edited in Branch Settings), with the discovery copy as fallback.
+                            Branch branch = branchRepository.findById(c.getBranchId()).orElse(null);
+                            if (branch != null) {
+                                if (branch.getAddress() != null && !branch.getAddress().isBlank()) dto.setAddress(branch.getAddress());
+                                if (branch.getLat() != null) dto.setLat(branch.getLat());
+                                if (branch.getLng() != null) dto.setLng(branch.getLng());
+                                dto.setCenterType(branch.getCenterType());
+                                dto.setAccessType(branch.getAccessType());
+                                if (branch.getAcceptedPaymentMethods() != null && !branch.getAcceptedPaymentMethods().isBlank()) {
+                                    dto.setAcceptedPaymentMethods(java.util.Arrays.stream(branch.getAcceptedPaymentMethods().split(","))
+                                            .map(String::trim)
+                                            .filter(s -> !s.isEmpty())
+                                            .collect(Collectors.toList()));
+                                }
                             }
-                        }
 
-                        // Same cover rule as getCenterDetails: the flagged cover, else the first gallery image.
-                        List<com.company.project.entities.BranchImage> images =
-                                branchImageRepository.findByBranchIdOrderBySortOrderAsc(c.getBranchId());
-                        images.stream().filter(com.company.project.entities.BranchImage::isCover).findFirst()
-                                .or(() -> images.stream().findFirst())
-                                .ifPresent(cover -> dto.setCoverImageUrl(cover.getImageUrl()));
+                            // Same cover rule as getCenterDetails: the flagged cover, else the first gallery image.
+                            List<com.company.project.entities.BranchImage> images =
+                                    branchImageRepository.findByBranchIdOrderBySortOrderAsc(c.getBranchId());
+                            images.stream().filter(com.company.project.entities.BranchImage::isCover).findFirst()
+                                    .or(() -> images.stream().findFirst())
+                                    .ifPresent(cover -> dto.setCoverImageUrl(cover.getImageUrl()));
 
-                        long reviewCount = reviewRepository.countByBranchId(c.getBranchId());
-                        dto.setReviewCount(reviewCount);
-                        dto.setAvgRating(reviewCount > 0 ? reviewRepository.findAverageRatingByBranchId(c.getBranchId()) : null);
+                            long reviewCount = reviewRepository.countByBranchId(c.getBranchId());
+                            dto.setReviewCount(reviewCount);
+                            dto.setAvgRating(reviewCount > 0 ? reviewRepository.findAverageRatingByBranchId(c.getBranchId()) : null);
 
-                        List<MembershipPlanResponseDTO> plans = planService.getPlans("Active");
-                        BigDecimal minPrice = plans.stream()
-                            .map(MembershipPlanResponseDTO::getEffectivePrice)
-                            .min(BigDecimal::compareTo)
-                            .orElse(null);
-                        dto.setStartingPrice(minPrice);
-                    } catch (Exception e) {
-                         // ignore
-                    } finally {
-                        if (TransactionSynchronizationManager.hasResource(entityManagerFactory)) {
-                            EntityManagerHolder tenantEmHolder = (EntityManagerHolder) TransactionSynchronizationManager.unbindResource(entityManagerFactory);
-                            EntityManagerFactoryUtils.closeEntityManager(tenantEmHolder.getEntityManager());
+                            List<MembershipPlanResponseDTO> plans = planService.getPlans("Active");
+                            BigDecimal minPrice = plans.stream()
+                                .map(MembershipPlanResponseDTO::getEffectivePrice)
+                                .min(BigDecimal::compareTo)
+                                .orElse(null);
+                            dto.setStartingPrice(minPrice);
+                        } catch (Exception e) {
+                             // ignore
                         }
-                        if (requestEmHolder != null) {
-                            TransactionSynchronizationManager.bindResource(entityManagerFactory, requestEmHolder);
-                        }
-                        BranchContextHolder.clear();
-                        TenantContextHolder.clear();
-                    }
+                        return null;
+                    });
 
                     return dto;
                 })
@@ -223,10 +239,7 @@ public class MobileDiscoveryController {
                 .orElseThrow(() -> new RuntimeException("Center not found"));
         java.util.Optional<String> gender = callerGender();
 
-        try {
-            TenantContextHolder.setCurrentTenant(tenantSlug);
-            BranchContextHolder.setActiveBranchId(branchId);
-
+        return inTenant(tenantSlug, branchId, () -> {
             Branch branch = branchRepository.findById(branchId)
                     .orElseThrow(() -> new RuntimeException("Branch not found in tenant DB"));
 
@@ -288,10 +301,7 @@ public class MobileDiscoveryController {
             dto.setTrainers(memberStaffService.getCenterTrainers(branchId));
 
             return ResponseEntity.ok(dto);
-        } finally {
-            BranchContextHolder.clear();
-            TenantContextHolder.clear();
-        }
+        });
     }
 
     /**
@@ -305,15 +315,8 @@ public class MobileDiscoveryController {
             @PathVariable Long branchId,
             @RequestParam String code,
             @RequestParam(required = false) BigDecimal amount) {
-        try {
-            TenantContextHolder.setCurrentTenant(tenantSlug);
-            BranchContextHolder.setActiveBranchId(branchId);
-            return ResponseEntity.ok(discountCodeService.resolve(code, amount,
-                    com.company.project.services.PromotionAudience.Buyer.JOINING));
-        } finally {
-            BranchContextHolder.clear();
-            TenantContextHolder.clear();
-        }
+        return inTenant(tenantSlug, branchId, () -> ResponseEntity.ok(discountCodeService.resolve(code, amount,
+                com.company.project.services.PromotionAudience.Buyer.JOINING)));
     }
 
     @GetMapping("/{tenantSlug}/{branchId}/plans")
@@ -321,17 +324,7 @@ public class MobileDiscoveryController {
             @PathVariable String tenantSlug,
             @PathVariable Long branchId) {
             
-        try {
-            TenantContextHolder.setCurrentTenant(tenantSlug);
-            BranchContextHolder.setActiveBranchId(branchId);
-            
-            List<MembershipPlanResponseDTO> plans = planService.getPlans("Active");
-            
-            return ResponseEntity.ok(plans);
-        } finally {
-            BranchContextHolder.clear();
-            TenantContextHolder.clear();
-        }
+        return inTenant(tenantSlug, branchId, () -> ResponseEntity.ok(planService.getPlans("Active")));
     }
 
     @PostMapping("/{tenantSlug}/{branchId}/purchase")
