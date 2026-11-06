@@ -24,4 +24,9 @@ public interface StaffTargetRepository extends JpaRepository<StaffTarget, Long>,
     @Modifying
     @Query("DELETE FROM StaffTarget t WHERE t.staff.id = :staffId")
     void deleteByStaffId(@Param("staffId") Long staffId);
+
+    /** The staff member's targets in the performance engine's table (V121); lines go with them (ON DELETE CASCADE). */
+    @Modifying
+    @Query(value = "DELETE FROM targets WHERE scope = 'staff' AND staff_id = :staffId", nativeQuery = true)
+    void deleteEngineTargetsByStaffId(@Param("staffId") Long staffId);
 }

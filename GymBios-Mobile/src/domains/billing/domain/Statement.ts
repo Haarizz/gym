@@ -16,6 +16,8 @@ export enum StatementLineType {
 export interface StatementLine {
   date?: string;
   receiptNo?: string;
+  /** Tax invoice number, set on Invoice lines when the gym issues invoices */
+  invoiceNo?: string;
   type?: StatementLineType;
   description?: string;
   debit?: number;

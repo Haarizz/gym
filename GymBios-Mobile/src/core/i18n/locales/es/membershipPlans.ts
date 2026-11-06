@@ -1,6 +1,10 @@
 const membershipPlans = {
   "membershipPlans": {
     "list": {
+      "addBtn": "Agregar nueva suscripción",
+      "kpiTotal": "Total",
+      "kpiActive": "Activas",
+      "kpiOnOffer": "En oferta",
       "title": "Suscripciones",
       "newSubscriptionBtn": "+ Nueva suscripción",
       "searchPlaceholder": "Buscar suscripciones por nombre o tipo...",
@@ -26,6 +30,21 @@ const membershipPlans = {
       "archived": "Archivado"
     },
     "card": {
+      "offer": "Oferta",
+      "unlimitedSessions": "Sesiones ilimitadas",
+      "unlimitedMembers": "Miembros ilimitados",
+      "durationDay_one": "{{count}} día",
+      "durationDay_other": "{{count}} días",
+      "durationWeek_one": "{{count}} semana",
+      "durationWeek_other": "{{count}} semanas",
+      "durationMonth_one": "{{count}} mes",
+      "durationMonth_other": "{{count}} meses",
+      "durationYear_one": "{{count}} año",
+      "durationYear_other": "{{count}} años",
+      "sessionsCount_one": "{{count}} sesión",
+      "sessionsCount_other": "{{count}} sesiones",
+      "familyMembers_one": "Hasta {{count}} miembro",
+      "familyMembers_other": "Hasta {{count}} miembros",
       "price": "Precio",
       "duration": "Duración",
       "familySize": "Tamaño familiar",
@@ -42,6 +61,8 @@ const membershipPlans = {
       "discardMsg": "Toda la información ingresada se perderá.",
       "keepEditing": "Seguir editando",
       "discard": "Descartar",
+      "required": "Obligatorio",
+      "save": "Guardar",
       "stepIndicator": "Paso {{current}} de {{total}}",
       "cancel": "Cancelar",
       "back": "Atrás",

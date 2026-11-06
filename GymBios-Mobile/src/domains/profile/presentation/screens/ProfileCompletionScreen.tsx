@@ -524,6 +524,7 @@ export function ProfileCompletionScreen() {
                           placeholder={t('profileCompletion.selectGender')}
                           value={value}
                           options={genderOptions}
+                          required
                           onChange={onChange}
                           error={errors.gender?.message}
                         />

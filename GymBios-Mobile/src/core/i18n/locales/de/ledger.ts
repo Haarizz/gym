@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: 'Einnahmenaufschlüsselung',
       commissionStructureTitle: 'Provisionsstruktur',
+      structure: {
+        noPlan: "Kein Prämienplan",
+        perUnit: "{{amount}} pro {{unit}}",
+        fromUnits: "ab {{count}}",
+        max: "max. {{amount}}",
+        bonusLabel: "{{threshold}} % Ihres Ziels für {{metric}} erreichen",
+        bonusPercent: "+{{rate}} % von {{metric}}",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "Neuaufnahmen",
+          LEAD_CONVERSION: "Lead-Abschlüsse",
+          POS_SALE: "Kassenverkäufe",
+          PT_SESSION_DELIVERED: "Durchgeführte PT-Einheiten",
+          CLASS_TAUGHT: "Geleitete Kurse",
+          CLASS_ATTENDEE: "Kursteilnehmer",
+          REVENUE_TOTAL: "Umsatz",
+        },
+        units: {
+          MEMBER_ADMISSION: "Aufnahme",
+          LEAD_CONVERSION: "Abschluss",
+          POS_SALE: "Verkauf",
+          PT_SESSION_DELIVERED: "Einheit",
+          CLASS_TAUGHT: "Kurs",
+          CLASS_ATTENDEE: "Teilnehmer",
+        },
+      },
       monthlyComparisonTitle: 'Monatsvergleich',
     },
 

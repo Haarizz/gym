@@ -1,5 +1,34 @@
 const ledger = {
   ledger: {
+    breakdown: {
+      structure: {
+        noPlan: "ஊக்கத் திட்டம் இல்லை",
+        perUnit: "ஒவ்வொரு {{unit}}க்கும் {{amount}}",
+        fromUnits: "{{count}} முதல்",
+        max: "அதிகபட்சம் {{amount}}",
+        bonusLabel: "{{metric}} இலக்கில் {{threshold}}% அடையுங்கள்",
+        bonusPercent: "{{metric}} இல் +{{rate}}%",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "புதிய உறுப்பினர் சேர்க்கைகள்",
+          LEAD_CONVERSION: "லீட் மாற்றங்கள்",
+          POS_SALE: "POS விற்பனை",
+          PT_SESSION_DELIVERED: "நடத்திய PT அமர்வுகள்",
+          CLASS_TAUGHT: "நடத்திய வகுப்புகள்",
+          CLASS_ATTENDEE: "வகுப்பு வருகையாளர்கள்",
+          REVENUE_TOTAL: "வருவாய்",
+        },
+        units: {
+          MEMBER_ADMISSION: "சேர்க்கை",
+          LEAD_CONVERSION: "மாற்றம்",
+          POS_SALE: "விற்பனை",
+          PT_SESSION_DELIVERED: "அமர்வு",
+          CLASS_TAUGHT: "வகுப்பு",
+          CLASS_ATTENDEE: "வருகையாளர்",
+        },
+      },
+    },
+
     tabs: {
       advances: "முன்பணம்",
     },

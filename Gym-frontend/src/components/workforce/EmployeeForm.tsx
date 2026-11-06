@@ -256,7 +256,6 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
         status: core.status,
         join_date: core.join_date,
         base_salary: basic,
-        monthly_target: Number(core.monthly_target) || 0,
         address: addressParts.join(", "),
         photo_url: core.photo_url || undefined,
         certifications: certs.filter(c => c.cert_name?.trim()),
@@ -446,9 +445,6 @@ export function EmployeeForm({ mode, employee, assignableRoles, branches, depart
           <Field label="Contract start"><Input type="date" value={profile.employment.contract_start} onChange={e => set("employment", { contract_start: e.target.value })} /></Field>
           <Field label="Contract end"><Input type="date" value={profile.employment.contract_end} onChange={e => set("employment", { contract_end: e.target.value })} /></Field>
           <Field label="Probation ends"><Input type="date" value={profile.employment.probation_end} onChange={e => set("employment", { probation_end: e.target.value })} /></Field>
-          <Field label={`Monthly sales target (${currencySymbol})`} hint="Fine-tune per month in Target & Commission">
-            <Input type="number" min={0} value={core.monthly_target} placeholder="0" onChange={e => setCore(c => ({ ...c, monthly_target: e.target.value }))} />
-          </Field>
         </div>
       </div>
     ),

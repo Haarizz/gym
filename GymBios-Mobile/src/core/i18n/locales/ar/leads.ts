@@ -99,6 +99,7 @@ const leads = {
       phone: 'الهاتف',
       preferredContact: 'طريقة الاتصال المفضلة',
       leadScore: 'نقاط العميل',
+      scoreNotSet: 'غير محدد',
       leadDetails: 'تفاصيل العميل المحتمل',
       source: 'المصدر',
       assignedStaff: 'الموظف المعين',
@@ -131,6 +132,9 @@ const leads = {
     },
     form: {
       addNewLead: 'إضافة عميل محتمل جديد',
+      leadScoreLabel: 'نقاط العميل (1-100، اختياري)',
+      leadScorePlaceholder: 'مثال: 50',
+      leadScoreInvalid: 'يجب أن تكون النقاط رقمًا صحيحًا من 1 إلى 100.',
       editLead: 'تعديل العميل المحتمل',
       fillDetails: 'املأ التفاصيل أدناه',
       contactDetails: 'بيانات الاتصال',

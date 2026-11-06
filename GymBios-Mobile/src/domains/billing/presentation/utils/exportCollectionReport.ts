@@ -64,14 +64,14 @@ async function shareFile(uri: string, mimeType: string, filename: string, UTI: s
   await Sharing.shareAsync(uri, { mimeType, dialogTitle: filename, UTI });
 }
 
-/** Writes the collection CSV and opens the native save/share sheet. Returns the filename. */
-export async function exportCollectionCsv(receipts: Receipt[]): Promise<string> {
-  const filename = `receipts-${today()}.csv`;
-  const csv = buildCollectionCsv(receipts);
-
+/**
+ * Saves CSV text as `filename`: a browser download on web, the native save/share
+ * sheet on iOS/Android.
+ */
+export async function saveCsvFile(filename: string, csv: string): Promise<void> {
   if (Platform.OS === 'web') {
     downloadOnWeb(filename, new Blob([csv], { type: 'text/csv' }));
-    return filename;
+    return;
   }
 
   const file = new File(Paths.cache, filename);
@@ -79,6 +79,11 @@ export async function exportCollectionCsv(receipts: Receipt[]): Promise<string> 
   file.create();
   file.write(csv);
   await shareFile(file.uri, 'text/csv', filename, 'public.comma-separated-values-text');
-  return filename;
 }
 
+/** Writes the collection CSV and opens the native save/share sheet. Returns the filename. */
+export async function exportCollectionCsv(receipts: Receipt[]): Promise<string> {
+  const filename = `receipts-${today()}.csv`;
+  await saveCsvFile(filename, buildCollectionCsv(receipts));
+  return filename;
+}

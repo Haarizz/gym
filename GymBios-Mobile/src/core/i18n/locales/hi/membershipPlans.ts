@@ -1,6 +1,10 @@
 const membershipPlans = {
   "membershipPlans": {
     "list": {
+      "addBtn": "नई सदस्यता जोड़ें",
+      "kpiTotal": "कुल",
+      "kpiActive": "सक्रिय",
+      "kpiOnOffer": "ऑफ़र पर",
       "title": "सदस्यता योजनाएं",
       "newSubscriptionBtn": "+ नई योजना",
       "searchPlaceholder": "नाम या प्रकार द्वारा योजनाएं खोजें...",
@@ -26,6 +30,21 @@ const membershipPlans = {
       "archived": "संग्रहीत"
     },
     "card": {
+      "offer": "ऑफ़र",
+      "unlimitedSessions": "असीमित सत्र",
+      "unlimitedMembers": "असीमित सदस्य",
+      "durationDay_one": "{{count}} दिन",
+      "durationDay_other": "{{count}} दिन",
+      "durationWeek_one": "{{count}} सप्ताह",
+      "durationWeek_other": "{{count}} सप्ताह",
+      "durationMonth_one": "{{count}} महीना",
+      "durationMonth_other": "{{count}} महीने",
+      "durationYear_one": "{{count}} वर्ष",
+      "durationYear_other": "{{count}} वर्ष",
+      "sessionsCount_one": "{{count}} सत्र",
+      "sessionsCount_other": "{{count}} सत्र",
+      "familyMembers_one": "अधिकतम {{count}} सदस्य",
+      "familyMembers_other": "अधिकतम {{count}} सदस्य",
       "price": "कीमत",
       "duration": "अवधि",
       "familySize": "परिवार का आकार",
@@ -42,6 +61,8 @@ const membershipPlans = {
       "discardMsg": "दर्ज की गई सभी जानकारी खो जाएगी।",
       "keepEditing": "संपादन जारी रखें",
       "discard": "छोड़ें",
+      "required": "आवश्यक",
+      "save": "सहेजें",
       "stepIndicator": "चरण {{current}} / {{total}}",
       "cancel": "रद्द करें",
       "back": "वापस",

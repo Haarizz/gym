@@ -124,7 +124,7 @@ export const extrasApi = {
 };
 
 /** i18n key for what a freeze does to add-ons and facility access (Branch Settings › Membership Freeze). */
-export function freezeRuleKey(pausesAddons?: boolean | null, pausesFacilities?: boolean | null): string {
+export function freezeRuleKey(pausesAddons?: boolean | null, pausesFacilities?: boolean | null): 'members.extras.ruleAll' | 'members.extras.ruleNone' | 'members.extras.ruleAddonsOnly' | 'members.extras.ruleFacilitiesOnly' {
   const addons = pausesAddons !== false;
   const facilities = pausesFacilities !== false;
   if (addons && facilities) return 'members.extras.ruleAll';

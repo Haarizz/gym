@@ -63,6 +63,8 @@ export interface CenterDetails {
   reviewCount: number;
   amenities: FacilityResponse[];
   trainers: CenterTrainer[];
+  /** Why the signed-in member can't join (branch Access Type vs. their gender), or null. */
+  accessBlockedReason: string | null;
 }
 
 export interface CenterPlan {

@@ -5,7 +5,6 @@ import com.company.project.entities.Receipt;
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.SaleTransactionItem;
 import com.company.project.entities.Staff;
-import com.company.project.repositories.CommissionRuleRepository;
 import com.company.project.repositories.LeadRepository;
 import com.company.project.repositories.ReceiptRepository;
 import com.company.project.repositories.SaleTransactionItemRepository;
@@ -37,7 +36,7 @@ class StaffProgressCalculatorUnitsTest {
     private final com.company.project.repositories.AddonPlanRepository addonPlans =
             mock(com.company.project.repositories.AddonPlanRepository.class);
     private final StaffProgressCalculator calculator = new StaffProgressCalculator(
-            receipts, mock(LeadRepository.class), mock(CommissionRuleRepository.class), sales, items, trainingSessions,
+            receipts, mock(LeadRepository.class), sales, items, trainingSessions,
             memberAddons, addonPlans);
 
     private static final LocalDateTime START = LocalDateTime.of(2026, 10, 1, 0, 0);

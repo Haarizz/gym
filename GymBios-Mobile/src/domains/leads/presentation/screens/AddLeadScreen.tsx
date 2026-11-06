@@ -81,6 +81,7 @@ export function AddLeadScreen() {
     followUpScheduledTime: '',
     followUpEstimatedDuration: '',
     notes: '',
+    leadScore: '',
     followUpPriority: '' as 'low' | 'medium' | 'high' | '',
   });
 
@@ -104,6 +105,10 @@ export function AddLeadScreen() {
     if (!form.followUpDueDate) newErrors.followUpDueDate = t('leads.form.requiredField');
     if (!form.followUpScheduledTime) newErrors.followUpScheduledTime = t('leads.form.requiredField');
     if (!form.followUpPriority) newErrors.followUpPriority = t('leads.form.requiredField');
+    if (form.leadScore) {
+      const score = Number(form.leadScore);
+      if (!Number.isInteger(score) || score < 1 || score > 100) newErrors.leadScore = t('leads.form.leadScoreInvalid');
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -120,6 +125,7 @@ export function AddLeadScreen() {
         source: form.source,
         priority: form.priority as 'low' | 'medium' | 'high',
         notes: form.notes || undefined,
+        leadScore: form.leadScore ? Number(form.leadScore) : undefined,
         followUpType: form.followUpType,
         followUpSubject: form.followUpSubject || t('leads.statuses.followUp'),
         // Local calendar date — toISOString() would shift it back a day in timezones ahead of UTC.
@@ -242,6 +248,14 @@ export function AddLeadScreen() {
                 {errors.priority}
               </Typography>
             )}
+            <Input
+              label={t('leads.form.leadScoreLabel')}
+              placeholder={t('leads.form.leadScorePlaceholder')}
+              value={form.leadScore}
+              onChangeText={(val) => updateForm('leadScore', val.replace(/[^0-9]/g, '').slice(0, 3))}
+              keyboardType="number-pad"
+              error={errors.leadScore}
+            />
           </View>
 
           {/* Follow-up Details */}

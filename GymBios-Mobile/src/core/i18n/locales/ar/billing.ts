@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "لا توجد بنود في كشف الحساب للتصدير.",
       "statementExported": "تم تصدير كشف حساب {{name}} إلى CSV.",
       "statementExportTitle": "تصدير كشف الحساب CSV",
+      "statementExportFailed": "تعذر تصدير كشف الحساب.",
       "familyHead": "رب العائلة",
       "member": "العضو",
       "receiptsExportInfo": "جارٍ تصدير قائمة الإيصالات كاملة ({{count}} سجل) إلى ملف CSV.",

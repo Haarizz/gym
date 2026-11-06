@@ -40,23 +40,22 @@ public class MobileTrainerLedgerService {
 
         Staff staff = staffRepository.findByUserId(principal.getId())
                 .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
-        String username = earnings.usernameFor(staff, principal);
 
         LocalDate today = LocalDate.now();
-        YearMonth current = YearMonth.from(today);
+        YearMonth current = earnings.currentMonth();
 
         Optional<SalaryPaymentEmployee> payrollEmployee = earnings.findPayrollEmployee(staff);
         List<SalaryPayment> payments = earnings.findSalaryPayments(staff);
 
-        // This month. PT session payouts are not calculated anywhere in the system, so they are not
-        // part of earnings.
+        // This month. Commission covers everything the trainer's incentive plan pays for —
+        // PT sessions, classes and attendees included (performance engine).
         BigDecimal baseSalary = earnings.baseSalaryFor(staff, payrollEmployee);
         BigDecimal allowances = earnings.allowancesFor(payrollEmployee);
-        BigDecimal commission = earnings.commissionFor(staff, username, current);
+        BigDecimal commission = earnings.commissionFor(staff, current);
         BigDecimal thisMonthTotal = baseSalary.add(commission).add(allowances);
 
         BigDecimal lastMonthTotal = earnings.lastMonthSalary(staff, payments, current, baseSalary, allowances)
-                .add(earnings.commissionFor(staff, username, current.minusMonths(1)));
+                .add(earnings.commissionFor(staff, current.minusMonths(1)));
         Integer growthPercentage = LedgerEarningsCalculator.growthPercentage(thisMonthTotal, lastMonthTotal);
 
         // Paid = what web payroll has recorded as paid for this month; the rest is still pending.
@@ -89,7 +88,7 @@ public class MobileTrainerLedgerService {
         );
 
         List<TrainerRecentTransactionDTO> recentTransactions = new ArrayList<>();
-        for (LedgerEarningsCalculator.LedgerEntry e : earnings.recentEntries(staff, username, payments)) {
+        for (LedgerEarningsCalculator.LedgerEntry e : earnings.recentEntries(staff, payments)) {
             recentTransactions.add(new TrainerRecentTransactionDTO(
                     e.id(),
                     e.date() != null ? e.date().toString() : null,

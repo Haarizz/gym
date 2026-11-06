@@ -39,6 +39,10 @@ public class FollowUpService {
     private final NotificationService notificationService;
     private final LeadRepository leadRepository;
 
+    /** Resolves the assignee's staff id from the assigned name (performance engine, V121). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.company.project.performance.attribution.StaffAttribution staffAttribution;
+
     public FollowUpService(FollowUpRepository followUpRepository,
                            CommunicationRecordRepository communicationRecordRepository,
                            NotificationService notificationService,
@@ -282,7 +286,10 @@ public class FollowUpService {
         if (req.getType() != null) fu.setType(req.getType());
         if (req.getStatus() != null) fu.setStatus(req.getStatus());
         if (req.getPriority() != null) fu.setPriority(req.getPriority());
-        if (req.getAssignedStaff() != null) fu.setAssignedStaff(req.getAssignedStaff());
+        if (req.getAssignedStaff() != null) {
+            fu.setAssignedStaff(req.getAssignedStaff());
+            if (staffAttribution != null) fu.setAssignedStaffId(staffAttribution.byExactName(req.getAssignedStaff()));
+        }
         if (req.getDueDate() != null) fu.setDueDate(req.getDueDate());
         if (req.getScheduledTime() != null) fu.setScheduledTime(req.getScheduledTime());
         if (req.getCompletedDate() != null) fu.setCompletedDate(req.getCompletedDate());

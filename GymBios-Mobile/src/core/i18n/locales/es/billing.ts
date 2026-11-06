@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "No hay líneas de estado de cuenta para exportar.",
       "statementExported": "Estado de cuenta de {{name}} exportado a CSV.",
       "statementExportTitle": "Exportar estado de cuenta CSV",
+      "statementExportFailed": "No se pudo exportar el estado de cuenta.",
       "familyHead": "Titular de la familia",
       "member": "Miembro",
       "receiptsExportInfo": "Exportando la lista completa de recibos ({{count}} registros) a CSV.",

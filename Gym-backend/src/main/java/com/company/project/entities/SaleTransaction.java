@@ -10,6 +10,7 @@ import java.util.List;
 
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
+@EntityListeners(com.company.project.performance.events.PerformanceSourceListener.class)
 @Table(name = "sale_transactions")
 public class SaleTransaction extends BaseEntity implements BranchAware {
 
@@ -251,6 +252,13 @@ public class SaleTransaction extends BaseEntity implements BranchAware {
     public void setPromotionId(Long promotionId) { this.promotionId = promotionId; }
     public String getPromotionName() { return promotionName; }
     public void setPromotionName(String promotionName) { this.promotionName = promotionName; }
+
+    // Cashier as a staff id (V121): the staff member signed in at the till.
+    @Column(name = "cashier_staff_id")
+    private Long cashierStaffId;
+
+    public Long getCashierStaffId() { return cashierStaffId; }
+    public void setCashierStaffId(Long cashierStaffId) { this.cashierStaffId = cashierStaffId; }
 
     @Column(name = "branch_id")
     private Long branchId;

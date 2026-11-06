@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
 import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
 
@@ -36,7 +36,7 @@ export function AssignmentsStep({ values }: AssignmentsStepProps) {
 
   return (
     <View style={styles.container}>
-      <FormSection title={t('membershipPlans.form.assignmentsStep.title')}>
+      <FormCard icon="link" title={t('membershipPlans.form.assignmentsStep.title')}>
         <Typography variant="caption" color="textSecondary" style={styles.note}>
           {t('membershipPlans.form.assignmentsStep.description')}
         </Typography>
@@ -61,15 +61,15 @@ export function AssignmentsStep({ values }: AssignmentsStepProps) {
           label={t('membershipPlans.form.assignmentsStep.campaigns')}
           count={values.selectedCampaigns.length}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
   note: {
     marginBottom: Spacing.two,

@@ -161,6 +161,13 @@ public final class ModulePermissionRules {
         // corrections/{id}/approve|reject need PAYROLL_APPROVE (STAFF has no approve action)
         gated("/api/staff-attendance/**", List.of("STAFF", "PAYROLL"), "STAFF", "PAYROLL");
         gated("/api/commission-earnings/**", plus(PAYROLL, "STAFF"), "STAFF", "PAYROLL");
+        // Performance & incentives engine: anyone signed in sees their own figures; the rest is
+        // the targets board, incentive plans and commission review.
+        skip("/api/performance/me");
+        skip("/api/performance/metrics");
+        gated("/api/performance/settlements/**", plus(PAYROLL, "STAFF"), "STAFF", "PAYROLL");
+        gated("/api/performance/plans/**", plus(PAYROLL, "STAFF"), "STAFF", "PAYROLL", "SALARY_PAYMENTS");
+        gated("/api/performance/**", plus(PAYROLL, "STAFF"), "STAFF", "PAYROLL");
         gated("/api/deductions/**", PAYROLL, "SALARY_ADVANCES", "PAYROLL");
         gated("/api/payroll/**", PAYROLL, "PAYROLL");
 

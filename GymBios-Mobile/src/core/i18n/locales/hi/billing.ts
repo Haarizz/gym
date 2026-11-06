@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "निर्यात के लिए कोई स्टेटमेंट पंक्ति नहीं।",
       "statementExported": "{{name}} का खाता विवरण CSV में निर्यात किया गया।",
       "statementExportTitle": "स्टेटमेंट CSV निर्यात करें",
+      "statementExportFailed": "खाता विवरण निर्यात नहीं हो सका।",
       "familyHead": "परिवार प्रमुख",
       "member": "सदस्य",
       "receiptsExportInfo": "पूरी रसीद सूची ({{count}} रिकॉर्ड) CSV फ़ाइल में निर्यात हो रही है।",

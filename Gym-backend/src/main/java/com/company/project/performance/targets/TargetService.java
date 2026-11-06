@@ -1,0 +1,170 @@
+package com.company.project.performance.targets;
+
+import com.company.project.exceptions.BusinessRuleViolationException;
+import com.company.project.exceptions.EntityNotFoundException;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
+import com.company.project.security.BranchContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.YearMonth;
+import java.util.*;
+
+/** Setting targets (plan §5.1). Monthly only; a target is replaced as a whole when saved again. */
+@Service
+@Transactional
+public class TargetService {
+
+    private final TargetRepository repository;
+    private final PerformanceEngine engine;
+    private final com.company.project.repositories.StaffRepository staffRepository;
+    private final com.company.project.repositories.UserRepository userRepository;
+
+    /** The gym owner's roles: they set targets for staff and never have one themselves. */
+    private static final Set<String> OWNER_ROLES = Set.of("ADMIN", "SUPER_ADMIN");
+
+    public TargetService(TargetRepository repository, PerformanceEngine engine,
+                         com.company.project.repositories.StaffRepository staffRepository,
+                         com.company.project.repositories.UserRepository userRepository) {
+        this.repository = repository;
+        this.engine = engine;
+        this.staffRepository = staffRepository;
+        this.userRepository = userRepository;
+    }
+
+    /** Whether this staff record's login is an owner account (ADMIN / SUPER_ADMIN). */
+    private boolean isLinkedToOwner(Long staffId) {
+        return staffRepository.findById(staffId)
+                .map(st -> st.getUserId() == null ? null : st.getUserId())
+                .flatMap(userRepository::findById)
+                .map(u -> u.getUserRoles().stream()
+                        .map(ur -> ur.getRole() != null ? ur.getRole().getRoleName() : null)
+                        .filter(Objects::nonNull)
+                        .map(r -> r.toUpperCase(Locale.ROOT).replace("ROLE_", ""))
+                        .anyMatch(OWNER_ROLES::contains))
+                .orElse(false);
+    }
+
+    public record LineRequest(String metric, String measure, BigDecimal goal) {}
+
+    public record TargetRequest(String scope, Long staffId, String role, Long branchId, String period,
+                                Boolean repeatMonthly, List<LineRequest> lines) {}
+
+    /** Targets set for the month itself, plus the repeating ones still in force for it. */
+    @Transactional(readOnly = true)
+    public List<Target> applicable(YearMonth month) {
+        return repository.findApplicableTo(month.atDay(1)).stream()
+                .sorted(Comparator.comparing(Target::getScope).thenComparing(Target::getPeriodStart, Comparator.reverseOrder()))
+                .toList();
+    }
+
+    public Target save(TargetRequest req) {
+        if (req.period() == null) throw new BusinessRuleViolationException("Month is required");
+        YearMonth month = YearMonth.parse(req.period());
+        String scope = req.scope() == null ? Target.SCOPE_STAFF : req.scope().trim().toLowerCase();
+        Long staffId = null;
+        String role = null;
+        Long branchId = req.branchId() != null ? req.branchId() : BranchContextHolder.getActiveBranchId();
+        switch (scope) {
+            case Target.SCOPE_STAFF -> {
+                if (req.staffId() == null) throw new BusinessRuleViolationException("Choose a staff member");
+                PerformanceEngine.StaffInfo s = engine.staffInfo(List.of(req.staffId())).get(req.staffId());
+                if (s == null) throw new EntityNotFoundException("Employee not found");
+                if (isLinkedToOwner(s.id())) {
+                    throw new BusinessRuleViolationException(
+                            s.name() + " signs in as the gym owner (Admin). Owners set targets for staff and don't have targets themselves.");
+                }
+                staffId = s.id();
+                branchId = s.branchId();
+            }
+            case Target.SCOPE_ROLE -> {
+                if (req.role() == null || req.role().isBlank()) throw new BusinessRuleViolationException("Choose a role");
+                role = req.role().trim();
+            }
+            case Target.SCOPE_BRANCH -> {
+                if (branchId == null) throw new BusinessRuleViolationException("Choose a branch");
+            }
+            default -> throw new BusinessRuleViolationException("Unknown target scope " + req.scope());
+        }
+
+        Map<String, TargetLine> lines = new LinkedHashMap<>();
+        for (LineRequest l : req.lines() != null ? req.lines() : List.<LineRequest>of()) {
+            if (l.goal() == null || l.goal().signum() <= 0) continue; // 0 / blank = no goal
+            Metric metric = Metric.require(l.metric());
+            Measure measure = Measure.parse(l.measure());
+            if (!metric.supports(measure)) {
+                throw new BusinessRuleViolationException(metric.label() + " has no " + measure.code() + " to target");
+            }
+            TargetLine line = new TargetLine();
+            line.setMetric(metric.name());
+            line.setMeasure(measure.code());
+            line.setGoal(l.goal());
+            lines.put(metric.name() + "|" + measure.code(), line);
+        }
+
+        Long fStaff = staffId;
+        String fRole = role;
+        Long fBranch = branchId;
+        Target target = repository.findForMonth(month.atDay(1)).stream()
+                .filter(t -> t.getScope().equals(scope) && Objects.equals(t.getStaffId(), fStaff)
+                        && Objects.equals(t.getBranchId(), fBranch)
+                        && Objects.equals(t.getRole() == null ? null : t.getRole().toLowerCase(), fRole == null ? null : fRole.toLowerCase()))
+                .findFirst().orElse(null);
+        if (lines.isEmpty()) {
+            if (target != null) repository.delete(target);
+            return null;
+        }
+        if (target == null) {
+            target = new Target();
+            target.setScope(scope);
+            target.setStaffId(staffId);
+            target.setRole(role);
+            target.setBranchId(branchId);
+            target.setPeriodStart(month.atDay(1));
+            target.setPeriodEnd(month.atEndOfMonth());
+        }
+        target.setRepeatMonthly(Boolean.TRUE.equals(req.repeatMonthly()));
+        target.getLines().clear();
+        for (TargetLine l : lines.values()) {
+            l.setTarget(target);
+            target.getLines().add(l);
+        }
+        return repository.save(target);
+    }
+
+    public void delete(Long id) {
+        repository.deleteById(id);
+    }
+
+    /** Copies every target set for {@code from} into {@code to}, leaving targets {@code to} already has. */
+    public int copy(YearMonth from, YearMonth to) {
+        List<Target> existing = repository.findForMonth(to.atDay(1));
+        int copied = 0;
+        for (Target t : repository.findForMonth(from.atDay(1))) {
+            boolean taken = existing.stream().anyMatch(e -> TargetResolver.scopeKey(e).equals(TargetResolver.scopeKey(t)));
+            if (taken) continue;
+            Target c = new Target();
+            c.setScope(t.getScope());
+            c.setStaffId(t.getStaffId());
+            c.setRole(t.getRole());
+            c.setBranchId(t.getBranchId());
+            c.setPeriodStart(to.atDay(1));
+            c.setPeriodEnd(to.atEndOfMonth());
+            c.setRepeatMonthly(t.isRepeatMonthly());
+            for (TargetLine l : t.getLines()) {
+                TargetLine n = new TargetLine();
+                n.setTarget(c);
+                n.setMetric(l.getMetric());
+                n.setMeasure(l.getMeasure());
+                n.setGoal(l.getGoal());
+                c.getLines().add(n);
+            }
+            repository.save(c);
+            copied++;
+        }
+        return copied;
+    }
+}

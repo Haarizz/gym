@@ -28,6 +28,8 @@ const centers = {
     priceAbove: '<amount/> से अधिक',
 
     list: {
+      genderMissing: 'केवल महिलाओं और केवल पुरुषों वाले सेंटर भी देखने के लिए मेरी प्रोफ़ाइल में अपना लिंग जोड़ें।',
+      genderMissingAction: 'जोड़ें',
       searchPlaceholder: 'नाम, क्षेत्र या प्रकार से खोजें...',
       nearMe: 'मेरे पास',
       useMyLocation: 'मेरा स्थान इस्तेमाल करें',
@@ -68,6 +70,7 @@ const centers = {
     },
 
     detail: {
+      accessBlockedTitle: 'इस सेंटर से नहीं जुड़ सकते',
       notFound: 'केंद्र नहीं मिला।',
       noPhoneTitle: 'कोई फ़ोन नंबर नहीं',
       noPhone: 'इस केंद्र ने अभी तक फ़ोन नंबर नहीं दिया है।',

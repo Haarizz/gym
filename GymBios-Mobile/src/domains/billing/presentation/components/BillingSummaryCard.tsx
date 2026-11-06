@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 
-import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 import { MoneyText } from './MoneyText';
@@ -12,52 +11,45 @@ interface BillingSummaryCardProps {
   value: number;
   iconName: keyof typeof Feather.glyphMap;
   iconBg: string;
-  /** Show value as percentage (e.g. collection rate). */
-  isPercent?: boolean;
+  /** How to render the value: currency amount (default), percentage, or plain count. */
+  format?: 'money' | 'percent' | 'count';
   /** Accent colour for the value text. */
   valueColor?: string;
 }
 
 /**
- * Dashboard stat card used in the Billing Overview summary row.
- * Purely presentational — no props trigger side effects.
+ * Compact dashboard stat tile used in the Billing Overview grid:
+ * tinted icon on the left, value + label stacked on the right.
  */
 export function BillingSummaryCard({
   label,
   value,
   iconName,
   iconBg,
-  isPercent = false,
+  format = 'money',
   valueColor,
 }: BillingSummaryCardProps) {
-  const displayValue = isPercent
-    ? `${value.toFixed(1)}%`
-    : undefined;
+  const valueStyle = [styles.value, valueColor ? { color: valueColor } : null];
+
 
   return (
     <View style={styles.card}>
-      <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-        <Feather name={iconName} size={18} color="#ffffff" />
+      <View style={[styles.iconBox, { backgroundColor: `${iconBg}1f` }]}>
+        <Feather name={iconName} size={16} color={iconBg} />
       </View>
 
-      {isPercent ? (
-        <Typography
-          variant="bodySmallBold"
-          style={[styles.value, valueColor ? { color: valueColor } : null]}
-        >
-          {displayValue}
+      <View style={styles.text}>
+        {format === 'money' ? (
+          <MoneyText amount={value} variant="bodySmallBold" color={valueColor} style={styles.value} numberOfLines={1} />
+        ) : (
+          <Typography variant="bodySmallBold" style={valueStyle} numberOfLines={1}>
+            {format === 'percent' ? `${value.toFixed(1)}%` : Math.round(value).toLocaleString()}
+          </Typography>
+        )}
+        <Typography variant="caption" color="textSecondary" numberOfLines={1}>
+          {label}
         </Typography>
-      ) : (
-        <MoneyText
-          amount={value}
-          variant="bodySmallBold"
-          color={valueColor}
-        />
-      )}
-
-      <Typography variant="caption" color="textSecondary" style={styles.label}>
-        {label}
-      </Typography>
+      </View>
     </View>
   );
 }
@@ -65,31 +57,33 @@ export function BillingSummaryCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + 2,
     backgroundColor: '#ffffff',
     borderRadius: Radius.md,
-    padding: Spacing.three,
-    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
-    gap: Spacing.half,
-    minWidth: 80,
   },
   iconBox: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.half,
+  },
+  text: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
   },
   value: {
-    textAlign: 'center',
-  },
-  label: {
-    textAlign: 'center',
-    lineHeight: 14,
+    fontSize: 15,
+    color: BrandColors.textPrimary,
   },
 });

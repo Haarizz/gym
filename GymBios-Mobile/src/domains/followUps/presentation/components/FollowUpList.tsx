@@ -14,6 +14,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import type { FollowUp } from '../../domain/FollowUp';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import { FollowUpCard } from './FollowUpCard';
 
 interface FollowUpListProps {
@@ -31,6 +32,10 @@ interface FollowUpListProps {
   onCall?: (followUp: FollowUp) => void;
   onEmail?: (followUp: FollowUp) => void;
   ListHeaderComponent?: React.ReactElement | null;
+  /** Shown below the cards (only when there are any), e.g. pagination and an add button. */
+  ListFooterComponent?: React.ReactElement | null;
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
 }
 
 export function FollowUpList({
@@ -48,26 +53,33 @@ export function FollowUpList({
   onCall,
   onEmail,
   ListHeaderComponent,
+  ListFooterComponent,
+  emptyActionLabel,
+  onEmptyAction,
 }: FollowUpListProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const bottomInset = useTabBarBottomInset();
 
   if (loading && followUps.length === 0) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={styles.stateContainer}>
         {ListHeaderComponent}
+        <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={BrandColors.teal} style={styles.spinner} />
         <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
           {t('followUps.loadingFollowUps')}
         </Text>
+        </View>
       </View>
     );
   }
 
   if (error && followUps.length === 0) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={styles.stateContainer}>
         {ListHeaderComponent}
+        <View style={styles.centerContainer}>
         <Feather name="alert-circle" size={48} color="#dc2626" />
         <Text style={[styles.errorTitle, { color: theme.text }]}>
           {t('followUps.failedLoadFollowUps')}
@@ -84,6 +96,7 @@ export function FollowUpList({
             <Text style={styles.retryBtnText}>{t('followUps.retry')}</Text>
           </TouchableOpacity>
         ) : null}
+        </View>
       </View>
     );
   }
@@ -97,6 +110,15 @@ export function FollowUpList({
       <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
         {t('followUps.noFollowUpsFoundDesc')}
       </Text>
+      {emptyActionLabel && onEmptyAction ? (
+        <TouchableOpacity
+          style={[styles.retryBtn, styles.emptyAction, { backgroundColor: BrandColors.teal }]}
+          onPress={onEmptyAction}
+        >
+          <Feather name="plus" size={16} color="#ffffff" />
+          <Text style={styles.retryBtnText}>{emptyActionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 
@@ -119,7 +141,9 @@ export function FollowUpList({
       )}
       ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={renderEmptyComponent}
-      contentContainerStyle={styles.listContent}
+      ListFooterComponent={followUps.length > 0 ? ListFooterComponent : null}
+      contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset + Spacing.six }]}
+      showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -136,11 +160,15 @@ export function FollowUpList({
 
 const styles = StyleSheet.create({
   listContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.four * 2,
+  },
+  stateContainer: {
+    flex: 1,
+    paddingHorizontal: Spacing.three,
   },
   centerContainer: {
-    padding: Spacing.four,
+    paddingVertical: Spacing.four,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -179,6 +207,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.four * 2,
     paddingHorizontal: Spacing.three,
+  },
+  emptyAction: {
+    marginTop: Spacing.three,
   },
   emptyIconBg: {
     width: 64,

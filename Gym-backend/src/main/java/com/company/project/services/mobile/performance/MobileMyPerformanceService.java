@@ -4,13 +4,14 @@ import com.company.project.dto.mobile.performance.MyPerformanceResponseDTO;
 import com.company.project.entities.Staff;
 import com.company.project.entities.StaffAttendance;
 import com.company.project.entities.StaffScheduleSlot;
-import com.company.project.entities.StaffTarget;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.repositories.StaffRepository;
-import com.company.project.repositories.StaffTargetRepository;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -40,25 +40,16 @@ import java.util.stream.Collectors;
 public class MobileMyPerformanceService {
 
     private final StaffRepository staffRepository;
-    private final StaffTargetRepository staffTargetRepository;
     private final StaffAttendanceRepository staffAttendanceRepository;
-    private final StaffProgressCalculator progressCalculator;
-    private final MobileTrainerPerformanceService trainerPerformanceService;
-    private final MobileStaffPerformanceService staffPerformanceService;
+    private final PerformanceEngine engine;
 
     public MobileMyPerformanceService(
             StaffRepository staffRepository,
-            StaffTargetRepository staffTargetRepository,
             StaffAttendanceRepository staffAttendanceRepository,
-            StaffProgressCalculator progressCalculator,
-            MobileTrainerPerformanceService trainerPerformanceService,
-            MobileStaffPerformanceService staffPerformanceService) {
+            PerformanceEngine engine) {
         this.staffRepository = staffRepository;
-        this.staffTargetRepository = staffTargetRepository;
         this.staffAttendanceRepository = staffAttendanceRepository;
-        this.progressCalculator = progressCalculator;
-        this.trainerPerformanceService = trainerPerformanceService;
-        this.staffPerformanceService = staffPerformanceService;
+        this.engine = engine;
     }
 
     public MyPerformanceResponseDTO getMyPerformance(UserDetailsImpl principal, String role) {
@@ -77,34 +68,22 @@ public class MobileMyPerformanceService {
         LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
         LocalDateTime startOfPrevMonth = startOfMonth.minusMonths(1);
 
-        // Same row selection as the role dashboards: several targets can exist for one period.
-        Optional<StaffTarget> targetOpt = staffTargetRepository
-                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), today.getYear(), today.getMonthValue())
-                .stream().findFirst();
+        java.time.YearMonth current = java.time.YearMonth.from(today);
+        PeriodResult thisMonth = engine.evaluate(staff.getId(), current);
+        PeriodResult lastMonth = engine.evaluate(staff.getId(), current.minusMonths(1));
 
         MyPerformanceResponseDTO dto = new MyPerformanceResponseDTO();
         dto.setRole(isTrainer ? "trainer" : "staff");
         dto.setPeriodLabel(today.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + today.getYear());
 
         // Revenue (shared)
-        BigDecimal revenueAchieved = progressCalculator.computeRevenue(staff, username, startOfMonth, startOfNextMonth);
-        BigDecimal revenueTarget = BigDecimal.ZERO;
-        if (targetOpt.isPresent() && isPositive(targetOpt.get().getRevenueTarget())) {
-            revenueTarget = targetOpt.get().getRevenueTarget();
-            BigDecimal recorded = targetOpt.get().getRevenueAchieved();
-            if (recorded != null && recorded.compareTo(revenueAchieved) > 0) {
-                revenueAchieved = recorded;
-            }
-        } else if (isPositive(staff.getMonthlyTarget())) {
-            revenueTarget = staff.getMonthlyTarget();
-        }
-        BigDecimal prevRevenue = progressCalculator.computeRevenue(staff, username, startOfPrevMonth, startOfMonth);
+        BigDecimal revenueAchieved = thisMonth.revenue();
+        BigDecimal revenueGoal = thisMonth.goal(Metric.REVENUE_TOTAL, Measure.AMOUNT);
+        BigDecimal revenueTarget = revenueGoal != null ? revenueGoal : BigDecimal.ZERO;
         dto.setRevenueAchieved(revenueAchieved);
         dto.setRevenueTarget(revenueTarget);
-        dto.setRevenueGrowth(growth(prevRevenue.doubleValue(), revenueAchieved.doubleValue()));
-        Integer revenuePct = isPositive(revenueTarget)
-                ? percentage(revenueAchieved.doubleValue(), revenueTarget.doubleValue())
-                : null;
+        dto.setRevenueGrowth(growth(lastMonth.revenue().doubleValue(), revenueAchieved.doubleValue()));
+        Integer revenuePct = thisMonth.percent(Metric.REVENUE_TOTAL, Measure.AMOUNT);
 
         // Hours & attendance (shared)
         List<StaffAttendance> attendance = staffAttendanceRepository
@@ -122,11 +101,9 @@ public class MobileMyPerformanceService {
         // Role-specific primary metric
         Integer primaryPct;
         if (isTrainer) {
-            int completed = trainerPerformanceService.countCompletedSessions(
-                    staff.getId(), today.withDayOfMonth(1), startOfNextMonth.toLocalDate().minusDays(1));
-            int prevCompleted = trainerPerformanceService.countCompletedSessions(
-                    staff.getId(), startOfPrevMonth.toLocalDate(), startOfMonth.toLocalDate().minusDays(1));
-            int target = targetOpt.map(StaffTarget::getSessionsTarget).filter(t -> t > 0).orElse(0);
+            int completed = MobileTrainerPerformanceService.sessionsDelivered(thisMonth);
+            int prevCompleted = MobileTrainerPerformanceService.sessionsDelivered(lastMonth);
+            int target = MobileTrainerPerformanceService.sessionsGoal(thisMonth);
             primaryPct = target > 0 ? percentage(completed, target) : null;
 
             dto.setClassesCompleted(completed);
@@ -135,16 +112,17 @@ public class MobileMyPerformanceService {
             dto.setSessionGrowth(growth(prevCompleted, completed));
             dto.setMessage(buildMessage(completed, target, "session", dto.getPeriodLabel()));
         } else {
-            int converted = progressCalculator.computeConversions(staff, username, startOfMonth, startOfNextMonth);
-            int prevConverted = progressCalculator.computeConversions(staff, username, startOfPrevMonth, startOfMonth);
-            int target = targetOpt.map(StaffTarget::getNewClientsTarget).filter(t -> t > 0).orElse(0);
+            int converted = (int) thisMonth.count(Metric.LEAD_CONVERSION);
+            int prevConverted = (int) lastMonth.count(Metric.LEAD_CONVERSION);
+            BigDecimal goal = thisMonth.goal(Metric.LEAD_CONVERSION, Measure.COUNT);
+            int target = goal != null ? goal.intValue() : 0;
             primaryPct = target > 0 ? percentage(converted, target) : null;
 
             dto.setLeadsConverted(converted);
             dto.setConversionTarget(target);
-            dto.setConversionRate(progressCalculator.computeLeadConversionRate(staff, username));
+            dto.setConversionRate(engine.leadConversionRates(List.of(staff.getId())).getOrDefault(staff.getId(), 0));
             dto.setConversionGrowth(growth(prevConverted, converted));
-            dto.setFollowUpCompletion(staffPerformanceService.computeFollowUpCompletion(staff));
+            dto.setFollowUpCompletion(engine.followUpCompletion(staff.getId()));
             dto.setMessage(buildMessage(converted, target, "conversion", dto.getPeriodLabel()));
         }
 

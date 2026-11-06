@@ -95,6 +95,7 @@ const leads = {
       phone: 'फ़ोन',
       preferredContact: 'पसंदीदा संपर्क',
       leadScore: 'लीड स्कोर',
+      scoreNotSet: 'सेट नहीं',
       leadDetails: 'लीड विवरण',
       source: 'स्रोत',
       assignedStaff: 'असाइन किया गया कर्मचारी',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: 'नई लीड जोड़ें',
+      leadScoreLabel: 'लीड स्कोर (1-100, वैकल्पिक)',
+      leadScorePlaceholder: 'जैसे 50',
+      leadScoreInvalid: 'लीड स्कोर 1 से 100 के बीच पूर्ण संख्या होना चाहिए।',
       editLead: 'लीड संपादित करें',
       fillDetails: 'नीचे विवरण भरें',
       contactDetails: 'संपर्क विवरण',

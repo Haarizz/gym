@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import Feather from '@expo/vector-icons/Feather';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { SearchBar } from '@/shared/components/SearchBar';
 import { Typography } from '@/shared/components/Typography';
 import { ScreenLayout } from '@/shared/layouts/ScreenLayout';
-import { Button } from '@/shared/components/Button';
 import type { MembershipPlan } from '../../domain/MembershipPlan';
 import { useMembershipPlans } from '../hooks/useMembershipPlans';
 import { MembershipPlanList } from '../components/MembershipPlanList';
@@ -14,6 +15,9 @@ import { MembershipPlanFilter, type StatusFilter } from '../components/Membershi
 import { useBranchContext } from '@/shared/providers/BranchProvider';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
+
+// RoleTabsLayout already pads the top inset and the list pads past the tab bar.
+const TAB_SCREEN_EDGES = ['left', 'right'] as const;
 
 interface MembershipPlansScreenProps {
   onNavigateToCreate: () => void;
@@ -25,6 +29,7 @@ export function MembershipPlansScreen({
   onNavigateToEdit,
 }: MembershipPlansScreenProps) {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
 
@@ -113,39 +118,73 @@ export function MembershipPlansScreen({
     [deletePlan, t],
   );
 
+  const kpis = useMemo(() => {
+    const isActive = (p: MembershipPlan) => p.status?.toUpperCase() === 'ACTIVE';
+    return [
+      { key: 'total', label: t('membershipPlans.list.kpiTotal'), value: plans.length, color: theme.text },
+      { key: 'active', label: t('membershipPlans.list.kpiActive'), value: plans.filter(isActive).length, color: '#16a34a' },
+      {
+        key: 'offers',
+        label: t('membershipPlans.list.kpiOnOffer'),
+        value: plans.filter(p => p.offerActive && p.offerDiscountAmount > 0).length,
+        color: '#ea580c',
+      },
+    ];
+  }, [plans, theme.text, t]);
+
+  const isFiltered = !!search || statusFilter !== 'All';
+
   // Must be an element, not a component: a component whose identity changes on
   // every keystroke is remounted by FlatList, which drops focus from the search input.
   const listHeader = useMemo(
     () => (
       <View style={styles.headerContainer}>
-        {/* Page title */}
-        <View style={styles.titleRow}>
-          <Typography variant="subtitle" style={styles.title}>
-            {t('membershipPlans.list.title')}
-          </Typography>
-          <Button
-            label={t('membershipPlans.list.newSubscriptionBtn')}
-            onPress={handleCreatePress}
-            size="md"
-          />
-        </View>
-
-        {/* Search */}
         <SearchBar
           value={search}
           onChangeText={setSearch}
           placeholder={t('membershipPlans.list.searchPlaceholder')}
         />
 
-        {/* Status filter chips */}
+        <View style={styles.summaryRow}>
+          {kpis.map(kpi => (
+            <View
+              key={kpi.key}
+              style={[styles.summaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            >
+              <Typography variant="caption" color="textSecondary" style={styles.summaryLabel} numberOfLines={1}>
+                {kpi.label}
+              </Typography>
+              <Typography variant="subtitle" style={[styles.summaryValue, { color: kpi.color }]}>
+                {loading && plans.length === 0 ? '—' : kpi.value}
+              </Typography>
+            </View>
+          ))}
+        </View>
+
         <MembershipPlanFilter selected={statusFilter} onSelect={setStatusFilter} />
       </View>
     ),
-    [search, statusFilter, handleCreatePress, t],
+    [search, statusFilter, kpis, loading, plans.length, theme, t],
+  );
+
+  const listFooter = useMemo(
+    () => (
+      <Pressable
+        style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+        onPress={handleCreatePress}
+        accessibilityRole="button"
+      >
+        <Feather name="plus" size={18} color={BrandColors.white} />
+        <Typography variant="bodySmallBold" style={styles.addButtonLabel}>
+          {t('membershipPlans.list.addBtn')}
+        </Typography>
+      </Pressable>
+    ),
+    [handleCreatePress, t],
   );
 
   return (
-    <ScreenLayout>
+    <ScreenLayout edges={TAB_SCREEN_EDGES}>
       <View style={styles.container}>
         <MembershipPlanList
           plans={filteredPlans}
@@ -156,16 +195,13 @@ export function MembershipPlansScreen({
           onDuplicate={handleDuplicate}
           onDelete={handleDelete}
           ListHeaderComponent={listHeader}
-          emptyTitle={
-            search || statusFilter !== 'All'
-              ? t('membershipPlans.list.noPlansFound')
-              : t('membershipPlans.list.noPlans')
-          }
+          ListFooterComponent={listFooter}
+          emptyTitle={isFiltered ? t('membershipPlans.list.noPlansFound') : t('membershipPlans.list.noPlans')}
           emptyDescription={
-            search || statusFilter !== 'All'
-              ? t('membershipPlans.list.emptyFiltered')
-              : t('membershipPlans.list.emptyUnfiltered')
+            isFiltered ? t('membershipPlans.list.emptyFiltered') : t('membershipPlans.list.emptyUnfiltered')
           }
+          emptyActionLabel={isFiltered ? undefined : t('membershipPlans.list.addBtn')}
+          onEmptyAction={handleCreatePress}
         />
       </View>
     </ScreenLayout>
@@ -178,17 +214,40 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     gap: Spacing.three,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.md,
   },
-  titleRow: {
+  summaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
+    gap: Spacing.md,
   },
-  title: {
+  summaryCard: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 0.5,
+    padding: Spacing.md,
+  },
+  summaryLabel: {
+    marginBottom: Spacing.one,
+  },
+  summaryValue: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '600',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: BrandColors.teal,
+    marginTop: Spacing.one,
+  },
+  addButtonPressed: {
+    backgroundColor: BrandColors.tealDark,
+  },
+  addButtonLabel: {
+    color: BrandColors.white,
   },
 });

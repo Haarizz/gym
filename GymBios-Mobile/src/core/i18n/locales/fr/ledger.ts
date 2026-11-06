@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: 'Détail des gains',
       commissionStructureTitle: 'Structure des commissions',
+      structure: {
+        noPlan: "Aucun plan d'incentive",
+        perUnit: "{{amount}} par {{unit}}",
+        fromUnits: "à partir de {{count}}",
+        max: "max. {{amount}}",
+        bonusLabel: "Atteindre {{threshold}} % de votre objectif de {{metric}}",
+        bonusPercent: "+{{rate}} % de {{metric}}",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "Nouvelles adhésions",
+          LEAD_CONVERSION: "Prospects convertis",
+          POS_SALE: "Ventes en caisse",
+          PT_SESSION_DELIVERED: "Séances de coaching données",
+          CLASS_TAUGHT: "Cours donnés",
+          CLASS_ATTENDEE: "Participants aux cours",
+          REVENUE_TOTAL: "chiffre d'affaires",
+        },
+        units: {
+          MEMBER_ADMISSION: "adhésion",
+          LEAD_CONVERSION: "conversion",
+          POS_SALE: "vente",
+          PT_SESSION_DELIVERED: "séance",
+          CLASS_TAUGHT: "cours",
+          CLASS_ATTENDEE: "participant",
+        },
+      },
       monthlyComparisonTitle: 'Comparaison mensuelle',
     },
 

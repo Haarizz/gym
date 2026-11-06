@@ -95,6 +95,7 @@ const leads = {
       phone: 'Téléphone',
       preferredContact: 'Contact préféré',
       leadScore: 'Score du prospect',
+      scoreNotSet: 'Non défini',
       leadDetails: 'Détails du prospect',
       source: 'Source',
       assignedStaff: 'Personnel assigné',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: 'Ajouter un nouveau prospect',
+      leadScoreLabel: 'Score (1-100, facultatif)',
+      leadScorePlaceholder: 'ex. 50',
+      leadScoreInvalid: 'Le score doit être un nombre entier entre 1 et 100.',
       editLead: 'Modifier le prospect',
       fillDetails: 'Remplissez les détails ci-dessous',
       contactDetails: 'COORDONNÉES',

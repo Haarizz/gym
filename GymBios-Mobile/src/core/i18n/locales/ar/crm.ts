@@ -2,6 +2,7 @@ const crm = {
   "crm": {
     "title": "الصفقات والعروض",
     "subtitle": "العروض الترويجية النشطة والخصومات والصفقات الخاصة",
+    "discountOff": "خصم",
     "activeOffers": "العروض النشطة",
     "totalRedemptions": "إجمالي مرات الاسترداد",
     "viewAll": "عرض الكل",

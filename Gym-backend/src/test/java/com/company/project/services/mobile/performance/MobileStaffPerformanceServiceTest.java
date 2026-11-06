@@ -1,11 +1,20 @@
 package com.company.project.services.mobile.performance;
 
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PerformanceTestData;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
+import java.time.YearMonth;
+import java.util.Map;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+
 import com.company.project.dto.mobile.performance.StaffPerformanceResponseDTO;
 import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,9 +41,6 @@ class MobileStaffPerformanceServiceTest {
     private StaffRepository staffRepository;
 
     @Mock
-    private StaffTargetRepository staffTargetRepository;
-
-    @Mock
     private LeadRepository leadRepository;
 
     @Mock
@@ -47,7 +53,7 @@ class MobileStaffPerformanceServiceTest {
     private WorkoutFeedbackRepository workoutFeedbackRepository;
 
     @Mock
-    private StaffProgressCalculator progressCalculator;
+    private PerformanceEngine engine;
 
     @InjectMocks
     private MobileStaffPerformanceService performanceService;
@@ -65,8 +71,10 @@ class MobileStaffPerformanceServiceTest {
         testStaff.setEmail("staff@gymbios.com");
         testStaff.setBranch("Main Branch");
 
-        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
-        lenient().when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(0);
+        PeriodResult empty = PerformanceTestData.result(10L, YearMonth.now()).build();
+        lenient().when(engine.achievedBetween(anyLong(), any(), any())).thenReturn(empty.achieved());
+        lenient().when(engine.evaluate(eq(10L), any(YearMonth.class))).thenReturn(empty);
+        lenient().when(engine.evaluate(anyCollection(), any(YearMonth.class))).thenReturn(Map.of(10L, empty));
         testStaff.setMonthlyTarget(new BigDecimal("150000"));
         testStaff.setUserId(100L);
     }
@@ -102,20 +110,18 @@ class MobileStaffPerformanceServiceTest {
     void testPerformanceWithConfiguredTarget() {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
 
-        StaffTarget target = new StaffTarget();
-        target.setRevenueTarget(new BigDecimal("150000"));
-        target.setRevenueAchieved(new BigDecimal("117000"));
-        target.setNewClientsTarget(30);
-        target.setNewClientsAchieved(24);
-        target.setForecast(8);
-
         LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(List.of(target));
+        PeriodResult month = PerformanceTestData.result(10L, YearMonth.from(today))
+                .achieved(Metric.MEMBER_ADMISSION, 10, "117000")
+                .achieved(Metric.LEAD_CONVERSION, 24, null)
+                .goal(Metric.REVENUE_TOTAL, Measure.AMOUNT, "150000")
+                .goal(Metric.LEAD_CONVERSION, Measure.COUNT, "30")
+                .build();
+        when(engine.evaluate(eq(10L), any(YearMonth.class))).thenReturn(month);
+        when(engine.evaluate(anyCollection(), any(YearMonth.class))).thenReturn(Map.of(10L, month));
+        when(engine.leadCount(10L)).thenReturn(24L);
+        lenient().when(engine.achievedBetween(anyLong(), any(), any())).thenReturn(month.achieved());
 
-        when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(new BigDecimal("117000"));
-        when(progressCalculator.computeConversions(any(), any(), any(), any())).thenReturn(24);
-        
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(24L);
 
@@ -170,11 +176,10 @@ class MobileStaffPerformanceServiceTest {
                 Math.min(today.getDayOfMonth(), startOfPrevMonth.toLocalDate().lengthOfMonth()));
 
         // Current month: 1500. Same days last month: 1000. Anything else (trend months): 0.
-        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
-        when(progressCalculator.computeRevenue(any(), any(), eq(startOfMonth), eq(startOfMonth.plusMonths(1))))
-                .thenReturn(new BigDecimal("1500"));
-        when(progressCalculator.computeRevenue(any(), any(), eq(startOfPrevMonth), eq(endOfPrevPeriod)))
-                .thenReturn(new BigDecimal("1000"));
+        when(engine.evaluate(eq(10L), any(YearMonth.class))).thenReturn(
+                PerformanceTestData.result(10L, YearMonth.from(today)).achieved(Metric.MEMBER_ADMISSION, 1, "1500").build());
+        when(engine.achievedBetween(eq(10L), eq(startOfPrevMonth), eq(endOfPrevPeriod))).thenReturn(
+                PerformanceTestData.result(10L, YearMonth.from(today)).achieved(Metric.MEMBER_ADMISSION, 1, "1000").build().achieved());
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         lenient().when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
@@ -189,13 +194,9 @@ class MobileStaffPerformanceServiceTest {
     @DisplayName("Growth is 0 (nothing to compare) when last month had no activity, not the target forecast")
     void testGrowthWithoutComparisonIgnoresForecast() {
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
-        StaffTarget target = new StaffTarget();
-        target.setRevenueTarget(new BigDecimal("1000"));
-        target.setForecast(85);
         LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(List.of(target));
-        lenient().when(progressCalculator.computeRevenue(any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
+        when(engine.evaluate(eq(10L), any(YearMonth.class))).thenReturn(PerformanceTestData.result(10L, YearMonth.from(today))
+                .goal(Metric.REVENUE_TOTAL, Measure.AMOUNT, "1000").build());
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
         lenient().when(followUpRepository.count(any(Specification.class))).thenReturn(0L);
@@ -211,10 +212,6 @@ class MobileStaffPerformanceServiceTest {
     void testZeroTargetGracefulHandling() {
         testStaff.setMonthlyTarget(BigDecimal.ZERO);
         when(staffRepository.findByUserId(100L)).thenReturn(Optional.of(testStaff));
-
-        LocalDate today = LocalDate.now();
-        when(staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(10L, today.getYear(), today.getMonthValue()))
-                .thenReturn(Collections.emptyList());
 
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(0L);
@@ -247,6 +244,12 @@ class MobileStaffPerformanceServiceTest {
 
         List<Staff> branchList = List.of(peerStaff1, testStaff, peerStaff2);
         when(staffRepository.findAll(any(Specification.class))).thenReturn(branchList);
+        YearMonth now = YearMonth.now();
+        when(engine.evaluate(anyCollection(), any(YearMonth.class))).thenReturn(Map.of(
+                11L, PerformanceTestData.result(11L, now).achieved(Metric.LEAD_CONVERSION, 5, null).build(),
+                10L, PerformanceTestData.result(10L, now).achieved(Metric.LEAD_CONVERSION, 3, null).build(),
+                12L, PerformanceTestData.result(12L, now).achieved(Metric.LEAD_CONVERSION, 3, null)
+                        .achieved(Metric.POS_SALE, 1, "900").build()));
 
         lenient().when(receiptRepository.findAll(any(Specification.class))).thenReturn(Collections.emptyList());
         lenient().when(leadRepository.count(any(Specification.class))).thenReturn(10L);
@@ -258,6 +261,10 @@ class MobileStaffPerformanceServiceTest {
         assertEquals(1, response.getLeaderboard().get(0).getRank());
         assertEquals(2, response.getLeaderboard().get(1).getRank());
         assertEquals(3, response.getLeaderboard().get(2).getRank());
+        // 5 conversions first; then 3 and 3, broken by revenue (Priya's POS sale)
+        assertEquals(11L, response.getLeaderboard().get(0).getStaffId());
+        assertEquals(12L, response.getLeaderboard().get(1).getStaffId());
+        assertEquals(10L, response.getLeaderboard().get(2).getStaffId());
 
         // Verify currentUser marker matches testStaff
         long currentUserCount = response.getLeaderboard().stream().filter(StaffPerformanceResponseDTO.LeaderboardItemDTO::isCurrentUser).count();

@@ -2,51 +2,33 @@ package com.company.project.services.mobile.performance;
 
 import com.company.project.dto.mobile.performance.TrainerPerformanceResponseDTO;
 import com.company.project.dto.mobile.performance.TrainerPerformanceResponseDTO.*;
-import com.company.project.entities.Receipt;
 import com.company.project.entities.Staff;
-import com.company.project.entities.StaffTarget;
-import com.company.project.entities.TrainingSession;
 import com.company.project.exceptions.EntityNotFoundException;
-import com.company.project.repositories.ReceiptRepository;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
 import com.company.project.repositories.StaffRepository;
-import com.company.project.repositories.StaffTargetRepository;
 import com.company.project.security.UserDetailsImpl;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
+/** Trainer performance screen: revenue and sessions from the performance engine. */
 @Service
 @Transactional(readOnly = true)
 public class MobileTrainerPerformanceService {
 
     private final StaffRepository staffRepository;
-    private final StaffTargetRepository staffTargetRepository;
-    private final ReceiptRepository receiptRepository;
+    private final PerformanceEngine engine;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    public MobileTrainerPerformanceService(
-            StaffRepository staffRepository,
-            StaffTargetRepository staffTargetRepository,
-            ReceiptRepository receiptRepository) {
+    public MobileTrainerPerformanceService(StaffRepository staffRepository, PerformanceEngine engine) {
         this.staffRepository = staffRepository;
-        this.staffTargetRepository = staffTargetRepository;
-        this.receiptRepository = receiptRepository;
+        this.engine = engine;
     }
 
     public TrainerPerformanceResponseDTO getTrainerPerformance(UserDetailsImpl principal) {
@@ -57,48 +39,22 @@ public class MobileTrainerPerformanceService {
         Staff staff = staffRepository.findByUserId(principal.getId())
                 .orElseThrow(() -> new EntityNotFoundException("No staff record linked to this account"));
 
-        LocalDate today = LocalDate.now();
-        int year = today.getYear();
-        int month = today.getMonthValue();
-
-        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
-        LocalDateTime startOfNextMonth = startOfMonth.plusMonths(1);
-
-        Optional<StaffTarget> targetOpt = staffTargetRepository
-                .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
-                .stream().findFirst();
+        YearMonth current = engine.clock().currentMonth(staff.getBranchId());
+        PeriodResult month = engine.evaluate(staff.getId(), current);
 
         // 1. Monthly Performance - Revenue
-        BigDecimal revenueAchieved = computeStaffRevenue(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
-        BigDecimal revenueTarget = BigDecimal.ZERO;
-        
-        if (targetOpt.isPresent() && targetOpt.get().getRevenueTarget() != null && targetOpt.get().getRevenueTarget().compareTo(BigDecimal.ZERO) > 0) {
-            revenueTarget = targetOpt.get().getRevenueTarget();
-            if (targetOpt.get().getRevenueAchieved() != null && targetOpt.get().getRevenueAchieved().compareTo(revenueAchieved) > 0) {
-                revenueAchieved = targetOpt.get().getRevenueAchieved();
-            }
-        } else if (staff.getMonthlyTarget() != null && staff.getMonthlyTarget().compareTo(BigDecimal.ZERO) > 0) {
-            revenueTarget = staff.getMonthlyTarget();
-        }
+        BigDecimal revenueAchieved = month.revenue();
+        BigDecimal revenueGoal = month.goal(Metric.REVENUE_TOTAL, Measure.AMOUNT);
+        BigDecimal revenueTarget = revenueGoal != null ? revenueGoal : BigDecimal.ZERO;
+        Integer revenuePct = month.percent(Metric.REVENUE_TOTAL, Measure.AMOUNT);
+        RevenuePerformanceDTO revenuePerformance = new RevenuePerformanceDTO(revenueAchieved, revenueTarget,
+                revenuePct != null ? revenuePct : 0);
 
-        int revenuePercentage = 0;
-        if (revenueTarget.compareTo(BigDecimal.ZERO) > 0) {
-            revenuePercentage = (int) Math.round((revenueAchieved.doubleValue() / revenueTarget.doubleValue()) * 100);
-        }
-        RevenuePerformanceDTO revenuePerformance = new RevenuePerformanceDTO(revenueAchieved, revenueTarget, revenuePercentage);
-
-        // 2. Monthly Performance - Sessions
-        int sessionsCompleted = countCompletedSessions(staff.getId(), startOfMonth.toLocalDate(), startOfNextMonth.toLocalDate().minusDays(1));
-        int sessionsTarget = 0;
-
-        if (targetOpt.isPresent() && targetOpt.get().getSessionsTarget() != null) {
-            sessionsTarget = targetOpt.get().getSessionsTarget();
-        }
-
-        double sessionsPercentage = 0;
-        if (sessionsTarget > 0) {
-            sessionsPercentage = Math.round(((double) sessionsCompleted / sessionsTarget) * 1000.0) / 10.0;
-        }
+        // 2. Monthly Performance - Sessions (PT sessions delivered + classes taught)
+        int sessionsCompleted = sessionsDelivered(month);
+        int sessionsTarget = sessionsGoal(month);
+        double sessionsPercentage = sessionsTarget > 0
+                ? Math.round(((double) sessionsCompleted / sessionsTarget) * 1000.0) / 10.0 : 0;
         SessionPerformanceDTO sessionPerformance = new SessionPerformanceDTO(sessionsCompleted, sessionsTarget, sessionsPercentage);
 
         MonthlyPerformanceDTO monthlyPerformance = new MonthlyPerformanceDTO(revenuePerformance, sessionPerformance);
@@ -108,14 +64,16 @@ public class MobileTrainerPerformanceService {
         ActiveClientsDTO activeClients = new ActiveClientsDTO(0, 0);
 
         // 4. Six-Month Trend
-        List<TrainerSessionTrendDTO> sixMonthTrend = computeSixMonthSessionTrend(staff.getId(), today);
+        List<TrainerSessionTrendDTO> sixMonthTrend = new ArrayList<>();
+        engine.evaluate(List.of(staff.getId()), current.minusMonths(5), current).forEach((m, byStaff) -> {
+            PeriodResult r = byStaff.get(staff.getId());
+            sixMonthTrend.add(new TrainerSessionTrendDTO(m.toString(), r != null ? sessionsDelivered(r) : 0));
+        });
 
         // 5. Performance Tip
         int sessionsRemaining = Math.max(sessionsTarget - sessionsCompleted, 0);
-        double remainingPercentage = 0;
-        if (sessionsTarget > 0) {
-            remainingPercentage = Math.round(((double) sessionsRemaining / sessionsTarget) * 1000.0) / 10.0;
-        }
+        double remainingPercentage = sessionsTarget > 0
+                ? Math.round(((double) sessionsRemaining / sessionsTarget) * 1000.0) / 10.0 : 0;
         PerformanceTipDTO performanceTip = new PerformanceTipDTO(remainingPercentage, sessionsRemaining);
 
         return new TrainerPerformanceResponseDTO(
@@ -126,78 +84,15 @@ public class MobileTrainerPerformanceService {
         );
     }
 
-    private BigDecimal computeStaffRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        Specification<Receipt> spec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("transactionDate"), start),
-                            cb.lessThan(root.get("transactionDate"), end)),
-                    cb.and(cb.isNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("createdAt"), start),
-                            cb.lessThan(root.get("createdAt"), end))
-            ));
-            if (staff.getName() != null && !staff.getName().isBlank()) {
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("processedBy")), "%" + staff.getName().toLowerCase() + "%"),
-                        cb.equal(root.get("createdBy"), username)
-                ));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        List<Receipt> receipts = receiptRepository.findAll(spec);
-        return receipts.stream()
-                .map(r -> r.getPaidAmount() != null ? r.getPaidAmount() : (r.getAmount() != null ? r.getAmount() : BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    /** Sessions a trainer delivered in the month: booked PT sessions plus classes held. */
+    public static int sessionsDelivered(PeriodResult r) {
+        return (int) (r.count(Metric.PT_SESSION_DELIVERED) + r.count(Metric.CLASS_TAUGHT));
     }
 
-    public int countCompletedSessions(Long trainerId, LocalDate start, LocalDate end) {
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Long> cq = cb.createQuery(Long.class);
-        Root<TrainingSession> sessionRoot = cq.from(TrainingSession.class);
-
-        Predicate trainerPredicate = cb.equal(sessionRoot.get("trainer").get("id"), trainerId);
-        Predicate statusPredicate = cb.equal(sessionRoot.get("status"), "completed");
-        Predicate datePredicate = cb.between(sessionRoot.get("date"), start, end);
-
-        cq.select(cb.count(sessionRoot)).where(cb.and(trainerPredicate, statusPredicate, datePredicate));
-        Long count = entityManager.createQuery(cq).getSingleResult();
-        return count != null ? count.intValue() : 0;
-    }
-
-    private List<TrainerSessionTrendDTO> computeSixMonthSessionTrend(Long trainerId, LocalDate today) {
-        List<TrainerSessionTrendDTO> trends = new ArrayList<>();
-
-        LocalDate sixMonthsAgo = today.minusMonths(5).withDayOfMonth(1);
-        LocalDate endOfCurrentMonth = today.withDayOfMonth(today.lengthOfMonth());
-
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<TrainingSession> cq = cb.createQuery(TrainingSession.class);
-        Root<TrainingSession> sessionRoot = cq.from(TrainingSession.class);
-
-        Predicate trainerPredicate = cb.equal(sessionRoot.get("trainer").get("id"), trainerId);
-        Predicate statusPredicate = cb.equal(sessionRoot.get("status"), "completed");
-        Predicate datePredicate = cb.between(sessionRoot.get("date"), sixMonthsAgo, endOfCurrentMonth);
-
-        cq.select(sessionRoot).where(cb.and(trainerPredicate, statusPredicate, datePredicate));
-        List<TrainingSession> sessions = entityManager.createQuery(cq).getResultList();
-
-        for (int i = 5; i >= 0; i--) {
-            LocalDate monthDate = today.minusMonths(i);
-            String periodStr = monthDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            
-            int monthValue = monthDate.getMonthValue();
-            int yearValue = monthDate.getYear();
-            
-            long sessionCount = sessions.stream()
-                    .filter(s -> s.getDate().getYear() == yearValue && s.getDate().getMonthValue() == monthValue)
-                    .count();
-                    
-            trends.add(new TrainerSessionTrendDTO(periodStr, (int) sessionCount));
-        }
-
-        return trends;
+    /** The month's session goal: PT sessions plus classes. */
+    public static int sessionsGoal(PeriodResult r) {
+        BigDecimal pt = r.goal(Metric.PT_SESSION_DELIVERED, Measure.COUNT);
+        BigDecimal classes = r.goal(Metric.CLASS_TAUGHT, Measure.COUNT);
+        return (pt != null ? pt.intValue() : 0) + (classes != null ? classes.intValue() : 0);
     }
 }

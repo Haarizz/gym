@@ -6,7 +6,10 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.PeriodResult;
+import com.company.project.performance.metric.Measure;
+import com.company.project.performance.metric.Metric;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -26,28 +29,25 @@ import java.util.stream.Collectors;
 public class MobileStaffPerformanceService {
 
     private final StaffRepository staffRepository;
-    private final StaffTargetRepository staffTargetRepository;
     private final LeadRepository leadRepository;
     private final FollowUpRepository followUpRepository;
     private final ReceiptRepository receiptRepository;
     private final WorkoutFeedbackRepository workoutFeedbackRepository;
-    private final StaffProgressCalculator progressCalculator;
+    private final PerformanceEngine engine;
 
     public MobileStaffPerformanceService(
             StaffRepository staffRepository,
-            StaffTargetRepository staffTargetRepository,
             LeadRepository leadRepository,
             FollowUpRepository followUpRepository,
             ReceiptRepository receiptRepository,
             WorkoutFeedbackRepository workoutFeedbackRepository,
-            StaffProgressCalculator progressCalculator) {
+            PerformanceEngine engine) {
         this.staffRepository = staffRepository;
-        this.staffTargetRepository = staffTargetRepository;
         this.leadRepository = leadRepository;
         this.followUpRepository = followUpRepository;
         this.receiptRepository = receiptRepository;
         this.workoutFeedbackRepository = workoutFeedbackRepository;
-        this.progressCalculator = progressCalculator;
+        this.engine = engine;
     }
 
     public StaffPerformanceResponseDTO getStaffPerformance(UserDetailsImpl principal) {
@@ -57,7 +57,7 @@ public class MobileStaffPerformanceService {
 
         // Accounts without a linked Staff record (e.g. Admin, gym owner) still get their own
         // performance computed off activity recorded under their login (receipts, leads and
-        // follow-ups they created, POS sales they rang up — see StaffProgressCalculator.personFilter),
+        // follow-ups they created),
         // just without staff-only fields like a branch, monthly target, or leaderboard.
         Staff staff = staffRepository.findByUserId(principal.getId()).orElse(null);
 
@@ -72,55 +72,28 @@ public class MobileStaffPerformanceService {
         // 1. Period
         PeriodDTO period = new PeriodDTO(year, month, monthLabel);
 
-        // Fetch optional StaffTarget for current month (only meaningful when linked to a Staff record).
-        // Multiple rows can exist for the same staff/period (no DB uniqueness enforced), so take
-        // the most recently created one rather than letting a non-unique lookup blow up.
-        Optional<StaffTarget> targetOpt = staff != null
-                ? staffTargetRepository.findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(staff.getId(), year, month)
-                        .stream().findFirst()
-                : Optional.empty();
+        // This month from the performance engine (only meaningful when linked to a Staff record).
+        PeriodResult thisMonth = staff != null ? engine.evaluate(staff.getId(), java.time.YearMonth.of(year, month)) : null;
 
         // 2. Revenue Target & Achieved
-        BigDecimal revenueAchieved = computeStaffRevenue(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
-        BigDecimal revenueTarget = BigDecimal.ZERO;
-        if (targetOpt.isPresent() && targetOpt.get().getRevenueTarget() != null && targetOpt.get().getRevenueTarget().compareTo(BigDecimal.ZERO) > 0) {
-            revenueTarget = targetOpt.get().getRevenueTarget();
-            if (targetOpt.get().getRevenueAchieved() != null && targetOpt.get().getRevenueAchieved().compareTo(revenueAchieved) > 0) {
-                revenueAchieved = targetOpt.get().getRevenueAchieved();
-            }
-        } else if (staff != null && staff.getMonthlyTarget() != null && staff.getMonthlyTarget().compareTo(BigDecimal.ZERO) > 0) {
-            revenueTarget = staff.getMonthlyTarget();
-        }
-
-        int revenuePercentage = 0;
-        if (revenueTarget.compareTo(BigDecimal.ZERO) > 0) {
-            revenuePercentage = (int) Math.round((revenueAchieved.doubleValue() / revenueTarget.doubleValue()) * 100);
-        }
+        BigDecimal revenueAchieved = thisMonth != null ? thisMonth.revenue() : BigDecimal.ZERO;
+        BigDecimal revenueGoal = thisMonth != null ? thisMonth.goal(Metric.REVENUE_TOTAL, Measure.AMOUNT) : null;
+        BigDecimal revenueTarget = revenueGoal != null ? revenueGoal : BigDecimal.ZERO;
+        int revenuePercentage = thisMonth != null && thisMonth.percent(Metric.REVENUE_TOTAL, Measure.AMOUNT) != null
+                ? thisMonth.percent(Metric.REVENUE_TOTAL, Measure.AMOUNT) : 0;
         RevenueTargetDTO revenueTargetDTO = new RevenueTargetDTO(revenueAchieved, revenueTarget, revenuePercentage);
 
         // 3. Conversion Target & Achieved
-        int conversionsAchieved = computeStaffConversions(staff, principal.getUsername(), startOfMonth, startOfNextMonth);
-        int conversionTarget = 0;
-        if (targetOpt.isPresent()) {
-            StaffTarget target = targetOpt.get();
-            if (target.getNewClientsTarget() != null && target.getNewClientsTarget() > 0) {
-                conversionTarget = target.getNewClientsTarget();
-            } else if (target.getSessionsTarget() != null && target.getSessionsTarget() > 0) {
-                conversionTarget = target.getSessionsTarget();
-            }
-            if (target.getNewClientsAchieved() != null && target.getNewClientsAchieved() > conversionsAchieved) {
-                conversionsAchieved = target.getNewClientsAchieved();
-            }
-        }
-        int conversionPercentage = 0;
-        if (conversionTarget > 0) {
-            conversionPercentage = (int) Math.round(((double) conversionsAchieved / conversionTarget) * 100);
-        }
+        int conversionsAchieved = thisMonth != null ? (int) thisMonth.count(Metric.LEAD_CONVERSION) : 0;
+        BigDecimal conversionGoal = thisMonth != null ? thisMonth.goal(Metric.LEAD_CONVERSION, Measure.COUNT) : null;
+        int conversionTarget = conversionGoal != null ? conversionGoal.intValue() : 0;
+        int conversionPercentage = conversionTarget > 0
+                ? (int) Math.round(((double) conversionsAchieved / conversionTarget) * 100) : 0;
         ConversionTargetDTO conversionTargetDTO = new ConversionTargetDTO(conversionsAchieved, conversionTarget, conversionPercentage);
 
         // 4. Summary KPIs (Rating, Growth, Lead count)
         double rating = computeStaffRating(staff);
-        int growthPercentage = computeGrowthPercentage(staff, principal.getUsername(), today, startOfMonth, conversionsAchieved, revenueAchieved, targetOpt);
+        int growthPercentage = computeGrowthPercentage(staff, principal.getUsername(), today, startOfMonth, conversionsAchieved, revenueAchieved);
         int leadCount = computeStaffLeadCount(staff, principal.getUsername());
         SummaryDTO summaryDTO = new SummaryDTO(rating, growthPercentage, leadCount);
 
@@ -133,7 +106,7 @@ public class MobileStaffPerformanceService {
                 : new ArrayList<>();
 
         // 7. Performance Breakdown
-        int conversionRate = progressCalculator.computeLeadConversionRate(staff, principal.getUsername());
+        int conversionRate = staff != null ? engine.leadConversionRates(List.of(staff.getId())).getOrDefault(staff.getId(), 0) : 0;
         int followUpCompletion = computeFollowUpCompletion(staff, principal.getUsername());
         int customerSatisfaction = computeCustomerSatisfaction(rating);
         BreakdownDTO breakdown = new BreakdownDTO(conversionRate, followUpCompletion, customerSatisfaction);
@@ -154,12 +127,16 @@ public class MobileStaffPerformanceService {
         );
     }
 
+    /** Revenue credited to the person in [start, end) — performance ledger, attributed by staff id. */
     private BigDecimal computeStaffRevenue(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        return progressCalculator.computeRevenue(staff, username, start, end);
+        if (staff == null) return BigDecimal.ZERO;
+        return engine.achievedBetween(staff.getId(), start, end).get(Metric.REVENUE_TOTAL).amountOrZero();
     }
 
     private int computeStaffConversions(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        return progressCalculator.computeConversions(staff, username, start, end);
+        if (staff == null) return 0;
+        var a = engine.achievedBetween(staff.getId(), start, end).get(Metric.LEAD_CONVERSION);
+        return a != null ? (int) a.count() : 0;
     }
 
     /**
@@ -185,7 +162,7 @@ public class MobileStaffPerformanceService {
      */
     private int computeGrowthPercentage(
             Staff staff, String username, LocalDate today, LocalDateTime startOfMonth,
-            int currentConversions, BigDecimal currentRevenue, Optional<StaffTarget> targetOpt) {
+            int currentConversions, BigDecimal currentRevenue) {
 
         LocalDateTime startOfPrevMonth = startOfMonth.minusMonths(1);
         int daysSoFar = today.getDayOfMonth();
@@ -208,10 +185,9 @@ public class MobileStaffPerformanceService {
     }
 
     private int computeStaffLeadCount(Staff staff, String username) {
-        Specification<Lead> spec = (root, query, cb) -> {
-            Predicate person = StaffProgressCalculator.personFilter(root, cb, staff, username, "assignedStaff");
-            return person != null ? person : cb.conjunction();
-        };
+        if (staff != null) return (int) engine.leadCount(staff.getId());
+        if (username == null || username.isBlank()) return 0;
+        Specification<Lead> spec = (root, query, cb) -> cb.equal(root.get("createdBy"), username);
         return (int) leadRepository.count(spec);
     }
 
@@ -249,11 +225,14 @@ public class MobileStaffPerformanceService {
             branchStaffList = Collections.singletonList(currentStaff);
         }
 
-        // Compute performance per staff
+        // Everyone's month in one evaluation
+        Map<Long, PeriodResult> results = engine.evaluate(branchStaffList.stream().map(Staff::getId).toList(),
+                java.time.YearMonth.from(startOfMonth));
         List<LeaderboardItemDTO> items = new ArrayList<>();
         for (Staff s : branchStaffList) {
-            int conversions = computeStaffConversions(s, s.getAppUsername() != null ? s.getAppUsername() : "", startOfMonth, startOfNextMonth);
-            BigDecimal revenue = computeStaffRevenue(s, s.getAppUsername() != null ? s.getAppUsername() : "", startOfMonth, startOfNextMonth);
+            PeriodResult r = results.get(s.getId());
+            int conversions = r != null ? (int) r.count(Metric.LEAD_CONVERSION) : 0;
+            BigDecimal revenue = r != null ? r.revenue() : BigDecimal.ZERO;
 
             boolean isCurrent = s.getId() != null && s.getId().equals(currentStaff.getId());
             items.add(new LeaderboardItemDTO(0, s.getId(), s.getName(), conversions, revenue, isCurrent));
@@ -292,7 +271,7 @@ public class MobileStaffPerformanceService {
         Specification<FollowUp> staffFUSpec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (hasName) {
-                predicates.add(cb.like(cb.lower(root.get("assignedStaff")), "%" + staff.getName().toLowerCase() + "%"));
+                predicates.add(cb.equal(root.get("assignedStaffId"), staff.getId()));
             } else if (username != null && !username.isBlank()) {
                 predicates.add(cb.equal(root.get("createdBy"), username));
             }

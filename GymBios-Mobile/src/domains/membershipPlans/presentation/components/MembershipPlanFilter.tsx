@@ -54,13 +54,11 @@ export function MembershipPlanFilter({ selected, onSelect }: MembershipPlanFilte
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
     gap: Spacing.two,
-    paddingBottom: Spacing.two,
   },
   chip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    paddingVertical: 6,
     borderRadius: Radius.full,
     borderWidth: 1,
   },

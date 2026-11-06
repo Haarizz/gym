@@ -5,7 +5,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.Filter;
 
-/** Commission decision for one staff member, month and category (memberships / pos). The amount is frozen when approved. */
+/**
+ * Commission settlement for one staff member and month (performance engine, V121): category
+ * "total", the frozen amount, and a JSON snapshot of the breakdown and plan it was approved
+ * under. Older months may still hold their pre-V121 "memberships" / "pos" rows; the engine
+ * reads those together as one settlement.
+ */
 @Filter(name = "branchFilter", condition = "branch_id = :branchId")
 @Entity
 @Table(name = "commission_earnings")
@@ -51,6 +56,22 @@ public class CommissionEarning extends BaseEntity implements BranchAware {
     @Column(name = "branch_id")
     private Long branchId;
 
+    /** Snapshot of the IncentiveBreakdown approved (lines, bonuses, plan). */
+    @Column(name = "breakdown_json", columnDefinition = "TEXT")
+    private String breakdownJson;
+
+    /** The plan version the month was approved under. */
+    @Column(name = "plan_id")
+    private Long planId;
+
+    /** What the engine calculated at approval, before any manual adjustment. */
+    @Column(name = "computed_amount", precision = 12, scale = 2)
+    private BigDecimal computedAmount;
+
+    /** Manual +/- adjustment made at approval (explained in the note). */
+    @Column(name = "adjustment_amount", precision = 12, scale = 2)
+    private BigDecimal adjustmentAmount;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getStaffId() { return staffId; }
@@ -77,4 +98,12 @@ public class CommissionEarning extends BaseEntity implements BranchAware {
     public void setPayrollRunId(Long payrollRunId) { this.payrollRunId = payrollRunId; }
     public Long getBranchId() { return branchId; }
     public void setBranchId(Long branchId) { this.branchId = branchId; }
+    public String getBreakdownJson() { return breakdownJson; }
+    public void setBreakdownJson(String breakdownJson) { this.breakdownJson = breakdownJson; }
+    public Long getPlanId() { return planId; }
+    public void setPlanId(Long planId) { this.planId = planId; }
+    public BigDecimal getComputedAmount() { return computedAmount; }
+    public void setComputedAmount(BigDecimal computedAmount) { this.computedAmount = computedAmount; }
+    public BigDecimal getAdjustmentAmount() { return adjustmentAmount; }
+    public void setAdjustmentAmount(BigDecimal adjustmentAmount) { this.adjustmentAmount = adjustmentAmount; }
 }

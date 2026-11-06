@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "没有可导出的对账明细。",
       "statementExported": "已将 {{name}} 的对账单导出为 CSV。",
       "statementExportTitle": "导出对账单 CSV",
+      "statementExportFailed": "导出对账单失败。",
       "familyHead": "家庭主账户",
       "member": "会员",
       "receiptsExportInfo": "正在将全部收据（{{count}} 条）导出为 CSV 文件。",

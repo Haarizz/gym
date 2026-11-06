@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "Todas las prioridades",
       "allStaff": "Todo el personal"
     },
+    "form": {
+      "addTitle": "Nuevo seguimiento",
+      "editTitle": "Editar seguimiento",
+      "subtitle": "Planifica el próximo contacto con un prospecto",
+      "create": "Crear seguimiento",
+      "addButton": "Agregar nuevo seguimiento",
+      "whoSection": "QUIÉN",
+      "detailsSection": "DETALLES",
+      "scheduleSection": "PROGRAMACIÓN",
+      "notesSection": "NOTAS",
+      "minutes": "{{count}} min"
+    },
     "msg": {
       "selectMemberOrLead": "Selecciona un miembro o prospecto.",
       "subjectRequired": "El asunto del seguimiento es obligatorio.",

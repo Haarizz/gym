@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "Alle Prioritäten",
       "allStaff": "Alle Mitarbeiter"
     },
+    "form": {
+      "addTitle": "Neues Follow-up",
+      "editTitle": "Follow-up bearbeiten",
+      "subtitle": "Planen Sie den nächsten Kontakt mit einem Lead",
+      "create": "Follow-up erstellen",
+      "addButton": "Neues Follow-up hinzufügen",
+      "whoSection": "WER",
+      "detailsSection": "DETAILS",
+      "scheduleSection": "ZEITPLAN",
+      "notesSection": "NOTIZEN",
+      "minutes": "{{count}} Min."
+    },
     "msg": {
       "selectMemberOrLead": "Bitte wähle ein Mitglied oder einen Lead aus.",
       "subjectRequired": "Betreff der Nachfassung ist erforderlich.",

@@ -5,11 +5,9 @@ import com.company.project.dto.StaffSummaryDTO;
 import com.company.project.entities.Staff;
 import com.company.project.entities.StaffAttendance;
 import com.company.project.entities.StaffScheduleSlot;
-import com.company.project.entities.StaffTarget;
 import com.company.project.repositories.StaffAttendanceRepository;
 import com.company.project.repositories.StaffBranchRepository;
 import com.company.project.repositories.StaffRepository;
-import com.company.project.repositories.StaffTargetRepository;
 import com.company.project.repositories.TrainingSessionRepository;
 import com.company.project.repositories.WorkoutFeedbackRepository;
 import com.company.project.security.BranchContextHolder;
@@ -38,25 +36,22 @@ public class StaffOverviewService {
     private final StaffRepository staffRepository;
     private final StaffBranchRepository staffBranchRepository;
     private final StaffAttendanceRepository staffAttendanceRepository;
-    private final StaffTargetRepository staffTargetRepository;
     private final TrainingSessionRepository trainingSessionRepository;
     private final WorkoutFeedbackRepository workoutFeedbackRepository;
-    private final StaffProgressCalculator progressCalculator;
+    private final com.company.project.performance.PerformanceEngine performanceEngine;
 
     public StaffOverviewService(StaffRepository staffRepository,
                                 StaffBranchRepository staffBranchRepository,
                                 StaffAttendanceRepository staffAttendanceRepository,
-                                StaffTargetRepository staffTargetRepository,
                                 TrainingSessionRepository trainingSessionRepository,
                                 WorkoutFeedbackRepository workoutFeedbackRepository,
-                                StaffProgressCalculator progressCalculator) {
+                                com.company.project.performance.PerformanceEngine performanceEngine) {
         this.staffRepository           = staffRepository;
         this.staffBranchRepository     = staffBranchRepository;
         this.staffAttendanceRepository = staffAttendanceRepository;
-        this.staffTargetRepository     = staffTargetRepository;
         this.trainingSessionRepository = trainingSessionRepository;
         this.workoutFeedbackRepository = workoutFeedbackRepository;
-        this.progressCalculator        = progressCalculator;
+        this.performanceEngine         = performanceEngine;
     }
 
     public StaffSummaryDTO getSummary() {
@@ -110,27 +105,21 @@ public class StaffOverviewService {
         // Fraction of the month elapsed, used to judge whether revenue is pacing to target.
         double monthElapsed = (double) today.getDayOfMonth() / today.lengthOfMonth();
 
+        java.time.YearMonth month = java.time.YearMonth.from(today);
+        Map<Long, com.company.project.performance.PeriodResult> results = performanceEngine.evaluate(ids, month);
+        Map<Long, Integer> conversionRates = performanceEngine.leadConversionRates(ids);
+
         List<StaffPerformanceMetricsDTO> result = new ArrayList<>();
         for (Staff s : staffList) {
-            String username = s.getAppUsername() != null ? s.getAppUsername() : "";
             StaffPerformanceMetricsDTO dto = new StaffPerformanceMetricsDTO();
             dto.setStaffId(String.valueOf(s.getId()));
 
-            BigDecimal achieved = progressCalculator.computeRevenue(s, username, startOfMonth, startOfNextMonth);
-            dto.setCommissionEarned(progressCalculator.computeCommission(s, username, startOfMonth, startOfNextMonth));
-            BigDecimal target = BigDecimal.ZERO;
-            Optional<StaffTarget> targetOpt = staffTargetRepository
-                    .findByStaff_IdAndYearAndMonthOrderByCreatedAtDesc(s.getId(), today.getYear(), today.getMonthValue())
-                    .stream().findFirst();
-            if (targetOpt.isPresent() && isPositive(targetOpt.get().getRevenueTarget())) {
-                target = targetOpt.get().getRevenueTarget();
-                BigDecimal recorded = targetOpt.get().getRevenueAchieved();
-                if (recorded != null && recorded.compareTo(achieved) > 0) {
-                    achieved = recorded;
-                }
-            } else if (isPositive(s.getMonthlyTarget())) {
-                target = s.getMonthlyTarget();
-            }
+            com.company.project.performance.PeriodResult r = results.get(s.getId());
+            BigDecimal achieved = r != null ? r.revenue() : BigDecimal.ZERO;
+            dto.setCommissionEarned(r != null ? r.commission() : BigDecimal.ZERO);
+            BigDecimal target = r != null ? r.goal(com.company.project.performance.metric.Metric.REVENUE_TOTAL,
+                    com.company.project.performance.metric.Measure.AMOUNT) : null;
+            if (target == null) target = BigDecimal.ZERO;
             int achievement = isPositive(target)
                     ? (int) Math.round(achieved.doubleValue() / target.doubleValue() * 100)
                     : 0;
@@ -139,7 +128,7 @@ public class StaffOverviewService {
             dto.setRevenueAchieved(achieved);
             dto.setAchievementPercentage(achievement);
             dto.setPerformanceStatus(performanceStatus(target, achievement, monthElapsed));
-            dto.setConversionRate(progressCalculator.computeLeadConversionRate(s, username));
+            dto.setConversionRate(conversionRates.getOrDefault(s.getId(), 0));
             dto.setPtSessions(ptSessions.getOrDefault(s.getId(), 0));
 
             Set<LocalDate> present = daysPresent.getOrDefault(s.getId(), Set.of());

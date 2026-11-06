@@ -6,9 +6,11 @@ import com.company.project.entities.*;
 import com.company.project.exceptions.EntityNotFoundException;
 import com.company.project.repositories.*;
 import com.company.project.security.UserDetailsImpl;
-import com.company.project.services.StaffProgressCalculator;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.company.project.performance.PerformanceEngine;
+import com.company.project.performance.api.PerformanceViews;
+import com.company.project.performance.incentives.IncentivePlan;
+import com.company.project.performance.incentives.IncentivePlanBonus;
+import com.company.project.performance.incentives.IncentivePlanLine;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,27 +31,24 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class MobileStaffLedgerService {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
-
     private final StaffRepository staffRepository;
-    private final StaffProgressCalculator progressCalculator;
+    private final PerformanceEngine engine;
     private final LedgerEarningsCalculator earnings;
 
     public MobileStaffLedgerService(
             StaffRepository staffRepository,
-            StaffProgressCalculator progressCalculator,
+            PerformanceEngine engine,
             LedgerEarningsCalculator earnings) {
         this.staffRepository = staffRepository;
-        this.progressCalculator = progressCalculator;
+        this.engine = engine;
         this.earnings = earnings;
     }
 
     public StaffLedgerResponseDTO getStaffLedger(UserDetailsImpl principal) {
         Staff staff = requireStaff(principal);
-        String username = earnings.usernameFor(staff, principal);
 
         LocalDate today = LocalDate.now();
-        YearMonth current = YearMonth.from(today);
+        YearMonth current = earnings.currentMonth();
         YearMonth previous = current.minusMonths(1);
         String monthLabel = current.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + current.getYear();
 
@@ -61,11 +60,11 @@ public class MobileStaffLedgerService {
         // This month
         BigDecimal baseSalary = earnings.baseSalaryFor(staff, payrollEmployee);
         BigDecimal allowances = earnings.allowancesFor(payrollEmployee);
-        BigDecimal commission = earnings.commissionFor(staff, username, current);
+        BigDecimal commission = earnings.commissionFor(staff, current);
         BigDecimal thisMonthTotal = baseSalary.add(commission).add(allowances);
 
         BigDecimal lastMonthTotal = earnings.lastMonthSalary(staff, payments, current, baseSalary, allowances)
-                .add(earnings.commissionFor(staff, username, previous));
+                .add(earnings.commissionFor(staff, previous));
         Integer growthPercentage = LedgerEarningsCalculator.growthPercentage(thisMonthTotal, lastMonthTotal);
 
         EarningsSummaryDTO summary = new EarningsSummaryDTO(
@@ -87,8 +86,8 @@ public class MobileStaffLedgerService {
         NextPayoutDTO nextPayout = new NextPayoutDTO(nextPayoutDate.toString(), daysRemaining);
 
         List<BreakdownItemDTO> breakdown = computeBreakdown(baseSalary, commission, allowances, thisMonthTotal);
-        List<CommissionStructureItemDTO> commissionStructure = computeCommissionStructure(staff);
-        List<RecentEarningDTO> recentEarnings = computeRecentEarnings(staff, username, payments);
+        List<CommissionStructureItemDTO> commissionStructure = computeCommissionStructure(staff, current);
+        List<RecentEarningDTO> recentEarnings = computeRecentEarnings(staff, payments);
 
         return new StaffLedgerResponseDTO(
                 period,
@@ -103,7 +102,6 @@ public class MobileStaffLedgerService {
 
     public byte[] getSalarySlip(UserDetailsImpl principal, Integer reqYear, Integer reqMonth) {
         Staff staff = requireStaff(principal);
-        String username = earnings.usernameFor(staff, principal);
 
         LocalDate today = LocalDate.now();
         YearMonth period = YearMonth.of(
@@ -117,7 +115,7 @@ public class MobileStaffLedgerService {
         BigDecimal baseSalary = earnings.baseSalaryFor(staff, payrollEmployee);
         BigDecimal allowances = earnings.allowancesFor(payrollEmployee);
         BigDecimal deductions = earnings.deductionsFor(payrollEmployee);
-        BigDecimal commission = earnings.commissionFor(staff, username, period);
+        BigDecimal commission = earnings.commissionFor(staff, period);
         BigDecimal grossEarnings = baseSalary.add(allowances).add(commission);
         BigDecimal netPayable = grossEarnings.subtract(deductions);
 
@@ -181,38 +179,39 @@ public class MobileStaffLedgerService {
         return items;
     }
 
-    /** The staff member's commission rule as configured on the web Staff & Trainers page. */
-    private List<CommissionStructureItemDTO> computeCommissionStructure(Staff staff) {
-        Optional<CommissionRule> rule = progressCalculator.findCommissionRule(staff);
+    /**
+     * The staff member's incentive plan for the month as configured on the web (commission lines
+     * and the target bonuses that are actually paid). No plan, no commission: shown as such.
+     */
+    private List<CommissionStructureItemDTO> computeCommissionStructure(Staff staff, YearMonth period) {
         List<CommissionStructureItemDTO> items = new ArrayList<>();
-        items.add(new CommissionStructureItemDTO("ADMISSION", "New member admissions",
-                formatPercent(progressCalculator.admissionCommissionRate(rule))));
-        items.add(new CommissionStructureItemDTO("BASE", "Renewals, add-ons & walk-ins",
-                formatPercent(progressCalculator.baseCommissionRate(rule))));
-        if (progressCalculator.hasPosRates(rule)) {
-            BigDecimal pct = rule.get().getPosCommission();
-            BigDecimal perSale = rule.get().getPosCommissionPerSale();
-            List<String> parts = new ArrayList<>();
-            if (pct != null && pct.signum() > 0) parts.add(formatPercent(pct));
-            if (perSale != null && perSale.signum() > 0) parts.add(perSale.stripTrailingZeros().toPlainString() + " per sale");
-            items.add(new CommissionStructureItemDTO("POS", "POS sales", String.join(" + ", parts)));
+        IncentivePlan plan = engine.planFor(staff.getId(), period);
+        if (plan == null) {
+            items.add(new CommissionStructureItemDTO("NONE", "No incentive plan", "—"));
+            return items;
         }
-
-        String bonusesJson = rule.map(CommissionRule::getTargetBonusesJson).orElse(null);
-        if (bonusesJson != null && !bonusesJson.isBlank()) {
-            try {
-                List<Map<String, Object>> bonuses = JSON.readValue(bonusesJson, new TypeReference<>() {});
-                for (Map<String, Object> bonus : bonuses) {
-                    Object threshold = bonus.get("threshold");
-                    Object extra = bonus.get("bonus");
-                    if (threshold == null || extra == null) continue;
-                    items.add(new CommissionStructureItemDTO("TARGET_BONUS",
-                            "Reach " + formatPercent(new BigDecimal(threshold.toString())) + " of target",
-                            "+" + formatPercent(new BigDecimal(extra.toString()))));
-                }
-            } catch (Exception ignored) {
-                // Malformed bonus config: show the base rates only.
-            }
+        List<String[]> text = PerformanceViews.structure(plan);
+        int i = 0;
+        for (IncentivePlanLine line : plan.getLines()) {
+            if (com.company.project.performance.metric.Metric.parse(line.getMetric()).isEmpty()) continue;
+            String[] t = text.get(i++);
+            CommissionStructureItemDTO item = new CommissionStructureItemDTO(t[0], t[1], t[2]);
+            item.setMetric(line.getMetric());
+            item.setBasis(line.getBasis());
+            item.setRate(line.getRate());
+            item.setMinUnits(line.getMinUnits());
+            item.setCapAmount(line.getCapAmount());
+            items.add(item);
+        }
+        for (IncentivePlanBonus bonus : plan.getBonuses()) {
+            if (com.company.project.performance.metric.Metric.parse(bonus.getMetric()).isEmpty()) continue;
+            String[] t = text.get(i++);
+            CommissionStructureItemDTO item = new CommissionStructureItemDTO(t[0], t[1], t[2]);
+            item.setMetric(bonus.getMetric());
+            item.setThresholdPct(bonus.getThresholdPct());
+            item.setRewardType(bonus.getRewardType());
+            item.setRewardValue(bonus.getRewardValue());
+            items.add(item);
         }
         return items;
     }
@@ -221,9 +220,9 @@ public class MobileStaffLedgerService {
         return value.stripTrailingZeros().toPlainString() + "%";
     }
 
-    private List<RecentEarningDTO> computeRecentEarnings(Staff staff, String username, List<SalaryPayment> payments) {
+    private List<RecentEarningDTO> computeRecentEarnings(Staff staff, List<SalaryPayment> payments) {
         List<RecentEarningDTO> list = new ArrayList<>();
-        for (LedgerEarningsCalculator.LedgerEntry e : earnings.recentEntries(staff, username, payments)) {
+        for (LedgerEarningsCalculator.LedgerEntry e : earnings.recentEntries(staff, payments)) {
             list.add(new RecentEarningDTO(
                     e.id(),
                     e.type(),

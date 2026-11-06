@@ -11,6 +11,7 @@ import { useTheme } from '@/core/hooks';
 import { BrandColors, Spacing } from '@/core/theme';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Loader } from '@/shared/components/Loader';
+import { useTabBarBottomInset } from '@/shared/layouts/ScreenLayout';
 import type { Lead } from '../../domain/Lead';
 import { LeadCard } from './LeadCard';
 
@@ -31,6 +32,9 @@ interface LeadListProps {
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
   ListHeaderComponent?: React.ReactElement | null;
+  ListFooterComponent?: React.ReactElement | null;
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
 }
 
 export function LeadList({
@@ -50,9 +54,13 @@ export function LeadList({
   onEdit,
   onDelete,
   ListHeaderComponent,
+  ListFooterComponent,
+  emptyActionLabel,
+  onEmptyAction,
 }: LeadListProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const bottomInset = useTabBarBottomInset();
 
   const renderItem = useCallback(
     ({ item }: { item: Lead }) => (
@@ -72,13 +80,18 @@ export function LeadList({
   );
 
   const renderFooter = useCallback(() => {
-    if (!loadingMore) return null;
+    if (!loadingMore && !ListFooterComponent) return null;
     return (
-      <View style={styles.footerLoading}>
-        <ActivityIndicator size="small" color={BrandColors.teal} />
+      <View>
+        {loadingMore ? (
+          <View style={styles.footerLoading}>
+            <ActivityIndicator size="small" color={BrandColors.teal} />
+          </View>
+        ) : null}
+        {leads.length > 0 ? ListFooterComponent : null}
       </View>
     );
-  }, [loadingMore]);
+  }, [loadingMore, ListFooterComponent, leads.length]);
 
   const renderEmpty = useCallback(() => {
     if (loading) return null;
@@ -96,13 +109,17 @@ export function LeadList({
         title={t('leads.list.emptyTitle')}
         description={t('leads.list.emptyDesc')}
         icon="users"
+        buttonLabel={emptyActionLabel}
+        onPress={onEmptyAction}
       />
     );
-  }, [loading, error, t]);
+  }, [loading, error, t, emptyActionLabel, onEmptyAction]);
+
+  const contentStyle = [styles.listContent, { paddingBottom: bottomInset + Spacing.six }];
 
   if (loading && leads.length === 0) {
     return (
-      <View style={styles.loaderContainer}>
+      <View style={[styles.loaderContainer, styles.listContent]}>
         {ListHeaderComponent}
         <Loader />
       </View>
@@ -117,7 +134,7 @@ export function LeadList({
       ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={renderEmpty}
       ListFooterComponent={renderFooter}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={contentStyle}
       refreshing={refreshing}
       onRefresh={onRefresh}
       onEndReached={onEndReached}
@@ -133,7 +150,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: Spacing.six,
+    paddingHorizontal: Spacing.three,
   },
   footerLoading: {
     paddingVertical: Spacing.three,

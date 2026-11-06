@@ -1,12 +1,10 @@
 package com.company.project.services;
 
-import com.company.project.entities.CommissionRule;
 import com.company.project.entities.Lead;
 import com.company.project.entities.Receipt;
 import com.company.project.entities.SaleTransaction;
 import com.company.project.entities.Staff;
 import com.company.project.repositories.AddonPlanRepository;
-import com.company.project.repositories.CommissionRuleRepository;
 import com.company.project.repositories.LeadRepository;
 import com.company.project.repositories.MemberAddonRepository;
 import com.company.project.repositories.ReceiptRepository;
@@ -26,15 +24,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Computes a staff member's actual revenue and conversions for a date range from real
- * sales/lead data. Shared by the mobile performance dashboard and the web staff-targets
- * feature so both surfaces derive "achieved" progress from the same source of truth.
+ * The pre-engine way of computing a staff member's sales for a date range, matching people by
+ * name. Commission and target logic now live in the performance engine
+ * (com.company.project.performance); what is left here backs the engine's parity check and a
+ * few POS/receipt helpers, and goes away with the old tables (plan §8 Phase 6).
  */
 @Service
 @Transactional(readOnly = true)
 public class StaffProgressCalculator {
-
-    private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("5");
 
     /**
      * Receipt statuses that carry money actually received: fully paid, or a part-payment.
@@ -53,7 +50,6 @@ public class StaffProgressCalculator {
 
     private final ReceiptRepository receiptRepository;
     private final LeadRepository leadRepository;
-    private final CommissionRuleRepository commissionRuleRepository;
     private final SaleTransactionRepository saleTransactionRepository;
     private final SaleTransactionItemRepository saleTransactionItemRepository;
     private final TrainingSessionRepository trainingSessionRepository;
@@ -61,7 +57,6 @@ public class StaffProgressCalculator {
     private final AddonPlanRepository addonPlanRepository;
 
     public StaffProgressCalculator(ReceiptRepository receiptRepository, LeadRepository leadRepository,
-                                   CommissionRuleRepository commissionRuleRepository,
                                    SaleTransactionRepository saleTransactionRepository,
                                    SaleTransactionItemRepository saleTransactionItemRepository,
                                    TrainingSessionRepository trainingSessionRepository,
@@ -69,65 +64,11 @@ public class StaffProgressCalculator {
                                    AddonPlanRepository addonPlanRepository) {
         this.receiptRepository = receiptRepository;
         this.leadRepository = leadRepository;
-        this.commissionRuleRepository = commissionRuleRepository;
         this.saleTransactionRepository = saleTransactionRepository;
         this.saleTransactionItemRepository = saleTransactionItemRepository;
         this.trainingSessionRepository = trainingSessionRepository;
         this.memberAddonRepository = memberAddonRepository;
         this.addonPlanRepository = addonPlanRepository;
-    }
-
-    /** The commission rule configured for the staff member's role, if any. */
-    public Optional<CommissionRule> findCommissionRule(Staff staff) {
-        return staff.getRole() != null
-                ? commissionRuleRepository.findByRoleIgnoreCase(staff.getRole())
-                : Optional.empty();
-    }
-
-    /** Percentage applied to renewals, add-ons and walk-ins; 5% when the role has no rule. */
-    public BigDecimal baseCommissionRate(Optional<CommissionRule> rule) {
-        return rule.map(CommissionRule::getBaseCommission).orElse(DEFAULT_COMMISSION_RATE);
-    }
-
-    /** Percentage applied to new-member admissions; falls back to the base rate. */
-    public BigDecimal admissionCommissionRate(Optional<CommissionRule> rule) {
-        return rule.map(CommissionRule::getAdmissionCommission).orElse(baseCommissionRate(rule));
-    }
-
-    /**
-     * Commission earned from the staff member's paid sales in the range. Admission (new-member)
-     * revenue is commissioned at the role's admissionCommission rate; everything else (renewals,
-     * add-ons, walk-ins) at baseCommission. Falls back to a flat 5% when the staff's role has no
-     * configured CommissionRule.
-     */
-    public BigDecimal computeCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        // Membership payments only: POS sales are commissioned at the POS rates below, never
-        // also at the base rate, even though both count toward the revenue target.
-        Optional<CommissionRule> rule = findCommissionRule(staff);
-        BigDecimal membershipRevenue = computeMembershipRevenue(staff, username, start, end);
-        BigDecimal admissionRevenue = computeRevenue(staff, username, start, end, "New");
-        BigDecimal otherRevenue = membershipRevenue.subtract(admissionRevenue).max(BigDecimal.ZERO);
-        return commissionOn(admissionRevenue, admissionCommissionRate(rule))
-                .add(commissionOn(otherRevenue, baseCommissionRate(rule)))
-                .add(computePosCommission(rule, username, start, end));
-    }
-
-    /**
-     * Commission on POS sales the staff member rang up (sale_transactions.created_by is the
-     * cashier's login): the role's posCommission % of each completed sale's net amount (total
-     * minus refunds) plus its posCommissionPerSale for every completed sale. Fully refunded
-     * and voided sales earn nothing. Zero when the role has no POS rates.
-     */
-    public BigDecimal computePosCommission(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        return computePosCommission(findCommissionRule(staff), username, start, end);
-    }
-
-    private BigDecimal computePosCommission(Optional<CommissionRule> rule, String username,
-                                            LocalDateTime start, LocalDateTime end) {
-        if (!hasPosRates(rule) || username == null || username.isBlank()) return BigDecimal.ZERO;
-        return posSales(username, start, end).stream()
-                .map(sale -> posCommissionOn(sale, rule))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Completed POS sales rung up by this login in the range, newest first. */
@@ -169,31 +110,6 @@ public class StaffProgressCalculator {
     /** Units across the whole gym in the range (same unit types as computeUnits). */
     public java.util.Map<String, Integer> computeGymUnits(LocalDateTime start, LocalDateTime end) {
         return countUnits(null, null, true, start, end);
-    }
-
-    public boolean hasPosRates(Optional<CommissionRule> rule) {
-        return rule.map(r -> positive(r.getPosCommission()) || positive(r.getPosCommissionPerSale())).orElse(false);
-    }
-
-    /** One sale's POS commission: % of its net amount plus the fixed per-sale amount. */
-    public BigDecimal posCommissionOn(SaleTransaction sale, Optional<CommissionRule> rule) {
-        if (rule.isEmpty()) return BigDecimal.ZERO;
-        BigDecimal net = posNet(sale);
-        BigDecimal commission = positive(rule.get().getPosCommission())
-                ? commissionOn(net, rule.get().getPosCommission())
-                : BigDecimal.ZERO;
-        if (positive(rule.get().getPosCommissionPerSale())) {
-            commission = commission.add(rule.get().getPosCommissionPerSale());
-        }
-        return commission;
-    }
-
-    private static boolean positive(BigDecimal value) {
-        return value != null && value.signum() > 0;
-    }
-
-    public BigDecimal commissionOn(BigDecimal revenue, BigDecimal ratePercent) {
-        return revenue.multiply(ratePercent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -416,74 +332,6 @@ public class StaffProgressCalculator {
             }
             if (transactionType != null) {
                 predicates.add(cb.equal(root.get("transactionType"), transactionType));
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-    }
-
-    public int computeConversions(Staff staff, String username, LocalDateTime start, LocalDateTime end) {
-        Specification<Lead> leadConvertedSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "converted"));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("lastContactDate")),
-                            cb.greaterThanOrEqualTo(root.get("lastContactDate"), start),
-                            cb.lessThan(root.get("lastContactDate"), end)),
-                    cb.and(cb.isNull(root.get("lastContactDate")),
-                            cb.greaterThanOrEqualTo(root.get("updatedAt"), start),
-                            cb.lessThan(root.get("updatedAt"), end))
-            ));
-            Predicate person = personFilter(root, cb, staff, username, "assignedStaff");
-            if (person != null) {
-                predicates.add(person);
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        int leadConversions = (int) leadRepository.count(leadConvertedSpec);
-
-        Specification<Receipt> receiptSpec = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "Paid"));
-            predicates.add(notAwaitingOrRejected(root, cb));
-            predicates.add(cb.or(
-                    cb.and(cb.isNotNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("transactionDate"), start),
-                            cb.lessThan(root.get("transactionDate"), end)),
-                    cb.and(cb.isNull(root.get("transactionDate")),
-                            cb.greaterThanOrEqualTo(root.get("createdAt"), start),
-                            cb.lessThan(root.get("createdAt"), end))
-            ));
-            Predicate person = personFilter(root, cb, staff, username, "processedBy");
-            if (person != null) {
-                predicates.add(person);
-            }
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-        int paidReceipts = (int) receiptRepository.count(receiptSpec);
-
-        return Math.max(leadConversions, paidReceipts);
-    }
-
-    /**
-     * Share (0–100) of the staff member's leads — assigned to them or created by them — that
-     * are converted. An account with no Staff record counts the leads its login created.
-     */
-    public int computeLeadConversionRate(Staff staff, String username) {
-        long totalLeads = leadRepository.count(staffLeadsSpec(staff, username, false));
-        if (totalLeads == 0) return 0;
-        long convertedLeads = leadRepository.count(staffLeadsSpec(staff, username, true));
-        return (int) Math.round(((double) convertedLeads / totalLeads) * 100);
-    }
-
-    private Specification<Lead> staffLeadsSpec(Staff staff, String username, boolean convertedOnly) {
-        return (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (convertedOnly) {
-                predicates.add(cb.equal(root.get("status"), "converted"));
-            }
-            Predicate person = personFilter(root, cb, staff, username, "assignedStaff");
-            if (person != null) {
-                predicates.add(person);
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };

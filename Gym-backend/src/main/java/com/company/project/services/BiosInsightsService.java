@@ -50,6 +50,9 @@ public class BiosInsightsService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.company.project.performance.PerformanceEngine performanceEngine;
+
     // ── Revenue ───────────────────────────────────────────────────────────────
 
     public RevenueInsights getRevenueInsights(int days) {
@@ -397,19 +400,22 @@ public class BiosInsightsService {
                 .map(e -> new DailyPoint(e.getKey(), e.getValue()[0], dailyRevenue.getOrDefault(e.getKey(), BigDecimal.ZERO),
                         e.getValue()[1], e.getValue()[2])).toList();
 
-        // Departments: this month's individual targets grouped by the staff member's department.
+        // Departments: this month's staff goals (performance engine) grouped by the staff member's department.
         Map<String, Object[]> deptAgg = new TreeMap<>();
-        for (Object[] t : rows("SELECT st.department, st.id, t.revenueTarget, t.revenueAchieved, t.sessionsTarget, t.sessionsAchieved "
-                + "FROM StaffTarget t JOIN t.staff st WHERE t.year = :year AND t.month = :month AND LOWER(t.scope) = 'individual'",
-                Map.of("year", today.getYear(), "month", today.getMonthValue()))) {
-            Object[] agg = deptAgg.computeIfAbsent(label(t[0], "Unassigned"),
+        Map<Long, String> departmentOf = new HashMap<>();
+        for (Object[] st : rows("SELECT st.id, st.department FROM Staff st", Map.of())) departmentOf.put((Long) st[0], label(st[1], "Unassigned"));
+        for (com.company.project.performance.PeriodResult r : performanceEngine.evaluate(departmentOf.keySet(), java.time.YearMonth.from(today)).values()) {
+            BigDecimal revenueGoal = r.goal(com.company.project.performance.metric.Metric.REVENUE_TOTAL, com.company.project.performance.metric.Measure.AMOUNT);
+            BigDecimal sessionGoal = r.goal(com.company.project.performance.metric.Metric.PT_SESSION_DELIVERED, com.company.project.performance.metric.Measure.COUNT);
+            if (revenueGoal == null && sessionGoal == null) continue;
+            Object[] agg = deptAgg.computeIfAbsent(departmentOf.get(r.staffId()),
                     k -> new Object[] { new HashSet<Long>(), BigDecimal.ZERO, BigDecimal.ZERO, 0L, 0L });
             @SuppressWarnings("unchecked") Set<Long> staff = (Set<Long>) agg[0];
-            staff.add((Long) t[1]);
-            agg[1] = ((BigDecimal) agg[1]).add(bd(t[2]));
-            agg[2] = ((BigDecimal) agg[2]).add(bd(t[3]));
-            agg[3] = (Long) agg[3] + lng(t[4]);
-            agg[4] = (Long) agg[4] + lng(t[5]);
+            staff.add(r.staffId());
+            agg[1] = ((BigDecimal) agg[1]).add(revenueGoal != null ? revenueGoal : BigDecimal.ZERO);
+            agg[2] = ((BigDecimal) agg[2]).add(r.revenue());
+            agg[3] = (Long) agg[3] + (sessionGoal != null ? sessionGoal.longValue() : 0L);
+            agg[4] = (Long) agg[4] + r.count(com.company.project.performance.metric.Metric.PT_SESSION_DELIVERED);
         }
         @SuppressWarnings("unchecked")
         List<DepartmentRow> departments = deptAgg.entrySet().stream()

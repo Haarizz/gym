@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCurrency, CurrencyGlyph } from '../utils/currency';
 import { toast } from 'sonner';
-import { staffService, Staff, CommissionRule, StaffCertification, StaffListPerformance } from '../utils/supabase/staff-service';
+import { staffService, Staff, StaffCertification, StaffListPerformance } from '../utils/supabase/staff-service';
+import { performanceService } from '../utils/supabase/performance-service';
 import { rolesService, Role, AssignableRole } from '../utils/supabase/roles-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -88,38 +89,6 @@ interface StaffsTrainersProps {
 const formatMoney = (value?: number | null) =>
   Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-// ── POS commission inputs (Target & Commission Settings) ───────────────────
-/** A role's POS commission: % of each completed POS sale and/or a fixed amount per sale. */
-function PosCommissionFields({ percent, perSale, onChange }: {
-  percent: number;
-  perSale: number;
-  onChange: (pos: { posCommission: number; posCommissionPerSale: number }) => void;
-}) {
-  const clamp = (v: string) => Math.max(0, Number(v) || 0);
-  return (
-    <div className="space-y-2 rounded-md bg-muted/30 p-3">
-      <Label className="text-xs font-semibold text-muted-foreground">POS Sales</Label>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">POS Commission (%)</Label>
-          <Input type="number" min="0" step="0.1" value={percent} className="h-8 text-sm"
-            onChange={e => onChange({ posCommission: clamp(e.target.value), posCommissionPerSale: perSale })}
-          />
-          <p className="text-xs text-muted-foreground">Of each POS sale (after refunds)</p>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Fixed per Sale (<CurrencyGlyph />)</Label>
-          <Input type="number" min="0" step="0.5" value={perSale} className="h-8 text-sm"
-            onChange={e => onChange({ posCommission: percent, posCommissionPerSale: clamp(e.target.value) })}
-          />
-          <p className="text-xs text-muted-foreground">Added for every completed sale</p>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">Credited to the cashier who rang up the sale. Leave both at 0 for no POS commission.</p>
-    </div>
-  );
-}
-
 export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const { currencyCode, currencySymbol } = useCurrency();
   const [activeTab, setActiveTab] = useState('all-staff');
@@ -129,30 +98,21 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
-  const [showTargetSettings, setShowTargetSettings] = useState(false);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
   // This month's live target progress + commission (membership and POS sales) per staff id.
   const [perfById, setPerfById] = useState<Record<string, StaffListPerformance>>({});
-  const [commissionRulesList, setCommissionRulesList] = useState<CommissionRule[]>([]);
-  // All roles from Roles & Permissions (system + user-created) — the source of truth
-  // for which roles a commission rule can target.
-  const [allRoles, setAllRoles] = useState<Role[]>([]);
   // Roles this user may give a staff member (Add/Edit Employee role picker).
   const [assignableRoles, setAssignableRoles] = useState<AssignableRole[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSavingRules, setIsSavingRules] = useState(false);
-  const [commissionRulesEdits, setCommissionRulesEdits] = useState<Record<string, {baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>({});
-  const [pendingNewRules, setPendingNewRules] = useState<Array<{tempId: string; role: string; baseCommission: number; admissionCommission: number; posCommission: number; posCommissionPerSale: number; targetBonuses: Array<{threshold: number; bonus: number}>}>>([]);
-  const [roleTargets, setRoleTargets] = useState<Record<string, { revenue: number; sessions: number; newClients: number }>>({});
   const [showViewSchedule, setShowViewSchedule] = useState(false);
   const [scheduleViewEmployee, setScheduleViewEmployee] = useState<Staff | null>(null);
   const [showSetTarget, setShowSetTarget] = useState(false);
   const [targetEmployee, setTargetEmployee] = useState<Staff | null>(null);
-  const [targetForm, setTargetForm] = useState({ revenue_target: '', sessions_target: '', new_clients_target: '', timeframe: 'monthly' });
-  const [existingTargetId, setExistingTargetId] = useState<string | null>(null);
+  const [targetForm, setTargetForm] = useState({ revenue_target: '', sessions_target: '', new_clients_target: '' });
+  const [existingTargetId, setExistingTargetId] = useState<number | null>(null);
   const [isSavingTarget, setIsSavingTarget] = useState(false);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerSrc, setPhotoViewerSrc] = useState<string | null>(null);
@@ -171,26 +131,8 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
 
   useEffect(() => {
     loadStaff();
-    loadCommissionRules();
     rolesService.getAssignableRoles().then(setAssignableRoles).catch(e => console.error('Failed to load roles', e));
   }, []);
-
-  // Reload settings data whenever the dialog opens
-  useEffect(() => {
-    if (!showTargetSettings) return;
-    loadCommissionRules();
-    rolesService.getRoles('', 1, 200).then(res => setAllRoles(res.data)).catch(e => console.error('Failed to load roles', e));
-    // Build role targets from current staff list
-    const roles: Record<string, { revenue: number; sessions: number; newClients: number }> = {};
-    const seen = new Set<string>();
-    staffList.forEach(s => {
-      if (s.role && !seen.has(s.role)) {
-        seen.add(s.role);
-        roles[s.role] = { revenue: s.monthly_target || 0, sessions: 0, newClients: 0 };
-      }
-    });
-    setRoleTargets(roles);
-  }, [showTargetSettings]);
 
   useEffect(() => {
     const ids = staffList.map(s => String(s.id)).slice(0, 100);
@@ -214,26 +156,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
       setStaffList(res.items);
     } catch (e) { console.error('Failed to load staff', e); }
     finally { setIsLoading(false); }
-  };
-
-  const loadCommissionRules = async () => {
-    try {
-      const rules = await staffService.getCommissionRules();
-      setCommissionRulesList(rules);
-      const edits: typeof commissionRulesEdits = {};
-      rules.forEach(r => {
-        let bonuses: Array<{threshold:number;bonus:number}> = [];
-        try { bonuses = JSON.parse(r.target_bonuses_json || '[]'); } catch {}
-        edits[r.id] = {
-          baseCommission: r.base_commission,
-          admissionCommission: r.admission_commission ?? r.base_commission,
-          posCommission: r.pos_commission ?? 0,
-          posCommissionPerSale: r.pos_commission_per_sale ?? 0,
-          targetBonuses: bonuses,
-        };
-      });
-      setCommissionRulesEdits(edits);
-    } catch (e) { console.error('Failed to load commission rules', e); }
   };
 
   const handleDeleteEmployee = async () => {
@@ -270,100 +192,58 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
     finally { setIsChangingStatus(false); }
   };
 
+  /** This month's own target for the employee (performance engine), as the quick Set Target form edits it. */
+  const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+
   const handleSaveTarget = async () => {
     if (!targetEmployee || !targetForm.revenue_target) return;
     setIsSavingTarget(true);
     try {
-      const now = new Date();
-      if (existingTargetId) {
-        await staffService.updateTarget(existingTargetId, {
-          revenue_target: Number(targetForm.revenue_target),
-          sessions_target: targetForm.sessions_target ? Number(targetForm.sessions_target) : undefined,
-          new_clients_target: targetForm.new_clients_target ? Number(targetForm.new_clients_target) : undefined,
-          timeframe: targetForm.timeframe,
-        } as any);
-      } else {
-        await staffService.createTarget({
-          staff_db_id: Number(targetEmployee.id),
-          scope: 'individual',
-          timeframe: targetForm.timeframe,
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
-          revenue_target: Number(targetForm.revenue_target),
-          sessions_target: targetForm.sessions_target ? Number(targetForm.sessions_target) : undefined,
-          new_clients_target: targetForm.new_clients_target ? Number(targetForm.new_clients_target) : undefined,
-        });
-      }
+      const period = thisMonth();
+      // Keep the goals this form doesn't show (e.g. POS or admissions) when updating an existing target.
+      const existing = (await performanceService.targets(period))
+        .find(t => t.scope === 'staff' && t.staff_id === Number(targetEmployee.id) && t.period === period);
+      const shown = new Set(['REVENUE_TOTAL|amount', 'PT_SESSION_DELIVERED|count', 'LEAD_CONVERSION|count']);
+      const kept = (existing?.lines ?? []).filter(l => !shown.has(`${l.metric}|${l.measure}`));
+      const lines = [
+        ...kept,
+        { metric: 'REVENUE_TOTAL' as const, measure: 'amount' as const, goal: Number(targetForm.revenue_target) },
+        ...(Number(targetForm.sessions_target) > 0 ? [{ metric: 'PT_SESSION_DELIVERED' as const, measure: 'count' as const, goal: Number(targetForm.sessions_target) }] : []),
+        ...(Number(targetForm.new_clients_target) > 0 ? [{ metric: 'LEAD_CONVERSION' as const, measure: 'count' as const, goal: Number(targetForm.new_clients_target) }] : []),
+      ];
+      await performanceService.saveTarget({
+        scope: 'staff', staff_id: Number(targetEmployee.id), period, repeat_monthly: existing?.repeat_monthly ?? false, lines,
+      });
       setShowSetTarget(false);
       setTargetEmployee(null);
       setExistingTargetId(null);
-      setTargetForm({ revenue_target: '', sessions_target: '', new_clients_target: '', timeframe: 'monthly' });
+      setTargetForm({ revenue_target: '', sessions_target: '', new_clients_target: '' });
     } catch (e) { console.error('Failed to save target', e); }
     finally { setIsSavingTarget(false); }
   };
 
   const openSetTarget = async (employee: Staff) => {
     setTargetEmployee(employee);
-    setTargetForm({ revenue_target: '', sessions_target: '', new_clients_target: '', timeframe: 'monthly' });
+    setTargetForm({ revenue_target: '', sessions_target: '', new_clients_target: '' });
     setExistingTargetId(null);
     try {
-      const now = new Date();
-      const existing = await staffService.getTargets(now.getFullYear(), now.getMonth() + 1, 'individual', Number(employee.id));
-      if (existing.length > 0) {
-        const t = existing[0];
+      const period = thisMonth();
+      const t = (await performanceService.targets(period))
+        .find(x => x.scope === 'staff' && x.staff_id === Number(employee.id) && x.period === period);
+      if (t) {
+        const goal = (metric: string, measure: string) => {
+          const l = t.lines.find(x => x.metric === metric && x.measure === measure);
+          return l ? String(Number(l.goal)) : '';
+        };
         setExistingTargetId(t.id);
         setTargetForm({
-          revenue_target: String(t.revenue_target || ''),
-          sessions_target: String(t.sessions_target || ''),
-          new_clients_target: String(t.new_clients_target || ''),
-          timeframe: t.timeframe || 'monthly',
+          revenue_target: goal('REVENUE_TOTAL', 'amount'),
+          sessions_target: goal('PT_SESSION_DELIVERED', 'count'),
+          new_clients_target: goal('LEAD_CONVERSION', 'count'),
         });
       }
     } catch { /* ignore */ }
     setShowSetTarget(true);
-  };
-
-  const handleSaveSettings = async () => {
-    setIsSavingRules(true);
-    try {
-      // Save monthly targets: update each staff's monthly_target by role
-      for (const [role, targets] of Object.entries(roleTargets)) {
-        const staffInRole = staffList.filter(s => s.role === role);
-        for (const staff of staffInRole) {
-          await staffService.updateStaff(staff.id, { monthly_target: targets.revenue });
-        }
-      }
-      // Update existing commission rules
-      for (const rule of commissionRulesList) {
-        const edits = commissionRulesEdits[rule.id];
-        if (edits) {
-          await staffService.updateCommissionRule(rule.id, {
-            base_commission: edits.baseCommission,
-            admission_commission: edits.admissionCommission,
-            pos_commission: edits.posCommission,
-            pos_commission_per_sale: edits.posCommissionPerSale,
-            target_bonuses_json: JSON.stringify(edits.targetBonuses)
-          });
-        }
-      }
-      // Create new pending commission rules
-      for (const nr of pendingNewRules) {
-        if (nr.role.trim()) {
-          await staffService.createCommissionRule({
-            role: nr.role.trim(),
-            base_commission: nr.baseCommission,
-            admission_commission: nr.admissionCommission,
-            pos_commission: nr.posCommission,
-            pos_commission_per_sale: nr.posCommissionPerSale,
-            target_bonuses_json: JSON.stringify(nr.targetBonuses)
-          });
-        }
-      }
-      setPendingNewRules([]);
-      await Promise.all([loadCommissionRules(), loadStaff()]);
-      setShowTargetSettings(false);
-    } catch (e) { console.error('Failed to save settings', e); }
-    finally { setIsSavingRules(false); }
   };
 
   // Filter and sort staff data
@@ -512,9 +392,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
             <Gauge className="h-4 w-4 mr-2" />
             Targets Overview
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowTargetSettings(true)}>
+          <Button variant="outline" size="sm" onClick={() => onNavigate?.('set-targets', { tab: 'plans' })}>
             <Settings className="h-4 w-4 mr-2" />
-            Settings
+            Incentive Plans
           </Button>
           <PermissionGate permission="STAFF_CREATE">
             <Button onClick={() => setFormMode({ mode: 'add' })}>
@@ -1120,17 +1000,9 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
           </DialogHeader>
           <Separator className="my-3" />
           <div className="space-y-4">
-            <div>
-              <Label>Timeframe</Label>
-              <Select value={targetForm.timeframe} onValueChange={v => setTargetForm(p => ({...p, timeframe: v}))}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              This month's goals. More metrics, role targets and repeating targets are in Targets &amp; Incentives.
+            </p>
             <div>
               <Label>Revenue Target ({currencySymbol}) <span className="text-destructive">*</span></Label>
               <Input type="number" placeholder="e.g. 50000" className="mt-1"
@@ -1138,13 +1010,13 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
                 onChange={e => setTargetForm(p => ({...p, revenue_target: e.target.value}))} />
             </div>
             <div>
-              <Label>Sessions Target</Label>
+              <Label>PT Sessions Target</Label>
               <Input type="number" placeholder="e.g. 120" className="mt-1"
                 value={targetForm.sessions_target}
                 onChange={e => setTargetForm(p => ({...p, sessions_target: e.target.value}))} />
             </div>
             <div>
-              <Label>New Clients Target</Label>
+              <Label>Lead Conversions Target</Label>
               <Input type="number" placeholder="e.g. 8" className="mt-1"
                 value={targetForm.new_clients_target}
                 onChange={e => setTargetForm(p => ({...p, new_clients_target: e.target.value}))} />
@@ -1171,274 +1043,6 @@ export function StaffsTrainers({ onNavigate }: StaffsTrainersProps = {}) {
               <img src={photoViewerSrc} alt={photoViewerName} className="h-52 w-52 rounded-full object-cover shadow-md" />
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Target & Commission Settings Modal */}
-      <Dialog open={showTargetSettings} onOpenChange={v => { setShowTargetSettings(v); if (!v) setPendingNewRules([]); }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-2">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Settings className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl">Target & Commission Settings</DialogTitle>
-                <DialogDescription className="mt-0.5">
-                  Configure monthly targets and commission rules for different roles
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <Separator className="my-4" />
-
-          <Tabs defaultValue="targets" className="space-y-4">
-            <TabsList className="bg-muted/50 p-1">
-              <TabsTrigger value="targets" className="flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Monthly Targets
-              </TabsTrigger>
-              <TabsTrigger value="commissions" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Commission Rules
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="targets" className="space-y-4">
-              {Object.keys(roleTargets).length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  No staff roles found. Add employees first to configure role-based targets.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.entries(roleTargets).map(([role, targets]) => (
-                    <Card key={role} className="border-primary/10 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 rounded-full bg-primary" />
-                          <CardTitle className="text-base font-semibold text-primary">{role}</CardTitle>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div>
-                          <Label className="text-xs text-muted-foreground mb-1 block">Revenue Target ({currencySymbol})</Label>
-                          <Input type="number" value={targets.revenue} className="h-8 text-sm"
-                            onChange={e => setRoleTargets(prev => ({ ...prev, [role]: { ...prev[role], revenue: Number(e.target.value) } }))}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground mb-1 block">Sessions Target</Label>
-                          <Input type="number" value={targets.sessions} className="h-8 text-sm"
-                            onChange={e => setRoleTargets(prev => ({ ...prev, [role]: { ...prev[role], sessions: Number(e.target.value) } }))}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground mb-1 block">New Clients Target</Label>
-                          <Input type="number" value={targets.newClients} className="h-8 text-sm"
-                            onChange={e => setRoleTargets(prev => ({ ...prev, [role]: { ...prev[role], newClients: Number(e.target.value) } }))}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="commissions" className="space-y-3">
-              {commissionRulesList.length === 0 && pendingNewRules.length === 0 && (
-                <div className="text-center py-6 text-muted-foreground text-sm">No commission rules configured yet. Add a rule below.</div>
-              )}
-
-              {/* Existing rules */}
-              {commissionRulesList.map((rule) => {
-                const edits = commissionRulesEdits[rule.id] || { baseCommission: rule.base_commission, admissionCommission: rule.admission_commission ?? rule.base_commission, posCommission: rule.pos_commission ?? 0, posCommissionPerSale: rule.pos_commission_per_sale ?? 0, targetBonuses: [] };
-                return (
-                  <Card key={rule.id} className="border-primary/10 shadow-sm">
-                    <CardHeader className="pb-2 pt-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                        <CardTitle className="text-sm font-semibold text-primary">{rule.role}</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-4 space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
-                          <Input type="number" value={edits.baseCommission} step="0.1" className="h-8 text-sm"
-                            onChange={e => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, baseCommission: Number(e.target.value) } }))}
-                          />
-                          <p className="text-xs text-muted-foreground">Renewals, add-ons, walk-ins</p>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Admission Commission (%)</Label>
-                          <Input type="number" value={edits.admissionCommission} step="0.1" className="h-8 text-sm"
-                            onChange={e => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, admissionCommission: Number(e.target.value) } }))}
-                          />
-                          <p className="text-xs text-muted-foreground">New member signups</p>
-                        </div>
-                      </div>
-                      <PosCommissionFields
-                        percent={edits.posCommission}
-                        perSale={edits.posCommissionPerSale}
-                        onChange={(pos) => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, ...pos } }))}
-                      />
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
-                        {edits.targetBonuses.map((bonus, index) => (
-                          <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end bg-muted/30 rounded-md p-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs text-muted-foreground">At target (%)</Label>
-                              <Input type="number" value={bonus.threshold} placeholder="100"
-                                onChange={e => { const u = [...edits.targetBonuses]; u[index] = { ...u[index], threshold: Number(e.target.value) }; setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, targetBonuses: u } })); }}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs text-muted-foreground">Bonus (%)</Label>
-                              <Input type="number" value={bonus.bonus} step="0.1"
-                                onChange={e => { const u = [...edits.targetBonuses]; u[index] = { ...u[index], bonus: Number(e.target.value) }; setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, targetBonuses: u } })); }}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => { const u = edits.targetBonuses.filter((_, i) => i !== index); setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, targetBonuses: u } })); }}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button type="button" variant="outline" size="sm" className="w-full text-xs h-7 border-dashed"
-                          onClick={() => setCommissionRulesEdits(prev => ({ ...prev, [rule.id]: { ...edits, targetBonuses: [...edits.targetBonuses, { threshold: 100, bonus: 5 }] } }))}>
-                          <Plus className="h-3 w-3 mr-1" /> Add Bonus Tier
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-
-              {/* Pending new rules */}
-              {pendingNewRules.map((nr) => {
-                // Offer every role from Roles & Permissions (system + user-created), not
-                // just roles among currently-hired staff — otherwise you couldn't set up a
-                // commission rule for a role before anyone's been hired into it. Excludes
-                // roles that already have a rule, since the backend enforces one per role.
-                // (Matching against Staff.role at commission-computation time is
-                // case-insensitive, so "RECEPTIONIST" here still matches a staff member's
-                // "Receptionist" job title.)
-                const usedRoles = new Set([
-                  ...commissionRulesList.map(r => r.role),
-                  ...pendingNewRules.filter(r => r.tempId !== nr.tempId).map(r => r.role).filter(Boolean),
-                ]);
-                const availableRoles = allRoles.map(r => r.role_name).filter(role => !usedRoles.has(role));
-                return (
-                <Card key={nr.tempId} className="border-primary/20 shadow-sm border-dashed">
-                  <CardHeader className="pb-2 pt-4 px-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs text-muted-foreground">Role</Label>
-                        <Select
-                          value={nr.role || undefined}
-                          onValueChange={v => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, role: v } : r))}
-                        >
-                          <SelectTrigger className="h-8 text-sm font-medium">
-                            <SelectValue placeholder={availableRoles.length ? "Select a role" : "No roles without a rule"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableRoles.map(role => (
-                              <SelectItem key={role} value={role}>{role}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 mt-5 flex-shrink-0"
-                        onClick={() => setPendingNewRules(prev => prev.filter(r => r.tempId !== nr.tempId))}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Base Commission (%)</Label>
-                        <Input type="number" value={nr.baseCommission} step="0.1" className="h-8 text-sm"
-                          onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, baseCommission: Number(e.target.value) } : r))}
-                        />
-                        <p className="text-xs text-muted-foreground">Renewals, add-ons, walk-ins</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Admission Commission (%)</Label>
-                        <Input type="number" value={nr.admissionCommission} step="0.1" className="h-8 text-sm"
-                          onChange={e => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, admissionCommission: Number(e.target.value) } : r))}
-                        />
-                        <p className="text-xs text-muted-foreground">New member signups</p>
-                      </div>
-                    </div>
-                    <PosCommissionFields
-                      percent={nr.posCommission}
-                      perSale={nr.posCommissionPerSale}
-                      onChange={(pos) => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, ...pos } : r))}
-                    />
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Target Achievement Bonuses</Label>
-                      {nr.targetBonuses.map((bonus, index) => (
-                        <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end bg-muted/30 rounded-md p-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">At target (%)</Label>
-                            <Input type="number" value={bonus.threshold} placeholder="100"
-                              onChange={e => setPendingNewRules(prev => prev.map(r => { if (r.tempId !== nr.tempId) return r; const u = [...r.targetBonuses]; u[index] = { ...u[index], threshold: Number(e.target.value) }; return { ...r, targetBonuses: u }; }))}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Bonus (%)</Label>
-                            <Input type="number" value={bonus.bonus} step="0.1"
-                              onChange={e => setPendingNewRules(prev => prev.map(r => { if (r.tempId !== nr.tempId) return r; const u = [...r.targetBonuses]; u[index] = { ...u[index], bonus: Number(e.target.value) }; return { ...r, targetBonuses: u }; }))}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, targetBonuses: r.targetBonuses.filter((_, i) => i !== index) } : r))}>
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button type="button" variant="outline" size="sm" className="w-full text-xs h-7 border-dashed"
-                        onClick={() => setPendingNewRules(prev => prev.map(r => r.tempId === nr.tempId ? { ...r, targetBonuses: [...r.targetBonuses, { threshold: 100, bonus: 5 }] } : r))}>
-                        <Plus className="h-3 w-3 mr-1" /> Add Bonus Tier
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                );
-              })}
-
-              {/* Add Rule button — only when a role still lacks a commission rule */}
-              {allRoles.map(r => r.role_name).some(role =>
-                !commissionRulesList.some(r => r.role === role) && !pendingNewRules.some(r => r.role === role)
-              ) ? (
-                <Button variant="outline" className="w-full border-dashed text-primary border-primary/30 hover:bg-primary/5"
-                  onClick={() => setPendingNewRules(prev => [...prev, { tempId: Date.now().toString(), role: '', baseCommission: 5, admissionCommission: 5, posCommission: 0, posCommissionPerSale: 0, targetBonuses: [] }])}>
-                  <Plus className="h-4 w-4 mr-2" /> Add Commission Rule
-                </Button>
-              ) : (
-                <p className="text-center text-xs text-muted-foreground py-2">Every role already has a commission rule.</p>
-              )}
-            </TabsContent>
-          </Tabs>
-
-          <Separator className="my-4" />
-
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowTargetSettings(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSettings} disabled={isSavingRules}>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {isSavingRules ? 'Saving...' : 'Save Settings'}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 

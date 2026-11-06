@@ -95,6 +95,7 @@ const leads = {
       phone: 'Telefon',
       preferredContact: 'Bevorzugter Kontakt',
       leadScore: 'Lead-Score',
+      scoreNotSet: 'Nicht festgelegt',
       leadDetails: 'Lead-Details',
       source: 'Quelle',
       assignedStaff: 'Zugewiesener Mitarbeiter',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: 'Neuen Lead hinzufügen',
+      leadScoreLabel: 'Lead-Score (1-100, optional)',
+      leadScorePlaceholder: 'z. B. 50',
+      leadScoreInvalid: 'Der Lead-Score muss eine ganze Zahl von 1 bis 100 sein.',
       editLead: 'Lead bearbeiten',
       fillDetails: 'Füllen Sie die folgenden Details aus',
       contactDetails: 'KONTAKTDETAILS',

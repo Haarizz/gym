@@ -48,7 +48,8 @@ export interface StaffRequestData {
   role: string;
   department: string;
   branch: string;
-  monthly_target: number;
+  /** Retired: targets are set in Targets & Incentives (performance engine). */
+  monthly_target?: number;
   base_salary?: number;
   status: string;
   join_date: string;
@@ -118,21 +119,6 @@ export interface StaffTarget {
   commission_earned: number;
   trend: string;
   forecast: number;
-}
-
-export interface CommissionRule {
-  id: string;
-  role: string;
-  base_commission: number;
-  // Rate applied to new-member admission revenue instead of base_commission,
-  // which still applies to everything else (renewals, add-ons, walk-ins).
-  // Falls back to base_commission when not set.
-  admission_commission?: number;
-  // POS sales the role rings up: % of each completed sale (net of refunds) and/or a
-  // fixed amount per sale. Unset/0 = no POS commission.
-  pos_commission?: number | null;
-  pos_commission_per_sale?: number | null;
-  target_bonuses_json: string;
 }
 
 /** GET /api/staff/performance — this month's live figures per staff member. */
@@ -358,47 +344,6 @@ class StaffService {
     return response.json();
   }
 
-  async createTarget(data: {
-    staff_db_id?: number;
-    scope: string;
-    timeframe: string;
-    year?: number;
-    month?: number;
-    start_date?: string;
-    end_date?: string;
-    revenue_target: number;
-    membership_revenue_target?: number | null;
-    pos_revenue_target?: number | null;
-    pt_revenue_target?: number | null;
-    sessions_target?: number;
-    new_clients_target?: number;
-    unit_targets_json?: string;
-  }): Promise<StaffTarget> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/staff-targets`,
-      { method: 'POST', body: JSON.stringify(data) }
-    );
-    if (!response.ok) throw new Error(`Failed to create target: ${response.status}`);
-    return response.json();
-  }
-
-  async updateTarget(id: string, data: Partial<StaffTarget>): Promise<StaffTarget> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/staff-targets/${id}`,
-      { method: 'PUT', body: JSON.stringify(data) }
-    );
-    if (!response.ok) throw new Error(`Failed to update target: ${response.status}`);
-    return response.json();
-  }
-
-  async deleteTarget(id: string): Promise<void> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/staff-targets/${id}`,
-      { method: 'DELETE' }
-    );
-    if (!response.ok) throw new Error(`Failed to delete target: ${response.status}`);
-  }
-
   /** Targets for the staff member linked to the logged-in account, defaulting to the current month. */
   async getMyTargets(year?: number, month?: number): Promise<StaffTarget[]> {
     const params = new URLSearchParams();
@@ -420,48 +365,6 @@ class StaffService {
       `${backendBaseUrl}/staff/performance?ids=${encodeURIComponent(ids.join(','))}`
     );
     if (!response.ok) throw new Error(`Failed to fetch staff performance: ${response.status}`);
-    return response.json();
-  }
-
-  // ── Commission Rules ─────────────────────────────────────────────────────
-
-  async getCommissionRules(): Promise<CommissionRule[]> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/commission-rules`
-    );
-    if (!response.ok) throw new Error(`Failed to fetch commission rules: ${response.status}`);
-    return response.json();
-  }
-
-  async updateCommissionRule(id: string, data: {
-    role?: string;
-    base_commission?: number;
-    admission_commission?: number;
-    pos_commission?: number;
-    pos_commission_per_sale?: number;
-    target_bonuses_json?: string;
-  }): Promise<CommissionRule> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/commission-rules/${id}`,
-      { method: 'PUT', body: JSON.stringify(data) }
-    );
-    if (!response.ok) throw new Error(`Failed to update commission rule: ${response.status}`);
-    return response.json();
-  }
-
-  async createCommissionRule(data: {
-    role: string;
-    base_commission: number;
-    admission_commission?: number;
-    pos_commission?: number;
-    pos_commission_per_sale?: number;
-    target_bonuses_json: string;
-  }): Promise<CommissionRule> {
-    const response = await authService.makeAuthenticatedRequest(
-      `${backendBaseUrl}/commission-rules`,
-      { method: 'POST', body: JSON.stringify(data) }
-    );
-    if (!response.ok) throw new Error(`Failed to create commission rule: ${response.status}`);
     return response.json();
   }
 

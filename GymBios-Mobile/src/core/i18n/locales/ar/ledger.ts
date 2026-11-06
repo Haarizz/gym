@@ -33,6 +33,32 @@ const ledger = {
     breakdown: {
       title: 'تفاصيل الأرباح',
       commissionStructureTitle: 'هيكل العمولات',
+      structure: {
+        noPlan: "لا توجد خطة حوافز",
+        perUnit: "{{amount}} لكل {{unit}}",
+        fromUnits: "ابتداءً من {{count}}",
+        max: "بحد أقصى {{amount}}",
+        bonusLabel: "حقّق {{threshold}}٪ من هدف {{metric}}",
+        bonusPercent: "+{{rate}}٪ من {{metric}}",
+        bonusFixed: "+{{amount}}",
+        metrics: {
+          MEMBER_ADMISSION: "تسجيل أعضاء جدد",
+          LEAD_CONVERSION: "تحويل العملاء المحتملين",
+          POS_SALE: "مبيعات نقطة البيع",
+          PT_SESSION_DELIVERED: "جلسات التدريب الشخصي المنفذة",
+          CLASS_TAUGHT: "الحصص المقدَّمة",
+          CLASS_ATTENDEE: "حضور الحصص",
+          REVENUE_TOTAL: "الإيرادات",
+        },
+        units: {
+          MEMBER_ADMISSION: "تسجيل",
+          LEAD_CONVERSION: "تحويل",
+          POS_SALE: "عملية بيع",
+          PT_SESSION_DELIVERED: "جلسة",
+          CLASS_TAUGHT: "حصة",
+          CLASS_ATTENDEE: "حاضر",
+        },
+      },
       monthlyComparisonTitle: 'المقارنة الشهرية',
     },
 

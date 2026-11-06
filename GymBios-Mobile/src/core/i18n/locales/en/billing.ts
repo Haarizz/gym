@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "No statement lines available to export.",
       "statementExported": "Exported statement of account for {{name}} to CSV.",
       "statementExportTitle": "Export Statement CSV",
+      "statementExportFailed": "Failed to export statement.",
       "familyHead": "Family Head",
       "member": "Member",
       "receiptsExportInfo": "Exporting entire receipt list ({{count}} records) to CSV file.",

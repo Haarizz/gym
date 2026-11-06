@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { StyleSheet, View, Pressable, ActivityIndicator, Share } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
@@ -94,102 +94,126 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
       }).catch(() => {});
     };
     const totalRedemptions = (allPromotions || []).reduce((sum, deal) => sum + (deal.usageCount || 0), 0);
-    const referralsList = referralPage?.referrals || [];
+    const referralsList = (referralPage?.referrals || []).slice(0, REFERRAL_PREVIEW_COUNT);
 
     return (
       <ScreenLayout scrollable>
         <View style={styles.container}>
-          {/* Header Stats */}
-          <View style={styles.headerStatsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>{t('crm.activeOffers')}</Text>
-              <Text style={[styles.statValue, { color: BrandColors.teal }]}>
-                {isLoadingOffers ? '-' : activeOfferCount}
-              </Text>
+          {/* ── Primary action ──────────────────────────────────── */}
+          <View style={styles.heroBanner}>
+            <View style={styles.heroTextGroup}>
+              <Text style={styles.heroTitle}>{t('crm.title')}</Text>
+              <Text style={styles.heroSubtitle}>{t('crm.subtitle')}</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>{t('crm.totalRedemptions')}</Text>
-              <Text style={[styles.statValue, { color: '#F5C742' }]}>
-                {isLoadingAll ? '-' : totalRedemptions}
-              </Text>
-            </View>
+            <Pressable
+              onPress={handleCreateOffer}
+              style={({ pressed }) => [styles.heroButton, pressed && styles.pressed]}
+              accessibilityRole="button"
+            >
+              <Feather name="plus-circle" size={16} color={BrandColors.teal} />
+              <Text style={styles.heroButtonText}>{t('crm.createNewOffer')}</Text>
+            </Pressable>
           </View>
 
-          {/* Active Deals Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('crm.activeOffers')}</Text>
-              <TouchableOpacity onPress={() => router.push('/(admin)/promotions')}>
-                <Text style={styles.viewAllText}>{t('crm.viewAll')}</Text>
-              </TouchableOpacity>
-            </View>
+          {/* ── Offer stats ─────────────────────────────────────── */}
+          <View style={styles.statsRow}>
+            <StatTile
+              icon="tag"
+              color={BrandColors.teal}
+              label={t('crm.activeOffers')}
+              value={isLoadingOffers ? '–' : String(activeOfferCount)}
+            />
+            <StatTile
+              icon="check-circle"
+              color="#d97706"
+              label={t('crm.totalRedemptions')}
+              value={isLoadingAll ? '–' : formatCount(totalRedemptions)}
+            />
+          </View>
 
+          {/* ── This month's impact ─────────────────────────────── */}
+          <Section title={t('crm.thisMonthsImpact')}>
+            {isLoadingImpact ? (
+              <ActivityIndicator size="small" color={BrandColors.teal} />
+            ) : impactError ? (
+              <InlineMessage tone="error" text={t('crm.failedLoadImpact')} />
+            ) : (
+              <View style={styles.statsRow}>
+                <StatTile
+                  icon="trending-up"
+                  color="#16a34a"
+                  label={t('crm.revenueFromDeals')}
+                  value={formatCompactCurrency(impact?.revenueFromDeals ?? 0)}
+                />
+                <StatTile
+                  icon="user-plus"
+                  color="#8b5cf6"
+                  label={t('crm.newMembers')}
+                  value={formatCount(impact?.newMembers ?? 0)}
+                />
+              </View>
+            )}
+          </Section>
+
+          {/* ── Active offers ───────────────────────────────────── */}
+          <Section
+            title={t('crm.activeOffers')}
+            actionLabel={t('crm.viewAll')}
+            onAction={() => router.push('/(admin)/promotions')}
+          >
             {isLoadingOffers ? (
               <ActivityIndicator size="small" color={BrandColors.teal} />
             ) : activeError && plansError ? (
-              <Text style={{ color: 'red' }}>{t('crm.failedLoadOffers')}</Text>
+              <InlineMessage tone="error" text={t('crm.failedLoadOffers')} />
             ) : activeOfferCount === 0 ? (
-              <Text style={{ color: '#6b7280' }}>{t('crm.noActiveOffers')}</Text>
+              <InlineMessage text={t('crm.noActiveOffers')} />
             ) : (
-              <View style={styles.dealsList}>
-                {activeError ? (
-                  <Text style={{ color: 'red' }}>{t('crm.failedLoadPromoOffers')}</Text>
-                ) : null}
-                {plansError ? (
-                  <Text style={{ color: 'red' }}>{t('crm.failedLoadPlanOffers')}</Text>
-                ) : null}
+              <View style={styles.list}>
+                {activeError ? <InlineMessage tone="error" text={t('crm.failedLoadPromoOffers')} /> : null}
+                {plansError ? <InlineMessage tone="error" text={t('crm.failedLoadPlanOffers')} /> : null}
+
                 {planOffers.map((plan) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={`plan-${plan.id}`}
-                    style={styles.dealCard}
-                    activeOpacity={0.8}
-                    onPress={() => router.push(`/(admin)/membership-plans/edit/${plan.id}` as any)}>
-                    <View style={styles.dealHeader}>
-                      <View style={styles.dealHeaderInfo}>
-                        <Text style={styles.dealTitle}>{plan.offerLabel || t('crm.planOfferSuffix', { name: plan.name })}</Text>
-                        <View style={styles.discountBadge}>
-                          <Text style={styles.discountText}>
-                            {plan.offerType === 'percentage'
-                              ? `${plan.offerValue}% OFF`
-                              : <CurrencyValue amount={plan.offerDiscountAmount} suffix=" OFF" />}
+                    style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                    onPress={() => router.push(`/(admin)/membership-plans/edit/${plan.id}` as any)}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.offerTop}>
+                      <DiscountTicket
+                        percent={plan.offerType === 'percentage' ? (plan.offerValue ?? 0) : undefined}
+                        amount={plan.offerDiscountAmount}
+                      />
+                      <View style={styles.offerInfo}>
+                        <View style={styles.offerTitleRow}>
+                          <Text style={styles.offerTitle} numberOfLines={1}>
+                            {plan.offerLabel || t('crm.planOfferSuffix', { name: plan.name })}
                           </Text>
+                          <StatusChip label={t('crm.planOffer')} colors={STATUS_COLORS.scheduled} />
                         </View>
-                      </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: STATUS_COLORS.active.bg, borderColor: STATUS_COLORS.active.border },
-                        ]}>
-                        <Text style={[styles.statusText, { color: STATUS_COLORS.active.fg }]}>{t('crm.planOffer')}</Text>
+                        <Text style={styles.offerMeta} numberOfLines={1}>
+                          {t('crm.plan')} {plan.name}
+                        </Text>
+                        <Text style={styles.offerMeta} numberOfLines={1}>
+                          {t('crm.validUntil')} {formatDate(plan.offerEndDate) ?? t('crm.noExpiry')}
+                        </Text>
                       </View>
                     </View>
 
-                    <View style={styles.dealDetails}>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>{t('crm.plan')}</Text>
-                        <Text style={styles.detailValue}>{plan.name}</Text>
+                    <View style={styles.offerFooter}>
+                      <View style={styles.autoApply}>
+                        <Feather name="zap" size={13} color={BrandColors.teal} />
+                        <Text style={styles.autoApplyText} numberOfLines={1}>{t('crm.autoNoCode')}</Text>
                       </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>{t('crm.price')}</Text>
-                        <Text style={styles.detailValue}>
-                          <Text style={styles.strikePrice}><CurrencyValue amount={plan.price} /></Text>
-                          {'  '}
-                          <CurrencyValue amount={plan.effectivePrice} />
-                        </Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
-                        <Text style={styles.detailValue}>
-                          {plan.offerEndDate ? new Date(plan.offerEndDate).toLocaleDateString(getIntlLocale()) : t('crm.noExpiry')}
-                        </Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>{t('crm.applies')}</Text>
-                        <Text style={styles.detailValue}>{t('crm.autoNoCode')}</Text>
-                      </View>
+                      <Text style={styles.priceText} numberOfLines={1}>
+                        <Text style={styles.strikePrice}><CurrencyValue amount={plan.price} /></Text>
+                        {'  '}
+                        <CurrencyValue amount={plan.effectivePrice} />
+                      </Text>
                     </View>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
+
                 {activeDeals.map((deal) => {
                   // Plain text for the share message; the card itself shows the currency glyph.
                   const discountText = deal.discountType === 'percentage'
@@ -201,448 +225,604 @@ export function createAdminDealsScreen(useRestoreSession: ReturnType<typeof crea
                   const usagePercent = deal.usageLimit
                     ? Math.min((usageCount / deal.usageLimit) * 100, 100)
                     : 0;
+                  const meta = [
+                    `${t('crm.validUntil')} ${formatDate(deal.endDate) ?? t('crm.noExpiry')}`,
+                    deal.branchName || t('crm.unknownBranch'),
+                  ].join('  ·  ');
 
                   return (
-                    <View key={deal.id} style={styles.dealCard}>
-                      {/* Deal Header */}
-                      <View style={styles.dealHeader}>
-                        <View style={styles.dealHeaderInfo}>
-                          <Text style={styles.dealTitle}>{deal.name}</Text>
-                          <View style={styles.discountBadge}>
-                            <Text style={styles.discountText}>
-                              {deal.discountType === 'percentage'
-                                ? discountText
-                                : <CurrencyValue amount={deal.discountValue} suffix=" OFF" />}
-                            </Text>
+                    <View key={deal.id} style={styles.card}>
+                      <View style={styles.offerTop}>
+                        <DiscountTicket
+                          percent={deal.discountType === 'percentage' ? deal.discountValue : undefined}
+                          amount={deal.discountValue}
+                        />
+                        <View style={styles.offerInfo}>
+                          <View style={styles.offerTitleRow}>
+                            <Text style={styles.offerTitle} numberOfLines={1}>{deal.name}</Text>
+                            <StatusChip
+                              label={translateValue('status', status, status).toUpperCase()}
+                              colors={statusColor}
+                            />
                           </View>
-                        </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            { backgroundColor: statusColor.bg, borderColor: statusColor.border },
-                          ]}>
-                          <Text style={[styles.statusText, { color: statusColor.fg }]}>
-                            {status.toUpperCase()}
-                          </Text>
+                          <Text style={styles.offerMeta} numberOfLines={2}>{meta}</Text>
                         </View>
                       </View>
 
-                      {/* Code Box */}
-                      <View style={styles.codeBox}>
+                      {/* Promo code */}
+                      <View style={styles.codeRow}>
                         <View style={styles.codeInfo}>
                           <Text style={styles.codeLabel}>{t('crm.promoCode')}</Text>
-                          <Text style={styles.codeValue}>{deal.code || 'N/A'}</Text>
+                          <Text style={styles.codeValue} numberOfLines={1}>{deal.code || 'N/A'}</Text>
                         </View>
-                        <View style={styles.codeActions}>
-                          <TouchableOpacity
-                            style={styles.iconButton}
-                            disabled={!deal.code}
-                            onPress={() => deal.code && handleCopy(deal.code)}>
-                            <Feather name="copy" size={16} color="#4b5563" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.iconButton, { backgroundColor: BrandColors.teal }]}
-                            disabled={!deal.code}
-                            onPress={() => handleShare(deal, discountText)}>
-                            <Feather name="share-2" size={16} color="#ffffff" />
-                          </TouchableOpacity>
-                        </View>
+                        <Pressable
+                          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, !deal.code && styles.disabled]}
+                          disabled={!deal.code}
+                          onPress={() => deal.code && handleCopy(deal.code)}
+                          accessibilityRole="button"
+                          hitSlop={4}
+                        >
+                          <Feather name="copy" size={16} color={BrandColors.teal} />
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [styles.iconButton, styles.iconButtonPrimary, pressed && styles.pressed, !deal.code && styles.disabled]}
+                          disabled={!deal.code}
+                          onPress={() => handleShare(deal, discountText)}
+                          accessibilityRole="button"
+                          hitSlop={4}
+                        >
+                          <Feather name="share-2" size={16} color="#ffffff" />
+                        </Pressable>
                       </View>
 
-                      {/* Details */}
-                      <View style={styles.dealDetails}>
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>{t('crm.validUntil')}</Text>
-                          <Text style={styles.detailValue}>
-                            {deal.endDate ? new Date(deal.endDate).toLocaleDateString(getIntlLocale()) : t('crm.noExpiry')}
-                          </Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>{t('crm.branches')}</Text>
-                          <Text style={styles.detailValue}>{deal.branchName || t('crm.unknownBranch')}</Text>
-                        </View>
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>{t('crm.usage')}</Text>
-                          <Text style={styles.detailValue}>
-                            {usageCount} / {deal.usageLimit || '∞'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Progress Bar */}
-                      <View style={styles.progressContainer}>
+                      {/* Usage */}
+                      <View style={styles.usageRow}>
                         <View style={styles.progressBarBg}>
                           <View style={[styles.progressBarFill, { width: `${usagePercent}%` }]} />
                         </View>
-                        {!deal.usageLimit ? (
-                          <Text style={styles.progressHint}>{t('crm.noUsageLimit')}</Text>
-                        ) : null}
+                        <Text style={styles.usageText}>
+                          {t('crm.usage')} {usageCount} / {deal.usageLimit || '∞'}
+                        </Text>
                       </View>
+                      {!deal.usageLimit ? (
+                        <Text style={styles.usageHint}>{t('crm.noUsageLimit')}</Text>
+                      ) : null}
                     </View>
                   );
                 })}
               </View>
             )}
-          </View>
+          </Section>
 
-          {/* Referral Codes Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('crm.referralCodes')}</Text>
-              <TouchableOpacity onPress={() => router.push('/(admin)/referrals')}>
-                <Text style={styles.viewAllText}>{t('crm.viewAll')}</Text>
-              </TouchableOpacity>
-            </View>
-            
+          {/* ── Referral codes ──────────────────────────────────── */}
+          <Section
+            title={t('crm.referralCodes')}
+            actionLabel={t('crm.viewAll')}
+            onAction={() => router.push('/(admin)/referrals')}
+          >
             {isLoadingReferrals ? (
               <ActivityIndicator size="small" color={BrandColors.teal} />
             ) : referralsError ? (
-              <Text style={{ color: 'red' }}>{t('crm.failedLoadReferrals')}</Text>
+              <InlineMessage tone="error" text={t('crm.failedLoadReferrals')} />
             ) : referralsList.length === 0 ? (
-              <Text style={{ color: '#6b7280' }}>{t('crm.noReferralCodes')}</Text>
+              <InlineMessage text={t('crm.noReferralCodes')} />
             ) : (
-              <View style={styles.dealsList}>
-                {referralsList.map((referral) => (
-                  <View key={referral.id} style={styles.referralCard}>
-                    <View style={styles.referralHeader}>
-                      <Text style={styles.referralCode}>{referral.referralCode || '—'}</Text>
-                      <Text style={styles.referralOwner}>{referral.referrerName || t('crm.unknown')}</Text>
+              <View style={[styles.card, styles.listCard]}>
+                {referralsList.map((referral, index) => (
+                  <View
+                    key={referral.id}
+                    style={[styles.referralRow, index < referralsList.length - 1 && styles.rowDivider]}
+                  >
+                    <View style={styles.referralIcon}>
+                      <Feather name="gift" size={16} color="#d97706" />
                     </View>
-                    <View style={styles.referralMetrics}>
-                      <View style={styles.referralMetricBox}>
-                        <Text style={styles.referralMetricLabel}>{t('crm.status')}</Text>
-                        <Text style={styles.referralMetricValue}>
-                          {translateValue('status', referral.status, t('crm.unknown'))}
-                        </Text>
-                      </View>
-                      <View style={styles.referralMetricBox}>
-                        <Text style={styles.referralMetricLabel}>{t('crm.date')}</Text>
-                        <Text style={styles.referralMetricValue}>
-                          {referral.date ? new Date(referral.date).toLocaleDateString(getIntlLocale()) : '—'}
-                        </Text>
-                      </View>
-                      {referral.rewardAmount !== undefined && referral.rewardAmount !== null ? (
-                        <View style={styles.referralMetricBox}>
-                          <Text style={styles.referralMetricLabel}>{t('crm.reward')}</Text>
-                          <Text style={[styles.referralMetricValue, { color: '#16a34a' }]}>
-                            <CurrencyValue amount={referral.rewardAmount} />
-                          </Text>
-                        </View>
-                      ) : null}
+                    <View style={styles.referralInfo}>
+                      <Text style={styles.referralCode} numberOfLines={1}>{referral.referralCode || '—'}</Text>
+                      <Text style={styles.offerMeta} numberOfLines={1}>
+                        {referral.referrerName || t('crm.unknown')}
+                        {referral.rewardAmount !== undefined && referral.rewardAmount !== null ? (
+                          <>
+                            {'  ·  '}
+                            <Text style={styles.rewardText}><CurrencyValue amount={referral.rewardAmount} /></Text>
+                          </>
+                        ) : null}
+                      </Text>
+                    </View>
+                    <View style={styles.referralRight}>
+                      <StatusChip
+                        label={translateValue('status', referral.status, t('crm.unknown'))}
+                        colors={referralStatusColors(referral.status)}
+                      />
+                      <Text style={styles.referralDate}>{formatDate(referral.date) ?? '—'}</Text>
                     </View>
                   </View>
                 ))}
               </View>
             )}
-          </View>
-
-          {/* Create New Deal */}
-          <TouchableOpacity style={styles.createButton} onPress={handleCreateOffer}>
-            <Feather name="plus" size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>{t('crm.createNewOffer')}</Text>
-          </TouchableOpacity>
-
-          {/* Quick Stats */}
-          <View style={styles.quickStatsCard}>
-            <Text style={styles.quickStatsTitle}>{t('crm.thisMonthsImpact')}</Text>
-            {isLoadingImpact ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : impactError ? (
-              <Text style={styles.quickStatsError}>{t('crm.failedLoadImpact')}</Text>
-            ) : (
-              <View style={styles.quickStatsRow}>
-                <View style={styles.quickStatBox}>
-                  <Text style={styles.quickStatLabel}>{t('crm.revenueFromDeals')}</Text>
-                  <Text style={styles.quickStatValue}>
-                    {formatCompactCurrency(impact?.revenueFromDeals ?? 0)}
-                  </Text>
-                </View>
-                <View style={styles.quickStatBox}>
-                  <Text style={styles.quickStatLabel}>{t('crm.newMembers')}</Text>
-                  <Text style={styles.quickStatValue}>{formatCount(impact?.newMembers ?? 0)}</Text>
-                </View>
-              </View>
-            )}
-          </View>
+          </Section>
         </View>
       </ScreenLayout>
     );
   };
 }
 
+// ── Local building blocks ──────────────────────────────────────────────────
+
+const REFERRAL_PREVIEW_COUNT = 5;
+
+function formatDate(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(getIntlLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function referralStatusColors(status?: string | null) {
+  const s = (status || '').toLowerCase();
+  if (['completed', 'converted', 'rewarded', 'paid', 'active'].includes(s)) return STATUS_COLORS.active;
+  if (['pending', 'invited'].includes(s)) return STATUS_COLORS.paused;
+  if (['expired', 'rejected', 'cancelled', 'canceled'].includes(s)) return STATUS_COLORS.expired;
+  return STATUS_COLORS.draft;
+}
+
+function Section({
+  title,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle} numberOfLines={1}>{title}</Text>
+        {actionLabel && onAction ? (
+          <Pressable
+            onPress={onAction}
+            style={({ pressed }) => [styles.viewAllBtn, pressed && styles.pressed]}
+            accessibilityRole="button"
+            hitSlop={8}
+          >
+            <Text style={styles.viewAllText}>{actionLabel}</Text>
+            <Feather name="arrow-right" size={13} color={BrandColors.teal} />
+          </Pressable>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function StatTile({
+  icon,
+  color,
+  label,
+  value,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <View style={styles.statTile}>
+      <View style={[styles.statIcon, { backgroundColor: `${color}1f` }]}>
+        <Feather name={icon} size={16} color={color} />
+      </View>
+      <View style={styles.statText}>
+        <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** Coupon-style discount block: "5%" or the currency amount, with "OFF" underneath. */
+function DiscountTicket({ percent, amount }: { percent?: number; amount: number }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.ticket}>
+      <Text style={styles.ticketValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {percent !== undefined ? `${percent}%` : <CurrencyValue amount={amount} />}
+      </Text>
+      <Text style={styles.ticketOff}>{t('crm.discountOff')}</Text>
+    </View>
+  );
+}
+
+function StatusChip({ label, colors }: { label: string; colors: { bg: string; border: string; fg: string } }) {
+  return (
+    <View style={[styles.statusChip, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+      <Text style={[styles.statusChipText, { color: colors.fg }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+function InlineMessage({ text, tone = 'muted' }: { text: string; tone?: 'muted' | 'error' }) {
+  return (
+    <View style={[styles.inlineMessage, tone === 'error' && styles.inlineMessageError]}>
+      <Feather
+        name={tone === 'error' ? 'alert-circle' : 'inbox'}
+        size={16}
+        color={tone === 'error' ? '#b91c1c' : '#6b7280'}
+      />
+      <Text style={[styles.inlineMessageText, tone === 'error' && { color: '#b91c1c' }]}>{text}</Text>
+    </View>
+  );
+}
+
+const CARD_SHADOW = {
+  shadowColor: '#000',
+  shadowOpacity: 0.04,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+} as const;
+
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.four,
+    padding: Spacing.three,
     gap: Spacing.four,
   },
-  headerStatsRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
+  pressed: {
+    opacity: 0.75,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    padding: Spacing.four,
+  disabled: {
+    opacity: 0.4,
+  },
+
+  // Hero
+  heroBanner: {
+    backgroundColor: BrandColors.teal,
     borderRadius: Radius.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    padding: Spacing.three,
+    gap: Spacing.md,
+    shadowColor: BrandColors.teal,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#4b5563',
-    marginBottom: Spacing.one,
+  heroTextGroup: {
+    gap: Spacing.one,
   },
-  statValue: {
-    fontSize: 24,
+  heroTitle: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '700',
   },
-  sectionContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    lineHeight: 17,
   },
-  sectionHeader: {
+  heroButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.four,
+    justifyContent: 'center',
+    gap: Spacing.two,
+    backgroundColor: '#ffffff',
+    paddingVertical: Spacing.md - 2,
+    borderRadius: Radius.full,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  viewAllText: {
+  heroButtonText: {
     color: BrandColors.teal,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  dealsList: {
-    gap: Spacing.three,
-  },
-  dealCard: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(50, 127, 116, 0.3)',
-    borderRadius: Radius.md,
-    padding: Spacing.four,
-    backgroundColor: 'rgba(50, 127, 116, 0.02)',
-  },
-  dealHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.three,
-  },
-  dealHeaderInfo: {
-    flex: 1,
-    marginRight: Spacing.two,
-  },
-  dealTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: Spacing.one,
-  },
-  discountBadge: {
-    backgroundColor: '#F5C742',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.sm,
-    alignSelf: 'flex-start',
-  },
-  discountText: {
-    color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },
-  statusBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  statusText: {
-    color: '#15803d',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  codeBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: Radius.sm,
-    padding: Spacing.three,
+
+  // Stats
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginBottom: Spacing.three,
+    gap: Spacing.md,
   },
-  codeInfo: {
+  statTile: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two + 2,
+    backgroundColor: '#ffffff',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    ...CARD_SHADOW,
   },
-  codeLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginBottom: 2,
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  codeValue: {
-    fontSize: 16,
+  statText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  statValue: {
+    fontSize: 17,
     fontWeight: '700',
     color: '#111827',
   },
-  codeActions: {
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+
+  // Sections
+  section: {
+    gap: Spacing.two + 2,
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  iconButton: {
-    padding: Spacing.two,
-    backgroundColor: '#f3f4f6',
-    borderRadius: Radius.sm,
-  },
-  dealDetails: {
-    gap: Spacing.two,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.one,
   },
-  detailLabel: {
-    fontSize: 12,
-    color: '#4b5563',
+  sectionTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: BrandColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  detailValue: {
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: BrandColors.screenBackgroundAlt,
+    paddingHorizontal: Spacing.two + 2,
+    paddingVertical: Spacing.one + 2,
+    borderRadius: Radius.full,
+  },
+  viewAllText: {
+    color: BrandColors.teal,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
+  },
+  list: {
+    gap: Spacing.md,
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+    gap: Spacing.md,
+    ...CARD_SHADOW,
+  },
+
+  // Offer card
+  offerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  ticket: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.md,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#f5c742',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  ticketValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#b45309',
+  },
+  ticketOff: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#b45309',
+  },
+  offerInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  offerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  offerTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
     color: '#111827',
   },
-  strikePrice: {
-    color: '#9ca3af',
-    textDecorationLine: 'line-through',
-    fontWeight: '400',
+  offerMeta: {
+    fontSize: 12,
+    color: '#6b7280',
   },
-  progressContainer: {
-    marginTop: Spacing.three,
+  statusChip: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  statusChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    backgroundColor: '#f6faf9',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: '#e2efec',
+    paddingVertical: Spacing.two,
+    paddingLeft: Spacing.md,
+    paddingRight: Spacing.two,
+  },
+  codeInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  codeLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  codeValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: '#111827',
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2efec',
+  },
+  iconButtonPrimary: {
+    backgroundColor: BrandColors.teal,
+    borderColor: BrandColors.teal,
+  },
+  usageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   progressBarBg: {
-    width: '100%',
-    height: 8,
+    flex: 1,
+    height: 6,
     backgroundColor: '#e5e7eb',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: BrandColors.teal,
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  progressHint: {
+  usageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  usageHint: {
     fontSize: 11,
-    color: '#6b7280',
-    marginTop: Spacing.one,
+    color: '#9ca3af',
+    marginTop: -Spacing.two,
   },
-  referralCard: {
-    backgroundColor: 'rgba(245, 199, 66, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 199, 66, 0.3)',
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-  },
-  referralHeader: {
+  offerFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.two,
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e5e7eb',
+  },
+  autoApply: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  autoApplyText: {
+    flexShrink: 1,
+    fontSize: 12,
+    color: BrandColors.teal,
+    fontWeight: '600',
+  },
+  priceText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  strikePrice: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+    fontWeight: '400',
+  },
+
+  // Referrals
+  listCard: {
+    paddingVertical: Spacing.one,
+    gap: 0,
+  },
+  referralRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e5e7eb',
+  },
+  referralIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referralInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
   referralCode: {
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.5,
     color: '#111827',
   },
-  referralOwner: {
-    fontSize: 12,
-    color: '#4b5563',
+  rewardText: {
+    color: '#16a34a',
+    fontWeight: '600',
   },
-  referralMetrics: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  referralRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+    flexShrink: 0,
   },
-  referralMetricBox: {
-    flex: 1,
-  },
-  referralMetricLabel: {
+  referralDate: {
     fontSize: 11,
     color: '#6b7280',
-    marginBottom: 2,
   },
-  referralMetricValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  createButton: {
+
+  // Empty / error
+  inlineMessage: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BrandColors.teal,
-    paddingVertical: Spacing.four,
-    borderRadius: Radius.md,
     gap: Spacing.two,
-    shadowColor: BrandColors.teal,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  createButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  quickStatsCard: {
-    backgroundColor: '#F5C742',
+    backgroundColor: '#ffffff',
     borderRadius: Radius.md,
-    padding: Spacing.four,
-  },
-  quickStatsTitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: Spacing.three,
-  },
-  quickStatsRow: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  quickStatBox: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: Spacing.three,
-    borderRadius: Radius.sm,
+    ...CARD_SHADOW,
   },
-  quickStatLabel: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 11,
-    marginBottom: Spacing.one,
+  inlineMessageError: {
+    backgroundColor: '#fef2f2',
   },
-  quickStatValue: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  quickStatsError: {
-    color: '#ffffff',
-    fontSize: 12,
+  inlineMessageText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6b7280',
   },
 });

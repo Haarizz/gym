@@ -243,6 +243,7 @@ const billing = {
       "noStatementLines": "Keine Auszugszeilen zum Exportieren.",
       "statementExported": "Kontoauszug für {{name}} als CSV exportiert.",
       "statementExportTitle": "Kontoauszug als CSV exportieren",
+      "statementExportFailed": "Kontoauszug konnte nicht exportiert werden.",
       "familyHead": "Familienoberhaupt",
       "member": "Mitglied",
       "receiptsExportInfo": "Gesamte Belegliste ({{count}} Einträge) wird als CSV exportiert.",

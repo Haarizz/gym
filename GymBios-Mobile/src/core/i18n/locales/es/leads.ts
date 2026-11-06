@@ -95,6 +95,7 @@ const leads = {
       phone: 'Teléfono',
       preferredContact: 'Contacto preferido',
       leadScore: 'Puntuación del prospecto',
+      scoreNotSet: 'Sin definir',
       leadDetails: 'Detalles del prospecto',
       source: 'Fuente',
       assignedStaff: 'Personal asignado',
@@ -127,6 +128,9 @@ const leads = {
     },
     form: {
       addNewLead: 'Agregar nuevo prospecto',
+      leadScoreLabel: 'Puntuación (1-100, opcional)',
+      leadScorePlaceholder: 'p. ej. 50',
+      leadScoreInvalid: 'La puntuación debe ser un número entero entre 1 y 100.',
       editLead: 'Editar prospecto',
       fillDetails: 'Complete los detalles a continuación',
       contactDetails: 'DETALLES DE CONTACTO',

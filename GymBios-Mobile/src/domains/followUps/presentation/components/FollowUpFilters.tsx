@@ -1,8 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Modal,
-  Pressable,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -12,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
+import { Button } from '@/shared/components/Button';
+import { FormSheet } from '@/shared/components/FormSheet';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
 import { Dropdown } from '@/shared/components/Dropdown';
@@ -174,83 +173,57 @@ export function FollowUpFilters({
         </TouchableOpacity>
       </View>
 
-      {/* Filter BottomSheet Modal */}
-      <Modal
+      {/* Filter sheet */}
+      <FormSheet
         visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
+        title={t('followUps.filterTitle')}
+        icon="sliders"
+        closeLabel={t('followUps.cancel')}
+        onClose={() => setModalVisible(false)}
+        footer={
+          <>
+            <Button variant="outline" label={t('followUps.resetAll')} onPress={handleReset} style={styles.flex} />
+            <Button label={t('followUps.applyFilters')} onPress={handleApply} style={styles.flex} />
+          </>
+        }
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
-          <Pressable
-            style={[styles.modalContent, { backgroundColor: theme.background }]}
-            onPress={e => e.stopPropagation()}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('followUps.filterTitle')}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Feather name="x" size={22} color={theme.text} />
-              </TouchableOpacity>
-            </View>
+          <Dropdown
+            label={t('followUps.status')}
+            value={localStatus}
+            options={localizeOptions(STATUS_OPTIONS, 'status').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allStatuses') }))}
+            onChange={setLocalStatus}
+          />
 
-            <ScrollView style={styles.modalBody}>
-              <Dropdown
-                label={t('followUps.status')}
-                value={localStatus}
-                options={localizeOptions(STATUS_OPTIONS, 'status').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allStatuses') }))}
-                onChange={setLocalStatus}
-              />
+          <Dropdown
+            label={t('followUps.type')}
+            value={localType}
+            options={localizeOptions(TYPE_OPTIONS, 'channel').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allTypes') }))}
+            onChange={setLocalType}
+          />
 
-              <Dropdown
-                label={t('followUps.type')}
-                value={localType}
-                options={localizeOptions(TYPE_OPTIONS, 'channel').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allTypes') }))}
-                onChange={setLocalType}
-              />
+          <Dropdown
+            label={t('followUps.priority')}
+            value={localPriority}
+            options={localizeOptions(PRIORITY_OPTIONS, 'priority').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allPriorities') }))}
+            onChange={setLocalPriority}
+          />
 
-              <Dropdown
-                label={t('followUps.priority')}
-                value={localPriority}
-                options={localizeOptions(PRIORITY_OPTIONS, 'priority').map(o => (o.value ? o : { ...o, label: t('followUps.filters.allPriorities') }))}
-                onChange={setLocalPriority}
-              />
-
-              <Dropdown
-                label={t('followUps.assignedStaff')}
-                value={localStaff}
-                options={staffOptions}
-                onChange={setLocalStaff}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.clearBtn, { borderColor: theme.border }]}
-                onPress={handleReset}
-              >
-                <Text style={[styles.clearBtnText, { color: theme.textSecondary }]}>
-                  {t('followUps.resetAll')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.applyBtn, { backgroundColor: BrandColors.teal }]}
-                onPress={handleApply}
-              >
-                <Text style={styles.applyBtnText}>{t('followUps.applyFilters')}</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          <Dropdown
+            label={t('followUps.assignedStaff')}
+            value={localStaff}
+            options={staffOptions}
+            onChange={setLocalStaff}
+          />
+      </FormSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: Spacing.two,
+  flex: {
+    flex: 1,
   },
+  container: {},
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,62 +268,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    maxHeight: '80%',
-    paddingBottom: Spacing.four,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.four,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalBody: {
-    padding: Spacing.four,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-  },
-  clearBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearBtnText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  applyBtn: {
-    flex: 2,
-    height: 48,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyBtnText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
   },
 });

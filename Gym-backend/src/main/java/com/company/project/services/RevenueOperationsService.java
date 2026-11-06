@@ -852,17 +852,12 @@ public class RevenueOperationsService {
         return ym.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + ym.getYear();
     }
 
-    /** The month's targets with live achieved figures; future months keep their stored (zero) progress. */
+    /**
+     * The month's targets with achieved figures, from the performance engine (the same source as
+     * Staff Targets): individual staff targets plus the branch-wide (institution) one.
+     */
     private List<StaffTargetResponseDTO> monthTargets(YearMonth ym, Map<YearMonth, List<StaffTargetResponseDTO>> cache) {
-        return cache.computeIfAbsent(ym, k -> {
-            List<StaffTarget> targets = targetRepository.findByYearAndMonth(k.getYear(), k.getMonthValue());
-            boolean future = k.isAfter(YearMonth.now());
-            List<StaffTargetResponseDTO> out = new ArrayList<>();
-            for (StaffTarget t : targets) {
-                out.add(future ? StaffTargetResponseDTO.fromEntity(t) : staffTargetService.getTargetById(t.getId()));
-            }
-            return out;
-        });
+        return cache.computeIfAbsent(ym, k -> staffTargetService.getTargets(k.getYear(), k.getMonthValue(), null, null));
     }
 
     private static boolean isInstitution(StaffTargetResponseDTO t) {

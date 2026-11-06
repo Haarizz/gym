@@ -1,27 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { Text, TextInput } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
+import { format } from 'date-fns';
+import type { ComponentProps } from 'react';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
+import { localizeOptions, translateValue } from '@/core/i18n/format';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { useStaff } from '@/domains/hr/presentation/hooks/useStaff';
 import { useLeads } from '@/domains/leads/hooks/useLeads';
+import { Button } from '@/shared/components/Button';
 import { DatePicker } from '@/shared/components/DatePicker';
 import { Dropdown } from '@/shared/components/Dropdown';
+import { FormSheet, FormSheetSection } from '@/shared/components/FormSheet';
+import { Input } from '@/shared/components/Input';
+import { TimePicker } from '@/shared/components/TimePicker';
+import { TrafficLightSelector } from '@/shared/components/TrafficLightSelector';
+import { Typography } from '@/shared/components/Typography';
 import type { FollowUp } from '../../domain/FollowUp';
 import type { FollowUpRequest } from '../../domain/FollowUpRequest';
-
-import { toast } from '@/shared/components/Toasts/toastStore';
-import { localizeOptions, translateValue, tOr } from '@/core/i18n/format';
 
 interface AddFollowUpSheetProps {
   visible: boolean;
@@ -31,21 +29,48 @@ interface AddFollowUpSheetProps {
   submitting?: boolean;
 }
 
-const TYPE_OPTIONS = [
-  { label: 'Call', value: 'call' },
-  { label: 'Email', value: 'email' },
-  { label: 'SMS', value: 'sms' },
-  { label: 'WhatsApp', value: 'whatsapp' },
-  { label: 'In-App', value: 'in-app' },
-  { label: 'Meeting', value: 'meeting' },
-  { label: 'Visit', value: 'visit' },
+type FeatherName = ComponentProps<typeof Feather>['name'];
+
+const TYPE_OPTIONS: { label: string; value: string; icon: FeatherName }[] = [
+  { label: 'Call', value: 'call', icon: 'phone' },
+  { label: 'Email', value: 'email', icon: 'mail' },
+  { label: 'SMS', value: 'sms', icon: 'message-square' },
+  { label: 'WhatsApp', value: 'whatsapp', icon: 'message-circle' },
+  { label: 'In-App', value: 'in-app', icon: 'smartphone' },
+  { label: 'Meeting', value: 'meeting', icon: 'users' },
+  { label: 'Visit', value: 'visit', icon: 'map-pin' },
 ];
 
-const PRIORITY_OPTIONS = [
-  { label: 'High', value: 'high' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'Low', value: 'low' },
-];
+const DURATIONS = ['15', '30', '45', '60'];
+
+type Priority = 'low' | 'medium' | 'high';
+
+function formFromFollowUp(followUp?: FollowUp | null) {
+  if (!followUp) {
+    return {
+      leadId: '',
+      type: 'call',
+      subject: '',
+      priority: 'medium' as Priority,
+      dueDate: new Date() as Date | null,
+      scheduledTime: '',
+      assignedStaff: '',
+      estimatedDuration: '15',
+      notes: '',
+    };
+  }
+  return {
+    leadId: String(followUp.leadId),
+    type: followUp.type === 'in_app' ? 'in-app' : followUp.type,
+    subject: followUp.subject || '',
+    priority: ((followUp.priority as Priority) || 'medium') as Priority,
+    dueDate: followUp.dueDate ? new Date(followUp.dueDate) : new Date(),
+    scheduledTime: followUp.scheduledTime || '',
+    assignedStaff: followUp.assignedStaff || '',
+    estimatedDuration: followUp.estimatedDuration ? String(followUp.estimatedDuration) : '15',
+    notes: followUp.notes || '',
+  };
+}
 
 export function AddFollowUpSheet({
   visible,
@@ -56,18 +81,19 @@ export function AddFollowUpSheet({
 }: AddFollowUpSheetProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  const isEdit = !!editingFollowUp;
 
-  // Load leads and staff
   const { data: leadsData } = useLeads({ size: 100 });
   const { staff } = useStaff();
 
-  const leadOptions = useMemo(() => {
-    const leads = leadsData?.leads ?? [];
-    return leads.map(l => ({
-      label: `${l.firstName} ${l.lastName}`.trim() + (l.phone ? ` (${l.phone})` : ''),
-      value: String(l.id),
-    }));
-  }, [leadsData]);
+  const leadOptions = useMemo(
+    () =>
+      (leadsData?.leads ?? []).map(l => ({
+        label: `${l.firstName} ${l.lastName}`.trim() + (l.phone ? ` (${l.phone})` : ''),
+        value: String(l.id),
+      })),
+    [leadsData],
+  );
 
   const staffOptions = useMemo(() => {
     const list = (staff || []).map(s => ({
@@ -77,294 +103,254 @@ export function AddFollowUpSheet({
     return [{ label: t('common.unassigned'), value: '' }, ...list];
   }, [staff, t]);
 
-  // Form states
-  const [leadId, setLeadId] = useState('');
-  const [type, setType] = useState('call');
-  const [subject, setSubject] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [dueDate, setDueDate] = useState<Date | null>(new Date());
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [assignedStaff, setAssignedStaff] = useState('');
-  const [estimatedDuration, setEstimatedDuration] = useState('15');
-  const [notes, setNotes] = useState('');
+  const typeOptions = useMemo(() => {
+    const labels = localizeOptions(TYPE_OPTIONS, 'channel');
+    return TYPE_OPTIONS.map((opt, i) => ({ ...opt, label: labels[i]?.label ?? opt.label }));
+  }, []);
 
-  useEffect(() => {
-    if (editingFollowUp) {
-      setLeadId(String(editingFollowUp.leadId));
-      setType(editingFollowUp.type === 'in_app' ? 'in-app' : editingFollowUp.type);
-      setSubject(editingFollowUp.subject || '');
-      setPriority(editingFollowUp.priority || 'medium');
-      setDueDate(editingFollowUp.dueDate ? new Date(editingFollowUp.dueDate) : new Date());
-      setScheduledTime(editingFollowUp.scheduledTime || '');
-      setAssignedStaff(editingFollowUp.assignedStaff || '');
-      setEstimatedDuration(
-        editingFollowUp.estimatedDuration ? String(editingFollowUp.estimatedDuration) : '15',
-      );
-      setNotes(editingFollowUp.notes || '');
-    } else {
-      setLeadId('');
-      setType('call');
-      setSubject('');
-      setPriority('medium');
-      setDueDate(new Date());
-      setScheduledTime('');
-      setAssignedStaff('');
-      setEstimatedDuration('15');
-      setNotes('');
+  const [form, setForm] = useState(() => formFromFollowUp(editingFollowUp));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Reset whenever the sheet opens (or switches follow-up), so it never shows stale values.
+  // Done during render rather than in an effect to avoid a flash of the old form.
+  const openKey = visible ? String(editingFollowUp?.id ?? 'new') : null;
+  const [lastOpenKey, setLastOpenKey] = useState(openKey);
+  if (openKey !== lastOpenKey) {
+    setLastOpenKey(openKey);
+    if (openKey) {
+      setForm(formFromFollowUp(editingFollowUp));
+      setErrors({});
     }
-  }, [editingFollowUp, visible]);
+  }
+
+  const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors(prev => ({ ...prev, [key]: '' }));
+  };
+
+  // Keep a non-standard saved duration selectable when editing.
+  const durationOptions = useMemo(
+    () =>
+      form.estimatedDuration && !DURATIONS.includes(form.estimatedDuration)
+        ? [...DURATIONS, form.estimatedDuration].sort((a, b) => Number(a) - Number(b))
+        : DURATIONS,
+    [form.estimatedDuration],
+  );
 
   const handleSubmit = () => {
-    if (!leadId) {
-      toast.error(t('followUps.msg.selectMemberOrLead'), {
-        title: t('common.validationError')
-      });
-      return;
-    }
-    if (!subject.trim()) {
-      toast.error(t('followUps.msg.subjectRequired'), {
-        title: t('common.validationError')
-      });
-      return;
-    }
-    if (!dueDate) {
-      toast.error(t('followUps.msg.dueDateRequired'), {
-        title: t('common.validationError')
-      });
-      return;
-    }
+    const nextErrors: Record<string, string> = {};
+    if (!form.leadId) nextErrors.leadId = t('followUps.msg.selectMemberOrLead');
+    if (!form.subject.trim()) nextErrors.subject = t('followUps.msg.subjectRequired');
+    if (!form.dueDate) nextErrors.dueDate = t('followUps.msg.dueDateRequired');
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0 || !form.dueDate) return;
 
-    const payload: FollowUpRequest = {
-      leadId: Number(leadId),
-      type,
-      subject: subject.trim(),
-      priority,
-      dueDate: dueDate.toISOString(),
-      scheduledTime: scheduledTime.trim() || undefined,
-      assignedStaff: assignedStaff || undefined,
-      estimatedDuration: estimatedDuration ? parseInt(estimatedDuration, 10) : 15,
-      notes: notes.trim() || undefined,
-    };
-
-    onSubmit(payload);
+    onSubmit({
+      leadId: Number(form.leadId),
+      type: form.type,
+      subject: form.subject.trim(),
+      priority: form.priority,
+      // Local calendar date — toISOString() would shift it back a day in timezones ahead of UTC.
+      dueDate: `${format(form.dueDate, 'yyyy-MM-dd')}T00:00:00`,
+      scheduledTime: form.scheduledTime.trim() || undefined,
+      assignedStaff: form.assignedStaff || undefined,
+      estimatedDuration: form.estimatedDuration ? parseInt(form.estimatedDuration, 10) : 15,
+      notes: form.notes.trim() || undefined,
+    });
   };
 
   return (
-    <Modal
+    <FormSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      title={isEdit ? t('followUps.form.editTitle') : t('followUps.form.addTitle')}
+      subtitle={t('followUps.form.subtitle')}
+      icon={isEdit ? 'edit-2' : 'calendar'}
+      closeLabel={t('followUps.cancel')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button
+            variant="outline"
+            label={t('followUps.cancel')}
+            onPress={onClose}
+            disabled={submitting}
+            style={styles.flex}
+          />
+          <Button
+            label={isEdit ? t('common.saveChanges') : t('followUps.form.create')}
+            onPress={handleSubmit}
+            loading={submitting}
+            style={styles.primaryButton}
+          />
+        </>
+      }
     >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modalSheet, { backgroundColor: theme.background }]}
-          onPress={e => e.stopPropagation()}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {editingFollowUp ? t('followUps.edit') : t('followUps.addFollowUp')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={theme.text} />
-            </TouchableOpacity>
-          </View>
+      {/* Who */}
+      <FormSheetSection label={t('followUps.form.whoSection')} />
+      <Dropdown
+        label={t('followUps.memberLead')}
+        required
+        placeholder={t('followUps.selectLead')}
+        value={form.leadId}
+        options={leadOptions}
+        onChange={v => update('leadId', v)}
+        error={errors.leadId}
+      />
+      <Dropdown
+        label={t('followUps.assignedStaff')}
+        placeholder={t('followUps.selectStaff')}
+        value={form.assignedStaff}
+        options={staffOptions}
+        onChange={v => update('assignedStaff', v)}
+      />
 
-          <ScrollView style={styles.modalBody}>
-            <Dropdown
-              label={t('followUps.memberLead')}
-              required
-              placeholder={t('followUps.selectLead')}
-              value={leadId}
-              options={leadOptions}
-              onChange={setLeadId}
-            />
-
-            <Dropdown
-              label={t('followUps.followUpType')}
-              value={type}
-              options={localizeOptions(TYPE_OPTIONS, 'channel')}
-              onChange={setType}
-            />
-
-            <Text style={[styles.fieldLabel, { color: theme.text }]}>{t('followUps.subjectRequired')}</Text>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-              value={subject}
-              onChangeText={setSubject}
-              placeholder={t('followUps.subjectPlaceholder')}
-              placeholderTextColor={theme.textSecondary}
-            />
-
-            <Dropdown
-              label={t('followUps.priority')}
-              value={priority}
-              options={localizeOptions(PRIORITY_OPTIONS, 'priority')}
-              onChange={setPriority}
-            />
-
-            <DatePicker
-              label={t('followUps.dueDate')}
-              required
-              value={dueDate}
-              onChange={val => setDueDate(val)}
-            />
-
-            <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              {t('followUps.scheduledTime')}
-            </Text>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-              value={scheduledTime}
-              onChangeText={setScheduledTime}
-              placeholder={t('followUps.timePlaceholder')}
-              placeholderTextColor={theme.textSecondary}
-            />
-
-            <Dropdown
-              label={t('followUps.assignedStaff')}
-              placeholder={t('followUps.selectStaff')}
-              value={assignedStaff}
-              options={staffOptions}
-              onChange={setAssignedStaff}
-            />
-
-            <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              {t('followUps.durationMins')}
-            </Text>
-            <TextInput
-              style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-              value={estimatedDuration}
-              onChangeText={setEstimatedDuration}
-              keyboardType="numeric"
-              placeholder="15"
-              placeholderTextColor={theme.textSecondary}
-            />
-
-            <Text style={[styles.fieldLabel, { color: theme.text, marginTop: Spacing.two }]}>
-              {t('followUps.notes')}
-            </Text>
-            <TextInput
+      {/* What */}
+      <FormSheetSection label={t('followUps.form.detailsSection')} />
+      <Typography variant="bodySmallBold" style={[styles.fieldLabel, { color: theme.text }]}>
+        {t('followUps.followUpType')}
+      </Typography>
+      <View style={styles.chips}>
+        {typeOptions.map(opt => {
+          const active = form.type === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => update('type', opt.value)}
               style={[
-                styles.input,
-                styles.multilineInput,
-                { color: theme.text, borderColor: theme.border },
+                styles.chip,
+                {
+                  borderColor: active ? BrandColors.teal : theme.border,
+                  backgroundColor: active ? `${BrandColors.teal}1f` : theme.backgroundElement,
+                },
               ]}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-              placeholder={t('followUps.notesPlaceholder')}
-              placeholderTextColor={theme.textSecondary}
-            />
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: theme.border }]}
-              onPress={onClose}
-              disabled={submitting}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
             >
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>
-                {t('followUps.cancel')}
-              </Text>
-            </TouchableOpacity>
+              <Feather name={opt.icon} size={14} color={active ? BrandColors.teal : theme.textSecondary} />
+              <Typography
+                variant="caption"
+                style={{ color: active ? BrandColors.teal : theme.textSecondary, fontWeight: active ? '700' : '500' }}
+              >
+                {opt.label}
+              </Typography>
+            </Pressable>
+          );
+        })}
+      </View>
 
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: BrandColors.teal }]}
-              onPress={handleSubmit}
-              disabled={submitting}
+      <Input
+        label={t('followUps.subjectRequired')}
+        placeholder={t('followUps.subjectPlaceholder')}
+        value={form.subject}
+        onChangeText={v => update('subject', v)}
+        error={errors.subject}
+      />
+
+      <TrafficLightSelector
+        label={t('followUps.priority')}
+        value={form.priority}
+        onChange={v => update('priority', v)}
+      />
+
+      {/* When */}
+      <FormSheetSection label={t('followUps.form.scheduleSection')} />
+      <View style={styles.row}>
+        <DatePicker
+          label={t('followUps.dueDate')}
+          required
+          value={form.dueDate}
+          onChange={d => update('dueDate', d)}
+          error={errors.dueDate}
+          style={styles.flex}
+        />
+        <TimePicker
+          label={t('followUps.scheduledTime')}
+          value={form.scheduledTime}
+          onChange={v => update('scheduledTime', v)}
+        />
+      </View>
+
+      <Typography variant="bodySmallBold" style={[styles.fieldLabel, { color: theme.text }]}>
+        {t('followUps.durationMins')}
+      </Typography>
+      <View style={styles.chips}>
+        {durationOptions.map(d => {
+          const active = form.estimatedDuration === d;
+          return (
+            <Pressable
+              key={d}
+              onPress={() => update('estimatedDuration', d)}
+              style={[
+                styles.chip,
+                styles.durationChip,
+                {
+                  borderColor: active ? BrandColors.teal : theme.border,
+                  backgroundColor: active ? `${BrandColors.teal}1f` : theme.backgroundElement,
+                },
+              ]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
             >
-              <Text style={styles.submitBtnText}>
-                {submitting
-                  ? t('common.saving')
-                  : editingFollowUp
-                  ? t('common.saveChanges', 'Save Changes')
-                  : t('followUps.addFollowUp')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+              <Typography
+                variant="caption"
+                style={{ color: active ? BrandColors.teal : theme.textSecondary, fontWeight: active ? '700' : '500' }}
+              >
+                {t('followUps.form.minutes', { count: Number(d) })}
+              </Typography>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Notes */}
+      <FormSheetSection label={t('followUps.form.notesSection')} />
+      <Input
+        placeholder={t('followUps.notesPlaceholder')}
+        value={form.notes}
+        onChangeText={v => update('notes', v)}
+        multiline
+        numberOfLines={3}
+        style={styles.notes}
+      />
+    </FormSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  flex: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  modalSheet: {
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    maxHeight: '90%',
-    paddingBottom: Spacing.four,
+  primaryButton: {
+    flex: 2,
   },
-  modalHeader: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.four,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalBody: {
-    padding: Spacing.four,
+    gap: Spacing.three,
   },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: Spacing.one,
-    marginTop: Spacing.two,
-  },
-  input: {
-    height: 48,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    fontSize: 14,
     marginBottom: Spacing.two,
   },
-  multilineInput: {
-    height: 80,
-    paddingTop: Spacing.two,
-    textAlignVertical: 'top',
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginBottom: Spacing.four,
   },
-  modalFooter: {
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.two,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: Radius.md,
+    gap: 6,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
+    borderRadius: Radius.full,
     borderWidth: 1,
-    alignItems: 'center',
+  },
+  durationChip: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
-  cancelBtnText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  submitBtn: {
-    flex: 2,
-    height: 48,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
+  notes: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
 });

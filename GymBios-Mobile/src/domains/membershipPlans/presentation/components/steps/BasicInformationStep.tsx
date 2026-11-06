@@ -1,58 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
-import { useTheme } from '@/core/hooks';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
+import { OptionChips, planOptions } from '../OptionChips';
 import { Input } from '@/shared/components/Input';
-import { Typography } from '@/shared/components/Typography';
 import { PLAN_TYPES, type PlanWizardData } from '../../hooks/useMembershipPlanWizard';
-import { tOr } from '@/core/i18n/format';
 
 const MEMBERSHIP_TYPES = ['Standard', 'Premium', 'VIP', 'Student', 'Corporate'];
 const STATUSES = ['ACTIVE', 'INACTIVE', 'DRAFT'];
 
-interface OptionRowProps {
-  options: string[];
-  selected: string;
-  onSelect: (value: string) => void;
-  getLabel?: (value: string) => string;
-}
 
-function OptionRow({ options, selected, onSelect, getLabel }: OptionRowProps) {
-  const theme = useTheme();
-  return (
-    <View style={styles.optionRow}>
-      {options.map((opt) => {
-        const isActive = opt === selected;
-        return (
-          <View
-            key={getLabel ? getLabel(opt) : opt}
-            style={[
-              styles.optionChip,
-              {
-                backgroundColor: isActive ? theme.primary : theme.backgroundElement,
-                borderColor: isActive ? theme.primary : theme.border,
-              },
-            ]}
-            // @ts-ignore – pressable via onTouchEnd for simplicity
-            onTouchEnd={() => onSelect(opt)}
-          >
-            <Typography
-              variant="caption"
-              style={[
-                styles.optionText,
-                { color: isActive ? '#ffffff' : theme.textSecondary },
-              ]}
-            >
-              {opt}
-            </Typography>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
 
 interface BasicInformationStepProps {
   values: PlanWizardData;
@@ -65,7 +23,7 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
 
   return (
     <View style={styles.container}>
-      <FormSection title={t('membershipPlans.form.basicStep.title')}>
+      <FormCard icon="file-text" title={t('membershipPlans.form.basicStep.title')}>
         <Input
           label={t('membershipPlans.form.basicStep.nameLabel')}
           value={values.name}
@@ -83,62 +41,36 @@ export function BasicInformationStep({ values, errors, onChange }: BasicInformat
           style={styles.multiline}
         />
 
-        <Typography variant="bodySmallBold" style={styles.label}>
-          {t('membershipPlans.form.basicStep.planTypeLabel')}
-        </Typography>
-        <OptionRow
-          options={PLAN_TYPES}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+        <OptionChips
+          label={t('membershipPlans.form.basicStep.planTypeLabel')}
+          options={planOptions(PLAN_TYPES)}
           selected={values.planType}
+          error={errors.planType}
           onSelect={(v) => onChange('planType', v)}
         />
 
-        <Typography variant="bodySmallBold" style={styles.label}>
-          {t('membershipPlans.form.basicStep.membershipTypeLabel')}
-        </Typography>
-        <OptionRow
-          options={MEMBERSHIP_TYPES}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+        <OptionChips
+          label={t('membershipPlans.form.basicStep.membershipTypeLabel')}
+          options={planOptions(MEMBERSHIP_TYPES)}
           selected={values.type}
           onSelect={(v) => onChange('type', v)}
         />
 
-        <Typography variant="bodySmallBold" style={styles.label}>
-          {t('membershipPlans.form.basicStep.statusLabel')}
-        </Typography>
-        <OptionRow
-          options={STATUSES}
-          getLabel={(o) => tOr(`membershipPlans.misc2.options.${o.toLowerCase().replace(/[\s-]+/g, '_')}`, o)}
+        <OptionChips
+          label={t('membershipPlans.form.basicStep.statusLabel')}
+          options={planOptions(STATUSES)}
           selected={values.status}
           onSelect={(v) => onChange('status', v)}
         />
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
-  label: {
-    marginTop: Spacing.one,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  optionChip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  optionText: {
-    fontWeight: '600',
-    fontSize: 12,
+    gap: Spacing.md,
   },
   multiline: {
     minHeight: 80,

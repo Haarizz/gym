@@ -3,7 +3,7 @@ import { StyleSheet, Switch, View } from 'react-native';
 
 import { Spacing } from '@/core/theme';
 import { useTheme } from '@/core/hooks';
-import { FormSection } from '@/shared/components/FormSection';
+import { FormCard } from '@/shared/components/FormCard';
 import { Input } from '@/shared/components/Input';
 import { Typography } from '@/shared/components/Typography';
 import type { PlanWizardData } from '../../hooks/useMembershipPlanWizard';
@@ -20,7 +20,7 @@ export function FreezePolicyStep({ values, errors, onChange }: FreezePolicyStepP
 
   return (
     <View style={styles.container}>
-      <FormSection title={t('membershipPlans.form.freezeStep.title')}>
+      <FormCard icon="pause-circle" title={t('membershipPlans.form.freezeStep.title')}>
         <Input
           label={t('membershipPlans.form.freezeStep.maxFreezeDaysLabel')}
           value={values.maxFreezeDays}
@@ -60,15 +60,15 @@ export function FreezePolicyStep({ values, errors, onChange }: FreezePolicyStepP
             thumbColor={theme.backgroundElement}
           />
         </View>
-      </FormSection>
+      </FormCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.md,
   },
   switchRow: {
     flexDirection: 'row',

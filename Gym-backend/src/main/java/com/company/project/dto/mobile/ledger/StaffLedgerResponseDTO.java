@@ -200,10 +200,23 @@ public class StaffLedgerResponseDTO {
         public void setPercentage(double percentage) { this.percentage = percentage; }
     }
 
+    /**
+     * One line of the person's incentive plan. label/amount are ready-made English text; the
+     * structured fields (metric, basis, rate, threshold, reward…) let the app word it in the
+     * user's language. type is the metric code, TARGET_BONUS, or NONE (no plan).
+     */
     public static class CommissionStructureItemDTO {
         private String type;
         private String label;
         private String amount;
+        private String metric;
+        private String basis;
+        private java.math.BigDecimal rate;
+        private Integer minUnits;
+        private java.math.BigDecimal capAmount;
+        private java.math.BigDecimal thresholdPct;
+        private String rewardType;
+        private java.math.BigDecimal rewardValue;
 
         public CommissionStructureItemDTO() {}
 
@@ -212,6 +225,23 @@ public class StaffLedgerResponseDTO {
             this.label = label;
             this.amount = amount;
         }
+
+        public String getMetric() { return metric; }
+        public void setMetric(String metric) { this.metric = metric; }
+        public String getBasis() { return basis; }
+        public void setBasis(String basis) { this.basis = basis; }
+        public java.math.BigDecimal getRate() { return rate; }
+        public void setRate(java.math.BigDecimal rate) { this.rate = rate; }
+        public Integer getMinUnits() { return minUnits; }
+        public void setMinUnits(Integer minUnits) { this.minUnits = minUnits; }
+        public java.math.BigDecimal getCapAmount() { return capAmount; }
+        public void setCapAmount(java.math.BigDecimal capAmount) { this.capAmount = capAmount; }
+        public java.math.BigDecimal getThresholdPct() { return thresholdPct; }
+        public void setThresholdPct(java.math.BigDecimal thresholdPct) { this.thresholdPct = thresholdPct; }
+        public String getRewardType() { return rewardType; }
+        public void setRewardType(String rewardType) { this.rewardType = rewardType; }
+        public java.math.BigDecimal getRewardValue() { return rewardValue; }
+        public void setRewardValue(java.math.BigDecimal rewardValue) { this.rewardValue = rewardValue; }
 
         public String getType() { return type; }
         public void setType(String type) { this.type = type; }

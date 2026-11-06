@@ -86,7 +86,6 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: Radius.md,
     padding: Spacing.three,
-    marginBottom: Spacing.three,
     borderWidth: 1.5,
     gap: Spacing.two,
   },

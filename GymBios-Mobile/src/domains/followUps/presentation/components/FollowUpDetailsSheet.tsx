@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/shared/components/AppText';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 
 import { useTheme } from '@/core/hooks';
@@ -68,6 +69,8 @@ export function FollowUpDetailsSheet({
 }: FollowUpDetailsSheetProps) {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Modals draw edge-to-edge; pad the action footers past the system navigation bar.
+  const insets = useSafeAreaInsets();
 
   // Detail query hook (uses cached list item as placeholder)
   const { data: followUp, isLoading } = useFollowUp(followUpId ?? 0);
@@ -168,11 +171,16 @@ export function FollowUpDetailsSheet({
       visible={visible}
       animationType="slide"
       transparent
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onClose}
     >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable
-          style={[styles.modalSheet, { backgroundColor: theme.background }]}
+          style={[
+            styles.modalSheet,
+            { backgroundColor: theme.background, paddingBottom: Spacing.four + insets.bottom },
+          ]}
           onPress={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -390,11 +398,16 @@ export function FollowUpDetailsSheet({
         visible={addRecordVisible}
         animationType="slide"
         transparent
+        statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={() => setAddRecordVisible(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setAddRecordVisible(false)}>
           <Pressable
-            style={[styles.modalSheet, { backgroundColor: theme.background }]}
+            style={[
+            styles.modalSheet,
+            { backgroundColor: theme.background, paddingBottom: Spacing.four + insets.bottom },
+          ]}
             onPress={e => e.stopPropagation()}
           >
             <View style={styles.modalHeader}>

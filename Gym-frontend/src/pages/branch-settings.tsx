@@ -324,6 +324,12 @@ export function BranchSettingsTab({ branchId: id, readOnly = false }: BranchSett
                       ))}
                     </SelectContent>
                   </Select>
+                  {form.access_type && form.access_type !== "Mixed" && (
+                    <p className="text-xs text-gray-500">
+                      Only {form.access_type === "Ladies Only" ? "female" : "male"} members can join or check in here,
+                      and the app hides this branch from everyone else. Transgender, other or blank gender: Mixed branches only.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "Toutes les priorités",
       "allStaff": "Tout le personnel"
     },
+    "form": {
+      "addTitle": "Nouveau suivi",
+      "editTitle": "Modifier le suivi",
+      "subtitle": "Planifiez le prochain contact avec un prospect",
+      "create": "Créer le suivi",
+      "addButton": "Ajouter un suivi",
+      "whoSection": "QUI",
+      "detailsSection": "DÉTAILS",
+      "scheduleSection": "PLANIFICATION",
+      "notesSection": "NOTES",
+      "minutes": "{{count}} min"
+    },
     "msg": {
       "selectMemberOrLead": "Veuillez sélectionner un membre ou un prospect.",
       "subjectRequired": "L'objet de la relance est obligatoire.",

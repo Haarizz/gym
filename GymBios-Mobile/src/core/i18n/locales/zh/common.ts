@@ -101,6 +101,7 @@ const common = {
 
   validation: {
     fullNameRequired: '请输入姓名',
+    genderRequired: '请选择性别',
     phoneRequired: '请输入手机号码',
     emergencyContactRequired: '请输入紧急联系人姓名',
     emergencyPhoneRequired: '请输入紧急联系电话',

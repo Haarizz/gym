@@ -484,6 +484,7 @@ public class StaffService {
         // outlive their trainer, so just unassign them.
         staffAttendanceRepository.deleteByStaffId(id);
         staffTargetRepository.deleteByStaffId(id);
+        staffTargetRepository.deleteEngineTargetsByStaffId(id);
         trainingSessionRepository.clearTrainer(id);
         trainingStreamRepository.clearInstructor(id);
         staffBranchRepository.deleteByStaffId(id);

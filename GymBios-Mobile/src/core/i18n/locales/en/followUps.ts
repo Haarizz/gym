@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "All Priorities",
       "allStaff": "All Staff"
     },
+    "form": {
+      "addTitle": "New Follow-up",
+      "editTitle": "Edit Follow-up",
+      "subtitle": "Plan the next touchpoint with a lead",
+      "create": "Create Follow-up",
+      "addButton": "Add New Follow-up",
+      "whoSection": "WHO",
+      "detailsSection": "DETAILS",
+      "scheduleSection": "SCHEDULE",
+      "notesSection": "NOTES",
+      "minutes": "{{count}} min"
+    },
     "msg": {
       "selectMemberOrLead": "Please select a member or lead.",
       "subjectRequired": "Follow-up subject is required.",

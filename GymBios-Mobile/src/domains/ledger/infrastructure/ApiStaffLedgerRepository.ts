@@ -31,6 +31,14 @@ interface RawCommissionItem {
   type?: string;
   label: string;
   amount: string | number;
+  metric?: string | null;
+  basis?: 'percent_of_amount' | 'fixed_per_unit' | null;
+  rate?: number | null;
+  min_units?: number | null;
+  cap_amount?: number | null;
+  threshold_pct?: number | null;
+  reward_type?: 'fixed' | 'percent_of_metric_amount' | null;
+  reward_value?: number | null;
 }
 
 interface RawRecentEarning {
@@ -100,8 +108,17 @@ export class ApiStaffLedgerRepository {
         percentage: item.percentage ?? 0,
       })),
       commissionStructure: (raw.commissionStructure || raw.commission_structure || []).map((item) => ({
+        type: item.type,
         label: item.label,
         value: String(item.amount),
+        metric: item.metric ?? undefined,
+        basis: item.basis ?? undefined,
+        rate: item.rate ?? undefined,
+        minUnits: item.min_units ?? null,
+        capAmount: item.cap_amount ?? null,
+        thresholdPct: item.threshold_pct ?? undefined,
+        rewardType: item.reward_type ?? undefined,
+        rewardValue: item.reward_value ?? undefined,
       })),
       recentEarnings: (raw.recentEarnings || raw.recent_earnings || []).map((item) => ({
         id: item.id,

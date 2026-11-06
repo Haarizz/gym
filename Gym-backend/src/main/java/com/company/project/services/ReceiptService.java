@@ -142,6 +142,12 @@ public class ReceiptService {
      * handled it (via an explicit staff picker), instead of always crediting whichever
      * account happened to be authenticated when the receipt was created.
      */
+    /** The picked staff member's id when it names a real employee (credited by the performance ledger), else null. */
+    public Long resolveProcessedByStaffId(Long processedByStaffId) {
+        if (processedByStaffId == null) return null;
+        return staffRepository.findNameById(processedByStaffId).stream().anyMatch(Objects::nonNull) ? processedByStaffId : null;
+    }
+
     public String resolveProcessedByName(Long processedByStaffId) {
         if (processedByStaffId == null) return "Admin";
         // Name only, not the Staff entity: a staff member assigned to several branches
@@ -842,6 +848,7 @@ public class ReceiptService {
         r.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
         r.setMembershipType(member.getMembershipType());
         r.setProcessedBy(resolveProcessedByName(processedByStaffId));
+        r.setProcessedByStaffId(resolveProcessedByStaffId(processedByStaffId));
 
         Receipt saved = receiptRepository.save(r);
         saved.setReceiptNo("RCPT-" + String.format("%010d", saved.getId()));
@@ -885,6 +892,7 @@ public class ReceiptService {
         r.setValidFrom(LocalDateTime.now());
         r.setMembershipType("Walk-In");
         r.setProcessedBy(resolveProcessedByName(processedByStaffId));
+        r.setProcessedByStaffId(resolveProcessedByStaffId(processedByStaffId));
         r.setRemarks(remarks);
 
         Receipt saved = receiptRepository.save(r);
@@ -954,6 +962,7 @@ public class ReceiptService {
         r.setValidTill(minor.getMembershipEndDate() != null ? minor.getMembershipEndDate() : minor.getExpiryDate());
         r.setMembershipType(guardian.getMembershipType());
         r.setProcessedBy(resolveProcessedByName(processedByStaffId));
+        r.setProcessedByStaffId(resolveProcessedByStaffId(processedByStaffId));
         r.setRemarks("Charge for family member: " + minor.getName()
                 + (minor.getRelationshipToHead() != null ? " (" + minor.getRelationshipToHead() + ")" : ""));
         r.setMinorCharges(List.of(new com.company.project.dto.MinorChargeDTO(
@@ -1040,6 +1049,7 @@ public class ReceiptService {
         settlement.setValidTill(member.getMembershipEndDate() != null ? member.getMembershipEndDate() : member.getExpiryDate());
         settlement.setMembershipType(member.getMembershipType());
         settlement.setProcessedBy(resolveProcessedByName(req.getProcessedByStaffId()));
+        settlement.setProcessedByStaffId(resolveProcessedByStaffId(req.getProcessedByStaffId()));
         settlement.setRemarks(req.getRemarks());
         settlement.setLinkedBillId(soleBillId);
         // member.outstandingBalance was just finalized above (post-settlement), so this

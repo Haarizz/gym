@@ -91,6 +91,18 @@ const followUps = {
       "allPriorities": "所有优先级",
       "allStaff": "所有员工"
     },
+    "form": {
+      "addTitle": "新建跟进",
+      "editTitle": "编辑跟进",
+      "subtitle": "安排与潜在客户的下一次联系",
+      "create": "创建跟进",
+      "addButton": "添加新跟进",
+      "whoSection": "对象",
+      "detailsSection": "详情",
+      "scheduleSection": "日程",
+      "notesSection": "备注",
+      "minutes": "{{count}} 分钟"
+    },
     "msg": {
       "selectMemberOrLead": "请选择会员或潜在客户。",
       "subjectRequired": "跟进主题为必填项。",

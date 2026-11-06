@@ -1,6 +1,10 @@
 const membershipPlans = {
   "membershipPlans": {
     "list": {
+      "addBtn": "Neues Abo hinzufügen",
+      "kpiTotal": "Gesamt",
+      "kpiActive": "Aktiv",
+      "kpiOnOffer": "Im Angebot",
       "title": "Abonnements",
       "newSubscriptionBtn": "+ Neues Abonnement",
       "searchPlaceholder": "Abonnements nach Name oder Typ suchen...",
@@ -26,6 +30,21 @@ const membershipPlans = {
       "archived": "Archiviert"
     },
     "card": {
+      "offer": "Angebot",
+      "unlimitedSessions": "Unbegrenzte Einheiten",
+      "unlimitedMembers": "Unbegrenzte Mitglieder",
+      "durationDay_one": "{{count}} Tag",
+      "durationDay_other": "{{count}} Tage",
+      "durationWeek_one": "{{count}} Woche",
+      "durationWeek_other": "{{count}} Wochen",
+      "durationMonth_one": "{{count}} Monat",
+      "durationMonth_other": "{{count}} Monate",
+      "durationYear_one": "{{count}} Jahr",
+      "durationYear_other": "{{count}} Jahre",
+      "sessionsCount_one": "{{count}} Einheit",
+      "sessionsCount_other": "{{count}} Einheiten",
+      "familyMembers_one": "Bis zu {{count}} Mitglied",
+      "familyMembers_other": "Bis zu {{count}} Mitglieder",
       "price": "Preis",
       "duration": "Laufzeit",
       "familySize": "Familiengröße",
@@ -42,6 +61,8 @@ const membershipPlans = {
       "discardMsg": "Alle eingegebenen Daten gehen verloren.",
       "keepEditing": "Weiter bearbeiten",
       "discard": "Verwerfen",
+      "required": "Erforderlich",
+      "save": "Speichern",
       "stepIndicator": "Schritt {{current}} von {{total}}",
       "cancel": "Abbrechen",
       "back": "Zurück",

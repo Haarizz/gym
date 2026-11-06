@@ -224,19 +224,25 @@ export function LeadDetailsSheet({
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
                 {t('leads.details.leadScore')}
               </Text>
+              {lead.leadScore == null ? (
+                <Text style={[styles.fieldValue, { color: theme.textSecondary }]}>
+                  {t('leads.details.scoreNotSet')}
+                </Text>
+              ) : (
               <View style={styles.scoreWrap}>
                 <Text style={[styles.scoreNumber, { color: BrandColors.teal }]}>
-                  {lead.leadScore ?? 50}
+                  {lead.leadScore}
                 </Text>
                 <View style={[styles.scoreTrack, { backgroundColor: theme.border }]}>
                   <View
                     style={[
                       styles.scoreBar,
-                      { width: `${Math.min(100, Math.max(0, lead.leadScore ?? 50))}%` },
+                      { width: `${Math.min(100, Math.max(0, lead.leadScore))}%` },
                     ]}
                   />
                 </View>
               </View>
+              )}
             </View>
           </View>
         </View>

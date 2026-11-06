@@ -140,6 +140,7 @@ interface StatementResponse {
 interface StatementLineResponse {
   date?: string;
   receipt_no?: string;
+  invoice_no?: string;
   type?: string;
   description?: string;
   debit?: number;
@@ -359,6 +360,7 @@ export class ApiBillingRepository implements BillingRepository {
       lines: (response.lines ?? []).map(line => ({
         date: line.date,
         receiptNo: line.receipt_no,
+        invoiceNo: line.invoice_no,
         type: line.type as Statement['lines'][number]['type'],
         description: line.description,
         debit: line.debit,
