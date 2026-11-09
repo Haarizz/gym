@@ -1,4 +1,4 @@
-import{p as E,r as T,e as a,a as _,i as M,h as H,f as b,P as k,L as N,c as w,b as C}from"./index-Bxn7CKoc.js";import{r as A,M as c,I as x,A as $,Z as u,R as y,a as R}from"./theme-BVpU--hQ.js";const F=(t,s)=>`
+import{p as E,r as T,e as a,a as _,i as M,h as H,f as b,P as k,L as N,c as w,b as C}from"./index-D3hnRJ1j.js";import{r as A,M as c,I as x,A as $,Z as u,R as y,a as R}from"./theme-CXfR9sSq.js";const F=(t,s)=>`
   @page { size: A4 ${t?"landscape":"portrait"}; margin: 15mm 14mm 17mm 14mm;
     @bottom-left { content: "${s.replace(/["\\]/g,"")}"; font: 7.5pt ${k}; color: ${c}; }
     @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt ${k}; color: ${c}; }
