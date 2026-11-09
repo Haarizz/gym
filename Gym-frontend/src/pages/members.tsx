@@ -315,7 +315,8 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
   // Active add-ons per member (member_db_id -> add-on names), shown as
   // "+ addon" under Plan Type in the member directory table.
-  const [memberActiveAddons, setMemberActiveAddons] = useState<Record<string, string[]>>({});
+  // Active add-ons / facility access per member (by internal id), for the Membership column's split.
+  const [memberActiveAddons, setMemberActiveAddons] = useState<Record<string, { name: string; amount: number; facility: boolean }[]>>({});
 
   // Renew Family dialog (family_head billing mode — one invoice for the whole
   // family, recalculated from the plan's price-per-member × current headcount)
@@ -530,11 +531,16 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   useEffect(() => {
     addonsService.getAddons({ status: 'Active' }, { limit: 500 })
       .then(res => {
-        const map: Record<string, string[]> = {};
+        const map: Record<string, { name: string; amount: number; facility: boolean }[]> = {};
         res.addons.forEach(addon => {
           const key = String(addon.member_db_id);
           if (!map[key]) map[key] = [];
-          map[key].push(addon.addon_name);
+          map[key].push({
+            name: addon.addon_name,
+            amount: Number(addon.amount) || 0,
+            // Facility access sold from a facility (Plans & Services › facilities) vs a catalogue add-on.
+            facility: addon.facility_id != null || String(addon.category || '').toLowerCase() === 'facility',
+          });
         });
         setMemberActiveAddons(map);
       })
@@ -943,6 +949,10 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       default: return 'bg-slate-100 text-slate-700';
     }
   };
+
+  // Amounts in the Membership column's split: whole numbers stay whole, otherwise 2 decimals.
+  const formatSplitAmount = (n: number) =>
+    (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(Number(n) || 0) ? 0 : 2, maximumFractionDigits: 2 });
 
   // Helper function to get plan type
   const getPlanDetails = (member: Member) => {
@@ -1797,12 +1807,29 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                               {planDetails.plan}
                               {planDetails.addons.length > 0 && (
                                 <span className="text-xs font-normal text-slate-500">
-                                  {' '}+ {planDetails.addons.join(', ')}
+                                  {' '}+ {planDetails.addons.map(a => a.name).join(', ')}
                                 </span>
                               )}
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              <CurrencyGlyph /> {getDisplayFee(member)}
+                            {/* One line: plan fee, then each add-on / facility amount (same order as the
+                                names above) and the total; hover for the itemised split. */}
+                            <div className="text-sm text-muted-foreground" style={{ whiteSpace: 'nowrap' }}
+                              title={planDetails.addons.length > 0
+                                ? [`Membership: ${formatSplitAmount(getDisplayFee(member))}`,
+                                   ...planDetails.addons.map(a => `${a.name} (${a.facility ? 'Facility' : 'Add-on'}): ${formatSplitAmount(a.amount)}`),
+                                   `Total: ${formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}`].join('\n')
+                                : undefined}>
+                              <CurrencyGlyph /> {planDetails.addons.length === 0
+                                ? getDisplayFee(member)
+                                : <>
+                                    {formatSplitAmount(getDisplayFee(member))}
+                                    {planDetails.addons.length <= 3
+                                      ? planDetails.addons.map((a, i) => <span key={i}> + {formatSplitAmount(a.amount)}</span>)
+                                      : <span> + {formatSplitAmount(planDetails.addons.reduce((sum, a) => sum + a.amount, 0))} add-ons</span>}
+                                    <span className="font-semibold text-slate-600">
+                                      {' '}= <CurrencyGlyph /> {formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}
+                                    </span>
+                                  </>}
                               <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${getMembershipCategoryBadgeClass(membershipCategory)}`}>
                                 {membershipCategory.charAt(0).toUpperCase() + membershipCategory.slice(1)}
                               </span>
