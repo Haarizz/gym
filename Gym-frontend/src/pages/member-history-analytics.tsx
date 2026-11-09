@@ -48,7 +48,7 @@ import {
   ChevronRight,
   X,
   UserX,
-  Eye,
+  Printer,
   Snowflake,
   Loader2,
   PauseCircle,
@@ -95,7 +95,8 @@ import type { ReferralReward, Wallet as RewardWallet } from '../utils/supabase/r
 import { referralService } from '../utils/supabase/referral-service';
 import type { ReferralResponse } from '../utils/supabase/referral-service';
 import { receiptsService } from '../utils/supabase/receipts-service';
-import { downloadReceiptInvoice } from '../utils/receipt-invoice';
+import { downloadReceiptInvoice, downloadPaymentReceipt } from '../utils/receipt-invoice';
+import { useInvoiceTitle } from '../utils/company-details';
 import s from './member-history-analytics.module.css';
 import { MemberFreezeDialog } from "../components/members/MemberFreezeDialog";
 import { SubscriptionTimeline } from '../components/members/SubscriptionTimeline';
@@ -195,6 +196,7 @@ interface TimelineItem {
 
 export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAnalyticsProps) {
   const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
+  const invoiceLabel = useInvoiceTitle();
 
   // ── Core data ──────────────────────────────────────────────────────────
   const [member, setMember] = useState<Member | null>(null);
@@ -573,13 +575,20 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
     }
   };
 
-  const handleViewReceiptLine = async (lineId?: number) => {
-    if (!lineId) { toast.error('No receipt available for this line'); return; }
+  // Transactions tab: print a line's payment Receipt or its (Tax) Invoice — the same two
+  // documents Billing prints. `printing` is "<line id>:<kind>" while one is being prepared.
+  const [printing, setPrinting] = useState<string | null>(null);
+  const handlePrintLine = async (lineId: number | undefined, kind: 'receipt' | 'invoice') => {
+    if (!lineId) { toast.error('No receipt is linked to this transaction'); return; }
+    setPrinting(`${lineId}:${kind}`);
     try {
       const receipt = await receiptsService.getReceiptById(String(lineId));
-      downloadReceiptInvoice(receipt, currencyCode);
+      if (kind === 'receipt') await downloadPaymentReceipt(receipt, currencyCode);
+      else await downloadReceiptInvoice(receipt, currencyCode);
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to open receipt');
+      toast.error(e?.message || `Failed to print the ${kind === 'receipt' ? 'receipt' : invoiceLabel.toLowerCase()}`);
+    } finally {
+      setPrinting(null);
     }
   };
 
@@ -1769,7 +1778,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                               <TableHead className="table-header">Mode</TableHead>
                               <TableHead className="table-header text-right">Amount ({currencySymbol})</TableHead>
                               <TableHead className="table-header">Remarks</TableHead>
-                              <TableHead className="table-header text-center">Actions</TableHead>
+                              <TableHead className="table-header text-center">Print</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1797,14 +1806,28 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
                                 </TableCell>
                                 <TableCell className="text-gray-600">{line.description}</TableCell>
                                 <TableCell>
-                                  <div className="flex items-center justify-center">
+                                  <div className="flex items-center justify-center gap-2" style={{ whiteSpace: 'nowrap' }}>
                                     <Button
-                                      variant="ghost"
+                                      variant="outline"
                                       size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-blue-50 group"
-                                      onClick={() => handleViewReceiptLine(line.id)}
+                                      className="h-8"
+                                      disabled={!line.id || printing !== null}
+                                      title={`Print the payment receipt for ${line.receipt_no}`}
+                                      onClick={() => handlePrintLine(line.id, 'receipt')}
                                     >
-                                      <Eye className="h-4 w-4 text-gray-600 group-hover:text-blue-600" />
+                                      <Printer className="h-4 w-4 mr-1" />
+                                      {printing === `${line.id}:receipt` ? 'Opening…' : 'Receipt'}
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8"
+                                      disabled={!line.id || printing !== null}
+                                      title={`Print the ${invoiceLabel.toLowerCase()} for ${line.invoice_no || line.receipt_no}`}
+                                      onClick={() => handlePrintLine(line.id, 'invoice')}
+                                    >
+                                      <FileText className="h-4 w-4 mr-1" />
+                                      {printing === `${line.id}:invoice` ? 'Opening…' : invoiceLabel}
                                     </Button>
                                   </div>
                                 </TableCell>

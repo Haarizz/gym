@@ -1811,25 +1811,38 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
                                 </span>
                               )}
                             </div>
-                            {/* One line: plan fee, then each add-on / facility amount (same order as the
-                                names above) and the total; hover for the itemised split. */}
-                            <div className="text-sm text-muted-foreground" style={{ whiteSpace: 'nowrap' }}
-                              title={planDetails.addons.length > 0
-                                ? [`Membership: ${formatSplitAmount(getDisplayFee(member))}`,
-                                   ...planDetails.addons.map(a => `${a.name} (${a.facility ? 'Facility' : 'Add-on'}): ${formatSplitAmount(a.amount)}`),
-                                   `Total: ${formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}`].join('\n')
-                                : undefined}>
-                              <CurrencyGlyph /> {planDetails.addons.length === 0
-                                ? getDisplayFee(member)
-                                : <>
-                                    {formatSplitAmount(getDisplayFee(member))}
-                                    {planDetails.addons.length <= 3
-                                      ? planDetails.addons.map((a, i) => <span key={i}> + {formatSplitAmount(a.amount)}</span>)
-                                      : <span> + {formatSplitAmount(planDetails.addons.reduce((sum, a) => sum + a.amount, 0))} add-ons</span>}
-                                    <span className="font-semibold text-slate-600">
-                                      {' '}= <CurrencyGlyph /> {formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}
+                            {/* The total the member pays (plan + active add-ons / facility access); hover
+                                it for the split. */}
+                            <div className="text-sm text-muted-foreground" style={{ whiteSpace: 'nowrap' }}>
+                              {planDetails.addons.length === 0 ? (
+                                <><CurrencyGlyph /> {getDisplayFee(member)}</>
+                              ) : (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span tabIndex={0} className="font-semibold text-slate-600"
+                                      style={{ cursor: 'help', borderBottom: '1px dotted currentColor' }}
+                                      aria-label={`Total ${formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}, hover for the split`}>
+                                      <CurrencyGlyph /> {formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}
                                     </span>
-                                  </>}
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="start">
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: 16, rowGap: 2, fontSize: 12 }}>
+                                      <span>Membership</span>
+                                      <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><CurrencyGlyph /> {formatSplitAmount(getDisplayFee(member))}</span>
+                                      {planDetails.addons.map((a, i) => (
+                                        <React.Fragment key={i}>
+                                          <span>{a.name} · {a.facility ? 'Facility' : 'Add-on'}</span>
+                                          <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><CurrencyGlyph /> {formatSplitAmount(a.amount)}</span>
+                                        </React.Fragment>
+                                      ))}
+                                      <span style={{ fontWeight: 600, borderTop: '1px solid currentColor', paddingTop: 2, marginTop: 2 }}>Total</span>
+                                      <span style={{ fontWeight: 600, borderTop: '1px solid currentColor', paddingTop: 2, marginTop: 2, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                        <CurrencyGlyph /> {formatSplitAmount(getDisplayFee(member) + planDetails.addons.reduce((sum, a) => sum + a.amount, 0))}
+                                      </span>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                               <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-medium ${getMembershipCategoryBadgeClass(membershipCategory)}`}>
                                 {membershipCategory.charAt(0).toUpperCase() + membershipCategory.slice(1)}
                               </span>
