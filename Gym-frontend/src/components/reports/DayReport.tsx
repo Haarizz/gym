@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from "react";
 import { endOfMonth, format, parseISO, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
 import {
-  AlertCircle, BarChart3, CalendarDays, ClipboardList, Copy, CreditCard, Download, FileText, Loader2, Printer,
-  Receipt, ShoppingBag, ShoppingCart, Snowflake, TrendingDown, TrendingUp, UserCheck, UserPlus, Users, Wallet,
+  AlertCircle, BarChart3, CalendarDays, ClipboardList, Copy, CreditCard, FileText, Loader2,
+  Receipt, Scale, ShoppingBag, ShoppingCart, Snowflake, TrendingDown, TrendingUp, UserCheck, UserPlus, Users, Wallet,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell as PieCell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer,
@@ -17,11 +17,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { DatePickerField } from "../shared/DatePickerField";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { authService } from "../../utils/supabase/auth-service";
-import { buildXlsx, downloadBlob } from "../../utils/xlsx-export";
+import { downloadBlob } from "../../utils/xlsx-export";
+import { ReportActions, type ReportDocument, type ReportSection, chartFromRows, kpiSection, pieSection } from "../report-export";
 import {
-  type Block, type DayReportData, type Row, blocksToText, blocksToXlsx, buildBlocks, cellText, hourLabel,
-  money, num, periodLabel, rightAligned, sum,
+  type Block, type DayReportData, type Row, blocksToSections, blocksToText, buildBlocks, cellText, hourLabel,
+  money, num, pendingExpenses, periodLabel, rightAligned, spentExpenses, sum,
 } from "./dayReportBlocks";
+import { buildSummary, buildSummaryBlocks } from "./revenueSummary";
+import { RevenueSummaryView } from "./RevenueSummaryView";
 import styles from "./DayReport.module.css";
 
 const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
@@ -30,7 +33,7 @@ const CHART_COLORS = ["var(--gb-primary-deep)", "#3B82F6", "#F59E0B", "#8B5CF6",
 const VIEW_KEY = "dayReport.view";
 
 type Preset = "today" | "yesterday" | "last7" | "thisWeek" | "thisMonth" | "lastMonth" | "custom";
-type View = "graph" | "text";
+type View = "graph" | "text" | "summary";
 
 const PRESETS: { id: Exclude<Preset, "custom">; label: string }[] = [
   { id: "today", label: "Today" },
@@ -59,7 +62,10 @@ function presetRange(p: Exclude<Preset, "custom">): [string, string] {
 }
 
 const readView = (): View => {
-  try { return localStorage.getItem(VIEW_KEY) === "text" ? "text" : "graph"; } catch { return "graph"; }
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === "text" || v === "summary" ? v : "graph";
+  } catch { return "graph"; }
 };
 
 const Money = ({ v }: { v: unknown }) => <><CurrencyGlyph /> {money(v)}</>;
@@ -179,7 +185,8 @@ function TextReport({ title, subtitle, blocks }: { title: string; subtitle: stri
  * Reports → Day Report: pick a day (today, yesterday, any date) or a range (last 7 days,
  * this/last month, custom) and see everything that happened — collections, member receipts,
  * POS sales, invoices, purchases, expenses, payments out, membership activity, attendance
- * and leads. Graphical view (charts) or Text view (numbers and words only); printable,
+ * and leads. Graphical view (charts), Text view (numbers and words only) or Summary
+ * (total revenue minus expenses, with graphs: RevenueSummaryView); printable,
  * copyable as text and exportable to Excel.
  */
 export function DayReport() {
@@ -226,21 +233,23 @@ export function DayReport() {
 
   const blocks = useMemo(() => (data ? buildBlocks(data) : []), [data]);
   const block = (id: string) => blocks.find((b) => b.id === id)!;
+  // Summary view: revenue − expenses only, with its own blocks for text / Excel / print
+  const summary = useMemo(() => (data ? buildSummary(data) : null), [data]);
+  const summaryBlocks = useMemo(() => (summary ? buildSummaryBlocks(summary, currencyCode) : []), [summary, currencyCode]);
+  const isSummary = view === "summary";
 
   const range = !!data && (data.from || data.date) !== (data.to || data.date);
   const period = data ? periodLabel(data) : "";
-  const reportTitle = range ? `Report — ${period}` : `Day Report — ${period}`;
+  const reportTitle = isSummary
+    ? `Revenue Summary — ${period}`
+    : range ? `Report — ${period}` : `Day Report — ${period}`;
   const subtitle = `Generated ${format(new Date(), "dd/MM/yyyy hh:mm a")} · Amounts in ${currencyCode}`;
-  const fileBase = data ? (range ? `report-${data.from}_to_${data.to}` : `day-report-${data.from || data.date}`) : "day-report";
+  const fileBase = (data ? (range ? `report-${data.from}_to_${data.to}` : `day-report-${data.from || data.date}`) : "day-report")
+    .replace(/^(day-)?report/, isSummary ? "revenue-summary" : "$&");
+  const exportBlocks = isSummary ? summaryBlocks : blocks;
 
-  const exportExcel = () => {
-    if (!data) return;
-    const { rows, bold } = blocksToXlsx(range ? "Report" : "Day Report", period, currencyCode, blocks);
-    const blob = buildXlsx("Day Report", rows, { boldRows: bold, columnWidths: [22, 22, 24, 16, 16, 14, 14, 14, 14, 16, 16] });
-    downloadBlob(blob, `${fileBase}.xlsx`);
-    toast.success("Report exported");
-  };
-  const plainText = () => blocksToText(reportTitle, subtitle, blocks);
+
+  const plainText = () => blocksToText(reportTitle, subtitle, exportBlocks);
   const copyText = async () => {
     try {
       await navigator.clipboard.writeText(plainText());
@@ -257,7 +266,10 @@ export function DayReport() {
   const err = (k: string) => data?.errors?.[k];
   const rev = data?.revenue;
   const collection = num(rev?.totalCollection?.total);
-  const expensesTotal = sum(data?.expenses, "amount");
+  // Deducted from collection: approved / paid only (the Revenue Dashboard rule); pending ones aren't
+  const spentList = spentExpenses(data?.expenses);
+  const pendingList = pendingExpenses(data?.expenses);
+  const expensesTotal = sum(spentList, "amount");
   const purchasesTotal = sum(data?.supplierBills, "total");
   const paymentsOut = sum(data?.paymentVouchers, "amount");
   const net = collection - expensesTotal;
@@ -289,6 +301,41 @@ export function DayReport() {
       ]
     : [];
 
+  // Export / print: the selected view's figures, tables and graphs.
+  const buildReport = (): ReportDocument => {
+    if (!data) throw new Error("Generate the report first");
+    const from = data.from || data.date;
+    const to = data.to || data.date;
+    const base = {
+      period: { from, to, label: range ? undefined : format(parseISO(from), "EEEE") },
+      filters: [{ label: "View", value: isSummary ? "Revenue summary" : view === "text" ? "Text" : "Graphical" }],
+    };
+    if (isSummary) {
+      return { ...base, title: range ? "Revenue Summary" : "Day Revenue Summary", fileName: "Revenue Summary", sections: blocksToSections(exportBlocks) };
+    }
+    const sections: ReportSection[] = [
+      kpiSection([
+        { label: "Total collection", value: collection, format: "money" },
+        { label: "Expenses (spent)", value: expensesTotal, format: "money", hint: pendingList.length ? `${pendingList.length} pending not deducted` : undefined },
+        { label: `Net for the ${periodWord}`, value: net, format: "money", tone: net >= 0 ? "good" : "bad" },
+        { label: "Supplier purchases", value: purchasesTotal, format: "money" },
+        { label: "Payments out", value: paymentsOut, format: "money" },
+      ], "Summary"),
+    ];
+    if (range && daily.length) {
+      sections.push(chartFromRows("Collection vs expenses by day", "line", daily, "day", [
+        { key: "Collection", name: "Collection", color: "#2a78d6" }, { key: "Expenses", name: "Expenses", color: "#eb6834" },
+      ], { valueFormat: "money" }));
+    } else if (hourly.length) {
+      sections.push(chartFromRows("Collection by hour", "bar", hourly, "hour", [{ key: "Collection", name: "Collection", color: "#2a78d6" }], { valueFormat: "money" }));
+      sections.push(chartFromRows("Check-ins by hour", "bar", hourly, "hour", [{ key: "Check-ins", name: "Check-ins", color: "#1baf7a" }], { valueFormat: "integer" }));
+    }
+    if (methods.length) sections.push(pieSection("Collection by payment method", methods.map((m: Row) => ({ label: m.name, value: m.value })), { valueFormat: "money" }));
+    if (streams.some((s) => s.amount)) sections.push(chartFromRows("Revenue streams", "hbar", streams, "stream", [{ key: "amount", name: "Amount", color: "#6250d6" }], { valueFormat: "money" }));
+    sections.push(...blocksToSections(blocks));
+    return { ...base, title: range ? "Period Report" : "Day Report", sections };
+  };
+
   return (
     <div className="space-y-6" id="day-report-print">
       <style>{`
@@ -310,7 +357,7 @@ export function DayReport() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" />Day Report</CardTitle>
-              <CardDescription>Everything that happened on a day or over a period — sales, purchases, expenses, members, attendance and more</CardDescription>
+              <CardDescription>Everything that happened on a day or over a period. Graphical and Text show every section; Summary shows only revenue minus expenses, with graphs</CardDescription>
             </div>
             <div className={styles.segmented} role="group" aria-label="Report view">
               <button type="button" aria-pressed={view === "graph"} onClick={() => setView("graph")}>
@@ -318,6 +365,10 @@ export function DayReport() {
               </button>
               <button type="button" aria-pressed={view === "text"} onClick={() => setView("text")}>
                 <FileText className="h-4 w-4" />Text
+              </button>
+              <button type="button" aria-pressed={view === "summary"} onClick={() => setView("summary")}
+                title="Total revenue minus expenses, with graphs">
+                <Scale className="h-4 w-4" />Summary
               </button>
             </div>
           </div>
@@ -360,13 +411,8 @@ export function DayReport() {
             )}
             {data && (
               <>
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="h-4 w-4 mr-2" />Print
-                </Button>
-                <Button variant="outline" onClick={exportExcel}>
-                  <Download className="h-4 w-4 mr-2" />Export Excel
-                </Button>
-                {view === "text" && (
+                <ReportActions report={buildReport} size="default" disabled={loading} menuLabel={isSummary ? "Revenue summary" : range ? "Period report" : "Day report"} />
+                {(view === "text" || view === "summary") && (
                   <>
                     <Button variant="outline" onClick={copyText}>
                       <Copy className="h-4 w-4 mr-2" />Copy Text
@@ -391,6 +437,8 @@ export function DayReport() {
         </Card>
       ) : view === "text" ? (
         <TextReport title={reportTitle} subtitle={subtitle} blocks={blocks} />
+      ) : view === "summary" && summary ? (
+        <RevenueSummaryView s={summary} blocks={summaryBlocks} title={reportTitle} subtitle={subtitle} currencyCode={currencyCode} />
       ) : (
         <>
           <div>
@@ -402,7 +450,7 @@ export function DayReport() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Total Collection", value: <Money v={collection} />, sub: `${num(rev?.totalCollection?.count)} transactions`, icon: Wallet, tone: "text-emerald-700", chip: "bg-emerald-50" },
-              { label: "Expenses", value: <Money v={expensesTotal} />, sub: `${(data.expenses || []).length} expenses`, icon: TrendingDown, tone: "text-red-700", chip: "bg-red-50" },
+              { label: "Expenses", value: <Money v={expensesTotal} />, sub: `${spentList.length} approved / paid${pendingList.length ? ` · ${pendingList.length} awaiting approval` : ""}`, icon: TrendingDown, tone: "text-red-700", chip: "bg-red-50" },
               { label: "Net (Collection − Expenses)", value: <Money v={net} />, sub: net >= 0 ? `Profit for the ${periodWord}` : `Loss for the ${periodWord}`, icon: TrendingUp, tone: net >= 0 ? "text-teal-700" : "text-red-700", chip: "bg-teal-50" },
               { label: "Purchases", value: <Money v={purchasesTotal} />, sub: `${(data.supplierBills || []).length} bills · ${(data.purchaseOrders || []).length} POs`, icon: ShoppingCart, tone: "text-amber-700", chip: "bg-amber-50" },
               { label: "Payments Out", value: <Money v={paymentsOut} />, sub: `${(data.paymentVouchers || []).length} vouchers`, icon: CreditCard, tone: "text-purple-700", chip: "bg-purple-50" },

@@ -28,7 +28,7 @@ import { PeriodComparison } from "../components/reports/PeriodComparison";
 import { PAY_METHOD_ORDER, splitPaid } from "../utils/payment-split";
 import { toast } from "sonner";
 import { receiptsService, Receipt } from '../utils/supabase/receipts-service';
-import { withPrintFont } from "../utils/print-font";
+import { ReportActions, type ReportDocument, col, moneyCol, kpiSection, tableSection, pieSection } from "../components/report-export";
 
 interface CustomReportsProps {
   onNavigate?: (section: string) => void;
@@ -111,13 +111,11 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
   const today = toLocalDateStr(new Date());
   const yesterday = toLocalDateStr(new Date(Date.now() - 86400000));
 
-  // Filter data based on date range
-  const filteredByDate = useMemo(() => {
-    if (dateRange === 'all') return reportData;
-
+  // Selected date window as local yyyy-MM-dd bounds (inclusive)
+  const rangeBounds = (): { startDate: string; endDate: string } | null => {
+    if (dateRange === 'all') return null;
     let startDate = today;
     let endDate = today;
-
     if (dateRange === 'yesterday') {
       startDate = yesterday;
       endDate = yesterday;
@@ -125,21 +123,23 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
       const d = new Date();
       d.setDate(d.getDate() - 6);
       startDate = toLocalDateStr(d);
-      endDate = today;
     } else if (dateRange === 'month') {
       const d = new Date();
       d.setDate(d.getDate() - 29);
       startDate = toLocalDateStr(d);
-      endDate = today;
     } else if (dateRange === 'custom') {
       startDate = customStartDate || today;
       endDate = customEndDate || today;
     }
+    return { startDate, endDate };
+  };
 
-    return reportData.filter(record => {
-      const recordDate = record.transactionDate;
-      return recordDate >= startDate && recordDate <= endDate;
-    });
+  // Filter data based on date range
+  const filteredByDate = useMemo(() => {
+    const b = rangeBounds();
+    if (!b) return reportData;
+    return reportData.filter(record => record.transactionDate >= b.startDate && record.transactionDate <= b.endDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportData, dateRange, customStartDate, customEndDate, today, yesterday]);
 
   // Filter by transaction type
@@ -181,68 +181,6 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
   }, [filteredData]);
 
 
-  // Export functions
-  const downloadBlob = (filename: string, blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const toCsvCell = (value: unknown) => {
-    const s = value == null ? "" : String(value);
-    const escaped = s.replaceAll('"', '""');
-    return `"${escaped}"`;
-  };
-
-  const buildCsv = (rows: ReportRecord[]) => {
-    const header = [
-      "#",
-      "Member ID",
-      "Member Name",
-      "Mobile",
-      "Membership Type",
-      "Transaction Type",
-      "Plan",
-      `Amount (${currencyCode})`,
-      "Payment Mode",
-      `Due (${currencyCode})`,
-      "Due Date",
-      "Transaction Date",
-    ];
-    const lines = [
-      header.map(toCsvCell).join(","),
-      ...rows.map((r, i) => ([
-        i + 1,
-        r.memberId,
-        r.memberName,
-        r.mobile,
-        r.membershipType,
-        r.transactionType,
-        r.planName,
-        r.planAmount,
-        r.paymentMode,
-        r.dueAmount,
-        r.dueDate ?? "",
-        r.transactionDate,
-      ]).map(toCsvCell).join(",")),
-    ];
-    return lines.join("\n");
-  };
-
-  const getRangeLabel = () => {
-    if (dateRange === "today") return today;
-    if (dateRange === "yesterday") return yesterday;
-    if (dateRange === "week") return "last_7_days";
-    if (dateRange === "month") return "last_30_days";
-    if (dateRange === "all") return "all_time";
-    return `${customStartDate || today}_to_${customEndDate || today}`;
-  };
-
   const getRangeDisplayLabel = () => {
     switch (dateRange) {
       case 'today': return 'Today';
@@ -254,114 +192,50 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
     }
   };
 
-  const handleExportCSV = () => {
-    const csv = buildCsv(filteredData);
-    downloadBlob(`custom-reports_${getRangeLabel()}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    toast.success("CSV downloaded");
-  };
-
-  const handleExportExcel = () => {
-    // Simple HTML table export that Excel can open.
-    const rows = filteredData;
-    const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-        </head>
-        <body>
-          <table border="1" cellspacing="0" cellpadding="4">
-            <thead>
-              <tr>
-                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
-                <th>Transaction Type</th><th>Plan</th><th>Amount (${currencyCode})</th><th>Payment Mode</th><th>Due (${currencyCode})</th><th>Due Date</th><th>Transaction Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map((r, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td>${r.memberId}</td>
-                  <td>${r.memberName}</td>
-                  <td>${r.mobile}</td>
-                  <td>${r.membershipType || ""}</td>
-                  <td>${r.transactionType}</td>
-                  <td>${r.planName}</td>
-                  <td>${r.planAmount}</td>
-                  <td>${r.paymentMode}</td>
-                  <td>${r.dueAmount}</td>
-                  <td>${r.dueDate ?? ""}</td>
-                  <td>${r.transactionDate}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `.trim();
-    downloadBlob(`custom-reports_${getRangeLabel()}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
-    toast.success("Excel downloaded");
-  };
-
-  const handleExportPDF = () => {
-    // Print-friendly HTML export (browser Save as PDF)
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast.error("Popup blocked. Please allow popups to export PDF.");
-      return;
-    }
-    const rangeLabel = getRangeLabel().replaceAll("_", " ");
-    const rows = filteredData;
-    w.document.write(withPrintFont(`
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Custom Reports</title>
-          <style>
-            body { font-family: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 24px; }
-            h1 { margin: 0 0 6px; font-size: 18px; }
-            .sub { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
-            th { background: #f9fafb; }
-            .right { text-align: right; }
-          </style>
-        </head>
-        <body>
-          <h1>Membership Report (Detailed)</h1>
-          <div class="sub">Range: ${rangeLabel} • Records: ${rows.length}</div>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th><th>Member ID</th><th>Member Name</th><th>Mobile</th><th>Membership Type</th>
-                <th>Transaction</th><th>Plan</th><th class="right">Amount (${currencyCode})</th><th>Pay Mode</th><th class="right">Due</th><th>Due Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map((r, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td>${r.memberId}</td>
-                  <td>${r.memberName}</td>
-                  <td>${r.mobile}</td>
-                  <td>${r.membershipType || ""}</td>
-                  <td>${r.transactionType}</td>
-                  <td>${r.planName}</td>
-                  <td class="right">${r.planAmount.toLocaleString()}</td>
-                  <td>${r.paymentMode}</td>
-                  <td class="right">${r.dueAmount ? r.dueAmount.toLocaleString() : "-"}</td>
-                  <td>${r.dueDate ?? "-"}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-          <script>
-            window.onload = () => { (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => window.print()); };
-          </script>
-        </body>
-      </html>
-    `));
-    w.document.close();
-    toast.success("Print dialog opened (Save as PDF)");
+  // Export / print: every receipt in the selected window (the screen lists the latest 500),
+  // with the same type and search filters and the same summary maths.
+  const buildMembershipReport = async (): Promise<ReportDocument> => {
+    const b = rangeBounds();
+    const local = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+    const window = b ? { from: local(b.startDate), to: new Date(local(b.endDate).getTime() + 86400000) } : {};
+    const all = (await receiptsService.getAllReceipts(window)).map(mapReceiptToRecord);
+    const q = searchQuery.toLowerCase();
+    const rows = all
+      .filter(r => !b || (r.transactionDate >= b.startDate && r.transactionDate <= b.endDate))
+      .filter(r => transactionTypeFilter === 'all' || r.transactionType === transactionTypeFilter)
+      .filter(r => !q || r.memberName.toLowerCase().includes(q) || r.memberId.toLowerCase().includes(q) || r.mobile.includes(q))
+      .sort((x, y) => (x.transactionDate < y.transactionDate ? 1 : x.transactionDate > y.transactionDate ? -1 : 0));
+    const byMethod: Record<string, number> = {};
+    rows.forEach(r => Object.entries(r.paidByMethod).forEach(([m, amt]) => { byMethod[m] = (byMethod[m] || 0) + amt; }));
+    const methods = PAY_METHOD_ORDER.filter(m => (byMethod[m] || 0) > 0).map(m => ({ method: m, amount: byMethod[m] }));
+    const totalPaid = rows.reduce((s, r) => s + r.paidAmount, 0);
+    return {
+      title: 'Membership Report (Detailed)',
+      fileName: 'Membership Report',
+      orientation: 'landscape',
+      period: b ? { from: b.startDate, to: b.endDate, label: getRangeDisplayLabel() } : { label: 'All Time' },
+      filters: [
+        { label: 'Transaction type', value: transactionTypeFilter === 'all' ? 'All types' : transactionTypeFilter },
+        { label: 'Search', value: searchQuery || undefined },
+      ],
+      sections: [
+        kpiSection([
+          { label: 'Transactions', value: rows.length, format: 'integer' },
+          { label: 'Total billed', value: rows.reduce((s, r) => s + r.planAmount, 0), format: 'money' },
+          { label: 'Collected', value: totalPaid, format: 'money' },
+          { label: 'Outstanding dues', value: rows.reduce((s, r) => s + r.dueAmount, 0), format: 'money' },
+        ], 'Summary'),
+        tableSection('Collected by payment method', [col('method', 'Payment method'), moneyCol('amount', 'Collected'), col('share', 'Share', 'percent', { total: 'sum' })],
+          methods.map(m => ({ method: m.method, amount: m.amount, share: totalPaid > 0 ? Math.round((m.amount / totalPaid) * 1000) / 10 : 0 })), { totals: true, emptyText: 'No payments in this range.' }),
+        pieSection('Collected by payment method', methods.map(m => ({ label: m.method, value: m.amount })), { valueFormat: 'money' }),
+        tableSection('Transactions', [
+          col('n', '#', 'integer'), col('memberId', 'Member ID'), col('memberName', 'Member name'), col('mobile', 'Mobile'),
+          col('membershipType', 'Membership type'), col('transactionType', 'Transaction'), col('planName', 'Plan'),
+          moneyCol('planAmount', 'Amount'), moneyCol('paidAmount', 'Paid'), col('paymentMode', 'Pay mode'), moneyCol('dueAmount', 'Due'),
+          col('dueDate', 'Due date', 'date'), col('transactionDate', 'Transaction date', 'date'),
+        ], rows.map(({ paidByMethod, photoUrl, ...r }, i) => ({ ...r, n: i + 1, membershipType: r.membershipType || '—' })), { totals: true }),
+      ],
+    };
   };
 
   // Get transaction type badge
@@ -416,10 +290,9 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
             Comparisons, profit analytics and detailed membership reports
           </p>
         </div>
-        <Button onClick={() => window.print()} className="bg-primary text-white" data-print-hide>
-          <Printer className="h-4 w-4 mr-2" />
-          Print Report
-        </Button>
+        <div data-print-hide>
+          <ReportActions report={buildMembershipReport} disabled={loading} menuLabel="Membership report (detailed)" />
+        </div>
       </div>
 
       {/* Today vs Yesterday and This Month vs Last Month */}
@@ -438,20 +311,7 @@ export function CustomReports({ onNavigate, embedded = false }: CustomReportsPro
                 Complete transaction history for the selected date range, with cash / card / online totals
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={handleExportPDF}>
-                <FileText className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
-            </div>
+
           </div>
         </CardHeader>
         <CardContent className="p-6">

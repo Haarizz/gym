@@ -15,6 +15,7 @@ import {
   styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Seg, Status, Delta,
   pctChange, fmtInt, fmtDate, Period, periodRange, PERIOD_OPTIONS,
 } from "../components/overview/overview-kit";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, countCol, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 type Tab = "sales" | "bills" | "orders";
 
@@ -173,6 +174,43 @@ export function SalesPurchases() {
   const margin = cur.revenue ? Math.round((cur.profit / cur.revenue) * 1000) / 10 : null;
   const noCompare = (p: number) => (!p ? "nothing to compare" : undefined);
 
+  // Export / print: the overview's figures and every tab's list
+  const buildReport = (): ReportDocument => ({
+    title: "Sales & Purchases Overview",
+    period: { from: range.from, to: range.to, label: range.label },
+    filters: [{ label: "Compared with", value: `${fmtDate(range.compareFrom)} – ${fmtDate(range.compareTo)}` }],
+    sections: [
+      kpiSection([
+        { label: "Sales", value: cur.sales, format: "money", ...changeHint(pctChange(cur.sales, prev.sales)) },
+        { label: "Gross profit", value: cur.profit, format: "money", ...changeHint(pctChange(cur.profit, prev.profit)) },
+        { label: "Gross margin", value: margin ?? "—", format: "percent" },
+        { label: "Average sale", value: cur.avg, format: "money", hint: `${fmtInt(itemsSold)} items sold` },
+        { label: "Purchases", value: curBought, format: "money", ...changeHint(pctChange(curBought, prevBought)) },
+        { label: "Owed to suppliers", value: owedToSuppliers, format: "money", hint: `${unpaidBills.length} bills · ${overdueBills.length} overdue` },
+        { label: "Customers owe", value: customerDue, format: "money" },
+        { label: "Stock alerts", value: stock ? stock.lowStockItems + stock.outOfStockItems : "—", format: "integer", hint: stock ? `${stock.outOfStockItems} out · ${stock.lowStockItems} low` : "unavailable" },
+      ], "Key figures"),
+      chartFromRows("Sales, purchases and profit (last 6 months)", "bar", monthly, "tipLabel", [
+        { key: "sales", name: "Sales", color: "#2a78d6" }, { key: "purchases", name: "Purchases", color: "#eb6834" }, { key: "profit", name: "Gross profit", color: "#1baf7a" },
+      ], { valueFormat: "money" }),
+      tableSection("By month", [col("tipLabel", "Month"), moneyCol("sales", "Sales"), moneyCol("purchases", "Purchases"), moneyCol("profit", "Gross profit")], monthly, { totals: true }),
+      tableSection("Sales by channel", [col("label", "Channel"), moneyCol("value", "Sales"), col("meta", "Count")], channelRows, { totals: true }),
+      tableSection("Top products", [col("label", "Product"), moneyCol("value", "Sales"), col("meta", "Quantity")], productRows, { totals: true }),
+      tableSection("Top suppliers", [col("label", "Supplier"), moneyCol("value", "Purchases"), col("meta", "Bills")], supplierRows, { totals: true }),
+      ...(stock ? [{ kind: "keyValue" as const, title: "Stock", items: [
+        { label: "Stock value (cost)", value: stock.totalInventoryValue, format: "money" as const },
+        { label: "Low stock items", value: stock.lowStockItems, format: "integer" as const },
+        { label: "Out of stock items", value: stock.outOfStockItems, format: "integer" as const },
+      ] }] : []),
+      tableSection("Recent sales", [col("invoiceDate", "Date", "date"), col("invoiceNumber", "Invoice"), col("customerName", "Customer"), col("source", "Source"), moneyCol("net", "Net sale")],
+        recentSales.map(i => ({ invoiceDate: i.invoiceDate, invoiceNumber: i.invoiceNumber, customerName: i.customerName, source: i.source === "POS" ? "POS" : "Invoice", net: netSale(i) })), { totals: true }),
+      tableSection("Bills to pay", [col("billDate", "Bill date", "date"), col("billNumber", "Bill"), col("supplierName", "Supplier"), col("dueDate", "Due date", "date"), moneyCol("totalAmount", "Total"), moneyCol("due", "Due")],
+        unpaidBills.map(b => ({ billDate: b.billDate, billNumber: b.billNumber, supplierName: b.supplierName, dueDate: b.dueDate ?? "", totalAmount: Number(b.totalAmount) || 0, due: b.due })), { totals: true, emptyText: "All bills paid." }),
+      tableSection("Open purchase orders", [col("orderDate", "Order date", "date"), col("poNumber", "PO"), col("supplierName", "Supplier"), col("expected", "Expected", "date"), col("status", "Status"), moneyCol("totalAmount", "Amount")],
+        openOrders.map(o => ({ orderDate: o.orderDate, poNumber: o.poNumber, supplierName: o.supplierName, expected: o.expectedDeliveryDate ?? "", status: o.status.replace(/_/g, " "), totalAmount: Number(o.totalAmount) || 0 })), { totals: true, emptyText: "No open purchase orders." }),
+    ],
+  });
+
   if (loading && !invoices.length && !bills.length) {
     return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading sales & purchases…</div></div>;
   }
@@ -189,6 +227,7 @@ export function SalesPurchases() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
+          <ReportActions report={buildReport} disabled={loading} menuLabel={`Sales & purchases · ${range.label}`} />
           <Button size="sm" onClick={() => navigate("/point-of-sale")}><Store className="h-4 w-4 mr-2" />Open POS</Button>
         </div>
       </div>

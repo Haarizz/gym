@@ -491,7 +491,7 @@ export function Approvals() {
               <div><dt>For</dt><dd>{dialogRequest.what}</dd></div>
               <div><dt>Paid by</dt><dd>{dialogRequest.method || '—'}</dd></div>
               <div><dt>Received</dt><dd>{money(dialogRequest.received)}</dd></div>
-              <div><dt>On credit</dt><dd style={{ color: dialogRequest.total > dialogRequest.received ? 'var(--status-critical)' : undefined }}>{money(Math.max(0, dialogRequest.total - dialogRequest.received))}</dd></div>
+              <div><dt>On credit</dt><dd style={{ color: dialogRequest.total > dialogRequest.received ? 'var(--status-critical, #d03b3b)' : undefined }}>{money(Math.max(0, dialogRequest.total - dialogRequest.received))}</dd></div>
             </dl>
           )}
           {/* Approvals take no note (the server doesn't store one); a rejection needs its reason. */}
@@ -514,7 +514,7 @@ export function Approvals() {
             <Button
               onClick={confirmAction}
               disabled={processing}
-              className={actionDialog?.type === 'reject' ? 'bg-red-600 hover:bg-red-700 text-white' : q.approve}
+              className={actionDialog?.type === 'reject' ? q.rejectSolid : q.approve}
             >
               {processing ? 'Processing...' : `Confirm ${actionDialog?.type === 'approve' ? 'Approval' : 'Rejection'}`}
             </Button>

@@ -7,6 +7,7 @@ import {
   Receipt, RefreshCw, Sparkles, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { PageHeader } from "../components/workforce/ui";
@@ -17,8 +18,7 @@ import {
 } from "../components/workforce/payroll-insights";
 import { useCurrency } from "../utils/currency";
 import { useBranch } from "../utils/branch-context";
-import { buildXlsx, downloadBlob, type XlsxCell } from "../utils/xlsx-export";
-import { printHtml } from "../utils/print-html";
+
 import {
   addMonths, avgHeadcount, costPerHead, groupBy, pctChange, payrollErrorMessage, payrollReportService,
   rangeText, share, totals, ym, type PayrollDataset, type PayrollRecord, type Totals,
@@ -325,77 +325,58 @@ export function PayrollAnalytics({ onNavigate }: Props) {
   const branchTitle = isAllBranches ? "All branches" : activeBranchName;
   const periodTitle = `${rangeText(range.from, range.to)} (vs ${cmpText})${department !== "all" ? ` · ${department}` : ""}`;
 
-  const exportExcel = () => {
-    if (!data) return;
-    const r2 = (n: number | null) => (n == null ? "" : Math.round(n * 100) / 100);
-    const rows: XlsxCell[][] = [
-      [`Payroll Analytics — ${branchTitle}`], [periodTitle], [`Amounts in ${currencyCode}`], [],
-      ["Metric", "This period", "Comparison", "Change %"],
-      ["Payroll cost (gross)", r2(T.gross), r2(P.gross), pctChange(T.gross, P.gross) ?? ""],
-      ["Net pay", r2(T.net), r2(P.net), pctChange(T.net, P.net) ?? ""],
-      ["Paid out", r2(T.paid), r2(P.paid), pctChange(T.paid, P.paid) ?? ""],
-      ["Approved, unpaid", r2(T.unpaid), r2(P.unpaid), ""],
-      ["Avg cost per employee / month", r2(costPerHead(T)), r2(costPerHead(P)), pctChange(costPerHead(T), costPerHead(P)) ?? ""],
-      ["Avg monthly headcount", r2(avgHeadcount(T, monthCount)), r2(avgHeadcount(P, prevMonthCount)), ""],
-      ["Basic salary", r2(T.basic), r2(P.basic), pctChange(T.basic, P.basic) ?? ""],
-      ["Allowances", r2(T.allowances), r2(P.allowances), pctChange(T.allowances, P.allowances) ?? ""],
-      ["Overtime", r2(T.overtime), r2(P.overtime), pctChange(T.overtime, P.overtime) ?? ""],
-      ["Commission", r2(T.commission), r2(P.commission), pctChange(T.commission, P.commission) ?? ""],
-      ["Not itemised (old payments, net only)", r2(T.unitemised), r2(P.unitemised), ""],
-      ["Deductions", r2(T.totalDeductions), r2(P.totalDeductions), pctChange(T.totalDeductions, P.totalDeductions) ?? ""],
-      ["Overtime hours", r2(T.otHours), r2(P.otHours), ""],
-      ["Advances outstanding (now)", r2(advances.outstanding), "", ""],
-      [],
-      ["Month", "Headcount", "Basic", "Allowances", "Overtime", "Commission", "Not itemised", "Gross", "Deductions", "Net", "Paid", "Unpaid"],
-      ...monthly.map(m => [m.label, m.headcount, r2(m.basic), r2(m.allowances), r2(m.overtime), r2(m.commission), r2(m.unitemised), r2(m.gross), r2(m.deductions), r2(m.net), r2(m.paid), r2(m.unpaid)]),
-      [],
-      ["Department", "Avg headcount", "Gross", "Share %", "Per employee / month", "Overtime", "Comparison gross", "Change %"],
-      ...deptRows.map(d => [d.department, r2(d.headcount), r2(d.gross), d.share, r2(d.perHead), r2(d.overtime), r2(d.previousGross), d.changePct ?? ""]),
-      [],
-      ["Employee", "Department", "Months", "Gross", "Avg / month", "Overtime", "OT hours", "Deductions", "Net", "Change %"],
-      ...[...employees].sort((a, b) => b.t.gross - a.t.gross).map(e => [e.name, e.department, e.t.rows, r2(e.t.gross), r2(e.avg), r2(e.t.overtime), r2(e.t.otHours), r2(e.t.totalDeductions), r2(e.t.net), e.changePct ?? ""]),
-      [],
-      ["Insight", "Detail"], ...insights.map(i => [i.title, i.detail]),
-    ];
-    // bold: the title and each table's header row (the row after a blank line)
-    const bold = [0, ...rows.map((r, i) => (i > 0 && rows[i - 1].length === 0 && r.length > 1 ? i : -1)).filter(i => i >= 0)];
-    downloadBlob(buildXlsx("Payroll analytics", rows, { boldRows: bold, moneyColumns: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], columnWidths: [30, 16, 16, 16, 18, 16, 16, 16, 16, 14, 14] }),
-      `payroll-analytics_${range.from}_${range.to}.xlsx`);
-    toast.success("Exported to Excel");
-  };
-
-  const print = () => {
-    if (!data) return;
-    const m = (n: number | null | undefined) => (n == null ? "—" : formatCurrencyText(Number(n), { maximumFractionDigits: 0 }));
-    const e = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-    const pct = (n: number | null) => (n == null ? "—" : `${n > 0 ? "+" : ""}${n}%`);
-    const table = (head: string[], body: unknown[][]) =>
-      `<table><thead><tr>${head.map((h, i) => `<th class="${i ? "n" : ""}">${e(h)}</th>`).join("")}</tr></thead><tbody>${body.map(r => `<tr>${r.map((c, i) => `<td class="${i ? "n" : ""}">${e(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-    printHtml(`<!doctype html><html><head><meta charset="utf-8"><title>Payroll Analytics</title><style>
-      @page{size:A4;margin:14mm}body{color:#0b0b0b;font-size:11px;margin:0}
-      h1{font-size:19px;margin:0}h2{font-size:13px;margin:20px 0 6px}.sub{color:#52514e;margin:4px 0 14px}
-      table{width:100%;border-collapse:collapse}th,td{padding:5px 7px;border-bottom:1px solid #e1e0d9;text-align:left}
-      th{color:#52514e;font-weight:600}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}li{margin:3px 0}</style></head><body>
-      <h1>Payroll Analytics — ${e(branchTitle)}</h1><div class="sub">${e(periodTitle)} · generated ${e(new Date().toLocaleString())}</div>
-      <h2>Summary</h2>${table(["Metric", "This period", "Comparison", "Change"], [
-        ["Payroll cost (gross)", m(T.gross), m(P.gross), pct(pctChange(T.gross, P.gross))],
-        ["Net pay", m(T.net), m(P.net), pct(pctChange(T.net, P.net))],
-        ["Paid out", m(T.paid), m(P.paid), pct(pctChange(T.paid, P.paid))],
-        ["Approved, unpaid", m(T.unpaid), m(P.unpaid), ""],
-        ["Cost per employee / month", m(costPerHead(T)), m(costPerHead(P)), pct(pctChange(costPerHead(T), costPerHead(P)))],
-        ["Avg monthly headcount", fmtNum(avgHeadcount(T, monthCount)), fmtNum(avgHeadcount(P, prevMonthCount)), ""],
-        ["Overtime", m(T.overtime), m(P.overtime), pct(pctChange(T.overtime, P.overtime))],
-        ["Commission", m(T.commission), m(P.commission), pct(pctChange(T.commission, P.commission))],
-        ["Deductions", m(T.totalDeductions), m(P.totalDeductions), pct(pctChange(T.totalDeductions, P.totalDeductions))],
-      ])}
-      <h2>Insights</h2><ul>${insights.map(i => `<li><b>${e(i.title)}</b> — ${e(i.detail)}</li>`).join("")}</ul>
-      <h2>By month</h2>${table(["Month", "Headcount", "Basic", "Allowances", "Overtime", "Commission", "Gross", "Net", "Unpaid"],
-        monthly.map(r => [r.label, r.headcount, m(r.basic), m(r.allowances), m(r.overtime), m(r.commission), m(r.gross), m(r.net), m(r.unpaid)]))}
-      <h2>By department</h2>${table(["Department", "Headcount", "Gross", "Share", "Per employee", "Change"],
-        deptRows.map(d => [d.department, fmtNum(d.headcount), m(d.gross), fmtPct(d.share), m(d.perHead), pct(d.changePct)]))}
-      <h2>Top earners</h2>${table(["Employee", "Department", "Gross", "Avg / month", "Overtime"],
-        topEarners.map(x => [x.name, x.department, m(x.t.gross), m(x.avg), m(x.t.overtime)]))}
-      </body></html>`);
+  // Export / print: every panel, same figures as on screen
+  const buildReport = (): ReportDocument => {
+    if (!data) throw new Error("Payroll analytics are still loading");
+    const r2 = (n: number | null) => (n == null ? null : Math.round(n * 100) / 100);
+    const row = (metric: string, cur: number | null, prev: number | null, change: number | null = pctChange(cur ?? 0, prev ?? 0)) =>
+      ({ metric, cur: r2(cur), prev: r2(prev), change: change ?? "—" });
+    const monthEnd = (ym: string) => { const [y, mo] = ym.split("-").map(Number); return new Date(y, mo, 0); };
+    return {
+      title: "Payroll Analytics",
+      orientation: "landscape",
+      period: { from: `${range.from}-01`, to: monthEnd(range.to), label: rangeText(range.from, range.to) },
+      filters: [{ label: "Compared with", value: cmpText }, { label: "Department", value: department !== "all" ? department : "All" }],
+      sections: [
+        kpiSection([
+          { label: "Payroll cost (gross)", value: T.gross, format: "money", ...changeHint(pctChange(T.gross, P.gross)) },
+          { label: "Net pay", value: T.net, format: "money", ...changeHint(pctChange(T.net, P.net)) },
+          { label: "Paid out", value: T.paid, format: "money" },
+          { label: "Approved, unpaid", value: T.unpaid, format: "money" },
+          { label: "Avg cost / employee / month", value: costPerHead(T), format: "money" },
+          { label: "Avg monthly headcount", value: avgHeadcount(T, monthCount), format: "number" },
+          { label: "Overtime hours", value: T.otHours, format: "number" },
+          { label: "Advances outstanding", value: advances.outstanding, format: "money" },
+        ], "Summary"),
+        tableSection("This period vs comparison · amounts", [col("metric", "Metric"), col("cur", "This period", "money"), col("prev", "Comparison", "money"), col("change", "Change", "percent")], [
+          row("Payroll cost (gross)", T.gross, P.gross), row("Net pay", T.net, P.net), row("Paid out", T.paid, P.paid), row("Approved, unpaid", T.unpaid, P.unpaid, null),
+          row("Avg cost per employee / month", costPerHead(T), costPerHead(P)), row("Basic salary", T.basic, P.basic), row("Allowances", T.allowances, P.allowances),
+          row("Overtime", T.overtime, P.overtime), row("Commission", T.commission, P.commission), row("Not itemised (old payments, net only)", T.unitemised, P.unitemised, null),
+          row("Deductions", T.totalDeductions, P.totalDeductions),
+        ]),
+        chartFromRows("Payroll cost by month", "stacked-bar", monthly, "label", [
+          { key: "basic", name: "Basic", color: "#2a78d6" }, { key: "allowances", name: "Allowances", color: "#eb6834" },
+          { key: "overtime", name: "Overtime", color: "#1baf7a" }, { key: "commission", name: "Commission", color: "#6250d6" }, { key: "unitemised", name: "Not itemised", color: "#8a8780" },
+        ], { valueFormat: "money" }),
+        tableSection("By month", [
+          col("label", "Month"), col("headcount", "Headcount", "integer"), moneyCol("basic", "Basic"), moneyCol("allowances", "Allowances"), moneyCol("overtime", "Overtime"),
+          moneyCol("commission", "Commission"), moneyCol("unitemised", "Not itemised"), moneyCol("gross", "Gross"), moneyCol("deductions", "Deductions"), moneyCol("net", "Net"),
+          moneyCol("paid", "Paid"), moneyCol("unpaid", "Unpaid"),
+        ], monthly, { totals: true }),
+        tableSection("By department", [
+          col("department", "Department"), col("headcount", "Avg headcount", "number"), moneyCol("gross", "Gross"), col("share", "Share", "percent", { total: "sum" }),
+          col("perHead", "Per employee / month", "money"), moneyCol("overtime", "Overtime"), moneyCol("previousGross", "Comparison gross"), col("changePct", "Change", "percent"),
+        ], deptRows.map(d => ({ ...d, changePct: d.changePct ?? "—" })), { totals: true }),
+        tableSection("Employees", [
+          col("name", "Employee"), col("department", "Department"), col("months", "Months", "integer"), moneyCol("gross", "Gross"), col("avg", "Avg / month", "money"),
+          moneyCol("overtime", "Overtime"), col("otHours", "OT hours", "number", { total: "sum" }), moneyCol("deductions", "Deductions"), moneyCol("net", "Net"), col("changePct", "Change", "percent"),
+        ], [...employees].sort((a, b) => b.t.gross - a.t.gross).map(e => ({
+          name: e.name, department: e.department, months: e.t.rows, gross: e.t.gross, avg: e.avg, overtime: e.t.overtime, otHours: e.t.otHours,
+          deductions: e.t.totalDeductions, net: e.t.net, changePct: e.changePct ?? "—",
+        })), { totals: true, sheetName: "Employees" }),
+        ...(insights.length ? [tableSection("Insights", [col("title", "Insight"), col("detail", "Detail", "text", { wrap: true })], insights)] : []),
+      ],
+    };
   };
 
   // ── Render helpers ─────────────────────────────────────────────────────
@@ -525,8 +506,7 @@ export function PayrollAnalytics({ onNavigate }: Props) {
           <>
             <Button variant="outline" size="sm" onClick={() => onNavigate?.("payroll-reports")}><FileText className="h-4 w-4 mr-1" />Reports</Button>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}><RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-            <Button variant="outline" size="sm" onClick={print} disabled={!data}><Printer className="h-4 w-4 mr-1" />Print</Button>
-            <Button size="sm" onClick={exportExcel} disabled={!data}><Download className="h-4 w-4 mr-1" />Export Excel</Button>
+            <ReportActions report={buildReport} disabled={!data} menuLabel={`Payroll analytics · ${periodTitle}`} />
           </>
         }
       />

@@ -54,7 +54,9 @@ import {
   CalendarClock,
   MessagesSquare
 } from 'lucide-react';
-import { type BiosLiveData, downloadCsv, BiosScheduleTable } from './bios-live';
+import { type BiosLiveData, BiosScheduleTable } from './bios-live';
+import { BiosReportActions } from "./bios-report";
+import { type ReportSection, col, moneyCol, tableSection } from "../report-export";
 
 interface PredictiveAnalyticsDialogProps {
   open: boolean;
@@ -118,13 +120,16 @@ export function PredictiveAnalyticsDialog({
     recommendations: [insight.action]
   }));
 
-  const exportPredictions = () => {
-    downloadCsv(
-      `bios-predictions_${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Insight', 'Prediction', 'Confidence (%)', 'Timeframe', 'Recommended Action', 'Priority'],
-      predictiveInsights.map((i) => [i.insight, i.prediction, i.confidence, i.timeframe, i.action, i.priority])
-    );
-  };
+  const predictionSections = (): ReportSection[] => [
+    tableSection("Predictions", [
+      col("insight", "Insight"), col("prediction", "Prediction", "text", { wrap: true }), col("confidence", "Confidence", "percent"),
+      col("timeframe", "Timeframe"), col("action", "Recommended action", "text", { wrap: true }), col("priority", "Priority"),
+    ], predictiveInsights, { emptyText: "No predictions yet." }),
+    tableSection("Next month scenarios", [
+      col("name", "Scenario"), col("description", "Basis", "text", { wrap: true }), moneyCol("revenue", "Revenue", { total: undefined }),
+      col("members", "Members", "integer"), col("retention", "Retention", "percent"), col("probability", "Outlook"),
+    ], scenarios),
+  ];
 
   // Prediction Scenarios — next month projected from the live trend.
   const trend = live.monthlyTrend;
@@ -355,10 +360,7 @@ export function PredictiveAnalyticsDialog({
                         <Bell className="h-4 w-4 mr-2" />
                         Set Alert
                       </Button>
-                      <Button size="sm" variant="outline" onClick={exportPredictions}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
+                      <BiosReportActions live={live} kind="predictive" readDialog={false} extra={predictionSections} compact />
                     </div>
                   </CardContent>
                 </Card>
@@ -453,14 +455,7 @@ export function PredictiveAnalyticsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={exportPredictions}>
-            <Download className="h-4 w-4 mr-2" />
-            Export All Predictions
-          </Button>
-          <Button className="bg-[#E63946] hover:bg-[#d32f3f]" onClick={live.onExportReport}>
-            <FileText className="h-4 w-4 mr-2" />
-            Generate Report
-          </Button>
+          <BiosReportActions live={live} kind="predictive" readDialog={false} extra={predictionSections} />
         </div>
       </DialogContent>
     </Dialog>

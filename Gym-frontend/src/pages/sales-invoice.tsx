@@ -26,11 +26,12 @@ import { displayDate, todayIso } from '../components/purchase/purchaseInvoiceUti
 import { SalesInvoiceEditor, SalesInvoiceEditorHandle } from '../components/sales-invoice/SalesInvoiceEditor';
 import { SalesInvoicePreview } from '../components/sales-invoice/SalesInvoicePreview';
 import {
-  STATUS_FILTERS, DisplayStatus, balanceOf, customerTypeMeta, displayStatus, exportInvoicesCsv, fetchAllInvoices,
+  STATUS_FILTERS, DisplayStatus, balanceOf, customerTypeMeta, displayStatus, buildInvoicesReport, fetchAllInvoices,
   invoiceActions, paymentSummaryLabel, statusMeta,
 } from '../components/sales-invoice/salesInvoiceUtils';
 import { printPurchaseDocument } from '../components/print-templates/purchasePrint';
 import { buildSalesInvoiceDocument } from '../components/print-templates/salesInvoicePrint';
+import { ReportActions } from '../components/report-export';
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 const PAGE_SIZE = 20;
@@ -346,9 +347,7 @@ export function SalesInvoicePage() {
               <Button variant="outline" size="sm" onClick={() => editorRef.current?.print()}><Printer className="h-4 w-4" /> Print</Button>
             )}
             {view === 'list' && (
-              <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => exportInvoicesCsv(filtered, currencyCode)}>
-                <Download className="h-4 w-4" /> Export
-              </Button>
+              <ReportActions report={() => buildInvoicesReport(filtered)} disabled={filtered.length === 0} menuLabel="Sales invoices" />
             )}
             {view !== 'editor' && <Button size="sm" onClick={openNew}><Plus className="h-4 w-4" /> Create New</Button>}
           </>

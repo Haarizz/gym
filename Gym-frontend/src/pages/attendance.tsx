@@ -16,6 +16,7 @@ import {
   ResponsiveContainer, LineChart, Line
 } from 'recharts';
 import { toast } from 'sonner';
+import { ReportActions, type ReportDocument, chartFromRows, col, kpiSection, tableSection } from '../components/report-export';
 import { staffAttendanceService, type AttendanceListItem, type AttendanceStats, type StaffAttendanceRecord } from '../utils/supabase/staff-attendance-service';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -41,27 +42,18 @@ function workoutLabel(r: AttendanceListItem): string {
   return r.workout_end_time ? r.formatted_workout_duration || '' : 'In progress';
 }
 
-function exportCsv(items: AttendanceListItem[]) {
-  const header = 'Name,ID,Type,Check In,Check Out,Duration,Workout,Activity,Status';
-  const rows = items.map(r => [
-    r.member_name || r.walk_in_name || 'Visitor',
-    r.member_biz_id || '',
-    r.type,
-    r.check_in_time ? new Date(r.check_in_time).toLocaleString() : '',
-    r.check_out_time ? new Date(r.check_out_time).toLocaleString() : '',
-    r.formatted_duration || '',
-    workoutLabel(r),
-    r.activity_type || '',
-    r.status,
-  ].join(','));
-  const csv = [header, ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `attendance-${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function attendanceRows(items: AttendanceListItem[]) {
+  return items.map(r => ({
+    name: r.member_name || r.walk_in_name || 'Visitor',
+    id: r.member_biz_id || '',
+    type: r.type,
+    checkIn: r.check_in_time || null,
+    checkOut: r.check_out_time || null,
+    duration: r.formatted_duration || '',
+    workout: workoutLabel(r),
+    activity: r.activity_type || '',
+    status: r.status,
+  }));
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -175,6 +167,38 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
   const weeklyData   = stats?.weekly_trend  || [];
   const monthlyData  = stats?.monthly_trend || [];
 
+  // Export / print: every record of the selected day/week and search (the table pages 50 at a time)
+  const buildAttendanceReport = async (): Promise<ReportDocument> => {
+    const { date, startDate, endDate } = resolveDate() as { date?: string; startDate?: string; endDate?: string };
+    const all: AttendanceListItem[] = [];
+    for (let p = 0; ; p++) {
+      const res = await staffAttendanceService.getAttendance(date, searchTerm || undefined, p, 500, startDate, endDate);
+      all.push(...res.items);
+      if (res.items.length < 500 || all.length >= res.total) break;
+    }
+    return {
+      title: 'Attendance Register',
+      orientation: 'landscape',
+      period: date ? { from: date, to: date } : { from: startDate, to: endDate, label: 'This week' },
+      filters: [{ label: 'Search', value: searchTerm || undefined }],
+      sections: [
+        kpiSection([
+          { label: "Today's visits", value: stats?.today_visits ?? 0, format: 'integer', hint: `${stats?.active_now ?? 0} currently active` },
+          { label: 'Avg duration', value: stats?.avg_duration_minutes ?? 0, format: 'duration' },
+          { label: 'Peak hour', value: stats?.peak_hour || '—' },
+          { label: 'Attendance rate', value: stats?.attendance_rate ?? 0, format: 'percent' },
+          { label: 'Records in register', value: all.length, format: 'integer' },
+        ], 'Summary'),
+        chartFromRows('Visits this week', 'bar', weeklyData, 'day', [{ key: 'visits', name: 'Visits', color: '#2a78d6' }], { valueFormat: 'integer' }),
+        chartFromRows('Monthly visits', 'line', monthlyData, 'month', [{ key: 'visits', name: 'Visits', color: '#2a78d6' }], { valueFormat: 'integer' }),
+        tableSection('Attendance register', [
+          col('name', 'Name'), col('id', 'ID'), col('type', 'Type'), col('checkIn', 'Check in', 'datetime'), col('checkOut', 'Check out', 'time'),
+          col('duration', 'Duration'), col('workout', 'Workout'), col('activity', 'Activity'), col('status', 'Status'),
+        ], attendanceRows(all), { emptyText: 'No attendance records for this period.' }),
+      ],
+    };
+  };
+
   // Busiest / quietest day from weekly trend
   const busiestDay  = weeklyData.reduce((a, b) => b.visits > a.visits ? b : a, { day: '—', visits: 0, date: '' });
   const quietestDay = weeklyData.reduce((a, b) => b.visits < a.visits ? b : a, { day: '—', visits: Infinity, date: '' });
@@ -220,10 +244,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading || statsLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportCsv(records)} disabled={records.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
+          <ReportActions report={buildAttendanceReport} disabled={total === 0 && records.length === 0} menuLabel="Attendance register" />
         </div>
       </div>
 
@@ -748,10 +769,7 @@ export function Attendance({ onNavigate }: AttendanceProps = {}) {
                     <BarChart3 className="mr-2 h-4 w-4" />
                     View Detailed Reports
                   </Button>
-                  <Button variant="outline" className="border-primary/30" onClick={() => exportCsv(records)} disabled={records.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export CSV
-                  </Button>
+                  <ReportActions report={buildAttendanceReport} size="default" disabled={total === 0 && records.length === 0} menuLabel="Attendance register" />
                 </div>
               </div>
             </CardContent>

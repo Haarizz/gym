@@ -318,6 +318,7 @@ public class MembershipFreezeService {
         record.setChargeWaived(request.isWaiveCharge() && allowance.chargeableDays(days) > 0);
         record.setLimitsOverridden(overLimits);
         record.setRecordedBy(actor != null ? actor.name() : null);
+        record.setAutoUnfreeze(request.getAutoUnfreeze());
         freezeRepository.save(record);
         return result;
     }
@@ -468,15 +469,26 @@ public class MembershipFreezeService {
                 .toList();
     }
 
-    /** Unfreezes the member as of their planned end date, if their plan auto-unfreezes. */
+    /**
+     * Unfreezes the member as of their planned end date, if the freeze auto-unfreezes:
+     * staff's choice for the open freeze when they made one, otherwise the plan's setting.
+     */
     public boolean autoUnfreeze(Long memberId, LocalDateTime now) {
         Member member = memberRepository.findById(memberId).orElse(null);
         if (member == null || !"frozen".equalsIgnoreCase(member.getMembershipStatus())
                 || member.getFreezeEndDate() == null || member.getFreezeEndDate().isAfter(now)) {
             return false; // already unfrozen (e.g. with their family head) or not due
         }
-        MembershipPlan plan = findPlan(member);
-        if (plan == null || !plan.isAutoUnfreeze()) return false;
+        Boolean chosen = freezeRepository.findFirstByMemberDbIdAndEndedAtIsNullOrderByFreezeStartDesc(memberId)
+                .map(MembershipFreeze::getAutoUnfreeze).orElse(null);
+        boolean auto;
+        if (chosen != null) {
+            auto = chosen;
+        } else {
+            MembershipPlan plan = findPlan(member);
+            auto = plan != null && plan.isAutoUnfreeze();
+        }
+        if (!auto) return false;
         unfreeze(memberId, member.getFreezeEndDate());
         return true;
     }

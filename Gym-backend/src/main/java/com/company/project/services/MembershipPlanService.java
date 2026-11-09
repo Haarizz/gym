@@ -50,6 +50,17 @@ public class MembershipPlanService {
             counts.merge("active", active, Long::sum);
             counts.merge("total", total, Long::sum);
         }
+        // "used": everyone who has ever been on the plan — current members plus those who
+        // bought or renewed onto it and have since moved on.
+        Long branchId = com.company.project.security.BranchContextHolder.getActiveBranchId();
+        for (Object[] row : memberRepository.countMembersEverOnPlan(branchId)) {
+            if (row[0] == null) continue;
+            String key = ((String) row[0]).trim().toLowerCase(Locale.ROOT);
+            long used = row[1] == null ? 0 : ((Number) row[1]).longValue();
+            out.computeIfAbsent(key, k -> new LinkedHashMap<>(Map.of("active", 0L, "total", 0L)))
+                    .merge("used", used, Long::sum);
+        }
+        out.values().forEach(c -> c.merge("used", c.get("total"), Math::max));
         return out;
     }
 

@@ -34,6 +34,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { format, differenceInDays } from "date-fns";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 
 interface FreezeUnfreezeProps {
@@ -292,29 +293,31 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
   const totalFrozenDays = frozenMembers.reduce((acc, m) => acc + plannedFreezeDays(m), 0);
   const autoUnfreezeCount = frozenMembers.filter((m) => autoUnfreezeFor(m)).length;
 
-  const exportReport = () => {
-    if (frozenMembers.length === 0) { toast.info('No frozen members to export'); return; }
-    const cell = (v: unknown) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = ['Member Name', 'Member ID', 'Phone', 'Plan', 'Freeze Start', 'Freeze End', 'Days Frozen', 'Status', 'Auto Unfreeze', 'Reason'];
-    const rows = frozenMembers.map((m) => [
-      m.name, m.member_id, m.phone, m.membership_plan,
-      m.freeze_start_date ? format(new Date(m.freeze_start_date), 'yyyy-MM-dd') : '',
-      m.freeze_end_date ? format(lastFrozenDay(m.freeze_end_date), 'yyyy-MM-dd') : '',
-      plannedFreezeDays(m), m.membership_status,
-      autoUnfreezeFor(m) ? 'Yes' : 'No', m.freeze_reason || '',
-    ]);
-    const csv = [header, ...rows].map((r) => r.map(cell).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `frozen-members-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${frozenMembers.length} frozen member(s)`);
-  };
+  const buildFrozenReport = (): ReportDocument => ({
+    title: 'Frozen Members Report',
+    orientation: 'landscape',
+    period: { to: new Date(), label: 'As of today' },
+    filters: [
+      { label: 'Status', value: filterStatus === 'all' ? 'All' : filterStatus },
+      { label: 'Search', value: tableSearch.trim() || undefined },
+    ],
+    sections: [
+      kpiSection([
+        { label: 'Frozen members', value: frozenMembers.length, format: 'integer', hint: filteredMembers.length !== frozenMembers.length ? `${filteredMembers.length} match the filters` : undefined },
+        { label: 'Total frozen days', value: totalFrozenDays, format: 'integer' },
+        { label: 'Auto-unfreeze on', value: autoUnfreezeCount, format: 'integer' },
+      ]),
+      tableFromMatrix('Frozen members',
+        ['Member Name', 'Member ID', 'Phone', 'Plan', 'Freeze Start', 'Freeze End', 'Days Frozen', 'Status', 'Auto Unfreeze', 'Reason'],
+        filteredMembers.map((m) => [
+          m.name, m.member_id, m.phone, m.membership_plan,
+          m.freeze_start_date ? format(new Date(m.freeze_start_date), 'yyyy-MM-dd') : '',
+          m.freeze_end_date ? format(lastFrozenDay(m.freeze_end_date), 'yyyy-MM-dd') : '',
+          plannedFreezeDays(m), m.membership_status,
+          autoUnfreezeFor(m) ? 'Yes' : 'No', m.freeze_reason || '',
+        ]), { totals: true, wrap: [9], emptyText: 'No members are frozen.' }),
+    ],
+  });
 
   const historyAllowance = selectedMemberHistory ? frozenAllowances[String(selectedMemberHistory.id)] : undefined;
 
@@ -327,14 +330,11 @@ export function FreezeUnfreeze({ onNavigate }: FreezeUnfreezeProps) {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Members
           </Button>
-          <Button variant="outline" size="sm" onClick={exportReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
+          <ReportActions report={buildFrozenReport} menuLabel="Frozen members" />
         </div>
 
         <div className="flex items-center space-x-3 mb-2">
-          <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${TEAL}, var(--primary-hover))` }}>
+          <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(to bottom right, ${TEAL}, var(--gb-primary-hover))` }}>
             <Snowflake className="h-5 w-5" style={{ color: 'var(--primary-foreground)' }} />
           </div>
           <div>

@@ -15,6 +15,7 @@ import {
   styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Seg, Status, Delta,
   pctChange, fmtInt, fmtDate, Period, periodRange, PERIOD_OPTIONS,
 } from "../components/overview/overview-kit";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, countCol, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 type Tab = "due" | "leads" | "referrals" | "promotions";
 
@@ -180,6 +181,39 @@ export function MemberConnect() {
     { id: "promotions", label: "Promotions", icon: Gift, count: activePromos.length },
   ];
 
+  // Export / print: the overview's figures and every tab's list
+  const buildReport = (): ReportDocument => ({
+    title: "Member Connect Overview",
+    period: { from: range.from, to: range.to, label: range.label },
+    filters: [{ label: "Compared with", value: `${fmtDate(range.compareFrom)} – ${fmtDate(range.compareTo)}` }],
+    sections: [
+      kpiSection([
+        { label: "New leads", value: cur.created, format: "integer", ...changeHint(pctChange(cur.created, prev.created)) },
+        { label: "Lead conversion", value: cur.rate ?? "—", format: "percent", hint: cur.created ? `${cur.converted} of ${cur.created} became members` : "no leads in this period" },
+        { label: "Referrals won", value: refCur, format: "integer", ...changeHint(pctChange(refCur, refPrev)) },
+        { label: "Follow-ups overdue", value: overdue.length, format: "integer", hint: `${dueToday.length} due today · ${doneInPeriod} done` },
+        { label: "People messaged", value: messages ? reached : "—", format: "integer", hint: messages ? `${sentMsgs.length} campaigns${deliveryRate != null ? ` · ${deliveryRate}% delivered` : ""}` : "unavailable" },
+        { label: "Active promotions", value: promotions ? activePromos.length : "—", format: "integer", hint: promotions ? `${redemptions} redemptions` : "unavailable" },
+      ], "Key figures"),
+      chartFromRows("Outreach results (last 6 months)", "bar", trend, "tipLabel", [
+        { key: "leads", name: "Leads", color: "#2a78d6" }, { key: "converted", name: "Converted", color: "#1baf7a" },
+        { key: "referrals", name: "Referrals won", color: "#6250d6" }, { key: "followUps", name: "Follow-ups done", color: "#eb6834" },
+      ], { valueFormat: "integer" }),
+      tableSection("Outreach results by month", [col("tipLabel", "Month"), countCol("leads", "Leads"), countCol("converted", "Converted"), countCol("referrals", "Referrals won"), countCol("followUps", "Follow-ups done")], trend, { totals: true }),
+      tableSection("Lead pipeline (all leads)", [col("label", "Stage"), countCol("value", "Leads")], pipelineRows, { totals: true }),
+      tableSection("Lead sources (this period)", [col("label", "Source"), countCol("value", "Leads"), col("meta", "Converted")], sourceRows, { totals: true }),
+      tableSection("Follow-ups by staff", [col("label", "Staff"), countCol("value", "Done in period"), col("meta", "Open")], staffRows),
+      tableSection("Follow-ups due (overdue and next 7 days)", [col("leadName", "Lead"), col("subject", "Subject"), col("type", "Type"), col("priority", "Priority"), col("assignedStaff", "Assigned"), col("dueDate", "Due", "date"), col("status", "Status")],
+        dueList.map(f => ({ ...f, assignedStaff: f.assignedStaff || "Unassigned" })), { emptyText: "Nothing due." }),
+      tableSection("Latest leads", [col("name", "Lead"), col("source", "Source"), col("status", "Status"), col("createdAt", "Created", "date")],
+        latestLeads.map(l => ({ name: leadName(l), source: SOURCE_LABELS[l.source || "other"] || l.source || "", status: l.status, createdAt: l.createdAt }))),
+      tableSection("Latest referrals", [col("referrer", "Referrer"), col("referee", "Referee"), col("status", "Status"), moneyCol("reward", "Reward"), col("createdAt", "Logged", "date")],
+        latestReferrals.map(r => ({ referrer: r.referrerName, referee: r.refereeName, status: r.status, reward: Number(r.rewardAmount || 0), createdAt: r.createdAt })), { totals: true }),
+      ...(promotions ? [tableSection("Active promotions", [col("name", "Promotion"), col("type", "Type"), countCol("usageCount", "Redemptions"), col("usageLimit", "Limit", "integer")],
+        activePromos.map(p => ({ name: p.name, type: (p as any).type ?? "", usageCount: Number(p.usageCount) || 0, usageLimit: (p as any).usageLimit ?? "—" })), { totals: true })] : []),
+    ],
+  });
+
   if (loading && !leads.length && !followUps.length) {
     return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading Member Connect…</div></div>;
   }
@@ -196,6 +230,7 @@ export function MemberConnect() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
+          <ReportActions report={buildReport} disabled={loading} menuLabel={`Member Connect · ${range.label}`} />
           <Button size="sm" onClick={() => navigate("/leads")}><UserPlus className="h-4 w-4 mr-2" />Leads</Button>
         </div>
       </div>

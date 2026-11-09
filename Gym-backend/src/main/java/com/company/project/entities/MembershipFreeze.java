@@ -79,8 +79,15 @@ public class MembershipFreeze {
     @Column(name = "recorded_by")
     private String recordedBy;
 
+    /** Staff's choice for this freeze: end it automatically on its end date. Null follows the plan. */
+    @Column(name = "auto_unfreeze")
+    private Boolean autoUnfreeze;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    public Boolean getAutoUnfreeze() { return autoUnfreeze; }
+    public void setAutoUnfreeze(Boolean autoUnfreeze) { this.autoUnfreeze = autoUnfreeze; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

@@ -60,7 +60,8 @@ import { useGlobalSearchPrefill } from "../components/global-search/use-global-s
 import { accountHeadsService, type AccountHead } from '../utils/supabase/account-heads-service';
 import type { SalesInvoice } from '../utils/supabase/sales-invoice-service';
 import { balanceOf as invoiceBalance, fetchAllInvoices } from '../components/sales-invoice/salesInvoiceUtils';
-import { printMemberStatement, exportMemberStatementXlsx } from "../utils/member-statement-print";
+import { buildMemberStatementReport } from "../utils/member-statement-print";
+import { ReportActions, useReportExporter, type ReportDocument, chartFromRows, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { ReceiptTemplateEditor } from "../components/billing/ReceiptTemplateEditor";
 import { SalesInvoiceSettleDialog, type SettleRequest } from '../components/sales-invoice/SalesInvoiceSettleDialog';
 
@@ -295,19 +296,9 @@ export function Billing({ onNavigate }: BillingProps = {}) {
       .finally(() => setSoaLoading(false));
   };
 
-  const handleExportStatementXlsx = () => {
-    if (!soaStatement || soaStatement.lines.length === 0) { toast.info('No statement lines to export'); return; }
-    exportMemberStatementXlsx(soaStatement, currencyCode, soaFrom || undefined, soaTo || undefined);
-    toast.success(`Exported statement for ${soaStatement.member_name}`);
-  };
-
-  const handlePrintStatement = async () => {
-    if (!soaStatement) return;
-    try {
-      await printMemberStatement(soaStatement, currencyCode, soaFrom || undefined, soaTo || undefined);
-    } catch (e: any) {
-      toast.error(e?.message || 'Could not open the print window');
-    }
+  const buildStatementReport = (): ReportDocument => {
+    if (!soaStatement) throw new Error('Generate a statement first');
+    return buildMemberStatementReport(soaStatement, soaFrom || undefined, soaTo || undefined);
   };
 
   // A new filter or period starts again from the first page.
@@ -429,50 +420,83 @@ export function Billing({ onNavigate }: BillingProps = {}) {
     loadDues();
   };
 
-  const handleExportOverdueReport = () => {
+  const exporter = useReportExporter();
+
+  const duesTable = (title: string, rows: MemberDue[]) => tableSection(title, [
+    col('member_name', 'Member'), col('member_id', 'Member ID'), col('member_phone', 'Phone'), col('member_email', 'Email'),
+    col('membership', 'Membership'), col('due_type', 'Due type'), moneyCol('amount', 'Amount due'), moneyCol('freeze_charge_amount', 'Extra freeze days'),
+    col('due_date', 'Due date', 'date'), col('days_overdue', 'Days overdue', 'integer'), col('last_payment', 'Last payment', 'date'), col('status', 'Status'),
+  ], rows.map(m => ({ ...m, due_type: m.due_type ?? 'Membership Due', freeze_charge_amount: m.freeze_charge_amount ?? 0, sales_invoice: undefined })), { totals: true, emptyText: 'No member dues.' });
+
+  const buildOverdueReport = (): ReportDocument => {
     const overdue = memberDues.filter(m => m.status === 'Overdue');
-    if (overdue.length === 0) { toast.info('No overdue members to export'); return; }
-    const header = 'Member Name,Member ID,Email,Phone,Membership,Due Type,Amount Due,Extra Freeze Days Amount,Due Date,Days Overdue,Last Payment\n';
-    const rows = overdue.map(m =>
-      `"${m.member_name}","${m.member_id}","${m.member_email}","${m.member_phone}","${m.membership ?? ''}","${m.due_type ?? 'Membership Due'}","${m.amount ?? 0}","${m.freeze_charge_amount ?? 0}","${m.due_date ?? ''}","${m.days_overdue}","${m.last_payment ?? ''}"`
-    ).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `overdue-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${overdue.length} overdue member(s)`);
+    return {
+      title: 'Overdue Members Report', orientation: 'landscape',
+      period: { to: new Date(), label: 'As of today' },
+      sections: [
+        kpiSection([
+          { label: 'Overdue members', value: overdue.length, format: 'integer' },
+          { label: 'Overdue amount', value: overdue.reduce((s, m) => s + Number(m.amount || 0), 0), format: 'money' },
+        ]),
+        duesTable('Overdue members', overdue),
+      ],
+    };
   };
 
-  const handleExportAllReceipts = async () => {
-    if (receiptsTotal === 0) { toast.info('No receipts to export'); return; }
-    // Every receipt in the selected period and filters, not just the page on screen.
-    setExportingReceipts(true);
-    let periodReceipts: Receipt[];
-    try {
-      periodReceipts = await receiptsService.getAllReceipts({ ...receiptBaseFilters, ...presetRange(receiptDatePreset) });
-    } catch {
-      toast.error('Could not load receipts to export');
-      return;
-    } finally {
-      setExportingReceipts(false);
-    }
-    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount Paid,Remaining Due,Date & Time,Payment Method,Created By,Status\n';
-    const rows = periodReceipts.map(r => {
-      const paid = Number(r.paid_amount ?? 0);
-      const remainingDue = Number(r.balance_after ?? 0);
-      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${getDisplayStatus(r)}"`;
-    }).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipts-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${periodReceipts.length} receipt(s)`);
+  const buildDuesReport = (): ReportDocument => ({
+    title: 'Member Dues Report', orientation: 'landscape',
+    period: { to: new Date(), label: 'As of today' },
+    filters: [{ label: 'Showing', value: duesFilter === 'overdue' ? 'Overdue' : duesFilter === 'due-soon' ? 'Due soon' : 'All dues' }],
+    sections: [
+      kpiSection([
+        { label: 'Members with dues', value: filteredDues.length, format: 'integer' },
+        { label: 'Total due', value: filteredDues.reduce((s, m) => s + Number(m.amount || 0), 0), format: 'money' },
+        { label: 'Overdue', value: overdueCount, format: 'integer', hint: `amount ${(overdueAmount || 0).toLocaleString()}` },
+        { label: 'Due soon', value: dueSoonCount, format: 'integer' },
+      ]),
+      duesTable('Member dues', filteredDues),
+    ],
+  });
+
+  // Every receipt in the selected period and filters, not just the page on screen.
+  const buildReceiptsReport = async (): Promise<ReportDocument> => {
+    const periodReceipts = await receiptsService.getAllReceipts({ ...receiptBaseFilters, ...presetRange(receiptDatePreset) });
+    const range = presetRange(receiptDatePreset);
+    const paid = periodReceipts.reduce((s, r) => s + Number(r.paid_amount ?? 0), 0);
+    const due = periodReceipts.reduce((s, r) => s + Number(r.balance_after ?? 0), 0);
+    const byMethod = new Map<string, number>();
+    periodReceipts.forEach(r => { const m = r.payment_method || 'Unspecified'; byMethod.set(m, (byMethod.get(m) || 0) + Number(r.paid_amount ?? 0)); });
+    return {
+      title: 'Member Receipts Report', orientation: 'landscape',
+      period: { from: range.from, to: range.to ? new Date(range.to.getTime() - 1) : undefined, label: RECEIPT_DATE_PRESETS.find(p => p.value === receiptDatePreset)?.label },
+      filters: [
+        { label: 'Search', value: receiptBaseFilters.search },
+        { label: 'Transaction type', value: receiptBaseFilters.transactionType ?? 'All' },
+        { label: 'Status', value: receiptBaseFilters.status ?? 'All' },
+      ],
+      sections: [
+        kpiSection([
+          { label: 'Receipts', value: periodReceipts.length, format: 'integer' },
+          { label: 'Amount paid', value: paid, format: 'money' },
+          { label: 'Remaining due', value: due, format: 'money' },
+        ]),
+        pieSection('Collected by payment method', [...byMethod.entries()].map(([label, value]) => ({ label, value })), { valueFormat: 'money' }),
+        tableSection('Receipts', [
+          col('receipt_no', 'Receipt No'), col('date', 'Date & time', 'datetime'), col('member_name', 'Member'), col('member_id', 'Member ID'),
+          col('plan_name', 'Plan'), col('transaction_type', 'Type'), moneyCol('paid', 'Amount paid'), moneyCol('due', 'Remaining due'),
+          col('payment_method', 'Payment method'), col('processed_by', 'Created by'), col('status', 'Status'),
+        ], periodReceipts.map(r => ({
+          receipt_no: r.receipt_no, date: r.transaction_date, member_name: r.member_name, member_id: r.member_id, plan_name: r.plan_name ?? '',
+          transaction_type: r.transaction_type, paid: Number(r.paid_amount ?? 0), due: Number(r.balance_after ?? 0),
+          payment_method: r.payment_method ?? '', processed_by: r.processed_by ?? '', status: getDisplayStatus(r),
+        })), { totals: true, emptyText: 'No receipts in this period.' }),
+      ],
+    };
+  };
+
+  const handleExportOverdueReport = () => {
+    if (!memberDues.some(m => m.status === 'Overdue')) { toast.info('No overdue members to export'); return; }
+    exporter.run('xlsx', buildOverdueReport);
   };
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -496,6 +520,34 @@ export function Billing({ onNavigate }: BillingProps = {}) {
   const paymentBreakdown = stats?.payment_method_breakdown ?? {};
   const totalBreakdown   = Object.values(paymentBreakdown).reduce((s, v) => s + Number(v), 0);
 
+  const buildCollectionReport = (): ReportDocument => ({
+    title: 'Total Collection Report',
+    period: { label: 'Monthly collections' },
+    sections: [
+      kpiSection([
+        { label: 'This month', value: Number(monthlyCollection), format: 'money', hint: monthlyTarget > 0 ? `${((Number(monthlyCollection) / monthlyTarget) * 100).toFixed(1)}% of target` : undefined },
+        { label: 'Monthly target', value: monthlyTarget, format: 'money' },
+        { label: 'Average monthly', value: chartData.length ? chartData.reduce((s, d) => s + d.collected, 0) / chartData.length : 0, format: 'money', hint: `Based on ${chartData.filter(d => d.collected > 0).length} active months` },
+        { label: 'Collection rate', value: collectionRate, format: 'percent', hint: 'Paid vs total billed this month' },
+      ]),
+      chartFromRows('Collected vs target by month', 'bar', chartData, 'month', [
+        { key: 'collected', name: 'Collected', color: '#2a78d6' }, { key: 'target', name: 'Target', color: '#b7d3f6' },
+      ], { valueFormat: 'money' }),
+      tableSection('Monthly collection', [col('month', 'Month'), moneyCol('collected', 'Collected'), moneyCol('target', 'Target'), col('pct', 'Achieved', 'percent')],
+        chartData.map(d => ({ ...d, pct: d.target ? Math.round((d.collected / d.target) * 1000) / 10 : null })), { totals: true }),
+      tableSection('Payment methods · this month', [col('method', 'Method'), moneyCol('amount', 'Amount'), col('share', 'Share', 'percent', { total: 'sum' })],
+        Object.entries(paymentBreakdown).sort(([, a], [, b]) => Number(b) - Number(a))
+          .map(([method, amount]) => ({ method, amount: Number(amount), share: totalBreakdown > 0 ? Math.round((Number(amount) / totalBreakdown) * 1000) / 10 : 0 })), { totals: true }),
+    ],
+  });
+
+  const tabReport = (): ReportDocument | Promise<ReportDocument> => {
+    if (billingTab === 'dues') return buildDuesReport();
+    if (billingTab === 'soa') return buildStatementReport();
+    if (billingTab === 'collection') return buildCollectionReport();
+    return buildReceiptsReport();
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -506,9 +558,9 @@ export function Billing({ onNavigate }: BillingProps = {}) {
           <p className="text-muted-foreground">Manage member receipts, dues, and payment collections.</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={handleExportAllReceipts}>
-            <Download className="mr-2 h-4 w-4" />Export Data
-          </Button>
+          {!(billingTab === 'soa' && (!soaStatement || soaStatement.billed_to_head)) && (
+            <ReportActions report={tabReport} size="default" menuLabel={billingTab === 'dues' ? 'Member dues' : billingTab === 'soa' ? 'Statement of account' : billingTab === 'collection' ? 'Total collection' : 'Member receipts'} />
+          )}
           <Button variant="outline" onClick={() => setShowTemplateEditor(true)}>
             <Palette className="mr-2 h-4 w-4" />Edit Template
           </Button>
@@ -733,9 +785,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                   <CardDescription>Open a receipt to print it, or use More to view or send it</CardDescription>
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleExportAllReceipts} disabled={exportingReceipts}>
-                    {exportingReceipts ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Export CSV
-                  </Button>
+                  <ReportActions report={buildReceiptsReport} disabled={receiptsTotal === 0} menuLabel="Member receipts" compact />
                 </div>
               </div>
             </CardHeader>
@@ -1274,12 +1324,7 @@ export function Billing({ onNavigate }: BillingProps = {}) {
                 </Button>
                 {soaStatement && !soaStatement.billed_to_head && (
                   <>
-                    <Button variant="outline" onClick={handlePrintStatement}>
-                      <Printer className="mr-2 h-4 w-4" />Print
-                    </Button>
-                    <Button variant="outline" onClick={handleExportStatementXlsx}>
-                      <Download className="mr-2 h-4 w-4" />Export Excel
-                    </Button>
+                    <ReportActions report={buildStatementReport} size="default" menuLabel="Statement of account" />
                   </>
                 )}
               </div>

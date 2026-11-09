@@ -28,6 +28,7 @@ import { authService } from "../../utils/supabase/auth-service";
 import { receiptsService, type Receipt } from "../../utils/supabase/receipts-service";
 import { downloadReceiptInvoice, downloadPaymentReceipt } from "../../utils/receipt-invoice";
 import { classifyRenewals, hasStoredRenewalKind, matchesKind, type RenewalKind } from "./RenewalTransactionHistory";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../report-export";
 
 export type LifecycleReportType = "transactions" | "renewals" | "expired" | "expiring" | "joined" | "freeze";
 
@@ -204,19 +205,7 @@ export async function countRenewalReport(): Promise<{ renewals: number; changes:
   return { renewals, changes: rows.length - renewals, total: rows.length };
 }
 
-function downloadCsv(filename: string, header: string[], rows: unknown[][]) {
-  const cell = (v: unknown) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const csv = [header, ...rows].map((r) => r.map(cell).join(",")).join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+
 
 /**
  * Members → Reports for the membership lifecycle: renewals, expired, expiring soon,
@@ -237,6 +226,8 @@ export function MembershipLifecycleReport({
   const isFuture = reportType === "expiring";
   const [range, setRange] = useState<RangeKey>(defaultRangeFor(reportType));
   const [custom, setCustom] = useState({ from: "", to: "" });
+  // The window the rows on screen were generated for (exports label that period, not an unapplied edit)
+  const generatedWindow = React.useRef<{ from: string; to: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [memberRows, setMemberRows] = useState<MemberRow[]>([]);
@@ -278,6 +269,7 @@ export function MembershipLifecycleReport({
     setLoading(true);
     try {
       const result = await loadReportRows(reportType, window);
+      generatedWindow.current = window;
       if (result.kind === "freeze") setFreezeRows(result.rows);
       else if (result.kind === "receipts") {
         setRenewalRows(result.rows);
@@ -335,24 +327,36 @@ export function MembershipLifecycleReport({
     ];
   }, [reportType, isReceiptReport, freezeRows, renewalRows, renewalKinds, memberRows]);
 
-  const exportCsv = () => {
-    const stamp = format(new Date(), ISO);
+  const buildReport = (): ReportDocument => {
+    const title = LIFECYCLE_REPORT_TYPES.find((t) => t.value === reportType)?.label ?? "Membership Report";
+    const w = generatedWindow.current;
+    let table;
     if (reportType === "freeze") {
-      downloadCsv(`freeze-report-${stamp}.csv`,
-        ["Member ID", "Member", "Mobile", "Plan", "Freeze Start", "Planned End", "Unfrozen On", "Status", "Requested Days", "Days Frozen", "Free Days", "Charged Days", `Charge (${currencyCode})`, "Reason"],
-        freezeRows.map((r) => [r.memberId, r.name, r.phone, r.plan, r.freezeStart, r.plannedEnd, r.endedAt, r.status, r.requestedDays, r.daysFrozen, r.freeDays, r.chargedDays, num(r.chargeAmount), r.reason]));
+      table = tableFromMatrix("Freezes",
+        ["Member ID", "Member", "Mobile", "Plan", "Freeze Start", "Planned End", "Unfrozen On", "Status", "Requested Days", "Days Frozen", "Free Days", "Charged Days", "Charge", "Reason"],
+        freezeRows.map((r) => [r.memberId, r.name, r.phone, r.plan, r.freezeStart, r.plannedEnd, r.endedAt, r.status, r.requestedDays, r.daysFrozen, r.freeDays, r.chargedDays, num(r.chargeAmount), r.reason]),
+        { totals: true, money: [12], wrap: [13] });
     } else if (isReceiptReport) {
-      downloadCsv(`${reportType}-report-${stamp}.csv`,
-        ["Date", "Receipt No", "Type", "Member ID", "Member", "Mobile", "Plan", `Amount (${currencyCode})`, `Paid (${currencyCode})`, "Payment Method", "New Expiry", "Processed By", "Status"],
-        renewalRows.map((r) => [r.transaction_date, r.receipt_no,
-          reportType === "renewals" ? renewalKinds[String(r.id)] ?? "Renewal" : r.transaction_type, r.member_id, r.member_name, r.member_phone, r.plan_name, num(r.amount), num(r.paid_amount), r.payment_method, r.valid_till, r.processed_by, r.status]));
+      table = tableFromMatrix("Transactions",
+        ["Date", "Receipt No", "Type", "Member ID", "Member", "Mobile", "Plan", "Amount", "Paid", "Payment Method", "New Expiry", "Processed By", "Status"],
+        renewalRows.map((r) => [r.transaction_date ? r.transaction_date.slice(0, 10) : "", r.receipt_no,
+          reportType === "renewals" ? renewalKinds[String(r.id)] ?? "Renewal" : r.transaction_type, r.member_id, r.member_name, r.member_phone, r.plan_name, num(r.amount), num(r.paid_amount), r.payment_method, r.valid_till ? String(r.valid_till).slice(0, 10) : "", r.processed_by, r.status]),
+        { totals: true, money: [7, 8] });
     } else {
-      downloadCsv(`${reportType}-members-report-${stamp}.csv`,
-        ["Member ID", "Member", "Mobile", "Email", "Membership Type", "Plan", "Status", "Join Date", "Start Date", "Expiry Date", reportType === "expired" ? "Days Since Expiry" : "Days Left", `Outstanding (${currencyCode})`],
+      table = tableFromMatrix("Members",
+        ["Member ID", "Member", "Mobile", "Email", "Membership Type", "Plan", "Status", "Join Date", "Start Date", "Expiry Date", reportType === "expired" ? "Days Since Expiry" : "Days Left", "Outstanding"],
         memberRows.map((r) => [r.memberId, r.name, r.phone, r.email, r.membershipType, r.plan, r.status, r.joinDate, r.startDate, r.expiryDate,
-          r.daysFromToday == null ? "" : Math.abs(r.daysFromToday), num(r.outstandingBalance)]));
+          r.daysFromToday == null ? "" : Math.abs(r.daysFromToday), num(r.outstandingBalance)]),
+        { totals: true, money: [11], noMoney: [10] });
     }
-    toast.success(`Exported ${rowCount} rows`);
+    return {
+      title, orientation: "landscape",
+      period: w ? { from: w.from, to: w.to, label: (isFuture ? FUTURE_RANGES : PAST_RANGES).find((r) => r.value === range)?.label } : undefined,
+      sections: [
+        kpiSection(summary.map((s) => ({ label: s.label, value: s.value, format: (s as { money?: boolean }).money ? "money" : "integer" })), "Summary"),
+        table,
+      ],
+    };
   };
 
   const ranges = isFuture ? FUTURE_RANGES : PAST_RANGES;
@@ -392,10 +396,7 @@ export function MembershipLifecycleReport({
               {loading ? "Generating..." : "Generate Report"}
             </Button>
             {generated && (
-              <Button variant="outline" onClick={exportCsv} disabled={rowCount === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Export Report
-              </Button>
+              <ReportActions report={buildReport} disabled={loading} size="default" menuLabel={LIFECYCLE_REPORT_TYPES.find((t) => t.value === reportType)?.label} />
             )}
           </div>
         </CardContent>

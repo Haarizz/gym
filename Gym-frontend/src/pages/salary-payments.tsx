@@ -48,9 +48,9 @@ import { format, addMonths } from "date-fns";
 import { BarChart, Bar, PieChart as RechartsPie, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
 import { salaryPaymentsService, SalaryPayItem, SalarySettlement } from "../utils/supabase/salary-payments-service";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 import { printHtml } from "../utils/print-html";
-import { getCompanyDetails } from "../utils/company-details";
+import { companyLocalNameHtml, getCompanyDetails } from "../utils/company-details";
 import { amountInWords } from "../components/print-templates/documentTemplate";
 import { Note } from "../components/workforce/ui";
 
@@ -174,6 +174,7 @@ body{font-family:'Plus Jakarta Sans Variable',"Segoe UI",Arial,sans-serif;color:
 .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2B7A78;padding-bottom:14px;margin-bottom:18px}
 .top img{max-height:48px;max-width:200px;display:block;margin-bottom:6px}
 .co{font-size:22px;font-weight:700;color:#2B7A78}
+.co-l{font-size:17px;font-weight:700;color:#2B7A78;line-height:1.35}
 .co-d{color:#64748b;font-size:11px;line-height:1.6}
 .title{text-align:right}
 .title h1{margin:0;font-size:18px;letter-spacing:.06em;color:#1e293b}
@@ -198,6 +199,7 @@ footer{margin-top:28px;font-size:10px;color:#94a3b8;text-align:center}
 <div class="top">
   <div>${company?.logo ? `<img src="${company.logo}" alt="">` : ""}
     <div class="co">${esc(company?.name || "GymBios")}</div>
+    ${company ? companyLocalNameHtml(company, "co-l") : ""}
     <div class="co-d">${[company?.address, [company?.phone && `Phone: ${company.phone}`, company?.email && `Email: ${company.email}`].filter(Boolean).join(" | "), company?.trn && `TRN: ${company.trn}`].filter(Boolean).map(esc).join("<br/>")}</div>
   </div>
   <div class="title"><h1>SALARY PAYMENT VOUCHER</h1><div class="no">${esc(voucherNo)}</div>
@@ -483,38 +485,36 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
     }
   };
 
-  const handleExportEmployees = () => {
-    if (filteredEmployees.length === 0) {
-      toast.error("No employees to export");
-      return;
-    }
-    exportAsCsv(
-      `payroll-employees_${format(new Date(), "yyyy-MM-dd")}.csv`,
-      ["Employee ID", "Name", "Department", "Designation", "Base Salary", "Allowances", "Deductions", "Net Salary", "Status", "Last Payment Date"],
-      filteredEmployees.map(e => [
-        e.employeeId, e.name, e.department, e.designation,
-        e.baseSalary, e.allowances, e.deductions, e.netSalary, e.paymentStatus,
-        e.lastPaymentDate ? format(e.lastPaymentDate, "yyyy-MM-dd") : "",
-      ])
-    );
-    toast.success("Export started");
-  };
+  const buildEmployeesReport = (): ReportDocument => ({
+    title: "Salary Payments · Employees", fileName: "Salary Payments Employees", orientation: "landscape",
+    period: { label: "Current salary month" },
+    sections: [
+      kpiSection([
+        { label: "Employees", value: filteredEmployees.length, format: "integer" },
+        { label: "Net salary", value: filteredEmployees.reduce((s, e) => s + Number(e.netSalary || 0), 0), format: "money" },
+        { label: "Paid", value: filteredEmployees.filter(e => e.paymentStatus === "Paid").length, format: "integer" },
+        { label: "Not paid", value: filteredEmployees.filter(e => e.paymentStatus !== "Paid").length, format: "integer" },
+      ]),
+      tableFromMatrix("Employees",
+        ["Employee ID", "Name", "Department", "Designation", "Base Salary", "Allowances", "Deductions", "Net Salary", "Status", "Last Payment Date"],
+        filteredEmployees.map(e => [e.employeeId, e.name, e.department, e.designation, e.baseSalary, e.allowances, e.deductions, e.netSalary, e.paymentStatus,
+          e.lastPaymentDate ? format(e.lastPaymentDate, "yyyy-MM-dd") : ""]),
+        { totals: true, money: [4, 5, 6, 7] }),
+    ],
+  });
 
-  const handleExportPaymentHistory = () => {
-    if (paymentHistory.length === 0) {
-      toast.error("No payment history to export");
-      return;
-    }
-    exportAsCsv(
-      `salary-payments_${format(new Date(), "yyyy-MM-dd")}.csv`,
-      ["Employee", "Month", "Year", "Net Salary", "Payment Date", "Status", "Processed By"],
-      paymentHistory.map(p => [
-        p.employeeName, p.month, p.year, p.netSalary,
-        format(p.paymentDate, "yyyy-MM-dd"), p.status, p.processedBy,
-      ])
-    );
-    toast.success("Export started");
-  };
+  const buildPaymentHistoryReport = (): ReportDocument => ({
+    title: "Salary Payments Report", period: { label: "Payment history" },
+    sections: [
+      kpiSection([
+        { label: "Payments", value: paymentHistory.length, format: "integer" },
+        { label: "Total paid", value: paymentHistory.reduce((s, p) => s + Number(p.netSalary || 0), 0), format: "money" },
+      ]),
+      tableFromMatrix("Salary payments", ["Employee", "Month", "Year", "Net Salary", "Payment Date", "Status", "Processed By"],
+        paymentHistory.map(p => [p.employeeName, p.month, String(p.year), p.netSalary, format(p.paymentDate, "yyyy-MM-dd"), p.status, p.processedBy]),
+        { totals: true, money: [3] }),
+    ],
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -861,13 +861,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                     <Send className="mr-2 h-4 w-4" />
                     Process Payment ({selectedEmployees.length})
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleExportEmployees}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
+                  <ReportActions report={buildEmployeesReport} size="default" disabled={filteredEmployees.length === 0} menuLabel="Employees" />
                 </div>
               </div>
             </CardContent>
@@ -1049,13 +1043,7 @@ ${payment.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(payment.note
                   <CardTitle>Recent Payment Transactions</CardTitle>
                   <CardDescription>Latest salary payments processed</CardDescription>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={handleExportPaymentHistory}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Report
-                </Button>
+                <ReportActions report={buildPaymentHistoryReport} size="default" disabled={paymentHistory.length === 0} menuLabel="Salary payments" />
               </div>
             </CardHeader>
             <CardContent>

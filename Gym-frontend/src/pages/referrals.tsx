@@ -66,6 +66,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { toast } from "sonner";
+import { ReportActions, useReportExporter, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 interface ReferralData {
   id: string;
@@ -436,19 +437,25 @@ export function Referrals() {
     setQrDialogLink(absoluteLink(link));
   }, []);
 
-  const handleExportCSV = useCallback(() => {
-    const csv = ['Referrer,Referee,Email,Status,Reward,Date', ...apiReferrals.map(r =>
-      `${r.referrerName},${r.refereeName},${r.refereeEmail || ''},${r.status},${r.rewardAmount || 0},${r.date || r.createdAt}`
-    )].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'referrals.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Report downloaded');
+  const referralExporter = useReportExporter();
+  const buildReferralsReport = useCallback((): ReportDocument => {
+    const byStatus = (s: string) => apiReferrals.filter(r => (r.status || '').toLowerCase() === s).length;
+    return {
+      title: 'Referrals Report',
+      period: { to: new Date(), label: 'All referrals' },
+      sections: [
+        kpiSection([
+          { label: 'Referrals', value: apiReferrals.length, format: 'integer' },
+          { label: 'Converted', value: byStatus('converted') + byStatus('completed') + byStatus('paid'), format: 'integer' },
+          { label: 'Pending', value: byStatus('pending'), format: 'integer' },
+          { label: 'Rewards', value: apiReferrals.reduce((s, r) => s + Number(r.rewardAmount || 0), 0), format: 'money' },
+        ]),
+        tableSection('Referrals', [col('referrer', 'Referrer'), col('referee', 'Referee'), col('email', 'Email'), col('status', 'Status'), moneyCol('reward', 'Reward'), col('date', 'Date', 'date')],
+          apiReferrals.map(r => ({ referrer: r.referrerName, referee: r.refereeName, email: r.refereeEmail || '', status: r.status, reward: Number(r.rewardAmount || 0), date: r.date || r.createdAt })), { totals: true }),
+      ],
+    };
   }, [apiReferrals]);
+  const handleExportCSV = () => referralExporter.run('xlsx', buildReferralsReport);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -490,10 +497,7 @@ export function Referrals() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Data
-          </Button>
+          <ReportActions report={buildReferralsReport} size="default" menuLabel="Referrals" />
           <Button
             onClick={handleOpenAddReferral}
             disabled={settings.programEnabled === false}
@@ -734,7 +738,7 @@ export function Referrals() {
                 </Button>
                 <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={handleExportCSV}>
                   <BarChart3 className="h-6 w-6 text-purple-600" />
-                  <span>Export CSV</span>
+                  <span>Export Excel</span>
                 </Button>
                 <Button variant="secondary" className="h-20 flex-col space-y-2 bg-white/80 shadow-sm hover:shadow-md" onClick={() => setActiveTab('settings')}>
                   <Settings className="h-6 w-6 text-gray-600" />

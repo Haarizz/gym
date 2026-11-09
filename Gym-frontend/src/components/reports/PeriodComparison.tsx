@@ -27,6 +27,7 @@ import { Button } from "../ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { CurrencyGlyph, useCurrency } from "../../utils/currency";
 import { dashboardService, type RevenueGranularity, type RevenueSummary } from "../../utils/supabase/dashboard-service";
+import { ReportActions, type ReportDocument, type ReportSection, chartFromRows, col, kpiSection, tableSection } from "../report-export";
 
 const ISO = "yyyy-MM-dd";
 const CURRENT = "var(--gb-primary-deep)";
@@ -109,6 +110,14 @@ function Change({ current, previous, lowerIsBetter }: { current: number; previou
       {up ? "+" : ""}{pct.toFixed(1)}%
     </span>
   );
+}
+
+/** KPI hint/tone from a current vs previous pair, matching the on-screen Change badge. */
+function hintOf(current: number, previous: number, vs: string): { hint: string; tone?: "good" | "bad" | "neutral" } {
+  const pct = changePct(current, previous);
+  if (pct === null) return { hint: `New ${vs}` };
+  const r = Math.round(pct * 10) / 10;
+  return { hint: `${r > 0 ? "+" : ""}${r}% ${vs}`, tone: r > 0 ? "good" : r < 0 ? "bad" : "neutral" };
 }
 
 const Value = ({ v, isMoney }: { v: number; isMoney: boolean }) =>
@@ -242,6 +251,48 @@ export function PeriodComparison() {
   const monthLabel = format(d.thisMonthStart, "MMMM yyyy");
   const lastMonthLabel = format(d.lastMonthStart, "MMMM yyyy");
 
+  // Export / print: every comparison on this panel, with the same figures and change rules.
+  const buildReport = (): ReportDocument => {
+    const pct = (cur: number, prev: number) => changePct(cur, prev);
+    const compare = (title: string, curLabel: string, prevLabel: string, cur: RevenueSummary, prev: RevenueSummary, money: boolean): ReportSection =>
+      tableSection(title, [
+        col("metric", "Metric"), col("cur", curLabel, money ? "money" : "integer"), col("prev", prevLabel, money ? "money" : "integer"),
+        col("change", "Change", "percent"),
+      ], METRICS.filter((m) => m.money === money).map((m) => {
+        const a = metric(cur, m.key);
+        const b = metric(prev, m.key);
+        const ch = pct(a, b);
+        return { _kind: m.bold ? "subtotal" : "data", metric: m.label.startsWith("  ") ? `   ${m.label.trim()}` : m.label, cur: a, prev: b, change: ch == null ? "New" : Math.round(ch * 10) / 10 };
+      }));
+    return {
+      title: "Period Comparison Report",
+      fileName: "Period Comparison",
+      period: { from: d.lastMonthStart, to: d.today, label: `${lastMonthLabel} – ${format(d.today, "dd MMM yyyy")}` },
+      sections: [
+        kpiSection([
+          { label: "Today's collection", value: metric(data.today, "collection"), format: "money", ...hintOf(metric(data.today, "collection"), metric(data.yesterday, "collection"), "vs yesterday") },
+          { label: "This month's collection", value: metric(data.thisMonth, "collection"), format: "money", ...hintOf(metric(data.thisMonth, "collection"), metric(data.lastMonthSame, "collection"), "vs same period last month") },
+          { label: "This month's net profit", value: metric(data.thisMonth, "net"), format: "money", ...hintOf(metric(data.thisMonth, "net"), metric(data.lastMonthSame, "net"), "vs same period last month") },
+          { label: "Last month's net profit", value: metric(data.lastMonthFull, "net"), format: "money", hint: lastMonthLabel },
+        ], "Headline"),
+        compare("Today vs Yesterday", format(d.today, "dd MMM"), format(d.yesterday, "dd MMM"), data.today, data.yesterday, true),
+        compare("Today vs Yesterday · activity", format(d.today, "dd MMM"), format(d.yesterday, "dd MMM"), data.today, data.yesterday, false),
+        chartFromRows("Collection by hour · today vs yesterday", "line", hourly, "hour", [
+          { key: "Today", name: "Today", color: "#2a78d6" }, { key: "Yesterday", name: "Yesterday", color: "#8a8780" },
+        ], { valueFormat: "money" }),
+        compare(`This month vs same period last month`, monthLabel, `${lastMonthLabel} (same days)`, data.thisMonth, data.lastMonthSame, true),
+        compare(`This month vs same period last month · activity`, monthLabel, `${lastMonthLabel} (same days)`, data.thisMonth, data.lastMonthSame, false),
+        chartFromRows("Daily collection · this month vs last month", "line", daily, "day", [
+          { key: "This Month", name: "This month", color: "#2a78d6" }, { key: "Last Month", name: "Last month", color: "#eb6834" },
+        ], { valueFormat: "money" }),
+        chartFromRows("Revenue streams · this month vs same period last month", "bar", streams, "stream", [
+          { key: "This Month", name: "This month", color: "#2a78d6" }, { key: "Last Month (same period)", name: "Last month (same period)", color: "#eb6834" },
+        ], { valueFormat: "money" }),
+        tableSection("Profit comparison", [col("period", "Period"), col("Collection", "Collection", "money"), col("Expenses", "Expenses", "money"), col("Net Profit", "Net profit", "money")], profit),
+      ],
+    };
+  };
+
   return (
     <div className="space-y-6 mb-6">
       {/* Headline cards */}
@@ -274,9 +325,12 @@ export function PeriodComparison() {
             <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" />Today vs Yesterday</CardTitle>
             <CardDescription>{format(d.today, "dd/MM/yyyy")} compared with {format(d.yesterday, "dd/MM/yyyy")}</CardDescription>
           </div>
-          <Button size="sm" variant="outline" onClick={load} disabled={loading} data-print-hide>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
-          </Button>
+          <div className="flex items-center gap-2" data-print-hide>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
+            </Button>
+            <ReportActions report={buildReport} disabled={loading} menuLabel="Period comparison" compact />
+          </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Table>

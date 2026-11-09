@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useCurrency, CurrencyValue } from '../utils/currency';
 import { useBranch } from '../utils/branch-context';
 import { toast } from 'sonner';
-import { exportAsExcel } from '../utils/export-utils';
+import { ReportActions, useReportExporter, type ReportDocument, type ReportRow, col, kpiSection, moneyCol, tableSection } from '../components/report-export';
 import { ledgersService, AccountHead as ApiAccountHead, CostCenter as ApiCostCenter, LedgerTransaction } from '../utils/supabase/ledgers-service';
 import { ListPagination } from '../components/list-pagination';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -562,39 +562,74 @@ export function Ledgers() {
     }
   };
 
-  // Exports whichever tab is currently active — Chart of Accounts, Cost Centers, or
-  // Transactions each have a different shape, so there's no single generic export.
-  // "pdf" is browser print (matches financial-reports.tsx's convention) since there's
-  // no backend PDF generator; "excel" is a real .xls file via export-utils.
-  const exportLedger = (fileFormat: 'excel' | 'pdf') => {
-    if (fileFormat === 'pdf') {
-      window.print();
-      return;
-    }
-    const dateLabel = new Date().toISOString().split('T')[0];
+  // Export / print: whichever tab is active, with every row its filters match (not just the page)
+  const ledgerExporter = useReportExporter();
+  const buildLedgerReport = async (): Promise<ReportDocument> => {
     if (activeTab === 'cost-centers') {
-      if (filteredCostCenters.length === 0) { toast.error('No cost centers to export'); return; }
-      exportAsExcel(
-        `cost-centers_${dateLabel}.xls`,
-        ['Code', 'Name', 'Branch', 'Manager', 'Budget', 'Spent', 'Utilization %', 'Status'],
-        filteredCostCenters.map(cc => [cc.code, cc.name, cc.branch ?? '', cc.manager ?? '', cc.budget, cc.spent, cc.utilization, cc.isActive ? 'Active' : 'Inactive'])
-      );
-    } else if (activeTab === 'transactions') {
-      if (transactions.length === 0) { toast.error('No transactions to export'); return; }
-      exportAsExcel(
-        `transactions_${dateLabel}.xls`,
-        ['Date', 'Reference', 'Type', 'Description', 'Debit', 'Credit', 'Branch', 'Status'],
-        transactions.map(tx => [tx.date, tx.referenceNo, tx.type, tx.description ?? '', tx.debit, tx.credit, tx.branch ?? '', tx.status ?? ''])
-      );
-    } else {
-      if (filteredAccounts.length === 0) { toast.error('No accounts to export'); return; }
-      exportAsExcel(
-        `chart-of-accounts_${dateLabel}.xls`,
-        ['Code', 'Name', 'Group', 'Branch', 'Cost Center', 'Opening Balance', 'Current Balance', 'Status'],
-        filteredAccounts.map(a => [a.code, a.name, a.group, a.branch, a.costCenter, a.openingBalance, a.currentBalance, a.status])
-      );
+      return {
+        title: 'Cost Centers Report', period: { to: new Date(), label: 'Current budgets' },
+        sections: [tableSection('Cost centers', [
+          col('code', 'Code'), col('name', 'Name'), col('branch', 'Branch'), col('manager', 'Manager'), moneyCol('budget', 'Budget'), moneyCol('spent', 'Spent'),
+          col('utilization', 'Utilization', 'percent'), col('status', 'Status'),
+        ], filteredCostCenters.map(cc => ({ ...cc, branch: cc.branch ?? '', manager: cc.manager ?? '', status: cc.isActive ? 'Active' : 'Inactive' })), { totals: true })],
+      };
     }
-    toast.success('Export started');
+    if (activeTab === 'transactions') {
+      const all: LedgerTransaction[] = [];
+      for (let page = 1; page <= 200; page++) {
+        const res = await ledgersService.getTransactions({
+          from: txDateFrom || undefined, to: txDateTo || undefined, type: txTypeFilter !== 'all' ? txTypeFilter : undefined,
+          search: txSearch || undefined, page, limit: 500,
+        });
+        all.push(...res.transactions);
+        if (page >= (res.pagination.totalPages || 1) || res.transactions.length === 0) break;
+      }
+      return {
+        title: 'Ledger Transactions', orientation: 'landscape',
+        period: txDateFrom || txDateTo ? { from: txDateFrom || undefined, to: txDateTo || undefined } : { label: 'All dates' },
+        filters: [{ label: 'Type', value: txTypeFilter !== 'all' ? txTypeFilter : 'All' }, { label: 'Search', value: txSearch || undefined }],
+        sections: [tableSection('Transactions', [
+          col('date', 'Date', 'date'), col('referenceNo', 'Reference'), col('type', 'Type'), col('description', 'Description', 'text', { wrap: true }),
+          moneyCol('debit', 'Debit'), moneyCol('credit', 'Credit'), col('branch', 'Branch'), col('status', 'Status'),
+        ], all.map(tx => ({ ...tx, description: tx.description ?? '', branch: tx.branch ?? '', status: tx.status ?? '' })), { totals: true })],
+      };
+    }
+    if (activeTab === 'general-ledger') {
+      const entries = await ledgersService.getLedgerEntries(selectedGLAccount, glDateFrom, glDateTo);
+      const acct = accounts.find(a => a.code === selectedGLAccount);
+      const rows: ReportRow[] = entries.map(e => ({
+        date: e.date, voucherNo: e.reference, type: e.sourceType === 'JOURNAL_VOUCHER' ? 'Journal Voucher' : e.sourceType,
+        account: e.accountName ?? acct?.name ?? e.accountCode ?? '', particulars: e.description, debit: e.debit || null, credit: e.credit || null,
+        balance: Math.abs(e.balance), side: e.balance >= 0 ? 'Dr' : 'Cr',
+      }));
+      const debit = entries.reduce((s, e) => s + Number(e.debit || 0), 0);
+      const credit = entries.reduce((s, e) => s + Number(e.credit || 0), 0);
+      if (rows.length) rows.push({ _kind: 'total', particulars: 'Totals', debit, credit });
+      return {
+        title: 'General Ledger', orientation: 'landscape',
+        period: { from: glDateFrom, to: glDateTo },
+        filters: [{ label: 'Account', value: selectedGLAccount === 'all' ? 'All accounts' : `${selectedGLAccount} · ${acct?.name ?? ''}` }],
+        sections: [
+          kpiSection([
+            { label: 'Entries', value: entries.length, format: 'integer' },
+            { label: 'Total debit', value: debit, format: 'money' },
+            { label: 'Total credit', value: credit, format: 'money' },
+            { label: 'Net', value: debit - credit, format: 'money' },
+          ]),
+          { kind: 'table', title: 'Ledger entries', columns: [
+            col('date', 'Date', 'date'), col('voucherNo', 'Voucher'), col('type', 'Type'), col('account', 'Account'), col('particulars', 'Particulars', 'text', { wrap: true }),
+            col('debit', 'Debit', 'money'), col('credit', 'Credit', 'money'), col('balance', 'Balance', 'money'), col('side', 'Dr/Cr'),
+          ], rows, emptyText: 'No ledger entries for this account and period.' },
+        ],
+      };
+    }
+    return {
+      title: 'Chart of Accounts', orientation: 'landscape', period: { to: new Date(), label: 'Current balances' },
+      sections: [tableSection('Accounts', [
+        col('code', 'Code'), col('name', 'Name'), col('group', 'Group'), col('branch', 'Branch'), col('costCenter', 'Cost center'),
+        moneyCol('openingBalance', 'Opening balance'), moneyCol('currentBalance', 'Current balance'), col('status', 'Status'),
+      ], filteredAccounts, { totals: true })],
+    };
   };
 
   const openAccountDetails = (account: any) => {
@@ -614,14 +649,7 @@ export function Ledgers() {
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => exportLedger('excel')}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
-            <Button variant="outline" size="sm" className="shadow-sm hover:shadow-md transition-all" onClick={() => exportLedger('pdf')}>
-              <Printer className="h-4 w-4 mr-2" />
-              Export PDF
-            </Button>
+            <ReportActions report={buildLedgerReport} menuLabel={activeTab === 'general-ledger' ? 'General ledger' : activeTab === 'cost-centers' ? 'Cost centers' : activeTab === 'transactions' ? 'Transactions' : 'Chart of accounts'} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" className="shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
@@ -942,9 +970,9 @@ export function Ledgers() {
                   </div>
 
                   <div className="flex items-end space-x-2">
-                    <Button onClick={() => exportLedger('pdf')} className="flex-1">
+                    <Button onClick={() => ledgerExporter.run('pdf', buildLedgerReport)} disabled={!!ledgerExporter.busy} className="flex-1">
                       <FileText className="h-4 w-4 mr-2" />
-                      Generate Report
+                      {ledgerExporter.busy === 'pdf' ? 'Generating…' : 'Generate PDF'}
                     </Button>
                   </div>
                 </div>

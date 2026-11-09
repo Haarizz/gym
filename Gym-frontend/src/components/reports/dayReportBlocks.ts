@@ -7,6 +7,8 @@ import type { XlsxCell } from "../../utils/xlsx-export";
  * view — so every format shows exactly the same figures.
  */
 
+import type { ReportColumn, ReportRow, TableSection } from "../report-export/types";
+
 export type Row = Record<string, any>;
 export interface DayReportData {
   date: string;
@@ -45,6 +47,8 @@ export interface Block {
   amount?: number;
   error?: string;
   empty?: string;
+  /** Plain-text export: never shorten its cells (sentences, e.g. highlights) */
+  fullText?: boolean;
 }
 
 export const num = (v: unknown) => {
@@ -54,6 +58,22 @@ export const num = (v: unknown) => {
 export const money = (v: unknown) => num(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const sum = (rows: Row[] | null | undefined, key: string) => (rows || []).reduce((s, r) => s + num(r[key]), 0);
 export const hourLabel = (h: number) => format(new Date(2000, 0, 1, h), "h a");
+
+/**
+ * Expenses deducted from collection — the server's ExpenseRepository.findSpentBetween rule:
+ * approved either way (the Expenses page sets `status`; the Approvals page sets `approvalStatus`
+ * and posts the journal but leaves status "pending") or paid; rejected by either never counts.
+ * Recorded-but-unapproved ones are shown, never deducted.
+ */
+const SPENT = new Set(["approved", "paid"]);
+const NOT_SPENDING = new Set(["rejected", "cancelled", "canceled", "void", "voided"]);
+const lower = (v: unknown) => String(v ?? "").toLowerCase();
+const isRejected = (x: Row) => NOT_SPENDING.has(lower(x.status)) || lower(x.approvalStatus) === "rejected";
+export const isSpent = (x: Row) => !isRejected(x) && (SPENT.has(lower(x.status)) || lower(x.approvalStatus) === "approved");
+export const spentExpenses = (rows: Row[] | null | undefined) => (rows || []).filter(isSpent);
+/** Recorded but not approved yet (draft / pending): listed, not deducted */
+export const pendingExpenses = (rows: Row[] | null | undefined) =>
+  (rows || []).filter((x) => !isSpent(x) && !isRejected(x));
 const m = (v: unknown): Cell => ({ money: num(v) });
 const pct = (part: number, whole: number) => (whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "—");
 
@@ -106,7 +126,9 @@ export function buildBlocks(data: DayReportData): Block[] {
   const att = data.attendance;
 
   const collection = num(rev?.totalCollection?.total);
-  const expensesTotal = sum(expenses, "amount");
+  const spent = spentExpenses(expenses);
+  const pending = pendingExpenses(expenses);
+  const expensesTotal = sum(spent, "amount");
   const purchasesTotal = sum(bills, "total");
   const paymentsOut = sum(vouchers, "amount");
   const dateCol = (label = "Date") => (range ? [label] : []);
@@ -121,8 +143,9 @@ export function buildBlocks(data: DayReportData): Block[] {
     id: "summary", title: "Summary", header: ["Metric", "Count", "Amount"],
     rows: [
       ["Total Collection", num(rev?.totalCollection?.count), m(collection)],
-      ["Expenses", expenses.length, m(expensesTotal)],
+      ["Expenses (approved & paid)", spent.length, m(expensesTotal)],
       ["Net (Collection − Expenses)", "", m(collection - expensesTotal)],
+      ["Expenses awaiting approval (not deducted)", pending.length, m(sum(pending, "amount"))],
       ["Member Receipts", receipts.length, m(sum(receipts, "paid"))],
       ["POS Sales", pos.length, m(sum(pos, "total"))],
       ["Sales Invoices", invoices.length, m(sum(invoices, "total"))],
@@ -202,7 +225,7 @@ export function buildBlocks(data: DayReportData): Block[] {
   });
 
   const byCategory = new Map<string, { count: number; amount: number }>();
-  expenses.forEach((x) => {
+  spent.forEach((x) => {
     const k = x.category || "Uncategorised";
     const c = byCategory.get(k) || { count: 0, amount: 0 };
     byCategory.set(k, { count: c.count + 1, amount: c.amount + num(x.amount) });
@@ -210,9 +233,10 @@ export function buildBlocks(data: DayReportData): Block[] {
   const categories = [...byCategory.entries()].sort((a, b) => b[1].amount - a[1].amount);
   blocks.push({
     id: "expenseCategories", title: "Expenses by Category", error: err("expenses"),
+    description: "Approved and paid expenses — the ones deducted from collection",
     header: ["Category", "Expenses", "Amount", "Share"],
     rows: categories.map(([k, c]) => [k, c.count, m(c.amount), pct(c.amount, expensesTotal)]),
-    total: categories.length ? totalRow(4, { 1: expenses.length, 2: m(expensesTotal), 3: "100.0%" }) : undefined,
+    total: categories.length ? totalRow(4, { 1: spent.length, 2: m(expensesTotal), 3: "100.0%" }) : undefined,
     empty: range ? "No expenses in this period." : "No expenses on this day.",
   });
 
@@ -250,10 +274,11 @@ export function buildBlocks(data: DayReportData): Block[] {
     total: pos2.length ? totalRow(4 + iw, { [2 + iw]: m(sum(pos2, "total")) }) : undefined,
   });
   blocks.push({
-    id: "expenses", title: "Expenses", error: err("expenses"), count: expenses.length, amount: expensesTotal,
+    id: "expenses", title: "Expenses", error: err("expenses"), count: expenses.length, amount: sum(expenses, "amount"),
+    description: "Every expense recorded, whatever its status (only approved and paid ones are deducted from collection)",
     header: [...dateCol(), "Vendor", "Category", "Amount", "Status", "Payment", "Notes"],
     rows: expenses.map((r) => [...dateCell(r.date), r.vendor, r.category, m(r.amount), r.status, r.paymentStatus, r.notes]),
-    total: expenses.length ? totalRow(6 + iw, { [2 + iw]: m(expensesTotal) }) : undefined,
+    total: expenses.length ? totalRow(6 + iw, { [2 + iw]: m(sum(expenses, "amount")) }) : undefined,
   });
   blocks.push({
     id: "paymentVouchers", title: "Payment Vouchers (Money Out)", error: err("paymentVouchers"), count: vouchers.length, amount: paymentsOut,
@@ -302,7 +327,10 @@ export function blocksToText(title: string, subtitle: string, blocks: Block[]): 
     if (b.rows.length === 0) { out.push(b.empty || "Nothing recorded.", ""); continue; }
     const all = [...b.rows, ...(b.total ? [b.total] : [])];
     const right = rightAligned(b);
-    const text = (r: Cell[]) => b.header.map((_, i) => clip(cellText(r[i]).replace(/\s+/g, " ")));
+    const text = (r: Cell[]) => b.header.map((_, i) => {
+      const s = cellText(r[i]).replace(/\s+/g, " ");
+      return b.fullText ? s : clip(s);
+    });
     const body = all.map(text);
     const widths = b.header.map((h, i) => Math.max(h.length, ...body.map((r) => r[i].length)));
     const line = (cells: string[]) =>
@@ -314,6 +342,34 @@ export function blocksToText(title: string, subtitle: string, blocks: Block[]): 
     out.push("");
   }
   return out.join("\n");
+}
+
+/**
+ * Report-export sections from blocks: one table per block. Columns holding amounts become money
+ * columns, counts become integers; a block's total row is kept as the bold total row.
+ */
+export function blocksToSections(blocks: Block[]): TableSection[] {
+  return blocks.map((b) => {
+    const all = [...b.rows, ...(b.total ? [b.total] : [])];
+    const columns: ReportColumn[] = b.header.map((h, i) => {
+      const cells = all.map((r) => r[i]).filter((c) => c !== null && c !== undefined && c !== "");
+      const format = cells.some(isMoney) ? "money" : cells.length && cells.every((c) => typeof c === "number") ? (h === "Share" ? "percent" : "number") : "text";
+      return { key: `c${i}`, header: h, format, wrap: !!b.fullText && format === "text" };
+    });
+    const toRow = (r: Cell[], kind?: "total"): ReportRow => {
+      const row: ReportRow = kind ? { _kind: kind } : {};
+      r.forEach((c, i) => { row[`c${i}`] = isMoney(c) ? c.money : c ?? ""; });
+      return row;
+    };
+    return {
+      kind: "table",
+      title: b.title,
+      description: b.description,
+      columns,
+      rows: b.error ? [] : [...b.rows.map((r) => toRow(r)), ...(b.total ? [toRow(b.total, "total")] : [])],
+      emptyText: b.error || b.empty || "Nothing recorded",
+    };
+  });
 }
 
 /** Excel rows: a bold title, bold header and bold total per block; money stays numeric */

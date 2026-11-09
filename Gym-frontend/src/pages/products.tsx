@@ -56,6 +56,7 @@ import { useNavigate } from "react-router-dom";
 import { Warehouse as WarehouseIcon } from "lucide-react";
 import type { BarcodePrintRequest } from "./barcode-print";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 
 interface CategoryDisplay {
   id: number;
@@ -273,32 +274,26 @@ export function Products({ onNavigate }: ProductsProps) {
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
-  const handleStockReportDownload = () => {
-    if (products.length === 0) { toast.error('No products to export'); return; }
-    const header = ['SKU', 'Product Name', 'Category', `Selling Price (${currencyCode})`, `Cost Price (${currencyCode})`, 'Unit', 'Total Stock', 'Reorder Level', 'Stock Status', `Inventory Value (${currencyCode})`, 'Supplier'];
-    const rows = products.map(p => [
-      p.sku,
-      `"${p.name.replace(/"/g, '""')}"`,
-      p.categoryName,
-      p.sellingPrice.toFixed(2),
-      p.costPrice.toFixed(2),
-      p.defaultUnit || '',
-      p.totalStock,
-      p.stockByWarehouse?.[0]?.reorderLevel ?? 0,
-      p.stockStatus,
-      p.inventoryValue.toFixed(2),
-      p.supplier || '',
-    ]);
-    const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `stock_report_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Stock report downloaded');
-  };
+  const buildStockReport = (): ReportDocument => ({
+    title: 'Stock Report',
+    orientation: 'landscape',
+    period: { to: new Date(), label: 'Stock on hand' },
+    sections: [
+      kpiSection([
+        { label: 'Products', value: products.length, format: 'integer' },
+        { label: 'Units in stock', value: products.reduce((s, p) => s + Number(p.totalStock || 0), 0), format: 'number' },
+        { label: 'Inventory value', value: products.reduce((s, p) => s + Number(p.inventoryValue || 0), 0), format: 'money' },
+        { label: 'Low stock', value: products.filter(p => p.stockStatus === 'LOW_STOCK').length, format: 'integer' },
+        { label: 'Out of stock', value: products.filter(p => p.stockStatus === 'OUT_OF_STOCK').length, format: 'integer' },
+      ]),
+      tableFromMatrix('Products',
+        ['SKU', 'Product Name', 'Category', 'Selling Price', 'Cost Price', 'Unit', 'Total Stock', 'Reorder Level', 'Stock Status', 'Inventory Value', 'Supplier'],
+        products.map(p => [p.sku, p.name, p.categoryName, p.sellingPrice, p.costPrice, p.defaultUnit || '', p.totalStock, p.stockByWarehouse?.[0]?.reorderLevel ?? 0,
+          String(p.stockStatus || '').replace(/_/g, ' '), p.inventoryValue, p.supplier || '']),
+        { totals: true, money: [3, 4, 9], noMoney: [6, 7] }),
+    ],
+  });
+
 
   const handlePrintAllBarcodes = () => {
     const printable = products.filter(p => p.barcode || p.sku);
@@ -356,10 +351,7 @@ export function Products({ onNavigate }: ProductsProps) {
           <p className="text-muted-foreground">Comprehensive product management and operations.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <ReportActions report={buildStockReport} disabled={products.length === 0} menuLabel="Stock report" />
           <Button onClick={handleAddProduct} className="bg-primary hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -812,13 +804,10 @@ export function Products({ onNavigate }: ProductsProps) {
                   <FileText className="h-5 w-5" />
                   Stock Report
                 </CardTitle>
-                <CardDescription>Current inventory levels and valuation — exports as CSV</CardDescription>
+                <CardDescription>Current inventory levels and valuation — Excel, PDF or print</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full border-0" onClick={handleStockReportDownload}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download CSV
-                </Button>
+                <ReportActions report={buildStockReport} disabled={products.length === 0} menuLabel="Stock report" className="w-full justify-center" />
               </CardContent>
             </Card>
 

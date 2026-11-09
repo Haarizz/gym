@@ -58,6 +58,8 @@ interface StaffFreezeOptionsProps {
   onWaiveChargeChange: (waive: boolean) => void;
   overrideLimits: boolean;
   onOverrideLimitsChange: (override: boolean) => void;
+  /** Show the plan's auto-unfreeze and the branch's add-on notes (off when the caller shows them itself). */
+  showNotes?: boolean;
 }
 
 /**
@@ -73,6 +75,7 @@ export function StaffFreezeOptions({
   onWaiveChargeChange,
   overrideLimits,
   onOverrideLimitsChange,
+  showNotes = true,
 }: StaffFreezeOptionsProps) {
   if (!allowance) return null;
 
@@ -141,6 +144,7 @@ export function StaffFreezeOptions({
         </div>
       )}
 
+      {showNotes && (<>
       <div className="flex items-start gap-2 rounded-lg p-3 text-xs text-gray-600" style={{ border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)' }}>
         <Info className="h-4 w-4 shrink-0" style={{ color: 'var(--primary)' }} />
         <span>
@@ -158,6 +162,7 @@ export function StaffFreezeOptions({
           {' '}Change this in Branch Settings.
         </span>
       </div>
+      </>)}
     </div>
   );
 }

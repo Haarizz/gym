@@ -6,6 +6,8 @@ import ErrorCorrectLevel from "qr.js/lib/ErrorCorrectLevel";
 
 export interface CompanyDetails {
   name: string;
+  /** Company name in the local language (e.g. Arabic) — printed under `name`; "" if not set. */
+  nameLocal: string;
   address: string;
   email: string;
   phone: string;
@@ -14,10 +16,13 @@ export interface CompanyDetails {
   stamp: string;
   /** UAE FTA Tax Registration Number — required on any document titled "Tax Invoice". */
   trn: string;
+  /** false when `address` is the built-in fallback, not something the gym saved (reports omit it). */
+  addressSet?: boolean;
 }
 
 const DEFAULT_COMPANY: CompanyDetails = {
   name: "GymBios",
+  nameLocal: "",
   address: "Dubai, United Arab Emirates",
   email: "",
   phone: "",
@@ -56,11 +61,12 @@ export async function getCompanyDetails(branchId?: number | null): Promise<Compa
     financialSettingsService.getSettings("BRANCH_TAX", branchId).catch(() => []),
   ])
     .then(([settings, taxSettings]) => {
-      const details = { ...DEFAULT_COMPANY };
+      const details: CompanyDetails = { ...DEFAULT_COMPANY, addressSet: false };
       settings.forEach(s => {
         if (!s.settingValue) return;
         if (s.settingKey === "company_name") details.name = s.settingValue;
-        if (s.settingKey === "company_address") details.address = s.settingValue;
+        if (s.settingKey === "company_name_local") details.nameLocal = s.settingValue.trim();
+        if (s.settingKey === "company_address") { details.address = s.settingValue; details.addressSet = true; }
         if (s.settingKey === "company_email") details.email = s.settingValue;
         if (s.settingKey === "company_phone") details.phone = s.settingValue;
         if (s.settingKey === "company_logo") details.logo = s.settingValue;
@@ -87,6 +93,26 @@ export async function getCompanyDetails(branchId?: number | null): Promise<Compa
 
 export function invalidateCompanyDetailsCache() {
   cached.clear();
+}
+
+/**
+ * Fonts for the local-language company name. Plus Jakarta has no Arabic glyphs, so name fonts
+ * that do — on Windows, macOS/iOS and Android — before the generic fallback.
+ */
+export const LOCAL_NAME_FONT_STACK =
+  "'Segoe UI', 'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, 'Geeza Pro', 'Arabic UI Text', Arial, sans-serif";
+
+/** Any Arabic-script character (Arabic, Supplement, Extended-A, Presentation Forms A/B). */
+export const ARABIC_SCRIPT = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+
+/**
+ * The local-language name as print HTML: dir="auto" lays Arabic out right-to-left (and any
+ * left-to-right script as usual) and isolates it from the surrounding text. "" when not set.
+ */
+export function companyLocalNameHtml(company: CompanyDetails, className = "company-name-local"): string {
+  if (!company.nameLocal) return "";
+  const lang = ARABIC_SCRIPT.test(company.nameLocal) ? ` lang="ar"` : "";
+  return `<div class="${className}" dir="auto"${lang} style="font-family:${LOCAL_NAME_FONT_STACK};unicode-bidi:isolate">${escapeHtml(company.nameLocal)}</div>`;
 }
 
 function escapeHtml(value: string): string {
@@ -155,6 +181,7 @@ export const COMPANY_HEADER_CSS = `
   .header-left{flex:1}
   .header-left .company-logo{max-height:48px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block}
   .company-name{color:var(--rc-primary, #327F74);font-size:32px;font-weight:bold;margin-bottom:5px}
+  .company-name-local{color:var(--rc-primary, #327F74);font-size:22px;font-weight:700;line-height:1.35;margin:-2px 0 6px}
   .company-details{color:#888;font-size:12px;line-height:1.6}
   .qr-top-right{width:120px;height:120px;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .qr-inner{text-align:center;color:var(--rc-primary, #327F74)}
@@ -180,6 +207,7 @@ export function buildCompanyHeaderHtml(company: CompanyDetails, receiptNo: strin
   <div class="header-left">
     ${logoImg}
     <div class="company-name">${escapeHtml(company.name)}</div>
+    ${companyLocalNameHtml(company)}
     <div class="company-details">${detailLines}</div>
   </div>
   <div class="qr-top-right">
@@ -199,7 +227,7 @@ export function buildCompanyFooterHtml(company: CompanyDetails): string {
     .join(" | ");
   const trnPart = company.trn && `TRN: ${escapeHtml(company.trn)}`;
   return `
-    <strong>${escapeHtml(company.name)}</strong><br/>
+    <strong>${escapeHtml(company.name)}</strong>${company.nameLocal ? ` · <bdi dir="auto" style="font-family:${LOCAL_NAME_FONT_STACK}">${escapeHtml(company.nameLocal)}</bdi>` : ""}<br/>
     ${[company.address && escapeHtml(company.address), contactParts].filter(Boolean).join(" | ")}
     ${trnPart ? `<br/>${trnPart}` : ""}
   `;

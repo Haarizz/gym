@@ -1,0 +1,320 @@
+/* Revenue Dashboard › Comparison hub (freeze, targets, CRM, POS, attendance, bookings,
+   members). A module because the precompiled Tailwind snapshot lacks most utilities. */
+
+/* ── Section switcher ── */
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding: 0.25rem;
+  border-radius: 0.75rem;
+  background: light-dark(#f1f5f9, var(--muted-bg));
+}
+
+.subnav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subnav button:hover {
+  color: var(--foreground, inherit);
+}
+
+.subnav button[aria-pressed="true"] {
+  background: var(--card, light-dark(#fff, var(--card)));
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* ── Trend series picker (wraps instead of squeezing its labels) ── */
+.seriesSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.1875rem;
+  border-radius: 0.5rem;
+  background: light-dark(#f1f5f9, var(--muted-bg));
+}
+
+.seriesSwitch button {
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: 0.375rem;
+  font: inherit;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  color: inherit;
+}
+
+.seriesSwitch button[aria-pressed="true"] {
+  background: var(--card, light-dark(#fff, var(--card)));
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* ── Area scorecards (overview) ──
+   Seven cards. The wrapper is a size container so the grid can switch to one row of seven
+   whenever the panel itself is wide enough (independent of the sidebar / body zoom). */
+.areaWrap {
+  container-type: inline-size;
+}
+
+.areaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+@container (min-width: 1120px) {
+  .areaGrid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+.areaCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--card, light-dark(#fff, var(--card)));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+  min-width: 0;
+}
+
+.areaHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.125rem;
+  border-bottom: 1px solid light-dark(#f1f5f9, var(--border));
+}
+
+.areaTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.areaTitle svg {
+  flex-shrink: 0;
+}
+
+.areaLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+
+.areaLink:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* One metric: label / value / change + comparison value, stacked so narrow columns fit */
+.areaRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid light-dark(#f1f5f9, var(--border));
+  min-width: 0;
+}
+
+.areaHead + .areaRow {
+  border-top: 0;
+}
+
+.areaLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.areaValue {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.areaSub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem 0.375rem;
+}
+
+.prevValue {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+/* ── Panels ── */
+.panelHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.panelHeadRow h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.panelHeadRow p {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.625rem;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  font-size: 0.8125rem;
+}
+
+.note svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  color: var(--primary);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 0;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: light-dark(#fef2f2, var(--muted-bg));
+  color: light-dark(#b91c1c, oklch(82% 0.15 27.5));
+  font-size: 0.875rem;
+}
+
+/* ── Targets ── */
+.meter {
+  position: relative;
+  height: 0.5rem;
+  min-width: 6rem;
+  border-radius: 9999px;
+  background: light-dark(#f1f5f9, var(--muted-bg));
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--primary);
+}
+
+.meter span.met {
+  background: #1baf7a;
+}
+
+.pts {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ptsUp { color: light-dark(#047857, oklch(82% 0.105 165.6)); }
+.ptsDown { color: light-dark(#b91c1c, oklch(82% 0.15 27.5)); }
+.ptsFlat { color: var(--muted-foreground); }
+
+/* ── All-metrics table ── */
+.groupRow td {
+  padding-top: 0.875rem !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.legendNote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-right: 0.25rem;
+  border-radius: 0.125rem;
+  vertical-align: -1px;
+}
+
+@media (max-width: 639px) {
+  .subnav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .areaGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

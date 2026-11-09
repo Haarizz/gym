@@ -1,580 +1,501 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useCurrency } from "../utils/currency";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  FileText,
-  Download,
-  Filter,
-  RefreshCw,
-  TrendingUp,
-  ShoppingCart,
-  CreditCard,
-  Users,
-  Wallet,
-  BadgeCheck,
-  Receipt,
-  CalendarDays,
-  ArrowUpRight,
+  AlertTriangle, BarChart3, CalendarDays, CreditCard, Download, FileSpreadsheet, Layers, Package, Receipt, RefreshCw,
+  RotateCcw, Search, ShoppingBag, ShoppingCart, Truck, TrendingUp, Users, Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
-import { receiptsService, Receipt as ReceiptType } from "../utils/supabase/receipts-service";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { useCurrency } from "../utils/currency";
+import { useBranch } from "../utils/branch-context";
+import type { SalesInvoice } from "../utils/supabase/sales-invoice-service";
+import type { SupplierBill } from "../utils/supabase/supplier-bill-service";
+import type { Product } from "../utils/supabase/products-service";
+import { ReportActions, type ReportDocument, type ReportRow, type ValueFormat, kpiSection } from "../components/report-export";
+import { styles, Kpi, Panel, Empty, Seg, SectionTabs, Status, fmtInt, fmtDate, isoDate, IconT } from "../components/overview/overview-kit";
+import {
+  inRange, keptShare, netSale, exTax, taxKept, cogsKept, balanceDue, itemCount, totalsOf, paymentLegs, prettyMethod,
+  loadConfirmedInvoices, loadConfirmedBills, loadAllProducts,
+} from "../components/sales/sales-data";
 
-type StatusType = "paid" | "partial" | "refunded" | "pending";
+type Preset = "today" | "yesterday" | "7d" | "mtd" | "last" | "90d" | "ytd" | "custom";
+type Source = "all" | "pos" | "manual";
+type ReportId = "register" | "daily" | "products" | "categories" | "customers" | "payments" | "returns" | "purchases" | "suppliers" | "bought";
+type Kind = "text" | "money" | "int" | "qty" | "pct" | "date" | "status";
+type StatusVal = "paid" | "part paid" | "unpaid" | "overdue" | "returned" | "due";
+interface Col { label: string; kind?: Kind }
+interface Row { key: string; cells: (string | number | null)[]; sub?: (string | null)[] }
+interface Report { title: string; sub: string; icon: IconT; cols: Col[]; rows: Row[]; foot?: (string | number | null)[]; empty: string; file: string }
 
-const statusBadge = (status: StatusType) => {
-  const map: Record<StatusType, string> = {
-    paid: "bg-green-100 text-green-800",
-    partial: "bg-yellow-100 text-yellow-800",
-    refunded: "bg-red-100 text-red-800",
-    pending: "bg-gray-100 text-gray-800",
-  };
-  return <Badge className={map[status] ?? "bg-gray-100 text-gray-800"}>{status}</Badge>;
+const PRESETS: [Preset, string][] = [
+  ["today", "Today"], ["yesterday", "Yesterday"], ["7d", "Last 7 days"], ["mtd", "This month"],
+  ["last", "Last month"], ["90d", "Last 90 days"], ["ytd", "This year"], ["custom", "Custom"],
+];
+const STATUS_KIND: Record<StatusVal, "good" | "warning" | "critical" | "info"> = {
+  paid: "good", "part paid": "warning", unpaid: "warning", overdue: "critical", returned: "info", due: "info",
 };
+const PAGE = 100;
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Memberships: "#2563eb",
-  "PT Sessions": "#16a34a",
-  Classes: "#f97316",
-  Merchandise: "#7c3aed",
-  Other: "#0891b2",
-};
-
-function categorizeReceipt(r: ReceiptType): string {
-  const t = (r.transaction_type || "").toLowerCase();
-  const plan = (r.plan_name || "").toLowerCase();
-  if (t.includes("new member") || t.includes("renew") || t.includes("upgrade") || plan.includes("membership")) return "Memberships";
-  if (t.includes("training") || plan.includes("pt") || plan.includes("personal")) return "PT Sessions";
-  if (t.includes("class") || plan.includes("class")) return "Classes";
-  if (t.includes("pos") || t.includes("product") || plan.includes("product") || plan.includes("merchandise")) return "Merchandise";
-  return "Other";
-}
-
-function normalizeStatus(s: string | undefined): StatusType {
-  const lower = (s || "").toLowerCase();
-  if (lower === "paid" || lower === "completed") return "paid";
-  if (lower === "partial") return "partial";
-  if (lower === "refunded") return "refunded";
-  if (lower === "pending") return "pending";
-  return "paid";
-}
-
-export function SalesReports() {
-  const { currencyCode, currencySymbol, currencyPrefix } = useCurrency();
-  const formatAED = (value: number) => `${currencyPrefix}${value.toLocaleString()}`;
-  const [receipts, setReceipts] = useState<ReceiptType[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState("last-7");
-  const [statusFilter, setStatusFilter] = useState("all-status");
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const resp = await receiptsService.getReceipts({}, { page: 1, limit: 5000 });
-      setReceipts(resp.receipts ?? []);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to load receipts");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
+function presetRange(p: Preset, custom: { from: string; to: string }) {
   const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const day = (offset: number) => isoDate(new Date(y, m, d + offset));
+  switch (p) {
+    case "today": return { from: day(0), to: day(0) };
+    case "yesterday": return { from: day(-1), to: day(-1) };
+    case "7d": return { from: day(-6), to: day(0) };
+    case "mtd": return { from: isoDate(new Date(y, m, 1)), to: day(0) };
+    case "last": return { from: isoDate(new Date(y, m - 1, 1)), to: isoDate(new Date(y, m, 0)) };
+    case "90d": return { from: day(-89), to: day(0) };
+    case "ytd": return { from: isoDate(new Date(y, 0, 1)), to: day(0) };
+    default: return custom.from <= custom.to ? custom : { from: custom.to, to: custom.from };
+  }
+}
 
-  // Date filter cutoff
-  const dateCutoff = useMemo(() => {
-    if (dateRange === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (dateRange === "last-7") return new Date(now.getTime() - 7 * 86400000);
-    if (dateRange === "last-30") return new Date(now.getTime() - 30 * 86400000);
-    if (dateRange === "this-month") return new Date(now.getFullYear(), now.getMonth(), 1);
-    return new Date(0);
-  }, [dateRange]);
+const saleStatus = (inv: SalesInvoice): StatusVal => {
+  if (Number(inv.returnedAmount) > 0 && netSale(inv) <= 0.005) return "returned";
+  const due = balanceDue(inv);
+  if (due <= 0.005) return "paid";
+  return (Number(inv.amountPaid) || 0) > 0 ? "part paid" : "unpaid";
+};
 
-  // Filtered receipts by date + status + search
-  const filteredReceipts = useMemo(() => {
-    return receipts.filter(r => {
-      const d = r.transaction_date ? new Date(r.transaction_date) : null;
-      if (d && d < dateCutoff) return false;
-      if (statusFilter !== "all-status" && normalizeStatus(r.status) !== statusFilter) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        if (
-          !(r.member_name || "").toLowerCase().includes(q) &&
-          !(r.receipt_no || "").toLowerCase().includes(q) &&
-          !(r.plan_name || "").toLowerCase().includes(q) &&
-          !(r.member_id || "").toLowerCase().includes(q)
-        ) return false;
+/**
+ * Sales & Purchase Reports: ten printable/exportable reports for any date range, built on the
+ * same data rules as the module overview and Sales Analytics (components/sales/sales-data.ts).
+ * Every report has totals and exports to CSV / Excel with plain currency codes.
+ */
+export function SalesReports() {
+  const navigate = useNavigate();
+  const { activeBranchId } = useBranch();
+  const { formatCurrency, currencyCode } = useCurrency();
+  const money = useCallback((n: number) => formatCurrency(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [formatCurrency]);
+  const money0 = useCallback((n: number) => formatCurrency(n, { maximumFractionDigits: 0 }), [formatCurrency]);
+
+  const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+  const [bills, setBills] = useState<SupplierBill[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [preset, setPreset] = useState<Preset>("mtd");
+  const [custom, setCustom] = useState(() => { const r = presetRange("mtd", { from: "", to: "" }); return r; });
+  const [source, setSource] = useState<Source>("all");
+  const [search, setSearch] = useState("");
+  const [report, setReport] = useState<ReportId>("register");
+  const [shown, setShown] = useState(PAGE);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [i, b, p] = await Promise.allSettled([loadConfirmedInvoices(), loadConfirmedBills(), loadAllProducts()]);
+    const errors: string[] = [];
+    if (i.status === "fulfilled") setInvoices(i.value); else errors.push("sales invoices");
+    if (b.status === "fulfilled") setBills(b.value); else errors.push("supplier bills");
+    if (p.status === "fulfilled") setProducts(p.value); else errors.push("products");
+    setFailed(errors);
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
+  useEffect(() => { load(); }, [load]);
+
+  const range = useMemo(() => presetRange(preset, custom), [preset, custom]);
+  useEffect(() => { setShown(PAGE); }, [range, source, search, report]);
+
+  const productById = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+  const q = search.trim().toLowerCase();
+
+  const sales = useMemo(() => invoices.filter(i =>
+    inRange(i.invoiceDate, range.from, range.to)
+    && (source === "all" || (source === "pos" ? i.source === "POS" : i.source !== "POS"))), [invoices, range, source]);
+  const salesSearched = useMemo(() => !q ? sales : sales.filter(i =>
+    [i.invoiceNumber, i.customerName, i.customerPhone, i.reference, ...(i.items ?? []).map(it => it.productName)]
+      .some(v => (v || "").toLowerCase().includes(q))), [sales, q]);
+  const purchases = useMemo(() => bills.filter(b => inRange(b.billDate, range.from, range.to)), [bills, range]);
+  const purchasesSearched = useMemo(() => !q ? purchases : purchases.filter(b =>
+    [b.billNumber, b.invoiceNumber, b.supplierName, ...(b.items ?? []).map(it => it.productName)].some(v => (v || "").toLowerCase().includes(q))), [purchases, q]);
+
+  const t = useMemo(() => totalsOf(sales), [sales]);
+  const bought = purchases.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
+  const owedSuppliers = purchases.reduce((s, b) => s + Math.max(0, (Number(b.totalAmount) || 0) - (Number(b.amountPaid) || 0)), 0);
+  const today = isoDate(new Date());
+  const isPurchaseReport = report === "purchases" || report === "suppliers" || report === "bought";
+
+  // ── Reports ──
+  const reports = useMemo((): Record<ReportId, Report> => {
+    const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
+    const sumCol = (rows: Row[], idx: number) => rows.reduce((s, r) => s + (Number(r.cells[idx]) || 0), 0);
+    const rangeTxt = `${range.from}_to_${range.to}`;
+
+    // Sales register
+    const regRows: Row[] = [...salesSearched]
+      .sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || "") || (b.createdAt || "").localeCompare(a.createdAt || ""))
+      .map(inv => {
+        const first = inv.items?.[0]?.productName;
+        const methods = [...new Set(paymentLegs(inv).map(l => l.method))].join(" + ");
+        return {
+          key: String(inv.id),
+          cells: [inv.invoiceNumber, inv.invoiceDate, inv.customerName || "Walk-in", fmtInt(itemCount(inv)), methods || "—", saleStatus(inv),
+            exTax(inv), taxKept(inv), Number(inv.returnedAmount) || 0, netSale(inv), Math.min(netSale(inv), Number(inv.amountPaid) || 0), balanceDue(inv)],
+          sub: [inv.source === "POS" ? "Point of Sale" : "Invoice", null, inv.customerPhone || null,
+            first ? (inv.items.length > 1 ? `${first} +${inv.items.length - 1}` : first) : null, null, null, null, null, null, null, null, null],
+        };
+      });
+
+    // Daily summary
+    const byDay = new Map<string, SalesInvoice[]>();
+    for (const inv of sales) { const k = (inv.invoiceDate || "").slice(0, 10); byDay.set(k, [...(byDay.get(k) ?? []), inv]); }
+    const dayRows: Row[] = [...byDay.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([day, invs]) => {
+      const d = totalsOf(invs);
+      return { key: day, cells: [day, d.count, d.items, d.revenue, d.tax, d.returned, d.sales, d.cost, d.profit, d.revenue > 0 ? pct(d.profit, d.revenue) : null] };
+    });
+
+    // Products
+    const prodMap = new Map<string, { id?: number; name: string; sku: string; qty: number; amount: number; count: number }>();
+    for (const inv of sales) {
+      const kept = keptShare(inv);
+      const seen = new Set<string>();
+      for (const it of inv.items ?? []) {
+        const key = it.productId ? `p${it.productId}` : `n${it.productName}`;
+        const v = prodMap.get(key) ?? { id: it.productId || undefined, name: it.productName || "Item", sku: it.productSku || "", qty: 0, amount: 0, count: 0 };
+        v.qty += (Number(it.quantity) || 0) * kept; v.amount += (Number(it.totalAmount) || 0) * kept;
+        if (!seen.has(key)) { v.count++; seen.add(key); }
+        prodMap.set(key, v);
       }
-      return true;
-    });
-  }, [receipts, dateCutoff, statusFilter, searchQuery]);
+    }
+    const itemsTotal = [...prodMap.values()].reduce((s, v) => s + v.amount, 0);
+    const prodAll = [...prodMap.entries()].sort((a, b) => b[1].amount - a[1].amount);
+    const prodRows: Row[] = prodAll
+      .filter(([, v]) => !q || v.name.toLowerCase().includes(q) || v.sku.toLowerCase().includes(q))
+      .map(([key, v]) => {
+        const prod = v.id ? productById.get(v.id) : undefined;
+        return { key, cells: [v.name, v.sku || prod?.sku || "", prod?.categoryName || "Uncategorised", v.qty, v.count, v.qty > 0 ? v.amount / v.qty : 0, v.amount, pct(v.amount, itemsTotal)] };
+      });
 
-  // Weekly sales trend (last 7 days)
-  const salesTrend = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() - (6 - i));
-      const ds = d.toISOString().split("T")[0];
-      const label = d.toLocaleString(undefined, { weekday: "short" });
-      const dayRows = receipts.filter(r => (r.transaction_date || "").split("T")[0] === ds);
-      const sales = dayRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-      const orders = dayRows.length;
-      const refunds = dayRows.filter(r => normalizeStatus(r.status) === "refunded").reduce((s, r) => s + (Number(r.amount) || 0), 0);
-      return { day: label, sales: Math.round(sales), orders, refunds: Math.round(refunds) };
-    });
-  }, [receipts]);
+    // Categories
+    const catMap = new Map<string, { products: Set<string>; qty: number; amount: number }>();
+    for (const [key, v] of prodAll) {
+      const cat = (v.id && productById.get(v.id)?.categoryName) || "Uncategorised";
+      const c = catMap.get(cat) ?? { products: new Set<string>(), qty: 0, amount: 0 };
+      c.products.add(key); c.qty += v.qty; c.amount += v.amount;
+      catMap.set(cat, c);
+    }
+    const catRows: Row[] = [...catMap.entries()].sort((a, b) => b[1].amount - a[1].amount)
+      .filter(([name]) => !q || name.toLowerCase().includes(q))
+      .map(([name, c]) => ({ key: name, cells: [name, c.products.size, c.qty, c.amount, pct(c.amount, itemsTotal)] }));
 
-  // Category mix
-  const categoryMix = useMemo(() => {
-    const cats: Record<string, number> = {};
-    filteredReceipts.forEach(r => {
-      const cat = categorizeReceipt(r);
-      cats[cat] = (cats[cat] || 0) + (Number(r.amount) || 0);
-    });
-    const total = Object.values(cats).reduce((s, v) => s + v, 0);
-    return Object.entries(cats)
-      .map(([name, revenue]) => ({
-        name,
-        value: total > 0 ? Math.round((revenue / total) * 100) : 0,
-        revenue: Math.round(revenue),
-        color: CATEGORY_COLORS[name] ?? "#64748b",
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-  }, [filteredReceipts]);
+    // Customers
+    const custMap = new Map<string, { name: string; phone: string; type: string; count: number; items: number; amount: number; due: number; last: string }>();
+    for (const inv of sales) {
+      const walkIn = !inv.memberId && (!inv.customerName || /^walk[- ]?in/i.test(inv.customerName));
+      const key = inv.memberId ? `m${inv.memberId}` : walkIn ? "walkin" : `n${(inv.customerName || "").toLowerCase()}`;
+      const v = custMap.get(key) ?? { name: walkIn ? "Walk-in customers" : inv.customerName, phone: walkIn ? "" : inv.customerPhone || "", type: inv.memberId ? "Member" : walkIn ? "Walk-in" : "Customer", count: 0, items: 0, amount: 0, due: 0, last: "" };
+      v.count++; v.items += itemCount(inv); v.amount += netSale(inv); v.due += balanceDue(inv);
+      if ((inv.invoiceDate || "") > v.last) v.last = inv.invoiceDate;
+      custMap.set(key, v);
+    }
+    const custRows: Row[] = [...custMap.entries()].sort((a, b) => b[1].amount - a[1].amount)
+      .filter(([, v]) => !q || v.name.toLowerCase().includes(q) || v.phone.includes(q))
+      .map(([key, v]) => ({ key, cells: [v.name, v.type, v.phone || "—", v.count, v.items, v.amount, v.due, v.last] }));
 
-  // Payment methods
-  const paymentMix = useMemo(() => {
-    const methods: Record<string, number> = {};
-    filteredReceipts.forEach(r => {
-      const m = r.payment_method || "Other";
-      methods[m] = (methods[m] || 0) + (Number(r.amount) || 0);
-    });
-    return Object.entries(methods)
-      .map(([method, value]) => ({ method, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value);
-  }, [filteredReceipts]);
+    // Payments
+    const payMap = new Map<string, { count: number; amount: number }>();
+    for (const inv of sales) for (const l of paymentLegs(inv)) {
+      const v = payMap.get(l.method) ?? { count: 0, amount: 0 };
+      v.count++; v.amount += l.amount; payMap.set(l.method, v);
+    }
+    const paidTotal = [...payMap.values()].reduce((s, v) => s + v.amount, 0);
+    const payRows: Row[] = [...payMap.entries()].sort((a, b) => b[1].amount - a[1].amount)
+      .map(([m, v]) => ({ key: m, cells: [prettyMethod(m) || m, v.count, v.amount, pct(v.amount, paidTotal + t.due)] }));
+    if (t.due > 0.005) payRows.push({ key: "__due", cells: ["Not paid yet (balance due)", sales.filter(i => balanceDue(i) > 0.005).length, t.due, pct(t.due, paidTotal + t.due)] });
 
-  // Sales register (latest 50 from filtered set)
-  const salesRegister = useMemo(() => {
-    return [...filteredReceipts]
-      .sort((a, b) => new Date(b.transaction_date || b.created_at).getTime() - new Date(a.transaction_date || a.created_at).getTime())
-      .slice(0, 50)
-      .map(r => ({
-        id: r.id,
-        invoice: r.receipt_no || r.id.slice(0, 8).toUpperCase(),
-        date: r.transaction_date ? r.transaction_date.split("T")[0] : "—",
-        customer: r.member_name || "—",
-        channel: r.transaction_type || "POS",
-        payment: r.payment_method || "—",
-        status: normalizeStatus(r.status),
-        amount: Number(r.amount) || 0,
-      }));
-  }, [filteredReceipts]);
+    // Returns
+    const retRows: Row[] = salesSearched.filter(i => Number(i.returnedAmount) > 0)
+      .sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || ""))
+      .map(inv => ({ key: String(inv.id), cells: [inv.invoiceNumber, inv.invoiceDate, inv.customerName || "Walk-in", Number(inv.totalAmount) || 0, Number(inv.returnedAmount) || 0, netSale(inv), pct(Number(inv.returnedAmount) || 0, Number(inv.totalAmount) || 0)] }));
 
-  // Top products/plans by revenue
-  const topProducts = useMemo(() => {
-    const plans: Record<string, { units: number; revenue: number; category: string }> = {};
-    filteredReceipts.forEach(r => {
-      const name = r.plan_name || r.transaction_type || "Unknown";
-      if (!plans[name]) plans[name] = { units: 0, revenue: 0, category: categorizeReceipt(r) };
-      plans[name].units += 1;
-      plans[name].revenue += Number(r.amount) || 0;
-    });
-    return Object.entries(plans)
-      .map(([name, v]) => ({ name, category: v.category, units: v.units, revenue: Math.round(v.revenue) }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-  }, [filteredReceipts]);
+    // Purchase register
+    const billStatus = (b: SupplierBill): StatusVal => {
+      const due = Math.max(0, (Number(b.totalAmount) || 0) - (Number(b.amountPaid) || 0));
+      if (due <= 0.005) return "paid";
+      if (b.dueDate && b.dueDate < today) return "overdue";
+      return (Number(b.amountPaid) || 0) > 0 ? "part paid" : "unpaid";
+    };
+    const purRows: Row[] = [...purchasesSearched].sort((a, b) => (b.billDate || "").localeCompare(a.billDate || ""))
+      .map(b => {
+        const total = Number(b.totalAmount) || 0, paid = Number(b.amountPaid) || 0;
+        return {
+          key: String(b.id),
+          cells: [b.billNumber, b.billDate, b.supplierName, b.dueDate || "", billStatus(b), (Number(b.subtotal) || 0) - (Number(b.discountAmount) || 0), Number(b.taxAmount) || 0, total, paid, Math.max(0, total - paid)],
+          sub: [b.invoiceNumber ? `Supplier inv. ${b.invoiceNumber}` : null, null, null, null, null, null, null, null, null, null],
+        };
+      });
 
-  // Summary totals
-  const totals = useMemo(() => {
-    const totalSales = filteredReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const paidCount = filteredReceipts.filter(r => normalizeStatus(r.status) === "paid").length;
-    const refundTotal = filteredReceipts.filter(r => normalizeStatus(r.status) === "refunded").reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const avgOrder = filteredReceipts.length > 0 ? totalSales / filteredReceipts.length : 0;
-    const uniqueMembers = new Set(filteredReceipts.map(r => r.member_id).filter(Boolean)).size;
-    return { totalSales, paidCount, refundTotal, avgOrder, uniqueMembers };
-  }, [filteredReceipts]);
+    // Suppliers
+    const supMap = new Map<string, { count: number; total: number; paid: number; overdue: number; last: string }>();
+    for (const b of purchases) {
+      const v = supMap.get(b.supplierName || "Supplier") ?? { count: 0, total: 0, paid: 0, overdue: 0, last: "" };
+      const total = Number(b.totalAmount) || 0, paid = Number(b.amountPaid) || 0;
+      v.count++; v.total += total; v.paid += paid;
+      if (b.dueDate && b.dueDate < today) v.overdue += Math.max(0, total - paid);
+      if ((b.billDate || "") > v.last) v.last = b.billDate;
+      supMap.set(b.supplierName || "Supplier", v);
+    }
+    const supRows: Row[] = [...supMap.entries()].sort((a, b) => b[1].total - a[1].total)
+      .filter(([name]) => !q || name.toLowerCase().includes(q))
+      .map(([name, v]) => ({ key: name, cells: [name, v.count, v.total, v.paid, Math.max(0, v.total - v.paid), v.overdue, v.last] }));
 
-  const periodLabel =
-    dateRange === "today" ? "1 Day" :
-    dateRange === "last-7" ? "7 Days" :
-    dateRange === "last-30" ? "30 Days" :
-    "This Month";
+    // Purchases by product
+    const boughtMap = new Map<string, { name: string; sku: string; qty: number; amount: number; bills: number; suppliers: Set<string> }>();
+    for (const b of purchases) for (const it of b.items ?? []) {
+      const key = it.productId ? `p${it.productId}` : `n${it.productName}`;
+      const v = boughtMap.get(key) ?? { name: it.productName || "Item", sku: it.productSku || "", qty: 0, amount: 0, bills: 0, suppliers: new Set<string>() };
+      v.qty += Number(it.quantity) || 0; v.amount += Number(it.totalAmount) || 0; v.bills++; v.suppliers.add(b.supplierName);
+      boughtMap.set(key, v);
+    }
+    const boughtRows: Row[] = [...boughtMap.entries()].sort((a, b) => b[1].amount - a[1].amount)
+      .filter(([, v]) => !q || v.name.toLowerCase().includes(q) || v.sku.toLowerCase().includes(q))
+      .map(([key, v]) => ({ key, cells: [v.name, v.sku, v.qty, v.qty > 0 ? v.amount / v.qty : 0, v.amount, v.bills, [...v.suppliers].join(", ")] }));
+
+    return {
+      register: {
+        title: "Sales register", sub: "Every confirmed sale in the range, newest first — amounts net of returns", icon: ShoppingBag, file: `sales-register_${rangeTxt}`,
+        cols: [{ label: "Invoice" }, { label: "Date", kind: "date" }, { label: "Customer" }, { label: "Items", kind: "text" }, { label: "Paid by" }, { label: "Status", kind: "status" },
+          { label: "Before tax", kind: "money" }, { label: "Tax", kind: "money" }, { label: "Returned", kind: "money" }, { label: "Net sale", kind: "money" }, { label: "Paid", kind: "money" }, { label: "Balance", kind: "money" }],
+        rows: regRows, empty: "No sales match these filters.",
+        foot: [`${regRows.length} sales`, null, null, null, null, null, sumCol(regRows, 6), sumCol(regRows, 7), sumCol(regRows, 8), sumCol(regRows, 9), sumCol(regRows, 10), sumCol(regRows, 11)],
+      },
+      daily: {
+        title: "Daily summary", sub: "Sales, tax, returns, cost and gross profit per day", icon: CalendarDays, file: `daily-sales_${rangeTxt}`,
+        cols: [{ label: "Date", kind: "date" }, { label: "Sales", kind: "int" }, { label: "Items", kind: "int" }, { label: "Before tax", kind: "money" }, { label: "Tax", kind: "money" },
+          { label: "Returned", kind: "money" }, { label: "Net sales", kind: "money" }, { label: "Cost of goods", kind: "money" }, { label: "Gross profit", kind: "money" }, { label: "Margin", kind: "pct" }],
+        rows: dayRows, empty: "No sales in this range.",
+        foot: [`${dayRows.length} days`, sumCol(dayRows, 1), sumCol(dayRows, 2), sumCol(dayRows, 3), sumCol(dayRows, 4), sumCol(dayRows, 5), sumCol(dayRows, 6), sumCol(dayRows, 7), sumCol(dayRows, 8), t.revenue > 0 ? pct(t.profit, t.revenue) : null],
+      },
+      products: {
+        title: "Sales by product", sub: "Quantity and value sold per product, net of returns", icon: Package, file: `sales-by-product_${rangeTxt}`,
+        cols: [{ label: "Product" }, { label: "SKU" }, { label: "Category" }, { label: "Qty sold", kind: "qty" }, { label: "Sales", kind: "int" }, { label: "Avg price", kind: "money" }, { label: "Net sales", kind: "money" }, { label: "Share", kind: "pct" }],
+        rows: prodRows, empty: "No products sold in this range.",
+        foot: [`${prodRows.length} products`, null, null, sumCol(prodRows, 3), null, null, sumCol(prodRows, 6), pct(sumCol(prodRows, 6), itemsTotal)],
+      },
+      categories: {
+        title: "Sales by category", sub: "Item sales grouped by product category", icon: Layers, file: `sales-by-category_${rangeTxt}`,
+        cols: [{ label: "Category" }, { label: "Products", kind: "int" }, { label: "Qty sold", kind: "qty" }, { label: "Net sales", kind: "money" }, { label: "Share", kind: "pct" }],
+        rows: catRows, empty: "No products sold in this range.",
+        foot: [`${catRows.length} categories`, sumCol(catRows, 1), sumCol(catRows, 2), sumCol(catRows, 3), pct(sumCol(catRows, 3), itemsTotal)],
+      },
+      customers: {
+        title: "Sales by customer", sub: "Spend per member or named customer; walk-ins grouped together", icon: Users, file: `sales-by-customer_${rangeTxt}`,
+        cols: [{ label: "Customer" }, { label: "Type" }, { label: "Phone" }, { label: "Purchases", kind: "int" }, { label: "Items", kind: "int" }, { label: "Net sales", kind: "money" }, { label: "Balance due", kind: "money" }, { label: "Last purchase", kind: "date" }],
+        rows: custRows, empty: "No sales in this range.",
+        foot: [`${custRows.length} customers`, null, null, sumCol(custRows, 3), sumCol(custRows, 4), sumCol(custRows, 5), sumCol(custRows, 6), null],
+      },
+      payments: {
+        title: "Payment methods", sub: "Money recorded on this range's sales by method, plus what's still unpaid", icon: CreditCard, file: `payment-methods_${rangeTxt}`,
+        cols: [{ label: "Method" }, { label: "Payments", kind: "int" }, { label: "Amount", kind: "money" }, { label: "Share", kind: "pct" }],
+        rows: payRows, empty: "No payments in this range.",
+        foot: ["Total", null, sumCol(payRows, 2), payRows.length ? 100 : null],
+      },
+      returns: {
+        title: "Returns", sub: "Sales in this range that had items returned", icon: RotateCcw, file: `sales-returns_${rangeTxt}`,
+        cols: [{ label: "Invoice" }, { label: "Date", kind: "date" }, { label: "Customer" }, { label: "Sale total", kind: "money" }, { label: "Returned", kind: "money" }, { label: "Kept", kind: "money" }, { label: "Returned %", kind: "pct" }],
+        rows: retRows, empty: "No returns in this range.",
+        foot: [`${retRows.length} sales`, null, null, sumCol(retRows, 3), sumCol(retRows, 4), sumCol(retRows, 5), pct(sumCol(retRows, 4), sumCol(retRows, 3))],
+      },
+      purchases: {
+        title: "Purchase register", sub: "Confirmed supplier bills in the range, newest first", icon: Receipt, file: `purchase-register_${rangeTxt}`,
+        cols: [{ label: "Bill" }, { label: "Bill date", kind: "date" }, { label: "Supplier" }, { label: "Due", kind: "date" }, { label: "Status", kind: "status" },
+          { label: "Before tax", kind: "money" }, { label: "Tax", kind: "money" }, { label: "Total", kind: "money" }, { label: "Paid", kind: "money" }, { label: "Balance", kind: "money" }],
+        rows: purRows, empty: "No supplier bills match these filters.",
+        foot: [`${purRows.length} bills`, null, null, null, null, sumCol(purRows, 5), sumCol(purRows, 6), sumCol(purRows, 7), sumCol(purRows, 8), sumCol(purRows, 9)],
+      },
+      suppliers: {
+        title: "Purchases by supplier", sub: "What was billed, paid and still owed per supplier", icon: Truck, file: `purchases-by-supplier_${rangeTxt}`,
+        cols: [{ label: "Supplier" }, { label: "Bills", kind: "int" }, { label: "Billed", kind: "money" }, { label: "Paid", kind: "money" }, { label: "Owed", kind: "money" }, { label: "Overdue", kind: "money" }, { label: "Last bill", kind: "date" }],
+        rows: supRows, empty: "No supplier bills in this range.",
+        foot: [`${supRows.length} suppliers`, sumCol(supRows, 1), sumCol(supRows, 2), sumCol(supRows, 3), sumCol(supRows, 4), sumCol(supRows, 5), null],
+      },
+      bought: {
+        title: "Purchases by product", sub: "Quantity and value bought per product on supplier bills", icon: Package, file: `purchases-by-product_${rangeTxt}`,
+        cols: [{ label: "Product" }, { label: "SKU" }, { label: "Qty bought", kind: "qty" }, { label: "Avg cost", kind: "money" }, { label: "Amount", kind: "money" }, { label: "Bill lines", kind: "int" }, { label: "Suppliers" }],
+        rows: boughtRows, empty: "No products bought in this range.",
+        foot: [`${boughtRows.length} products`, null, sumCol(boughtRows, 2), null, sumCol(boughtRows, 4), sumCol(boughtRows, 5), null],
+      },
+    };
+  }, [sales, salesSearched, purchases, purchasesSearched, productById, q, range, t, today]);
+
+  const r = reports[report];
+
+  const display = (v: string | number | null, kind?: Kind) => {
+    if (v == null || v === "") return kind === "money" || kind === "pct" ? "—" : "";
+    switch (kind) {
+      case "money": return money(Number(v));
+      case "int": return fmtInt(Number(v));
+      case "qty": return (Math.round(Number(v) * 100) / 100).toLocaleString();
+      case "pct": return `${Number(v).toFixed(1)}%`;
+      case "date": return fmtDate(String(v));
+      case "status": return <Status kind={STATUS_KIND[v as StatusVal] ?? "info"}>{String(v)}</Status>;
+      default: return String(v);
+    }
+  };
+  // Export / print: the selected report exactly as listed (every row), with the page's headline figures
+  const buildReport = (): ReportDocument => {
+    const fmtOf = (kind?: Kind): ValueFormat =>
+      kind === "money" ? "money" : kind === "int" ? "integer" : kind === "qty" ? "number" : kind === "pct" ? "percent" : kind === "date" ? "date" : "text";
+    const columns = r.cols.map((c, i) => ({ key: `c${i}`, header: c.label, format: fmtOf(c.kind) }));
+    const toRow = (cells: (string | number | null)[], kind?: "total"): ReportRow => {
+      const row: ReportRow = kind ? { _kind: kind } : {};
+      cells.forEach((v, i) => { row[`c${i}`] = v; });
+      return row;
+    };
+    const rows = r.rows.map(row => toRow(row.cells));
+    if (r.foot && rows.length) rows.push(toRow(r.foot.map((v, i) => (i === 0 ? (v == null ? "Total" : `Total — ${v}`) : v)), "total"));
+    return {
+      title: r.title,
+      fileName: r.title,
+      subtitle: r.sub,
+      period: { from: range.from, to: range.to },
+      filters: [
+        ...(!isPurchaseReport ? [{ label: "Sales channel", value: source === "pos" ? "POS" : source === "manual" ? "Invoices" : "All sales" }] : []),
+        { label: "Search", value: search.trim() || undefined },
+      ],
+      sections: [
+        kpiSection([
+          { label: "Net sales", value: t.sales, format: "money", hint: `${fmtInt(t.count)} sales` },
+          { label: "Gross profit", value: t.profit, format: "money", hint: margin != null ? `${margin.toFixed(1)}% margin` : undefined },
+          { label: "Tax collected", value: t.tax, format: "money" },
+          { label: "Returns", value: t.returned, format: "money" },
+          { label: "Purchases", value: bought, format: "money", hint: `${fmtInt(purchases.length)} supplier bills` },
+          { label: "Customers owe", value: t.due, format: "money" },
+          { label: "Owed to suppliers", value: owedSuppliers, format: "money" },
+        ], "Summary"),
+        { kind: "table", title: r.title, columns, rows, emptyText: r.empty },
+      ],
+    };
+  };
+
+  const reportTabs: { id: ReportId; label: string; icon: IconT; count?: number }[] = [
+    { id: "register", label: "Sales register", icon: ShoppingBag },
+    { id: "daily", label: "Daily summary", icon: CalendarDays },
+    { id: "products", label: "By product", icon: Package },
+    { id: "categories", label: "By category", icon: Layers },
+    { id: "customers", label: "By customer", icon: Users },
+    { id: "payments", label: "Payment methods", icon: CreditCard },
+    { id: "returns", label: "Returns", icon: RotateCcw, count: reports.returns.rows.length },
+    { id: "purchases", label: "Purchase register", icon: Receipt },
+    { id: "suppliers", label: "By supplier", icon: Truck },
+    { id: "bought", label: "Bought by product", icon: Package },
+  ];
+  const margin = t.revenue > 0 ? (t.profit / t.revenue) * 100 : null;
+
+  if (loading && !invoices.length && !bills.length) {
+    return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading reports…</div></div>;
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className={styles.root}>
+      <div className={styles.head}>
         <div>
-          <h1 className="text-3xl font-bold">Sales Reports</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Revenue tracking, transaction summaries, and product performance reporting.
-          </p>
+          <h1 className={styles.title}>Sales & Purchase Reports</h1>
+          <div className={styles.subtitle}>{fmtDate(range.from)}{range.from !== range.to ? ` – ${fmtDate(range.to)}` : ""} · confirmed POS sales, sales invoices and supplier bills</div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-9" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+        <div className={styles.actions}>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          <Button size="sm" className="h-9">
-            <Filter className="mr-2 h-4 w-4" />
-            Filters
-          </Button>
+          <Button size="sm" onClick={() => navigate("/sales-analytics")}><BarChart3 className="h-4 w-4 mr-2" />Analytics</Button>
         </div>
       </div>
 
-      <style>{`
-        @keyframes reportFadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .report-panel {
-          animation: reportFadeIn 0.22s ease-out;
-        }
-      `}</style>
-
-      {/* Filter Bar */}
-      <Card className="report-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex-1 min-w-[220px] relative">
-              <Input
-                placeholder="Search invoices, customers, or plans..."
-                className="h-10"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="last-7">Last 7 Days</SelectItem>
-                <SelectItem value="last-30">Last 30 Days</SelectItem>
-                <SelectItem value="this-month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-status">All Status</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="refunded">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+      {/* Filters — one row above everything they control */}
+      <div className={`${styles.card} ${styles.filters}`}>
+        <div className={styles.chips} role="tablist" aria-label="Date range">
+          {PRESETS.map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={preset === id} data-active={preset === id} className={styles.chip}
+              onClick={() => { if (id === "custom") setCustom(range); setPreset(id); }}>{label}</button>
+          ))}
+        </div>
+        {preset === "custom" && (
+          <div className={styles.customRange}>
+            <Input type="date" aria-label="From" value={custom.from} max={custom.to} onChange={e => setCustom(c => ({ ...c, from: e.target.value || c.from }))} />
+            <span className={styles.muted}>to</span>
+            <Input type="date" aria-label="To" value={custom.to} min={custom.from} onChange={e => setCustom(c => ({ ...c, to: e.target.value || c.to }))} />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 report-panel">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Total Sales</CardTitle>
-            <div className="bg-green-50 p-2 rounded-lg">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">{formatAED(Math.round(totals.totalSales))}</div>
-            <p className="text-xs text-muted-foreground mt-1">{filteredReceipts.length} transactions</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Paid Orders</CardTitle>
-            <div className="bg-blue-50 p-2 rounded-lg">
-              <BadgeCheck className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{totals.paidCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Receipts issued</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Refunds</CardTitle>
-            <div className="bg-red-50 p-2 rounded-lg">
-              <Receipt className="h-4 w-4 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">{formatAED(Math.round(totals.refundTotal))}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totals.totalSales > 0 ? `${((totals.refundTotal / totals.totalSales) * 100).toFixed(1)}% refund rate` : "No refunds"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Avg Order</CardTitle>
-            <div className="bg-purple-50 p-2 rounded-lg">
-              <Wallet className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-700">{formatAED(Math.round(totals.avgOrder))}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across all channels</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-all">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Unique Members</CardTitle>
-            <div className="bg-amber-50 p-2 rounded-lg">
-              <Users className="h-4 w-4 text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-700">{totals.uniqueMembers}</div>
-            <p className="text-xs text-muted-foreground mt-1">Members with transactions</p>
-          </CardContent>
-        </Card>
+        )}
+        <div className={styles.filterEnd}>
+          {!isPurchaseReport && <Seg value={source} onChange={setSource} label="Sales channel" options={[["all", "All sales"], ["pos", "POS"], ["manual", "Invoices"]]} />}
+          <div style={{ position: "relative", width: "15rem" }}>
+            <Search size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--muted-foreground)", pointerEvents: "none" }} />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={isPurchaseReport ? "Bill, supplier, product…" : "Invoice, customer, product…"} style={{ paddingLeft: 32 }} aria-label="Search the report" />
+          </div>
+        </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 report-panel">
-        <Card className="xl:col-span-2 border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Weekly Sales Trend</CardTitle>
-            <CardDescription>Sales, orders, and refunds by day (last 7 days)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={salesTrend}>
-                <defs>
-                  <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip formatter={(v: number, name: string) => name === "sales" ? `${currencyPrefix}${v.toLocaleString()}` : v} />
-                <Legend />
-                <Area type="monotone" dataKey="sales" stroke="#2563eb" fill="url(#salesFill)" name={`Sales (${currencySymbol})`} />
-                <Line type="monotone" dataKey="orders" stroke="#16a34a" strokeWidth={2} name="Orders" />
-                <Line type="monotone" dataKey="refunds" stroke="#dc2626" strokeWidth={2} name={`Refunds (${currencySymbol})`} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {failed.length > 0 && (
+        <div className={`${styles.card} ${styles.filters}`} style={{ color: "var(--destructive)" }}>
+          <AlertTriangle size={16} />Couldn't load {failed.join(", ")}. Reports using them may be incomplete.
+        </div>
+      )}
 
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Category Mix</CardTitle>
-            <CardDescription>Revenue share by type</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {categoryMix.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">No data available.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={categoryMix} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90} paddingAngle={2}>
-                    {categoryMix.map(entry => (
-                      <Cell key={entry.name} fill={entry.color} />
+      <div className={loading ? styles.loadingVeil : undefined} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div className={styles.kpis}>
+          <Kpi icon={ShoppingCart} tone="blue" label="Net sales" value={money0(t.sales)} hint={`${fmtInt(t.count)} sale${t.count === 1 ? "" : "s"}`} onClick={() => setReport("register")} />
+          <Kpi icon={TrendingUp} tone={t.profit < 0 ? "red" : "green"} label="Gross profit" value={money0(t.profit)} hint={margin != null ? `${margin.toFixed(1)}% margin` : "no sales"} onClick={() => setReport("daily")} />
+          <Kpi icon={Wallet} tone="teal" label="Tax collected" value={money0(t.tax)} hint={`on ${money0(t.revenue)} before tax`} />
+          <Kpi icon={RotateCcw} tone="amber" label="Returns" value={money0(t.returned)} hint={t.gross > 0 ? `${((t.returned / t.gross) * 100).toFixed(1)}% of sales` : "no sales"} onClick={() => setReport("returns")} />
+          <Kpi icon={Truck} tone="orange" label="Purchases" value={money0(bought)} hint={`${fmtInt(purchases.length)} supplier bill${purchases.length === 1 ? "" : "s"}`} onClick={() => setReport("purchases")} />
+          <Kpi icon={FileSpreadsheet} tone={t.due + owedSuppliers > 0 ? "violet" : "green"} label="Open balances" value={money0(t.due)}
+            hint={`customers owe · ${money0(owedSuppliers)} owed to suppliers`} onClick={() => setReport("customers")} />
+        </div>
+
+        <SectionTabs tabs={reportTabs} value={report} onChange={setReport} label="Reports" />
+
+        <Panel title={r.title} icon={r.icon} sub={r.sub}
+          action={
+            <ReportActions report={buildReport} disabled={loading} menuLabel={r.title} compact />
+          }>
+          {r.rows.length === 0 ? <Empty icon={r.icon} title={r.empty} text={q ? "Try clearing the search or widening the date range." : "Try a wider date range."} /> : (
+            <>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>{r.cols.map((c, i) => <th key={i} className={c.kind && c.kind !== "text" && c.kind !== "date" && c.kind !== "status" ? styles.num : undefined}>{c.label}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {r.rows.slice(0, shown).map(row => (
+                      <tr key={row.key}>
+                        {row.cells.map((v, i) => {
+                          const kind = r.cols[i].kind;
+                          const numeric = kind && kind !== "text" && kind !== "date" && kind !== "status";
+                          return (
+                            <td key={i} className={numeric ? styles.num : i > 1 && kind !== "status" && kind !== "date" ? styles.muted : undefined}
+                              style={i === 0 ? { fontWeight: 600 } : kind === "money" && (r.cols[i].label === "Net sale" || r.cols[i].label === "Net sales" || r.cols[i].label === "Amount" || r.cols[i].label === "Billed") ? { fontWeight: 700 } : undefined}>
+                              {display(v, kind)}
+                              {row.sub?.[i] && <div className={styles.muted} style={{ fontSize: "var(--text-xs)", fontWeight: 400 }}>{row.sub[i]}</div>}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number, name: string) => [`${value}%`, name]} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 report-panel">
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Payment Methods</CardTitle>
-            <CardDescription>Revenue by payment type</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {paymentMix.length === 0 ? (
-              <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">No data available.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={paymentMix}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="method" />
-                  <YAxis />
-                  <Tooltip formatter={(v: number) => `${currencyPrefix}${v.toLocaleString()}`} />
-                  <Bar dataKey="value" fill="#6366f1" name="Revenue" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Reporting Snapshot</CardTitle>
-            <CardDescription>Key highlights for this period</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CalendarDays className="h-4 w-4" />
-                Period Coverage
+                  </tbody>
+                  {r.foot && (
+                    <tfoot>
+                      <tr>{r.foot.map((v, i) => {
+                        const kind = r.cols[i].kind;
+                        const numeric = kind && kind !== "text" && kind !== "date" && kind !== "status";
+                        return <td key={i} className={numeric ? styles.num : undefined}>{i === 0 ? v : v == null ? "" : display(v, kind === "status" || kind === "date" ? "text" : kind)}</td>;
+                      })}</tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
-              <span className="text-sm font-semibold">{periodLabel}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ShoppingCart className="h-4 w-4" />
-                Orders Processed
-              </div>
-              <span className="text-sm font-semibold">{filteredReceipts.length.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CreditCard className="h-4 w-4" />
-                Payment Success Rate
-              </div>
-              <span className="text-sm font-semibold">
-                {filteredReceipts.length > 0
-                  ? `${(((filteredReceipts.length - filteredReceipts.filter(r => normalizeStatus(r.status) === "pending").length) / filteredReceipts.length) * 100).toFixed(1)}%`
-                  : "—"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ArrowUpRight className="h-4 w-4" />
-                Total Revenue
-              </div>
-              <span className="text-sm font-semibold text-green-600">{formatAED(Math.round(totals.totalSales))}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sales Register */}
-      <Card className="report-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Sales Register</CardTitle>
-              <CardDescription>Detailed transaction listing ({salesRegister.length} shown)</CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="py-8 text-center text-muted-foreground">Loading transactions...</div>
-          ) : salesRegister.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No transactions found for the selected period.</div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Plan / Type</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salesRegister.map(row => (
-                  <TableRow key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="font-medium">{row.invoice}</TableCell>
-                    <TableCell>{row.date}</TableCell>
-                    <TableCell>{row.customer}</TableCell>
-                    <TableCell>{row.channel}</TableCell>
-                    <TableCell>{row.payment}</TableCell>
-                    <TableCell>{statusBadge(row.status)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatAED(row.amount)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              {r.rows.length > shown && (
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, paddingTop: "0.75rem" }}>
+                  <span className={styles.muted} style={{ fontSize: "var(--text-xs)" }}>Showing {fmtInt(shown)} of {fmtInt(r.rows.length)} · totals and exports include every row</span>
+                  <Button variant="outline" size="sm" onClick={() => setShown(s => s + PAGE)}>Show {Math.min(PAGE, r.rows.length - shown)} more</Button>
+                </div>
+              )}
+            </>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Top Products */}
-      <Card className="report-panel border-primary/10 shadow-md hover:shadow-lg transition-shadow">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Top Plans and Services</CardTitle>
-              <CardDescription>Best performers by revenue</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm">
-              <FileText className="mr-2 h-4 w-4" />
-              View Full Report
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {topProducts.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No product data available.</div>
-          ) : (
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Plan / Service</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-center">Transactions</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topProducts.map(product => (
-                  <TableRow key={product.name} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell className="text-center">{product.units}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatAED(product.revenue)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        </Panel>
+      </div>
     </div>
   );
 }

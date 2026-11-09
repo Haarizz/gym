@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { addYears, differenceInCalendarDays, format, isSameMonth, isValid, parseISO, subYears } from "date-fns";
 import { AlertCircle, Clock, Download, Eye, EyeOff, FileText, Hash, Play, Receipt, RefreshCw, Snowflake, User, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../report-export";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -194,27 +195,28 @@ export function FreezeTransactionHistory({
     : rows;
   const visible = showAll ? shownRows : shownRows.slice(0, PREVIEW_ROWS);
 
-  const exportCsv = () => {
-    if (rows.length === 0) { toast.info("No freeze transactions to export"); return; }
-    const cell = (v: unknown) => {
-      const s = v === null || v === undefined ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = ["Receipt No", "Transaction ID", "Member", "Member ID", "Action", "Reason", "Freeze From", "Freeze To", "Duration (days)", "Free Days", "Charged Days", "Charge", "Date", "Processed By", "Status"];
-    const lines = rows.map((r) => [
-      r.docNo, r.txnId, r.record.name, r.record.memberId, r.action, r.record.reason || "",
-      r.record.freezeStart, r.periodTo || "", r.duration, r.record.freeDays, r.record.chargedDays,
-      Number(r.record.chargeAmount || 0), r.date, sourceLabel(r.record.source), r.status,
-    ]);
-    const csv = [header, ...lines].map((l) => l.map(cell).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `freeze-unfreeze-history-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${rows.length} transactions`);
-  };
+  // Export / print: every row of the current filter (all rows, not only the preview)
+  const buildReport = (): ReportDocument => ({
+    title: "Freeze / Unfreeze Transaction History",
+    fileName: "Freeze History",
+    orientation: "landscape",
+    filters: [{ label: "Showing", value: filter ? String(filter).replace(/^./, (c) => c.toUpperCase()) : "All freeze and unfreeze actions" }],
+    sections: [
+      kpiSection([
+        { label: "Transactions", value: shownRows.length, format: "integer" },
+        { label: "Freezes", value: shownRows.filter((r) => r.action === "Freeze").length, format: "integer" },
+        { label: "Unfreezes", value: shownRows.filter((r) => r.action === "Unfreeze").length, format: "integer" },
+        { label: "Freeze charges", value: shownRows.filter((r) => r.action === "Freeze").reduce((s, r) => s + Number(r.record.chargeAmount || 0), 0), format: "money" },
+      ]),
+      tableFromMatrix("Transactions",
+        ["Receipt No", "Transaction ID", "Member", "Member ID", "Action", "Reason", "Freeze From", "Freeze To", "Duration (days)", "Free Days", "Charged Days", "Charge", "Date", "Processed By", "Status"],
+        shownRows.map((r) => [
+          r.docNo, r.txnId, r.record.name, r.record.memberId, r.action, r.record.reason || "",
+          r.record.freezeStart, r.periodTo || "", r.duration, r.record.freeDays, r.record.chargedDays,
+          Number(r.record.chargeAmount || 0), r.date, sourceLabel(r.record.source), r.status,
+        ]), { totals: true, money: [11], noMoney: [8, 9, 10], wrap: [5] }),
+    ],
+  });
 
   return (
     <Card id="freeze-history" className="mt-6 shadow-sm" style={{ borderColor: "color-mix(in srgb, var(--primary) 20%, transparent)" }}>
@@ -231,10 +233,7 @@ export function FreezeTransactionHistory({
             <Button variant="outline" size="sm" onClick={load} disabled={loading} title="Refresh">
               <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             </Button>
-            <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || rows.length === 0}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <ReportActions report={buildReport} disabled={loading || rows.length === 0} menuLabel="Freeze / unfreeze history" compact />
             {shownRows.length > PREVIEW_ROWS && (
               <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
                 {showAll ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}

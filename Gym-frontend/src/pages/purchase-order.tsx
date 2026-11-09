@@ -23,9 +23,10 @@ import styles from '../components/purchase/PurchaseInvoice.module.css';
 import { IconBtn, ModuleHeader, NativeSelect, StatCard, SupplierFormDialog, cx } from '../components/purchase/purchaseUi';
 import { displayDate, fetchAllBills, fetchAllOrders, priorityMeta, todayIso } from '../components/purchase/purchaseInvoiceUtils';
 import {
-  PO_STATUS_FILTERS, exportOrdersCsv, isLate, isoDay, poActions, poStatusMeta, receipt,
+  PO_STATUS_FILTERS, buildOrdersReport, isLate, isoDay, poActions, poStatusMeta, receipt,
 } from '../components/purchase/purchaseOrderUtils';
 import { buildOrderDocument, printPurchaseDocument } from '../components/print-templates/purchasePrint';
+import { ReportActions } from '../components/report-export';
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 const PAGE_SIZE = 20;
@@ -303,9 +304,7 @@ export function PurchaseOrder() {
             {view === 'editor' && <Button variant="outline" size="sm" onClick={() => editorRef.current?.print()}><Printer className="h-4 w-4" /> Print</Button>}
             {view === 'list' && (
               <>
-                <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => exportOrdersCsv(filtered, currencyCode)}>
-                  <Download className="h-4 w-4" /> Export
-                </Button>
+                <ReportActions report={() => buildOrdersReport(filtered)} disabled={filtered.length === 0} menuLabel="Purchase orders" />
                 <Button variant="outline" size="sm" onClick={() => navigate('/suppliers')}><Users className="h-4 w-4" /> Suppliers</Button>
               </>
             )}

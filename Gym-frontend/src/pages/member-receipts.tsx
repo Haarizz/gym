@@ -51,6 +51,7 @@ import { ListPagination } from "../components/list-pagination";
 import { useDebouncedValue } from "../utils/use-debounced-value";
 import { downloadReceiptInvoice, downloadPaymentReceipt } from "../utils/receipt-invoice";
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 interface MemberReceiptsProps {
   onNavigate?: (section: string) => void;
@@ -184,33 +185,36 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
     setSendChannels([]);
   };
 
-  const handleExportAllReceipts = async () => {
-    if (totalReceipts === 0) { toast.info('No receipts to export'); return; }
-    setExporting(true);
-    let receipts: Receipt[];
-    try {
-      receipts = await receiptsService.getAllReceipts(filters);
-    } catch {
-      toast.error('Could not load receipts to export');
-      return;
-    } finally {
-      setExporting(false);
-    }
-    const header = 'Receipt No,Member,Member ID,Plan,Type,Amount Paid,Remaining Due,Date & Time,Payment Method,Created By,Status\n';
-    const rows = receipts.map(r => {
-      const paid = Number(r.paid_amount ?? 0);
-      const remainingDue = Number(r.balance_after ?? 0);
-      const displayStatus = r.approval_status === "PENDING" ? "Request" : (r.approval_status === "REJECTED" ? "Rejected" : r.status);
-      return `"${r.receipt_no}","${r.member_name}","${r.member_id}","${r.plan_name ?? ''}","${r.transaction_type}","${paid.toFixed(2)}","${remainingDue.toFixed(2)}","${r.transaction_date ? new Date(r.transaction_date).toLocaleString() : ''}","${r.payment_method ?? ''}","${r.processed_by ?? ''}","${displayStatus}"`;
-    }).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipts-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${receipts.length} receipt(s)`);
+  // Every receipt matching the filters (not just the page on screen)
+  const buildReceiptsReport = async (): Promise<ReportDocument> => {
+    const receipts = await receiptsService.getAllReceipts(filters);
+    const statusOf = (r: Receipt) => r.approval_status === "PENDING" ? "Request" : (r.approval_status === "REJECTED" ? "Rejected" : r.status);
+    return {
+      title: 'Member Receipts Report',
+      orientation: 'landscape',
+      period: { label: 'All dates' },
+      filters: [
+        { label: 'Search', value: filters.search },
+        { label: 'Transaction type', value: filters.transactionType ?? 'All' },
+        { label: 'Status', value: filters.status ?? 'All' },
+      ],
+      sections: [
+        kpiSection([
+          { label: 'Receipts', value: receipts.length, format: 'integer' },
+          { label: 'Amount paid', value: receipts.reduce((s, r) => s + Number(r.paid_amount ?? 0), 0), format: 'money' },
+          { label: 'Remaining due', value: receipts.reduce((s, r) => s + Number(r.balance_after ?? 0), 0), format: 'money' },
+        ]),
+        tableSection('Receipts', [
+          col('receipt_no', 'Receipt No'), col('date', 'Date & time', 'datetime'), col('member_name', 'Member'), col('member_id', 'Member ID'),
+          col('plan_name', 'Plan'), col('transaction_type', 'Type'), moneyCol('paid', 'Amount paid'), moneyCol('due', 'Remaining due'),
+          col('payment_method', 'Payment method'), col('processed_by', 'Created by'), col('status', 'Status'),
+        ], receipts.map(r => ({
+          receipt_no: r.receipt_no, date: r.transaction_date, member_name: r.member_name, member_id: r.member_id, plan_name: r.plan_name ?? '',
+          transaction_type: r.transaction_type, paid: Number(r.paid_amount ?? 0), due: Number(r.balance_after ?? 0),
+          payment_method: r.payment_method ?? '', processed_by: r.processed_by ?? '', status: statusOf(r),
+        })), { totals: true }),
+      ],
+    };
   };
 
   return (
@@ -244,9 +248,7 @@ export function MemberReceipts({ onNavigate, embedded, statusFilter, onStatusFil
                 <CardDescription>All payment receipts and transaction history</CardDescription>
               </div>
               <div className="flex space-x-2">
-                <Button variant="outline" size="sm" onClick={handleExportAllReceipts} disabled={exporting}>
-                  {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Export CSV
-                </Button>
+                <ReportActions report={buildReceiptsReport} disabled={totalReceipts === 0} menuLabel="Member receipts" />
               </div>
             </div>
           </CardHeader>

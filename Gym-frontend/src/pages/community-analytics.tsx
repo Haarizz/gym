@@ -26,6 +26,7 @@ import { communityService } from "../utils/supabase/community-service";
 import { posApi } from "../pos/api";
 import type { Sale } from "../pos/types";
 import styles from "../components/analytics/community-analytics.module.css";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 
 // ── Periods ─────────────────────────────────────────────────────────────────
 
@@ -852,39 +853,94 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
     return out;
   }, [stats, roster, forecast, heat, money, ranges]);
 
-  // ── Export ────────────────────────────────────────────────────────────────
-  const handleExport = () => {
-    if (!stats || !roster) return;
-    const esc = (v: unknown) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const rows: unknown[][] = [
-      ["Analytics Dashboard", isAllBranches ? "All branches" : activeBranchName], ["Period", rangeLabel(ranges.from, ranges.to)],
-      ["Compared with", rangeLabel(ranges.compareFrom, ranges.compareTo)], ["Currency", currencyCode], [],
-      ["Metric", "This period", "Previous period", "Change %"],
-      ["Collections", Math.round(stats.collections), Math.round(stats.prevCollections), fmtPct(pctChange(stats.collections, stats.prevCollections))],
-      ["Payments", stats.payments, stats.prevPayments, fmtPct(pctChange(stats.payments, stats.prevPayments))],
-      ["Average payment", Math.round(stats.avgTicket), Math.round(stats.prevAvgTicket), fmtPct(pctChange(stats.avgTicket, stats.prevAvgTicket))],
-      ["New members", stats.newMembers, stats.prevNewMembers, fmtPct(pctChange(stats.newMembers, stats.prevNewMembers))],
-      ["Renewals", stats.renewals, stats.prevRenewals, fmtPct(pctChange(stats.renewals, stats.prevRenewals))],
-      ["Lapsed (not renewed)", stats.lapsed, stats.prevLapsed, fmtPct(pctChange(stats.lapsed, stats.prevLapsed))],
-      ["Check-ins", checkins?.total ?? "", checkins?.prevTotal ?? "", checkins ? fmtPct(pctChange(checkins.total, checkins.prevTotal)) : ""], [],
-      ["Now", "Value"], ["Active members", roster.active], ["Frozen", roster.frozen], ["Expiring in 14 days", roster.expiring.length],
-      ["Members with dues", roster.owing], ["Outstanding member balances", Math.round(roster.outstanding)], ["Unpaid product invoices", Math.round(roster.invoiceDue)], [],
-      ["Source", "This period", "Previous period"], ...stats.sources.map(s => [s.label, Math.round(s.value), Math.round(s.prev)]), [],
-      ["Payment method", "Amount"], ...stats.paymentMethods.map(([k, v]) => [k, Math.round(v)]), [],
-      ["Trend", "This period", "Previous period"], ...stats.trend.map(t => [t.tipLabel, t.current, t.previous]), [],
-      ["Staff", "Collections", "Payments", "Monthly target", "Achieved toward target"], ...stats.staffRows.map(s => [s.name, Math.round(s.value), s.count, s.target ? Math.round(s.target.target) : "", s.target ? Math.round(s.target.achieved) : ""]), [],
-      ["Plan", "Active members"], ...roster.planMix.map(([k, v]) => [k, v]), [],
-      ["Month", "Joined", "Lapsed", "Net"], ...roster.growth.map(g => [g.tipLabel, g.joins, g.lapses, g.net]), [],
-      ["Busiest check-in slots", "Check-ins"], ...heat.slots.slice(0, 15).map(s => [`${s.day} ${String(s.h).padStart(2, "0")}:00`, s.v]), [],
-      ["Churn risk", "Member ID", "Risk %", "Tier", "Reasons"], ...roster.risk.map(r => [r.m.name, r.m.member_id ?? "", r.probability, r.tier, toPlainCurrencyText(r.reasons.join("; "))]), [],
-      ["Plans ending in 14 days", "Member ID", "Plan", "End date", "Days left"], ...roster.expiring.map(e => [e.m.name, e.m.member_id ?? "", planOf(e.m), e.end, e.daysLeft]),
+  // ── Export / print: every panel and deep dive, from the same figures ─────
+  const buildReport = (): ReportDocument => {
+    if (!stats || !roster || !forecast) throw new Error("Analytics are still loading");
+    const pc = (a: number, b: number) => { const p = pctChange(a, b); return p == null ? "New" : Math.round(p * 10) / 10; };
+    const cmp = (label: string, a: number, b: number, fmt: "money" | "integer") => ({ metric: label, fmt, cur: a, prev: b, change: pc(a, b) });
+    const compareRows = [
+      cmp("Collections", stats.collections, stats.prevCollections, "money"),
+      cmp("Average payment", stats.avgTicket, stats.prevAvgTicket, "money"),
+      cmp("Payments", stats.payments, stats.prevPayments, "integer"),
+      cmp("New members", stats.newMembers, stats.prevNewMembers, "integer"),
+      cmp("Renewals", stats.renewals, stats.prevRenewals, "integer"),
+      cmp("Lapsed (not renewed)", stats.lapsed, stats.prevLapsed, "integer"),
+      ...(checkins ? [cmp("Check-ins", checkins.total, checkins.prevTotal, "integer")] : []),
     ];
-    const csv = rows.map(r => r.map(esc).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = `analytics_${keys.from}_${keys.to}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Exported — opens in Excel");
+    const compareTable = (title: string, fmt: "money" | "integer") => tableSection(title, [
+      col("metric", "Metric"), col("cur", "This period", fmt), col("prev", "Previous period", fmt), col("change", "Change", "percent"),
+    ], compareRows.filter((r) => r.fmt === fmt));
+    const mTotal = stats.paymentMethods.reduce((s, [, v]) => s + v, 0);
+    return {
+      title: "Analytics Dashboard",
+      fileName: "Analytics Dashboard",
+      period: { from: ranges.from, to: ranges.to },
+      filters: [{ label: "Compared with", value: rangeLabel(ranges.compareFrom, ranges.compareTo) }],
+      sections: [
+        kpiSection([
+          { label: "Collections", value: stats.collections, format: "money", ...changeHint(pctChange(stats.collections, stats.prevCollections)) },
+          { label: "Payments", value: stats.payments, format: "integer", ...changeHint(pctChange(stats.payments, stats.prevPayments)) },
+          { label: "New members", value: stats.newMembers, format: "integer", ...changeHint(pctChange(stats.newMembers, stats.prevNewMembers)) },
+          { label: "Renewals", value: stats.renewals, format: "integer", ...changeHint(pctChange(stats.renewals, stats.prevRenewals)) },
+          { label: "Active members (now)", value: roster.active, format: "integer", hint: `${fmtInt(roster.frozen)} frozen` },
+          { label: "Check-ins", value: checkins?.total ?? "—", format: "integer", ...(checkins ? changeHint(pctChange(checkins.total, checkins.prevTotal)) : {}) },
+          { label: "Outstanding dues", value: roster.outstanding + roster.invoiceDue, format: "money", hint: `${fmtInt(roster.owing)} members owe` },
+          { label: "Monthly target", value: forecast.target || "—", format: "money", hint: forecast.target ? `${money(forecast.achieved).replace(/\u20C3\s?/g, "AED ")} achieved · projected ${money(forecast.projected).replace(/\u20C3\s?/g, "AED ")}` : "No target set" },
+        ], "Headline"),
+        compareTable("This period vs previous · amounts", "money"),
+        compareTable("This period vs previous · activity", "integer"),
+        chartFromRows(`Collections trend (${stats.mode === "hour" ? "by hour" : stats.mode === "day" ? "by day" : "by week"})`, "line", stats.trend, "label", [
+          { key: "current", name: "This period", color: "#2a78d6" }, { key: "previous", name: "Previous period", color: "#8a8780" },
+        ], { valueFormat: "money" }),
+        tableSection("Collections trend", [col("period", "Period"), moneyCol("current", "This period"), moneyCol("previous", "Previous period")],
+          stats.trend.map((t) => ({ period: t.tipLabel, current: t.current, previous: t.previous })), { totals: true }),
+        pieSection("Collections by source", stats.sources.map((s) => ({ label: s.label, value: s.value })), { valueFormat: "money" }),
+        tableSection("Collections by source", [col("source", "Source"), moneyCol("value", "This period"), moneyCol("prev", "Previous period"), col("change", "Change", "percent")],
+          stats.sources.map((s) => ({ source: s.label, value: s.value, prev: s.prev, change: pc(s.value, s.prev) })), { totals: true }),
+        tableSection("Payment methods", [col("method", "Method"), moneyCol("amount", "Amount"), col("share", "Share", "percent", { total: "sum" })],
+          stats.paymentMethods.map(([k, v]) => ({ method: k, amount: v, share: mTotal ? Math.round((v / mTotal) * 1000) / 10 : 0 })), { totals: true }),
+        { kind: "keyValue", title: "Monthly target (this calendar month)", items: [
+          { label: "Target", value: forecast.target || "Not set", format: "money" },
+          { label: "Achieved", value: forecast.achieved, format: "money" },
+          { label: "Projected month end", value: forecast.projected, format: "money" },
+          { label: "Daily rate", value: forecast.dailyRate, format: "money" },
+          { label: "Needed per day", value: forecast.neededPerDay || "—", format: "money" },
+          { label: "Days remaining", value: forecast.remainingDays, format: "integer" },
+        ] },
+        tableSection("When members train · check-ins by weekday", [col("day", "Weekday"), countCol("total", "Check-ins"), col("avg", "Avg per day", "number")],
+          heat.byDay.map((d) => ({ day: d.day, total: d.total, avg: Math.round(d.avg * 10) / 10 })), { totals: true }),
+        tableSection("Busiest check-in slots", [col("slot", "Slot"), countCol("v", "Check-ins")],
+          heat.slots.slice(0, 15).map((s) => ({ slot: `${s.day} ${String(s.h).padStart(2, "0")}:00`, v: s.v }))),
+        tableSection("Renewals due · next 14 days", [col("name", "Member"), col("id", "Member ID"), col("plan", "Plan"), col("end", "End date", "date"), col("days", "Days left", "integer")],
+          roster.expiring.map((e) => ({ name: e.m.name, id: e.m.member_id ?? "", plan: planOf(e.m), end: e.end, days: e.daysLeft })), { emptyText: "No plans end in the next 14 days." }),
+        chartFromRows("Member growth · last 12 months", "bar", roster.growth, "label", [
+          { key: "joins", name: "Joined", color: "#1baf7a" }, { key: "lapses", name: "Lapsed", color: "#eb6834" },
+        ], { valueFormat: "integer" }),
+        tableSection("Member growth · last 12 months", [col("month", "Month"), countCol("joins", "Joined"), countCol("lapses", "Lapsed"), col("net", "Net", "integer", { total: "sum" })],
+          roster.growth.map((g) => ({ month: g.tipLabel, joins: g.joins, lapses: g.lapses, net: g.net })), { totals: true }),
+        tableSection("Active members by plan", [col("plan", "Plan"), countCol("count", "Active members")], roster.planMix.map(([k, v]) => ({ plan: k, count: v })), { totals: true }),
+        tableSection("Members at risk of leaving", [col("name", "Member"), col("id", "Member ID"), col("risk", "Risk", "percent"), col("tier", "Tier"), col("reasons", "Reasons", "text", { wrap: true })],
+          roster.risk.map((r) => ({ name: r.m.name, id: r.m.member_id ?? "", risk: r.probability, tier: r.tier, reasons: toPlainCurrencyText(r.reasons.join("; ")) })), { emptyText: "No members at risk." }),
+        tableSection("Collections by staff", [col("name", "Staff"), moneyCol("value", "Collections"), countCol("count", "Payments"), col("target", "Monthly target", "money"), col("achieved", "Achieved toward target", "money")],
+          stats.staffRows.map((s) => ({ name: s.name, value: s.value, count: s.count, target: s.target ? s.target.target : null, achieved: s.target ? s.target.achieved : null })), { totals: true }),
+        tableSection("Trainer class bookings · last 30 days", [col("name", "Trainer"), countCol("bookings", "Bookings"), countCol("held", "Held"), countCol("checkedIn", "Checked in"), countCol("noShow", "No-show"), countCol("cancelled", "Cancelled"), col("showRate", "Show rate", "percent"), moneyCol("revenue", "Value")],
+          trainers.map((t) => ({ ...t, showRate: t.showRate == null ? "—" : Math.round(t.showRate * 10) / 10 })), { totals: true, emptyText: "No class bookings in the last 30 days." }),
+        chartFromRows("Revenue, expenses and profit (posted ledger)", "bar", base!.monthly, "month", [
+          { key: "revenue", name: "Revenue", color: "#2a78d6" }, { key: "expenses", name: "Expenses", color: "#eb6834" }, { key: "profit", name: "Profit", color: "#1baf7a" },
+        ], { valueFormat: "money" }),
+        tableSection("Revenue, expenses and profit by month", [col("month", "Month"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), col("margin", "Margin", "percent")],
+          base!.monthly.map((m) => ({ month: m.month, revenue: m.revenue, expenses: m.expenses, profit: m.profit, margin: m.revenue ? Math.round((m.profit / m.revenue) * 1000) / 10 : "—" })), { totals: true, emptyText: "No posted ledger entries yet." }),
+        ...(base!.ledger ? [{ kind: "keyValue" as const, title: "Ledger totals (all time)", items: [
+          { label: "Revenue", value: base!.ledger.revenue, format: "money" as const },
+          { label: "Expenses", value: base!.ledger.expenses, format: "money" as const },
+          { label: "Net profit", value: base!.ledger.profit, format: "money" as const },
+          { label: "Margin", value: base!.ledger.margin, format: "percent" as const },
+        ] }] : []),
+        tableSection("Expenses by category (all time)", [col("category", "Category"), moneyCol("amount", "Amount")],
+          [...base!.expenses].sort((a, b) => b.amount - a.amount).map((e) => ({ category: e.category, amount: e.amount })), { totals: true, emptyText: "No posted expenses yet." }),
+        ...(insights.length ? [tableSection("Insights", [col("title", "Insight"), col("detail", "Detail", "text", { wrap: true })], insights.map((i) => ({ title: i.title, detail: toPlainCurrencyText(i.detail) })))] : []),
+      ],
+    };
   };
 
   const openMember = (m: Member) => onNavigate?.("member-history-analytics", { memberId: m.id });
@@ -938,9 +994,7 @@ export function CommunityAnalytics({ onNavigate }: Props = {}) {
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading || rangeLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading || rangeLoading ? "animate-spin" : ""}`} />Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />Export
-          </Button>
+          <ReportActions report={buildReport} disabled={loading || rangeLoading} menuLabel={`Analytics · ${periodText}`} />
         </div>
       </div>
 

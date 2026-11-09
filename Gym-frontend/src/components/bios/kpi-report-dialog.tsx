@@ -25,6 +25,7 @@ import {
   Minus
 } from 'lucide-react';
 import { type BiosLiveData, formatSignedPercent, clampPercent, compactCurrency } from './bios-live';
+import { BiosReportActions } from "./bios-report";
 
 interface KPIReportDialogProps {
   open: boolean;
@@ -625,14 +626,7 @@ export function KPIReportDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button className="bg-[#2B7A78] hover:bg-[#236663]" onClick={live.onExportReport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button className="bg-[#E63946] hover:bg-[#d32f3f]" onClick={() => window.print()}>
-            <FileText className="h-4 w-4 mr-2" />
-            Print Report
-          </Button>
+          <BiosReportActions live={live} kind="kpi" />
         </div>
       </DialogContent>
     </Dialog>

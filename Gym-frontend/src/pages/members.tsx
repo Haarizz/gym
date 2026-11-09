@@ -94,7 +94,7 @@ import { RewardDiscountPicker, selectionDiscount, selectionRequestFields, type R
 import { FamilyRenewalPanel, type FamilyPanelState } from '../components/members/FamilyRenewalPanel';
 import { resolveBackendImageUrl } from '../utils/resolve-image-url';
 import type { CreditCustomer } from '../payments/modals/CreditModal';
-import { withPrintFont } from "../utils/print-font";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 import { NewMembersTab } from "../components/members/NewMembersTab";
 
 const membershipPlans = [
@@ -681,6 +681,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
       const data = receipts.map((r, i) => ({
         id: i + 1,
         docDate: r.transaction_date ? new Date(r.transaction_date).toLocaleDateString('en-GB') : '—',
+        docDateRaw: r.transaction_date || null,
         docNo: r.receipt_no || '—',
         memberId: r.member_id || '—',
         memberName: r.member_name || '—',
@@ -753,40 +754,39 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
   const paginatedReportData = reportData.slice(reportStartIndex, reportEndIndex);
   const reportTotalPages = Math.ceil(reportData.length / reportPageSize);
 
-  // Handle export
-  const handleExport = (format: string) => {
-    if (reportData.length === 0) {
-      toast.error('Nothing to export');
-      return;
-    }
-    if (format === 'pdf') {
-      // Print-friendly copy of the results; the browser's print dialog saves it as PDF
-      const esc = (v: unknown) => String(v ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
-      const head = ['#', 'Doc. Date', 'Doc. No.', 'Member ID', 'Member Name', 'Mobile', 'Membership Type', 'Transaction Type', 'Plan', 'Amount', 'Mode', 'Cash', 'Card', 'Due', 'Due Date'];
-      const body = reportData.map((r: any, i: number) => [i + 1, r.docDate, r.docNo, r.memberId, r.memberName, r.mobile, r.membershipType, r.transactionType, r.plan, r.amount, r.mode, r.cash, r.card, r.due, r.dueDate]);
-      const win = window.open('', '_blank', 'width=1100,height=800');
-      if (win) {
-        win.document.write(withPrintFont(`<!doctype html><html><head><title>Membership Report</title><style>body{font-family:'Plus Jakarta Sans Variable',Arial,sans-serif;font-size:11px;margin:16px}h2{margin:0 0 8px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left}th{background:#f1f5f9}</style></head><body><h2>Membership Report</h2><p>Total records: ${reportData.length} · Total amount: ${currencyCode} ${reportSummary.totalAmount.toLocaleString()} · Cash: ${reportSummary.totalCash.toLocaleString()} · Card: ${reportSummary.totalCard.toLocaleString()} · Due: ${reportSummary.totalDue.toLocaleString()}</p><table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`));
-        win.document.close();
-      }
-      return;
-    }
-    const cell = (v: unknown) => {
-      const str = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  // Export / print: every generated row (not just the visible page), with the report filters
+  const buildMembershipTransactionsReport = (): ReportDocument => {
+    if (reportData.length === 0) throw new Error('Nothing to export — generate the report first');
+    const rangeLabel: Record<string, string> = {
+      today: 'Today', yesterday: 'Yesterday', 'last-7-days': 'Last 7 days', 'last-30-days': 'Last 30 days',
+      'last-90-days': 'Last 90 days', 'last-12-months': 'Last 12 months', custom: 'Custom range', all: 'All time',
     };
-    const header = ['Doc. Date', 'Doc. No.', 'Member ID', 'Member Name', 'Mobile', 'Membership Type', 'Transaction Type', 'Plan', `Amount (${currencyCode})`, 'Mode', 'Cash', 'Card', 'Due', 'Due Date'];
-    const lines = reportData.map((r: any) => [r.docDate, r.docNo, r.memberId, r.memberName, r.mobile, r.membershipType, r.transactionType, r.plan, r.amount, r.mode, r.cash, r.card, r.due, r.dueDate]);
-    const csv = [header, ...lines].map(l => l.map(cell).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `membership-report-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${reportData.length} transactions`, {
-      description: 'Your report will be downloaded shortly.',
-    });
+    return {
+      title: 'Membership Transactions Report',
+      fileName: 'Membership Report',
+      orientation: 'landscape',
+      period: dateRange === 'custom' && customDateFrom && customDateTo
+        ? { from: customDateFrom, to: customDateTo, label: 'Custom range' }
+        : { label: rangeLabel[dateRange] ?? dateRange },
+      filters: [
+        { label: 'Membership type', value: membershipType === 'all' ? 'All' : membershipType },
+        { label: 'Payment mode', value: payMode === 'all' ? 'All' : payMode },
+      ],
+      sections: [
+        kpiSection([
+          { label: 'Transactions', value: reportSummary.totalRecords, format: 'integer' },
+          { label: 'Total amount', value: reportSummary.totalAmount, format: 'money' },
+          { label: 'Cash', value: reportSummary.totalCash, format: 'money' },
+          { label: 'Card', value: reportSummary.totalCard, format: 'money' },
+          { label: 'Due', value: reportSummary.totalDue, format: 'money', tone: reportSummary.totalDue > 0 ? 'bad' : undefined },
+        ], 'Summary'),
+        tableSection('Transactions', [
+          col('id', '#', 'integer'), col('docDateRaw', 'Doc. date', 'date'), col('docNo', 'Doc. no.'), col('memberId', 'Member ID'), col('memberName', 'Member name'),
+          col('mobile', 'Mobile'), col('membershipType', 'Membership type'), col('transactionType', 'Transaction type'), col('plan', 'Plan'),
+          moneyCol('amount', 'Amount'), col('mode', 'Mode'), moneyCol('cash', 'Cash'), moneyCol('card', 'Card'), moneyCol('due', 'Due'), col('dueDate', 'Due date'),
+        ], reportData, { totals: true }),
+      ],
+    };
   };
 
   // Handle schedule save
@@ -3209,36 +3209,7 @@ export function Members({ onNavigate, initialTab = "members" }: MembersProps = {
 
                 {reportGenerated && (
                   <>
-                    <div className="relative">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowExportMenu(v => !v)}
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Export Report
-                      </Button>
-                      {showExportMenu && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
-                          <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg z-50 w-48">
-                            <button
-                              onClick={() => { handleExport('excel'); setShowExportMenu(false); }}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center rounded-t-lg"
-                            >
-                              <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-                              Export as Excel
-                            </button>
-                            <button
-                              onClick={() => { handleExport('pdf'); setShowExportMenu(false); }}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center rounded-b-lg"
-                            >
-                              <FileText className="mr-2 h-4 w-4 text-red-600" />
-                              Export as PDF
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    <ReportActions report={buildMembershipTransactionsReport} size="default" menuLabel="Membership transactions" />
 
                     <Button
                       variant="outline"

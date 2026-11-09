@@ -20,10 +20,32 @@ public class TargetService {
 
     private final TargetRepository repository;
     private final PerformanceEngine engine;
+    private final com.company.project.repositories.StaffRepository staffRepository;
+    private final com.company.project.repositories.UserRepository userRepository;
 
-    public TargetService(TargetRepository repository, PerformanceEngine engine) {
+    /** The gym owner's roles: they set targets for staff and never have one themselves. */
+    private static final Set<String> OWNER_ROLES = Set.of("ADMIN", "SUPER_ADMIN");
+
+    public TargetService(TargetRepository repository, PerformanceEngine engine,
+                         com.company.project.repositories.StaffRepository staffRepository,
+                         com.company.project.repositories.UserRepository userRepository) {
         this.repository = repository;
         this.engine = engine;
+        this.staffRepository = staffRepository;
+        this.userRepository = userRepository;
+    }
+
+    /** Whether this staff record's login is an owner account (ADMIN / SUPER_ADMIN). */
+    private boolean isLinkedToOwner(Long staffId) {
+        return staffRepository.findById(staffId)
+                .map(st -> st.getUserId() == null ? null : st.getUserId())
+                .flatMap(userRepository::findById)
+                .map(u -> u.getUserRoles().stream()
+                        .map(ur -> ur.getRole() != null ? ur.getRole().getRoleName() : null)
+                        .filter(Objects::nonNull)
+                        .map(r -> r.toUpperCase(Locale.ROOT).replace("ROLE_", ""))
+                        .anyMatch(OWNER_ROLES::contains))
+                .orElse(false);
     }
 
     public record LineRequest(String metric, String measure, BigDecimal goal) {}
@@ -51,6 +73,10 @@ public class TargetService {
                 if (req.staffId() == null) throw new BusinessRuleViolationException("Choose a staff member");
                 PerformanceEngine.StaffInfo s = engine.staffInfo(List.of(req.staffId())).get(req.staffId());
                 if (s == null) throw new EntityNotFoundException("Employee not found");
+                if (isLinkedToOwner(s.id())) {
+                    throw new BusinessRuleViolationException(
+                            s.name() + " signs in as the gym owner (Admin). Owners set targets for staff and don't have targets themselves.");
+                }
                 staffId = s.id();
                 branchId = s.branchId();
             }

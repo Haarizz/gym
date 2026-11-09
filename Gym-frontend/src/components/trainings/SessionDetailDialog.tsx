@@ -16,9 +16,10 @@ import { trainingService, type SessionOverview, type SessionParticipant, type Tr
 import { bookingService } from "../../utils/supabase/booking-service";
 import { membersService } from "../../utils/supabase/members-service";
 import {
-  clockTime, downloadRoster, formatSessionDate, hhmm, participantStatus, sessionDuration, sessionStatus, sessionType,
+  clockTime, buildRosterReport, formatSessionDate, hhmm, participantStatus, sessionDuration, sessionStatus, sessionType,
 } from "./session-utils";
 import s from "./trainings.module.css";
+import { ReportActions } from "../report-export";
 
 interface SessionDetailDialogProps {
   sessionId: string | null;
@@ -235,9 +236,7 @@ export function SessionDetailDialog({ sessionId, open, onOpenChange, onChanged, 
                     <Button variant="outline" size="sm" className="gap-2" disabled={closed} onClick={() => setReminderOpen(true)}>
                       <MessageSquare className="h-4 w-4" /> Send Reminder
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2" disabled={!participants.length} onClick={() => downloadRoster(session, participants)}>
-                      <Download className="h-4 w-4" /> Export Roster
-                    </Button>
+                    <ReportActions report={() => buildRosterReport(session, participants)} disabled={!participants.length} menuLabel="Session roster" />
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 import type { Receipt } from './supabase/receipts-service';
-import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, buildQrCodeSvg, buildReceiptQrPayload, COMPANY_HEADER_CSS, type CompanyDetails } from './company-details';
-import { getVatRate, splitVatInclusive, DEFAULT_VAT_RATE } from './tax';
+import { getCompanyDetails, buildCompanyHeaderHtml, buildCompanyFooterHtml, buildQrCodeSvg, buildReceiptQrPayload, COMPANY_HEADER_CSS, companyLocalNameHtml, type CompanyDetails } from './company-details';
+import { getVatRate, splitVatInclusive, vatRateFor, DEFAULT_VAT_RATE } from './tax';
 import { getReceiptColors, receiptColorsCss, DEFAULT_RECEIPT_COLORS, type ReceiptColors } from './receipt-colors';
 import { printHtml } from './print-html';
 
@@ -98,6 +98,7 @@ export function buildPaymentReceiptHtml(data: ReceiptPrintData, company: Company
       ${company.logo ? `<div class="logo"><img src="${company.logo}" alt="${escapeHtml(company.name)} logo"></div>` : ""}
       <div>
         <div class="company">${escapeHtml(company.name)}</div>
+        ${companyLocalNameHtml(company, "company-local")}
         <div class="company-lines">
           ${company.address ? `${escapeHtml(company.address)}<br>` : ""}${contact ? `${contact}<br>` : ""}${company.trn ? `TRN: ${escapeHtml(company.trn)}` : ""}
         </div>
@@ -133,7 +134,7 @@ export function buildPaymentReceiptHtml(data: ReceiptPrintData, company: Company
     </div>
 
     <table>
-      <thead><tr><th>Description</th><th>Type</th><th>Amount (Incl. VAT)</th></tr></thead>
+      <thead><tr><th>Description</th><th>Type</th><th>${data.vatRatePercent > 0 ? "Amount (Incl. VAT)" : "Amount"}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
 
@@ -146,9 +147,9 @@ export function buildPaymentReceiptHtml(data: ReceiptPrintData, company: Company
         ${payRow("Transaction ref", data.transactionRef)}
       </div>
       <div class="summary">
-        <div class="row"><span>Subtotal (excl. VAT)</span><strong>${money(data.subtotalExclVat)}</strong></div>
+        <div class="row"><span>${data.vatRatePercent > 0 ? "Subtotal (excl. VAT)" : "Subtotal"}</span><strong>${money(data.subtotalExclVat)}</strong></div>
         ${data.discount ? `<div class="row discount"><span>Discount</span><span>- ${money(data.discount)}</span></div>` : ""}
-        <div class="row"><span>VAT (${data.vatRatePercent}%)</span><strong>${money(data.vatAmount)}</strong></div>
+        ${data.vatRatePercent > 0 ? `<div class="row"><span>VAT (${data.vatRatePercent}%)</span><strong>${money(data.vatAmount)}</strong></div>` : ""}
         <div class="row total"><span>Invoice amount</span><span>${money(data.invoiceAmount)}</span></div>
         <div class="row paid"><span>Total paid</span><span>${money(data.totalPaid)}</span></div>
         ${data.balanceDue ? `<div class="row balance"><span>Balance due</span><span>${money(data.balanceDue)}</span></div>` : ""}
@@ -185,6 +186,7 @@ function modernReceiptCss(colors: ReceiptColors): string {
   .logo { flex-shrink: 0; background: #fff; border-radius: 10px; padding: 6px 8px; display: flex; align-items: center; }
   .logo img { max-height: 40px; max-width: 120px; object-fit: contain; display: block; }
   .company { font-size: 24px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
+  .company-local { font-size: 18px; font-weight: 700; line-height: 1.35; margin-top: 2px; }
   .company-lines { margin-top: 6px; font-size: 11px; line-height: 1.6; color: rgba(255,255,255,.78); }
   .doc-type { display: flex; gap: 16px; align-items: flex-start; text-align: right; flex-shrink: 0; }
   .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.72); }
@@ -280,7 +282,7 @@ export function buildCreditReceiptHtml(data: CreditReceiptData, currencyCode: st
   <header>
     <div class="brand">
       ${company.logo ? `<div class="logo"><img src="${company.logo}" alt="${escapeHtml(company.name)} logo"></div>` : ""}
-      <div><div class="company">${escapeHtml(company.name)}</div>
+      <div><div class="company">${escapeHtml(company.name)}</div>${companyLocalNameHtml(company, "company-local")}
         <div class="company-lines">${company.address ? `${escapeHtml(company.address)}<br>` : ""}${contact ? `${contact}<br>` : ""}${company.trn ? `TRN: ${escapeHtml(company.trn)}` : ""}</div></div>
     </div>
     <div class="doc-type">
@@ -488,14 +490,14 @@ export function buildFullReceiptHtml(data: ReceiptPrintData, company: CompanyDet
             ${data.billTo.phone ? `<div class="customer-detail"><strong>Phone:</strong> ${escapeHtml(data.billTo.phone)}</div>` : ""}
         </div>
         <table class="items-table">
-            <thead><tr><th>Description</th><th>Type</th><th style="text-align: right;">Amount (Incl. VAT)</th></tr></thead>
+            <thead><tr><th>Description</th><th>Type</th><th style="text-align: right;">${data.vatRatePercent > 0 ? "Amount (Incl. VAT)" : "Amount"}</th></tr></thead>
             <tbody>${rows}
             </tbody>
         </table>
         <div class="totals-section">
-            <div class="total-row normal"><span>Subtotal (Excl. VAT):</span><span>${currencyCode} ${data.subtotalExclVat.toFixed(2)}</span></div>
+            <div class="total-row normal"><span>${data.vatRatePercent > 0 ? "Subtotal (Excl. VAT):" : "Subtotal:"}</span><span>${currencyCode} ${data.subtotalExclVat.toFixed(2)}</span></div>
             ${data.discount ? `<div class="total-row discount"><span>Discount:</span><span>- ${currencyCode} ${data.discount.toFixed(2)}</span></div>` : ""}
-            <div class="total-row vat"><span>VAT (${data.vatRatePercent}%):</span><span>${currencyCode} ${data.vatAmount.toFixed(2)}</span></div>
+            ${data.vatRatePercent > 0 ? `<div class="total-row vat"><span>VAT (${data.vatRatePercent}%):</span><span>${currencyCode} ${data.vatAmount.toFixed(2)}</span></div>` : ""}
             <div class="total-row grand-total"><span>Invoice Amount:</span><span>${currencyCode} ${data.invoiceAmount.toFixed(2)}</span></div>
             <div class="total-row normal" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"><span>TOTAL PAID:</span><span>${currencyCode} ${data.totalPaid.toFixed(2)}</span></div>
             ${data.balanceDue ? `<div class="total-row discount"><span>BALANCE DUE:</span><span>${currencyCode} ${data.balanceDue.toFixed(2)}</span></div>` : ""}
@@ -612,7 +614,7 @@ async function printSavedReceipt(receipt: Receipt, currencyCode: string, build: 
   printInFlight = true;
   try {
     const [company, vatRate, colors] = await Promise.all([getCompanyDetails(), getVatRate(), getReceiptColors()]);
-    printHtml(build(receipt, currencyCode, company, vatRate, colors));
+    printHtml(build(receipt, currencyCode, company, vatRateFor(company, vatRate), colors));
   } finally {
     printInFlight = false;
   }

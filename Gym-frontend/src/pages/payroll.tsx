@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useCurrency } from "../utils/currency";
 import { hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 import { printHtml } from "../utils/print-html";
 import { getCompanyDetails } from "../utils/company-details";
 import { payrollRunService, PayrollRun, PayrollLine, PayrollReadiness } from "../utils/supabase/workforce-service";
@@ -207,27 +207,37 @@ export function Payroll({ onNavigate }: PayrollProps) {
   }), [filtered]);
 
   // ── Exports & print ───────────────────────────────────────────────────────
-  const exportRegister = () => {
-    if (!selected) return;
-    exportAsCsv(`payroll-register-${selected.period}.csv`,
+  const runDoc = (title: string, sections: ReportDocument["sections"]): ReportDocument => {
+    if (!selected) throw new Error("Open a payroll run first");
+    return { title, fileName: `${title} ${selected.period}`, orientation: "landscape", period: { label: selected.period_label }, filters: [{ label: "Run status", value: selected.status }], sections };
+  };
+  const registerReport = () => runDoc("Payroll Register", [
+    kpiSection([
+      { label: "Employees", value: lines.length, format: "integer" },
+      { label: "Gross pay", value: lines.reduce((s, l) => s + Number(l.gross_pay || 0), 0), format: "money" },
+      { label: "Deductions", value: lines.reduce((s, l) => s + Number(l.attendance_deduction || 0) + Number(l.advance_repayment || 0) + Number(l.other_deductions || 0), 0), format: "money" },
+      { label: "Net pay", value: lines.reduce((s, l) => s + Number(l.net_pay || 0), 0), format: "money" },
+    ]),
+    tableFromMatrix("Payroll register",
       ["Employee", "Code", "Designation", "Department", "Basic", "Allowances", "Gross Fixed", "Scheduled Hrs", "Actual Hrs", "Regular Hrs", "Approved OT Hrs",
         "OT Earnings", "Commission", "Attendance Deduction", "Advance Repayment", "Other Deductions", "Gross Pay", "Net Pay"],
-      lines.map(l => [l.employee_name, l.employee_code, l.designation, l.department, l.basic_salary, l.allowances, Number(l.basic_salary) + Number(l.allowances),
-        l.scheduled_hours, l.actual_hours, l.regular_hours, l.approved_ot_hours, l.ot_pay, l.commission, l.attendance_deduction, l.advance_repayment,
-        l.other_deductions, l.gross_pay, l.net_pay]));
-  };
-  const exportAttendance = () => {
-    if (!selected) return;
-    exportAsCsv(`attendance-vs-salary-${selected.period}.csv`,
+      lines.map(l => [l.employee_name, l.employee_code, l.designation, l.department, Number(l.basic_salary), Number(l.allowances), Number(l.basic_salary) + Number(l.allowances),
+        Number(l.scheduled_hours), Number(l.actual_hours), Number(l.regular_hours), Number(l.approved_ot_hours), Number(l.ot_pay), Number(l.commission), Number(l.attendance_deduction),
+        Number(l.advance_repayment), Number(l.other_deductions), Number(l.gross_pay), Number(l.net_pay)]),
+      { totals: true, money: [4, 5, 6, 11, 12, 13, 14, 15, 16, 17], noMoney: [7, 8, 9, 10] }),
+  ]);
+  const attendanceReport = () => runDoc("Attendance vs Salary", [
+    tableFromMatrix("Attendance vs salary",
       ["Employee", "Scheduled Days", "Present", "Absent", "Paid Leave", "Unpaid Leave", "Late Arrivals", "Attendance Deduction", "Net Pay"],
-      lines.map(l => [l.employee_name, l.scheduled_days, l.present_days, l.absent_days, l.paid_leave_days, l.unpaid_leave_days, l.late_count, l.attendance_deduction, l.net_pay]));
-  };
-  const exportOvertime = () => {
-    if (!selected) return;
-    exportAsCsv(`overtime-${selected.period}.csv`,
+      lines.map(l => [l.employee_name, Number(l.scheduled_days), Number(l.present_days), Number(l.absent_days), Number(l.paid_leave_days), Number(l.unpaid_leave_days), Number(l.late_count), Number(l.attendance_deduction), Number(l.net_pay)]),
+      { totals: true, money: [7, 8], noMoney: [1, 2, 3, 4, 5, 6] }),
+  ]);
+  const overtimeReport = () => runDoc("Overtime Report", [
+    tableFromMatrix("Overtime",
       ["Employee", "Scheduled Hrs", "Actual Hrs", "Total OT Hrs", "Approved OT Hrs", "OT Rate", "OT Earnings"],
-      lines.map(l => [l.employee_name, l.scheduled_hours, l.actual_hours, l.breakdown?.attendance?.ot_hours ?? "", l.approved_ot_hours, l.breakdown?.ot_rate ?? "", l.ot_pay]));
-  };
+      lines.map(l => [l.employee_name, Number(l.scheduled_hours), Number(l.actual_hours), l.breakdown?.attendance?.ot_hours ?? "", Number(l.approved_ot_hours), l.breakdown?.ot_rate ?? "", Number(l.ot_pay)]),
+      { totals: true, money: [5, 6], noMoney: [1, 2, 3, 4] }),
+  ]);
 
   const printPayslip = async (l: PayrollLine) => {
     if (!selected) return;
@@ -411,7 +421,7 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
                     <SelectTrigger className="h-9" style={{ width: "15rem" }}><SelectValue /></SelectTrigger>
                     <SelectContent>{runs.map(r => <SelectItem key={r.id} value={String(r.id)}>{r.period_label} · {r.status}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm" onClick={exportRegister}><Download className="h-4 w-4 mr-1" />Export</Button>
+                  <ReportActions report={registerReport} menuLabel="Payroll register" />
                 </>
               }
             >
@@ -624,15 +634,15 @@ ${block("E. Summary", row("Gross pay", money(l.gross_pay)) + row("Total deductio
             </div>
             <div className={s.grid3}>
               {[
-                { icon: FileText, title: "Payroll register", desc: "Every employee's earnings, deductions and net pay", action: exportRegister },
-                { icon: Users, title: "Attendance vs salary", desc: "Days present, absences, leave and what they cost", action: exportAttendance },
-                { icon: TrendingUp, title: "Overtime", desc: "Total vs approved overtime hours and earnings", action: exportOvertime },
+                { icon: FileText, title: "Payroll register", desc: "Every employee's earnings, deductions and net pay", action: registerReport },
+                { icon: Users, title: "Attendance vs salary", desc: "Days present, absences, leave and what they cost", action: attendanceReport },
+                { icon: TrendingUp, title: "Overtime", desc: "Total vs approved overtime hours and earnings", action: overtimeReport },
               ].map(r => (
                 <Panel key={r.title}>
                   <div className={s.stack} style={{ gap: "0.5rem" }}>
                     <div className={s.row}><span className={s.titleIcon} style={{ width: "2.25rem", height: "2.25rem" }}><r.icon size={18} /></span><span className={s.strong}>{r.title}</span></div>
                     <p className={cx(s.small, s.muted)} style={{ margin: 0 }}>{r.desc} — {selected.period_label}</p>
-                    <Button variant="outline" onClick={r.action}><Download className="h-4 w-4 mr-1" />Download CSV</Button>
+                    <ReportActions report={r.action} menuLabel={r.title} />
                   </div>
                 </Panel>
               ))}

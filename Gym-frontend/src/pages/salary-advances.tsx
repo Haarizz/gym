@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from "../components/report-export";
 import { salaryAdvancesService, SalaryAdvance } from "../utils/supabase/salary-advances-service";
 import { staffService, Staff } from "../utils/supabase/staff-service";
 import {
@@ -365,9 +365,18 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
     }
   };
 
-  const exportTx = () => exportAsCsv("advances-deductions-transactions.csv",
-    ["Date", "Employee", "Reference", "Description", "Amount", "Payroll Period", "Type"],
-    filteredTx.map(x => [x.date, x.employee_name, x.reference, x.description, x.amount, x.period, x.type]));
+  const buildTxReport = (): ReportDocument => ({
+    title: "Advances & Deductions Transactions", fileName: "Advances and Deductions",
+    period: { label: "Transactions" },
+    sections: [
+      kpiSection([
+        { label: "Transactions", value: filteredTx.length, format: "integer" },
+        { label: "Total amount", value: filteredTx.reduce((s, x) => s + Number(x.amount || 0), 0), format: "money" },
+      ]),
+      tableFromMatrix("Transactions", ["Date", "Employee", "Reference", "Description", "Amount", "Payroll Period", "Type"],
+        filteredTx.map(x => [x.date, x.employee_name, x.reference, x.description, Number(x.amount), x.period, x.type]), { totals: true, money: [4], wrap: [3] }),
+    ],
+  });
 
   // Next pending installment per advance (for the advance table / detail)
   const nextDueByAdvance = useMemo(() => {
@@ -463,7 +472,7 @@ export function SalaryAdvances({ onNavigate }: SalaryAdvancesProps) {
               <Button variant="outline" size="sm" className="h-9" style={{ marginLeft: "auto" }} onClick={() => setTypesOpen(true)}><Settings2 className="h-4 w-4 mr-1" />Deduction Types</Button>
             )}
             {tab === "transactions" && (
-              <Button variant="outline" size="sm" className="h-9" style={{ marginLeft: "auto" }} onClick={exportTx}><Download className="h-4 w-4 mr-1" />Export</Button>
+              <ReportActions report={buildTxReport} className="ml-auto" disabled={filteredTx.length === 0} menuLabel="Advances & deductions" />
             )}
           </div>
         </Panel>

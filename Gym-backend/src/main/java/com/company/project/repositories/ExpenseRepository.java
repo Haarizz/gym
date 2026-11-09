@@ -21,8 +21,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
 
     List<Expense> findByDateBetweenOrderByDateDesc(LocalDate from, LocalDate to);
 
-    // Expenses that count as spent (approved or paid) dated in [from, to] — web Revenue Dashboard
-    @Query("SELECT e FROM Expense e WHERE LOWER(e.status) IN ('approved', 'paid') AND e.date >= :from AND e.date <= :to")
+    // Expenses that count as spent dated in [from, to] — web Revenue Dashboard and Day Report.
+    // Approved either way (Expenses page sets status; the Approvals page sets approvalStatus and posts
+    // the journal but leaves status 'pending') or paid; rejected by either one never counts.
+    @Query("SELECT e FROM Expense e WHERE (LOWER(e.status) IN ('approved', 'paid') OR UPPER(e.approvalStatus) = 'APPROVED') " +
+           "AND LOWER(COALESCE(e.status, '')) <> 'rejected' AND UPPER(COALESCE(e.approvalStatus, '')) <> 'REJECTED' " +
+           "AND e.date >= :from AND e.date <= :to")
     List<Expense> findSpentBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("SELECT COALESCE(SUM(e.totalAmount), 0) FROM Expense e WHERE e.status = 'APPROVED'")

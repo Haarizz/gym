@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { hasPermission } from "../utils/permissions";
 import { useBranch } from "../utils/branch-context";
-import { exportAsCsv } from "../utils/export-utils";
+import { ReportActions, type ReportDocument, tableFromMatrix } from "../components/report-export";
 import {
   staffAttendanceAdminService, AttendanceDay, AttendanceSummary, AttendanceCorrection, AttendanceStatus, ApprovalStatus,
 } from "../utils/supabase/workforce-service";
@@ -219,19 +219,28 @@ export function StaffAttendance({ onNavigate }: StaffAttendanceProps) {
     catch (e) { toast.error(errorMessage(e, "Failed to withdraw")); }
   };
 
-  const exportCsv = () => {
+  const buildReport = (): ReportDocument => {
     if (tab === "monthly") {
-      exportAsCsv(`staff-attendance-${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}.csv`,
-        ["Employee", "Code", "Shift", "Scheduled Days", "Present", "Absent", "Paid Leave", "Unpaid Leave", "Weekly Off", "Holidays", "Late Arrivals",
-          "Scheduled Hrs", "Actual Hrs", "Regular Hrs", "Late Hrs", "OT Hrs", "Approved OT Hrs", "Attendance %"],
-        summary.map(m => [m.staff_name, m.staff_code, m.shift_name, m.scheduled_days, m.present, m.absent, m.paid_leave, m.unpaid_leave, m.weekly_off,
-          m.holidays, m.late_count, m.scheduled_hours, m.actual_hours, m.regular_hours, m.late_hours, m.ot_hours, m.approved_ot_hours, m.attendance_rate ?? ""]));
-      return;
+      return {
+        title: "Staff Attendance · Monthly Summary", fileName: "Staff Attendance Monthly", orientation: "landscape",
+        period: { from: new Date(month.getFullYear(), month.getMonth(), 1), to: new Date(month.getFullYear(), month.getMonth() + 1, 0) },
+        sections: [tableFromMatrix("Monthly summary",
+          ["Employee", "Code", "Shift", "Scheduled Days", "Present", "Absent", "Paid Leave", "Unpaid Leave", "Weekly Off", "Holidays", "Late Arrivals",
+            "Scheduled Hrs", "Actual Hrs", "Regular Hrs", "Late Hrs", "OT Hrs", "Approved OT Hrs", "Attendance %"],
+          summary.map(m => [m.staff_name, m.staff_code, m.shift_name, m.scheduled_days, m.present, m.absent, m.paid_leave, m.unpaid_leave, m.weekly_off,
+            m.holidays, m.late_count, m.scheduled_hours, m.actual_hours, m.regular_hours, m.late_hours, m.ot_hours, m.approved_ot_hours, m.attendance_rate == null ? "" : `${m.attendance_rate}%`]),
+          { totals: true, noMoney: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] })],
+      };
     }
-    exportAsCsv(`staff-attendance-${from}${from !== to ? `_${to}` : ""}.csv`,
-      ["Date", "Employee", "Code", "Shift", "Scheduled In", "Actual In", "Scheduled Out", "Actual Out", "Worked (min)", "Late (min)", "Early (min)", "OT (min)", "Approved OT (min)", "Status", "Approval"],
-      filtered.map(d => [d.date, d.staff_name, d.staff_code, d.shift_name, d.scheduled_in, d.actual_in, d.scheduled_out, d.actual_out,
-        d.worked_minutes, d.late_minutes, d.early_minutes, d.ot_minutes, d.approved_ot_minutes, d.status, d.approval_status]));
+    return {
+      title: "Staff Attendance · Daily Register", fileName: "Staff Attendance", orientation: "landscape",
+      period: { from, to },
+      sections: [tableFromMatrix("Daily attendance",
+        ["Date", "Employee", "Code", "Shift", "Scheduled In", "Actual In", "Scheduled Out", "Actual Out", "Worked (min)", "Late (min)", "Early (min)", "OT (min)", "Approved OT (min)", "Status", "Approval"],
+        filtered.map(d => [d.date, d.staff_name, d.staff_code, d.shift_name, d.scheduled_in, d.actual_in, d.scheduled_out, d.actual_out,
+          d.worked_minutes, d.late_minutes, d.early_minutes, d.ot_minutes, d.approved_ot_minutes, d.status, d.approval_status]),
+        { totals: true, noMoney: [8, 9, 10, 11, 12] })],
+    };
   };
 
   const shiftDay = (delta: number) => {
@@ -254,7 +263,7 @@ export function StaffAttendance({ onNavigate }: StaffAttendanceProps) {
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => onNavigate?.("shifts-schedules")}><CalendarClock className="h-4 w-4 mr-1" />Shifts & Schedules</Button>
-            <Button variant="outline" size="sm" onClick={exportCsv}><Download className="h-4 w-4 mr-1" />Export</Button>
+            <ReportActions report={buildReport} menuLabel={tab === "monthly" ? "Monthly summary" : "Daily register"} />
             {canEdit && <Button size="sm" onClick={() => openCorrection()}><Pencil className="h-4 w-4 mr-1" />Manual Entry</Button>}
           </>
         }

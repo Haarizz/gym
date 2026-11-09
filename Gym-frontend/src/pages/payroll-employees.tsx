@@ -15,6 +15,7 @@ import {
   styles, usePalette, axisTick, Kpi, Panel, ChartTip, Legend, BarRows, Empty, SectionTabs, Status, Delta,
   pctChange, fmtInt, fmtDate,
 } from "../components/overview/overview-kit";
+import { ReportActions, type ReportDocument, chartFromRows, col, countCol, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 type Tab = "hires" | "unpaid" | "advances" | "classes";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -93,6 +94,49 @@ export function PayrollEmployees() {
     { id: "classes", label: "Top classes", icon: GraduationCap },
   ];
 
+  // Export / print: the overview's figures and every tab's list
+  const buildReport = (): ReportDocument => ({
+    title: "Payroll & Employees Overview",
+    fileName: "Payroll and Employees Overview",
+    period: { label: monthLabel(thisMonth, true) },
+    sections: [
+      kpiSection([
+        { label: "Staff & trainers", value: dash?.kpiData.totalStaffTrainers ?? "—", format: "integer" },
+        { label: `Payroll · ${monthLabel(lastMonth)}`, value: lm?.net ?? "—", format: "money", hint: lm ? `${lm.employees} employees · net pay` : "no salaries recorded" },
+        { label: `Unpaid · ${monthLabel(lastMonth)}`, value: unpaid ? unpaid.length : "—", format: "integer", hint: unpaid?.length ? "to pay" : undefined },
+        { label: "Unpaid amount", value: unpaidTotal, format: "money" },
+        { label: "Advances owed", value: report ? report.advances.outstanding : "—", format: "money", hint: report ? `${report.advances.openCount} open advances` : undefined },
+        { label: "Upcoming classes", value: dash?.kpiData.activeTrainingsClasses ?? "—", format: "integer" },
+        { label: "Bookings · 7 days", value: dash?.kpiData.upcomingBookings ?? "—", format: "integer" },
+      ], "Key figures"),
+      chartFromRows("Payroll by salary month (gross parts)", "stacked-bar", payrollByMonth, "tipLabel", [
+        { key: "basic", name: "Basic", color: "#2a78d6" }, { key: "allowances", name: "Allowances", color: "#eb6834" },
+        { key: "overtime", name: "Overtime", color: "#1baf7a" }, { key: "commission", name: "Commission", color: "#6250d6" },
+      ], { valueFormat: "money" }),
+      tableSection("Payroll by salary month", [
+        col("tipLabel", "Month"), moneyCol("basic", "Basic"), moneyCol("allowances", "Allowances"), moneyCol("overtime", "Overtime"),
+        moneyCol("commission", "Commission"), moneyCol("net", "Net pay"), col("employees", "Employees", "integer"),
+      ], payrollByMonth, { totals: true }),
+      tableSection("Staff by department", [col("label", "Department"), countCol("value", "Staff"), col("meta", "Monthly basic")], deptRows, { totals: true }),
+      { kind: "keyValue", title: "Payroll facts", items: [
+        { label: "Monthly basic", value: report?.staff.monthlyBase ?? totalBasic, format: "money" },
+        { label: "Average basic", value: report?.staff.active ? report.staff.monthlyBase / report.staff.active : "—", format: "money" },
+        { label: "Advance recoveries / month", value: installmentsDue, format: "money" },
+        { label: "Joined in last 6 months", value: report?.staff.joinedInRange ?? "—", format: "integer" },
+      ] },
+      tableSection(`Unpaid salaries · ${monthLabel(lastMonth)}`, [col("name", "Employee"), col("employeeId", "ID"), col("department", "Department"), col("status", "Status"), moneyCol("net", "Net to pay")],
+        (unpaid ?? []).map(e => ({ name: e.name, employeeId: e.employeeId, department: e.department || "—", status: e.paymentStatus + (e.payrollRunStatus ? ` · payroll ${e.payrollRunStatus.toLowerCase()}` : ""), net: Number(e.netSalary) || 0 })),
+        { totals: true, emptyText: "Everyone is paid." }),
+      tableSection("Open salary advances", [col("name", "Employee"), col("ref", "Advance"), col("issuedOn", "Issued", "date"), moneyCol("approved", "Approved"), moneyCol("recovered", "Recovered"), moneyCol("installment", "Installment"), moneyCol("balance", "Balance")],
+        (report?.advances.open ?? []).map(a => ({ ...a, ref: `ADV-${a.id}${a.type ? ` · ${a.type}` : ""}` })), { totals: true, emptyText: "No open advances." }),
+      tableSection("Recent hires", [col("name", "Employee"), col("position", "Position"), col("department", "Department"), col("hireDate", "Joined", "date"), moneyCol("salary", "Basic salary")],
+        (dash?.recentHires ?? []).map(h => ({ name: h.name, position: h.position || "—", department: h.department || "—", hireDate: h.hireDate, salary: h.salary != null ? Number(h.salary) : null }))),
+      tableSection("Top classes", [col("className", "Class"), col("instructor", "Trainer"), countCol("bookings", "Seats booked"), col("capacity", "Capacity", "integer"), moneyCol("revenue", "Booking revenue")],
+        (dash?.topPerformingClasses ?? []).map(c => ({ className: c.className, instructor: c.instructor, bookings: c.bookings, capacity: c.capacity || null, revenue: Number(c.revenue) || 0 })), { totals: true }),
+      chartFromRows("Classes and bookings by month", "bar", classTrend, "label", [{ key: "classes", name: "Classes", color: "#2a78d6" }, { key: "bookings", name: "Bookings", color: "#1baf7a" }], { valueFormat: "integer" }),
+    ],
+  });
+
   if (loading && !dash && !report) {
     return <div className={styles.root}><div className={styles.centered}><RefreshCw className="h-6 w-6 animate-spin text-primary" />Loading payroll & employees…</div></div>;
   }
@@ -108,6 +152,7 @@ export function PayrollEmployees() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />Refresh
           </Button>
+          <ReportActions report={buildReport} disabled={loading} menuLabel="Payroll & employees" />
           <Button size="sm" onClick={() => navigate("/payroll")}><Wallet className="h-4 w-4 mr-2" />Open Payroll</Button>
         </div>
       </div>

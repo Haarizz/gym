@@ -1,6 +1,7 @@
 import { Building2, Dumbbell, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { SessionParticipant, TrainingSessionApi } from "../../utils/supabase/training-service";
+import { type ReportDocument, tableFromMatrix } from "../report-export";
 
 export const SESSION_TYPES: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
   class: { label: "Group Class", icon: Users, tone: "purple" },
@@ -64,23 +65,20 @@ const csvCell = (v: unknown) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-/** Downloads the session roster as a CSV (opens in Excel). */
-export function downloadRoster(session: TrainingSessionApi, participants: SessionParticipant[]) {
-  const header = ["#", "Member", "Member ID", "Plan", "Phone", "Email", "Attendance", "Check-in time", "Waitlist #"];
-  const rows = participants.map((p, i) => [
-    i + 1, p.name, p.guest ? "Guest" : p.memberCode ?? "", p.plan ?? "", p.phone ?? "", p.email ?? "",
-    participantStatus(p.status).label, clockTime(p.checkedInAt), p.waitlistPosition ?? "",
-  ]);
-  const title = [`${session.name} — ${formatSessionDate(session.date)} ${hhmm(session.startTime)}-${hhmm(session.endTime)}`
-    + (session.trainerName ? ` — ${session.trainerName}` : "")];
-  const csv = [title, [], header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `roster-${(session.name || "session").replace(/[^\w-]+/g, "-").toLowerCase()}-${session.date}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+/** The session roster as an export / print document. */
+export function buildRosterReport(session: TrainingSessionApi, participants: SessionParticipant[]): ReportDocument {
+  const counts = new Map<string, number>();
+  participants.forEach((p) => { const l = participantStatus(p.status).label; counts.set(l, (counts.get(l) || 0) + 1); });
+  return {
+    title: "Session Roster",
+    fileName: `Roster ${session.name || "session"} ${session.date}`,
+    period: { from: session.date, to: session.date },
+    filters: [{ label: "Session", value: session.name }, { label: "Time", value: `${hhmm(session.startTime)}–${hhmm(session.endTime)}` }, { label: "Trainer", value: session.trainerName }],
+    sections: [
+      { kind: "kpis", items: [{ label: "Participants", value: participants.length, format: "integer" }, ...[...counts.entries()].map(([label, n]) => ({ label, value: n, format: "integer" as const }))] },
+      tableFromMatrix("Participants", ["#", "Member", "Member ID", "Plan", "Phone", "Email", "Attendance", "Check-in time", "Waitlist #"],
+        participants.map((p, i) => [i + 1, p.name, p.guest ? "Guest" : p.memberCode ?? "", p.plan ?? "", p.phone ?? "", p.email ?? "",
+          participantStatus(p.status).label, clockTime(p.checkedInAt), p.waitlistPosition ?? ""]), { noMoney: [0, 8] }),
+    ],
+  };
 }

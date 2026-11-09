@@ -15,6 +15,7 @@ import { resolveBackendImageUrl } from "../utils/resolve-image-url";
 import recentStyles from "./dashboard-recent-members.module.css";
 import { cn } from "../components/ui/utils";
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, chartFromRows, changeHint, col, countCol, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { 
   dashboardService, 
   type KPIData, 
@@ -379,46 +380,31 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   }, []);
 
-  // Downloads what the Overview tab currently shows as a CSV
-  const handleExport = useCallback(() => {
-    if (!kpiData) {
-      toast.error('Nothing to export yet — dashboard data has not loaded');
-      return;
-    }
-    const csvCell = (v: unknown) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // Export / print: what the Overview tab currently shows
+  const buildOverviewReport = useCallback((): ReportDocument => {
+    if (!kpiData) throw new Error('Dashboard data has not loaded yet');
+    const revRows = revenueData.map((p) => ({ label: p.time ?? p.day ?? p.week ?? '', revenue: p.revenue }));
+    return {
+      title: 'Dashboard Overview',
+      fileName: 'Dashboard Overview',
+      period: { label: periodLabel },
+      sections: [
+        kpiSection([
+          { label: 'Total revenue', value: kpiData.revenue, format: 'money', ...changeHint(kpiData.revenueChange) },
+          { label: 'Active members', value: kpiData.activeMembers, format: 'integer', ...changeHint(kpiData.membersChange) },
+          { label: 'Attendance', value: kpiData.todayAttendance, format: 'integer', ...changeHint(kpiData.attendanceChange) },
+          { label: 'Available staff', value: kpiData.availableStaff, format: 'integer' },
+        ], 'Key metrics'),
+        chartFromRows('Revenue', 'bar', revRows, 'label', [{ key: 'revenue', name: 'Revenue', color: '#2a78d6' }], { valueFormat: 'money' }),
+        tableSection('Revenue', [col('label', 'Period'), moneyCol('revenue', 'Revenue')], revRows, { totals: true }),
+        pieSection('Membership distribution', membershipDistribution.map((m) => ({ label: m.name, value: m.value })), { valueFormat: 'integer', seriesName: 'Members' }),
+        tableSection('Membership distribution', [col('name', 'Membership type'), countCol('value', 'Members'), moneyCol('amount', 'Amount')], membershipDistribution, { totals: true }),
+        tableSection('Attendance by time slot', [col('type', 'Time slot'), countCol('members', 'Check-ins'), col('percentage', 'Share', 'percent', { total: 'sum' })], attendanceByType, { totals: true }),
+        chartFromRows('Sales pipeline', 'hbar', salesPipeline, 'status', [{ key: 'count', name: 'Leads', color: '#6250d6' }], { valueFormat: 'integer' }),
+        tableSection('Sales pipeline', [col('status', 'Lead status'), countCol('count', 'Leads')], salesPipeline, { totals: true }),
+      ],
     };
-    const rows: unknown[][] = [
-      ['GymBios Dashboard', periodLabel, format(new Date(), 'yyyy-MM-dd HH:mm')],
-      [],
-      ['Metric', 'Value', 'Change %'],
-      [`Total Revenue (${currencyCode})`, kpiData.revenue, kpiData.revenueChange],
-      ['Active Members', kpiData.activeMembers, kpiData.membersChange],
-      ['Attendance', kpiData.todayAttendance, kpiData.attendanceChange],
-      ['Available Staff', kpiData.availableStaff, ''],
-      [],
-      ['Revenue', `Amount (${currencyCode})`],
-      ...revenueData.map((p: any) => [p.time ?? p.day ?? p.week, p.revenue]),
-      [],
-      ['Membership Type', 'Members', `Amount (${currencyCode})`],
-      ...membershipDistribution.map((m) => [m.name, m.value, m.amount]),
-      [],
-      ['Time Slot', 'Check-ins', 'Share %'],
-      ...attendanceByType.map((a) => [a.type, a.members, a.percentage]),
-      [],
-      ['Lead Status', 'Count'],
-      ...salesPipeline.map((s) => [s.status, s.count]),
-    ];
-    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `dashboard-${dateFilter}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Dashboard exported');
-  }, [kpiData, revenueData, membershipDistribution, attendanceByType, salesPipeline, dateFilter, periodLabel, currencyCode]);
+  }, [kpiData, revenueData, membershipDistribution, attendanceByType, salesPipeline, periodLabel]);
 
   // Search members function
   const searchMembers = useCallback(async (term: string) => {
@@ -647,10 +633,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button variant="outline" className={dashboardHeaderActionButton} onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            {activeDashboardTab === 'overview' && (
+              <ReportActions report={buildOverviewReport} disabled={!kpiData} size="default" menuLabel={`Dashboard · ${periodLabel}`} />
+            )}
             <Button variant="outline" className={dashboardHeaderActionButton} onClick={() => setPeriodSelectOpen(true)}>
               <Filter className="mr-2 h-4 w-4" />
               Filter

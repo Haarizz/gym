@@ -35,6 +35,16 @@ export async function getVatRate(): Promise<number> {
 }
 
 /**
+ * The VAT rate a document for this branch carries: none unless the branch is VAT registered,
+ * i.e. it has a TRN and Settings › Tax Configuration's VAT switch isn't off (getCompanyDetails
+ * already blanks the TRN when the switch is off). Mirrors TaxPolicyService on the backend, so
+ * a gym with no TRN prints and posts no VAT.
+ */
+export function vatRateFor(company: { trn?: string | null }, ratePercent: number): number {
+  return company.trn && company.trn.trim() ? ratePercent : 0;
+}
+
+/**
  * Prices across this app (memberships, add-ons) are quoted VAT-inclusive —
  * the member never pays more than the sticker price. This splits what they
  * paid into the pre-tax amount and the VAT portion, purely for display on a

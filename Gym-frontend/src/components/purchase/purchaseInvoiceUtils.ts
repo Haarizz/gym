@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { supplierBillService, type SupplierBill } from '../../utils/supabase/supplier-bill-service';
 import { purchaseService, type PurchaseOrder } from '../../utils/supabase/purchase-service';
 import styles from './PurchaseInvoice.module.css';
+import { type ReportDocument, kpiSection, tableFromMatrix } from '../report-export';
 
 // ── Loading ──────────────────────────────────────────────────────────────────
 // The list endpoints are paginated; pull every page so KPIs, balances and history are complete.
@@ -234,24 +235,23 @@ export function buildTimeline(bill: SupplierBill): TimelineEvent[] {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
-export function exportBillsCsv(bills: SupplierBill[], currencyCode: string, warehouseName: (id?: number) => string) {
-  const head = ['S.No', 'Bill No', 'Date', 'Due Date', 'Supplier', 'Supplier Invoice No', 'Warehouse', 'Priority',
-    'Status', 'Items', `Net Amount (${currencyCode})`, `Paid (${currencyCode})`, `Balance (${currencyCode})`];
-  const esc = (v: unknown) => {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/** Purchase invoices (supplier bills) register for export / print — the list as filtered on screen. */
+export function buildBillsReport(bills: SupplierBill[], warehouseName: (id?: number) => string): ReportDocument {
+  return {
+    title: 'Purchase Invoices Register', fileName: 'Purchase Invoices', orientation: 'landscape',
+    period: { to: new Date(), label: 'Current list' },
+    sections: [
+      kpiSection([
+        { label: 'Bills', value: bills.length, format: 'integer' },
+        { label: 'Net amount', value: bills.reduce((s, b) => s + Number(b.totalAmount || 0), 0), format: 'money' },
+        { label: 'Paid', value: bills.reduce((s, b) => s + Number(b.amountPaid || 0), 0), format: 'money' },
+        { label: 'Balance', value: bills.reduce((s, b) => s + balanceOf(b), 0), format: 'money' },
+      ]),
+      tableFromMatrix('Purchase invoices',
+        ['S.No', 'Bill No', 'Date', 'Due Date', 'Supplier', 'Supplier Invoice No', 'Warehouse', 'Priority', 'Status', 'Items', 'Net Amount', 'Paid', 'Balance'],
+        bills.map((b, i) => [i + 1, b.billNumber, b.billDate, b.dueDate ?? '', b.supplierName, b.invoiceNumber ?? '', warehouseName(b.warehouseId),
+          priorityMeta(b.priority).label, statusMeta(displayStatus(b)).label, b.items.length, b.totalAmount, b.amountPaid, balanceOf(b)]),
+        { totals: true, money: [10, 11, 12], noMoney: [0, 9] }),
+    ],
   };
-  const rows = bills.map((b, i) => [
-    i + 1, b.billNumber, b.billDate, b.dueDate ?? '', b.supplierName, b.invoiceNumber ?? '',
-    warehouseName(b.warehouseId), priorityMeta(b.priority).label, statusMeta(displayStatus(b)).label,
-    b.items.length, b.totalAmount.toFixed(2), b.amountPaid.toFixed(2), balanceOf(b).toFixed(2),
-  ]);
-  const csv = [head, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Purchase_Invoices_${todayIso()}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

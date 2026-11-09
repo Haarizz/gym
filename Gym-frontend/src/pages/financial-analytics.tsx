@@ -12,6 +12,7 @@ import {
   Wallet, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ReportActions, type ReportDocument, changeHint, chartFromRows, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
@@ -349,85 +350,50 @@ export function FinancialAnalytics() {
   const periodTitle = `${rangeLabel(ranges.from, ranges.to)} (vs ${compareText})`;
   const branchTitle = isAllBranches ? "All branches" : activeBranchName;
 
-  const exportCsv = () => {
-    if (!data || !k) return;
-    const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  // Export / print: every panel, from the same /overview payload the page draws
+  const buildReport = (): ReportDocument => {
+    if (!data || !k) throw new Error("Financial analytics are still loading");
+    const cmp = (metric: string, m: { current: number; previous: number; changePct: number | null }) => ({ metric, cur: m.current, prev: m.previous, change: m.changePct ?? "—" });
+    const accounts = (title: string, rows: typeof data.revenueByAccount) => tableSection(title, [
+      col("code", "Code"), col("name", "Account"), moneyCol("current", "This period"), moneyCol("previous", "Comparison"), col("share", "Share", "percent", { total: "sum" }), col("changePct", "Change", "percent"),
+    ], rows, { totals: true });
+    return {
+      title: "Financial Analytics",
+      period: { from: ranges.from, to: ranges.to },
+      filters: [{ label: "Compared with", value: compareText }],
+      sections: [
+        kpiSection([
+          { label: "Revenue", value: k.revenue.current, format: "money", ...changeHint(k.revenue.changePct) },
+          { label: "Expenses", value: k.expenses.current, format: "money", ...changeHint(k.expenses.changePct) },
+          { label: "Net profit", value: k.netProfit.current, format: "money", ...changeHint(k.netProfit.changePct) },
+          { label: "Profit margin", value: k.profitMargin.current, format: "percent", hint: k.profitMargin.change != null ? `${k.profitMargin.change} pts vs comparison` : undefined },
+          { label: "Collections", value: k.collections.current, format: "money", ...changeHint(k.collections.changePct) },
+          { label: "Cash & bank", value: k.cashBalance, format: "money" },
+          { label: "Member dues", value: k.receivables.amount, format: "money", hint: `${k.receivables.members} members` },
+          { label: "Supplier bills due", value: k.payables.amount, format: "money", hint: `${k.payables.bills} bills` },
+        ], "Summary"),
+        tableSection("This period vs comparison", [col("metric", "Metric"), col("cur", "This period", "money"), col("prev", "Comparison", "money"), col("change", "Change", "percent")], [
+          cmp("Revenue", k.revenue), cmp("Expenses", k.expenses), cmp("Net profit", k.netProfit), cmp("Cash in", k.cashIn), cmp("Cash out", k.cashOut),
+          cmp("Net cash flow", k.netCashFlow), cmp("Collections", k.collections), cmp("Avg daily revenue", k.avgDailyRevenue), cmp("Avg receipt", k.avgReceipt),
+        ]),
+        chartFromRows(`${granularityLabel} trend`, "line", data.trend, "label", [
+          { key: "revenue", name: "Revenue", color: "#2a78d6" }, { key: "expenses", name: "Expenses", color: "#eb6834" }, { key: "profit", name: "Profit", color: "#1baf7a" },
+        ], { valueFormat: "money" }),
+        tableSection(`${granularityLabel} trend`, [col("label", "Period"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), moneyCol("cashIn", "Cash in"), moneyCol("cashOut", "Cash out"), moneyCol("previousRevenue", "Comparison revenue")], data.trend, { totals: true }),
+        chartFromRows("Last 12 months", "bar", data.monthly, "label", [{ key: "revenue", name: "Revenue", color: "#2a78d6" }, { key: "expenses", name: "Expenses", color: "#eb6834" }], { valueFormat: "money" }),
+        tableSection("Last 12 months", [col("label", "Month"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), col("margin", "Margin", "percent")], data.monthly, { totals: true }),
+        accounts("Revenue by account", data.revenueByAccount),
+        accounts("Expenses by account", data.expenseByAccount),
+        pieSection("Collections by payment method", data.collectionsByMethod.filter(m => m.amount > 0).map(m => ({ label: m.method, value: m.amount })), { valueFormat: "money" }),
+        tableSection("Collections by payment method", [col("method", "Method"), moneyCol("amount", "Amount"), col("count", "Payments", "integer", { total: "sum" }), col("share", "Share", "percent", { total: "sum" })], data.collectionsByMethod, { totals: true }),
+        tableSection("Member dues ageing", [col("label", "Age"), moneyCol("amount", "Amount"), col("count", "Bills", "integer", { total: "sum" })], data.receivablesAging, { totals: true }),
+        tableSection("Supplier bills ageing", [col("label", "Age"), moneyCol("amount", "Amount"), col("count", "Bills", "integer", { total: "sum" })], data.payablesAging, { totals: true }),
+        ...(data.branches.length > 1 ? [tableSection("By branch", [col("name", "Branch"), moneyCol("revenue", "Revenue"), moneyCol("expenses", "Expenses"), moneyCol("profit", "Profit"), col("margin", "Margin", "percent")], data.branches, { totals: true })] : []),
+        tableSection("Activity", [col("date", "Date", "date"), col("voucherNo", "Voucher"), col("type", "Type"), col("amount", "Amount", "money"), col("accounts", "Accounts"), col("narration", "Narration", "text", { wrap: true })],
+          activity.map(a => ({ date: a.date, voucherNo: a.voucherNo ?? "", type: KIND_LABEL[a.kind], amount: a.amount, accounts: a.accounts, narration: a.narration ?? "" })), { emptyText: "No postings match." }),
+        ...(data.insights.length ? [tableSection("Insights", [col("title", "Insight"), col("detail", "Detail", "text", { wrap: true })], data.insights)] : []),
+      ],
     };
-    const rows: unknown[][] = [
-      ["Financial Analytics", branchTitle], ["Period", periodTitle], ["Currency", currencyCode], [],
-      ["Metric", "This period", "Comparison", "Change %"],
-      ["Revenue", k.revenue.current, k.revenue.previous, k.revenue.changePct],
-      ["Expenses", k.expenses.current, k.expenses.previous, k.expenses.changePct],
-      ["Net profit", k.netProfit.current, k.netProfit.previous, k.netProfit.changePct],
-      ["Profit margin %", k.profitMargin.current, k.profitMargin.previous, k.profitMargin.change],
-      ["Cash in", k.cashIn.current, k.cashIn.previous, k.cashIn.changePct],
-      ["Cash out", k.cashOut.current, k.cashOut.previous, k.cashOut.changePct],
-      ["Collections", k.collections.current, k.collections.previous, k.collections.changePct],
-      ["Member dues outstanding", k.receivables.amount], ["Supplier bills outstanding", k.payables.amount],
-      ["Tax payable", k.taxPayable], ["Cash & bank balance", k.cashBalance], [],
-      ["Trend", "Revenue", "Expenses", "Profit", "Cash in", "Cash out", "Comparison revenue"],
-      ...data.trend.map(t => [t.label, t.revenue, t.expenses, t.profit, t.cashIn, t.cashOut, t.previousRevenue]), [],
-      ["Revenue account", "This period", "Comparison", "Share %", "Change %"],
-      ...data.revenueByAccount.map(r => [r.name, r.current, r.previous, r.share, r.changePct]), [],
-      ["Expense account", "This period", "Comparison", "Share %", "Change %"],
-      ...data.expenseByAccount.map(r => [r.name, r.current, r.previous, r.share, r.changePct]), [],
-      ["Payment method", "Amount", "Payments", "Share %"],
-      ...data.collectionsByMethod.map(m => [m.method, m.amount, m.count, m.share]), [],
-      ["Member dues ageing", "Amount", "Bills"], ...data.receivablesAging.map(a => [a.label, a.amount, a.count]), [],
-      ["Supplier bills ageing", "Amount", "Bills"], ...data.payablesAging.map(a => [a.label, a.amount, a.count]), [],
-      ["Date", "Voucher", "Type", "Amount", "Accounts", "Narration"],
-      ...data.activity.map(a => [a.date, a.voucherNo, KIND_LABEL[a.kind], a.amount, a.accounts, a.narration]),
-    ];
-    const csv = rows.map(r => r.map(esc).join(",")).join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `financial-analytics_${ymd(ranges.from)}_${ymd(ranges.to)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Exported — opens in Excel");
-  };
-
-  const printReport = () => {
-    if (!data || !k) return;
-    const w = window.open("", "_blank");
-    if (!w) return toast.error("Allow pop-ups to print the report");
-    // The print window has no app fonts, so amounts use the plain currency code.
-    const money = (n: number | null | undefined) => (n == null ? "—" : formatCurrencyText(Number(n), { maximumFractionDigits: 0 }));
-    const e = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-    const table = (head: string[], body: unknown[][]) =>
-      `<table><thead><tr>${head.map(h => `<th>${e(h)}</th>`).join("")}</tr></thead><tbody>${body.map(r => `<tr>${r.map((c, i) => `<td class="${i ? "n" : ""}">${e(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-    const pct = (n: number | null) => (n == null ? "—" : `${n > 0 ? "+" : ""}${n}%`);
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Financial Analytics</title><style>
-      body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#0b0b0b;margin:32px;font-size:12px}
-      h1{font-size:20px;margin:0}h2{font-size:14px;margin:24px 0 8px}.sub{color:#52514e;margin:4px 0 16px}
-      table{width:100%;border-collapse:collapse;margin-bottom:8px}th,td{padding:6px 8px;border-bottom:1px solid #e1e0d9;text-align:left}
-      th{color:#52514e;font-weight:600}td.n{text-align:right;font-variant-numeric:tabular-nums}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}li{margin:4px 0}</style></head><body>
-      <h1>Financial Analytics — ${e(branchTitle)}</h1><div class="sub">${e(periodTitle)} · generated ${e(format(new Date(), "d MMM yyyy, HH:mm"))}</div>
-      <h2>Summary</h2>${table(["Metric", "This period", "Comparison", "Change"], [
-        ["Revenue", money(k.revenue.current), money(k.revenue.previous), pct(k.revenue.changePct)],
-        ["Expenses", money(k.expenses.current), money(k.expenses.previous), pct(k.expenses.changePct)],
-        ["Net profit", money(k.netProfit.current), money(k.netProfit.previous), pct(k.netProfit.changePct)],
-        ["Profit margin", fmtPct(k.profitMargin.current), fmtPct(k.profitMargin.previous), `${k.profitMargin.change} pts`],
-        ["Cash in / out", `${money(k.cashIn.current)} / ${money(k.cashOut.current)}`, `${money(k.cashIn.previous)} / ${money(k.cashOut.previous)}`, ""],
-        ["Collections", money(k.collections.current), money(k.collections.previous), pct(k.collections.changePct)],
-        ["Member dues", money(k.receivables.amount), "", `${k.receivables.members} members`],
-        ["Supplier bills due", money(k.payables.amount), "", `${k.payables.bills} bills`],
-        ["Tax payable", money(k.taxPayable), "", ""],
-      ])}
-      <h2>Insights</h2><ul>${data.insights.map(i => `<li><b>${e(i.title)}</b> — ${e(i.detail)}</li>`).join("")}</ul>
-      <div class="grid"><div><h2>Revenue by account</h2>${table(["Account", "Amount", "Share", "Change"], data.revenueByAccount.map(r => [r.name, money(r.current), fmtPct(r.share), pct(r.changePct)]))}</div>
-      <div><h2>Expenses by account</h2>${table(["Account", "Amount", "Share", "Change"], data.expenseByAccount.map(r => [r.name, money(r.current), fmtPct(r.share), pct(r.changePct)]))}</div></div>
-      <h2>${e(granularityLabel)} trend</h2>${table(["Period", "Revenue", "Expenses", "Profit", "Cash in", "Cash out"], data.trend.map(t => [t.label, money(t.revenue), money(t.expenses), money(t.profit), money(t.cashIn), money(t.cashOut)]))}
-      <h2>Last 12 months</h2>${table(["Month", "Revenue", "Expenses", "Profit", "Margin"], data.monthly.map(m => [m.label, money(m.revenue), money(m.expenses), money(m.profit), fmtPct(m.margin)]))}
-      <div class="grid"><div><h2>Collections by payment method</h2>${table(["Method", "Amount", "Payments", "Share"], data.collectionsByMethod.map(m => [m.method, money(m.amount), m.count, fmtPct(m.share)]))}</div>
-      <div><h2>Member dues ageing</h2>${table(["Age", "Amount", "Bills"], data.receivablesAging.map(a => [a.label, money(a.amount), a.count]))}</div></div>
-      <script>window.onload=()=>{window.print();}</script></body></html>`);
-    w.document.close();
   };
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -452,8 +418,7 @@ export function FinancialAnalytics() {
           <Button variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" onClick={exportCsv} disabled={!data}><Download className="mr-2 h-4 w-4" /> Excel (CSV)</Button>
-          <Button onClick={printReport} disabled={!data}><Printer className="mr-2 h-4 w-4" /> Print / PDF</Button>
+          <ReportActions report={buildReport} size="default" disabled={!data} menuLabel={`Financial analytics · ${periodTitle}`} />
         </div>
       </div>
 

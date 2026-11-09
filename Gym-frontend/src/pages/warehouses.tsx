@@ -20,6 +20,7 @@ import type { SupplierBill } from '../utils/supabase/supplier-bill-service';
 import styles from '../components/purchase/PurchaseInvoice.module.css';
 import { IconBtn, InfoRow, ModuleHeader, NativeSelect, RailCard, StatCard, cx } from '../components/purchase/purchaseUi';
 import { displayDate, fetchAllBills, todayIso } from '../components/purchase/purchaseInvoiceUtils';
+import { ReportActions, type ReportDocument, tableFromMatrix } from '../components/report-export';
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -185,20 +186,15 @@ export function Warehouses() {
     }
   };
 
-  const exportCsv = () => {
-    const head = ['Warehouse', 'Type', 'Location', 'Status', 'Products in stock', 'Units', 'Stock value', 'Low stock', 'Out of stock'];
-    const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const rows = filtered.map(w => {
-      const s = statsOf(w.id);
-      return [w.name, typeMeta(w.type).label, w.location, w.isActive ? 'Active' : 'Inactive', s.skus, s.units, s.value.toFixed(2), s.low, s.out];
-    });
-    const url = URL.createObjectURL(new Blob(['﻿' + [head, ...rows].map(r => r.map(esc).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Warehouses_${todayIso()}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const buildReport = (): ReportDocument => ({
+    title: 'Warehouses Report',
+    period: { to: new Date(), label: 'Stock on hand' },
+    sections: [tableFromMatrix('Warehouses',
+      ['Warehouse', 'Type', 'Location', 'Status', 'Products in stock', 'Units', 'Stock value', 'Low stock', 'Out of stock'],
+      filtered.map(w => { const s = statsOf(w.id); return [w.name, typeMeta(w.type).label, w.location, w.isActive ? 'Active' : 'Inactive', s.skus, s.units, s.value, s.low, s.out]; }),
+      { totals: true, money: [6], noMoney: [4, 5, 7, 8] })],
+  });
+
 
   const SortIcon = ({ k }: { k: SortKey }) => (sort.key === k ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null);
   const Th = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
@@ -216,7 +212,7 @@ export function Warehouses() {
         actions={
           <>
             {view !== 'list' && <Button variant="outline" size="sm" onClick={() => setView('list')}><ArrowLeft className="h-4 w-4" /> Back</Button>}
-            {view === 'list' && <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={exportCsv}><Download className="h-4 w-4" /> Export</Button>}
+            {view === 'list' && <ReportActions report={buildReport} disabled={filtered.length === 0} menuLabel="Warehouses" />}
             <Button variant="outline" size="sm" onClick={() => navigate('/products')}><Package className="h-4 w-4" /> Products</Button>
             <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" /> Add Warehouse</Button>
           </>

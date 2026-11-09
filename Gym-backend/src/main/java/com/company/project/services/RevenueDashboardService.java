@@ -133,23 +133,13 @@ public class RevenueDashboardService {
             from = to;
             to = swap;
         }
-        long days = ChronoUnit.DAYS.between(from, to) + 1;
         boolean lastYear = "last-year".equalsIgnoreCase(compare);
-        LocalDate prevFrom;
-        LocalDate prevTo;
-        if (lastYear) {
-            prevFrom = from.minusYears(1);
-            prevTo = to.minusYears(1);
-        } else if (from.getDayOfMonth() == 1 && to.equals(to.withDayOfMonth(to.lengthOfMonth()))) {
-            // Whole calendar months (This Month / Quarter / Year): compare with the months just
-            // before — October vs all of September, not the 31 days from Aug 31.
-            long months = ChronoUnit.MONTHS.between(from, to.plusDays(1));
-            prevFrom = from.minusMonths(months);
-            prevTo = from.minusDays(1);
-        } else {
-            prevTo = from.minusDays(1);
-            prevFrom = prevTo.minusDays(days - 1);
-        }
+        LocalDate requestedTo = to;
+        LocalDate[] window = comparisonWindow(from, to, compare, LocalDate.now());
+        to = window[1];
+        LocalDate prevFrom = window[2];
+        LocalDate prevTo = window[3];
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
         String bucket = resolveGranularity(granularity, days);
 
         List<Entry> current = collectEntries(from, to);
@@ -167,6 +157,9 @@ public class RevenueDashboardService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("from", from.toString());
         result.put("to", to.toString());
+        result.put("requestedTo", requestedTo.toString());
+        // The range runs past today: both periods are measured up to the same point
+        result.put("toDate", !to.equals(requestedTo));
         result.put("previousFrom", prevFrom.toString());
         result.put("previousTo", prevTo.toString());
         result.put("compare", lastYear ? "last-year" : "previous");
@@ -225,6 +218,35 @@ public class RevenueDashboardService {
 
         result.put("insights", buildInsights(current, previous, expenses, previousExpenses, collection, activeMembers));
         return result;
+    }
+
+    /**
+     * Like-for-like windows for [from, to] (from <= to), as {from, effectiveTo, prevFrom, prevTo}.
+     *
+     * A range that runs past today (This Month / Week / Quarter / Year) is measured up to today
+     * only — the days after it can't have happened yet — and the comparison window is cut at the
+     * same point: November 1–6 vs October 1–6, not vs all of October (which made everything read
+     * −60…−100% early in the month).
+     *
+     * The comparison window is the range shifted back by its own length: by whole months when the
+     * range is whole calendar months (October vs September, not the 31 days from Aug 31), else by
+     * its number of days; "last-year" shifts by one year. Shared with RevenueOperationsService so
+     * every comparison on the Revenue Dashboard uses the same windows.
+     */
+    static LocalDate[] comparisonWindow(LocalDate from, LocalDate to, String compare, LocalDate today) {
+        LocalDate effectiveTo = to.isAfter(today) && !from.isAfter(today) ? today : to;
+        if ("last-year".equalsIgnoreCase(compare)) {
+            return new LocalDate[]{from, effectiveTo, from.minusYears(1), effectiveTo.minusYears(1)};
+        }
+        if (from.getDayOfMonth() == 1 && to.equals(to.withDayOfMonth(to.lengthOfMonth()))) {
+            long months = ChronoUnit.MONTHS.between(from, to.plusDays(1));
+            LocalDate prevTo = effectiveTo.minusMonths(months);
+            LocalDate lastPrevDay = from.minusDays(1);
+            return new LocalDate[]{from, effectiveTo, from.minusMonths(months),
+                    prevTo.isAfter(lastPrevDay) ? lastPrevDay : prevTo};
+        }
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
+        return new LocalDate[]{from, effectiveTo, from.minusDays(days), effectiveTo.minusDays(days)};
     }
 
     /** Total money received in [from, to] — the same figure as the Revenue tab's Total Collection. */
@@ -718,7 +740,7 @@ public class RevenueDashboardService {
 
     // ── Trend ──────────────────────────────────────────────────────────────────
 
-    private static String resolveGranularity(String requested, long days) {
+    static String resolveGranularity(String requested, long days) {
         if (requested != null) {
             String g = requested.toLowerCase(Locale.ROOT);
             if (List.of("hourly", "daily", "weekly", "monthly").contains(g)) {
@@ -780,7 +802,7 @@ public class RevenueDashboardService {
         return rows;
     }
 
-    private static LocalDateTime bucketStart(LocalDateTime t, String bucket) {
+    static LocalDateTime bucketStart(LocalDateTime t, String bucket) {
         return switch (bucket) {
             case "hourly" -> t.truncatedTo(ChronoUnit.HOURS);
             case "daily" -> t.toLocalDate().atStartOfDay();
@@ -789,7 +811,7 @@ public class RevenueDashboardService {
         };
     }
 
-    private static LocalDateTime next(LocalDateTime t, String bucket) {
+    static LocalDateTime next(LocalDateTime t, String bucket) {
         return switch (bucket) {
             case "hourly" -> t.plusHours(1);
             case "daily" -> t.plusDays(1);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { buildQrCodeSvg, type CompanyDetails } from '../../utils/company-details';
+import { ARABIC_SCRIPT, LOCAL_NAME_FONT_STACK, buildQrCodeSvg, type CompanyDetails } from '../../utils/company-details';
 import { CURRENCIES, type CurrencyCode } from '../../utils/currency';
 import aedSymbolUrl from '../../assets/currency/aed-symbol.webp';
 
@@ -517,6 +517,10 @@ export function DocumentView({ s, doc, forPrint = false }: { s: DocTemplateSetti
             ))}
             <div style={{ textAlign: 'right', lineHeight: 1.55 }}>
               {s.showCompanyName && <p style={{ fontWeight: 700, fontSize: `${f + 3}px`, color: '#1a1a2e', margin: 0 }}>{co.name}</p>}
+              {s.showCompanyName && co.nameLocal && (
+                <p dir="auto" lang={ARABIC_SCRIPT.test(co.nameLocal) ? 'ar' : undefined}
+                  style={{ fontWeight: 700, fontSize: `${f + 2}px`, color: '#1a1a2e', margin: 0, fontFamily: LOCAL_NAME_FONT_STACK, unicodeBidi: 'isolate' }}>{co.nameLocal}</p>
+              )}
               {s.showCompanyAddress && co.address && <p style={{ margin: 0, color: '#555', whiteSpace: 'pre-line' }}>{co.address}</p>}
               {s.showCompanyPhone && co.phone && <p style={{ margin: 0 }}>{co.phone}</p>}
               {s.showCompanyEmail && co.email && <p style={{ margin: 0 }}>{co.email}</p>}

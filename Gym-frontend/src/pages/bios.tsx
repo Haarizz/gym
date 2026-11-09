@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -74,7 +74,9 @@ import { MemberAnalyticsDialog } from '../components/bios/member-analytics-dialo
 import { OperationalReportsDialog } from '../components/bios/operational-reports-dialog';
 import { BenchmarkingDialog } from '../components/bios/benchmarking-dialog';
 import { BIEngineWrapper } from '../components/bios/bi-engine-wrapper';
-import { type BiosLiveData, downloadCsv, formatSignedPercent } from '../components/bios/bios-live';
+import { type BiosLiveData, formatSignedPercent } from '../components/bios/bios-live';
+import { buildBiosReport } from '../components/bios/bios-report';
+import { useReportExporter } from '../components/report-export';
 import '../styles/bios.css';
 
 type RevenueChartPoint = {
@@ -860,44 +862,22 @@ export function BiOS() {
     return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
 
-  const handleGenerateReport = () => {
-    const dateLabel = new Date().toISOString().slice(0, 10);
-    const header = ['Metric', 'Value'];
-    const rows: Array<[string, string | number]> = [
-      ['Report Period', getCurrentPeriod()],
-      ['Total Revenue', totalRevenue],
-      ['Active Members', activeMembers],
-      ['Total Members', totalMembers],
-      ['Retention Rate (%)', retentionRate],
-      ['Monthly Revenue Growth (%)', revenueGrowthRate === null ? 'New' : revenueGrowthRate],
-      ['Member Growth (%)', memberGrowthRate === null ? 'New' : memberGrowthRate],
-      ['Overall Health Score', overallHealthScore],
-      ...livePerformanceMetrics.map((metric) => [`${metric.metric} (current)`, metric.current] as [string, number]),
-      ...liveBenchmarks.map((benchmark) => [`${benchmark.metric} vs your target`, `${benchmark.value} vs ${benchmark.industry}`] as [string, string]),
-    ];
-    downloadCsv(`bios-report_${dateLabel}.csv`, header, rows);
-    const title = `Business Summary — ${getCurrentPeriod()}`;
-    biosService.logActivity('REPORT', title, 'CSV', rows.length)
-      .then(loadActivityLogs)
-      .catch(() => {});
-    toast.success('Report generated');
+  // Reports go through the shared export engine (A4 PDF / formatted Excel), built from the same
+  // live figures the page shows; each one is logged in the BiOS activity log once it was made.
+  const biosExporter = useReportExporter();
+  const liveRef = useRef<BiosLiveData | null>(null);
+  const runBiosReport = (output: 'pdf' | 'xlsx', kind: 'summary' | 'bi-engine', logType: 'REPORT' | 'EXPORT', title: string) => {
+    const live = liveRef.current;
+    if (!live) return;
+    biosExporter.run(output, () => {
+      const doc = buildBiosReport(live, kind);
+      const rows = doc.sections.reduce((n, s) => n + (s.kind === 'table' ? s.rows.length : s.kind === 'kpis' ? s.items.length : 0), 0);
+      biosService.logActivity(logType, title, output === 'pdf' ? 'PDF' : 'XLSX', rows).then(loadActivityLogs).catch(() => {});
+      return doc;
+    });
   };
-
-  const handleExportData = () => {
-    const dateLabel = new Date().toISOString().slice(0, 10);
-    const header = ['Category', 'Item', 'Value'];
-    const rows: Array<[string, string, string | number]> = [
-      ...revenueSourceData.map((source) => ['Revenue by Source', source.source, source.amount] as [string, string, number]),
-      ...revenueChartData.map((point) => ['Monthly Revenue', point.month, point.revenue] as [string, string, number]),
-      ...memberChartData.map((point) => ['Monthly Members', point.month, point.members] as [string, string, number]),
-      ...displayMemberSegments.map((segment) => ['Member Segment', segment.segment, segment.count] as [string, string, number]),
-    ];
-    downloadCsv(`bios-data-export_${dateLabel}.csv`, header, rows);
-    biosService.logActivity('EXPORT', 'Full Data Export', 'CSV', rows.length)
-      .then(loadActivityLogs)
-      .catch(() => {});
-    toast.success('Data export started');
-  };
+  const handleGenerateReport = () => runBiosReport('pdf', 'summary', 'REPORT', `Business Summary — ${getCurrentPeriod()}`);
+  const handleExportData = () => runBiosReport('xlsx', 'bi-engine', 'EXPORT', 'Full Data Export');
 
   // Everything the analysis dialogs and the BI Engine tab read — live where a
   // source exists; see components/bios/bios-live.tsx.
@@ -946,6 +926,8 @@ export function BiOS() {
       setSettingsOpen(true);
     }
   };
+  liveRef.current = live;
+
 
   // Shapes the design's dialogs expect.
   const dialogTopKPIs = {

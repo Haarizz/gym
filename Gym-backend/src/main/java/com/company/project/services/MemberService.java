@@ -138,6 +138,16 @@ public class MemberService {
         return getMembers(search, status, membershipType, paymentStatus, plan, expiringWithin, dues, null, null, page, limit);
     }
 
+    /** joinDate, else membershipStartDate, else createdAt — when the member actually joined. */
+    private static jakarta.persistence.criteria.Expression<LocalDateTime> effectiveJoinDate(
+            jakarta.persistence.criteria.Root<Member> root, jakarta.persistence.criteria.CriteriaBuilder cb) {
+        jakarta.persistence.criteria.CriteriaBuilder.Coalesce<LocalDateTime> c = cb.coalesce();
+        c.value(root.<LocalDateTime>get("joinDate"));
+        c.value(root.<LocalDateTime>get("membershipStartDate"));
+        c.value(root.<LocalDateTime>get("createdAt"));
+        return c;
+    }
+
     /**
      * joinedFrom (inclusive) / joinedTo (exclusive) keep members who joined in that window
      * (Members › New Members), listed newest join first.
@@ -149,11 +159,23 @@ public class MemberService {
                                              int page, int limit) {
         Specification<Member> spec = buildSpec(search, status, membershipType, paymentStatus,
                 plan, expiringWithin, dues);
-        if (joinedFrom != null) spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("joinDate"), joinedFrom));
-        if (joinedTo != null) spec = spec.and((root, q, cb) -> cb.lessThan(root.get("joinDate"), joinedTo));
+        // Older/imported members can have no join date saved; they joined when their membership
+        // started (or, failing that, when the record was created) — the same fallback as BiOS.
+        if (joinedFrom != null) spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(effectiveJoinDate(root, cb), joinedFrom));
+        if (joinedTo != null) spec = spec.and((root, q, cb) -> cb.lessThan(effectiveJoinDate(root, cb), joinedTo));
         Sort sort = joinedFrom != null || joinedTo != null
                 ? Sort.by(Sort.Direction.DESC, "joinDate").and(Sort.by(Sort.Direction.DESC, "createdAt"))
                 : Sort.by(Sort.Direction.DESC, "createdAt");
+        if (joinedFrom != null || joinedTo != null) {
+            // Newest join first, by the same effective join date (a null joinDate would sort apart).
+            spec = spec.and((root, q, cb) -> {
+                if (q != null && !Long.class.equals(q.getResultType()) && !long.class.equals(q.getResultType())) {
+                    q.orderBy(cb.desc(effectiveJoinDate(root, cb)), cb.desc(root.get("createdAt")));
+                }
+                return null;
+            });
+            sort = Sort.unsorted();
+        }
         Pageable pageable = PageRequest.of(page - 1, limit, sort);
         Page<Member> memberPage = memberRepository.findAll(spec, pageable);
 

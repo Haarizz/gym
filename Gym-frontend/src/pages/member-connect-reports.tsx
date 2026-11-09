@@ -90,6 +90,7 @@ import { referralService, type ReferralResponse } from '../utils/supabase/referr
 import { followUpService, type FollowUpResponse } from '../utils/supabase/follow-up-service';
 import { messagingService, type MessagingAnalyticsApi, type MessageHistoryApi } from '../utils/supabase/messaging-service';
 import { membersService, type Member } from '../utils/supabase/members-service';
+import { ReportActions, type ReportDocument, kpiSection, tableFromMatrix } from '../components/report-export';
 
 // All interfaces now come from respective service files
 
@@ -405,10 +406,10 @@ export function MemberConnectReports() {
       .reduce((sum, r) => sum + (r.rewardAmount || 0), 0);
   }, [apiReferrals]);
 
-  // Build a CSV of whichever tab's real data is currently displayed
-  const buildExportCsv = useCallback((): { filename: string; content: string } => {
+  // Export / print whichever tab's real data is currently displayed
+  const buildReport = useCallback((): ReportDocument => {
     let header: string[] = [];
-    let rows: string[][] = [];
+    let rows: (string | number)[][] = [];
     let filename = 'member-connect-overview.csv';
 
     switch (activeTab) {
@@ -422,7 +423,7 @@ export function MemberConnectReports() {
           String(c.usageCount ?? 0), c.usageLimit != null ? String(c.usageLimit) : '',
           String(c.redemptionRate ?? 0), String(c.conversionRate ?? 0),
           String(c.totalRevenue ?? 0), String(c.totalSavings ?? 0), c.createdBy || ''
-        ].map(csvEscape));
+        ]);
         break;
       case 'engagement':
         filename = 'member-engagement-report.csv';
@@ -430,7 +431,7 @@ export function MemberConnectReports() {
         rows = memberEngagementsData.map((m: any) => [
           m.memberName, m.membershipType, String(m.referralsMade),
           m.lastEngagement ? format(new Date(m.lastEngagement), 'yyyy-MM-dd') : ''
-        ].map(csvEscape));
+        ]);
         break;
       case 'referrals':
         filename = 'referrals-report.csv';
@@ -440,7 +441,7 @@ export function MemberConnectReports() {
           r.date ? format(new Date(r.date), 'yyyy-MM-dd') : '',
           r.status, r.ruleName || '', String(r.rewardAmount ?? 0),
           r.paymentDate ? format(new Date(r.paymentDate), 'yyyy-MM-dd') : ''
-        ].map(csvEscape));
+        ]);
         break;
       case 'followups':
         filename = 'follow-ups-report.csv';
@@ -452,7 +453,7 @@ export function MemberConnectReports() {
             scheduled ? format(new Date(scheduled), 'yyyy-MM-dd') : '',
             f.completedDate ? format(new Date(f.completedDate), 'yyyy-MM-dd') : '',
             f.status, f.outcome || '', f.assignedStaff || '', f.notes || ''
-          ].map(csvEscape);
+          ];
         });
         break;
       default:
@@ -475,33 +476,35 @@ export function MemberConnectReports() {
         ];
     }
 
-    const content = [header.map(csvEscape).join(','), ...rows.map(r => r.join(','))].join('\n');
-    return { filename, content };
+    const titles: Record<string, string> = {
+      campaigns: 'Campaigns Report', engagement: 'Member Engagement Report', referrals: 'Referrals Report', followups: 'Follow-ups Report',
+    };
+    if (!titles[activeTab]) {
+      return {
+        title: 'Member Connect Overview', fileName: 'Member Connect Overview',
+        sections: [kpiSection([
+          { label: 'Active members engaged', value: analytics.totalMembersEngaged, format: 'integer' },
+          { label: 'Campaigns run', value: analytics.totalCampaigns, format: 'integer', hint: `${analytics.activeCampaigns} active` },
+          { label: 'Messages sent', value: analytics.totalMessagesSent, format: 'integer' },
+          { label: 'Open rate', value: analytics.openRate, format: 'percent' },
+          { label: 'Click rate', value: analytics.clickRate, format: 'percent' },
+          { label: 'Referrals generated', value: analytics.referralsGenerated, format: 'integer' },
+          { label: 'Referral conversion', value: analytics.referralConversionRate, format: 'percent' },
+          { label: 'Follow-ups completed', value: analytics.followUpsCompleted, format: 'integer', hint: `${analytics.followUpCompletionRate.toFixed(1)}% completion` },
+          { label: 'Total revenue', value: analytics.totalRevenue, format: 'money' },
+          { label: 'Total cost', value: analytics.totalCost, format: 'money' },
+          { label: 'ROI', value: analytics.roi, format: 'percent' },
+        ], 'Key metrics')],
+      };
+    }
+    return {
+      title: titles[activeTab], fileName: filename.replace(/\.csv$/, '').replace(/-/g, ' '),
+      orientation: header.length > 7 ? 'landscape' : 'auto',
+      sections: [tableFromMatrix(titles[activeTab].replace(' Report', ''), header, rows, { totals: true, wrap: activeTab === 'followups' ? [7] : [] })],
+    };
   }, [activeTab, filteredCampaigns, memberEngagementsData, apiReferrals, apiFollowUps, analytics]);
 
-  // Handle export functionality - CSV is a real client-side export of the active tab's data.
-  // PDF generation isn't implemented (no PDF library in this codebase), so it's reported honestly
-  // instead of faking a success toast.
-  const handleExport = useCallback(async (exportFormat: 'csv' | 'pdf') => {
-    setIsExporting(true);
-    try {
-      if (exportFormat === 'csv') {
-        const { filename, content } = buildExportCsv();
-        const blob = new Blob([content], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Member Connect report exported as CSV!');
-      } else {
-        toast.info('PDF export is not available yet - use Export CSV instead.');
-      }
-    } finally {
-      setIsExporting(false);
-    }
-  }, [buildExportCsv]);
+
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -514,18 +517,7 @@ export function MemberConnectReports() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" onClick={() => handleExport('csv')} disabled={isExporting}>
-            {isExporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Export CSV
-          </Button>
-          <Button variant="outline" onClick={() => handleExport('pdf')} disabled={isExporting}>
-            <FileText className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
+          <ReportActions report={buildReport} size="default" disabled={isLoading} />
           <Button onClick={async () => { await loadData(); toast.success('Data refreshed!'); }} disabled={isLoading}>
             <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
             Refresh

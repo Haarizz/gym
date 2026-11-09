@@ -1,6 +1,7 @@
 import type { PurchaseOrder } from '../../utils/supabase/purchase-service';
 import styles from './PurchaseInvoice.module.css';
 import { priorityMeta, todayIso } from './purchaseInvoiceUtils';
+import { type ReportDocument, kpiSection, tableFromMatrix } from '../report-export';
 
 // ── Status ───────────────────────────────────────────────────────────────────
 
@@ -72,23 +73,24 @@ export function buildPOTimeline(po: PurchaseOrder): POTimelineEvent[] {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
-export function exportOrdersCsv(orders: PurchaseOrder[], currencyCode: string) {
-  const head = ['S.No', 'PO No', 'Order Date', 'Expected Delivery', 'Supplier', 'Priority', 'Status', 'Items',
-    'Qty Ordered', 'Qty Received', `Total (${currencyCode})`];
-  const esc = (v: unknown) => {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/** Purchase orders register for export / print — the list as filtered on screen. */
+export function buildOrdersReport(orders: PurchaseOrder[]): ReportDocument {
+  return {
+    title: 'Purchase Orders Register', fileName: 'Purchase Orders', orientation: 'landscape',
+    period: { to: new Date(), label: 'Current list' },
+    sections: [
+      kpiSection([
+        { label: 'Orders', value: orders.length, format: 'integer' },
+        { label: 'Total value', value: orders.reduce((s, o) => s + Number(o.totalAmount || 0), 0), format: 'money' },
+      ]),
+      tableFromMatrix('Purchase orders',
+        ['S.No', 'PO No', 'Order Date', 'Expected Delivery', 'Supplier', 'Priority', 'Status', 'Items', 'Qty Ordered', 'Qty Received', 'Total'],
+        orders.map((o, i) => {
+          const r = receipt(o);
+          return [i + 1, o.poNumber, isoDay(o.orderDate), isoDay(o.expectedDeliveryDate), o.supplierName, priorityMeta(o.priority).label,
+            poStatusMeta(o.status).label, o.items.length, r.ordered, r.received, o.totalAmount];
+        }),
+        { totals: true, money: [10], noMoney: [0, 7, 8, 9] }),
+    ],
   };
-  const rows = orders.map((o, i) => {
-    const r = receipt(o);
-    return [i + 1, o.poNumber, isoDay(o.orderDate), isoDay(o.expectedDeliveryDate), o.supplierName, priorityMeta(o.priority).label,
-      poStatusMeta(o.status).label, o.items.length, r.ordered, r.received, o.totalAmount.toFixed(2)];
-  });
-  const csv = [head, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
-  const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Purchase_Orders_${todayIso()}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

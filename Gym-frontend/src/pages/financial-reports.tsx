@@ -74,6 +74,7 @@ import { ReportsAnalytics } from "./reports-analytics";
 import { CustomReports } from "./custom-reports";
 import { Select as UISelect, SelectContent as UISelectContent, SelectItem as UISelectItem, SelectTrigger as UISelectTrigger, SelectValue as UISelectValue } from "../components/ui/select";
 import { MembershipLifecycleReport, ALL_MEMBERSHIP_REPORT_TYPES, type LifecycleReportType } from "../components/members/MembershipLifecycleReport";
+import { ReportActions, type ReportDocument, type ReportRow, type ReportSection, chartFromRows, col, kpiSection, moneyCol, pieSection, tableSection } from "../components/report-export";
 import {
   BarChart,
   Bar,
@@ -466,145 +467,156 @@ export function FinancialReports() {
     if (selectedReport) handleGenerateReport(selectedReport);
   };
 
-  const downloadBlob = (filename: string, blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
+  // Export / print of the generated statement, laid out as a financial statement (sections,
+  // subtotals, totals) and in the on-screen order (FIFO / LIFO).
+  const EXPORTABLE = ["profit-loss", "balance-sheet", "trial-balance", "cash-flow", "cash-book", "day-book", "general-ledger", "member-aging", "supplier-aging", "deferred-revenue", "tax-summary"];
+  const buildStatement = (): ReportDocument => {
+    const id = selectedReport;
+    const title = selectedReportDef?.title ?? "Financial Report";
+    const range = { from: dateRange.from, to: dateRange.to };
+    const asOf = { to: dateRange.to, label: `As of ${format(dateRange.to, "dd MMM yyyy")}` };
+    const none = () => { throw new Error("Generate the report first"); };
+    const ledgerCols = [col("date", "Date", "date"), col("voucherNo", "Voucher"), col("accountName", "Account"), col("narration", "Narration", "text", { wrap: true }), moneyCol("debit", "Debit"), moneyCol("credit", "Credit"), col("runningBalance", "Balance", "money")];
+    const doc = (sections: ReportSection[], period: ReportDocument["period"], extra: Partial<ReportDocument> = {}): ReportDocument =>
+      ({ title, period, filters: [{ label: "Order", value: sortOrder === "fifo" ? "Oldest first" : "Newest first" }], sections, ...extra });
 
-  const toCsvCell = (value: unknown) => {
-    const s = value == null ? "" : String(value);
-    return `"${s.replaceAll('"', '""')}"`;
-  };
-
-  const exportAsCsv = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
-    const csv = [
-      header.map(toCsvCell).join(","),
-      ...rows.map((r) => r.map(toCsvCell).join(",")),
-    ].join("\n");
-    downloadBlob(filename, new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  };
-
-  const exportAsExcel = (filename: string, header: string[], rows: Array<Array<unknown>>) => {
-    const html = `
-      <html><head><meta charset="utf-8" /></head><body>
-      <table border="1" cellspacing="0" cellpadding="4">
-        <thead><tr>${header.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-        <tbody>
-          ${rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? ""}</td>`).join("")}</tr>`).join("")}
-        </tbody>
-      </table>
-      </body></html>
-    `.trim();
-    downloadBlob(filename, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
-  };
-
-  const handleExportReport = (exportFormat: "csv" | "excel" | "pdf") => {
-    if (!selectedReport) return;
-    const dateLabel = `${format(dateRange.from, "yyyy-MM-dd")}_to_${format(dateRange.to, "yyyy-MM-dd")}`;
-
-    const emit = (name: string, header: string[], rows: Array<Array<unknown>>) => {
-      const filename = `${name}_${dateLabel}.${exportFormat === "excel" ? "xls" : "csv"}`;
-      if (exportFormat === "pdf") {
-        window.print();
-        return;
+    if (id === "profit-loss") {
+      if (!incomeStatement || !profitLossSections) return none();
+      const rows: ReportRow[] = [];
+      for (const s of profitLossSections) {
+        rows.push({ _kind: "section", account: s.category });
+        s.accounts.forEach(a => rows.push({ account: `   ${a.accountName}`, cur: a.currentPeriod, prior: a.priorPeriod, change: a.currentPeriod - a.priorPeriod }));
+        rows.push({ _kind: "subtotal", account: `Total ${s.category.toLowerCase()}`, cur: s.totalCurrent, prior: s.totalPrior, change: s.totalCurrent - s.totalPrior });
       }
-      if (exportFormat === "excel") exportAsExcel(filename, header, rows);
-      else exportAsCsv(filename, header, rows);
-      toast.success("Export started");
-    };
-
-    if (selectedReport === "profit-loss") {
-      if (!incomeStatement) { toast.error("Generate the report first"); return; }
-      const rows = [
-        ...incomeStatement.revenueLines.map((l) => ["Revenue", l.accountName, l.amount]),
-        ...incomeStatement.expenseLines.map((l) => ["Expense", l.accountName, l.amount]),
-        ["", "Total Revenue", incomeStatement.totalRevenue],
-        ["", "Total Expenses", incomeStatement.totalExpenses],
-        ["", "Net Income", incomeStatement.netIncome],
-      ];
-      emit("profit-loss", ["Section", "Account", `Amount (${currencyCode})`], rows);
-      return;
+      const priorNet = (incomeStatementPrior?.totalRevenue ?? 0) - (incomeStatementPrior?.totalExpenses ?? 0);
+      rows.push({ _kind: "total", account: incomeStatement.netIncome < 0 ? "Net loss" : "Net income", cur: incomeStatement.netIncome, prior: priorNet, change: incomeStatement.netIncome - priorNet });
+      return doc([
+        kpiSection([
+          { label: "Total revenue", value: incomeStatement.totalRevenue, format: "money" },
+          { label: "Total expenses", value: incomeStatement.totalExpenses, format: "money" },
+          { label: "Net income", value: incomeStatement.netIncome, format: "money", tone: incomeStatement.netIncome >= 0 ? "good" : "bad" },
+          { label: "Net margin", value: incomeStatement.totalRevenue ? (incomeStatement.netIncome / incomeStatement.totalRevenue) * 100 : "—", format: "percent" },
+        ]),
+        { kind: "table", title: "Income statement", columns: [col("account", "Account"), col("cur", "This period", "money"), col("prior", "Prior period", "money"), col("change", "Change", "money")], rows },
+        pieSection("Expenses by account", incomeStatement.expenseLines.map(l => ({ label: l.accountName, value: l.amount })), { valueFormat: "money" }),
+      ], range, { title: "Profit & Loss Statement", fileName: "Profit and Loss" });
     }
-
-    if (selectedReport === "trial-balance") {
-      if (!trialBalance) { toast.error("Generate the report first"); return; }
-      const rows = trialBalance.lines.map((l) => [l.code, l.name, l.debit, l.credit, l.netBalance]);
-      emit("trial-balance", ["Code", "Account", `Debit (${currencyCode})`, `Credit (${currencyCode})`, `Net Balance (${currencyCode})`], rows);
-      return;
+    if (id === "balance-sheet") {
+      if (!balanceSheet) return none();
+      const rows: ReportRow[] = [];
+      for (const [group, lines] of Object.entries(balanceSheet.accounts || {})) {
+        rows.push({ _kind: "section", name: group });
+        (lines || []).forEach(l => rows.push({ code: l.code, name: `   ${l.name}`, subGroup: l.subGroup, balance: l.balance }));
+        rows.push({ _kind: "subtotal", name: `Total ${group.toLowerCase()}`, balance: (lines || []).reduce((s, l) => s + Number(l.balance || 0), 0) });
+      }
+      rows.push({ _kind: "total", name: "Total liabilities & equity", balance: balanceSheet.totalLiabilities + balanceSheet.totalEquity });
+      return doc([
+        kpiSection([
+          { label: "Total assets", value: balanceSheet.totalAssets, format: "money" },
+          { label: "Total liabilities", value: balanceSheet.totalLiabilities, format: "money" },
+          { label: "Total equity", value: balanceSheet.totalEquity, format: "money" },
+          { label: "Difference", value: balanceSheet.totalAssets - balanceSheet.totalLiabilities - balanceSheet.totalEquity, format: "money", hint: "Assets − (liabilities + equity)" },
+        ]),
+        { kind: "table", title: "Balance sheet", columns: [col("code", "Code"), col("name", "Account"), col("subGroup", "Sub-group"), col("balance", "Balance", "money")], rows },
+      ], asOf, { fileName: "Balance Sheet" });
     }
-
-    if (selectedReport === "balance-sheet") {
-      if (!balanceSheet) { toast.error("Generate the report first"); return; }
-      const rows = Object.entries(balanceSheet.accounts || {}).flatMap(([group, lines]) =>
-        (lines || []).map((l) => [group, l.code, l.name, l.balance])
-      );
-      emit("balance-sheet", ["Group", "Code", "Account", `Balance (${currencyCode})`], rows);
-      return;
+    if (id === "trial-balance") {
+      if (!trialBalance) return none();
+      return doc([
+        kpiSection([
+          { label: "Total debit", value: trialBalance.totalDebit, format: "money" },
+          { label: "Total credit", value: trialBalance.totalCredit, format: "money" },
+          { label: "Difference", value: trialBalance.totalDebit - trialBalance.totalCredit, format: "money", tone: Math.abs(trialBalance.totalDebit - trialBalance.totalCredit) < 0.01 ? "good" : "bad" },
+        ]),
+        tableSection("Trial balance", [col("code", "Code"), col("name", "Account"), col("type", "Type"), moneyCol("openingBalance", "Opening", { total: undefined }), moneyCol("debit", "Debit"), moneyCol("credit", "Credit"), col("netBalance", "Net balance", "money", { total: "sum" })],
+          trialBalance.lines, { totals: true }),
+      ], asOf, { orientation: "landscape" });
     }
-
-    if (selectedReport === "cash-flow") {
-      if (!cashFlow) { toast.error("Generate the report first"); return; }
-      const rows = [
-        [`Total Inflows (${currencyCode})`, cashFlow.totalInflows],
-        [`Total Outflows (${currencyCode})`, cashFlow.totalOutflows],
-        [`Net Cash Flow (${currencyCode})`, cashFlow.netCashFlow],
-        ["Inflow Count", cashFlow.inflowCount],
-        ["Outflow Count", cashFlow.outflowCount],
-      ];
-      emit("cash-flow", ["Metric", "Value"], rows);
-      return;
+    if (id === "cash-flow") {
+      if (!cashFlow) return none();
+      return doc([
+        kpiSection([
+          { label: "Total inflows", value: cashFlow.totalInflows, format: "money", hint: `${cashFlow.inflowCount} entries` },
+          { label: "Total outflows", value: cashFlow.totalOutflows, format: "money", hint: `${cashFlow.outflowCount} entries` },
+          { label: "Net cash flow", value: cashFlow.netCashFlow, format: "money", tone: cashFlow.netCashFlow >= 0 ? "good" : "bad" },
+        ]),
+        chartFromRows("Inflows vs outflows", "bar", [{ name: "Inflows", v: cashFlow.totalInflows }, { name: "Outflows", v: cashFlow.totalOutflows }], "name", [{ key: "v", name: "Amount" }], { valueFormat: "money", colors: ["#1baf7a", "#eb6834"] }),
+      ], range);
     }
-
-    if (selectedReport === "cash-book") {
-      if (!cashBook) { toast.error("Generate the report first"); return; }
-      const rows = cashBook.entries.map((e) => [e.date, e.voucherNo, e.accountName, e.debit, e.credit, e.runningBalance ?? 0]);
-      emit("cash-book", ["Date", "Voucher", "Account", "Debit", "Credit", "Balance"], rows);
-      return;
+    if (id === "cash-book") {
+      if (!cashBook) return none();
+      return doc([
+        kpiSection([
+          { label: "Opening balance", value: cashBook.openingBalance, format: "money" },
+          { label: "Receipts (debit)", value: cashBook.entries.reduce((s, e) => s + e.debit, 0), format: "money" },
+          { label: "Payments (credit)", value: cashBook.entries.reduce((s, e) => s + e.credit, 0), format: "money" },
+          { label: "Closing balance", value: cashBook.closingBalance, format: "money" },
+        ]),
+        tableSection("Cash book", ledgerCols, sortByDate(cashBook.entries, (e) => e.date, sortOrder), { totals: true }),
+      ], range, { orientation: "landscape" });
     }
-
-    if (selectedReport === "day-book") {
-      if (!dayBook) { toast.error("Generate the report first"); return; }
-      const rows = dayBook.entries.map((e) => [e.voucherNo, e.accountName, e.narration ?? "", e.debit, e.credit]);
-      emit("day-book", ["Voucher", "Account", "Narration", "Debit", "Credit"], rows);
-      return;
+    if (id === "day-book") {
+      if (!dayBook) return none();
+      return doc([
+        kpiSection([{ label: "Total debit", value: dayBook.totalDebit, format: "money" }, { label: "Total credit", value: dayBook.totalCredit, format: "money" }, { label: "Entries", value: dayBook.entries.length, format: "integer" }]),
+        tableSection("Day book", ledgerCols.filter(c => c.key !== "date" && c.key !== "runningBalance"), dayBook.entries, { totals: true }),
+      ], { from: dayBook.date, to: dayBook.date }, { orientation: "landscape" });
     }
-
-    if (selectedReport === "general-ledger") {
-      if (!generalLedger) { toast.error("Generate the report first"); return; }
-      const rows = generalLedger.accounts.flatMap((acc) =>
-        acc.entries.map((e) => [acc.accountCode, acc.accountName, e.date, e.voucherNo, e.debit, e.credit, e.runningBalance ?? 0])
-      );
-      emit("general-ledger", ["Account Code", "Account Name", "Date", "Voucher", "Debit", "Credit", "Balance"], rows);
-      return;
+    if (id === "general-ledger") {
+      if (!generalLedger) return none();
+      const rows: ReportRow[] = [];
+      for (const acc of generalLedger.accounts) {
+        rows.push({ _kind: "section", date: `${acc.accountCode} · ${acc.accountName}` });
+        rows.push({ _kind: "muted", narration: "Opening balance", runningBalance: acc.openingBalance });
+        sortByDate(acc.entries, (e) => e.date, sortOrder).forEach(e => rows.push({ ...e }));
+        rows.push({ _kind: "subtotal", narration: "Closing balance", debit: acc.entries.reduce((s, e) => s + e.debit, 0), credit: acc.entries.reduce((s, e) => s + e.credit, 0), runningBalance: acc.closingBalance });
+      }
+      return doc([{ kind: "table", title: "General ledger", columns: ledgerCols.filter(c => c.key !== "accountName"), rows, emptyText: "No ledger postings in this period." }], range, { orientation: "landscape" });
     }
-
-    if (selectedReport === "member-aging" || selectedReport === "supplier-aging") {
-      const data = selectedReport === "member-aging" ? memberAging : supplierAging;
-      if (!data) { toast.error("Generate the report first"); return; }
-      const rows = data.rows.map((r) => [r.name, r.reference ?? "", r.dueDate ?? "", r.outstanding, r.daysOverdue, r.bucket]);
-      emit(selectedReport, ["Name", "Reference", "Due Date", "Outstanding", "Days Overdue", "Bucket"], rows);
-      return;
+    if (id === "member-aging" || id === "supplier-aging") {
+      const data = id === "member-aging" ? memberAging : supplierAging;
+      if (!data) return none();
+      const buckets = Object.entries(data.buckets || {});
+      return doc([
+        kpiSection([{ label: "Total outstanding", value: data.totalOutstanding, format: "money" }, ...buckets.map(([b, v]) => ({ label: b, value: v, format: "money" as const }))]),
+        chartFromRows("Outstanding by age", "bar", buckets.map(([b, v]) => ({ b, v })), "b", [{ key: "v", name: "Outstanding", color: "#eb6834" }], { valueFormat: "money" }),
+        tableSection(id === "member-aging" ? "Member dues" : "Supplier payables", [col("name", "Name"), col("reference", "Reference"), col("dueDate", "Due date", "date"), moneyCol("outstanding", "Outstanding"), col("daysOverdue", "Days overdue", "integer"), col("bucket", "Bucket")],
+          sortByDate(data.rows, (r) => r.dueDate, sortOrder), { totals: true }),
+      ], asOf);
     }
-
-    if (selectedReport === "deferred-revenue") {
-      if (!deferredRevenue) { toast.error("Generate the report first"); return; }
-      const rows = deferredRevenue.schedules.map((s) => [s.memberName ?? "", s.planName ?? "", s.startDate, s.endDate, s.totalAmount, s.recognizedAmount, s.remainingAmount]);
-      emit("deferred-revenue", ["Member", "Plan", "Start", "End", "Total", "Recognized", "Remaining"], rows);
-      return;
+    if (id === "deferred-revenue") {
+      if (!deferredRevenue) return none();
+      return doc([
+        kpiSection([
+          { label: "Ledger balance", value: deferredRevenue.ledgerBalance, format: "money" },
+          { label: "Scheduled remaining", value: deferredRevenue.scheduledRemaining, format: "money" },
+          { label: "Active schedules", value: deferredRevenue.activeScheduleCount, format: "integer" },
+        ]),
+        tableSection("Deferred revenue schedules", [col("memberName", "Member"), col("planName", "Plan"), col("startDate", "Start", "date"), col("endDate", "End", "date"), col("totalPeriods", "Periods", "integer"), moneyCol("totalAmount", "Total"), moneyCol("recognizedAmount", "Recognized"), moneyCol("remainingAmount", "Remaining")],
+          deferredRevenue.schedules, { totals: true }),
+      ], { to: new Date(), label: "Current schedules" }, { orientation: "landscape" });
     }
-
-    if (selectedReport === "tax-summary") {
-      if (!taxSummary) { toast.error("Generate the report first"); return; }
-      const rows = taxSummary.taxByCode.map((t) => [t.taxCode, t.name, t.taxType, t.outputAmount, t.inputAmount]);
-      emit("tax-summary", ["Tax Code", "Name", "Type", "Output Amount", "Input Amount"], rows);
-      return;
+    if (id === "tax-summary") {
+      if (!taxSummary) return none();
+      return doc([
+        kpiSection([
+          { label: "Output VAT", value: taxSummary.outputVat, format: "money" },
+          { label: "Input VAT", value: taxSummary.inputVat, format: "money" },
+          { label: "Net VAT payable", value: taxSummary.netVatPayable, format: "money" },
+          { label: "Corporate tax payable", value: taxSummary.corporateTaxPayable, format: "money" },
+        ]),
+        { kind: "keyValue", title: "Corporate tax", items: [
+          { label: "Total revenue", value: taxSummary.totalRevenue, format: "money" },
+          { label: "Deductions", value: taxSummary.deductions, format: "money" },
+          { label: "Taxable profit", value: taxSummary.taxableProfit, format: "money" },
+          { label: "0% threshold", value: taxSummary.corporateTaxZeroRateThreshold, format: "money" },
+          { label: "Corporate tax rate", value: taxSummary.corporateTaxRate, format: "percent" },
+          { label: "Corporate tax payable", value: taxSummary.corporateTaxPayable, format: "money" },
+        ] },
+        tableSection("Tax by code", [col("taxCode", "Tax code"), col("name", "Name"), col("taxType", "Type"), moneyCol("outputAmount", "Output"), moneyCol("inputAmount", "Input")], taxSummary.taxByCode, { totals: true }),
+      ], range);
     }
+    throw new Error("This report has its own export controls");
   };
 
   // Merge current + prior income statement lines by account name for an accurate variance column.
@@ -726,19 +738,9 @@ export function FinancialReports() {
             <RefreshCw className={cn("h-4 w-4 mr-2", isGeneratingReport && "animate-spin")} />
             Refresh
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={!selectedReport}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportReport("csv")}>CSV</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportReport("excel")}>Excel</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportReport("pdf")}>PDF</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {(!selectedReport || EXPORTABLE.includes(selectedReport)) && (
+            <ReportActions report={buildStatement} disabled={!selectedReport || isGeneratingReport} menuLabel={selectedReportDef?.title} />
+          )}
         </div>
       </div>
 

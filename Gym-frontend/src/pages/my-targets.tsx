@@ -30,8 +30,10 @@ import {
 } from "lucide-react";
 import { cn } from "../components/ui/utils";
 import { StaffTargetsBoard } from "../components/targets/StaffTargetsBoard";
+import { isGymAdminRole } from "../utils/permissions";
 import { MetricGrid } from "../components/targets/target-metrics";
 import { unitLabel } from "../utils/target-units";
+import { ReportActions, type ReportDocument, col, kpiSection, moneyCol, tableSection } from "../components/report-export";
 
 const COLORS = {
   success: "#4CAF50",
@@ -67,22 +69,23 @@ export function MyTargets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Admin accounts (no linked Staff record) don't have personal targets — instead
-  // they get the Staff Targets board: every staff member's targets for a chosen month.
-  const [isAdminView, setIsAdminView] = useState(false);
+  // The gym owner (ADMIN) gets the Staff Targets board — every staff member's targets for a
+  // chosen month — and the sidebar names this page "Staff Targets" for them. Every other
+  // role sees their own targets here, even if their login has no linked staff record.
+  const isAdminView = isGymAdminRole();
 
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
 
   const loadData = async () => {
+    if (isAdminView) { setLoading(false); return; } // the board loads its own data
     setLoading(true);
     setError(null);
     try {
       const myProfile = await staffService.getMyProfile();
       setProfile(myProfile);
       if (myProfile?.id) {
-        setIsAdminView(false);
         const [myTargets, individualTargets] = await Promise.all([
           staffService.getMyTargets(year, month),
           staffService.getTargets(year, month, "individual"),
@@ -90,7 +93,6 @@ export function MyTargets() {
         setMyTarget(myTargets[0] ?? null);
         setPeerTargets(individualTargets);
       } else {
-        setIsAdminView(true);
         setMyTarget(null);
         setPeerTargets([]);
       }
@@ -138,6 +140,25 @@ export function MyTargets() {
     const position = rows.findIndex(t => t.staff_db_id === profile.id);
     return { position: position === -1 ? null : position + 1, total: rows.length, rows };
   }, [peerTargets, profile]);
+
+  const buildReport = (): ReportDocument => ({
+    title: "My Targets",
+    period: { from: new Date(year, month - 1, 1), to: new Date(year, month, 0), label: `${MONTH_NAMES[month - 1]} ${year}` },
+    filters: [{ label: "Staff", value: profile ? (profile as any).name ?? (profile as any).full_name : undefined }],
+    sections: [
+      kpiSection([
+        { label: "Revenue target", value: revenueTarget, format: "money" },
+        { label: "Achieved", value: revenueAchieved, format: "money", hint: `${percentage}% of target` },
+        { label: "Remaining", value: remaining, format: "money", hint: daysLeft ? `${daysLeft} days left · ${Math.round(dailyRequired).toLocaleString()} per day` : undefined },
+        { label: "Commission earned", value: commission, format: "money" },
+        ...(ranking?.position ? [{ label: "Ranking", value: `${ranking.position} of ${ranking.total}` }] : []),
+      ], "This month"),
+      tableSection("Unit targets", [col("service", "Service"), col("target_units", "Target", "integer", { total: "sum" }), col("achieved_units", "Achieved", "integer", { total: "sum" }), col("pct", "Progress", "percent")],
+        unitTargets.map(u => ({ ...u, service: unitLabel(u.service) || u.service, pct: u.target_units ? Math.round((u.achieved_units / u.target_units) * 1000) / 10 : null })), { totals: true, emptyText: "No unit targets this month." }),
+      ...(ranking && ranking.rows.length ? [tableSection("Team ranking", [col("rank", "Rank", "integer"), col("name", "Staff"), moneyCol("target", "Target"), moneyCol("achieved", "Achieved"), col("pct", "Progress", "percent")],
+        ranking.rows.map((t, i) => ({ rank: i + 1, name: t.staff_name || "", target: Number(t.revenue_target || 0), achieved: Number(t.revenue_achieved || 0), pct: Number(t.percentage || 0) })), { totals: true })] : []),
+    ],
+  });
 
   const getProgressColor = (pct: number) => {
     if (pct >= 100) return "bg-green-500";
@@ -224,12 +245,22 @@ export function MyTargets() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          <ReportActions report={buildReport} disabled={loading || !myTarget} menuLabel="My targets" />
         </div>
       </div>
 
       {error && (
         <Alert className="border-l-4 border-l-red-500 bg-white border-red-200">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {!error && !profile?.id && (
+        <Alert className="border-l-4 bg-white border-amber-200" style={{ borderLeftColor: "#f59e0b" }}>
+          <AlertDescription>
+            Your login isn't linked to a staff profile yet, so there are no personal targets to show.
+            Ask an admin to link your account in Staffs &amp; Trainers.
+          </AlertDescription>
         </Alert>
       )}
 

@@ -20,6 +20,7 @@ import { IconBtn, InfoRow, ModuleHeader, NativeSelect, RailCard, StatCard, Suppl
 import { balanceOf, displayDate, displayStatus, fetchAllBills, fetchAllOrders, statusMeta, todayIso } from '../components/purchase/purchaseInvoiceUtils';
 import { isoDay, poStatusMeta } from '../components/purchase/purchaseOrderUtils';
 import { useGlobalSearchPrefill } from "../components/global-search/use-global-search";
+import { ReportActions, type ReportDocument, tableFromMatrix } from "../components/report-export";
 
 const fmt2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 const PAGE_SIZE = 20;
@@ -198,22 +199,19 @@ export function Suppliers() {
     }
   };
 
-  const exportCsv = () => {
-    const head = ['Name', 'Contact', 'Phone', 'Email', 'City', 'Country', 'TRN', 'Payment Terms', `Credit Limit (${currencyCode})`,
-      'Status', `Purchased (${currencyCode})`, `Outstanding (${currencyCode})`, 'Open Orders', 'Last Purchase'];
-    const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const rows = filtered.map(s => {
-      const st = statsOf(s.id);
-      return [s.name, s.contactPerson, s.phone, s.email, s.city, s.country, s.taxId, s.paymentTerms, s.creditLimit ?? 0,
-        s.isActive === false ? 'Inactive' : 'Active', st.purchased.toFixed(2), st.outstanding.toFixed(2), st.openOrders, st.lastPurchase];
-    });
-    const url = URL.createObjectURL(new Blob(['﻿' + [head, ...rows].map(r => r.map(esc).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Suppliers_${todayIso()}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const buildReport = (): ReportDocument => ({
+    title: 'Suppliers Report',
+    orientation: 'landscape',
+    period: { to: new Date(), label: 'Current list' },
+    sections: [tableFromMatrix('Suppliers',
+      ['Name', 'Contact', 'Phone', 'Email', 'City', 'Country', 'TRN', 'Payment Terms', 'Credit Limit', 'Status', 'Purchased', 'Outstanding', 'Open Orders', 'Last Purchase'],
+      filtered.map(s => {
+        const st = statsOf(s.id);
+        return [s.name, s.contactPerson, s.phone, s.email, s.city, s.country, s.taxId, s.paymentTerms, s.creditLimit ?? 0,
+          s.isActive === false ? 'Inactive' : 'Active', st.purchased, st.outstanding, st.openOrders, st.lastPurchase];
+      }), { totals: true, money: [8, 10, 11], noMoney: [12] })],
+  });
+
 
   const SortIcon = ({ k }: { k: SortKey }) => (sort.key === k ? (sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null);
   const Th = ({ k, children, right }: { k: SortKey; children: React.ReactNode; right?: boolean }) => (
@@ -231,7 +229,7 @@ export function Suppliers() {
         actions={
           <>
             {tab === 'suppliers' && view !== 'list' && <Button variant="outline" size="sm" onClick={() => setView('list')}><ArrowLeft className="h-4 w-4" /> Back</Button>}
-            {tab === 'suppliers' && view === 'list' && <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={exportCsv}><Download className="h-4 w-4" /> Export</Button>}
+            {tab === 'suppliers' && view === 'list' && <ReportActions report={buildReport} disabled={filtered.length === 0} menuLabel="Suppliers" />}
             <Button variant="outline" size="sm" onClick={() => navigate('/purchase-order')}><ClipboardList className="h-4 w-4" /> Purchase Orders</Button>
             <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" /> Add Supplier</Button>
           </>
