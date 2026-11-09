@@ -56,7 +56,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { MemberAppAccountCard } from "../components/members/MemberAppAccountCard";
 import { Calendar as CalendarComponent } from "../components/ui/calendar";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import {
   LineChart,
   Line,
@@ -324,8 +324,10 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   };
 
   // ── Derived values ────────────────────────────────────────────────────
+  // Days left = calendar days from today to the expiry date (the Members list and old GymBios
+  // count the same way); differenceInDays dropped the part-day already gone and showed one less.
   const daysRemaining = member?.expiry_date
-    ? differenceInDays(safeDate(member.expiry_date) as Date, new Date())
+    ? differenceInCalendarDays(safeDate(member.expiry_date) as Date, new Date())
     : null;
 
   const statementLines = statement?.lines ?? [];
@@ -672,7 +674,7 @@ export function MemberHistoryAnalytics({ onNavigate, memberId }: MemberHistoryAn
   // Share of the current term already used, for the progress bar.
   const termStart = safeDate(member.membership_start_date);
   const termEnd = safeDate(member.expiry_date);
-  const termDays = termStart && termEnd ? Math.max(1, differenceInDays(termEnd, termStart)) : null;
+  const termDays = termStart && termEnd ? Math.max(1, differenceInCalendarDays(termEnd, termStart)) : null;
   const termUsedPct = termDays !== null && daysRemaining !== null
     ? Math.min(100, Math.max(0, ((termDays - daysRemaining) / termDays) * 100))
     : null;
