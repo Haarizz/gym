@@ -44,7 +44,7 @@ import {
   Gift,
   Trophy,
   Smartphone,
-  Download,
+
   RefreshCw,
   Filter,
   Eye,
@@ -317,10 +317,7 @@ export function PlansServicesCatalog() {
     setShowQRCode(true);
   };
 
-  const exportToPDF = () => {
-    toast.success('Opening print dialog — choose "Save as PDF" to export the catalog.');
-    window.print();
-  };
+
 
   // Deterministic color assignment for plan cards (purely visual — plans
   // don't carry a "color" field from the backend).
@@ -415,14 +412,6 @@ export function PlansServicesCatalog() {
             QR Code
           </Button>
           
-          <Button
-            variant="outline"
-            size={isFullscreen ? "default" : "sm"}
-            onClick={exportToPDF}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
           
           <Button
             variant="outline"
@@ -969,15 +958,7 @@ export function PlansServicesCatalog() {
             <QrCode className="h-5 w-5 mr-2" />
             QR Code
           </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="bg-white shadow-lg"
-            onClick={exportToPDF}
-          >
-            <Download className="h-5 w-5 mr-2" />
-            Print PDF
-          </Button>
+
         </div>
       )}
 
