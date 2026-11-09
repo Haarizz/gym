@@ -81,6 +81,8 @@ const payments = {
     retryPayment: 'Zahlung erneut versuchen',
     pay: '<amount/> bezahlen',
     sheetSubtitle: 'Bezahle deinen offenen Betrag von {{amount}}',
+    paymentNotStarted: 'Zahlung konnte nicht gestartet werden',
+    mobileOnly: 'Online-Zahlungen sind in der mobilen App verfügbar',
   },
 } satisfies LocaleResource;
 

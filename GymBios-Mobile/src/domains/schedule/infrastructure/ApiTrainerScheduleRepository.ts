@@ -1,6 +1,7 @@
 import { apiClient } from '@/core/network/apiClient';
 import type { TrainerScheduleData, MobileSessionRequestDTO, MobileAvailabilityDTO } from '../domain/TrainerScheduleData';
-import { format, isToday, parseISO } from 'date-fns';
+import { isToday, parseISO } from 'date-fns';
+import { formatDate } from '@/core/i18n';
 
 export class ApiTrainerScheduleRepository {
   static async getSchedule(startDate: string, endDate: string): Promise<TrainerScheduleData> {
@@ -11,7 +12,7 @@ export class ApiTrainerScheduleRepository {
     const data = response.data;
 
     return {
-      dateRange: `${format(parseISO(data.start_date), 'MMMM d')} - ${format(parseISO(data.end_date), 'd, yyyy')}`,
+      dateRange: `${formatDate(parseISO(data.start_date), 'MMMM d')} - ${formatDate(parseISO(data.end_date), 'd, yyyy')}`,
       totalSessions: data.total_sessions,
       stats: {
         thisWeek: data.total_sessions,
@@ -19,13 +20,13 @@ export class ApiTrainerScheduleRepository {
         openSlots: 0, // Explicitly left undefined/zero per business rule
       },
       weekSchedule: (data.days || []).map((day: any) => ({
-        day: format(parseISO(day.date), 'EEE'),
-        dayName: format(parseISO(day.date), 'EEEE'),
+        day: formatDate(parseISO(day.date), 'EEE'),
+        dayName: formatDate(parseISO(day.date), 'EEEE'),
         isToday: isToday(parseISO(day.date)),
-        date: parseInt(format(parseISO(day.date), 'd'), 10),
+        date: parseInt(formatDate(parseISO(day.date), 'd'), 10),
         sessions: (day.sessions || []).map((session: any) => ({
           id: session.id,
-          time: format(parseISO(`1970-01-01T${session.start_time}`), 'hh:mm a'),
+          time: formatDate(parseISO(`1970-01-01T${session.start_time}`), 'p'),
           member: session.name || session.member_name || 'Class',
           type: session.type?.toUpperCase() || 'CLASS',
           duration: `${session.duration_minutes || 60} min`,

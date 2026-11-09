@@ -6,6 +6,7 @@ import { StorageKeys } from '@/core/platform/storage/storageKeys';
 
 import { ApiError, type ApiErrorBody } from '@/core/platform/api/types';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { i18n } from '@/core/i18n';
 
 /**
  * Shared API client for the mobile app.
@@ -83,7 +84,11 @@ apiClient.interceptors.response.use(
     const rawBody: unknown = body;
     const textBody = typeof rawBody === 'string' && rawBody.trim() ? rawBody : undefined;
     const message =
-      textBody ?? body?.message ?? body?.error ?? error.message ?? 'An unexpected error occurred';
+      textBody ??
+      body?.message ??
+      body?.error ??
+      error.message ??
+      i18n.t('common.unexpectedError', { defaultValue: 'An unexpected error occurred' });
 
     // Suppress toasts for pure network failures (no response received — device
     // is offline, timed out, or the server is unreachable). The NetworkGuard

@@ -54,6 +54,7 @@ const profile = {
     validationTitle: 'Validation Error',
     updated: 'Profile updated successfully.',
     updateFailed: 'Failed to update profile.',
+    fetchFailed: 'Failed to fetch profile.',
     nameEmailRequired: 'Name and email are required.',
     nameRequired: 'Name is required.',
     emailRequired: 'Email is required.',
@@ -116,6 +117,9 @@ const profile = {
     label: 'Address',
     useCurrentLocation: 'Use current location',
     searchPlaceholder: 'Search for your address',
+    permissionDenied: 'Location permission was denied.',
+    couldNotResolve: 'Could not resolve address from coordinates.',
+    fetchFailed: 'An error occurred while fetching location.',
   },
 
   transactions: {

@@ -56,6 +56,7 @@ const profile = {
     validationTitle: 'Erreur de saisie',
     updated: 'Profil mis à jour.',
     updateFailed: 'Impossible de mettre à jour le profil.',
+    fetchFailed: 'Échec du chargement du profil.',
     nameEmailRequired: 'Le nom et l’e-mail sont obligatoires.',
     nameRequired: 'Le nom est requis',
     emailRequired: 'L’e-mail est requis',
@@ -118,6 +119,9 @@ const profile = {
     label: 'Adresse',
     useCurrentLocation: 'Utiliser ma position actuelle',
     searchPlaceholder: 'Rechercher votre adresse',
+    permissionDenied: "L'autorisation d'accès à la localisation a été refusée.",
+    couldNotResolve: "Impossible de déterminer l'adresse à partir des coordonnées.",
+    fetchFailed: 'Une erreur est survenue lors de la récupération de la localisation.',
   },
 
   transactions: {

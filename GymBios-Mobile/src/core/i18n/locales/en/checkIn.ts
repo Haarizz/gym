@@ -145,6 +145,13 @@ const checkIn = {
       expired: 'Expired',
       frozen: 'Frozen',
     },
+    methods: {
+      manual: 'Manual',
+      qr: 'QR Code',
+      biometric: 'Biometric',
+      rfid: 'RFID',
+      app: 'Mobile App',
+    },
   },
 };
 

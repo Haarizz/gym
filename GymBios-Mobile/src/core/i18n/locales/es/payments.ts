@@ -81,6 +81,8 @@ const payments = {
     retryPayment: 'Reintentar pago',
     pay: 'Pagar <amount/>',
     sheetSubtitle: 'Paga tu saldo pendiente de {{amount}}',
+    paymentNotStarted: 'No se pudo iniciar el pago',
+    mobileOnly: 'Los pagos en línea están disponibles en la aplicación móvil',
   },
 } satisfies LocaleResource;
 

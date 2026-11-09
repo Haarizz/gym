@@ -43,7 +43,7 @@ export function ModuleSubmoduleView({
           hitSlop={8}
           style={styles.closeButton}
           accessibilityRole="button"
-          accessibilityLabel="Close modules"
+          accessibilityLabel={t('shared.modules.closeModules', { defaultValue: 'Close modules' })}
         >
           <Feather name="x" size={24} color={BrandColors.textPrimary} />
         </Pressable>

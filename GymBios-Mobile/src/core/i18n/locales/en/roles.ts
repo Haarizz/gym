@@ -36,7 +36,42 @@ const roles = {
     "saving": "Saving...",
     "save": "Save",
     "failedDuplicate": "Failed to duplicate role.",
-    "unableDelete": "Unable to delete role."
+    "unableDelete": "Unable to delete role.",
+    "actions": {
+      "view": "View",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "export": "Export",
+      "approve": "Approve"
+    },
+    "errors": {
+      "roleNameRequired": "Role name is required",
+      "failedLoadRole": "Failed to load role data.",
+      "failedCreateRole": "Failed to create role.",
+      "failedUpdateRole": "Failed to update role."
+    },
+    "modules": {
+      "dashboard": "Dashboard",
+      "members": "Members",
+      "memberConnect": "Member Connect",
+      "community": "Community",
+      "attendance": "Attendance",
+      "billing": "Billing",
+      "payments": "Payments",
+      "membershipPlans": "Subscriptions",
+      "trainers": "Trainers",
+      "staff": "Staff",
+      "payroll": "Payroll",
+      "reports": "Reports",
+      "assets": "Assets",
+      "salesPurchases": "Sales Purchases",
+      "financials": "Financials",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "Settings",
+      "administration": "Administration"
+    }
   }
 };
 

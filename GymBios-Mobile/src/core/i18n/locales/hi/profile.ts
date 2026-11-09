@@ -56,6 +56,7 @@ const profile = {
     validationTitle: 'सत्यापन त्रुटि',
     updated: 'प्रोफ़ाइल सफलतापूर्वक अपडेट हुई।',
     updateFailed: 'प्रोफ़ाइल अपडेट नहीं हो सकी।',
+    fetchFailed: 'प्रोफ़ाइल लोड करने में विफल।',
     nameEmailRequired: 'नाम और ईमेल आवश्यक हैं।',
     nameRequired: 'नाम आवश्यक है',
     emailRequired: 'ईमेल आवश्यक है',
@@ -118,6 +119,9 @@ const profile = {
     label: 'पता',
     useCurrentLocation: 'वर्तमान स्थान इस्तेमाल करें',
     searchPlaceholder: 'अपना पता खोजें',
+    permissionDenied: 'स्थान की अनुमति अस्वीकृत कर दी गई।',
+    couldNotResolve: 'निर्देशांक से पता प्राप्त नहीं किया जा सका।',
+    fetchFailed: 'स्थान प्राप्त करते समय त्रुटि हुई।',
   },
 
   transactions: {

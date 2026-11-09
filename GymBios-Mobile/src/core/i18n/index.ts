@@ -9,4 +9,13 @@ export {
   type LanguageCode,
 } from './languages';
 export { useLanguageStore, isRTL } from './languageStore';
-export { formatClockTime, formatDate, formatTimeAgo, getDateLocale, getIntlLocale, tOr } from './format';
+export {
+  formatClockTime,
+  formatDate,
+  formatTimeAgo,
+  getDateLocale,
+  getIntlLocale,
+  localizeOptions,
+  tOr,
+  translateValue,
+} from './format';

@@ -223,7 +223,7 @@ export class ApiMemberDashboardRepository implements MemberDashboardRepository {
     const rawSchedule = data.todaysSchedule || data.todays_schedule || [];
 
     const memberInfo = {
-      name: data.identity?.name || 'Member',
+      name: data.identity?.name || '',
 
       role: membership?.membershipType || membership?.membership_type
         ? `${membership?.membershipType || membership?.membership_type} Member`

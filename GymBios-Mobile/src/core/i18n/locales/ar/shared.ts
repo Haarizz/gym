@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'الخطوة {{current}} من {{total}}',
       saveChanges: 'حفظ التغييرات',
       createStaff: 'إنشاء موظف',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: 'تعذر تحميل المخطط',
       loadFailed: 'فشل تحميل بيانات المخطط',
       retry: 'إعادة المحاولة',
+      categoryN: 'الفئة {{n}}',
+      barChartA11y: 'مخطط شريطي بياني',
+      horizontalBarChartA11y: 'مخطط شريطي أفقي بياني',
+      lineChartA11y: 'مخطط خطي بياني',
+      pieChartA11y: 'مخطط دائري بياني',
+      donutChartA11y: 'مخطط حلقي بياني',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "الرواتب والموظفون",
       "roles-permissions": "الأدوار والصلاحيات",
       "gymos": "GymOS",
-      "facilities": "المرافق"
+      "facilities": "المرافق",
+      "closeModules": "إغلاق الوحدات",
+      "openModules": "فتح الوحدات"
     },
     "branchPicker": {
       "title": "اختر الفرع",

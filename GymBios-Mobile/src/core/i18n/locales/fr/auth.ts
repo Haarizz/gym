@@ -102,6 +102,15 @@ const auth = {
       roleAccessDenied: 'Accès refusé. Votre rôle ne permet pas d’accéder à la section {{role}}.',
       customRoleNoAdmin: 'Accès refusé. Votre rôle personnalisé ne dispose pas des privilèges d’administrateur.',
       notRegisteredStaff: 'Accès refusé. Vous n’êtes pas enregistré comme membre du personnel.',
+      unableToSignIn: 'Impossible de vous connecter. Veuillez réessayer.',
+      unableToVerifySession: 'Impossible de vérifier la session',
+      unableToRegister: 'Impossible de vous inscrire. Veuillez réessayer.',
+      unableToVerifyCode: 'Impossible de vérifier le code. Veuillez réessayer.',
+      unableToResendCode: 'Impossible de renvoyer le code. Veuillez réessayer.',
+      unableToCheckRegStatus: "Impossible de vérifier le statut de l'inscription.",
+      unableToFinishAccount: 'Impossible de terminer la création de votre compte. Veuillez réessayer.',
+      unableToLinkAccount: 'Impossible de lier ce compte. Veuillez réessayer.',
+      invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     },
 
     roleSelection: {

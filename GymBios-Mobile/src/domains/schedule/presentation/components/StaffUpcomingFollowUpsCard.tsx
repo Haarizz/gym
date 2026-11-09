@@ -3,6 +3,7 @@ import { Text } from '@/shared/components/AppText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTranslation } from 'react-i18next';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { translateValue } from '@/core/i18n';
 import type { UpcomingFollowUp } from '../../domain/StaffScheduleData';
 
 interface StaffUpcomingFollowUpsCardProps {
@@ -25,6 +26,15 @@ export function StaffUpcomingFollowUpsCard({
     }
   };
 
+  const formatType = (rawType: string) => {
+    const norm = (rawType || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (norm === 'followup') return t('schedule.staff.types.followUp');
+    if (norm === 'meeting') return t('schedule.staff.types.meeting');
+    if (norm === 'tour') return t('schedule.staff.types.tour');
+    if (norm === 'class') return t('schedule.staff.types.class');
+    return translateValue('channel', rawType) || rawType;
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{t('schedule.staff.upcomingFollowUps')}</Text>
@@ -41,7 +51,7 @@ export function StaffUpcomingFollowUpsCard({
 
               <View style={styles.itemInfo}>
                 <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.type}>{item.type}</Text>
+                <Text style={styles.type}>{formatType(item.type)}</Text>
                 <View style={styles.timeRow}>
                   <Feather name="clock" size={11} color="#64748B" />
                   <Text style={styles.timeText}>{item.time}</Text>

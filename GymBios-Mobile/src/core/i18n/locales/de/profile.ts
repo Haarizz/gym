@@ -56,6 +56,7 @@ const profile = {
     validationTitle: 'Eingabefehler',
     updated: 'Profil erfolgreich aktualisiert.',
     updateFailed: 'Profil konnte nicht aktualisiert werden.',
+    fetchFailed: 'Profil konnte nicht geladen werden.',
     nameEmailRequired: 'Name und E-Mail sind erforderlich.',
     nameRequired: 'Name ist erforderlich',
     emailRequired: 'E-Mail ist erforderlich',
@@ -118,6 +119,9 @@ const profile = {
     label: 'Adresse',
     useCurrentLocation: 'Aktuellen Standort verwenden',
     searchPlaceholder: 'Nach deiner Adresse suchen',
+    permissionDenied: 'Standorterlaubnis wurde verweigert.',
+    couldNotResolve: 'Adresse konnte nicht aus den Koordinaten ermittelt werden.',
+    fetchFailed: 'Beim Abrufen des Standorts ist ein Fehler aufgetreten.',
   },
 
   transactions: {

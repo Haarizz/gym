@@ -918,7 +918,7 @@ export function SetTargets({ onNavigate }: SetTargetsProps) {
                       </div>
                       <div className={s.grid2}>
                         {m.hasCount && (
-                          <Field label={`Number of ${m.unit}s`}>
+                          <Field label={`Number of ${m.unit.endsWith("s") ? `${m.unit}es` : `${m.unit}s`}`}>
                             <Input type="number" min={0} className="h-9" placeholder="No goal" value={targetForm.goals[goalKey(m.code, "count")] ?? ""}
                               onChange={e => setTargetForm(f => f && ({ ...f, goals: { ...f.goals, [goalKey(m.code, "count")]: e.target.value } }))} />
                           </Field>

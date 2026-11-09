@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'Schritt {{current}} von {{total}}',
       saveChanges: 'Änderungen speichern',
       createStaff: 'Mitarbeiter erstellen',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: 'Diagramm konnte nicht geladen werden',
       loadFailed: 'Fehler beim Laden der Diagrammdaten',
       retry: 'Wiederholen',
+      categoryN: 'Kategorie {{n}}',
+      barChartA11y: 'Balkendiagramm-Visualisierung',
+      horizontalBarChartA11y: 'Horizontale Balkendiagramm-Visualisierung',
+      lineChartA11y: 'Liniendiagramm-Visualisierung',
+      pieChartA11y: 'Kreisdiagramm-Visualisierung',
+      donutChartA11y: 'Donut-Diagramm-Visualisierung',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "Gehalt & Mitarbeiter",
       "roles-permissions": "Rollen & Berechtigungen",
       "gymos": "GymOS",
-      "facilities": "Einrichtungen"
+      "facilities": "Einrichtungen",
+      "closeModules": "Module schließen",
+      "openModules": "Module öffnen"
     },
     "branchPicker": {
       "title": "Filiale wählen",

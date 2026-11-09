@@ -204,7 +204,7 @@ export function ScheduleCard({ schedule }: { schedule: Record<string, string[]> 
                     return (
                       <View key={slot} style={styles.slotChip}>
                         <Typography variant="caption" style={styles.slotName}>
-                          {name}
+                          {t(`schedule.slots.${name.trim().toLowerCase()}` as any, { defaultValue: name })}
                         </Typography>
                         {time ? (
                           <Typography variant="caption" color="textSecondary" style={styles.slotTime}>

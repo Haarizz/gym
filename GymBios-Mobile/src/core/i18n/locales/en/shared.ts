@@ -57,6 +57,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'Step {{current}} of {{total}}',
       saveChanges: 'Save Changes',
       createStaff: 'Create Staff',
     },
@@ -74,6 +75,12 @@ const shared = {
       unableToLoad: 'Unable to Load Chart',
       loadFailed: 'Failed to load chart data',
       retry: 'Retry',
+      categoryN: 'Category {{n}}',
+      barChartA11y: 'Bar chart visualization',
+      horizontalBarChartA11y: 'Horizontal bar chart visualization',
+      lineChartA11y: 'Line chart visualization',
+      pieChartA11y: 'Pie chart visualization',
+      donutChartA11y: 'Donut chart visualization',
     },
 
     noInternet: {
@@ -134,7 +141,9 @@ const shared = {
       "payroll-employees": "Payroll & Employees",
       "roles-permissions": "Roles & Permissions",
       "gymos": "GymOS",
-      "facilities": "Facilities"
+      "facilities": "Facilities",
+      "closeModules": "Close modules",
+      "openModules": "Open Modules"
     },
     "branchPicker": {
       "title": "Select Branch",

@@ -36,7 +36,42 @@ const roles = {
     "saving": "保存中...",
     "save": "保存",
     "failedDuplicate": "复制角色失败。",
-    "unableDelete": "无法删除角色。"
+    "unableDelete": "无法删除角色。",
+    "actions": {
+      "view": "查看",
+      "create": "创建",
+      "edit": "编辑",
+      "delete": "删除",
+      "export": "导出",
+      "approve": "批准"
+    },
+    "errors": {
+      "roleNameRequired": "角色名称为必填项",
+      "failedLoadRole": "加载角色数据失败。",
+      "failedCreateRole": "创建角色失败。",
+      "failedUpdateRole": "更新角色失败。"
+    },
+    "modules": {
+      "dashboard": "仪表板",
+      "members": "会员",
+      "memberConnect": "会员联系",
+      "community": "社区",
+      "attendance": "考勤",
+      "billing": "账单",
+      "payments": "付款",
+      "membershipPlans": "会员方案",
+      "trainers": "教练",
+      "staff": "员工",
+      "payroll": "薪资",
+      "reports": "报表",
+      "assets": "资产",
+      "salesPurchases": "销售与采购",
+      "financials": "财务",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "设置",
+      "administration": "管理后台"
+    }
   }
 };
 

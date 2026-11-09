@@ -7,6 +7,7 @@ import { Avatar } from '@/shared/components/Avatar';
 import { Radius, Spacing } from '@/core/theme';
 import { getCheckInEligibility } from '../../../domain/membershipEligibility';
 import { useCheckInTheme } from '../../hooks/useCheckInTheme';
+import { translateValue } from '@/core/i18n';
 
 export interface StaffCheckInCardProps {
   person: any; // Can be a member or staff
@@ -21,7 +22,12 @@ export function StaffCheckInCard({ person, onCheckIn, onCheckOut, isActive }: St
   const name = person.name || t('checkIn.members.unknownMember');
   // Fallbacks across Member and Staff domains
   const id = person.bizId || person.memberNumber || person.id;
-  const role = person.membershipType || person.role || person.department || 'User';
+  const rawRole = person.membershipType || person.role || person.department || 'User';
+  const role =
+    translateValue('membershipType', person.membershipType) ||
+    translateValue('role', person.role) ||
+    translateValue('department', person.department) ||
+    (rawRole === 'User' ? t('common.user') : rawRole);
   const avatarUrl = person.photoUrl;
   
   const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();

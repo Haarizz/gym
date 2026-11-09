@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'Étape {{current}} sur {{total}}',
       saveChanges: 'Enregistrer les modifications',
       createStaff: 'Créer un employé',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: 'Impossible de charger le graphique',
       loadFailed: 'Échec du chargement des données du graphique',
       retry: 'Réessayer',
+      categoryN: 'Catégorie {{n}}',
+      barChartA11y: 'Visualisation de graphique à barres',
+      horizontalBarChartA11y: 'Visualisation de graphique à barres horizontales',
+      lineChartA11y: 'Visualisation de graphique en courbes',
+      pieChartA11y: 'Visualisation de graphique à secteurs',
+      donutChartA11y: 'Visualisation de graphique en anneau',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "Paie et employés",
       "roles-permissions": "Rôles et autorisations",
       "gymos": "GymOS",
-      "facilities": "Installations"
+      "facilities": "Installations",
+      "closeModules": "Fermer les modules",
+      "openModules": "Ouvrir les modules"
     },
     "branchPicker": {
       "title": "Choisir l'agence",

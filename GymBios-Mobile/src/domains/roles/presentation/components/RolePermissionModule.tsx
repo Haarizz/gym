@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Typography } from '@/shared/components/Typography';
 import { Spacing, Radius, BrandColors } from '@/core/theme';
-import { PERMISSION_ACTIONS, moduleLabel } from '../constants/modules';
+import { PERMISSION_ACTIONS, moduleLabel, getLocalizedModuleName, getLocalizedActionName } from '../constants/modules';
 
 interface RolePermissionModuleProps {
   moduleName: string;
@@ -42,7 +42,7 @@ export function RolePermissionModule({
         activeOpacity={0.7}
       >
         <Typography variant="body" style={styles.moduleName}>
-          {moduleLabel(moduleName)}
+          {getLocalizedModuleName(moduleName, t)}
         </Typography>
         
         <View style={[styles.badge, hasSelection && styles.badgeActive]}>
@@ -81,7 +81,7 @@ export function RolePermissionModule({
                 <View style={styles.permissionLabel}>
                   <View style={styles.dot} />
                   <Typography variant="bodySmall" style={{ fontWeight: '500' }}>
-                    {action}
+                    {getLocalizedActionName(action, t)}
                   </Typography>
                 </View>
                 <Switch

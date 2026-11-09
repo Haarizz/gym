@@ -13,7 +13,7 @@ import { useCurrency } from '@/core/providers';
 import { useMessagingAnalytics, useMessagingHistory } from '../../hooks/useMessagingHooks';
 import { MESSAGING_CHANNELS, getChannel } from '../channels';
 import { MessagingColors } from '../theme';
-import { getIntlLocale } from '@/core/i18n/format';
+import { getIntlLocale, translateValue } from '@/core/i18n';
 
 const formatPct = (value: number) => `${(Number.isFinite(value) ? value : 0).toFixed(1)}%`;
 
@@ -158,7 +158,7 @@ export function MessagingAnalyticsScreen() {
                     <Feather name={channel.icon} size={15} color={channel.color} />
                   </View>
                   <View style={styles.channelMeta}>
-                    <Text style={styles.channelName}>{channel.label}</Text>
+                    <Text style={styles.channelName}>{translateValue('channel', channel.id === 'in-app' ? 'push' : channel.id, channel.label)}</Text>
                     <Text style={styles.channelSub}>
                       {t('messaging.analytics.sentAndRecipients', { count, recipients })}
                     </Text>

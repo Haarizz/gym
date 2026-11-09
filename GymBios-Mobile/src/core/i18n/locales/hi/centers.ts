@@ -104,6 +104,8 @@ const centers = {
       noTrainers: 'इस केंद्र के लिए अभी कोई ट्रेनर सूचीबद्ध नहीं है।',
       paymentOptions: 'भुगतान विकल्प',
       viaProvider: ' {{provider}} के ज़रिए',
+      accepted: 'स्वीकृत',
+      notAvailable: 'उपलब्ध नहीं',
       terms: 'नियम और नीतियाँ',
       noTerms: 'इस केंद्र ने अभी तक कोई नियम या नीति सूचीबद्ध नहीं की है।',
       termsSheetTitle: 'नियम और शर्तें',
@@ -126,6 +128,7 @@ const centers = {
       subscribeA11y: '{{name}} की सदस्यता लें',
       viewDetails: 'विवरण देखें',
       viewDetailsA11y: '{{name}} का विवरण देखें',
+      limitedOffer: 'सीमित प्रस्ताव',
     },
 
     planDetail: {

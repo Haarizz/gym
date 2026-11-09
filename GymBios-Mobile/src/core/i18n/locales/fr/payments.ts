@@ -81,6 +81,8 @@ const payments = {
     retryPayment: 'Réessayer le paiement',
     pay: 'Payer <amount/>',
     sheetSubtitle: 'Réglez votre solde restant de {{amount}}',
+    paymentNotStarted: 'Le paiement n’a pas pu être lancé',
+    mobileOnly: 'Les paiements en ligne sont disponibles dans l’application mobile',
   },
 } satisfies LocaleResource;
 

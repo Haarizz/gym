@@ -241,7 +241,7 @@ function AdvanceRow({
             <View style={styles.planLine}>
               <Text style={styles.planLabel}>{t('ledger.advances.plan')}</Text>
               <Text style={styles.planValue}>
-                {advance.installmentCount} × <CurrencyValue amount={advance.installmentAmount} />
+                {advance.installmentCount}{' \u00D7 '}<CurrencyValue amount={advance.installmentAmount} />
                 {advance.startMonth ? ` · ${fmt(advance.startMonth, 'MMM yyyy')}` : ''}
               </Text>
             </View>

@@ -102,6 +102,15 @@ const auth = {
       roleAccessDenied: 'Acceso denegado. Tu rol no puede acceder a la sección {{role}}.',
       customRoleNoAdmin: 'Acceso denegado. Tu rol personalizado no tiene privilegios de administrador.',
       notRegisteredStaff: 'Acceso denegado. No estás registrado como miembro del personal.',
+      unableToSignIn: 'No se pudo iniciar sesión. Vuelva a intentarlo.',
+      unableToVerifySession: 'No se pudo verificar la sesión',
+      unableToRegister: 'No se pudo registrar. Vuelva a intentarlo.',
+      unableToVerifyCode: 'No se pudo verificar el código. Vuelva a intentarlo.',
+      unableToResendCode: 'No se pudo reenviar el código. Vuelva a intentarlo.',
+      unableToCheckRegStatus: 'No se pudo verificar el estado del registro.',
+      unableToFinishAccount: 'No se pudo completar la creación de su cuenta. Vuelva a intentarlo.',
+      unableToLinkAccount: 'No se pudo vincular esta cuenta. Vuelva a intentarlo.',
+      invalidCredentials: 'Nombre de usuario o contraseña no válidos',
     },
 
     roleSelection: {

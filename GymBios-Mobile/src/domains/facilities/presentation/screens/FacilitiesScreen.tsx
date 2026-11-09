@@ -51,8 +51,8 @@ export function FacilitiesScreen() {
 
   const handleDelete = (facility: Facility) => {
     Alert.alert(
-      t('facilities.deleteFacility', 'Delete Facility'),
-      `Are you sure you want to delete ${facility.name}?`,
+      t('facilities.deleteFacility'),
+      t('facilities.deleteFacilityConfirm', { name: facility.name }),
       [
         { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         { 

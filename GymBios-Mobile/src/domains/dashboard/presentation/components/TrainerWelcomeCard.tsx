@@ -13,7 +13,10 @@ interface TrainerWelcomeCardProps {
 
 export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
   const { t } = useTranslation();
-  const firstName = trainerInfo.name.split(' ')[0] || trainerInfo.name;
+  const firstName =
+    !trainerInfo.name || trainerInfo.name === 'Trainer'
+      ? t('common.trainer')
+      : trainerInfo.name.split(' ')[0] || trainerInfo.name;
   const greeting = getGreeting(t);
   const hasRating = trainerInfo.rating != null && trainerInfo.ratingCount > 0;
 
@@ -27,7 +30,9 @@ export function TrainerWelcomeCard({ trainerInfo }: TrainerWelcomeCardProps) {
       <Text style={styles.greeting}>
         {t('dashboard.trainer.welcomeGreeting', { greeting, name: firstName })}
       </Text>
-      <Text style={styles.specialization}>{trainerInfo.specialization}</Text>
+      <Text style={styles.specialization}>
+        {trainerInfo.specialization === 'General' ? t('common.general') : trainerInfo.specialization}
+      </Text>
       <View style={styles.ratingRow}>
         <Feather name="star" size={14} color="#FFFFFF" />
         {hasRating ? (

@@ -6,6 +6,7 @@ import { StorageKeys } from '@/core/platform/storage/storageKeys';
 
 import { ApiError, type ApiErrorBody } from './types';
 import { toast } from '@/shared/components/Toasts/toastStore';
+import { i18n } from '@/core/i18n';
 
 export const httpClient = axios.create({
   baseURL: env.apiBaseUrl,
@@ -29,7 +30,10 @@ httpClient.interceptors.response.use(
   (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status ?? 0;
     const body = error.response?.data;
-    const message = body?.message ?? error.message ?? 'An unexpected error occurred';
+    const message =
+      body?.message ??
+      error.message ??
+      i18n.t('common.unexpectedError', { defaultValue: 'An unexpected error occurred' });
 
     if (!error.config?.skipGlobalErrorToast) {
       toast.error(message);

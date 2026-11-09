@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/shared/components/AppText';
 import { format, isToday, parse } from 'date-fns';
+import { formatDate } from '@/core/i18n';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
 import { Loader } from '@/shared/components';
 import { useRouter } from 'expo-router';
@@ -118,9 +119,9 @@ export function StaffScheduleScreen() {
       return {
         id: `class-${cls.id}`,
         time: formattedTime,
-        type: 'Class',
-        name: cls.name || 'Class',
-        action: cls.trainerName || cls.type || 'Scheduled Class',
+        type: t('schedule.staff.types.class'),
+        name: cls.name || t('schedule.staff.types.class'),
+        action: cls.trainerName || cls.type || t('schedule.staff.types.class'),
         priority: 'medium' as const,
         completed: cls.status === 'completed',
       };
@@ -171,7 +172,7 @@ export function StaffScheduleScreen() {
     >
       <StaffScheduleHeaderCard
         title={viewingToday ? t('schedule.todaySchedule') : t('schedule.title')}
-        dateText={format(selectedDate, 'EEEE, MMMM d, yyyy')}
+        dateText={formatDate(selectedDate, 'EEEE, MMMM d, yyyy')}
         tasksCount={combinedTasks.length}
         urgentCount={combinedTasks.filter((t) => t.priority === 'high').length}
         onCalendarPress={() => setDatePickerOpen(true)}

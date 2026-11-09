@@ -102,6 +102,15 @@ const auth = {
       roleAccessDenied: 'تم رفض الوصول. دورك لا يسمح بالوصول إلى قسم {{role}}.',
       customRoleNoAdmin: 'تم رفض الوصول. دورك المخصص لا يملك صلاحيات المسؤول.',
       notRegisteredStaff: 'تم رفض الوصول. أنت غير مسجل كموظف.',
+      unableToSignIn: 'تعذر تسجيل الدخول. يرجى المحاولة مرة أخرى.',
+      unableToVerifySession: 'تعذر التحقق من الجلسة',
+      unableToRegister: 'تعذر التسجيل. يرجى المحاولة مرة أخرى.',
+      unableToVerifyCode: 'تعذر التحقق من الرمز. يرجى المحاولة مرة أخرى.',
+      unableToResendCode: 'تعذر إعادة إرسال الرمز. يرجى المحاولة مرة أخرى.',
+      unableToCheckRegStatus: 'تعذر التحقق من حالة التسجيل.',
+      unableToFinishAccount: 'تعذر إكمال إنشاء حسابك. يرجى المحاولة مرة أخرى.',
+      unableToLinkAccount: 'تعذر ربط هذا الحساب. يرجى المحاولة مرة أخرى.',
+      invalidCredentials: 'اسم المستخدم أو كلمة المرور غير صحيحة',
     },
 
     roleSelection: {

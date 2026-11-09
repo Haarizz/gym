@@ -56,6 +56,7 @@ const profile = {
     validationTitle: '校验错误',
     updated: '个人资料已更新。',
     updateFailed: '更新个人资料失败。',
+    fetchFailed: '获取个人资料失败。',
     nameEmailRequired: '姓名和邮箱均为必填项。',
     nameRequired: '请输入姓名',
     emailRequired: '请输入邮箱',
@@ -118,6 +119,9 @@ const profile = {
     label: '地址',
     useCurrentLocation: '使用当前位置',
     searchPlaceholder: '搜索你的详细地址',
+    permissionDenied: '位置权限已被拒绝。',
+    couldNotResolve: '无法从坐标解析地址。',
+    fetchFailed: '获取位置时发生错误。',
   },
 
   transactions: {

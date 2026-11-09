@@ -62,6 +62,7 @@ const dashboard = {
         priorityHigh: 'عالية',
         priorityMed: 'متوسطة',
         lastContact: 'آخر تواصل: {{contact}}',
+        neverContacted: 'أبداً',
         callNow: 'اتصل الآن',
         callA11y: 'الاتصال بـ {{name}}',
       },

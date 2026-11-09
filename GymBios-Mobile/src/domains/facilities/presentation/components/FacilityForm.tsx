@@ -17,6 +17,12 @@ interface FacilityFormProps {
 }
 
 const RATE_TYPES = ['Per Hour', 'Per Half Day', 'Per Full Day', 'Per Month'];
+const RATE_TYPE_KEYS: Record<string, string> = {
+  'Per Hour': 'facilities.rateTypes.perHour',
+  'Per Half Day': 'facilities.rateTypes.perHalfDay',
+  'Per Full Day': 'facilities.rateTypes.perFullDay',
+  'Per Month': 'facilities.rateTypes.perMonth',
+};
 
 export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFormProps) {
   const { t } = useTranslation();
@@ -59,9 +65,9 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Name is required';
+    if (!name.trim()) newErrors.name = t('facilities.nameRequired');
     if (occupancyLimit && isNaN(Number(occupancyLimit))) {
-      newErrors.occupancyLimit = 'Must be a number';
+      newErrors.occupancyLimit = t('facilities.mustBeNumber');
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -158,7 +164,7 @@ export function FacilityForm({ initialData, onSubmit, isSubmitting }: FacilityFo
                   size={20} 
                   color={isEnabled ? BrandColors.teal : BrandColors.textSecondary} 
                 />
-                <Typography variant="body">{type}</Typography>
+                <Typography variant="body">{t((RATE_TYPE_KEYS[type] ?? type) as any)}</Typography>
               </TouchableOpacity>
               
               {isEnabled && (

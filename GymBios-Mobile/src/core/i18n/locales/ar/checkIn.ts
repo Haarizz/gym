@@ -145,6 +145,13 @@ const checkIn = {
       expired: 'منتهي الصلاحية',
       frozen: 'مجمد',
     },
+    methods: {
+      manual: 'يدوي',
+      qr: 'رمز الاستجابة السريعة',
+      biometric: 'القياس الحيوي',
+      rfid: 'RFID',
+      app: 'تطبيق الهاتف',
+    },
   },
 };
 

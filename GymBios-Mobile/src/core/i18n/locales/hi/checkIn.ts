@@ -145,6 +145,13 @@ const checkIn = {
       expired: 'समाप्त हो चुकी',
       frozen: 'स्थगित',
     },
+    methods: {
+      manual: 'मैन्युअल',
+      qr: 'क्यूआर कोड',
+      biometric: 'बायोमेट्रिक',
+      rfid: 'आरएफ़आईडी',
+      app: 'मोबाइल ऐप',
+    },
   },
 };
 

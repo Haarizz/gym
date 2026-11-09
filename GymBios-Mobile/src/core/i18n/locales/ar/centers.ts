@@ -104,6 +104,8 @@ const centers = {
       noTrainers: 'لا يوجد مدرّبون مدرجون لهذا المركز بعد.',
       paymentOptions: 'خيارات الدفع',
       viaProvider: ' عبر {{provider}}',
+      accepted: 'مقبول',
+      notAvailable: 'غير متوفر',
       terms: 'الشروط والسياسات',
       noTerms: 'لم يُدرج هذا المركز أي شروط أو سياسات بعد.',
       termsSheetTitle: 'الشروط والأحكام',
@@ -126,6 +128,7 @@ const centers = {
       subscribeA11y: 'الاشتراك في {{name}}',
       viewDetails: 'عرض التفاصيل',
       viewDetailsA11y: 'عرض تفاصيل {{name}}',
+      limitedOffer: 'عرض محدود',
     },
 
     planDetail: {

@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: '第 {{current}} 步，共 {{total}} 步',
       saveChanges: '保存修改',
       createStaff: '创建员工',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: '无法加载图表',
       loadFailed: '加载图表数据失败',
       retry: '重试',
+      categoryN: '类别 {{n}}',
+      barChartA11y: '柱状图可视化',
+      horizontalBarChartA11y: '水平柱状图可视化',
+      lineChartA11y: '折线图可视化',
+      pieChartA11y: '饼图可视化',
+      donutChartA11y: '环形图可视化',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "薪资与员工",
       "roles-permissions": "角色与权限",
       "gymos": "GymOS",
-      "facilities": "设施"
+      "facilities": "设施",
+      "closeModules": "关闭模块",
+      "openModules": "打开模块"
     },
     "branchPicker": {
       "title": "选择分店",

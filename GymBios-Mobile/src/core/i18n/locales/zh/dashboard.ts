@@ -58,6 +58,7 @@ const dashboard = {
         priorityHigh: '高',
         priorityMed: '中',
         lastContact: '上次联系：{{contact}}',
+        neverContacted: '从未',
         callNow: '立即拨打',
         callA11y: '拨打电话给 {{name}}',
       },

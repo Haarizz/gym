@@ -36,7 +36,42 @@ const roles = {
     "saving": "جارٍ الحفظ...",
     "save": "حفظ",
     "failedDuplicate": "فشل تكرار الدور.",
-    "unableDelete": "تعذر حذف الدور."
+    "unableDelete": "تعذر حذف الدور.",
+    "actions": {
+      "view": "عرض",
+      "create": "إنشاء",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "export": "تصدير",
+      "approve": "موافقة"
+    },
+    "errors": {
+      "roleNameRequired": "اسم الدور مطلوب",
+      "failedLoadRole": "فشل تحميل بيانات الدور.",
+      "failedCreateRole": "فشل إنشاء الدور.",
+      "failedUpdateRole": "فشل تحديث الدور."
+    },
+    "modules": {
+      "dashboard": "لوحة المعلومات",
+      "members": "الأعضاء",
+      "memberConnect": "تواصل الأعضاء",
+      "community": "المجتمع",
+      "attendance": "الحضور",
+      "billing": "الفواتير",
+      "payments": "المدفوعات",
+      "membershipPlans": "الاشتراكات",
+      "trainers": "المدربون",
+      "staff": "الموظفون",
+      "payroll": "الرواتب",
+      "reports": "التقارير",
+      "assets": "الأصول",
+      "salesPurchases": "المبيعات والمشتريات",
+      "financials": "المالية",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "الإعدادات",
+      "administration": "الإدارة"
+    }
   }
 };
 

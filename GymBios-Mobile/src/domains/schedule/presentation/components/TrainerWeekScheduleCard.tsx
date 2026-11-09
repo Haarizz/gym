@@ -85,6 +85,14 @@ export function TrainerWeekScheduleCard({
     setExpandedIdx(idx === -1 ? null : idx);
   }, [weekSchedule]);
 
+  const formatSessionType = (rawType: string) => {
+    const norm = (rawType || '').toLowerCase();
+    if (norm === 'class') return t('schedule.staff.types.class');
+    if (norm === 'pt' || norm === 'personal_training') return t('schedule.staffClassForm.types.pt');
+    if (norm === 'facility') return t('schedule.sessionForm.types.facility');
+    return rawType;
+  };
+
   const toggleDay = (idx: number) => {
     setExpandedIdx((current) => (current === idx ? null : idx));
   };
@@ -136,9 +144,11 @@ export function TrainerWeekScheduleCard({
                       <Text style={styles.timeText}>{session.time}</Text>
                     </View>
                     <View style={styles.sessionInfo}>
-                      <Text style={styles.memberName}>{session.member}</Text>
+                      <Text style={styles.memberName}>
+                        {session.member === 'Class' ? t('schedule.staff.types.class') : session.member}
+                      </Text>
                       <Text style={styles.sessionMeta}>
-                        {`${session.type} • ${session.duration}`}
+                        {`${formatSessionType(session.type)} • ${session.duration}`}
                       </Text>
                     </View>
                     <Feather

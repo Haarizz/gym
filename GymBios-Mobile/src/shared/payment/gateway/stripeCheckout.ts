@@ -2,6 +2,7 @@ import * as Linking from 'expo-linking';
 import { initPaymentSheet, initStripe, PaymentSheetError, presentPaymentSheet } from '@stripe/stripe-react-native';
 
 import { env } from '@/core/platform/config/env';
+import { i18n } from '@/core/i18n';
 
 import type { OnlineMethodType } from '../types';
 import { paymentGatewayApi } from './paymentGatewayApi';
@@ -88,7 +89,10 @@ export async function payOnline(request: OnlinePaymentRequest, hooks: OnlinePaym
     }
     return { status: 'succeeded', paymentIntentId: intent.paymentIntentId };
   } catch (error: any) {
-    const message = error?.response?.data?.message ?? error?.message ?? 'Payment could not be started';
+    const message =
+      error?.response?.data?.message ??
+      error?.message ??
+      i18n.t('payments.paymentNotStarted', { defaultValue: 'Payment could not be started' });
     return { status: 'failed', message };
   }
 }

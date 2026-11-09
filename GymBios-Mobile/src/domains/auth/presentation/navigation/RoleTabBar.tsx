@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Animated as RNAnimated,
   Easing as RNEasing,
@@ -520,6 +521,7 @@ interface CenterButtonProps {
 }
 
 const CenterButton = memo(function CenterButton({ open, reduceMotion, onPress }: CenterButtonProps) {
+  const { t } = useTranslation();
   const rotation = useSharedValue(open ? 1 : 0);
   const pressScale = useSharedValue(1);
 
@@ -547,7 +549,7 @@ const CenterButton = memo(function CenterButton({ open, reduceMotion, onPress }:
           pressScale.set(reduceMotion ? 1 : withSpring(1, ICON_SPRING));
         }}
         accessibilityRole="button"
-        accessibilityLabel="Open Modules"
+        accessibilityLabel={t('shared.modules.openModules', { defaultValue: 'Open Modules' })}
         accessibilityState={{ expanded: open }}
       >
         <LinearGradient

@@ -78,6 +78,8 @@ const payments = {
     retryPayment: '重试付款',
     pay: '支付 <amount/>',
     sheetSubtitle: '支付剩余余额 {{amount}}',
+    paymentNotStarted: '无法开始付款',
+    mobileOnly: '在线支付仅在移动应用中可用',
   },
 } satisfies LocaleResource;
 

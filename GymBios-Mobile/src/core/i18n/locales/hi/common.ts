@@ -2,6 +2,7 @@ import type { LocaleResource } from '../en';
 
 const common = {
   common: {
+    close: 'बंद करें',
     continue: 'जारी रखें',
     save: 'सहेजें',
     optional: '(वैकल्पिक)',
@@ -34,6 +35,9 @@ const common = {
     "share": "शेयर करें",
     "print": "प्रिंट",
     "exportCsv": "CSV निर्यात करें",
+    "general": "सामान्य",
+    "trainer": "ट्रेनर",
+    "user": "उपयोगकर्ता",
     "comingSoon": "जल्द आ रहा है",
     "tryAgainError": "एक त्रुटि हुई। कृपया फिर से कोशिश करें।",
     "somethingWentWrong": "कुछ गलत हो गया। कृपया फिर से कोशिश करें।",

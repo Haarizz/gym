@@ -268,7 +268,7 @@ export function AttendanceHubScreen({
           <View style={styles.quickStatsGrid}>
             <View style={styles.quickStat}>
               <Typography variant="caption" color="textSecondary">
-                {t('attendance.reports.activeMembers', { defaultValue: 'Active Members' })}
+                {t('attendance.summary.activeMembers')}
               </Typography>
               <Typography variant="bodySmallBold" style={styles.quickStatValue}>
                 {totalActiveMembers}

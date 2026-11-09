@@ -22,7 +22,7 @@ import { useAddLeadInteraction } from '../../hooks/useLeadMutations';
 import { useLead } from '../../hooks/useLeads';
 
 import { toast } from '@/shared/components/Toasts/toastStore';
-import { getIntlLocale } from '@/core/i18n/format';
+import { getIntlLocale, translateValue } from '@/core/i18n';
 
 interface LeadDetailsSheetProps {
   visible: boolean;
@@ -217,7 +217,7 @@ export function LeadDetailsSheet({
                 {t('leads.details.preferredContact')}
               </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.preferredContactMethod || 'Email'}
+                {lead.preferredContactMethod ? translateValue('channel', lead.preferredContactMethod, lead.preferredContactMethod) : t('shared.values.channel.email')}
               </Text>
             </View>
             <View style={styles.gridCol}>
@@ -259,7 +259,7 @@ export function LeadDetailsSheet({
                 {t('leads.details.source')}
               </Text>
               <Text style={[styles.fieldValue, { color: theme.text }]}>
-                {lead.source ? formatSource(lead.source) : 'Website'}
+                {lead.source ? translateValue('channel', lead.source, formatSource(lead.source)) : t('shared.values.channel.website')}
               </Text>
             </View>
             <View style={styles.gridCol}>
@@ -476,7 +476,7 @@ export function LeadDetailsSheet({
                   </Text>
                   <View style={styles.historyMetaRow}>
                     <Text style={[styles.historyStaff, { color: theme.textSecondary }]}>
-                      {t('leads.details.byStaff', { staff: item.staffMember || 'Staff' })}
+                      {t('leads.details.byStaff', { staff: item.staffMember || t('shared.values.role.staff') })}
                     </Text>
                     {!!item.outcome && (
                       <View style={[styles.outcomeBadge, { backgroundColor: theme.muted }]}>

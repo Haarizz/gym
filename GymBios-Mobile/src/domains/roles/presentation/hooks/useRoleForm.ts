@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Role } from '../../domain/Role';
 import type { RoleRequest } from '../../application/RoleRepository';
 
 export function useRoleForm(initialData?: Role | null) {
+  const { t } = useTranslation();
   const [roleName, setRoleName] = useState(initialData?.roleName || '');
   const [description, setDescription] = useState(initialData?.description || '');
   
@@ -45,11 +47,11 @@ export function useRoleForm(initialData?: Role | null) {
   const validate = useCallback(() => {
     const newErrors: { roleName?: string } = {};
     if (!roleName.trim()) {
-      newErrors.roleName = 'Role name is required';
+      newErrors.roleName = t('roles.errors.roleNameRequired');
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [roleName]);
+  }, [roleName, t]);
 
   const getFormData = useCallback((): RoleRequest => {
     return {

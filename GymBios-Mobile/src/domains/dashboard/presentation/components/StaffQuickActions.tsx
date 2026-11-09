@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { BrandColors } from '@/core/theme';
 import { useCanCreateMembers } from '@/domains/members/hooks/useCanCreateMembers';
+import { useCanCheckInMembers } from '@/domains/checkIn/hooks/useCanCheckInMembers';
 import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
 
 interface StaffQuickActionsProps {
@@ -13,6 +14,7 @@ export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsPro
   const { t } = useTranslation();
   const router = useRouter();
   const canCreateMembers = useCanCreateMembers();
+  const canCheckInMembers = useCanCheckInMembers();
 
   const handleAddLead = () => {
     if (onAddLead) {
@@ -32,8 +34,10 @@ export function StaffQuickActions({ onAddLead, onCheckIn }: StaffQuickActionsPro
 
   const actions: QuickAction[] = [
     { label: t('dashboard.staff.quickActions.addNewLead'), icon: 'user-plus', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleAddLead },
-    { label: t('dashboard.staff.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCheckIn },
   ];
+  if (canCheckInMembers) {
+    actions.push({ label: t('dashboard.staff.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCheckIn });
+  }
   if (canCreateMembers) {
     actions.push({
       label: t('dashboard.staff.quickActions.addMember'),

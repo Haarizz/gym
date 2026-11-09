@@ -145,6 +145,13 @@ const checkIn = {
       expired: '已到期',
       frozen: '已停卡',
     },
+    methods: {
+      manual: '手动',
+      qr: '二维码',
+      biometric: '生物识别',
+      rfid: 'RFID',
+      app: '移动应用',
+    },
   },
 };
 

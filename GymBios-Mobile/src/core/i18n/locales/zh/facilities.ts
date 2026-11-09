@@ -41,7 +41,17 @@ const facilities = {
       "active": "启用",
       "inactive": "停用"
     },
-    "id": "ID: {{id}}"
+    "id": "ID: {{id}}",
+    "deleteFacility": "删除设施",
+    "deleteFacilityConfirm": "确定要删除 {{name}} 吗？",
+    "nameRequired": "名称为必填项",
+    "mustBeNumber": "必须为数字",
+    "rateTypes": {
+      "perHour": "每小时",
+      "perHalfDay": "每半天",
+      "perFullDay": "每全天",
+      "perMonth": "每月"
+    }
   }
 };
 

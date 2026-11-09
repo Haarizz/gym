@@ -14,7 +14,7 @@ import { Typography } from '@/shared/components/Typography';
 import { useRoles } from '../../hooks/useRoles';
 import { useRoleActions } from '../../hooks/useRoleActions';
 import { useRoleForm } from '../hooks/useRoleForm';
-import { ROLE_MODULES, moduleLabel } from '../constants/modules';
+import { ROLE_MODULES, moduleLabel, getLocalizedModuleName } from '../constants/modules';
 
 import { RolePermissionSummary } from '../components/RolePermissionSummary';
 import { RolePermissionModule } from '../components/RolePermissionModule';
@@ -35,13 +35,13 @@ export function RoleFormScreen() {
   useEffect(() => {
     if (isEditing && roleId) {
       loadRole(roleId).catch(() => {
-        toast.error('Failed to load role data.', {
-          title: 'Error'
+        toast.error(t('roles.errors.failedLoadRole'), {
+          title: t('common.error'),
         });
         router.back();
       });
     }
-  }, [isEditing, roleId, loadRole, router]);
+  }, [isEditing, roleId, loadRole, router, t]);
 
   // We conditionally render the form to ensure it mounts with loaded data
   if (isEditing && loading && !selectedRole) {
@@ -98,15 +98,20 @@ function RoleFormContent({ initialData, isEditing, roleId, submitting, onSubmitA
     onSubmitAction(roleId || 0, request)
       .then(() => onSuccess())
       .catch((err) => {
-        toast.error(isEditing ? 'Failed to update role.' : 'Failed to create role.', {
-          title: 'Error'
+        toast.error(isEditing ? t('roles.errors.failedUpdateRole') : t('roles.errors.failedCreateRole'), {
+          title: t('common.error'),
         });
       });
   };
 
-  const filteredModules = ROLE_MODULES.filter(m => 
-    moduleLabel(m).toLowerCase().includes(moduleSearch.toLowerCase())
-  );
+  const filteredModules = ROLE_MODULES.filter(m => {
+    const query = moduleSearch.toLowerCase();
+    return (
+      moduleLabel(m).toLowerCase().includes(query) ||
+      getLocalizedModuleName(m, t).toLowerCase().includes(query) ||
+      m.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <View style={styles.container}>

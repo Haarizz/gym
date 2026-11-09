@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as Location from 'expo-location';
+import { i18n } from '@/core/i18n';
 
 interface UseDeviceLocationResult {
   getCurrentLocation: () => Promise<string | null>;
@@ -19,7 +20,7 @@ export function useDeviceLocation(): UseDeviceLocationResult {
       // 1. Request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setError('Location permission was denied.');
+        setError(i18n.t('address.permissionDenied'));
         return null;
       }
 
@@ -48,10 +49,10 @@ export function useDeviceLocation(): UseDeviceLocationResult {
         return parts.join(', ');
       }
 
-      setError('Could not resolve address from coordinates.');
+      setError(i18n.t('address.couldNotResolve'));
       return null;
     } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching location.');
+      setError(err.message || i18n.t('address.fetchFailed'));
       return null;
     } finally {
       setIsFetchingLocation(false);

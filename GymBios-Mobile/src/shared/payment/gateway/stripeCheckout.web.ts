@@ -1,5 +1,6 @@
 // Stripe's React Native SDK has no web build, so online methods are offered as
 // unavailable on web; Cash and Credit still work there.
+import { i18n } from '@/core/i18n';
 import type { OnlineMethodType } from '../types';
 
 export type OnlinePaymentOutcome =
@@ -27,5 +28,8 @@ export function isOnlinePaymentAvailable(): boolean {
 }
 
 export async function payOnline(_request: OnlinePaymentRequest, _hooks: OnlinePaymentHooks): Promise<OnlinePaymentOutcome> {
-  return { status: 'failed', message: 'Online payments are available in the mobile app' };
+  return {
+    status: 'failed',
+    message: i18n.t('payments.mobileOnly', { defaultValue: 'Online payments are available in the mobile app' }),
+  };
 }

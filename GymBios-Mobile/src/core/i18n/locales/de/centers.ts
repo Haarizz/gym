@@ -104,6 +104,8 @@ const centers = {
       noTrainers: 'Für dieses Studio sind noch keine Trainer angegeben.',
       paymentOptions: 'Zahlungsoptionen',
       viaProvider: ' über {{provider}}',
+      accepted: 'Akzeptiert',
+      notAvailable: 'Nicht verfügbar',
       terms: 'Bedingungen & Richtlinien',
       noTerms: 'Dieses Studio hat noch keine Bedingungen oder Richtlinien angegeben.',
       termsSheetTitle: 'Allgemeine Geschäftsbedingungen',
@@ -126,6 +128,7 @@ const centers = {
       subscribeA11y: '{{name}} abonnieren',
       viewDetails: 'Details anzeigen',
       viewDetailsA11y: 'Details für {{name}} anzeigen',
+      limitedOffer: 'Begrenztes Angebot',
     },
 
     planDetail: {

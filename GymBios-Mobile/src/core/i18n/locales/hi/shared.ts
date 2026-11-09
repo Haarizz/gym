@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'चरण {{current}} / {{total}}',
       saveChanges: 'परिवर्तन सहेजें',
       createStaff: 'स्टाफ़ बनाएँ',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: 'चार्ट लोड करने में असमर्थ',
       loadFailed: 'चार्ट डेटा लोड करने में विफल',
       retry: 'पुनः प्रयास करें',
+      categoryN: 'श्रेणी {{n}}',
+      barChartA11y: 'बार चार्ट विज़ुअलाइज़ेशन',
+      horizontalBarChartA11y: 'क्षैतिज बार चार्ट विज़ुअलाइज़ेशन',
+      lineChartA11y: 'लाइन चार्ट विज़ुअलाइज़ेशन',
+      pieChartA11y: 'पाई चार्ट विज़ुअलाइज़ेशन',
+      donutChartA11y: 'डोनट चार्ट विज़ुअलाइज़ेशन',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "पेरोल और कर्मचारी",
       "roles-permissions": "भूमिकाएँ और अनुमतियाँ",
       "gymos": "GymOS",
-      "facilities": "सुविधाएँ"
+      "facilities": "सुविधाएँ",
+      "closeModules": "मॉड्यूल बंद करें",
+      "openModules": "मॉड्यूल खोलें"
     },
     "branchPicker": {
       "title": "शाखा चुनें",

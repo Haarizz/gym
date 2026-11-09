@@ -2,6 +2,7 @@ import type { LocaleResource } from '../en';
 
 const common = {
   common: {
+    close: '关闭',
     continue: '继续',
     save: '保存',
     optional: '（选填）',
@@ -34,6 +35,9 @@ const common = {
     "share": "分享",
     "print": "打印",
     "exportCsv": "导出 CSV",
+    "general": "通用",
+    "trainer": "教练",
+    "user": "用户",
     "comingSoon": "即将推出",
     "tryAgainError": "发生错误，请重试。",
     "somethingWentWrong": "出了点问题，请重试。",

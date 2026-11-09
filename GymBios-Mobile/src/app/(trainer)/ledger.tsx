@@ -11,7 +11,7 @@ export default function TrainerLedgerRoute() {
   if (isLoading || !profile) {
     return (
       <View style={{ flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' }}>
-        <Loader message="Loading..." />
+        <Loader />
       </View>
     );
   }

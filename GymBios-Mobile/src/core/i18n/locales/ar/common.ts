@@ -2,6 +2,7 @@ import type { LocaleResource } from '../en';
 
 const common = {
   common: {
+    close: 'إغلاق',
     continue: 'متابعة',
     save: 'حفظ',
     optional: '(اختياري)',
@@ -34,6 +35,9 @@ const common = {
     "share": "مشاركة",
     "print": "طباعة",
     "exportCsv": "تصدير CSV",
+    "general": "عام",
+    "trainer": "مدرّب",
+    "user": "المستخدم",
     "comingSoon": "قريباً",
     "tryAgainError": "حدث خطأ. يرجى المحاولة مرة أخرى.",
     "somethingWentWrong": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",

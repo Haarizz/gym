@@ -81,6 +81,8 @@ const payments = {
     retryPayment: 'भुगतान फिर से करें',
     pay: '<amount/> भुगतान करें',
     sheetSubtitle: 'अपनी शेष राशि {{amount}} का भुगतान करें',
+    paymentNotStarted: 'भुगतान शुरू नहीं किया जा सका',
+    mobileOnly: 'ऑनलाइन भुगतान मोबाइल ऐप में उपलब्ध हैं',
   },
 } satisfies LocaleResource;
 

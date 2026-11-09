@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { BrandColors } from '@/core/theme';
 import { useCanCreateMembers } from '@/domains/members/hooks/useCanCreateMembers';
+import { useCanCheckInMembers } from '@/domains/checkIn/hooks/useCanCheckInMembers';
 import { QuickActionsGrid, type QuickAction } from './QuickActionsGrid';
 
 interface TrainerQuickActionsProps {
@@ -20,6 +21,7 @@ export function TrainerQuickActions({
   const { t } = useTranslation();
   const router = useRouter();
   const canCreateMembers = useCanCreateMembers();
+  const canCheckInMembers = useCanCheckInMembers();
 
   const handleMessage = () => {
     if (onMessageMember) onMessageMember();
@@ -44,7 +46,9 @@ export function TrainerQuickActions({
   const actions: QuickAction[] = [
     { label: t('dashboard.trainer.quickActions.messageMember'), icon: 'message-circle', color: BrandColors.trainerAmber, textColor: '#b45309', onPress: handleMessage },
     { label: t('dashboard.trainer.quickActions.createWorkout'), icon: 'activity', color: BrandColors.teal, textColor: '#1B5A4C', onPress: handleCreateWorkout },
-    { label: t('dashboard.trainer.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleCheckIn },
+    ...(canCheckInMembers
+      ? [{ label: t('dashboard.trainer.quickActions.memberCheckIn'), icon: 'check-circle', color: BrandColors.memberGold, textColor: '#9A6212', onPress: handleCheckIn } as QuickAction]
+      : []),
     { label: t('dashboard.trainer.quickActions.viewLedger'), icon: 'book-open', color: '#A855F7', textColor: '#7E22CE', onPress: handleViewLedger },
   ];
   if (canCreateMembers) {

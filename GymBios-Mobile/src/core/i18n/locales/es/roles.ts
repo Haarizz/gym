@@ -36,7 +36,42 @@ const roles = {
     "saving": "Guardando...",
     "save": "Guardar",
     "failedDuplicate": "Error al duplicar el rol.",
-    "unableDelete": "No se pudo eliminar el rol."
+    "unableDelete": "No se pudo eliminar el rol.",
+    "actions": {
+      "view": "Ver",
+      "create": "Crear",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "export": "Exportar",
+      "approve": "Aprobar"
+    },
+    "errors": {
+      "roleNameRequired": "El nombre del rol es obligatorio",
+      "failedLoadRole": "Error al cargar los datos del rol.",
+      "failedCreateRole": "Error al crear el rol.",
+      "failedUpdateRole": "Error al actualizar el rol."
+    },
+    "modules": {
+      "dashboard": "Panel de control",
+      "members": "Miembros",
+      "memberConnect": "Conexión de miembros",
+      "community": "Comunidad",
+      "attendance": "Asistencia",
+      "billing": "Facturación",
+      "payments": "Pagos",
+      "membershipPlans": "Suscripciones",
+      "trainers": "Entrenadores",
+      "staff": "Personal",
+      "payroll": "Nómina",
+      "reports": "Informes",
+      "assets": "Activos",
+      "salesPurchases": "Ventas y compras",
+      "financials": "Finanzas",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "Configuración",
+      "administration": "Administración"
+    }
   }
 };
 

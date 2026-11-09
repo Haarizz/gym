@@ -102,6 +102,15 @@ const auth = {
       roleAccessDenied: 'Zugriff verweigert. Deine Rolle kann nicht auf den Bereich {{role}} zugreifen.',
       customRoleNoAdmin: 'Zugriff verweigert. Deine benutzerdefinierte Rolle hat keine Administratorrechte.',
       notRegisteredStaff: 'Zugriff verweigert. Du bist nicht als Mitarbeiter registriert.',
+      unableToSignIn: 'Anmeldung nicht möglich. Bitte versuchen Sie es erneut.',
+      unableToVerifySession: 'Sitzung konnte nicht überprüft werden',
+      unableToRegister: 'Registrierung nicht möglich. Bitte versuchen Sie es erneut.',
+      unableToVerifyCode: 'Code konnte nicht überprüft werden. Bitte versuchen Sie es erneut.',
+      unableToResendCode: 'Code konnte nicht erneut gesendet werden. Bitte versuchen Sie es erneut.',
+      unableToCheckRegStatus: 'Registrierungsstatus konnte nicht überprüft werden.',
+      unableToFinishAccount: 'Kontoerstellung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
+      unableToLinkAccount: 'Dieses Konto konnte nicht verknüpft werden. Bitte versuchen Sie es erneut.',
+      invalidCredentials: 'Ungültiger Benutzername oder Passwort',
     },
 
     roleSelection: {

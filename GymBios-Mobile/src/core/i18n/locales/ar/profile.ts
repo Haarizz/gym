@@ -56,6 +56,7 @@ const profile = {
     validationTitle: 'خطأ في التحقق',
     updated: 'تم تحديث الملف الشخصي بنجاح.',
     updateFailed: 'تعذّر تحديث الملف الشخصي.',
+    fetchFailed: 'فشل تحميل الملف الشخصي.',
     nameEmailRequired: 'الاسم والبريد الإلكتروني مطلوبان.',
     nameRequired: 'الاسم مطلوب',
     emailRequired: 'البريد الإلكتروني مطلوب',
@@ -118,6 +119,9 @@ const profile = {
     label: 'العنوان',
     useCurrentLocation: 'استخدام الموقع الحالي',
     searchPlaceholder: 'ابحث عن عنوانك',
+    permissionDenied: 'تم رفض إذن تحديد الموقع.',
+    couldNotResolve: 'تعذر تحديد العنوان من الإحداثيات.',
+    fetchFailed: 'حدث خطأ أثناء جلب الموقع.',
   },
 
   transactions: {

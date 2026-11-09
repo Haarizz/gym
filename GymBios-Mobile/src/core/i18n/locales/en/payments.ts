@@ -79,6 +79,8 @@ const payments = {
     retryPayment: 'Retry payment',
     pay: 'Pay <amount/>',
     sheetSubtitle: 'Pay your remaining balance of {{amount}}',
+    paymentNotStarted: 'Payment could not be started',
+    mobileOnly: 'Online payments are available in the mobile app',
   },
 };
 

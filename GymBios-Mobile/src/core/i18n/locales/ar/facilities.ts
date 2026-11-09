@@ -41,7 +41,17 @@ const facilities = {
       "active": "نشط",
       "inactive": "غير نشط"
     },
-    "id": "المعرّف: {{id}}"
+    "id": "المعرّف: {{id}}",
+    "deleteFacility": "حذف المرفق",
+    "deleteFacilityConfirm": "هل أنت متأكد من حذف {{name}}؟",
+    "nameRequired": "الاسم مطلوب",
+    "mustBeNumber": "يجب أن يكون رقماً",
+    "rateTypes": {
+      "perHour": "لكل ساعة",
+      "perHalfDay": "لكل نصف يوم",
+      "perFullDay": "لكل يوم كامل",
+      "perMonth": "شهرياً"
+    }
   }
 };
 

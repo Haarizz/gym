@@ -59,6 +59,7 @@ const shared = {
     },
 
     wizard: {
+      stepProgress: 'Paso {{current}} de {{total}}',
       saveChanges: 'Guardar cambios',
       createStaff: 'Crear personal',
     },
@@ -76,6 +77,12 @@ const shared = {
       unableToLoad: 'No se pudo cargar el gráfico',
       loadFailed: 'Error al cargar los datos del gráfico',
       retry: 'Reintentar',
+      categoryN: 'Categoría {{n}}',
+      barChartA11y: 'Visualización de gráfico de barras',
+      horizontalBarChartA11y: 'Visualización de gráfico de barras horizontales',
+      lineChartA11y: 'Visualización de gráfico de líneas',
+      pieChartA11y: 'Visualización de gráfico circular',
+      donutChartA11y: 'Visualización de gráfico de anillo',
     },
 
     noInternet: {
@@ -136,7 +143,9 @@ const shared = {
       "payroll-employees": "Nómina y empleados",
       "roles-permissions": "Roles y permisos",
       "gymos": "GymOS",
-      "facilities": "Instalaciones"
+      "facilities": "Instalaciones",
+      "closeModules": "Cerrar módulos",
+      "openModules": "Abrir módulos"
     },
     "branchPicker": {
       "title": "Seleccionar sucursal",

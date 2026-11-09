@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -26,10 +27,12 @@ export function LineChart({
   showTooltip = true,
   yAxisFormatter = (v: number) => String(v),
   xAxisFormatter = (v: unknown) => String(v ?? ''),
-  emptyText = 'No chart data available',
+  emptyText,
   style,
 }: LineChartProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const resolvedEmptyText = emptyText ?? t('shared.charts.noData');
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -83,7 +86,7 @@ export function LineChart({
     return (
       <View style={[styles.emptyContainer, { height }, style]}>
         <Typography variant="caption" color="textSecondary">
-          {emptyText}
+          {resolvedEmptyText}
         </Typography>
       </View>
     );
@@ -117,7 +120,7 @@ export function LineChart({
       style={[styles.wrapper, style]}
       onLayout={handleLayout}
       accessibilityRole="image"
-      accessibilityLabel="Line chart visualization"
+      accessibilityLabel={t('shared.charts.lineChartA11y')}
     >
       {/* Legend */}
       {showLegend && seriesWithColors.length > 0 ? (

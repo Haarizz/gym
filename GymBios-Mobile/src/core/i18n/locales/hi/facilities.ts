@@ -41,7 +41,17 @@ const facilities = {
       "active": "सक्रिय",
       "inactive": "निष्क्रिय"
     },
-    "id": "आईडी: {{id}}"
+    "id": "आईडी: {{id}}",
+    "deleteFacility": "सुविधा हटाएँ",
+    "deleteFacilityConfirm": "क्या आप वाकई {{name}} को हटाना चाहते हैं?",
+    "nameRequired": "नाम आवश्यक है",
+    "mustBeNumber": "एक संख्या होनी चाहिए",
+    "rateTypes": {
+      "perHour": "प्रति घंटा",
+      "perHalfDay": "प्रति आधा दिन",
+      "perFullDay": "प्रति पूरा दिन",
+      "perMonth": "प्रति माह"
+    }
   }
 };
 

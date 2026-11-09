@@ -102,6 +102,15 @@ const auth = {
       roleAccessDenied: '访问被拒绝。你的角色无法访问 {{role}} 区域。',
       customRoleNoAdmin: '访问被拒绝。你的自定义角色不具备管理员权限。',
       notRegisteredStaff: '访问被拒绝。你未注册为员工。',
+      unableToSignIn: '无法登录，请重试。',
+      unableToVerifySession: '无法验证会话',
+      unableToRegister: '无法注册，请重试。',
+      unableToVerifyCode: '无法验证验证码，请重试。',
+      unableToResendCode: '无法重发验证码，请重试。',
+      unableToCheckRegStatus: '无法查询注册状态。',
+      unableToFinishAccount: '无法完成账户创建，请重试。',
+      unableToLinkAccount: '无法关联此账户，请重试。',
+      invalidCredentials: '用户名或密码无效',
     },
 
     roleSelection: {

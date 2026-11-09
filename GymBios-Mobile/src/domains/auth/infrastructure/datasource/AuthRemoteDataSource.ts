@@ -1,6 +1,7 @@
 import { ApiError } from '@/core/platform/api';
 import { env } from '@/core/platform/config';
 import type { Result } from '@/core/types';
+import { i18n } from '@/core/i18n';
 
 import { Session } from '../../domain/entities/Session';
 import { User } from '../../domain/entities/User';
@@ -63,7 +64,7 @@ export class AuthRemoteDataSource {
         return { success: false, error: error.message };
       }
 
-      return { success: false, error: 'Unable to sign in. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToSignIn') };
     }
   }
 
@@ -85,7 +86,7 @@ export class AuthRemoteDataSource {
         return { success: false, error: error.message };
       }
 
-      return { success: false, error: 'Unable to verify session' };
+      return { success: false, error: i18n.t('auth.errors.unableToVerifySession') };
     }
   }
 
@@ -107,7 +108,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to register. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToRegister') };
     }
   }
 
@@ -119,7 +120,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to verify code. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToVerifyCode') };
     }
   }
 
@@ -133,7 +134,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to resend code. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToResendCode') };
     }
   }
 
@@ -145,7 +146,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to check registration status.' };
+      return { success: false, error: i18n.t('auth.errors.unableToCheckRegStatus') };
     }
   }
 
@@ -157,7 +158,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to continue with Google. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.googleFailed') };
     }
   }
 
@@ -172,7 +173,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to continue with Apple. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.appleFailed') };
     }
   }
 
@@ -193,7 +194,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to finish creating your account. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToFinishAccount') };
     }
   }
 
@@ -205,7 +206,7 @@ export class AuthRemoteDataSource {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
       }
-      return { success: false, error: 'Unable to link this account. Please try again.' };
+      return { success: false, error: i18n.t('auth.errors.unableToLinkAccount') };
     }
   }
 
@@ -215,7 +216,7 @@ export class AuthRemoteDataSource {
     appRole: AppRoleValue,
   ): Result<Session, string> {
     if (password.value !== 'password123') {
-      return { success: false, error: 'Invalid username or password' };
+      return { success: false, error: i18n.t('auth.errors.invalidCredentials') };
     }
 
     const role = appRole.value;

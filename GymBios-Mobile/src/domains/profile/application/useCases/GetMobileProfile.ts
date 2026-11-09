@@ -1,6 +1,7 @@
 import type { Result } from '@/core/types';
 import type { ProfileApiModel } from '../../infrastructure/api/ProfileApiModels';
 import type { ProfileApi } from '../../infrastructure/api/ProfileApi';
+import { i18n } from '@/core/i18n';
 
 export class GetMobileProfile {
   constructor(private readonly profileApi: ProfileApi) {}
@@ -10,7 +11,7 @@ export class GetMobileProfile {
       const data = await this.profileApi.getMobileProfile();
       return { success: true, value: data };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to fetch profile' };
+      return { success: false, error: e?.message || i18n.t('myProfile.fetchFailed') };
     }
   }
 }

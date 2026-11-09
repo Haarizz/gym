@@ -5,6 +5,7 @@ import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
 import { Surface } from '@/shared/components/Surface';
 import { Radius, Spacing } from '@/core/theme';
+import { translateValue } from '@/core/i18n';
 import { MemberStatusBadge } from './MemberStatusBadge';
 import { getCheckInEligibility } from '../../../domain/membershipEligibility';
 
@@ -18,7 +19,8 @@ export function MemberCheckInCard({ member, onCheckIn, isActive }: MemberCheckIn
   const { t } = useTranslation();
   const name = member.name || t('checkIn.members.unknownMember');
   const id = member.bizId || member.memberNumber || member.id;
-  const type = member.membershipType || 'INDIVIDUAL';
+  const rawType = member.membershipType || 'INDIVIDUAL';
+  const type = translateValue('membershipType', rawType) || rawType;
   const avatarUrl = member.photoUrl;
   const { eligible, label } = getCheckInEligibility(member);
 

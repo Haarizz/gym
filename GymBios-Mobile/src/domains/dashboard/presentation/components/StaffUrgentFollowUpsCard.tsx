@@ -78,7 +78,9 @@ export function StaffUrgentFollowUpsCard({
 
               <View style={styles.leadFooter}>
                 <Text style={styles.lastContactText}>
-                  {t('dashboard.staff.urgentFollowUps.lastContact', { contact: lead.lastContact })}
+                  {t('dashboard.staff.urgentFollowUps.lastContact', {
+                    contact: lead.lastContact === 'Never' ? t('dashboard.staff.urgentFollowUps.neverContacted') : lead.lastContact,
+                  })}
                 </Text>
                 <Pressable
                   style={styles.callButton}

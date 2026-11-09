@@ -31,7 +31,7 @@ public class Branch extends BaseEntity {
     private String centerType;
 
     @Column(name = "access_type")
-    private String accessType;
+    private String accessType = "Mixed";
 
     @Column(name = "operating_hours", columnDefinition = "TEXT")
     private String operatingHours;

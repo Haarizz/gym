@@ -3,6 +3,7 @@ import type { ProfileApiModel, UpdateProfileRequestApiModel } from '../../infras
 import type { ProfileApi } from '../../infrastructure/api/ProfileApi';
 import type { AuthOrchestrator } from '../../../auth/application/orchestrators/AuthOrchestrator';
 import { refreshSession } from '../../../auth';
+import { i18n } from '@/core/i18n';
 
 export class UpdateMobileProfile {
   constructor(
@@ -16,7 +17,7 @@ export class UpdateMobileProfile {
       // Doing this async after success.
       return { success: true, value: data };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'Failed to update profile' };
+      return { success: false, error: e?.message || i18n.t('myProfile.updateFailed') };
     }
   }
 }

@@ -104,6 +104,8 @@ const centers = {
       noTrainers: 'Aucun coach renseigné pour ce centre.',
       paymentOptions: 'Moyens de paiement',
       viaProvider: ' via {{provider}}',
+      accepted: 'Accepté',
+      notAvailable: 'Non disponible',
       terms: 'Conditions et politiques',
       noTerms: 'Ce centre n’a pas encore indiqué de conditions ni de politiques.',
       termsSheetTitle: 'Conditions générales',
@@ -126,6 +128,7 @@ const centers = {
       subscribeA11y: 'S’abonner à {{name}}',
       viewDetails: 'Voir les détails',
       viewDetailsA11y: 'Voir les détails de {{name}}',
+      limitedOffer: 'Offre limitée',
     },
 
     planDetail: {

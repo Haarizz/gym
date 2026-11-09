@@ -41,7 +41,17 @@ const facilities = {
       "active": "Actif",
       "inactive": "Inactif"
     },
-    "id": "ID : {{id}}"
+    "id": "ID : {{id}}",
+    "deleteFacility": "Supprimer l’installation",
+    "deleteFacilityConfirm": "Voulez-vous vraiment supprimer {{name}} ?",
+    "nameRequired": "Le nom est obligatoire",
+    "mustBeNumber": "Doit être un nombre",
+    "rateTypes": {
+      "perHour": "Par heure",
+      "perHalfDay": "Par demi-journée",
+      "perFullDay": "Par journée entière",
+      "perMonth": "Par mois"
+    }
   }
 };
 

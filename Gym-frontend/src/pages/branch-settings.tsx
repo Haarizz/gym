@@ -70,7 +70,7 @@ function toFormState(branch: BranchDTO): DiscoveryFormState {
     description: branch.description || "",
     established_year: branch.established_year != null ? String(branch.established_year) : "",
     center_type: branch.center_type || "",
-    access_type: branch.access_type || "",
+    access_type: branch.access_type || "Mixed",
     operating_hours: branch.operating_hours || "",
     lat: branch.lat != null ? String(branch.lat) : "",
     lng: branch.lng != null ? String(branch.lng) : "",

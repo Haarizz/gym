@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { BrandColors, Spacing, Radius } from '@/core/theme';
 import { Typography } from '@/shared/components/Typography';
 
@@ -10,6 +11,7 @@ interface FacilityFiltersProps {
 }
 
 export function FacilityFilters({ status, onChangeStatus }: FacilityFiltersProps) {
+  const { t } = useTranslation();
   const statuses: FacilityStatusFilter[] = ['All', 'Active', 'Inactive'];
 
   return (
@@ -31,7 +33,7 @@ export function FacilityFilters({ status, onChangeStatus }: FacilityFiltersProps
               color={isActive ? 'primary' : 'textSecondary'}
               style={isActive ? styles.textActive : undefined}
             >
-              {s}
+              {t(`facilities.filter.${s.toLowerCase()}` as any)}
             </Typography>
           </TouchableOpacity>
         );

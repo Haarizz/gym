@@ -58,6 +58,7 @@ const dashboard = {
         priorityHigh: 'ÉLEVÉE',
         priorityMed: 'MOYENNE',
         lastContact: 'Dernier contact : {{contact}}',
+        neverContacted: 'Jamais',
         callNow: 'Appeler maintenant',
         callA11y: 'Appeler {{name}}',
       },

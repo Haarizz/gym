@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
@@ -28,10 +29,12 @@ export function PieChart({
   showTooltip = true,
   valueFormatter = (v: number) => String(v),
   colors = DEFAULT_PIE_COLORS,
-  emptyText = 'No chart data available',
+  emptyText,
   style,
 }: PieChartProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
+  const resolvedEmptyText = emptyText ?? t('shared.charts.noData');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   // Normalize slices data
@@ -40,7 +43,7 @@ export function PieChart({
     const rawSlices: { name: string; value: number; color: string }[] = [];
 
     data.forEach((row, idx) => {
-      const name = String(row[nameKey] ?? `Category ${idx + 1}`);
+      const name = String(row[nameKey] ?? t('shared.charts.categoryN', { n: idx + 1, defaultValue: `Category ${idx + 1}` }));
       const rawVal = row[valueKey];
       const val = typeof rawVal === 'number' ? rawVal : parseFloat(String(rawVal ?? '0')) || 0;
       if (val > 0) {
@@ -56,13 +59,13 @@ export function PieChart({
     }));
 
     return { slices: normalized, totalValue: total };
-  }, [data, nameKey, valueKey, colors]);
+  }, [data, nameKey, valueKey, colors, t]);
 
   if (!data || data.length === 0 || slices.length === 0) {
     return (
       <View style={[styles.emptyContainer, height ? { height } : undefined, style]}>
         <Typography variant="caption" color="textSecondary">
-          {emptyText}
+          {resolvedEmptyText}
         </Typography>
       </View>
     );
@@ -74,7 +77,7 @@ export function PieChart({
     <View
       style={[styles.wrapper, style]}
       accessibilityRole="image"
-      accessibilityLabel={`${variant === 'donut' ? 'Donut' : 'Pie'} chart visualization`}
+      accessibilityLabel={variant === 'donut' ? t('shared.charts.donutChartA11y') : t('shared.charts.pieChartA11y')}
     >
       {/* Proportion Ring Segment Bar */}
       <View style={styles.ringBarContainer}>

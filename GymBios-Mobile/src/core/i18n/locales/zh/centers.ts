@@ -104,6 +104,8 @@ const centers = {
       noTrainers: '该场馆暂未列出教练。',
       paymentOptions: '付款方式',
       viaProvider: '（通过 {{provider}}）',
+      accepted: '已接受',
+      notAvailable: '不可用',
       terms: '条款与政策',
       noTerms: '该场馆尚未列出任何条款或政策。',
       termsSheetTitle: '条款与条件',
@@ -126,6 +128,7 @@ const centers = {
       subscribeA11y: '订阅 {{name}}',
       viewDetails: '查看详情',
       viewDetailsA11y: '查看 {{name}} 的详情',
+      limitedOffer: '限时优惠',
     },
 
     planDetail: {

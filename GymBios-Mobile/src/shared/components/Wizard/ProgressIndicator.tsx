@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/core/hooks';
 import { Radius, Spacing } from '@/core/theme';
@@ -16,8 +17,13 @@ export function ProgressIndicator({
   labels,
 }: ProgressIndicatorProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
 
-  const progressLabel = `Step ${current} of ${total}`;
+  const progressLabel = t('shared.wizard.stepProgress', {
+    current,
+    total,
+    defaultValue: `Step ${current} of ${total}`,
+  });
 
   return (
     <View style={styles.container}>

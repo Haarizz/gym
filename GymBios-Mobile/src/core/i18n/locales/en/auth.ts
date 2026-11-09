@@ -100,6 +100,15 @@ const auth = {
       roleAccessDenied: 'Access denied. Your role cannot access the {{role}} section.',
       customRoleNoAdmin: 'Access denied. Your custom role does not have admin privileges.',
       notRegisteredStaff: 'Access denied. You are not registered as a staff member.',
+      unableToSignIn: 'Unable to sign in. Please try again.',
+      unableToVerifySession: 'Unable to verify session',
+      unableToRegister: 'Unable to register. Please try again.',
+      unableToVerifyCode: 'Unable to verify code. Please try again.',
+      unableToResendCode: 'Unable to resend code. Please try again.',
+      unableToCheckRegStatus: 'Unable to check registration status.',
+      unableToFinishAccount: 'Unable to finish creating your account. Please try again.',
+      unableToLinkAccount: 'Unable to link this account. Please try again.',
+      invalidCredentials: 'Invalid username or password',
     },
 
     roleSelection: {

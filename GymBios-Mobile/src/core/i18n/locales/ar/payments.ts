@@ -79,6 +79,8 @@ const payments = {
     retryPayment: 'إعادة محاولة الدفع',
     pay: 'ادفع <amount/>',
     sheetSubtitle: 'ادفع رصيدك المتبقي البالغ {{amount}}',
+    paymentNotStarted: 'تعذر بدء الدفع',
+    mobileOnly: 'المدفوعات الإلكترونية متاحة في تطبيق الهاتف',
   },
 } satisfies LocaleResource;
 

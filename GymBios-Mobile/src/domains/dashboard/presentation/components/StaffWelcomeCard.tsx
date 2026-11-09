@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '@/shared/components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Radius, Spacing } from '@/core/theme';
+import { translateValue } from '@/core/i18n';
 import type { StaffInfo } from '../../domain/StaffDashboardData';
 
 interface StaffWelcomeCardProps {
@@ -21,7 +22,7 @@ export function StaffWelcomeCard({ staffInfo }: StaffWelcomeCardProps) {
       style={styles.container}
     >
       <Text style={styles.greeting}>{t('dashboard.staff.welcomeGreeting', { name: firstName })}</Text>
-      <Text style={styles.role}>{staffInfo.role}</Text>
+      <Text style={styles.role}>{translateValue('role', staffInfo.role) || staffInfo.role}</Text>
       <View style={styles.branchRow}>
         <Text style={styles.branchLabel}>{t('dashboard.staff.branchLabel')}</Text>
         <Text style={styles.branchValue}>{staffInfo.branch}</Text>

@@ -101,7 +101,15 @@ public class TargetService {
             target.setPeriodEnd(month.atEndOfMonth());
         }
         target.setRepeatMonthly(Boolean.TRUE.equals(req.repeatMonthly()));
-        target.getLines().clear();
+        // Update matching lines in place. Clearing and re-adding would fail on uq_target_line,
+        // because Hibernate flushes the new inserts before the orphan deletes.
+        Iterator<TargetLine> it = target.getLines().iterator();
+        while (it.hasNext()) {
+            TargetLine existing = it.next();
+            TargetLine wanted = lines.remove(existing.getMetric() + "|" + existing.getMeasure());
+            if (wanted == null) it.remove();
+            else existing.setGoal(wanted.getGoal());
+        }
         for (TargetLine l : lines.values()) {
             l.setTarget(target);
             target.getLines().add(l);

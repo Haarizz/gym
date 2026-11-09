@@ -36,7 +36,42 @@ const roles = {
     "saving": "सहेज रहा है...",
     "save": "सहेजें",
     "failedDuplicate": "भूमिका को डुप्लिकेट करने में विफल।",
-    "unableDelete": "भूमिका हटाने में असमर्थ।"
+    "unableDelete": "भूमिका हटाने में असमर्थ।",
+    "actions": {
+      "view": "देखें",
+      "create": "बनाएँ",
+      "edit": "संपादित करें",
+      "delete": "हटाएँ",
+      "export": "निर्यात करें",
+      "approve": "स्वीकृत करें"
+    },
+    "errors": {
+      "roleNameRequired": "भूमिका का नाम आवश्यक है",
+      "failedLoadRole": "भूमिका डेटा लोड करने में विफल।",
+      "failedCreateRole": "भूमिका बनाने में विफल।",
+      "failedUpdateRole": "भूमिका अपडेट करने में विफल।"
+    },
+    "modules": {
+      "dashboard": "डैशबोर्ड",
+      "members": "सदस्य",
+      "memberConnect": "सदस्य कनेक्ट",
+      "community": "समुदाय",
+      "attendance": "उपस्थिति",
+      "billing": "बिलिंग",
+      "payments": "भुगतान",
+      "membershipPlans": "सदस्यता योजनाएं",
+      "trainers": "ट्रेनर",
+      "staff": "कर्मचारी",
+      "payroll": "पेरोल",
+      "reports": "रिपोर्ट",
+      "assets": "संपत्ति",
+      "salesPurchases": "बिक्री और खरीद",
+      "financials": "वित्तीय",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "सेटिंग्स",
+      "administration": "प्रशासन"
+    }
   }
 };
 

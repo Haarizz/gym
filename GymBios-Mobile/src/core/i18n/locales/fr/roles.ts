@@ -36,7 +36,42 @@ const roles = {
     "saving": "Enregistrement...",
     "save": "Enregistrer",
     "failedDuplicate": "Échec de la duplication du rôle.",
-    "unableDelete": "Impossible de supprimer le rôle."
+    "unableDelete": "Impossible de supprimer le rôle.",
+    "actions": {
+      "view": "Voir",
+      "create": "Créer",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "export": "Exporter",
+      "approve": "Approuver"
+    },
+    "errors": {
+      "roleNameRequired": "Le nom du rôle est obligatoire",
+      "failedLoadRole": "Échec du chargement des données du rôle.",
+      "failedCreateRole": "Échec de la création du rôle.",
+      "failedUpdateRole": "Échec de la mise à jour du rôle."
+    },
+    "modules": {
+      "dashboard": "Tableau de bord",
+      "members": "Membres",
+      "memberConnect": "Relation membres",
+      "community": "Communauté",
+      "attendance": "Présence",
+      "billing": "Facturation",
+      "payments": "Paiements",
+      "membershipPlans": "Abonnements",
+      "trainers": "Coachs",
+      "staff": "Personnel",
+      "payroll": "Paie",
+      "reports": "Rapports",
+      "assets": "Équipements",
+      "salesPurchases": "Ventes et achats",
+      "financials": "Finances",
+      "gymos": "GymOS",
+      "bios": "Bios",
+      "settings": "Paramètres",
+      "administration": "Administration"
+    }
   }
 };
 

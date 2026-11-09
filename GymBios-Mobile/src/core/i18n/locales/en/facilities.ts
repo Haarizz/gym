@@ -41,7 +41,17 @@ const facilities = {
       "active": "Active",
       "inactive": "Inactive"
     },
-    "id": "ID: {{id}}"
+    "id": "ID: {{id}}",
+    "deleteFacility": "Delete Facility",
+    "deleteFacilityConfirm": "Are you sure you want to delete {{name}}?",
+    "nameRequired": "Name is required",
+    "mustBeNumber": "Must be a number",
+    "rateTypes": {
+      "perHour": "Per Hour",
+      "perHalfDay": "Per Half Day",
+      "perFullDay": "Per Full Day",
+      "perMonth": "Per Month"
+    }
   }
 };
 

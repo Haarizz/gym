@@ -5,7 +5,7 @@ import { Typography } from '@/shared/components/Typography';
 import { Button } from '@/shared/components/Button';
 import { Surface } from '@/shared/components/Surface';
 import { Radius, Spacing, BrandColors } from '@/core/theme';
-import { formatDate } from '@/core/i18n';
+import { formatDate, translateValue } from '@/core/i18n';
 import Feather from '@expo/vector-icons/Feather';
 
 export interface RecentCheckInCardProps {
@@ -17,14 +17,25 @@ export function RecentCheckInCard({ record, onCheckOut }: RecentCheckInCardProps
   const { t } = useTranslation();
   const name = record.memberName || record.walkInName || t('checkIn.members.unknownMember');
   const id = record.memberBizId || record.membershipType || t('checkIn.walkIn.walkInPassFallback');
-  const type = record.membershipType || (record.type === 'Walk-In' ? 'Walk-In' : 'INDIVIDUAL');
+  const rawType = record.membershipType || (record.type === 'Walk-In' ? 'Walk-In' : 'INDIVIDUAL');
+  const type = translateValue('membershipType', rawType) || (rawType === 'Walk-In' ? t('shared.values.channel.walk_in') : rawType);
   const avatarUrl = record.photoUrl;
   
   const inTime = record.checkInTime ? formatDate(record.checkInTime, 'p') : '--:--';
   const outTime = record.checkOutTime ? formatDate(record.checkOutTime, 'p') : null;
   const isCompleted = !!record.checkOutTime || record.status === 'Completed';
   
-  const method = record.checkInMethod || 'Manual';
+  const rawMethod = record.checkInMethod || 'Manual';
+  const getMethodLabel = (m: string) => {
+    const lower = m.toLowerCase();
+    if (lower === 'manual') return t('checkIn.methods.manual');
+    if (lower === 'qr' || lower === 'qr code') return t('checkIn.methods.qr');
+    if (lower === 'biometric') return t('checkIn.methods.biometric');
+    if (lower === 'rfid') return t('checkIn.methods.rfid');
+    if (lower === 'app' || lower === 'mobile app') return t('checkIn.methods.app');
+    return translateValue('channel', m) || m;
+  };
+  const method = getMethodLabel(rawMethod);
 
   const initials = name.substring(0, 2).toUpperCase();
 
